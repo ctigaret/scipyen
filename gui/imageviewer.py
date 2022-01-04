@@ -3389,17 +3389,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             return False
             
         try:
-            #(nFrames, widthAxis, heightAxis, channelAxisInfo, frameAxis) = vu.proposeLayout(img, 
-                                                                                                        #userFrameAxis = self.userFrameAxisInfo,
-                                                                                                        #timeVertical = self._display_time_vertical_)
-            
-            #layout = vu.proposeLayout(img, userFrameAxis = self.userFrameAxisInfo,
-                                      #timeVertical = self._display_time_vertical_)
-            
             layout = vu.proposeLayout(img, userFrameAxis = self.userFrameAxisInfo,
                                       timeVertical = self._display_time_vertical_,
                                       indices=True)
-            
             
         except Exception as e:
             s = io.StringIO()
@@ -3411,9 +3403,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         try:
             # there may be a previous image stored here
             if self._data_ is not None and len(self.dataCursors) > 0: # parse width/height of previos image if any, to check against existing cursors
-                #if self._data_.width != img.width or self._data_.height != img.height:
-                if self._data_.shape[layout.horizontal] != img.shape[layout.horizontal] or \
-                    self._data_.shape[layout.vertical] != img.shape[layout.vertical]:
+                if self._data_.shape[layout.horizontalAxis] != img.shape[layout.horizontalAxis] or \
+                    self._data_.shape[layout.verticalAxis] != img.shape[layout.verticalAxis]:
                     self.questionMessage("Imageviewer:", "New image frame geometry will invalidate existing cursors.\nLoad image and bring all cursors to center?")
                     
                     ret = msgBox.exec()
@@ -3422,11 +3413,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                         return False
                     
                     for c in self.cursors:
-                        #widthAxisNdx = img.axistags.index(widthAxis.key)
-                        #heightAxisNdx = img.axistags.index(heightAxis.key)
-                        c.rangeX = img.shape[layout.horizontal]
-                        c.rangeY = img.shape[layout.vertical]
-                        c.setPos(img.shape[layout.horizontal]/2, img.shape[layout.vertical]/2)
+                        c.rangeX = img.shape[layout.horizontalAxis]
+                        c.rangeY = img.shape[layout.verticalAxis]
+                        c.setPos(img.shape[layout.horizontalAxis]/2, img.shape[layout.verticalAxis]/2)
             
             self._number_of_frames_ = layout.nFrames 
 
@@ -3434,20 +3423,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 self.criticalMessage("Error", "Cannot determine the number of frames in the data")
                 return False
         
-            self.frameAxis  = layout.frames
+            self.frameAxis  = layout.framesAxis
             
-            self.widthAxis  = layout.horizontal
-            self.heightAxis = layout.vertical
-            
-            #self.frameAxis  = frameAxis
-            
-            #self.widthAxis  = widthAxis
-            #self.heightAxis = heightAxis
-            
-            #if isinstance(self._number_of_frames_, (tuple, list)):
-                #self.frameIndices = tuple(itertools.product(*tuple(tuple((ax,i) for i in range(axSize)) for ax , axSize in zip(self.frameAxis, self._number_of_frames_))))
-            #else:
-                #self.frameIndices = list(range)
+            self.widthAxis  = layout.horizontalAxis
+            self.heightAxis = layout.verticalAxis
             
             totalFrames = self._number_of_frames_ if isinstance(self._number_of_frames_, int) else \
                         np.prod(self._number_of_frames_)

@@ -1137,7 +1137,7 @@ class ScanData(BaseScipyenData):
         frame       = 1
         volume      = 2
         
-    class ScanDataImageSetter(AttributeAdapter):
+    class ImageParser(AttributeAdapter):
         def __init__(self, owner=None, fieldname=None):
             self.fieldname = fieldname
             self.obj = owner
@@ -1158,22 +1158,23 @@ class ScanData(BaseScipyenData):
             if not hasattr(self.obj, self.fieldname):
                 return
             
-            frameAxis = getattr(obj, f"{self.fieldname}FrameAxis", None)
-            axesCalibrations = getattr(obj, f"{self.fieldName}AxesCalibration", None)
+            imageLayout = getattr(self.obj, f"{self.fieldname}Layout", None)
+            frameAxis = None if not isinstance(imageLayout, dict) else imageLayout.get(f"{self.fieldname}FrameAxis", None)
+            axesCalibration = getattr(self.obj, f"{self.fieldname}AxesCalibration", None)
             
-            data, layout, axesCalibrations = obj.imageDataLayout(value, 
-                                                                 frameAxis = frameAxis,
-                                                                 axescal = axesCalibrations)
+            data, layout, axesCalibration = self.obj.imageDataLayout(value, 
+                                                                frameAxis = frameAxis,
+                                                                axescal = axesCalibration)
             
+            setattr(self.obj, f"{self.fieldname}Layout", layout)
+            setattr(self.obj, f"{self.fieldname}AxesCalibration", axesCalibration)
         
-        
-    class ScanDataFramesMapUpdater(AttributeAdapter):
+    class FramesMapUpdater(AttributeAdapter):
         def __init__(self, owner=None, fieldname=None):
             self.fieldname = fieldname
             self.obj = owner
             
         def __call__(self, obj=None, value=None):
-            #print(f"ScanDataFramesMapUpdater instance(obj=<{type(obj).__name__}>, value=<{type(value).__name__}>)")
             self.updateFramesMap(value)
             
         def updateFramesMap(self, value):
@@ -1217,59 +1218,82 @@ class ScanData(BaseScipyenData):
             if not hasattr(self.obj, self.fieldname):
                 return
             
-            if not hasattr(self.obj, "framesMap"):# or not isinstance(getattr(self.obj, "framesMap"), FrameIndexLookup):
+            if not hasattr(self.obj, "framesMap"):
                 return
             
-            field = getattr(self.obj, self.fieldname)
-            #print(f"ScanDataFramesMapUpdater.updateFramesMap(value=<{type(value).__name__}>): field = {type(field).__name__}" )
-            nframes = len(self.obj.framesMap)
-                
-            if isinstance(field, neo.Block):
-                newframes = len(field.segments)
-                
-            elif isinstance(field, list) and all(isinstance(v, vigra.VigraArray) for v in field):
-                userFrameAxis = getattr(self.obj, f"{self.fieldname}FrameAxis", None)
-                #userFrameAxis = self.obj.scansFrameAxis if self.fieldname == "scans" else self.obj.sceneFrameAxis
-                layout = proposeLayout(field, userFrameAxis = userFrameAxis)
-                newframes = layout.nFrames
-                
-            else:
-                newframes=0
+            framesMap = getattr(self.obj, "framesMap", None)
             
-            if newframes == nframes:
-                # assume 1-2-1 correspondence with the index in framesMap
-                self.obj.framesMap[self.fieldname] = range(newframes)
-                
-            elif newframes < nframes:
-                value = list(range(newframes))
-                value.extend([self.obj.framesMap.missingFieldFrameIndex for k in range(newframes, nframes)])
-                        
-                self.obj.framesMap[self.fieldname] = value
-                
-            else:
-                # concatenate a new frame index lookup
-                dd = dict()
-                for c in self.obj._data_children_:
-                    name = c[0]
-                    if name != self.fieldname:
-                        if np.any(self.obj.framesMap[name].isna()):
-                            val = None
-                        else:
-                            val = 0
-                        dd[name] = val
+            field = getattr(self.obj, self.fieldname)
+            
+            if framesMap is None:
+                field_frames = dict((c[0], 0) for c in self.obj._data_children_)
+                for c in field_frames:
+                    if c in ("scene","scans"):
+                        f = getattr(self.obj, f"{c}Layout", None)
+                        nFrames = f.get("nFrames", 0) if isinstance(f, dict) else 0
+                        val = nFrames if isinstance(nFrames, int) else np.prod(nFrames)
                         
                     else:
-                        dd[name] = newframes - nframes
-                        
-                fil = FrameIndexLookup(dd)
-                fil[self.fieldname] = range(nframes, nsegs)
+                        data = getattr(self.obj, c, None)
+                        val = len(data.segments) if isinstance(data, neo.Block) else 0
                 
-                newmap = pd.concat([self.obj.framesMap.map, fil.map], ignore_index=True)
+                    field_frames[c] = val
                 
-                self.obj.frameMap.map = newmap
+                # NOTE: 2022-01-04 16:06:11
+                # FrameIndexLookup is now MANDATORY - see also NOTE: 2022-01-04 16:05:12
+                framesMap = FrameIndexLookup(field_frames)
+                
+                setattr(self.obj, "framesMap", framesMap)
+           
+            else:
+                nframes = len(framesMap)
+                    
+                if isinstance(field, neo.Block):
+                    newframes = len(field.segments)
+                    
+                elif isinstance(field, list) and all(isinstance(v, vigra.VigraArray) for v in field):
+                    userFrameAxis = getattr(self.obj, f"{self.fieldname}FrameAxis", None)
+                    axesCalibration = getattr(self.obj, f"{self.fieldname}AxesCalibration", None)
+                    data, layout, axesCalibration = self.obj.imageDataLayout(field,
+                                                                             frameAxis = userFrameAxis,
+                                                                             axescal = axesCalibration)
+                    newframes = layout.nFrames
+                    
+                else:
+                    newframes=0
+                
+                if newframes == nframes:
+                    # assume 1-2-1 correspondence with the index in framesMap
+                    self.obj.framesMap[self.fieldname] = range(newframes)
+                    
+                elif newframes < nframes:
+                    value = list(range(newframes))
+                    value.extend([self.obj.framesMap.missingFieldFrameIndex for k in range(newframes, nframes)])
+                            
+                    framesMap[self.fieldname] = value
+                    
+                else: # --> newframes > nframes
+                    # concatenate a new frame index lookup
+                    dd = dict()
+                    for c in self.obj._data_children_:
+                        name = c[0]
+                        if name != self.fieldname:
+                            if np.any(self.obj.framesMap[name].isna()):
+                                val = None
+                            else:
+                                val = 0
+                            dd[name] = val
+                            
+                        else:
+                            dd[name] = newframes - nframes
+                            
+                    fil = FrameIndexLookup(dd)
+                    fil[self.fieldname] = range(nframes, newframes)
+                    
+                    newmap = pd.concat([self.obj.framesMap.map, fil.map], ignore_index=True)
+                    
+                    self.obj.framesMap.map = newmap
         
-    #apiversion = (0,3)
-    
     # NOTE: 2021-11-30 16:07:40
     # 'triggers' is inherited from BaseScipyenData along with others
     _data_children_ = (
@@ -1296,12 +1320,6 @@ class ScanData(BaseScipyenData):
         ("scansAxesCalibration",            list,   AxesCalibration),
         ("sceneLayout",                     dict),
         ("scansLayout",                     dict),
-        #("sceneFrameAxis",                  (vigra.AxisInfo, tuple)),
-        #("scansFrameAxis",                  (vigra.AxisInfo, tuple)),
-        # NOTE: 2021-12-09 23:24:13
-        # vigra.AxisInfo is NOT serializable !
-        ("sceneFrameAxis",                  (int, vigra.AxisInfo, tuple)),
-        ("scansFrameAxis",                  (int, vigra.AxisInfo, tuple)),
         ("framesMap",                       FrameIndexLookup),
         )
     
@@ -1888,83 +1906,63 @@ class ScanData(BaseScipyenData):
         self._processed_ = False
         
         # parse parameters, check images, frame axes & calibrations, electorphys.
-        # and metadata --> repopulate kwargs and let super().init populate self
+        # and metadata --> populate kwargs and let super().init populate self
         # with everything else
-        kwscans = kwargs.pop("scans", None)
-        kwscene = kwargs.pop("scene", None)
-        kwephys = kwargs.pop("electrophysiology", None)
-        kwmeta  = kwargs.pop("metadata", None)
-        
-        if scans is None:
-            scans = kwscans
 
         self._preset_hooks_ = {
-            "scans" = self.ScanDataImageSetter(self, "scans")
-            "scene" = self.ScanDataImageSetter(self, "scene")
+            "scans": self.ImageParser(self, "scans"),
+            "scene": self.ImageParser(self, "scene"),
             }
             
         self._postset_hooks_ = {
-            "scans": self.ScanDataFramesMapUpdater(self, "scans"),
-            "scene": self.ScanDataFramesMapUpdater(self, "scene"),
-            "electrophysiology": self.ScanDataFramesMapUpdater(self, "electrophysiology"),
+            "scans": self.FramesMapUpdater(self, "scans"),
+            "scene": self.FramesMapUpdater(self, "scene"),
+            "electrophysiology": self.FramesMapUpdater(self, "electrophysiology"),
+            "metadata": self._parse_metadata_,
             }
     
-        if scene is None:
-            scene = kwscene
-            
-        if electrophysiology is None:
-            electrophysiology = kwephys
-            
-        if metadata is None:
-            metadata = kwmeta
-
-        sceneFrameAxis = kwargs.pop("sceneFrameAxis", None)
         sceneLayout = kwargs.pop("sceneLayout", None)
+        sceneFrameAxis = None if not isinstance(sceneLayout, dict) else sceneLayout.get("sceneFrameAxis", None)
         sceneAxesCalibration = kwargs.pop("sceneAxesCalibration", None)
         
-        scansFrameAxis = kwargs.pop("scansFrameAxis", None)
         scansLayout = kwargs.pop("scansLayout", None)
+        scansFrameAxis = None if not isinstance(scansLayout, dict) else scansLayout.get("scansFrameAxis", None)
         scansAxesCalibration = kwargs.pop("scansAxesCalibration", None)
         
-        scene, scene_layout, scene_axes_cal = self.imageDataLayout(scene, sceneFrameAxis, sceneAxesCalibration)
-        scans, scans_layout, scans_axes_cal = self.imageDataLayout(scans, scansFrameAxis, scansAxesCalibration)
+        scene, scene_layout, scene_axes_cal = self.imageDataLayout(scene, 
+                                                                   frameAxis = sceneFrameAxis, 
+                                                                   axescal = sceneAxesCalibration)
+        
+        scans, scans_layout, scans_axes_cal = self.imageDataLayout(scans, 
+                                                                   frameAxis = scansFrameAxis, 
+                                                                   axescal = scansAxesCalibration)
         
         kwargs["scene"] = scene
         kwargs["sceneLayout"] = scene_layout if sceneLayout is None else sceneLayout
-        kwargs["sceneFrameAxis"] = None if kwargs["sceneLayout"] is None else kwargs["sceneLayout"].frames
         kwargs["sceneAxesCalibration"] = scene_axes_cal if sceneAxesCalibration is None else sceneAxesCalibration
         
         kwargs["scans"] = scans
         kwargs["scansLayout"] = scans_layout if scansLayout is None else scansLayout
-        kwargs["scansFrameAxis"] = None if kwargs["scansLayout"] is None else kwargs["scansLayout"].frames
         kwargs["scansAxesCalibration"] = scans_axes_cal if scansAxesCalibration is None else scansAxesCalibration
         
         kwargs["electrophysiology"] = electrophysiology
         kwargs["metadata"] = metadata
         
-        field_frames = dict((c[0], None) for c in self._data_children_)
+        field_frames = dict((c[0], 0) for c in self._data_children_)
         for c in field_frames:
             if c in ("scene","scans"):
-                f = f"{c}Layout"
-                val = None if kwargs[f] is None else kwargs[f].nFrames if isinstance(kwargs[f].nFrames, (int, type(None))) else np.prod(kwargs[f].nFrames)
+                layout = kwargs.get(f"{c}Layout", None)
+                f = layout.get("nFrames", 0) if isinstance(layout, dict) else 0
+                val = f if isinstance(f, int) else np.prod(f)
                 
             else:
-                val = len(kwargs[c].segments) if isinstance(kwargs[c], neo.Block) else None
+                val = len(kwargs[c].segments) if isinstance(kwargs[c], neo.Block) else 0
                 
-            #print(f"c: {c} = {kwargs[c]}")
             field_frames[c] = val
             
-        # check if we need to bother with a FrameIndexLookup
-        # if all data children return same number of frames we assume all have 
-        # biunivocal relationship so we do NOT use a FrameIndexLookup
-        
-        #print(field_frames)
-        
-        sub_nframes = tuple(v for v in field_frames.values())
-        if all(v == sub_nframes[0] for v in sub_nframes[1:]):
-            framesLookup = None
-        else:
-            framesLookup = FrameIndexLookup(field_frames)
+        # NOTE: 2022-01-04 16:05:12 
+        # FrameIndexLookup ALWAYS in use
+        framesLookup = FrameIndexLookup(field_frames)
             
         # the user may have supplied a frame index lookup to the initializer
         framesMap = kwargs.pop("framesMap", framesLookup)
@@ -1975,23 +1973,13 @@ class ScanData(BaseScipyenData):
         # setup_descriptor :class: method inherited from prog.WithDescriptors
         # 
         super().__init__(**kwargs) # BaseScipyenData/WithDescriptors
-        
-        # NOTE: 2021-10-28 18:36:14
-        # also set up self._scans_axes_calibrations_ and self._scene_axes_calibrations_
-        #DEPRECATED / OBSOLETE self._parse_image_arrays_(scene, scans, sceneFrameAxis, scansFrameAxis)
-        
-        #self._parse_metadata_(metadata) # will also set up channel names for scene & scans, separately
-        
+
         # NOTE: 2022-01-02 23:22:32
-        # metadata noe set via the descriptor mechanism (WithDescriptors)
+        # metadata now set via the descriptor mechanism (WithDescriptors) in
+        # super().__init__(**kwargs) above
         self._parse_metadata_()
         
         self._modified_ = False
-        #if isinstance(electrophysiology, neo.Block):
-            #self.validateElectrophysiology(electrophysiology)
-            
-        #elif isinstance(triggers, (tuple, list)) and all([isinstance(t, TriggerProtocol) for t in triggers]):
-            #self._trigger_protocols_[:] = triggers
     
     def __str__(self):
         """
@@ -2010,6 +1998,7 @@ class ScanData(BaseScipyenData):
         result.append("Scans channels: %s;" % str(self.scansChannelNames))
         result.append("Scans frames: %d;" % self.scansFrames)
         result.append("Scans frame axis: %s;" % self.scansFrameAxis)
+        
         if len(self.triggerProtocols):
             protocol_names = [p.name for p in self.triggerProtocols]
             result.append("Protocols: %s" % (", ".join(protocol_names)))
@@ -2076,25 +2065,25 @@ class ScanData(BaseScipyenData):
                             that is orthogonal to the display plane. For more
                             details see imaging.vigrautils.proposeLayout().
                             
-            'horizontal':   int; 
+            'horizontalAxis': int; 
                             Index - or dimension - of the horizontal axis.
                             This is the axis corresponding to the 'horizontal'
                             dimension (or aspect) of the data for the purpose of
                             being displayed in a 2D image viewer.
                             
-            'vertical':     int;
+            'verticalAxis': int;
                             Index - or dimension - of the vertical axis
                             This is the axis corresponding to the 'vertical'
                             dimension (or aspect) of the data for the purpose of
                             being displayed in a 2D image viewer.
                             
-            'channels':     int; 
+            'channelsAxis': int; 
                             Index - or dimension - of the channels axis
                             For VigraArray objects, the size of the image data
                             array on this dimension (or axis) indicates the
                             number of data channels in each pixel.
                             
-            'frames':       int; 
+            'framesAxis':   int; 
                             Index - or dimenson - of the frames axis
                             This is the axis (or axes) along which 2D data 
                             frames (or slices) are taken to be displayed one at
@@ -2114,7 +2103,6 @@ class ScanData(BaseScipyenData):
             # CAUTION 2021-12-03 10:21:58
             # this layout has axisInfo objects, not indices
             layout = proposeLayout(data, userFrameAxis = frameAxis, indices = True)
-            #nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo = proposeLayout(data, userFrameAxis = frameAxis)
             
             if isinstance(axescal, AxesCalibration) and all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(axescal.axiskeys, data.axistags)):
                 axes_cal = [axscal]
@@ -2222,11 +2210,11 @@ class ScanData(BaseScipyenData):
         """
         from gui import pictgui as pgui
         from systems.PrairieView import PVSequenceType
+        # NOTE: 2022-01-04 17:15:31
+        # self.metadata is assigned via the descriptor protocol 
+        # (see ScanData.__init__())
         if self.metadata is None or len(self.metadata) == 0:
             return
-        #if value is None:
-            #self._metadata_ = None
-            #return
         
         # NOTE: 2017-11-15 12:06:36
         # TODO adapt this for scanimage metadata as well !
@@ -2244,9 +2232,7 @@ class ScanData(BaseScipyenData):
                 if value.sequences[0].attributes.sequencetype == PVSequenceType.Linescan:
                     self.analysisMode = ScanData.ScanDataAnalysisMode.frame
                     self.type = ScanData.ScanDataType.linescan
-                    #self._analysismode_ = ScanData.ScanDataAnalysisMode.frame
-                    #self._scandatatype_ = ScanData.ScanDataType.linescan
-                    
+
                     roi = pgui.Path(*value.sequences[0].definition.coordinates)
                     
                     if roi.type.name in ("line", "polyline", "arc", "quad", "cubic") or\
@@ -2257,15 +2243,10 @@ class ScanData(BaseScipyenData):
                         roi.name = "scanregion"
                         
                     self.scanTrajectory = roi
-                    #self._scan_region_ = roi
                         
             else: 
                 raise NotImplementedError("%s data not yet supported" % value.type)
             
-            #self._metadata_ = value
-            
-            #self._modified_ = False
-                    
         else:
             raise TypeError("metadata was expected to be a DataBag or None; got %s instead" % type(self._metadata_).__name__)
         
@@ -4563,7 +4544,9 @@ class ScanData(BaseScipyenData):
                                 progressValue = None):
         """Outputs a defined analysis unit as a ScanData object.
         
-        FIXME/TODO adapt to a new scenario where all scene image data is a single
+        FIXME/TODO 2022-01-04 17:13:13
+        1) break up dependency on _parse_image_arrays_
+        2) adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
         
         This function returns a ScanData object where scans images contain only
@@ -8490,153 +8473,6 @@ class ScanData(BaseScipyenData):
     # properties
     # ###
     
-    #@property
-    #def scene_mapping(self) -> typing.Optional[dict]:
-        #return self._scene_frame_mapping_
-    
-    #@scene_mapping.setter
-    #def scene_mapping(self, val:typing.Optional[dict] = None) -> None:
-        #if isinstance(val, dict):
-            #if not all(isinstance(k, (int, range, tuple)) for k in val):
-                #raise TypeError("Expecting a mapping with keys of type int, range, tuple")
-            
-            #if not all(isinstance(v, int) for v in val.values()):
-                #raise TypeError("Expecting a mapping with values of type int")
-            
-            
-        #elif val is not None:
-            #raise TypeError(f"Expecting a mapping or None; for {type(val).__name__} instead")
-    
-        #self._scene_frame_mapping_ = val
-        
-    #@property
-    #def ephys_mapping(self) -> typing.Optional[dict]:
-        #return self._ephys_frame_mapping_
-    
-    #@ephys_mapping.setter
-    #def ephys_mapping(self, val:typing.Optional[dict] = None) -> None:
-        #if isinstance(val, dict):
-            #if not all(isinstance(k, (int, range, tuple)) for k in val):
-                #raise TypeError("Expecting a mapping with keys of type int, range, tuple")
-            
-            #if not all(isinstance(v, int) for v in val.values()):
-                #raise TypeError("Expecting a mapping with values of type int")
-            
-            
-        #elif val is not None:
-            #raise TypeError(f"Expecting a mapping or None; for {type(val).__name__} instead")
-    
-        #self._ephys_frame_mapping_ = val
-        
-    #@property
-    #def genotype(self):
-        #if not hasattr(self, "_analysis_unit_"):
-            #self._analysis_unit_ = AnalysisUnit(self)
-            
-        #return self._analysis_unit_.genotype
-    
-    #@genotype.setter
-    #def genotype(self, value):
-        #if isinstance(value, str):
-            #if len(value.strip()) == 0:
-                #genotype = "NA"
-                
-            #else:
-                #genotype = strutils.str2symbol(value)
-                ##genotype = strutils.str2R(value)
-                
-        #elif value is None:
-            #genotype = "NA"
-    
-        #else:
-            #raise TypeError("value expected to be a string or None; got %s instead" % type(value).__name__)
-        
-        #if not hasattr(self, "_analysis_unit_"):
-            #self._analysis_unit_ = AnalysisUnit(self)
-            
-        #self._analysis_unit_.genotype = genotype
-        
-        #if hasattr(self, "_analysis_units_") and len(self._analysis_units_):
-            #for unit in self._analysis_units_:
-                #unit.sourceID = genotype
-                
-    #@property
-    #def gender(self):
-        #if not hasattr(self, "_analysis_unit_"):
-            #self._analysis_unit_ = AnalysisUnit(self)
-            
-            
-        #return self._analysis_unit_.gender
-    
-    #@gender.setter
-    #def gender(self, value):
-        #if not hasattr(self, "_analysis_unit_"):
-            #self._analysis_unit_ = AnalysisUnit(self)
-            
-        #self._analysis_unit_.gender = value
-        
-        #if hasattr(self, "_analysis_units_") and len(self._analysis_units_):
-            #for unit in self._analysis_units_:
-                #unit.gender = value
-                
-        
-    #@property
-    #def age(self):
-        #"""Age property of the underlying analysis unit source
-        #"""
-        #if not hasattr(self, "_analysis_unit_"):
-            #self._analysis_unit_ = AnalysisUnit(self)
-            
-        #return self._analysis_unit_.age
-    
-    #@age.setter
-    #def age(self, value):
-        #"""See AnalysisUnit.age property for details.
-        #Type checks are done in AnalysisUnit code
-        #"""
-        #if not hasattr(self, "_analysis_unit_"):
-            #self._analysis_unit_ = AnalysisUnit(self)
-            
-        #self._analysis_unit_.age = value
-        
-        #if hasattr(self, "_analysis_units_") and len(self._analysis_units_):
-            #for unit in self._analysis_units_:
-                #unit.age = value
-                
-    #@property
-    #def sourceID(self):
-        #"""Source property for the underlying analysis unit(s)
-        #"""
-        #if not hasattr(self, "_analysis_unit_"):
-            #self._analysis_unit_ = AnalysisUnit(self)
-            
-        #return self._analysis_unit_.sourceID
-    
-    #@sourceID.setter
-    #def sourceID(self, value):
-        #if isinstance(value, str):
-            #if len(value.strip()) == 0:
-                #sourceID = "NA"
-                
-            #else:
-                #sourceID = strutils.str2symbol(value)
-                ##sourceID = strutils.str2R(value)
-                
-        #elif value is None:
-            #sourceID = "NA"
-    
-        #else:
-            #raise TypeError("value expected to be a string or None; got %s instead" % type(value).__name__)
-        
-        #if not hasattr(self, "_analysis_unit_"):
-            #self._analysis_unit_ = AnalysisUnit(self)
-            
-        #self._analysis_unit_.sourceID = sourceID
-        
-        #if hasattr(self, "_analysis_units_") and len(self._analysis_units_):
-            #for unit in self._analysis_units_:
-                #unit.sourceID = sourceID
-                
     @property
     def availableUnitTypes(self):
         return self._availableUnitTypes_
@@ -8645,79 +8481,6 @@ class ScanData(BaseScipyenData):
     def availableGenotypes(self):
         return self._availableGenotypes_
         
-    #@property
-    #def cell(self):
-        #"""Returns/sets the value of the cell attribute of THIS ScanData object's analysis unit.
-        #"""
-        #if not hasattr(self, "_analysis_unit_"):
-            #self._analysis_unit_ = AnalysisUnit(self)
-
-        #return self._analysis_unit_.cell
-            
-    #@cell.setter
-    #def cell(self, value):
-        #if isinstance(value, str):
-            #if len(value.strip()) == 0:
-                #cell = "NA"
-                
-            #else:
-                #cell = strutils.str2symbol(value)
-                ##cell = strutils.str2R(value)
-                
-        #elif value is None:
-            #cell = "NA"
-            
-        #else:
-            #raise TypeError("value expected to be a string or None; got %s instead" % type(value).__name__)
-        
-        #if not hasattr(self, "_analysis_unit_"):
-            #self._analysis_unit_ = AnalysisUnit(self)
-            
-        #self._analysis_unit_.cell = cell
-        
-        #if len(self._analysis_units_):
-            #for unit in self._analysis_units_:
-                #unit.cell = cell
-        
-    #@property
-    #def field(self):
-        #"""Returns/sets the value of the "field" attribute of THIS ScanData 
-        #object's analysis unit.
-        #NOTE: there actually is an instance member called "field" (i.e. 
-        #microscope field) -- the name does not have the meaning of a generic 
-        #python class instance field
-        #"""
-        #return self._analysis_unit_.field
-    
-        #if len(self._analysis_units_):
-            #for unit in self._analysis_units_:
-                #unit.field = field
-        
-    #@field.setter
-    #def field(self, value):
-        #if isinstance(value, str):
-            #if len(value.strip()) == 0:
-                #field = "NA"
-                
-            #else:
-                #field = strutils.str2symbol(value)
-                ##field = strutils.str2R(value)
-                
-        #elif value is None:
-            #field = "NA"
-            
-        #else:
-            #raise TypeError("value expected to be a string or None; got %s instead" % type(value).__name__)
-        
-        #if not hasattr(self, "_analysis_unit_"):
-            #self._analysis_unit_ = AnalysisUnit(self)
-            
-        #self._analysis_unit_.field = field
-        
-        #if len(self._analysis_units_):
-            #for unit in self._analysis_units_:
-                #unit.field = field
-    
     @property
     def unitType(self):
         """Returns/sets the value of the type attribute of THIS ScanData object's analysis unit.
@@ -8779,30 +8542,6 @@ class ScanData(BaseScipyenData):
         
         """
         return [u.name for u in self.analysisUnits]
-        
-    #@property
-    #def name(self):
-        #if not hasattr(self, "_name_"):
-            #if hasattr(self, "__name__"):
-                #self._name_ = self.__name__
-                #delattr(self, "__name__")
-                
-            #else:
-                #self._name_ = ""
-        
-        #return self._name_
-    
-    #@name.setter
-    #def name(self, value):
-        #if not isinstance(value, (str, type(None))):
-            #raise TypeError("Expecting a str or None; got %s instead" % type(value).__name__)
-        
-        #self._name_ = value
-        
-        #if hasattr(self, "__name__"):
-            #delattr(self, "__name__")
-        
-        #self._modified_ = True
         
     #@property
     #def sceneCursors(self):
@@ -8996,7 +8735,7 @@ class ScanData(BaseScipyenData):
         return self.electrophysiologySweeps
     
     @property
-    def sceneFrames(self):
+    def sceneFrames(self) -> int:
         """Read-only.
         
         Can only be changed indirectly, by either:
@@ -9009,14 +8748,17 @@ class ScanData(BaseScipyenData):
         return self.nFrames("scene")
     
     @property
-    def sceneChannels(self):
+    def sceneFrameAxis(self) -> int:
+        return self.sceneLayout.framesAxis
+    
+    @property
+    def sceneChannels(self) -> int:
         """Read-only. 
         The number of channels in the scene data or 0 if no scene data exists.
          
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
         """
-        
         if len(self.scene) == 0:
             return 0
         
@@ -9027,7 +8769,7 @@ class ScanData(BaseScipyenData):
             return len(self.scene)
 
     @property
-    def sceneChannelNames(self):
+    def sceneChannelNames(self) -> tuple:
         """
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
@@ -9039,7 +8781,7 @@ class ScanData(BaseScipyenData):
         if len(self.scene) == 1:
             return AxesCalibration(self.scene[0])["c"].channelNames
         
-        return list(itertools.chain.from_iterable((AxesCalibration(self.scene[k])["c"].channelNames for k in range(len(self.scene)))))
+        return tuple(itertools.chain.from_iterable((AxesCalibration(self.scene[k])["c"].channelNames for k in range(len(self.scene)))))
         
     @sceneChannelNames.setter
     def sceneChannelNames(self, value):
@@ -9058,7 +8800,6 @@ class ScanData(BaseScipyenData):
         if len(value) == self.sceneChannels:
             if len(self.scene) == 1:
                 axcal = self.getSceneAxesCalibration(0)
-                #axcal = AxesCalibration(self.scene[0].axistags["c"])
                 
                 for c in range(self.sceneChannels):
                     axcal.setChannelName(c, value[c])
@@ -9068,16 +8809,14 @@ class ScanData(BaseScipyenData):
             else:
                 for k, v in enumerate(value):
                     axcal = self.getSceneAxesCalibration(k)
-                    #axcal = AxesCalibration(self.scene[k].axistags["c"])
                     axcal.setChannelName(0, v)
                     axcal.calibrateAxis(self.scene[k].axistags["c"])
-                    #setAxisName(self.scene[k].axistags["c"], name=[v], index=[k])
             
         else:
             raise ValueError("Expecting a str list with as many elements as channels (%d); got %d elements instead" % (self.sceneChannels, len(value)))
         
     @property
-    def scansFrames(self):
+    def scansFrames(self) -> int:
         """Read-only.
         
         Can only be modifier indirectly by either:
@@ -9091,7 +8830,11 @@ class ScanData(BaseScipyenData):
         return self.nFrames("scans")
     
     @property
-    def scansChannels(self):
+    def scansFrameAxis(self) -> int:
+        return self.scansLayout.framesAxis
+    
+    @property
+    def scansChannels(self) -> int:
         """The number of channels; read-only
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
@@ -9108,7 +8851,7 @@ class ScanData(BaseScipyenData):
             return len(self.scans)
     
     @property
-    def scansChannelNames(self):
+    def scansChannelNames(self) -> tuple:
         """
         """
         if len(self._scans_) == 0:
@@ -9117,7 +8860,7 @@ class ScanData(BaseScipyenData):
         if len(self.scans) == 1: # this may be a multi-band image
             return AxesCalibration(self.scans[0])["c"].channelNames # to ensure we get a virtual channel if needed
 
-        return list(itertools.chain.from_iterable((AxesCalibration(self.scans[k])["c"].channelNames for k in range(len(self.scans)))))
+        return tuple(itertools.chain.from_iterable((AxesCalibration(self.scans[k])["c"].channelNames for k in range(len(self.scans)))))
         
     @scansChannelNames.setter
     def scansChannelNames(self, value):
@@ -9138,7 +8881,6 @@ class ScanData(BaseScipyenData):
             if len(self.scans) == 1:
                 axcal = AxisCalibrationData(self.scans[0].axistags["c"])
                 axcal = self.getScansAxesCalibration(0)
-                #axcal = AxesCalibration(self.scans[0].axistags["c"])
                 
                 for c in range(self.scansChannels):
                     axcal.setChannelName(c, value[c])
@@ -9148,10 +8890,8 @@ class ScanData(BaseScipyenData):
             else:
                 for k, v in enumerate(value):
                     axcal = self.getScansAxesCalibration(k)
-                    #axcal = AxesCalibration(self.scans[k].axistags["c"])
                     axcal.setChannelName(0, v)
                     axcal.calibrateAxis(self.scans[k].axistags["c"])
-                    #setAxisName(self.scans[k].axistags["c"], name=[v], index=[k])
                 
         else:
             raise ValueError("Expecting a str list with as many elements as channels (%d); got %d elements instead" % (self.scansChannels, len(value)))

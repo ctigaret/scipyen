@@ -452,7 +452,7 @@ class FrameIndexLookup(object):
         if not isinstance(value, pd.DataFrame):
             raise TypeError(f"Expecting a DataFrame; got {type(value).__name__} instead")
         
-        if not len(value.columns) != len(self._map_.columns) or np.all(value.columns == self._map_.columns):
+        if len(value.columns) != len(self._map_.columns) or not np.all(value.columns == self._map_.columns):
             raise ValueError(f"Expecting {self._map_.columns} columns; got {value.columns} instead")
         
         self._map_ = value

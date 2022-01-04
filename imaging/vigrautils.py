@@ -1550,7 +1550,7 @@ def proposeLayout(img:vigra.VigraArray,
             raise TypeError("Channels axes cannot be used as frame axes")
         
     elif isinstance(userFrameAxis, int):
-        if userFrameAxis < 0 or userFrameAxis >= ndim:
+        if userFrameAxis < 0 or userFrameAxis >= img.ndim:
             raise ValueError("Axis index expected to be in the semi-open interval [0 .. %d); got %d instead" % (img.ndim, userFrameAxis))
         
         userFrameAxis = img.axistags[userFrameAxis]
@@ -1814,10 +1814,10 @@ def proposeLayout(img:vigra.VigraArray,
         
     
     return Bunch({"nFrames":nFrames, 
-                  "horizontal":horizontal, 
-                  "vertical":vertical, 
-                  "channels":channels,
-                  "frames":frames})
+                  "horizontalAxis":horizontal, 
+                  "verticalAxis":vertical, 
+                  "channelsAxis":channels,
+                  "framesAxis":frames})
 
 @singledispatch
 def kernel2array(value:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D],

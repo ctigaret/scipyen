@@ -93,6 +93,21 @@ class BaseDescriptorValidator(ABC):
             if isinstance(preset_func, AttributeAdapter):
                 preset_func(obj, value)
                 
+            elif isinstance(preset_func, types.MethodType) and inspect.ismethod(getattr(obj, preset_func.__name__, None)):
+                fargs = inspect.getfullargspec(preset_func)
+                if len(fargs.args) == 0:
+                    preset_func(obj)
+                    
+                else:
+                    preset_func(obj, value)
+                
+            elif isinstance(preset_func, types.FunctionType):
+                fargs = inspect.getfullargspec(preset_func)
+                if len(fargs.args) == 1:
+                    preset_func(obj)
+                elif len(fargs.args) > 1:
+                    preset_func(obj,value)
+                
         setattr(obj, self.private_name, value)
         
         # NOTE: 2021-12-06 12:43:48 
@@ -102,6 +117,20 @@ class BaseDescriptorValidator(ABC):
             postset_func = obj._postset_hooks_.get(self.public_name, None)
             if isinstance(postset_func, AttributeAdapter):
                 postset_func(obj, value)
+            elif isinstance(postset_func, types.MethodType) and inspect.ismethod(getattr(obj, postset_func.__name__, None)):
+                fargs = inspect.getfullargspec(postset_func)
+                if len(fargs.args) == 0:
+                    postset_func()
+                else:
+                    postset_func(value)
+                    
+            elif isinstance(postset_func, types.FunctionType):
+                fargs = inspect.getfullargspec(postset_func)
+                if len(fargs.args) == 1:
+                    postset_func(obj)
+                elif len(fargs.args) > 1:
+                    postset_func(obj,value)
+                
         
     def __delete__(self, obj):
         if hasattr(obj, self.private_name):
