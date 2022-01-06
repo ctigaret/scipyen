@@ -8776,10 +8776,10 @@ class ScanData(BaseScipyenData):
         
         """
         if len(self.scene) == 0:
-            return list()
+            return tuple()
         
         if len(self.scene) == 1:
-            return AxesCalibration(self.scene[0])["c"].channelNames
+            return (AxesCalibration(self.scene[0])["c"].channelNames, )
         
         return tuple(itertools.chain.from_iterable((AxesCalibration(self.scene[k])["c"].channelNames for k in range(len(self.scene)))))
         

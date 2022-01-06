@@ -795,7 +795,12 @@ class PVFrame(object):
         
         sourceData = list() # will contnain vigra arrays for each source frame, to be concatenated
         
+        #channelNames = (f["channelName"] for f in self.files)
+        
         for k in range(len(mdata["files"])):
+            # NOTE: 2022-01-06 00:10:42
+            # fdata: frame data
+            # sdata: source data
             if filepath is not None:
                 fdata = pio.loadImageFile(os.path.join(filepath, self.files[k]["filename"]))
             
@@ -828,15 +833,16 @@ class PVFrame(object):
                 
             # NOTE: 2018-06-03 22:15:10
             # axis_0_info is the AxisInfo object for the 1st (spatial) dimension (axis)
-            axis_0_info = fdata.axistags[0]
+            fdata_axis_0_info = fdata.axistags[0]
+            
             # NOTE: 2021-10-26 15:48:42
             
-            axis_0_cal  = AxisCalibrationData(axis_0_info)
-            axis_0_cal.resolution = self.state.attributes["micronsPerPixel_XAxis"]
-            axis_0_cal.units = pq.um
+            fdata_axis_0_cal  = AxisCalibrationData(fdata_axis_0_info)
+            fdata_axis_0_cal.resolution = self.state.attributes["micronsPerPixel_XAxis"]
+            fdata_axis_0_cal.units = pq.um
             
             # embed calibration string into axis_0_info's description
-            axis_0_info = axis_0_cal.calibrateAxis(axis_0_info)
+            fdata_axis_0_info = fdata_axis_0_cal.calibrateAxis(fdata_axis_0_info)
             
             
             # NOTE: 2018-06-03 22:15:54
@@ -848,22 +854,22 @@ class PVFrame(object):
             # so we only modify this default behaviour when PVSequence is of 
             # Linescan type
             if self.parent is not None and self.parent.type == PVSequenceType.Linescan:
-                axis_1_info = vigra.AxisInfo(key="t", 
+                fdata_axis_1_info = vigra.AxisInfo(key="t", 
                                              typeFlags=vigra.AxisType.Time, 
                                              resolution = self.state.attributes["scanlinePeriod"])
                 
-                axis_1_cal  = AxisCalibrationData(axis_1_info)
-                axis_1_cal.units = pq.s
+                fdata_axis_1_cal  = AxisCalibrationData(fdata_axis_1_info)
+                fdata_axis_1_cal.units = pq.s
                 
             else:
-                axis_1_info = fdata.axistags[1] # by default vigra behaviour is Space 
+                fdata_axis_1_info = fdata.axistags[1] # by default vigra behaviour is Space 
                 
-                axis_1_cal = AxisCalibrationData(axis_1_info)
-                axis_1_cal.resolution = self.state.attributes["micronsPerPixel_YAxis"]
-                axis_1_cal.units = pq.um
+                fdata_axis_1_cal = AxisCalibrationData(fdata_axis_1_info)
+                fdata_axis_1_cal.resolution = self.state.attributes["micronsPerPixel_YAxis"]
+                fdata_axis_1_cal.units = pq.um
                 
             # embed calibration string into axis_1_info's description
-            axis_1_info = axis_1_cal.calibrateAxis(axis_1_info)
+            fdata_axis_1_info = fdata_axis_1_cal.calibrateAxis(fdata_axis_1_info)
             
             # NOTE: 2018-06-03 22:16:26
             # axis_2_info is the AxisInfo object for 3rd dimension
@@ -875,31 +881,22 @@ class PVFrame(object):
             if fdata.channelIndex == fdata.ndim: # channel axis is virtual
                 # NOTE: 2018-08-01 16:43:58
                 # make sure there IS a channel axis
-                axis_2_info = vigra.AxisInfo.c #(description=self.files[k]["channelName"])
+                fdata_axis_2_info = vigra.AxisInfo.c 
                 
             else:
-                axis_2_info = fdata.axistags["c"]
+                fdata_axis_2_info = fdata.axistags["c"]
                 
-            #print("channel name", self.files[k]["channelName"])
-                
-            axis_2_info.description = self.files[k]["channelName"]
+            fdata_axis_2_info.description = self.files[k]["channelName"]
             
-            axis_2_cal = AxisCalibrationData(axis_2_info)
-            axis_2_cal.setChannelName(0, self.files[k]["channelName"])
+            fdata_axis_2_cal = AxisCalibrationData(fdata_axis_2_info)
+            fdata_axis_2_cal.setChannelName(0, self.files[k]["channelName"]) # also adds channel calibration to the channel axis calibration
                                         
-            # add ChannelCalibrationData to the AxisCalibrationData for Channels
-            # axis (3rd)
-            for f in self.files:
-                axis_2_cal.addChannelCalibration(ChannelCalibrationData(name = f["channelName"],
-                                                                        index = int(f["channel"])),
-                                                name = f["channelName"])
-                
             # embed calibration string into axis_2_info's description
-            axis_2_info = axis_2_cal.calibrateAxis(axis_2_info)
+            fdata_axis_2_info = fdata_axis_2_cal.calibrateAxis(fdata_axis_2_info)
             
             # construct a new VigraArray using fdata and new axistags initialized
             # from the calibrated AxisInfo objects
-            newaxistags = vigra.AxisTags(axis_0_info, axis_1_info, axis_2_info)
+            newaxistags = vigra.AxisTags(fdata_axis_0_info, fdata_axis_1_info, fdata_axis_2_info)
             frame = vigra.VigraArray(fdata, axistags=newaxistags)
             
             frameData.append(frame)
@@ -917,32 +914,31 @@ class PVFrame(object):
                 if sdata.ndim == 2 and sdata.channelIndex == sdata.ndim:
                     sdata.insertChannelAxis() # make sure there is a channel axis
                     
-                axis_0_info = sdata.axistags[0]
-                axis_0_cal = AxisCalibrationData(axis_0_info)
-                axis_0_cal.resolution = self.state.attributes["micronsPerPixel_XAxis"]
-                axis_0_cal.units = pq.um
+                sdata_axis_0_info = sdata.axistags[0]
+                sdata_axis_0_cal = AxisCalibrationData(sdata_axis_0_info)
+                sdata_axis_0_cal.resolution = self.state.attributes["micronsPerPixel_XAxis"]
+                sdata_axis_0_cal.units = pq.um
                 
-                axis_0_info = axis_0_cal.calibrateAxis(axis_0_info)
+                sdata_axis_0_info = sdata_axis_0_cal.calibrateAxis(sdata_axis_0_info)
                 
-                axis_1_info = sdata.axistags[1]
-                axis_1_cal = AxisCalibrationData(axis_1_info)
-                axis_1_cal.resolution=self.state.attributes["micronsPerPixel_YAxis"]
-                axis_1_cal.units = pq.um
+                sdata_axis_1_info = sdata.axistags[1]
+                sdata_axis_1_cal = AxisCalibrationData(sdata_axis_1_info)
+                sdata_axis_1_cal.resolution=self.state.attributes["micronsPerPixel_YAxis"]
+                sdata_axis_1_cal.units = pq.um
                 
-                axis_1_info = axis_1_cal.calibrateAxis(axis_1_info)
+                sdata_axis_1_info = sdata_axis_1_cal.calibrateAxis(sdata_axis_1_info)
                 
-                axis_2_info = sdata.axistags["c"]
+                if sdata.channelIndex == sdata.ndim:
+                    sdata_axis_2_info = vigra.AxisInfo.c
+                else:
+                    sdata_axis_2_info = sdata.axistags["c"]
                 
-                axis_2_cal = AxisCalibrationData(axis_2_info)
+                sdata_axis_2_cal = AxisCalibrationData(sdata_axis_2_info)
+                sdata_axis_2_cal.setChannelName(0, self.files[k]["channelName"])
 
-                for f in self.files:
-                    axis_2_cal.addChannelCalibration(ChannelCalibrationData(name=f["channelName"], 
-                                                                            index = int(f["channel"])),
-                                                    name=f["channelName"])
+                sdata_axis_2_cal = sdata_axis_2_cal.calibrateAxis(sdata_axis_2_info)
                 
-                axis_2_cal = axis_2_cal.calibrateAxis(axis_2_info)
-                
-                newaxistags = vigra.AxisTags(axis_0_info, axis_1_info, axis_2_info)
+                newaxistags = vigra.AxisTags(sdata_axis_0_info, sdata_axis_1_info, sdata_axis_2_info)
                 source = vigra.VigraArray(sdata, axistags=newaxistags)
                 
                 sourceData.append(source)

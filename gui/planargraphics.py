@@ -834,7 +834,7 @@ class PlanarGraphics():
         
         self._currentframe_ = currentframe
         
-        self._checkStates_()
+        self.checkStates()
         
     def __init_from_state__(self, state:dict, frameindex:typing.Optional[typing.Iterable]=[], 
                             currentframe:int=0) -> None:
@@ -846,7 +846,7 @@ class PlanarGraphics():
             
         self._currentframe_ = currentframe
         
-        self._checkStates_()
+        self.checkStates()
         
     def __init_from_states__(self, *states, frameindex:typing.Optional[typing.Iterable]=[], 
                             currentframe:int=0) -> None:
@@ -863,7 +863,7 @@ class PlanarGraphics():
                 
             self._currentframe_ = currentframe
             
-            self._checkStates_()
+            self.checkStates()
             
         else:
             raise TypeError("Expecting a sequence of state dict-like objects; got %s instead" % states)
@@ -1111,7 +1111,7 @@ class PlanarGraphics():
                     
                     self._states_ = self.__class__.copyConvertStates(*src._states_)
                     
-                    self._checkStates_()
+                    self.checkStates()
                     
                     return # we're DONE here
                 
@@ -1163,7 +1163,7 @@ class PlanarGraphics():
                 
                 self._currentframe_ = currentframe
             
-                self._checkStates_()
+                self.checkStates()
                 self._applyFrameIndex_(frameindex)
                 
                 if isinstance(self, Cursor):
@@ -1311,7 +1311,8 @@ class PlanarGraphics():
             if isinstance(state, (DataBag, dict)):
                 return state[name]
         
-        elif hasattr(self, name):
+        #elif hasattr(self, name):
+        else:
             return object.__getattribute__(self, name)
             
     def __setattr__(self, name, value):
@@ -1323,7 +1324,7 @@ class PlanarGraphics():
         else:
             object.__setattr__(self, name, value)
             
-    def _checkStates_(self):
+    def checkStates(self):
         """Ensures consistency of states with respect to z_frame.
         
         A PlanarGraphics state can be:
@@ -1405,7 +1406,7 @@ class PlanarGraphics():
         
         WARNING: This can be very expensive - only call it at construction
         """
-        #print("PlanarGraphics (%s) _checkStates_: %d states: " % (self.__class__.__name__, len(self._states_)), self._states_)
+        #print("PlanarGraphics (%s) checkStates: %d states: " % (self.__class__.__name__, len(self._states_)), self._states_)
         from core.utilities import unique
         if len(self._states_):
             # make sure the states conform to the planar descriptors
@@ -1603,7 +1604,7 @@ class PlanarGraphics():
         
             
     @property
-    def pos(self):
+    def pos(self) -> QtCore.QPointF:
         """The position of this object as a Qt QPointF.
         """
         position = self.position
@@ -1614,16 +1615,18 @@ class PlanarGraphics():
         return QtCore.QPointF(position[0], position[1])
     
     @pos.setter
-    def pos(self, value):
+    def pos(self, value:QtCore.QPointF):
+        if not all(s in self._planar_descriptors_ for s in ("x", "y")):
+            return
+        
         if isinstance(value, (QtCore.QPoint, QtCore.QPointF)):
             self.position = (value.x(), value.y())
             
         else:
             raise TypeError("Expecting a QPoint or QPointF; got %s instead" % type(value).__name__)
         
-    
     @property
-    def position(self):
+    def position(self) -> tuple:
         """The position of this object as (x,y) coordinates tuple.
         
         To change, assign a pair (x,y) of new coordinate values (a tuple), 
@@ -1633,23 +1636,32 @@ class PlanarGraphics():
         
         """
         #print("PlanarGraphics.position() for %s " % self)
-        return (self.x, self.y)
+        if all(s in self._planar_descriptors_ for s in ("x", "y")):
+            return (self.x, self.y)
+        return (None, None)
     
     @position.setter
-    def position(self, x):
+    def position(self, x, y=None):
+        if not all(s in self._planar_descriptors_ for s in ("x", "y")):
+            return
+        
         if isinstance(x, (tuple, list)) and len(x) == 2 and all([isinstance(v, numbers.Real) for v in x]):
-            y = x[1]
-            x = x[0]
+            self.x = x[0]
+            self.y = x[1]
             
         elif isinstance(x, (QtCore.QPoint, QtCore.QPointF)):
-            y = x.y()
-            x = x.x()
+            self.y = x.y()
+            self.x = x.x()
+            
+        elif all(isinstance(v, numbers.Real) for v in (x,y)):
+            self.x = x
+            self.y = y
             
         else:
-            raise TypeError("Expecting x,y a pair of real scalars, or just a Qt QPoint or QPointF")
+            raise TypeError("Expecting x,y two scalars a tulpe of scalars, or just a Qt QPoint or QPointF")
 
-        self.x = x[0]
-        self.y = x[1]
+        #self.x = x[0]
+        #self.y = x[1]
         
         self.updateLinkedObjects()
         
@@ -1871,18 +1883,6 @@ class PlanarGraphics():
             
         return ret
         
-        #state = self.getState(frame)
-        
-        #if state is None:
-            #return ret
-        
-        #if isinstance(state, DataBag) and len(state)==0:
-            #ret.append(Move(state.x, state.y))
-            ## NOTE: 2018-04-20 16:08:03
-            ## override in a :subclass: 
-            
-        #return ret
-    
     def asPath(self, frame=None, closed=False):
         """Returns a COPY of this object's state as a Path, for the specified frame.
         
@@ -1929,11 +1929,6 @@ class PlanarGraphics():
         """Calls copy constructor and returns the result.
         WARNING: linked objects are stored by reference
         """
-        #print("PlanarGraphics.copy() frameIndices", self.frameIndices)
-        
-        #if isinstance(self, Path):
-            #print("PlanarGraphics.copy() %s %s len(self) %d \n %s" % (self.type, self.name, len(self), self))
-        
         #Path objects need special treatment here:
         
         if "z_frame" not in self._planar_descriptors_:
@@ -1957,11 +1952,7 @@ class PlanarGraphics():
         
         ret._linked_objects_ = self._linked_objects_
         
-        #if isinstance(self, Path):
-            #print("PlanarGraphics.copy() returns: %s %s len(ret) %d \n %s" % (ret.type, ret.name, len(ret), ret))
-            
         return ret
-    
         
     def appendStates(self, other):
         """Joins the state descriptors of the "other" PlanarGraphics object to self.
@@ -2561,18 +2552,15 @@ class PlanarGraphics():
         
         return QtWidgets.QGraphicsPathItem(self(path=None, frame=frame, closed=self.closed)) # by default, the most generic case
         
-    def stateIndex(self, state:typing.Optional[DataBag]=None, 
-                           z_frame:typing.Optional[int]=None,
+    def stateIndex(self, state:typing.Optional[typing.Union[DataBag, int]]= None, 
                            visible_only:bool=False) -> typing.Optional[int]:
         """Get the index of a state in this object's internal list of states.
         
         Parameters:
         ===========
         
-        state: DataBag (optional, default is None)
+        state: DataBag (state), int or None (z_frame); default is None
 
-        z_frame: int (optional, default is None)
-        
         visible_only: bool (optional, default is False)
             
         Returns:
@@ -2584,26 +2572,26 @@ class PlanarGraphics():
             returns the index of the state in the list, else returns None.
             
         If 'state' is None:
-            * if 'z_frame' is None, returns the index of the current state
+            * returns the index of the current state
             in the internal list
             
-            * if 'z_frame' is an int:
+        If 'state' is an int:
         
-                * if 'z_frame' < 0 returns the index of the frame-avoiding
-                    state with state.z_frame == z_frame, if found, or None.
+                * if 'state' < 0 returns the index of the frame-avoiding
+                    state with state.z_frame == state, if found, or None.
                 
-                * if 'z_frame' >= 0
+                * if 'state' >= 0
                 
                     * if visible_only is False (default) returns the index of the
-                        single-frame state where state.z_frame == z_frame or None.
+                        single-frame state where state.z_frame == state or None.
                     
                     * if visible_only is True:
                         if there is a single-frame state where 
-                        state.z_frame == z_frame, returns its index (as above)
+                        state.z_frame == state, returns its index (as above)
                         
                         otherwise, if there is a frame-avoding state visible in
                         the frame with index z_frame (i.e., the state where
-                        state.z_frame != -z_frame - 1), returns its index;
+                        state.z_frame != -state - 1), returns its index;
                         
                         otherwise, return None
                         
@@ -2614,10 +2602,8 @@ class PlanarGraphics():
         state state in the internal list, hence its index is always 0 (zero), 
         if it exists in the internal states list.
         
-        
-        
-        Calls:
-        =====
+        Examples:
+        ========
         
         stateIndex() -> the index of the current state
         
@@ -2639,17 +2625,22 @@ class PlanarGraphics():
             
         """
         from core.utilities import index_of
-        if state is None:
-            state = self.getState(z_frame=z_frame, return_visible=visible_only)
+        
+        if isinstance(state, int):
+            state = self.getState(z_frame=state, return_visible=visible_only)
+            
+        elif state is None:
+            state = self.getState()
+            
+        elif not isinstance(state, DataBag):
+            raise TypeError(f"Expecting a state DataBag, int or None; got {type(state).__name__} instead")
+        
+        if self.validateState(state):
+            return index_of(self._states_, state, key = lambda x: x.z_frame)
                         
-        return index_of(self._states_, state, key = lambda x: x.z_frame)
-            
-            
     def getState(self, z_frame:typing.Optional[int]=None,
                  return_visible:bool=True) -> typing.Optional[object]:
         """Access the state according to their z_frame value.
-        
-        TODO use as delegate for hasStateForFrame
         
         Parameters:
         ----------
@@ -2751,7 +2742,8 @@ class PlanarGraphics():
             when a DataBag, it must exist in the internal states list
             
             when None, the function operates on the current (visible) state.
-                If there is no visible state in the current frame, then returns.
+                If there is no visible state in the current frame, then returns
+                without effect.
                 To avoid this, make sure a DataBag is pased as state parameter
                 
         new_frame: int or None
@@ -2770,8 +2762,8 @@ class PlanarGraphics():
             the current frame; otherwise, operate in the state where
             z_frame == current frame, if it exists
                     
-        NOTE: Might want to call self._checkStates_() after executing this function.
-        Since _checkStates_ can be expensive the decision to call it is left to 
+        NOTE: Might want to call self.checkStates() after executing this function.
+        Since self.checkStates() can be expensive the decision to call it is left to 
         the user.
         """
         if state is None:
@@ -3097,7 +3089,7 @@ class PlanarGraphics():
         # (II)  one frame-avoding state and maximum a single-frame state 
         #       (visible in the avoided frame)
         # (III) any number of single-frame states
-        self._checkStates_()
+        self.checkStates()
         
         # NOTE: 2020-11-13 13:02:19
         # allow frame to override state z_frame
@@ -3378,7 +3370,7 @@ class PlanarGraphics():
                         else:
                             self._states_[:] = [new_state]
                                 
-        self._checkStates_()
+        self.checkStates()
         
     def getObjectForFrame(self, frame:typing.Optional[int]=None) -> typing.Optional[object]:
         """Returns a PlnaraGRaphics of the same type at self, for the specified frame.
@@ -5825,7 +5817,7 @@ class Text(PlanarGraphics):
             
         self._applyFrameIndex_(frameindex)
         self._currentframe_ = currentframe
-        self._checkStates_()
+        self.checkStates()
     
     def __init__(self, *args, name="Text", frameindex=[], currentframe=0, position = (0,0)):
         if not isinstance(text, str):

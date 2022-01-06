@@ -698,6 +698,14 @@ class CalibrationData(object):
         od = dict((k, dict(v._data_) if isinstance(v, CalibrationData) else v) for (k,v) in self._data_.items())
         return pformat(od)
         #return pformat(self._data_)
+        
+    def _repr_pretty_(self, p, cycle):
+        p.text(f"{self.__class__.__name__}.")
+        p.breakable()
+        od = dict((k, dict(v._data_) if isinstance(v, CalibrationData) else v) for (k,v) in self._data_.items())
+        p.pretty(od)
+        p.text("\n")
+        
     
     def __eq__(self, other):
         ret = other.__class__ == self.__class__
@@ -2377,6 +2385,12 @@ class AxesCalibration(object):
     def __str__(self):
         repr_str = self.__repr__().split()
         return "\n".join([f"{self.__repr__()} with {len(self._calibration_)} axes:"] + [cal.__str__() for cal in self._calibration_])
+    
+    def _repr_pretty_(self, p, cycle):
+        p.text(f"{self.__class__.__name__} with {len(self._calibration_)} axes.")
+        p.breakable()
+        for cal in self._calibration_:
+            p.pretty(cal)
         
     def hasAxis(self, key):
         """Queries if the axis key is calibrated by this object
