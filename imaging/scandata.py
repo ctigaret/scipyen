@@ -1162,13 +1162,134 @@ class ScanData(BaseScipyenData):
             frameAxis = None if not isinstance(imageLayout, dict) else imageLayout.get(f"{self.fieldname}FrameAxis", None)
             axesCalibration = getattr(self.obj, f"{self.fieldname}AxesCalibration", None)
             
-            data, layout, axesCalibration = self.obj.imageDataLayout(value, 
+            data, layout, axesCalibration = self.imageDataLayout(value, 
                                                                 frameAxis = frameAxis,
                                                                 axescal = axesCalibration)
             
             setattr(self.obj, f"{self.fieldname}Layout", layout)
             setattr(self.obj, f"{self.fieldname}AxesCalibration", axesCalibration)
         
+        def imageDataLayout(self,data, 
+                        frameAxis:typing.Optional[vigra.AxisInfo]=None, 
+                        horizontalAxis:typing.Optional[vigra.AxisInfo]=None, 
+                        verticalAxis:typing.Optional[vigra.AxisInfo]=None, 
+                        axescal:typing.Optional[AxesCalibration]=None):
+            """ Proposes an axes layout and axes calibration for the data.
+            
+            See also imaging.vigrautils.proposeLayout()
+            
+            Returns
+            --------
+            
+            The tuple (data, layout, axes_calibration):
+            
+            'data': VigraArray object, or sequence of at least one VigraArray 
+                object, or None.
+                When a sequence, the vigra arrays must have have identical 
+                shapes and axistag keys. If there is more than one vigra array
+                in the sequence then all the arrays must have one channel only.
+                
+            'layout': traitlets.Bunch or None. When a Bunch, it maps the following
+                key/value pairs:
+                
+                'nFrames':      int;
+                                This is the total number of 2D data 
+                                slices (or frames) that can be displayed in a 2D 
+                                viewer one at a time.
+                                
+                                The 'frames' are defined along the data array axis 
+                                that is orthogonal to the display plane. For more
+                                details see imaging.vigrautils.proposeLayout().
+                                
+                'horizontalAxis': int; 
+                                Index - or dimension - of the horizontal axis.
+                                This is the axis corresponding to the 'horizontal'
+                                dimension (or aspect) of the data for the purpose of
+                                being displayed in a 2D image viewer.
+                                
+                'verticalAxis': int;
+                                Index - or dimension - of the vertical axis
+                                This is the axis corresponding to the 'vertical'
+                                dimension (or aspect) of the data for the purpose of
+                                being displayed in a 2D image viewer.
+                                
+                'channelsAxis': int; 
+                                Index - or dimension - of the channels axis
+                                For VigraArray objects, the size of the image data
+                                array on this dimension (or axis) indicates the
+                                number of data channels in each pixel.
+                                
+                'framesAxis':   int; 
+                                Index - or dimenson - of the frames axis
+                                This is the axis (or axes) along which 2D data 
+                                frames (or slices) are taken to be displayed one at
+                                a time in a 2D image viewer.
+                                
+                For a detailed explanation of the concept of frames and frames axis
+                see imaging.vigrautils.proposeLayout()
+
+            'axes_calibration': an imaging.axiscalibration.AxesCalibration object, 
+                                or None.
+                                
+            """
+            if data is None:
+                return (None, None, None)
+            
+            if not isinstance(data, (vigra.VigraArray, tuple, list)):
+               raise TypeError(f"Expecting a VigraArray or a sequence (tuple, list) of VigraArrays; got {type(data).__name__} instead")
+            
+            if isinstance(data, vigra.VigraArray):
+                layout = proposeLayout(data, userFrameAxis = frameAxis, indices = True)
+                
+                if isinstance(axescal, AxesCalibration) and all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(axescal.axiskeys, data.axistags)):
+                    axes_cal = [axscal]
+                else:
+                    axes_cal = [AxesCalibration(data)]
+                    
+                return ([data], layout, axes_cal)
+                
+            elif isinstance(data, (tuple, list)):
+                if len(data):
+                    if not all([isinstance(s, vigra.VigraArray) for s in data]):
+                        raise TypeError("When not empty, data is expected to contain VigraArray objects")
+
+                    if not all([s.shape == data[0].shape for s in data[1:]]):
+                        raise TypeError("Image arrays in a sequence must have identical shapes")
+
+                    if not all([s.axistags == data[0].axistags for s in data[1:]]):
+                        raise TypeError("Image arrays in a sequence must have identical axistags")
+                    
+                    if len(data) > 1 and any(s.channels > 1 for s in data):
+                        raise TypeError("When more than one image array is supplied, these must have a single channel")
+
+                    if not all([s.channels == data[0].channels for s in data[1:]]):
+                        raise TypeError("Image arrays in a sequence must have the same number of channels")
+
+                    # NOTE: 2022-01-06 10:38:28
+                    # when several images are contained in 'data' we assume they
+                    # all have the same axes layout
+                    layout = proposeLayout(data[0], userFrameAxis = frameAxis, indices = True)
+                    
+                    if isinstance(axescal, (tuple, list)):
+                        if len(axescal) != len(data):
+                            raise ValueError(f"Axes calibration expected to be a sequence with as many elements as 'data' ({len(data)}; got {len(axescal)} instead)")
+                        
+                        if not all(isinstance(ac, AxesCalibration) for ac in axescal):
+                            raise TypeError("Expecting a tuple of AxesCalibration objects")
+                        
+                        if all(all(axcal.typeFlags(key) == x.typeFlags for (key, x) in zip(axcal.axiskeys, img.axistags)) for axcal,img in zip(axescal,data)):
+                            axes_cal = [axcal for axcal in axescal]
+                        else:
+                            axes_cal = [AxesCalibration(img) for img in data]
+                    else:
+                        axes_cal = [AxesCalibration(img) for img in data]
+                    
+                    return (data, layout, axes_cal)
+
+                return (list(), None, None)
+                    
+            return (None, None, None)
+                    
     class FramesMapUpdater(AttributeAdapter):
         def __init__(self, owner=None, fieldname=None):
             self.fieldname = fieldname
@@ -1905,13 +2026,16 @@ class ScanData(BaseScipyenData):
         
         self._processed_ = False
         
+        self._scans_parser_ = self.ImageParser(self, "scans")
+        self._scene_parser_ = self.ImageParser(self, "scene")
+        
         # parse parameters, check images, frame axes & calibrations, electorphys.
         # and metadata --> populate kwargs and let super().init populate self
         # with everything else
 
         self._preset_hooks_ = {
-            "scans": self.ImageParser(self, "scans"),
-            "scene": self.ImageParser(self, "scene"),
+            "scans": self._scans_parser_,
+            "scene": self._scene_parser_,
             }
             
         self._postset_hooks_ = {
@@ -1929,11 +2053,11 @@ class ScanData(BaseScipyenData):
         scansFrameAxis = None if not isinstance(scansLayout, dict) else scansLayout.get("scansFrameAxis", None)
         scansAxesCalibration = kwargs.pop("scansAxesCalibration", None)
         
-        scene, scene_layout, scene_axes_cal = self.imageDataLayout(scene, 
+        scene, scene_layout, scene_axes_cal = self._scene_parser_.imageDataLayout(scene, 
                                                                    frameAxis = sceneFrameAxis, 
                                                                    axescal = sceneAxesCalibration)
         
-        scans, scans_layout, scans_axes_cal = self.imageDataLayout(scans, 
+        scans, scans_layout, scans_axes_cal = self._scans_parser_.imageDataLayout(scans, 
                                                                    frameAxis = scansFrameAxis, 
                                                                    axescal = scansAxesCalibration)
         
@@ -2016,136 +2140,182 @@ class ScanData(BaseScipyenData):
             
         return "\n".join(result)
     
-    def set_scene(self, data: (vigra.VigraArray, tuple, list, None), sceneFrameAxis: (vigra.AxisInfo, str, type(None))=None, clear_planar_graphics:bool=False):
-        """
-        TODO
-        """
-        warnings.warn("DEPRECATED", DeprecationWarning, stacklevel=2)
-        if data is None:
-            self._scene_ = None
+    def _set_channel_names_(self, what:str, values:tuple):
+        if what not in ("scene", "scans"):
+            raise ValueError(f"Cannot set channel names for {what}")
+        
+        image_data = getattr(self, what)
+        
+        if len(image_data) == 0:
+            return
+        
+        nChannels = getattr(self, f"{what}Channels")
+        
+        if isinstance(image_data, (tuple, list)) and all(isinstance(i, vigra.VigraArray) for i in image_data):
+            image_channels = sum(i.channels for i in image_data)
+            assert(nChannels == image_channels), f"{self.name} reports {nChannels} {what} channels which is different from theactual number of image channels ({image_channels})"
             
-        elif isinstance(data, vigra.VigraArray):
-            (nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo) = proposeLayout(img, userFrameAxis = sceneFrameAxis)
-            self._scene_ = data
-            self._scene_axes_calibrations_ = [AxesCalibration(data)]
+        elif isinstance(image_data, vigra.VigraArray):
+            assert(nChannels==image_data.channels), f"Mismatch between actual number of image channels ({image_data.channels}) and reported number of channels ({nChannels}) in {what}"
             
-            if sceneFrameAxis is None:
-                chindex = data.channelIndex
+            
+            
+        
+        
+    
+    def _set_channel_name_(self, what:str, channel:int, value:typing.Optional[str]=None):
+        if what not in ("scene", "scans"):
+            raise ValueError(f"Cannot set channel names for {what}")
+        
+        image_data = getattr(self, what)
+        
+        if len(image_data) == 0:
+            return
+        
+        nChannels = getattr(self, f"{what}Channels")
+        
+        if not isinstance(channel, int) or channel < 0 or channel >= nChannels:
+            raise ValueError(f"Incompatible channel number {channel}")
+        
+        if len(image_data) == 1:
+            axcal = getattr(self, f"{what}AxesCalibration")[0]
+            axcal["c"].setChannelName(channel, value)
+            axcal.calibrateAxis(image_data[0].axistags["c"])
+            
+        else:
+            axcal = getattr(self, f"{what}AxesCalibration")[channel]
+            axcal["c"].setChannelName(0, value)
+    
+    #def set_scene(self, data: (vigra.VigraArray, tuple, list, None), sceneFrameAxis: (vigra.AxisInfo, str, type(None))=None, clear_planar_graphics:bool=False):
+        #"""
+        #TODO
+        #"""
+        #warnings.warn("DEPRECATED", DeprecationWarning, stacklevel=2)
+        #if data is None:
+            #self._scene_ = None
+            
+        #elif isinstance(data, vigra.VigraArray):
+            #(nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo) = proposeLayout(img, userFrameAxis = sceneFrameAxis)
+            #self._scene_ = data
+            #self._scene_axes_calibrations_ = [AxesCalibration(data)]
+            
+            #if sceneFrameAxis is None:
+                #chindex = data.channelIndex
                 
-                if chindex == data:
-                    pass
-    @staticmethod
-    def imageDataLayout(data, 
-                    frameAxis:typing.Optional[vigra.AxisInfo]=None, 
-                    horizontalAxis:typing.Optional[vigra.AxisInfo]=None, 
-                    verticalAxis:typing.Optional[vigra.AxisInfo]=None, 
-                    axescal:typing.Optional[AxesCalibration]=None):
-                    #electrophysiology:typing.Optional[neo.Block]=None):
-        """ Proposes an axes layout and axes calibration for the data.
+                #if chindex == data:
+                    #pass
+    #@staticmethod
+    #def imageDataLayout(data, 
+                    #frameAxis:typing.Optional[vigra.AxisInfo]=None, 
+                    #horizontalAxis:typing.Optional[vigra.AxisInfo]=None, 
+                    #verticalAxis:typing.Optional[vigra.AxisInfo]=None, 
+                    #axescal:typing.Optional[AxesCalibration]=None):
+                    ##electrophysiology:typing.Optional[neo.Block]=None):
+        #""" Proposes an axes layout and axes calibration for the data.
         
-        See also imaging.vigrautils.proposeLayout()
+        #See also imaging.vigrautils.proposeLayout()
         
-        Returns
-        --------
+        #Returns
+        #--------
         
-        The tuple (data, layout, axes_calibration):
+        #The tuple (data, layout, axes_calibration):
         
-        'data': list containing at least one VigraArray objects, or None.
-            The arrays have identical shapes and axistag keys.
+        #'data': list containing at least one VigraArray objects, or None.
+            #The arrays have identical shapes and axistag keys.
             
-        'layout': traitlets.Bunch or None. When a Bunch, it maps the following
-            key/value pairs:
+        #'layout': traitlets.Bunch or None. When a Bunch, it maps the following
+            #key/value pairs:
             
-            'nFrames':      int;
-                            This is the total number of 2D data 
-                            slices (or frames) that can be displayed in a 2D 
-                            viewer one at a time.
+            #'nFrames':      int;
+                            #This is the total number of 2D data 
+                            #slices (or frames) that can be displayed in a 2D 
+                            #viewer one at a time.
                             
-                            The 'frames' are defined along the data array axis 
-                            that is orthogonal to the display plane. For more
-                            details see imaging.vigrautils.proposeLayout().
+                            #The 'frames' are defined along the data array axis 
+                            #that is orthogonal to the display plane. For more
+                            #details see imaging.vigrautils.proposeLayout().
                             
-            'horizontalAxis': int; 
-                            Index - or dimension - of the horizontal axis.
-                            This is the axis corresponding to the 'horizontal'
-                            dimension (or aspect) of the data for the purpose of
-                            being displayed in a 2D image viewer.
+            #'horizontalAxis': int; 
+                            #Index - or dimension - of the horizontal axis.
+                            #This is the axis corresponding to the 'horizontal'
+                            #dimension (or aspect) of the data for the purpose of
+                            #being displayed in a 2D image viewer.
                             
-            'verticalAxis': int;
-                            Index - or dimension - of the vertical axis
-                            This is the axis corresponding to the 'vertical'
-                            dimension (or aspect) of the data for the purpose of
-                            being displayed in a 2D image viewer.
+            #'verticalAxis': int;
+                            #Index - or dimension - of the vertical axis
+                            #This is the axis corresponding to the 'vertical'
+                            #dimension (or aspect) of the data for the purpose of
+                            #being displayed in a 2D image viewer.
                             
-            'channelsAxis': int; 
-                            Index - or dimension - of the channels axis
-                            For VigraArray objects, the size of the image data
-                            array on this dimension (or axis) indicates the
-                            number of data channels in each pixel.
+            #'channelsAxis': int; 
+                            #Index - or dimension - of the channels axis
+                            #For VigraArray objects, the size of the image data
+                            #array on this dimension (or axis) indicates the
+                            #number of data channels in each pixel.
                             
-            'framesAxis':   int; 
-                            Index - or dimenson - of the frames axis
-                            This is the axis (or axes) along which 2D data 
-                            frames (or slices) are taken to be displayed one at
-                            a time in a 2D image viewer.
+            #'framesAxis':   int; 
+                            #Index - or dimenson - of the frames axis
+                            #This is the axis (or axes) along which 2D data 
+                            #frames (or slices) are taken to be displayed one at
+                            #a time in a 2D image viewer.
                             
-            For a detailed explanation of the concept of frames and frames axis
-            see imaging.vigrautils.proposeLayout()
+            #For a detailed explanation of the concept of frames and frames axis
+            #see imaging.vigrautils.proposeLayout()
 
-        'axes_calibration': an imaging.axiscalibration.AxesCalibration object, 
-                            or None.
+        #'axes_calibration': an imaging.axiscalibration.AxesCalibration object, 
+                            #or None.
         
-        """
-        if not isinstance(data, (vigra.VigraArray, tuple, list)):
-            return (None, None, None)
+        #"""
+        #if not isinstance(data, (vigra.VigraArray, tuple, list)):
+            #return (None, None, None)
         
-        if isinstance(data, vigra.VigraArray):
-            # CAUTION 2021-12-03 10:21:58
-            # this layout has axisInfo objects, not indices
-            layout = proposeLayout(data, userFrameAxis = frameAxis, indices = True)
+        #if isinstance(data, vigra.VigraArray):
+            ## CAUTION 2021-12-03 10:21:58
+            ## this layout has axisInfo objects, not indices
+            #layout = proposeLayout(data, userFrameAxis = frameAxis, indices = True)
             
-            if isinstance(axescal, AxesCalibration) and all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(axescal.axiskeys, data.axistags)):
-                axes_cal = [axscal]
-            else:
-                axes_cal = [AxesCalibration(data)]
+            #if isinstance(axescal, AxesCalibration) and all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(axescal.axiskeys, data.axistags)):
+                #axes_cal = [axscal]
+            #else:
+                #axes_cal = [AxesCalibration(data)]
                 
-            return ([data], layout, axes_cal)
+            #return ([data], layout, axes_cal)
             
-        elif isinstance(data, (tuple, list)):
-            if len(data):
-                if not all([isinstance(s, vigra.VigraArray) for s in data]):
-                    raise TypeError("When not empty, data is expected to contain VigraArray objects")
+        #elif isinstance(data, (tuple, list)):
+            #if len(data):
+                #if not all([isinstance(s, vigra.VigraArray) for s in data]):
+                    #raise TypeError("When not empty, data is expected to contain VigraArray objects")
 
-                if not all([s.shape == data[0].shape for s in data[1:]]):
-                    raise TypeError("Image arrays in a sequence must have identical shapes")
+                #if not all([s.shape == data[0].shape for s in data[1:]]):
+                    #raise TypeError("Image arrays in a sequence must have identical shapes")
 
-                if not all([s.axistags == data[0].axistags for s in data[1:]]):
-                    raise TypeError("Image arrays in a sequence must have identical axistags")
+                #if not all([s.axistags == data[0].axistags for s in data[1:]]):
+                    #raise TypeError("Image arrays in a sequence must have identical axistags")
 
-                if not all([s.channels == data[0].channels for s in data[1:]]):
-                    raise TypeError("Image arrays in a sequence must have the same number of channels")
+                #if not all([s.channels == data[0].channels for s in data[1:]]):
+                    #raise TypeError("Image arrays in a sequence must have the same number of channels")
 
-                layout = proposeLayout(data[0], userFrameAxis = frameAxis, indices = True)
+                #layout = proposeLayout(data[0], userFrameAxis = frameAxis, indices = True)
                 
-                if isinstance(axescal, (tuple, list)):
-                    if len(axescal) != len(data):
-                        raise ValueError(f"Axes calibration expected to be a sequence with as many elements as 'data' ({len(data)}; got {len(axescal)} instead)")
+                #if isinstance(axescal, (tuple, list)):
+                    #if len(axescal) != len(data):
+                        #raise ValueError(f"Axes calibration expected to be a sequence with as many elements as 'data' ({len(data)}; got {len(axescal)} instead)")
                     
-                    if not all(isinstance(ac, AxesCalibration) for ac in axescal):
-                        raise TypeError("Expecting a tuple of AxesCalibration objects")
+                    #if not all(isinstance(ac, AxesCalibration) for ac in axescal):
+                        #raise TypeError("Expecting a tuple of AxesCalibration objects")
                     
-                    if all(all(axcal.typeFlags(key) == x.typeFlags for (key, x) in zip(axcal.axiskeys, img.axistags)) for axcal,img in zip(axescal,data)):
-                        axes_cal = [axcal for axcal in axescal]
-                    else:
-                        axes_cal = [AxesCalibration(img) for img in data]
-                else:
-                    axes_cal = [AxesCalibration(img) for img in data]
+                    #if all(all(axcal.typeFlags(key) == x.typeFlags for (key, x) in zip(axcal.axiskeys, img.axistags)) for axcal,img in zip(axescal,data)):
+                        #axes_cal = [axcal for axcal in axescal]
+                    #else:
+                        #axes_cal = [AxesCalibration(img) for img in data]
+                #else:
+                    #axes_cal = [AxesCalibration(img) for img in data]
                 
-                return (data, layout, axes_cal)
+                #return (data, layout, axes_cal)
 
-            return (list(), None, None)
+            #return (list(), None, None)
                 
-        return (None, None, None)
+        #return (None, None, None)
                 
     #@safeWrapper
     def _parse_image_arrays_(self, scene, scans, sceneFrameAxis=None, scansFrameAxis=None):
@@ -2178,7 +2348,7 @@ class ScanData(BaseScipyenData):
             self.scanTrajectory = None
             self.scene = new_scene
             self.sceneFrameAxis = scene_frame_axis
-            self.sceneAxesCalibrations = scene_axes_calibrations
+            self.sceneAxesCalibration = scene_axes_calibrations
 
         if new_scans is not None:
             self.scansCursors.clear()
@@ -8784,7 +8954,7 @@ class ScanData(BaseScipyenData):
         return tuple(itertools.chain.from_iterable((AxesCalibration(self.scene[k])["c"].channelNames for k in range(len(self.scene)))))
         
     @sceneChannelNames.setter
-    def sceneChannelNames(self, value):
+    def sceneChannelNames(self, value:typing.Union[tuple, list, str]):
         """
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
@@ -8793,28 +8963,30 @@ class ScanData(BaseScipyenData):
         if len(self.scene) == 0:
             return
         
-        if not isinstance(value, (tuple, list)) or not all([isinstance(v, str) for v in value]):
-            raise TypeError("Expecting a list of strings")
-        
-        # check conformance to number of channels in the scene data
-        if len(value) == self.sceneChannels:
-            if len(self.scene) == 1:
-                axcal = self.getSceneAxesCalibration(0)
-                
-                for c in range(self.sceneChannels):
-                    axcal.setChannelName(c, value[c])
-                    
-                axcal.calibrateAxis(self.scene[0].axistags["c"])
-                
-            else:
-                for k, v in enumerate(value):
-                    axcal = self.getSceneAxesCalibration(k)
-                    axcal.setChannelName(0, v)
-                    axcal.calibrateAxis(self.scene[k].axistags["c"])
+        if self.sceneChannels > 1:
+            if not isinstance(value, (tuple, list)) or not all([isinstance(v, str) for v in value]) or len(value) != self.sceneChannels:
+                raise TypeError(f"Expecting a sequence of {self.sceneChannel} strings; got {value}")
             
         else:
-            raise ValueError("Expecting a str list with as many elements as channels (%d); got %d elements instead" % (self.sceneChannels, len(value)))
-        
+            if isinstance(value, (tuple, list)) and len(value) >= 1:
+                value = value[0]
+                
+            if not isinstance(value, str):
+                raise TypeError(f"Expecting a str; got {value}")
+            
+        if len(self.scene) == 1:
+            axcal = self.sceneAxesCalibration[0]
+            for c in range(self.sceneChannels):
+                axcal.setChannelName(c, value[c])
+                
+            axcal.calibrateAxis(self.scene[0].axistags["c"])
+            
+        else:
+            for k,s in enumerate(self.scene):
+                axcal = self.sceneAxesCalibration[k]
+                axcal.setChannelName[0, value[k]]
+                axcal.calibrateAxis(s.axistags["c"])
+            
     @property
     def scansFrames(self) -> int:
         """Read-only.

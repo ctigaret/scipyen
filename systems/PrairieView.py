@@ -889,7 +889,12 @@ class PVFrame(object):
             fdata_axis_2_info.description = self.files[k]["channelName"]
             
             fdata_axis_2_cal = AxisCalibrationData(fdata_axis_2_info)
-            fdata_axis_2_cal.setChannelName(0, self.files[k]["channelName"]) # also adds channel calibration to the channel axis calibration
+            fdata_axis_2_cal.addChannelCalibration(ChannelCalibrationData(index = self.files[k]["channel"],
+                                                                          name=self.files[k]["channelName"]),
+                                                   name=self.files[k]["channelName"],
+                                                   index = self.files[k]["channel"])
+            
+            #fdata_axis_2_cal.setChannelName(0, self.files[k]["channelName"]) # also adds channel calibration to the channel axis calibration
                                         
             # embed calibration string into axis_2_info's description
             fdata_axis_2_info = fdata_axis_2_cal.calibrateAxis(fdata_axis_2_info)
@@ -934,7 +939,8 @@ class PVFrame(object):
                     sdata_axis_2_info = sdata.axistags["c"]
                 
                 sdata_axis_2_cal = AxisCalibrationData(sdata_axis_2_info)
-                sdata_axis_2_cal.setChannelName(0, self.files[k]["channelName"])
+                sdata_axis_2_cal.setChannelName(int(self.files[k]["channel"]), self.files[k]["channelName"])
+                #sdata_axis_2_cal.setChannelName(0, self.files[k]["channelName"])
 
                 sdata_axis_2_cal = sdata_axis_2_cal.calibrateAxis(sdata_axis_2_info)
                 

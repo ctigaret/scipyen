@@ -123,7 +123,7 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
         return "\n".join(result)
     
     @property
-    def needed_descriptors(self):
+    def mandatory_descriptors(self):
         return dict((a[0], getattr(self, a[0], None)) for a in self._descriptor_attributes_)
     
 
