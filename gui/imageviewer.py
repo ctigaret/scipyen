@@ -4167,7 +4167,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                             val = [float(img.bindAxis("c", k)[x,y,...]) for k in range(img.channels)]
                             
                             if self._axes_calibration_:
-                                cval = [self._axes_calibration_["c"].getChannelCalibration(k).calibratedMeasure(val[k]) for k in range(img.channels)]
+                                channelNdx = self._axes_calibration_["c"].channelIndices
+                                cval = [self._axes_calibration_["c"].getChannelCalibration(channelNdx[k]).calibratedMeasure(val[k]) for k in range(img.channels)]
                                 sval = "(%s)" % "; ".join(["%s" % quantity2str(v) for v in cval])
                                 
                             else:
@@ -4176,7 +4177,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                         else:
                             val = float(img[x,y])
                             if self._axes_calibration_:
-                                cval = self._axes_calibration_["c"].getChannelCalibration(0).calibratedMeasure(val)
+                                cval = self._axes_calibration_["c"].getChannelCalibration().calibratedMeasure(val)
                                 sval = "(%s)" % quantity2str(cval)
                             else:
                                 sval = "(%.2f)" % val

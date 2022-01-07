@@ -351,7 +351,7 @@ class CalibrationData(object):
                             self._data_.update(cal._data_)
                             return
                         except:
-                            raise ValueError(f"str argument is an ambiguous calibraiton string")
+                            raise ValueError(f"str argument is an ambiguous calibration string")
                         
                     elif not isSpecificAxisType(self._data_.type):
                         self._data_.type = axisTypeFromString(arg)
@@ -1185,26 +1185,35 @@ class AxisCalibrationData(CalibrationData):
     def channels(self) -> list:
         """Returns a list of tuples with (name, ChannelCalibrationData) 
         
-        WARNING: Excludes calibraitn data for virtual channel.
+        WARNING: Excludes calibration data for virtual channel.
         
-        The tuple elemets represent the symbol and channel calibration for
-        non-virtual channels only, where symbol is the name to which  the 
-        channel calibration data is bound, in this AxisCalibrationData object.
+        In each tuple, the elements represent the symbol and the channel 
+        calibration mapped to it, for non-virtual channels only, in this 
+        AxisCalibrationData object.
         
         The symbol is not necessarily the name of the channel.
         
         VigraArray objects always have at least one channel. When the array
-        lacks a defined Channels axis, the data constitute a single channel
-        corresponding to a virtual Channels axis of size 1.
+        lacks a defined Channels axis, the data itself constitutes a single 
+        channel corresponding to a virtual Channels axis of size 1.
         
-        This means that a VigraArray can have one channel (in a real or virtual
-        Channels axis) or several channels (always in a defined in a real
-        Channels axis).
+        Hence, the calibration data for a Channels axis will report either:
         
-        This property reports the non-virtual channels (which may be absent)
+        * at least one calibration data for 'real' channels
+        
+        or:
+        
+        * one calibration data with default parameters for a 'virtual' channel.
+        
+        This property reports only the calibrations for 'real' channels, hence
+        it may be an empty list.
         
         This behaviour is different from that of the `channelCalibrations`
-        property where one (virtual) channel calibration is returned.
+        property where a virtual channel calibration is returned when no 'real'
+        channel calibration data exists.
+        
+        For AxisCalibrationData corresponding to a non-Channels axis this 
+        property is always an empty list.
         
         The setter expects a sequence of tuples (a,b) with:
         `a`:str = the field name that will be mapped to the ChannelCalibrationData
@@ -1233,17 +1242,19 @@ class AxisCalibrationData(CalibrationData):
     def channelCalibrations(self):
         """A list of tuples (symbol, channel calibration).
         
-        This INCLUDES the virtual channel when calibrations for real channels do
-        not exist; therefore, will always return a non-empty list
+        These INCLUDE the virtual channel when calibrations for real channels do
+        not exist; hence,, for a channels-type axis, this property is always a 
+        non-empty list. 
         
-        To get the actual channel calibrations EXCLUDIG the virtual ones, use 
-        `self.channels` property.
+        To get the actual ('real') channel calibrations see `self.channels` 
+        property.
         
         The setter of this property expects a tuple (str, ChannelCalibrationData)
         as for the `channels` property setter (it actualy delegates to the
         latter).
         """
-        ret = list((k,v) for v in self._data_.items() if isinstance(v, ChannelCalibrationData))
+        ret = [(k,v) for k, v in self._data_.items() if isinstance(v, ChannelCalibrationData)]
+        #ret = list((k,v) for v in self._data_.items() if isinstance(v, ChannelCalibrationData))
         
         if len(ret) == 0 and self.type == vigra.AxisType.Channels:
             cal = ChannelCalibrationData()
@@ -1261,17 +1272,23 @@ class AxisCalibrationData(CalibrationData):
         
     @property
     def channelNames(self):
-        """Yields channel names or nothing of there is no ChannelCalibrationData.
-        NonChannel axes have no ChannelCalibrationData
+        """A list of channel names, from their calibration data.
+        These include the virtual channel (if it exists).
+        
+        This list is empty if the AxisCalibrationData corresponds to a 
+        non-Channels axis.
         """
-        return list(ch.name for ch in self.channelCalibrations)
+        return list(ch[1].name for ch in self.channelCalibrations)
         
     @property
     def channelIndices(self):
-        """A list of channel indices or empty list.
-        NonChannel axes have no ChannelCalibrationData
+        """A list of channel indices, from their calibration data.
+        These include the virtual channel (if it exists).
+        
+        This list is empty if the AxisCalibrationData corresponds to a 
+        non-Channels axis.
         """
-        return list(ch.index for ch in self.channelCalibrations)
+        return list(ch[1].index for ch in self.channelCalibrations)
         
     @property
     def nChannels(self) -> int:
@@ -1287,7 +1304,7 @@ class AxisCalibrationData(CalibrationData):
         
         
         """
-        return len(list(self.channelCalibrations))
+        return len(self.channelCalibrations)
         
     @property
     def calibrationString(self):
@@ -1520,13 +1537,13 @@ class AxisCalibrationData(CalibrationData):
         for (k,c) in self.channels:
             self._data_.pop(k, None)
                 
-    def getChannelCalibration(self, index:typing.Optional[typing.Union[int, str]]=0,
+    def getChannelCalibration(self, index:typing.Optional[typing.Union[int, str]]=None,
                               full:typing.Optional[bool]=False) -> typing.Optional[typing.Union[list, ChannelCalibrationData]]:
         """ChannelCalibrationData for a single channel.
         
         Parameters:
         ==========
-        index: str or int; optional default is 0 
+        index: str or int; optional default is None.
             When a str, this is the channel name as in the ChannelCalibrationData
             'name' field, if it exists; failing that, 'name' will be matched 
             against the symbols mapped to ChannelCalibrationData in this 
@@ -1534,6 +1551,10 @@ class AxisCalibrationData(CalibrationData):
             
             When an int, this is the channel index as in the ChannelCalibrationData
             'index' field.
+            
+            When None, this will return the first available channel calibration
+            data, if any, in the insertion order of the symbols to which channel
+            calibration data are bound, in this AxisCalibrationData object.
             
         full:bool, optional (default is False)
             When True, also returns the name (symbol) to which the 
@@ -1552,21 +1573,24 @@ class AxisCalibrationData(CalibrationData):
         calibration data will not be stored in this AxisCalibrationData object,
         unless the channel calibration data is explicitly added to this object.
         
-        Returns None for non-Channels axis.
+        Returns None for non-Channels axis, or when no channel calibration data
+        was found using the supplied index value.
         
         """
         if not self.type & vigra.AxisType.Channels:
             return
         
-        if index is None:
-            index = 0
-            
-        if len(self.channels) == 0:
+        if len(self.channelCalibrations) == 0:
             cal = ChannelCalibrationData()
             cal.name = "virtual_channel_0"
             if full:
                 return (cal.name, cal)
             return cal
+        
+        if index is None:
+            if full:
+                return self.channelCalibrations[0]
+            return self.channelCalibrations[0][1]
             
         if isinstance(index, int):
             what = "index"
@@ -1575,7 +1599,7 @@ class AxisCalibrationData(CalibrationData):
             what = "name"
             
         else:
-            raise TypeError(f"Expecting a str or int; got {type(index).__name__} instead.")
+            raise TypeError(f"Expecting a str, int or None; got {type(index).__name__} instead.")
         
         # NOTE: 2022-01-07 00:12:54
         # 1) search by calibration name or index
