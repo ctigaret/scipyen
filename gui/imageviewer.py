@@ -4290,18 +4290,17 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 
                 if img.ndim > 2:
                     if self.frameAxis is not None:
-                        if isinstance(self.frameAxis, vigra.AxisInfo):
+                        if isinstance(self.frameAxis, (vigra.AxisInfo, int)):
                             #if self.frameAxis not in self._data_.axistags:
                             if self.frameAxis >= img.ndim:
                                 raise RuntimeError(f"frame axis {self.frameAxis} %s not found in the image")
-                                #raise RuntimeError("frame axis  %s not found in the image" % self.frameAxis.key)
                         
                             if self._axes_calibration_:
                                 cz = quantity2str(self._axes_calibration_[self._data_.axistags[self.frameAxis].key].calibratedMeasure(self._current_frame_index_))
                             else:
                                 cz = ""
                         
-                            sz = self.frameAxis.key
+                            sz = self.frameAxis.key if isinstance(self.frameAxis, vigra.AxisInfo) else self._data_.axistags[self.frameAxis].key
                         
                             c_list.append(", Z: %d (%s: %s)>" % (self._current_frame_index_, sz, cz))
                             
@@ -4840,95 +4839,124 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._scaleBarLength_ = length
         self._scaleBarOrigin_ = origin
         
-    def addCursors(self, **kwargs):
-        """Programmatically add a set of cursors
+    def addCursors(self, **kwargs) -> tuple:
+        """Programmatically creates a set of cursors from cursor parameters.
+        
+        Creates gui.planargraphics.Cursor objects and their 
+        gui.planargraphics.GraphicsObject frontends.
+        
+        The method provides a quick shorthand for creating new cursors in the 
+        ImageViewer's scene.
         
         Var-keyword parameters:
         =======================
         Mapping of cursor name (str) to a dict with fields:
-        "type": str (valid PlanarGraphicsType name)
-        "pos": tuple (x,y) of coordinates
+            "type": str (valid PlanarGraphicsType name)
+            "pos": tuple (x,y) of coordinates
+            
+        Returns:
+        ========
+        A (possibly empty) tuple of gui.planargraphics.Cursor objects.
         
         Example:
         
-        addCursors(**dict(map(lambda k: ("Cursor%i"%k, {"type":"vertical", "pos": (50 + 50 * k, 0)}), range(2))))
+        c = addCursors(**dict(map(lambda k: ("Cursor%i"%k, {"type":"vertical", "pos": (50 + 50 * k, 0)}), range(2))))
         
         """
-        if self.viewerWidget.scene.rootImage is None:
-            return 
+        objects = list()
         
-        k = 0
-        
-        for name, type_pos in kwargs.items():
-            ctype = type_pos.get("type", None)
-            cpos = type_pos.get("pos", None)
+        if self.viewerWidget.scene.rootImage is not None:
+            #k = 0
             
-            if isinstance(ctype, str):
-                cursor_type_names = filter(lambda x: x.endswith("_cursor"), pgui.PlanarGraphicsType.names())
-                sub_match = list(filter(lambda x: ctype in x, cursor_type_names))
-                if ctype in cursor_type_names:
-                    ctype = pgui.PlanarGraphicsType["ctype"]
+            for name, type_pos in kwargs.items():
+                ctype = type_pos.get("type", None)
+                cpos = type_pos.get("pos", None)
+                
+                if isinstance(ctype, str):
+                    cursor_type_names = filter(lambda x: x.endswith("_cursor"), pgui.PlanarGraphicsType.names())
+                    sub_match = list(filter(lambda x: ctype in x, cursor_type_names))
+                    if ctype in cursor_type_names:
+                        ctype = pgui.PlanarGraphicsType["ctype"]
+                        
+                    elif len(sub_match):
+                        ctype = pgui.PlanarGraphicsType[sub_match[0]]
+                        
+                    else:
+                        continue # no known cursor type
                     
-                elif len(sub_match):
-                    ctype = pgui.PlanarGraphicsType[sub_match[0]]
+                elif isinstance(ctype, pgui.PlanarGraphicsType):
+                    if not ctype.is_primitive() or not ctype.name.endswith("_cursor"):
+                        continue
                     
                 else:
-                    continue # no known cursor type
-                
-            elif isinstance(ctype, pgui.PlanarGraphicsType):
-                if not ctype.is_primitive() or not ctype.name.endswith("_cursor"):
+                    continue
+                        
+                if not isinstance(cpos, (tuple, list)) or len(cpos) != 2 or not all((isinstance(v, numbers.Number) for v in cpos)):
                     continue
                 
-            else:
-                continue
+                if ctype == pgui.PlanarGraphicsType.vertical_cursor:
+                    factory = pgui.VerticalCursor
                     
-            if not isinstance(cpos, (tuple, list)) or len(cpos) != 2 or not all((isinstance(v, numbers.Number) for v in cpos)):
-                continue
-            
-            if ctype == pgui.PlanarGraphicsType.vertical_cursor:
-                factory = pgui.VerticalCursor
+                elif ctype == pgui.PlanarGraphicsType.horizontal_cursor:
+                    factory = pgui.HorizontalCursor
+                    
+                elif ctype == pgui.PlanarGraphicsType.crosshair_cursor:
+                    factory = pgui.CrosshairCursor
+                    
+                elif ctype == pgui.PlanarGraphicsType.point_cursor:
+                    factory = pgui.PointCursor
+                    
+                else:
+                    continue
                 
-            elif ctype == pgui.PlanarGraphicsType.horizontal_cursor:
-                factory = pgui.HorizontalCursor
+                obj = factory(cpos[0], cpos[1],
+                            self.viewerWidget.scene.sceneRect().width(),
+                            self.viewerWidget.scene.sceneRect().height(),
+                            self.viewerWidget.__cursorWindow__, 
+                            self.viewerWidget.__cursorWindow__,
+                            self.viewerWidget.__cursorRadius__,
+                            name=name,
+                            frameindex=[],
+                            currentFrame = self.currentFrame,
+                            )
                 
-            elif ctype == pgui.PlanarGraphicsType.crosshair_cursor:
-                factory = pgui.CrosshairCursor
+                obj=self.addPlanarGraphics(obj, showLabel=True, labelShowsPosition=True)
+                # NOTE: 2021-09-16 12:11:54
+                # these two are needed to that we can move the thing with the mouse
+                # FIXME this should not happen
+                obj.x = cpos[0]
+                obj.y = cpos[1]
                 
-            elif ctype == pgui.PlanarGraphicsType.point_cursor:
-                factory = pgui.PointCursor
-                
-            else:
-                continue
+                objects.append(obj)
             
-            obj = factory(cpos[0], cpos[1],
-                          self.viewerWidget.scene.sceneRect().width(),
-                          self.viewerWidget.scene.sceneRect().height(),
-                          self.viewerWidget.__cursorWindow__, 
-                          self.viewerWidget.__cursorWindow__,
-                          self.viewerWidget.__cursorRadius__,
-                          name=name,
-                          frameindex=[],
-                          currentFrame = self.currentFrame,
-                          )
-            
-            self.addPlanarGraphics(obj, showLabel=True, labelShowsPosition=True)
-            # NOTE: 2021-09-16 12:11:54
-            # these two are needed to that we can move the thing with the mouse
-            # FIXME this should not happen
-            obj.x = cpos[0]
-            obj.y = cpos[1]
-            
+        return objects
         
-    def addPlanarGraphics(self, item:pgui.PlanarGraphics, movable:bool = True, 
-                          editable:bool = True, showLabel:bool = True, 
-                          labelShowsPosition:bool = True, autoSelect:bool = True,
+    def addPlanarGraphics(self, item:pgui.PlanarGraphics, 
+                          movable:bool = True, 
+                          editable:bool = True, 
+                          showLabel:bool = True, 
+                          labelShowsPosition:bool = True, 
+                          autoSelect:bool = True,
                           transparentLabel:bool = False):
-        """Programmatically add a roi or a cursor to the underlying scene.
+        """Add a roi or a cursor to the underlying scene.
+        
+        The function generates a gui.planargraphics.GraphicsObject as a frontend
+        to a gui.plarangraphics.PlanarGraphics object.
+        
+        The ImageViewer does not own the PlanarGraphics object, but a reference
+        to the PlanarGraphics object is accessible to the GraphicsObject 
+        instance as the 'backend'. attribute.
+        
+        In turn, a PlanarGraphics object can hold references to potentially more
+        than one GraphicsObject 'frontends' (e.g. one for a distinct instance
+        of ImageViewer) such that changes in the PlaraGraphics object shape
+        descriptors are visible in all frontends.
+        
         
         Parameters:
         ===========
         
-        item: pictgui.PlanarGraphics object
+        item: gui.PlanarGraphics object
         
         Keyword parameters:
         ==================
@@ -4939,15 +4967,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         Returns:
         ========
-        A PlanarGraphics object
+        The PlanarGraphics object passed in the 'item' argument.
         
         """
         obj = self.viewerWidget.newGraphicsObject(item, 
-                                                movable             = movable,
-                                                editable            = editable, 
-                                                showLabel           = showLabel,
-                                                labelShowsPosition  = labelShowsPosition,
-                                                autoSelect          = autoSelect)
+                                                  movable             = movable,
+                                                  editable            = editable, 
+                                                  showLabel           = showLabel,
+                                                  labelShowsPosition  = labelShowsPosition,
+                                                  autoSelect          = autoSelect)
         
         if isinstance(obj.backend, pgui.Cursor):
             if isinstance(self.cursorsColor, QtGui.QColor) and self.cursorsColor.isValid():

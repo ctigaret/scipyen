@@ -1182,6 +1182,13 @@ class PlanarGraphics():
             # TODO: deep copy
             self._linked_objects_.update(linked_objects)
             
+    def _repr_pretty_(self, p, cycle):
+        p.text(f"{self.__class__.__name__}:")
+        p.breakable()
+        p.pretty(self._states_)
+        p.text("\n")
+        
+            
     def __reduce__(self):
         shape_descriptors = [d for d in self._planar_descriptors_ if d != "z_frame"]
         
@@ -1285,7 +1292,7 @@ class PlanarGraphics():
         
         state = self.getState(frame)
         
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             return path
             
         if connected and path.elementCount() > 0:
@@ -1703,7 +1710,7 @@ class PlanarGraphics():
         else:
             state = self.getState(frame)
                 
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             warnings.warn("%s.qPoints(): Undefined state" % self.__class__.__name__, stacklevel=2)
             return [QtCore.QPointF()]
         
@@ -1851,7 +1858,7 @@ class PlanarGraphics():
         
         state = self.getState(frame)
         
-        if state and len(state):
+        if state: # and len(state):
             return ((state.x, state.y),)
         
         return tuple()
@@ -1900,7 +1907,7 @@ class PlanarGraphics():
         else:
             state = self.getState(frame)
         
-        if isinstance(state, DataBag) and len(state):
+        if isinstance(state, DataBag): # and len(state):
             ret.append(self.__class__(state.copy(), graphicstype = self._planar_graphics_type_))
             
         return ret
@@ -2438,7 +2445,7 @@ class PlanarGraphics():
         
         """
         state = self.getState(frame)
-        return (state is not None) and len(state)>0
+        return (state is not None) 
         
     def qGraphicsItem(self, pointSize=1, frame=None):
         """Generates a concrete QGraphicsItem instance using the 
@@ -2546,7 +2553,7 @@ class PlanarGraphics():
             
             state = self.getState(frame)
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             warnings.warn("%s.qGraphicsItem: undefined state" % self.__class__.__name__, stacklevel=2)
             return QtWidgets.QGraphicsPathItem()
         
@@ -2638,52 +2645,56 @@ class PlanarGraphics():
         if self.validateState(state):
             return index_of(self._states_, state, key = lambda x: x.z_frame)
                         
-    def getState(self, z_frame:typing.Optional[int]=None,
-                 return_visible:bool=True) -> typing.Optional[object]:
+    def getState(self, frame:typing.Optional[int]=None,
+                 visible:bool=True) -> typing.Optional[DataBag]:
         """Access the state according to their z_frame value.
+        
+        By definition, a primitive PlanarGraphics (i.e., NOT a Path) has only
+        one state DataBag associated with a given frame (which, depending on its
+        'z_frame' value, it may be visible in the frame, or not).
         
         Parameters:
         ----------
-        z_frame: int, None (default) 
-            ATTENTION: When z_frame is None, then it will automatically use 
-            the current frame.
+        frame: int, None (default) 
+            ATTENTION: When frame is None, then the method will return the state
+            associated with the current frame.
             
-        return_visible: bool, optional (default is True):
+        visible: bool, optional (default is True):
             When True, returns the state that is visible in the specified frame 
             index, regardless of its state.z_frame value (i.e. state.z_frame can
-            be either None, z_frame, or any int < 0 and != -z_frame - 1).
+            be either None, frame, or any int < 0 and != -frame - 1).
             
-            When False, returns the state which has state.z_frame == z_frame, or 
-            None if no state exists with state.z_frame == z_frame.
+            When False, returns the state which has state.z_frame == frame, or 
+            None if no state exists with state.z_frame == frame.
             
         Returns:
         -------
         
-        A DataBag object (state) or None
+        The state (DataBag) for the current frame or None.
         
         The DataBag object can be:
         
         * the unique state with ubiquitous visibility (i.e., state.z_frame is None)
             - is such a state exists, it will be returned regardless of the 
-                value of the 'z_frame' parameter, as it is the only state 
+                value of the 'frame' parameter, as it is the only state 
                 available
                 
         * the non-ubiquitous state that is visible in the frame with the index 
-            specified by 'z_frame'; this state is either:
+            specified by 'frame'; this state is either:
             
-            - a single-frame state with state.z_frame == z_frame if it exists,
+            - a single-frame state with state.z_frame == frame if it exists,
             
             or
             
             - the frame-avoiding state that would be visible in this frame, i.e.:
                 
-                state.z_frame != -1 * z_frame -1
+                state.z_frame != -1 * frame -1
             
         NOTE: It does not make sense to query for a state where 
         state.z_frame is None, since such a state, if it exists, is the only 
         state allowed.
         
-        Hence, getState() called with z_frame having any acceptable value
+        Hence, getState() called with frame having any acceptable value
         (either int or None) and return_visible=True (the default) will always
         return the ubiquitous state if it exists.
         
@@ -2706,26 +2717,26 @@ class PlanarGraphics():
             ATTENTION:
             In this case the function returns None even if there exists an
             ubiquitous state, or a frame-avoiding state that would be visible in 
-            the frame with index z_frame.
+            the frame with index frame.
             
-        3. self.getState(z_frame=-3) -> the state 
+        3. self.getState(frame=-3) -> the state 
         """
-        if z_frame is None:
-            z_frame = self._currentframe_
+        if frame is None:
+            frame = self._currentframe_
             
-        if not isinstance(z_frame, int):
-            raise TypeError("'z_frame' expected to be an int; got %s instead" % type(z_frame).__name__)
+        if not isinstance(frame, int):
+            raise TypeError("'frame' expected to be an int; got %s instead" % type(frame).__name__)
             
-        if return_visible:
-            visible_states = [s for s in self._states_ if self.__class__.isStateVisible(s, z_frame)]
+        if visible:
+            visible_states = [s for s in self._states_ if self.__class__.isStateVisible(s, frame)]
             
-            if len(visible_states):
+            if visible_states:
                 return visible_states[0]
             
         else:
-            states = [s for s in self._states_ if s.z_frame == z_frame]
+            states = [s for s in self._states_ if s.z_frame == frame]
             
-            if len(states):
+            if states:
                 return states[0]
             
     def setFrameIndex(self, state:typing.Optional[typing.Union[DataBag, int]]=None, 
@@ -3372,17 +3383,20 @@ class PlanarGraphics():
                                 
         self.checkStates()
         
-    def getObjectForFrame(self, frame:typing.Optional[int]=None) -> typing.Optional[object]:
-        """Returns a PlnaraGRaphics of the same type at self, for the specified frame.
+    def objectForFrame(self, frame:typing.Optional[int]=None,
+                       visible:typing.Optional[bool]=True) -> typing.Optional[object]:
+        """Returns a PlanarGraphics of the same type as self, linked to frame.
         
         In contrast with getState(frame) which returns just the DataBag state for
         the specified frame, this function constructs a new PlanarGraphics object
         having a single ubiquitous state identical to the one returned by getState().
         
+        This implies that the new PlanarGraphics is a copy of the 
+        
         This is used typically when dysplaying the PlanarGraphics in a frame (as
         "cached" object)
         """
-        return self.__class__(self.getState(frame))
+        return self.__class__(self.getState(frame, visible=visible))
     
     @staticmethod
     def getCurveLength(obj, prev=None):
@@ -4496,7 +4510,7 @@ class Cursor(PlanarGraphics):
         
         state = self.getState(frame)
         
-        if state and len(state):
+        if state: # and len(state):
             if self.type is PlanarGraphicsType.vertical_cursor:
                 path.addRect(QtCore.QRectF(state.x - state.xwindow/2, 0, 
                                            state.xwindow, state.height))
@@ -4585,7 +4599,7 @@ class VerticalCursor(Cursor):
         
         state = self.getState(frame)
         
-        if state and len(state):
+        if state: # and len(state):
             path.addRect(QtCore.QRectF(state.x - state.xwindow/2, 0, 
                                        state.xwindow, state.height))
         return path
@@ -4615,7 +4629,7 @@ class HorizontalCursor(Cursor):
         
         state = self.getState(frame)
         
-        if state and len(state):
+        if state: # and len(state):
             path.addRect(QtCore.QRectF(0, state.y - state.ywindow/2, 
                                        state.width, state.ywindow))
         
@@ -4646,7 +4660,7 @@ class CrosshairCursor(Cursor):
         
         state = self.getState(frame)
         
-        if state and len(state):
+        if state: # and len(state):
             path.addRect(QtCore.QRectF(state.x - state.xwindow/2, 0, 
                                        state.xwindow, state.height))
             path.addRect(QtCore.QRectF(0, state.y - state.ywindow/2, 
@@ -4683,7 +4697,7 @@ class PointCursor(Cursor):
         
         state = self.getState(frame)
 
-        if state and len(state):
+        if state: # and len(state):
             path.addRect(QtCore.QRectF(state.x - state.xwindow/2, 
                                        state.y - state.ywindow/2, 
                                        state.xwindow, 
@@ -4754,7 +4768,7 @@ class Arc(PlanarGraphics):
         """
         state = self.getState(frame)
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             return tuple() # empty path
         
         if state.w > state.h:
@@ -4834,7 +4848,7 @@ class Arc(PlanarGraphics):
         else:
             state = self.getState(frame)
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             return
         
         # cp0: top-left corner of the enclosing rectangle 
@@ -4920,7 +4934,7 @@ class ArcMove(PlanarGraphics):
         else:
             state = self.getState(frame)
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             return tuple() # empty path
         
         if state.w > state.h:
@@ -4994,7 +5008,7 @@ class ArcMove(PlanarGraphics):
         else:
             state = self.getState(frame)
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             return
         
         # cp0: top-left corner of the enclosing rectangle 
@@ -5053,7 +5067,7 @@ class Line(PlanarGraphics):
     def controlPoints(self, frame=None):
         state = self.getState(frame)
 
-        if state and len(state):
+        if state: # and len(state):
             return ((state.x, state.y),)
         
         return tuple() # empty path
@@ -5090,7 +5104,7 @@ class Line(PlanarGraphics):
                 warnings.warn("No state is associated with specified frame (%d)" % frame)
                 return
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             warnings.warn("undefined state")
             return
             
@@ -5132,7 +5146,7 @@ class Move(PlanarGraphics):
     def controlPoints(self, frame=None):
         state = self.getState(frame)
         
-        if state and len(state):
+        if state: # and len(state):
             return ((state.x, state.y),)
 
         return tuple()
@@ -5169,7 +5183,7 @@ class Move(PlanarGraphics):
                 warnings.warn("No state is associated with specified frame (%d)" % frame)
                 return
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             warnings.warn("undefined state")
             return
             
@@ -5228,7 +5242,7 @@ class Cubic(PlanarGraphics):
         else:
             state = self.getState(frame)
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             return tuple()
         
         return ((state.x, state.y), (state.c1x, state.c1y), (state.c2x, state.c2y))
@@ -5266,7 +5280,7 @@ class Cubic(PlanarGraphics):
         else:
             state = self.getState(frame)
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             return
         
         state.x = path[0].x
@@ -5375,7 +5389,7 @@ class Quad(PlanarGraphics):
         else:
             state = self.getState(frame)
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             return tuple()
         
         return ((state.x, state.y), (state.cx, state.cy))
@@ -5493,7 +5507,7 @@ class Ellipse(PlanarGraphics):
         else:
             state = self.getState(frame)
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             return tuple()
         
         return ((state.x, state.y), (state.x + state.w, state.y + state.h))
@@ -5534,7 +5548,7 @@ class Ellipse(PlanarGraphics):
         else:
             state = self.getState(frame)
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             return
         
         state.x = path[0].x
@@ -5559,7 +5573,7 @@ class Ellipse(PlanarGraphics):
         else:
             state = self.getState(frame)
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             return list()
             
         return [QtCore.QPointF(state.x, state.y), 
@@ -5570,7 +5584,7 @@ class Ellipse(PlanarGraphics):
     def qGraphicsItem(self, pointSize=0, frame = None):
         state = self.getstate(frame)
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             warnings.warn("undefined state")
             return
             
@@ -5621,7 +5635,7 @@ class Rect(PlanarGraphics):
         else:
             state = self.getState(frame)
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             return tuple()
         
         return ((state.x, state.y), (state.x + state.w, state.y + state.h))
@@ -5666,7 +5680,7 @@ class Rect(PlanarGraphics):
         else:
             state = self.getState(frame)
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             return
         
         state.x = path[0].x
@@ -5691,7 +5705,7 @@ class Rect(PlanarGraphics):
         else:
             state = self.getState(frame)
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             warnings.warn("Rectangle: undefined state")
             return list()
             
@@ -5715,7 +5729,7 @@ class Rect(PlanarGraphics):
                 warnings.warn("No state is associated with specified frame (%d)" % frame)
                 return
             
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             warnings.warn("undefined state")
             return
             
@@ -5735,7 +5749,7 @@ class Rect(PlanarGraphics):
             raise TypeError("'frame' parameter expected to be an int or None; got %s instead" % type(frame).__name__)
         
             
-        if state is not None and len(state):
+        if state is not None: # and len(state):
             ret.append(Move(state.x, state.y))
             ret.append(Line(state.x + state.w, state.y))
             ret.append(Line(state.x + state.w, state.y + state.h))
@@ -5858,7 +5872,7 @@ class Text(PlanarGraphics):
         else:
             frame = self.getState(frame)
             
-        if state and len(state):
+        if state: # and len(state):
             return [QtCore.QPointF(state.x, state.y)]
         
         else:
@@ -6247,6 +6261,23 @@ class Path(PlanarGraphics):
                                         self._linked_objects_.copy(),
                                         self._position_)
     
+    def _repr_pretty_(self, p, cycle):
+        if cycle:
+            p.text(f"{self.__class__.__name__}(...)")
+        else:
+            p.text(f"{self.__class__.__name__}:")
+            p.breakable()
+            if len(self._objects_) > 6:
+                for k in range(3):
+                    p.pretty(self._objects_[k])
+                p.text("\n...\n")
+                for k in range(2, len(self._objects_)):
+                    p.pretty(self._objects_[k])
+            else:
+                for o in self._objects_:
+                    p.pretty(o)
+            p.text("\n")
+
     def __repr__(self):
         ss = super(PlanarGraphics, self).__repr__()
         return ss
@@ -6315,7 +6346,7 @@ class Path(PlanarGraphics):
                 else:
                     state = self.getState(frame)
                     
-                if state and len(state):
+                if state: # and len(state):
                     path.lineTo(self._objects_[0].x, 
                                 self._objects_[0].y) 
                 
@@ -6672,7 +6703,8 @@ class Path(PlanarGraphics):
         path, in the current descriptor state
         """
         if len(self._objects_):
-            states = self.getState(self.currentFrame)
+            states = self.objectForFrame(self.currentFrame, visible=True)
+            #states = self.getState(self.currentFrame, visible=True)
             
             if len(states):
                 x = min([s.x for s in states])
@@ -6688,7 +6720,7 @@ class Path(PlanarGraphics):
     @x.setter
     def x(self, value):
         if len(self._objects_):
-            states = self.getState(self.currentFrame)
+            states = self.getState(self.currentFrame, visible=True)
             if len(states):
                 old_x = min([s.x for s in states])
                 
@@ -6962,12 +6994,12 @@ class Path(PlanarGraphics):
     def states(self):
         """Returns a list of lists of states (one list per element)
         """
-        # FIXME should this not be a list of states (as paths) instead?
-        # as it is right now it returns a list with as many elements as there are
-        # elements in the path, which is confusing;
-        # a path's state should return a single-state path corresponding to the
-        # queried state
-        uniqe_frames = self.frameIndices
+        ## FIXME should this not be a list of states (as paths) instead?
+        ## as it is right now it returns a list with as many elements as there are
+        ## elements in the path, which is confusing;
+        ## a path's state should return a single-state path corresponding to the
+        ## queried state
+        #uniqe_frames = self.frameIndices
         
         return [p.states for p in self._objects_]
         
@@ -6989,7 +7021,8 @@ class Path(PlanarGraphics):
             
     @property
     def currentState(self):
-        """ A list of states.
+        """ A Path object containing the list of objects visible in the current
+        state.
         
         As for the currentStateIndexed property, the states are taken from the
         PlanarGraphics elements that compose this Path object, provided that they
@@ -7001,10 +7034,14 @@ class Path(PlanarGraphics):
         state for the current frame, the returned list will be empty.
         
         """
-        #raise NotImplementedError("Path object do not support this method")
-        states = [p.getState(self._currentframe_) for p in self._objects_] # may be empty
+        states = self.getState()
         
-        return states if len(states) else None
+        return states
+        
+        
+        #states = [p.getState(self._currentframe_) for p in self._objects_] # may be empty
+        
+        #return Path(states) if len(states) else None
         
     @property
     def closed(self):
@@ -7049,7 +7086,7 @@ class Path(PlanarGraphics):
                 warnings.warn("%s.qPoints(): No state is associated with specified frame (%d)" % (self.__class__.__name__, frame), stacklevel=2)
                 return [QtCore.QPointF()]
         
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             warnings.warn("%s.qPoints(): Undefined state" % self.__class__.__name__, stacklevel=2)
             return [QtCore.QPointF()]
         
@@ -7078,39 +7115,63 @@ class Path(PlanarGraphics):
     def hasStateForFrame(self, frame:typing.Optional[int]=None):
         return any([o.hasStateForFrame(frame) for o in self])
         
-    def getObjectForFrame(self, frame:typing.Optional[int]=None):
-        return self.asPath(frame)
+    #def objectForFrame(self, frame):
+        #"""See PlanarGraphics.objectForFrame
+        #"""
+        #if self.hasStateForFrame(frame):
+            #ret = Path()
+            #for p in self:
+                #ret.append(p.objectForFrame(frame))
+            
+            #ret.name = "copy of %s for frame %d" % (self.name, frame)
+                
+        #else:
+            #ret = None
+            
+        #return ret
+            
+    def objectForFrame(self, frame:typing.Optional[int]=None,
+                          visible:typing.Optional[bool] = True) -> object:
+        return self.asPath(frame, visible)
     
-    def asPath(self, frame:typing.Optional[int]=None, closed:bool=False):
-        """Returns a Path object made of graphics visibile in the specified frame
+    def asPath(self, frame:typing.Optional[int]=None,
+               visible:typing.Optional[bool] = True) -> object:
+        """Returns a Path object made of graphics linked to the specified frame
         
-        frame: int (frame index)
+        Parameters:
+        ========================
+        frame: int (frame index); optional, default is current frame
+
+        visible: bool, optional, deftault is True: only include PlanarGraphics
+            objects that are visible in the specified frame
         
         """
-        # NOTE 2020-11-02 22:28:07
-        # this deliberately constructs a path containing graphics elements having
-        # only a single state 
-        # (if there are more than one visible state for this frame, the first 
-        # such state is retained, discarding the rest)
-        elements = [o for o in map(lambda x: x.getObjectForFrame(frame), self) if o is not None]
-        if len(elements):
+        elements = [o for o in map(lambda x: x.objectForFrame(frame, visible=visible), self) if o is not None]
+        if elements:
             return Path(elements)
         #return Path([o for o in map(lambda x: x.getObjectForFrame(frame), self) if o is not None])
-    
-    def getState(self, frame:typing.Optional[int]=None) -> typing.Optional[object]:
-        """Returns a list of states that defined for the specified frame.
+        
+    def getState(self, frame:typing.Optional[int]=None,
+                 visible:typing.Optional[bool]=True) -> typing.Optional[list]:
+        """Returns this Path elements' states for the specified frame.
         
         A state is defined for the specified frame if either:
         * its z_frame == frame
         * its z_frame is None
         
-        The result is a list of state references.
-        
         """
         if frame is None:
             frame = self._currentframe_
             
-        return [o for o in [o.getState(frame) for o in self._objects_] if o is not None]
+        states = list(o.getState(frame, visible=visible) for o in self._objects_)
+        
+        if states:
+            if len(states) > 1:
+                return states
+            else:
+                return states[0]
+                
+        #return [o for o in [o.getState(frame) for o in self._objects_] if o is not None]
     
     def removeState(self, value):
         for o in self._objects_:
@@ -7151,7 +7212,7 @@ class Path(PlanarGraphics):
         else:
             state = self.getState(frame)
         
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             return
         
         control_state = path.currentState
@@ -7170,21 +7231,6 @@ class Path(PlanarGraphics):
             if value[k] is not None and len(value[k]):
                 o.linkFrames(value[k]) # o.linkFrame() may raise its own error.
     
-    def objectForFrame(self, frame):
-        """See PlanarGraphics.objectForFrame
-        """
-        if self.hasStateForFrame(frame):
-            ret = Path()
-            for p in self:
-                ret.append(p.objectForFrame(frame))
-            
-            ret.name = "copy of %s for frame %d" % (self.name, frame)
-                
-        else:
-            ret = None
-            
-        return ret
-            
     def adoptPainterPath(self, p):
         """Re-composes this Path from a (possibly different) QPainterPath object.
         
@@ -7290,7 +7336,7 @@ class Planar2QGraphicsManager(QtCore.QObject):
                 
     def register(self, planarobject=None, grobject=None):
         if not isinstance(planarobject, (PlanarGraphics, type(None))):
-            raise TypeError("planarobject expected to be a PlanarGraphics objetc or None; got %s instead" % type(planarobject).__name__)
+            raise TypeError("planarobject expected to be a PlanarGraphics object or None; got %s instead" % type(planarobject).__name__)
         
         if not isinstance(grobject, (GraphicsObject, type(None))):
             raise TypeError("grobject expected to be a GraphicsObject or None; got %s instead" % type(grobject).__name__)
@@ -8402,7 +8448,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         """
         state = self._backend_.currentState
         
-        if state is None or len(state) == 0:
+        if state is None: # or len(state) == 0:
             return
         
         self.prepareGeometryChange() # inherited from QGraphicsObject
@@ -8577,7 +8623,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 # NOTE: 2021-05-07 13:34:17 
                 # Use mapRectFromScene to obtain a QRectF instead of a QPolygonF
                 # which would be returned by mapFromScene(rect)
-                if isinstance(state, DataBag) and len(state):
+                if isinstance(state, DataBag): # and len(state):
                     if isinstance(self._backend_, VerticalCursor) or \
                         self._backend_.type & PlanarGraphicsType.vertical_cursor:
                         bRect = self.mapRectFromScene(QtCore.QRectF(state.x - state.xwindow/2,
@@ -8693,7 +8739,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         if isinstance(self._backend_, Cursor):
             state = self._backend_.getState()
-            if state and len(state):
+            if state: # and len(state):
                 p = self.mapToScene(QtCore.QPointF(state.x, state.y))
                 return Cursor(self._backend_.name, p.x(), p.y(), self._backend_.width, self._backend_.height, self._backend_.xwindow, self._backend_.ywindow, self._backend_.radius)
             
@@ -8808,7 +8854,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 
             else:
                 state = self._backend_.currentState
-                if state and len(state):
+                if state: # and len(state):
                     if isinstance(self._backend_, Path):
                         path.addRect(self.mapRectFromScene(self._backend_().boundingRect()))
                     
@@ -9452,11 +9498,11 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             
             #self._oldPos = QtCore.QPointF(value)
             
-            state = self._backend_.currentState
+            #state = self._backend_.currentState
             
             if isinstance(self._backend_, Cursor): # cursor types
-                if state is None or len(state) == 0:
-                    return value
+                #if not state: #state is None: # or len(state) == 0:
+                    #return value
                 
                 # NOTE 2018-01-18 16:57:28
                 # ATTENTION This is also called by self.setPos() (inherited)
@@ -9467,20 +9513,22 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 if value.x() <= 0.0:
                     value.setX(0.0)
                     
-                if value.x() > state.width:
-                    value.setX(state.width)
+                if value.x() > self._backend_.width:
+                    value.setX(self._backend_.width)
 
                 if value.y() <= 0.0:
                     value.setY(0.0)
                     
-                if value.y() > state.height:
-                    value.setY(state.height)
+                if value.y() > self._backend_.height:
+                    value.setY(self._backend_.height)
                     
+            self._backend_.x = value.x()
+            self._backend_.y = value.y()
                         
             # NOTE: 2018-01-18 15:44:28
             # 'value' is already in scene coordinates, so no mapping needed here
-            state.x = value.x()
-            state.y = value.y()
+            #state.x = value.x()
+            #state.y = value.y()
 
             self._backend_.updateLinkedObjects()
 
@@ -10012,7 +10060,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             if isinstance(self._backend_, Cursor):
                 state = self._backend_.getState()
                 
-                if state is None or len(state) == 0:
+                if state is None: # or len(state) == 0:
                     return
                 
                 self._positionChangeHasBegun=False
@@ -10201,7 +10249,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         if isinstance(self._backend_, Cursor):
             state = self._backend_.currentState
-            if state is None or len(state) == 0:
+            if state is None: # or len(state) == 0:
                 return
             
             dx =  1. if evt.key() == QtCore.Qt.Key_Right else -1. if evt.key() == QtCore.Qt.Key_Left else 0.
@@ -10328,7 +10376,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         # TODO code for all non-Cursor types!
         if isinstance(self._backend_, (Ellipse, Rect)) and len(self._cachedPath_) >= 2:
             state = self._backend_.currentState
-            if state and len(state):
+            if state: # and len(state):
                 self._backend_.x = self._cachedPath_[0].x
                 
                 self._backend_.y = self._cachedPath_[0].y
