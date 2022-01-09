@@ -4937,7 +4937,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                           showLabel:bool = True, 
                           labelShowsPosition:bool = True, 
                           autoSelect:bool = True,
-                          transparentLabel:bool = False):
+                          transparentLabel:bool = False,
+                          returnGraphics:bool=False,
+                          ) -> typing.Union[pgui.PlanarGraphics, pgui.GraphicsObject]:
         """Add a roi or a cursor to the underlying scene.
         
         The function generates a gui.planargraphics.GraphicsObject as a frontend
@@ -4949,7 +4951,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         In turn, a PlanarGraphics object can hold references to potentially more
         than one GraphicsObject 'frontends' (e.g. one for a distinct instance
-        of ImageViewer) such that changes in the PlaraGraphics object shape
+        of ImageViewer) such that changes in the PlanarGraphics object shape
         descriptors are visible in all frontends.
         
         
@@ -4960,8 +4962,23 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         Keyword parameters:
         ==================
-        Passed to GraphicsObject constructor via GraphicsImageViewerWidget 
-        newGraphicsObject(...) method.
+        returnGraphics:bool, optional, default is False
+            When True, returns the newly-created gui.planargraphics.GraphicsObject
+            ( a PyQt5.QtWidgets.QGraphicsItem); otherwise, returns the 
+            PlanarGraphics objects passed as 'item'
+        
+        The following are optional (default values shownn in parantheses) and
+        are passed directly to the GraphicsObject constructor via the method
+        GraphicsImageViewerWidget.newGraphicsObject(...):
+        
+        movable:bool (True)
+        editable:bool (True)
+        showLabel:bool (True)
+        labelShowsPosition:bool (True); for gui.planargraphics.Cursor objects
+        autoSelect:bool (True)
+        transparentLabel:bool (False)
+        
+        
         
         NOTE: To manually add a roi or cursor in the window, use the window menu
         
@@ -4986,7 +5003,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 obj.color = self.roisColor
                 
         obj.setTransparentLabel(transparentLabel)
-        return obj.backend
+
+        return obj if returnGraphics else obj.backend
         
     @pyqtSlot()
     @safeWrapper

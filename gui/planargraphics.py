@@ -179,7 +179,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 # NOTE: 2020-11-04 08:56:57
 # for compatibility with more recent pickles
-PlanarGraphicsState = GraphicsState = DataBag 
+PlanarGraphicsState = GraphicsState = Bunch 
 
 # NOTE: 2017-11-24 21:33:20
 # bring this up at module level - useful for other classes as well
@@ -193,8 +193,8 @@ def __new_planar_graphic__(cls, states, name="", frameindex=[], currentframe=0,
     =======================
     cls: the sub-class
     
-    states: dictionary mapping frame index (int) keys to datatypes.DataBag state objects, 
-            or a datatypes.DataBag state object, or a sequence (tuple, list) of 
+    states: dictionary mapping frame index (int) keys to datatypes.Bunch state objects, 
+            or a datatypes.Bunch state object, or a sequence (tuple, list) of 
             PlanarGraphics objects (for unpickling Path objects)
     
     name: the name (_ID_), a str
@@ -674,15 +674,13 @@ class PlanarGraphics():
         #print("PlanarGraphics (%s) validateState(%s: %s)" % (cls.__name__, value.__class__.__name__, value))
         #print("PlanarGraphics (%s) _planar_descriptors_: %s" % (cls.__name__, cls._planar_descriptors_))
         
-        if not isinstance(value, DataBag):
-            return False
-
+        if not isinstance(value, (DataBag, Bunch)):
+            raise TypeError(f"Expecting a Bunch; got {type(value).__name__} instead")
+        
+        if isinstance(value, DataBag):
+            value = Bunch(dict(value).copy())
+            
         all_keys = all([a in value.keys() for a in cls._planar_descriptors_])
-        
-        #print("\tall_keys", all_keys)
-        
-        #print([(d, ":", type(value[d])) for d in cls._planar_descriptors_])
-        
         
         if all_keys:
             valid_descriptors = all([isinstance(value[d], (numbers.Number, str)) for d in cls._planar_descriptors_])
@@ -704,8 +702,7 @@ class PlanarGraphics():
         Parameters:
         ===========
         
-        A sequence of DataBag objects, or a mapping of int keys to DataBag 
-        objects.
+        A sequence of Bunch objects, or a mapping of int keys to Bunch objects.
         
         """
         if isinstance(value, (tuple, list)):
@@ -729,9 +726,7 @@ class PlanarGraphics():
         # NOTE: 2020-11-01 14:01:12
         # z_frame has special treatment; by default this is set to None so that
         # the object is visible in any frame
-        #descriptors = [d for d in cls._planar_descriptors_ if d != "z_frame"]
-        #state = DataBag(dict(zip(descriptors, [0]*len(descriptors))))
-        state = DataBag(dict(zip(cls._planar_descriptors_, [0]*len(cls._planar_descriptors_))))
+        state = Bunch(dict(zip(cls._planar_descriptors_, [0]*len(cls._planar_descriptors_))))
         state.z_frame = None
         return state
     
@@ -742,7 +737,7 @@ class PlanarGraphics():
         #If src does not have an attribute "z_frame" then it is given one, with
         #value None
         if not isinstance(src, dict):
-            raise TypeError("Expecting a dict or derivative (e.g., DataBag, PlanarGraphics); got %s instead" % type(src).__name__)
+            raise TypeError("Expecting a dict, got %s instead" % type(src).__name__)
         
         #print("\t%s.copyConvertState %s planar descriptors: %s" % (cls.__name__, cls.__name__, cls._planar_descriptors_))
         # accept objects created with older API
@@ -750,18 +745,7 @@ class PlanarGraphics():
         # z_frame has special treatment and it was absent in old APIs
         #descriptors = [d for d in cls._planar_descriptors_ if d != "z_frame"]
         
-        if isinstance(src, DataBag):
-            ret = src.copy()
-            # NOTE: make sure of these two are right:
-            ret.use_mutable = True
-            ret.allow_none = True
-                
-        else: # covers dict and common subclasses such as collections.OrderedDict, traitlets Bunch, mappings etc
-            if not all([isinstance(k, str) for k in src.keys()]):
-                src_ = dict((str(k), v) for k, v in src.items())
-                src = src_
-                
-            ret = DataBag(src, use_mutable=True, allow_none=True)        
+        ret = Bunch(dict((str(k), v) for k, v in src.items() if k in cls._planar_descriptors_))
         
         # now make sure it has a z_frame attribute
         if not hasattr(ret, "z_frame"):
@@ -825,8 +809,7 @@ class PlanarGraphics():
         if len(args) != len(self.__class__._planar_descriptors_):
             raise ValueError("Expecting %d descriptors; got %d instead" % (len(self.__class__._planar_descriptors_), len(args)))
         
-        self._states_ = [DataBag(dict(zip(self.__class__._planar_descriptors_, args)), 
-                                use_mutable=True, allow_none=True)]
+        self._states_ = [Bunch(dict(zip(self.__class__._planar_descriptors_, args)))]
 
         self._states_[0].z_frame = None
         
@@ -1120,7 +1103,7 @@ class PlanarGraphics():
                 elif isinstance(args[0], (tuple, list)) and len(args[0]): # construct from descriptors
                     # construct from a single var-positional parameter, which is:
                     # * a sequence of coefficients (planar descriptors),
-                    # * a sequence of PlanarGraphicsState/DataBag/dict
+                    # * a sequence of PlanarGraphicsState/Bunch/dict
 
                     if all([isinstance(v, (numbers.Number, str)) for v in args[0]]):
                         self.__init_from_descriptors__(*args[0], 
@@ -1292,40 +1275,37 @@ class PlanarGraphics():
         
         state = self.getState(frame)
         
-        if state is None: # or len(state) == 0:
-            return path
+        if state: # is None: # or len(state) == 0:
+            if connected and path.elementCount() > 0:
+                s = ["lineTo("]
+                
+            else:
+                s = [self._qt_path_composition_call_+"("]
             
-        if connected and path.elementCount() > 0:
-            s = ["lineTo("]
+            s += [",".join(["%f" % state[a] for a in self.shapeDescriptors])]
+
+            s += [")"]
+
+            eval("path."+"".join(s))
             
-        else:
-            s = [self._qt_path_composition_call_+"("]
-        
-        s += [",".join(["%f" % state[a] for a in self.shapeDescriptors])]
-
-        s += [")"]
-
-        eval("path."+"".join(s))
-        
-        if closePath:
-            path.lineTo(state.x, state.y) # x & y always in planar descriptors
+            if closePath:
+                path.lineTo(state.x, state.y) # x & y always in planar descriptors
         
         return path
     
     def __getattr__(self, name):
         if name in self.__class__._planar_descriptors_:
             state = self.getState()
-            if isinstance(state, (DataBag, dict)):
+            if isinstance(state, dict):
                 return state[name]
         
-        #elif hasattr(self, name):
         else:
             return object.__getattribute__(self, name)
             
     def __setattr__(self, name, value):
         if name in self.__class__._planar_descriptors_:
             state = self.getState()
-            if isinstance(state, DataBag):
+            if isinstance(state, Bunch):
                 state[name]=value
             
         else:
@@ -1453,11 +1433,11 @@ class PlanarGraphics():
             self._states_[:] = fa_states + sf_states
             
     @classmethod
-    def isStateVisible(cls, state:DataBag, frame:int) -> bool:
+    def isStateVisible(cls, state:Bunch, frame:int) -> bool:
         """Checks if state is visible in frame.
         """
-        if not isinstance(state, DataBag):
-            raise TypeError("Expecting a DataBag; got %s instead" % type(state).__name__)
+        if not isinstance(state, Bunch):
+            raise TypeError("Expecting a Bunch object; got %s instead" % type(state).__name__)
 
         if state.z_frame is None: # trivial: this is ALWAYS visible
             return True
@@ -1582,7 +1562,7 @@ class PlanarGraphics():
                     s_states = list()
                     
                     for f in frameindex:
-                        s = state.copy()
+                        s = Bunch(state.copy())
                         s.z_frame = f
                         s_states.append(s)
                         
@@ -1730,7 +1710,7 @@ class PlanarGraphics():
     
     @property
     def currentState(self):
-        """Read-only.
+        """Read-only. Alias to self.getState()
         
         NOTE: even if this is a read-only property, the returned object is 
         mutable.
@@ -1831,15 +1811,35 @@ class PlanarGraphics():
     
     @property
     def descriptors(self):
-        """Returns a tuple of planar graphics descriptor names specific to this
+        """Tuple of planar graphics descriptor names specific to this
         concrete subclass.
-        Read-only; returns a tuple (immutable sequence)
+        Read-only
         """
-        return self._planar_descriptors_
+        return self.__class__._planar_descriptors_
     
     @property
     def shapeDescriptors(self):
-        return [d for d in self.__class__._planar_descriptors_ if d != "z_frame"]
+        """Tuple of shape descriptor names.
+        These are the descriptor less "z_frame".
+        Read-only
+        """
+        return tuple(d for d in self.__class__._planar_descriptors_ if d != "z_frame")
+    
+    #@property
+    #def parameters(self):
+        #"""Tuple of planar descriptor values for the current frame.
+        #These are in the same order as their names in self.descriptors property.
+        #Read-only
+        #"""
+        #return tuple(getattr(self, p, None) for p in self.__class__._planar_descriptors_)
+    
+    #@property
+    #def shapeParameters(self):
+        #"""Tuple of shape descriptor values for the current frame.
+        #These are in the same order as their names in self.shapeDescriptors
+        #Read-only
+        #"""
+        #return tuple(getattr(self, p, None) for p in self.__class__._planar_descriptors_ if p != "z_frame")
     
     @property
     def closed(self):
@@ -1890,30 +1890,6 @@ class PlanarGraphics():
             
         return ret
         
-    def asPath(self, frame=None, closed=False):
-        """Returns a COPY of this object's state as a Path, for the specified frame.
-        
-        The state is the one associated with the specified frame or with the 
-        current state.
-        
-        """
-        import core.datatypes as dt
-        
-        ret = Path()
-        
-        if frame is None:
-            state = self.currentState
-            
-        else:
-            state = self.getState(frame)
-        
-        if isinstance(state, DataBag): # and len(state):
-            ret.append(self.__class__(state.copy(), graphicstype = self._planar_graphics_type_))
-            
-        return ret
-    
-    
-    
     def convertToPath(self, closed=False): 
         """Creates a Path from all frame-state associations.
         """
@@ -1921,10 +1897,10 @@ class PlanarGraphics():
         
         frame_ndx = self.frameIndices
         
-        ret = self.asPath(frame=frame_ndx[0], closed=closed)
+        ret = self.objectForFrame(frame=frame_ndx[0], closed=closed)
         
         for f in frame_ndx[1:]:
-            frame_path = self.asPath(frame=f, closed=closed)
+            frame_path = self.objectForFrame(frame=f, closed=closed)
             
             ret.addState(frame_path.currentState, f)
             
@@ -2065,7 +2041,7 @@ class PlanarGraphics():
         Parameters:
         ===========
         
-        state: datatypes.DataBag with members that must conform to the particular 
+        state: traitlets.Bunch with members that must conform to the particular 
             PlanarGraphics subclass.
             
             In addition, it must have an attribute called "z_frame" with the value
@@ -2147,96 +2123,6 @@ class PlanarGraphics():
         
         return
         
-        #import bisect
-        #import core.datatypes as dt
-        
-        #if not isinstance(state, DataBag):
-            #raise TypeError("state expected to be a datatypes.DataBag; got %s instead" % type(state).__name__)
-        
-        #if not self.validateState(state):                                       # make sure state complies with this planar type
-            #raise TypeError("state %s does not contain the required descriptors %s" % (state, self._planar_descriptors_))
-        
-        #if not hasattr(state, "z_frame"):                                       # make sure state is conformant
-            #raise AttributeError("state is expected to have a z_frame attribute")
-        
-        ## just in case self has NO states (shouldn't happen, though...)
-        #if len(self._states_) == 0:
-            #self._states_.append(state)
-        
-        #elif len(self._states_) == 1:                                         # self has a single state
-            ##if self._states_[0].z_frame < 0:                              #   self has a frameless state
-            #if self._states_[0].z_frame is None:                              #   self has a frameless state
-                ##if state.z_frame < 0:                                       #   if new state is frameless then replace existing frameless state
-                #if state.z_frame is None:                                       #   if new state is frameless then replace existing frameless state
-                    #self._states_[:] = [state]                                #   --> replace the current frameless state
-                    #self._currentstates_ = [self._states_[0]]                  #   --> update current state so that the old one is not left dangling
-                    
-                #else:                                                           #   new frame-linked state added but existing state is frameless
-                    #self._currentstates_ = [self._states_[0]]                  #       make sure current state references the exising state; 
-                                                                                ##           changes to z_frame will always be reflected in current state,
-                                                                                ##           because it is a reference to one of the elements in self._states_
-                    
-                    #if state.z_frame > 0:                                       # new state always gets the next frame, in this function
-                        #self._states_[0].z_frame = state.z_frame - 1
-                        
-                    #else:
-                        #self._states_[0].z_frame = 0
-                        #state = state.copy()                                    # don't change the "state" parameter, make a copy of it
-                        #state.z_frame = 1
-                    
-                    #self._states_.append(state)
-                    
-            #else:                                                               # self has a single frame-linked frame =>
-
-                #if state.s_frame is None:                                       # new state is frameless => link this to the next largest frame then append
-                    #state = state.copy()                                        # don't change the "state" parameter, make a copy of it
-                    #state.z_frame  = self._states_[0].z_frame + 1               # leave current state as it is (it should be a ref to this single frame-linked state)
-                    #self._states_.append(state)
-                    
-                #else:                                                           # new state is frame-linked and it may be linked ot the state of the current frame!
-                    #currentframe = self._currentstates_[0].z_frame                  # in the following manipulations current state might also get its z_frame changed
-
-                    #frame_sorted_states = sorted(self._states_, 
-                                                 #key = lambda x: x.z_frame)
-                    
-                    #state_frames = [s.z_frame for s in frame_sorted_states]     # same order as frame_sorted_states (i.e. ascending)
-                    
-                    #insert_index = bisect.bisect_left(state_frames,
-                                                     #state.z_frame)             # find what frame index the new state should get
-                    
-                    #for s in frame_sorted_states[insert_index:]:                # increment the z_frame for states in frame_sorted_states[insert_index:]
-                        #s.z_frame += 1                                          # i.e, with z_frame values that woudl be beyond the new frame of the inserted state
-                        
-                    #self._states_.append(state)                                 # append the new state
-                    
-                    #self._currentstates_ = [s for s in self._states_ \
-                                             #if s.z_frame == currentframe][0]   # set current state a reference to the state linked to the cached current frame
-                
-        #else:                                                                   # self has several (at least one) frame-linked states
-            #if state.z_frame is None:                                           # new state is frameless => assign next available frame then append it
-                #state = state.copy()                                            # don't change the "state" parameter, make a copy of it
-                #state.z_frame = max(state_frames) + 1                           # current state won't change here
-                #self._states_.append(state)
-                
-            #else:                                                               # new state is frame-linked; its frame may point to the frame of the current state
-                #currentframe = self._currentstates_[0].z_frame                      # so cache that here
-                
-                #frame_sorted_states = sorted(self._states_, 
-                                            #key = lambda x: x.z_frame)
-                
-                #state_frames = [s.z_frame for s in frame_sorted_states]         # same order as frame_sorted_states
-                #insert_index = bisect.bisect_left(state_frames, state.z_frame)  # index into frame_sorted_states where the new state should go given its z_frame
-                                                                                ## 
-                #for s in frame_sorted_states[insert_index:]:                    # increment the states from frame_sorted_states[insert_index:] by 1
-                    #s.z_frame += 1
-                    
-                #self._states_.append(state)                                   # append the new state
-                
-                #self._currentstates_ = [s for s in self._states_ \
-                                         #if s.z_frame == currentframe]          # set current state a reference to the state linked to the cached current frame
-                
-        #return state
-    
     def updateLinkedObjects(self):
         """Must be called asynchronously.
         
@@ -2335,7 +2221,7 @@ class PlanarGraphics():
         
         Parameters:
         ==========
-        stateOrFrame:   a DataBag (state), an in, OR
+        stateOrFrame:   a Bunch (state), an int, OR
                         a sequence (tuple, list) of states or int (no mixed types!)
         
         """
@@ -2353,7 +2239,7 @@ class PlanarGraphics():
             else:
                 raise ValueError("No state found for frame %d" % stateOrFrame)
             
-        elif isinstance(stateOrFrame, DataBag):
+        elif isinstance(stateOrFrame, Bunch):
             if state in self._states_:
                 self._states_.remove(state)
                 
@@ -2373,7 +2259,7 @@ class PlanarGraphics():
                 else:
                     raise ValueError("No states found for frames in %s" % stateOrFrame)
                 
-            elif all([isinstance(v, DataBag) for v in stateOrFrame]):
+            elif all([isinstance(v, Bunch) for v in stateOrFrame]):
                 for states in stateOrFrame:
                     if state in self._states_:
                         self._states_.remove(state)
@@ -2382,7 +2268,7 @@ class PlanarGraphics():
                         raise ValueError("state %s not found" % state)
             
         else:
-            raise TypeError("expecting an int, a DataBag, or a sequence of int or DataBag (no mixed types); got %s instead" % stateOrFrame)
+            raise TypeError("expecting an int, a Bunch, or a sequence of int or Bunch objects (no mixed types); got %s instead" % stateOrFrame)
         
     def setParameter(self, name, value, frame=None):
         """Sets the value of a named planar graphics descriptor.
@@ -2398,8 +2284,7 @@ class PlanarGraphics():
             frame
         
         The name of the descriptor must be one present in self._planar_descriptors_
-        and found in any of the decscriptor state objects (either the common state
-        DataBag object, or in the frame-state associations dictionary).
+        and found in any of the descriptor state objects.
         
         For Path PlanarGraphics objects, the function does nothing.
         To set the value of a named planar descriptor for a specific Path element,
@@ -2559,14 +2444,14 @@ class PlanarGraphics():
         
         return QtWidgets.QGraphicsPathItem(self(path=None, frame=frame, closed=self.closed)) # by default, the most generic case
         
-    def stateIndex(self, state:typing.Optional[typing.Union[DataBag, int]]= None, 
+    def stateIndex(self, state:typing.Optional[typing.Union[Bunch, int]]= None, 
                            visible_only:bool=False) -> typing.Optional[int]:
         """Get the index of a state in this object's internal list of states.
         
         Parameters:
         ===========
         
-        state: DataBag (state), int or None (z_frame); default is None
+        state: Bunch object (state), int or None (z_frame); default is None
 
         visible_only: bool (optional, default is False)
             
@@ -2575,7 +2460,7 @@ class PlanarGraphics():
         
         An int or None.
         
-        If 'state' is a DataBag which exists in the internal list of states,
+        If 'state' is a Bunch which exists in the internal list of states,
             returns the index of the state in the list, else returns None.
             
         If 'state' is None:
@@ -2639,18 +2524,18 @@ class PlanarGraphics():
         elif state is None:
             state = self.getState()
             
-        elif not isinstance(state, DataBag):
-            raise TypeError(f"Expecting a state DataBag, int or None; got {type(state).__name__} instead")
+        elif not isinstance(state, Bunch):
+            raise TypeError(f"Expecting a state Bunch object, int or None; got {type(state).__name__} instead")
         
         if self.validateState(state):
             return index_of(self._states_, state, key = lambda x: x.z_frame)
                         
     def getState(self, frame:typing.Optional[int]=None,
-                 visible:bool=True) -> typing.Optional[DataBag]:
+                 visible:bool=True) -> typing.Optional[Bunch]:
         """Access the state according to their z_frame value.
         
         By definition, a primitive PlanarGraphics (i.e., NOT a Path) has only
-        one state DataBag associated with a given frame (which, depending on its
+        one state Bunch associated with a given frame (which, depending on its
         'z_frame' value, it may be visible in the frame, or not).
         
         Parameters:
@@ -2670,9 +2555,9 @@ class PlanarGraphics():
         Returns:
         -------
         
-        The state (DataBag) for the current frame or None.
+        The state (Bunch) for the current frame or None.
         
-        The DataBag object can be:
+        The Bunch state object can be:
         
         * the unique state with ubiquitous visibility (i.e., state.z_frame is None)
             - is such a state exists, it will be returned regardless of the 
@@ -2739,7 +2624,7 @@ class PlanarGraphics():
             if states:
                 return states[0]
             
-    def setFrameIndex(self, state:typing.Optional[typing.Union[DataBag, int]]=None, 
+    def setFrameIndex(self, state:typing.Optional[typing.Union[Bunch, int]]=None, 
                       new_frame:typing.Optional[int]=None,
                       check_visible:bool=True,
                       nFrames:typing.Optional[int]=None):
@@ -2749,13 +2634,13 @@ class PlanarGraphics():
         
         Parameters:
         ----------
-        state: DataBag or None
-            when a DataBag, it must exist in the internal states list
+        state: Bunch state object or None
+            when a Bunch, it must exist in the internal states list
             
             when None, the function operates on the current (visible) state.
                 If there is no visible state in the current frame, then returns
                 without effect.
-                To avoid this, make sure a DataBag is pased as state parameter
+                To avoid this, make sure a Bunch is pased as state parameter
                 
         new_frame: int or None
             When None, set the z_frame value of the state to None:
@@ -2781,12 +2666,12 @@ class PlanarGraphics():
             if new_frame == self._currentframe_:
                 return # no change needed here
             
-            state = self.getState(return_visible=check_visible)
+            state = self.getState(visible=check_visible)
             if state is None: #no state found for current frame -> bye
                 warnings.warn("There is no %sstate for frame %d", ("visible " if check_visible else "", self._currentframe_))
                 return
             
-        if isinstance(state, DataBag):
+        if isinstance(state, Bunch):
             if state not in self._states_: # state not found in self._states_ => quit
                 warnings.warn("The state %d does not exist for this object" % state)
                 return
@@ -2871,7 +2756,7 @@ class PlanarGraphics():
                                 # in all BUT the originally avoided frame and the
                                 # new frame
                                 if k not in (old_avoided_frame, new_frame):
-                                    s = old_state.copy()
+                                    s = Bunch(old_state.copy())
                                     s.z_frame = k
                                     new_states.append(s)
                                 
@@ -2991,7 +2876,7 @@ class PlanarGraphics():
             raise TypeError("new_frame expected to be an int or None; got %sinstead" % type(new_frame).__name__)
         
                 
-    def setState(self, state:DataBag, frame:typing.Optional[int], nFrames:typing.Optional[int]=None):
+    def setState(self, state:Bunch, frame:typing.Optional[int], nFrames:typing.Optional[int]=None):
         """Sets/adds a state
         
         For Path objects, this function does nothing. To alter frame states for 
@@ -3005,7 +2890,7 @@ class PlanarGraphics():
         
         Parameters:
         =====================
-        state: datatypes.DataBag object. Its member names must conform with the
+        state: datatypes.Bunch object. Its member names must conform with the
             parametric descriptors of the planar graphics object.
             
             If state is a reference to an existing state, does nothing.
@@ -3104,7 +2989,7 @@ class PlanarGraphics():
         
         # NOTE: 2020-11-13 13:02:19
         # allow frame to override state z_frame
-        new_state = state.copy()
+        new_state = Bunch(state.copy())
         
         # NOTE: 2020-11-13 16:54:10
         # set this here so that we forget about this 'frame' variable
@@ -3180,7 +3065,7 @@ class PlanarGraphics():
                             converted_states = list()
                             
                             for k in new_frames:
-                                s = original_state.copy()
+                                s = Bunch(original_state.copy())
                                 s.z_frame = k
                                 converted_states.append(s)
                                 
@@ -3243,7 +3128,7 @@ class PlanarGraphics():
                             converted_states = list()
                             
                             for k in new_frames:
-                                s = original_state.copy()
+                                s = Bunch(original_state.copy())
                                 s.z_frame = k
                                 converted_states.append(s)
                                 
@@ -3301,7 +3186,7 @@ class PlanarGraphics():
                                 
                                 converted_states = list()
                                 for k in new_frames:
-                                    s = fa_state.copy()
+                                    s = Bunch(fa_state.copy())
                                     s.z_frame = k
                                     converted_states.append(s)
                                     
@@ -3323,7 +3208,7 @@ class PlanarGraphics():
                             converted_states = list()
 
                             for k in new_frames:
-                                s = fa_state.copy()
+                                s = Bunch(fa_state.copy())
                                 s.z_frame = k
                                 converted_states.append(s)
                                 
@@ -3368,7 +3253,7 @@ class PlanarGraphics():
                                 self._states_.append(new_frame)
                                 
                         else:
-                            s = fa_state.copy()
+                            s = Bunch(fa_state.copy())
                             s.z_frame = new_avoided_frame
                             self._states_[:] = [new_state, s]
                         
@@ -3387,7 +3272,7 @@ class PlanarGraphics():
                        visible:typing.Optional[bool]=True) -> typing.Optional[object]:
         """Returns a PlanarGraphics of the same type as self, linked to frame.
         
-        In contrast with getState(frame) which returns just the DataBag state for
+        In contrast with getState(frame) which returns just the Bunch state for
         the specified frame, this function constructs a new PlanarGraphics object
         having a single ubiquitous state identical to the one returned by getState().
         
@@ -3396,7 +3281,9 @@ class PlanarGraphics():
         This is used typically when dysplaying the PlanarGraphics in a frame (as
         "cached" object)
         """
-        return self.__class__(self.getState(frame, visible=visible))
+        state = self.getState(frame, visible=visible)
+        if state:
+            return self.__class__(state)
     
     @staticmethod
     def getCurveLength(obj, prev=None):
@@ -3406,17 +3293,17 @@ class PlanarGraphics():
         Parameters:
         ==========
         obj: 
-            Either a datatypes.DataBag: the state of an elementary PlanarGraphics or a sequence
+            Either a datatypes.Bunch: the state of an elementary PlanarGraphics or a sequence
             of states of a Path.
             
             The function supports only states for Move, Line, Cubic, and Quad
             
-            Or: a sequence (typle, list) of state DataBag (such as those from a Path)
+            Or: a sequence (typle, list) of state Bunch (such as those from a Path)
             
             In either case, these are typically obtained by calling PlanarGraphics.getState()
             or Path.getState().
         
-        prev: None (default) or a datatypes.DataBag: state of an elementary PlanarGraphics
+        prev: None (default) or a datatypes.Bunch: state of an elementary PlanarGraphics
             e.g., as returned by PlanarGraphics.getState()
             
         NOTE: the function cannot distinguish between states belonging to a Move and
@@ -3433,7 +3320,7 @@ class PlanarGraphics():
         if prev is None:
             x0 = y0 = 0.
             
-        elif isinstance(prev, DataBag):
+        elif isinstance(prev, Bunch):
             if not any([p in prev for p in ("x", "y", "cx", "cy", "c1x", "c1y", "c2x", "c2y", "z_frame")]):
                 raise TypeError("Incompatible data for prev")
             
@@ -3441,10 +3328,10 @@ class PlanarGraphics():
             y0 = prev.y
             
         else:
-            raise TypeError("prev expected to be a datatypes.DataBag compatible with a PlanarGraphics, or None; got %s instead" % type(prev).__name__)
+            raise TypeError("prev expected to be a datatypes.Bunch compatible with a PlanarGraphics, or None; got %s instead" % type(prev).__name__)
         
         
-        if isinstance(obj, DataBag):
+        if isinstance(obj, Bunch):
             if not any([p in obj for p in ("x", "y", "cx", "cy", "c1x", "c1y", "c2x", "c2y", "z_frame")]):
                 raise TypeError("Incompatible data for obj")
             
@@ -3494,11 +3381,11 @@ class PlanarGraphics():
                 return spatial.distance.euclidean([x1, y1], [x0, y0])
                 
         elif isinstance(obj, (tuple, list)): # sequence of states from a Path
-            if not all([isinstance(o, DataBag) for o in obj]):
-                raise TypeError("The sequence must contain datatypes.DataBag objects")
+            if not all([isinstance(o, Bunch) for o in obj]):
+                raise TypeError("The sequence must contain datatypes.Bunch objects")
             
             if any([not any([p in o for p in ("x", "y", "cx", "cy", "c1x", "c1y", "c2x", "c2y", "z_frame")]) for o in obj]):
-                raise TypeError("The sequence contains incompatible datatypes.DataBag objects")
+                raise TypeError("The sequence contains incompatible datatypes.Bunch objects")
                 
             element_curve_lengths = [curveLength(obj[0], prev=obj[0])]
             
@@ -3568,7 +3455,7 @@ class PlanarGraphics():
         elif isinstance(self, Path):
             if all([isinstance(e, (Move, Line, Cubic, Quad)) for e in self]):
                 # get a copy for the current frame
-                path = self.asPath(self.currentFrame)
+                path = self.objectForFrame(self.currentFrame)
                 
                 element_curve_lengths = [path[0].curveLength()]
                 
@@ -3754,7 +3641,7 @@ class PlanarGraphics():
     def linkFrames(self, value):
         """Associates planar descriptor state values to frame indices.
         
-        A planar descriptor state (datatypes.DataBag) can be:
+        A planar descriptor state (datatypes.Bunch) can be:
         a) "frameless" when its z_frame attribute is None
         
         b) frame-linked when its z_frame attribute points to a frame index
@@ -3800,7 +3687,7 @@ class PlanarGraphics():
         
         Parameters:
         ==========
-        state: DataBag - a state present in this object's states list
+        state: Bunch - a state present in this object's states list
         
         destframes: a sequence of int, or None: frame indices where state is to 
                     be propagated
@@ -3828,7 +3715,7 @@ class PlanarGraphics():
                     target_state = target_states[target_frame_indices.index(f)]
                     
                     self._states_.remove(target_state)
-                    self._states_.append(state.copy())
+                    self._states_.append(Bunch(state.copy()))
                     
             else: # empty destframes
                 # use this state as a single state to all frames
@@ -3931,14 +3818,14 @@ class PlanarGraphics():
         all avaliable frames) pass an empty list. The common state will the the 
         one formerly assigned ot the current frame.
         
-        A planar graphics descriptor state is a datatypes.DataBag with its members
+        A planar graphics descriptor state is a datatypes.Bunch with its members
         being the planar descriptors specific to the concrete subclass. The values 
         of the planar descriptors are either common to all possible frames of a 3D 
         data array where the PlanarGraphics object would be used, or specific to 
         particular frame indices, if the object has frame-state associations.
         
         A frame-state association is a dictionary that maps frame indices (int)
-        as keys, to descriptor states (datatypes.DataBag) as values.
+        as keys, to descriptor states (datatypes.Bunch) as values.
         
         """
         
@@ -4021,14 +3908,6 @@ class PlanarGraphics():
         
         
         """
-        import bisect
-        
-        #### BEGIN  use linkFrames code and make linkFrames call this function, or an alias
-        # when values is either None, an empty iterable, (tuple, list, range, dict)
-        # or an iterable that contains None, then automatically unlink all states
-        # and make the current state frameless (universal) then ditch the other 
-        # states
-        
         if isinstance(self, Path): # FIXME: this won't be reached because the method is overridden in Path
             for o in self._objects_:
                 o.frameIndices = value
@@ -4036,19 +3915,17 @@ class PlanarGraphics():
             return
         
         if values is None or ((isinstance(values, (tuple, list, range)) and (len(values)==0 ))): # trivial
-            # remove any framelinks;
-            # leave a single frameless state
-            # remove the other states
-            #state = self._currentstates_[0]
-            state = self.getState() # get state for current frame
+            # copy whatever state is visible at the current frame index,
+            # make it ubiquitous and dump the others
+            state = self.getState(visible=True) # get visible state for current frame
             state.z_frame = None    # and make it ubiquitous
             self._states_[:] = [state]
                 
             return 
         
         elif isinstance(values, (tuple, list, range)):
-            # a list of frames was specified
-            # this covers the following possibilities
+            # a sequence of frames was specified; these are the specific frame
+            # indices where the object is to be visible (drawn)
             if not all([isinstance(f, int) for f in values]):
                 # check for int types
                 raise TypeError("new frame indices expected to be a sequence of int, or a dictionary with int keys; got %s instead" % values)
@@ -4062,303 +3939,151 @@ class PlanarGraphics():
                 raise ValueError("duplicate new frame indices are not allowed")
                 
             if len(self._states_) == 1:
-                # here there is a single state
+                # currently, there is a single state => duplicate it and make
+                # the duplicates frame-specific for the indices in value;
+                # dump the rest; 
+                # NOTE: 2022-01-09 21:52:51
+                # if current state is already frame-specific for current
+                # frame don't duplicate, but use directly in the new list
                 state = self._states_[0]
-                if state.z_frame is None: # which is ubiquitous
+                if state.z_frame is None or state.z_frame not in values:
                     new_states = list()
                     
-                    for f in values:                                            # generate new states for the frames
-                        state = self._states_[0].copy()
-                        state.z_frame = f
-                        new_states.append(state)
+                    # generate new states for the frames: a copy of the initial
+                    # ubiquitous state, for each frame index in value
+                    for f in values: 
+                        s = Bunch(state.copy())
+                        s.z_frame = f
+                        new_states.append(s)
                         
-                    self._states_[:] = new_states
+                    self._states_[:] = sorted(new_states, key = lambda x: x.z_frame)
                     
-                else:                                                           # which is frame-linked
-                    if state.z_frame in values:                                  # values already contain state's frame index
-                        new_frame_values = [f for f in values if f != state.z_frame]
-                        # we then replicate this state for ALL OTHER frames
-                        
-                        for f in new_frame_values:                              # loop does nothing if new_frame_values is empty 
-                            s = state.copy()                                    # is empty (thus avoid duplication)
-                            s.z_frame = f
-                            self._states_.append(s)
-                            
-            else: # case with several states
-                current_frame_indices = [s.z_frame for s in self._states_]
-                
-                # this will expand
-                new_frame_values = [f for f in values if f not in current_frame_indices]          
-                # skip states linked already linked to frames in values
-                # so for instance if values include
-                # the current state's frame
-                # this will be unchanged
-                
-                # frame links to drop
-                frame_indices_to_drop = [f for f in current_frame_indices if f not in values]   
-                
-                
-                new_current_frame_link = None
-                states_to_drop = list()
-                
-                if len(frame_indices_to_drop):
-                    states_to_drop = [s for s in self._states_ if s.z_frame in frame_indices_to_drop]    
-                    # this MAY contain the current state
-                
-                    for s in self._currentstates_:
-                        if s in states_to_drop:                  # find out which framek-linked state
-                                                                                    # should become current
-                            
-                            new_current_frame_ndx = bisect.bisect_left(new_frame_values, s.z_frame)    
-                            #print(new_frame_values)
-                            if len(new_frame_values):
-                                if new_current_frame_ndx >= len(new_frame_values):
-                                    new_current_frame_link = new_frame_values[-1]
-                                    
-                                else:
-                                    new_current_frame_link = new_frame_values[new_current_frame_ndx]
-                                
-
+                else:  
+                    # see NOTE: 2022-01-09 21:52:51
+                    new_frame_values = [f for f in values if f != state.z_frame]
+                    # we then replicate this state for ALL OTHER frames
                     
-                for f in new_frame_values:                                      # duplicate currentstate, update z_frame then append
-                    for s in self._currentstates_:
-                        ss = s.copy()
+                    new_states = list()
+                    new_states.append(state)
+                    
+                    for f in new_frame_values: 
+                        # loop does nothing if new_frame_values is empty 
+                        # => avoid duplication
+                        s = Bunch(state.copy()    )
+                        s.z_frame = f
+                        new_states_.append(s)
+                    
+                    self._states_[:] = sorted(new_states, key = lambda x: x.z_frame)
+                         
+                return
+                            
+            else: 
+                # case with several states
+                # NOTE: 2022-01-09 21:46:32
+                # copy whatever states are, or would be, visible at the frame
+                # indices in value, make then frame index-specific, then
+                # dump the others
+                new_states = list()
+                for f in values:
+                    s = self.getState(f, visible=True)
+                    if s:
+                        ss = Bunch(s.copy())
                         ss.z_frame = f
-                        self._states_=append(ss)
-                    #s = self._currentstate_.copy()
-                    #s.z_frame = f
-                    #self._states_.append(s)
+                        new_states.append(ss)
                     
-                for state in states_to_drop:                                    # drop extra states 
-                    self._states_.remove(state)
+                self._states_[:] = sorted(new_states, key=lambda x: x.z_frame)
+                
+                return
+            
+        elif isinstance(values, dict):  
+            # NOTE 2022-01-09 21:54:30: using a mapping
+            # except for skip keys that do not point to a frame index with a visible frame
+            if not all([isinstance(f, int) for f in values]): 
+                # check for int types of keys
+                raise TypeError("new frame indices expected to be a sequence of int, or a dictionary with int keys; got %s instead" % values)
+
+            if not all([isinstance(f, int) for f in values.values()]):
+                # check for int types of values
+                raise TypeError("new frame indices expected to be a sequence of int, or a dictionary with int keys; got %s instead" % values)
+
+            if len(set(values.values())) < len(values):
+                # check that new frame indices (values) are unique)
+                # NOTE this beign a dict, its keys are guaranteed to be unique
+                raise ValueError("duplicate new frame indices are not allowed") 
+                
+            #if any([f < 0 for f in values]):
+                ## check that old frame indices (keys) are valid
+                #raise ValueError("new frame indices must be >= 0")
+                
+            new_specifics = [f for f in values.values() if f >= 0]
+            new_avoiders = [f for f in values.values() if f < 0]
+            if len(new_avoiders) > 1:
+                raise ValueError("Cannot have more than one frame-avoiding state")
+            
+            if len(new_avoiders) == 1:
+                fa_new = new_avoiders[0]
+                if any (f == -fa_new-1 for f in new_specifics):
+                    raise ValueError(f"New frame-avoiding index {fa} clashes with a frame-specific index in {new_specifics}")
+                
+            old_avoiders = [f for f in values if f < 0]
+            if len(old_avoiders):
+                if len(old_avoiders) > 1:
+                    raise ValueError("Cannot expect more than one frame-avoiding states in the current states")
+            
+                #fa_old = old_avoiders[0]
+                #if any(f == -fa_old-1 for f in new_avoiders):
+                    #raise ValueError(f"New frame index for an old avoider at {fa_old} clashes with new frame indices {[f for f in values.values()]}")
+                
+            new_states = list()
+            
+            if len(self._states_) == 1: 
+                # NOTE: 2022-01-09 22:04:25
+                # bypass checks for visibility: the unique state may be frame-avoiding
+                # but then we don't care here
+                state = self._states_[0]
+                for v in values.values():
+                    s = Bunch(state.copy())
+                    s.z_frame = v
+                    new_states.append(s)
                     
-                if new_current_frame_link is not None:
-                    new_current_state = [s for s in self._states_ \
-                                         if s.z_frame == new_current_frame_link]
-                    
-                    if len(new_current_state):
-                        self._currentstate_ = new_current_state[0]
+            else:
+                # cache states checked in NEITHER values' old indices, nor new
+                # indices
+                cached_states = list(s for s in self._states_ if s.z_frame not in values and s.z_frame not in values.values())
+                new_states.extend(cached_states)
+                for k, v in values.items():
+                    if k < 0:
+                        fa_state = list(s for s in self._states_ if s.z_frame == k)
+                        if len(fa_state):
+                            fa_state = fa_state[0]
+                            s = Bunch(fa_state.copy())
+                            s.z_frame = v
+                            new_states.append(s)
                         
                     else:
-                        self._currentstate_ = None                            # CAUTION
-            
-        # NOTE: using a mapping 
-        # below, for a single frame-linked state this just changes its 
-        # z_frame value but does not add extra frame-linked states
-        elif isinstance(values, dict):                                           # explicit mapping old -> new frame
-            if not all([isinstance(f, int) for f in values]):                   # check for int types of keys
-                raise TypeError("new frame indices expected to be a sequence of int, or a dictionary with int keys; got %s instead" % values)
-
-            if not all([isinstance(f, int) for f in values.values()]):          # check for int types of values
-                raise TypeError("new frame indices expected to be a sequence of int, or a dictionary with int keys; got %s instead" % values)
-
-            if any([f < 0 for f in values]):                                    # check for valid values of keys
-                raise ValueError("new frame indices must be >= 0")
-            
-            if any([f < 0 for f in values.values()]):                           # check for valid values
-                raise ValueError("new frame indices must be >= 0")
-            
-            if len(set(values.values())) < len(values):                         # check for uniqueness of values
-                raise ValueError("duplicate new frame indices are not allowed") # NOTE this beign a dict its keys
-                                                                                # are guaranteed to be unique
-                
-            if len(self._states_) == 1:                                       # single frameless state
-                if self._states_[0].z_frame is None:                          # 
-                    new_states = list()                                         # generate new states for the frames
+                        state = self.getState(k, visible=True)
+                        if state:
+                            s = Bunch(state.copy())
+                            s.z_frame = v
+                            new_states.append(s)
+                            
+                self._states_[:] = sorted(new_states, key = lambda x: x.z_frame)
                     
-                    for f in values.values():                                   # use the values in the mapping regardless
-                        state = self._states_[0].copy()                       # of their keys
-                        state.z_frame = f
-                        new_states.append(state)
-                        
-                    self._states_[:] = new_states
-                    self._currentstate_ = self._states_[0]
-                    
-                else:                                                           # a single frame-linked state
-                    state = self._states_[0]
-                    if state.z_frame in values:                                 # do nothing if its frame is not
-                        new_frame = values[state.z_frame]                       # in the dict keys
-                        state.z_frame = new_frame
-                        
-            else:                                                               # case with several states
-                # change z_frame in states, supply new states if necessary:
-                # 1) which states require a change to z_frame attribute ?
-                target_states = [s for s in self._states_ \
-                                 if s.z_frame in values.keys()]
-                
-                # 2) which states do NOT require change in z-frame attribute?
-                avoid_states = [s for s in self._states_ \
-                                if s.z_frame not in values.keys()]
-                
-                # 3) z_frame values of the states that must be avoided (see 2)
-                avoid_state_frames = [s.z_frame for s in avoid_states]
-                
-                # 4) avoid new frame values that might generate duplication of
-                # frame links
-                new_frame_map = dict([(k,v) for (k,v) in values.items() \
-                                      if k not in avoid_state_frames])
-                
-                # 5) let user know the outcome of all of the above checks 
-                # 5.a) no suitable mappings left
-                if len(new_frame_map) == 0:
-                    warnings.warn("No remapping posible after avoiding frame-link duplications", RuntimeWarning)
-                    return
-                
-                # 5.b) some suitable mapping left
-                if len(new_frame_map) < len(values):
-                    warnings.warn("Some new frame remappings were discarded to avoid frame-link duplications", RuntimeWarning)
-                    # re-select target states
-                    target_states = [s for s in self._states_ \
-                                     if s.z_frame in new_frame_map.keys()]
-                
-                # 6) FINALLY apply the mappings
-                if len(target_states):
-                    for k, s in enumerate(target_states):
-                        new_frame = values[s.z_frame]
-                        s.z_frame = new_frame
-                        
-                else:   # tehcnically this branch will never be reached
-                    warnings.warn("State-frame links could not be remapped", RuntimeWarning)
-                    
-        elif isinstance(values, int):                                            # for just one frame link, if value is not a linked frame index already
-            if values not in self.frameIndices:
-                s = self._currentstate_.copy()
+        elif isinstance(values, int): 
+            new_states = list()
+            cached_states = list(s for s in self._states_ if s.z_frame not in values and s.z_frame not in values.values())
+            new_states.extend(cached_states)
+            current_state = self.getState(visible=False)
+            if current_state:
+                s = Bunch(current_state.copy())
                 s.z_frame = values
-                self._states_.append(s)
+                new_states.append(s)
+            
+            if len(new_states):
+                self._states_[:] = sorted(new_states, key = lambda x: x.z_frame)
                 
         else:
             raise TypeError("Expecting an int, a possibly empty iterable (tupe, list, range) of int, a possibly empty dict ({int keys -> int values}) or just None; got %s instead" % type(values).__name__)
-
-        #### END 
-            
-        #### BEGIN  old frameIndices() code; DO NOT DELETE
-        #if not isinstance(values, (tuple, list, dict)):
-            #raise TypeError("Expecting a sequence or a dict; got %s instead" % type(values).__name__)
-        
-        #if len(values) > len(self._states_):
-            #if len(self._states_) > 1 or self._states_[0].z_frame is not None:
-                #raise ValueError("Too many new frame indices (%d) for %d states" % (len(values), len(self._states_)))
-
-        #if len(values) == 1 and values[0] is None:
-            #values = []
-        
-        #if len(values):
-            #if not all([isinstance(f, int) for f in values]):
-                #raise TypeError("new frame indices expected to be a sequence of int, or a dictionary with int keys; got %s instead" % values)
-            
-            #if any([f < 0 for f in values]):
-                #raise ValueError("new frame indices must be >= 0")
-            
-            #if isinstance(values, (tuple, list)):
-                #if len(set(values)) < len(values):                                # check for uniqueness of values
-                    #raise ValueError("duplicate new frame indices are not allowed")
-                
-                #if len(self._states_) > 1:
-                    #states = sorted(self._states_, 
-                                    #key=lambda x:x.z_frame)
-                    
-                    #currentstate = self._currentstate_.copy()
-                    
-                    #if len(values) >= len(states):
-                        #for k,s in enumerate(states):                           # change frames for existing states, supply new states if necessary
-                            #if s.z_frame != values[k]:
-                                #s.z_frame = values[k]
-                            
-                        #for v in range(len(states), len(values)):
-                            #s = currentstate.copy()                             # replicate current state to extra frame indices
-                            #s.z_frame = values[k]
-                            #self._states_.append(s)
-                            
-                    #else:                                                       # discard extra states
-                        #for k, s in enumerate(states__[0:len(values)]):
-                            #if s.z_frame != values[k]:
-                                #s.z_frame = values[k]
-                                
-                        #for s in states[len(values):]:
-                            #self._states_.remove(s)
-                            
-                    #if self._currentstate_ not in self._states_:            # now re-set the current state in case it was removed
-                        #newstates = sorted(self._states_, 
-                                           #key=lambda x:x.z_frame)
-                        
-                        #newstateframes = [s.z_frame for s in newstates]
-                        
-                        #new_current_frame = bisect.bisect_left(newstateframes, self._currentstate_.z_frame)
-                        
-                        #self._currentstate_ = newstates[newstateframes.index(new_current_frame)]
-                        
-                #else:
-                    #state = self._states_[0].copy()                           # replicate the only state as necessary
-                    #self._states_.clear()
-                    #for k in values:
-                        #s = state.copy()
-                        #s.z_frame = k
-                        #self._states_.append(s)
-                        
-                    #self._currentstate_ = self._states_[0]
-                        
-            #elif isinstance(values, dict): # remaps frames
-                #if not all([isinstance(v, int) for v in values.values()]):
-                    #raise TypeError("When a mapping, all values in the new frame indices dictionary are expected to be int")
-                
-                #if len(set(values.values())) < len(values.values()):
-                    #raise ValueError("Duplicate frame values are not allowed")  # do not allow duplicates
-                
-                #if any([v < 0 for v in values.values()]):
-                    #raise ValueError("new frame indices must be >= 0")
-            
-                ## if there are to be NO duplicates in the values.keys() (and they aren't
-                ## because values a dict), and since no two states can have
-                ## identical z_frame values it follows that len(values) cannot 
-                ## be larger than len(self._states_)
-                ## therefore the next line is redundant
-                ##if len(values) >= len(self._states_):
-                
-                ## after remapping, the currentstate might be linked to a new frame index
-                ## we let this happen
-                
-                ## change frames for existing states, supply new states if necessary:
-                
-                ## 1) find out which states require a change to z_frame attribute
-                #target_states = [s for s in self._states_ \
-                                 #if s.z_frame in values.keys()]
-                
-                ## 2) which states do NOT require change in z-frame attribute
-                #avoid_states = [s for s in self._states_ \
-                                #if s.z_frame not in values.keys()]
-                
-                ## 3) frames of the states that must be avoided
-                #avoid_state_frames = [s.z_frame for s in avoid_states]
-                
-                ## 4) avoid new frame values that might generate duplication of frame links
-                #new_frame_map = dict([(k,v) for (k,v) in values.items() \
-                                      #if k not in avoid_state_frames])
-                
-                #if len(new_frame_map) == 0:
-                    #warnings.warn("No remapping posible after avoiding frame-link duplications", RuntimeWarning)
-                    #return
-                
-                #if len(new_frame_map) < len(values):
-                    #warnings.warn("Some new frame remappings were discarded to avoid frame-link duplications", RuntimeWarning)
-                    ## re-select target states
-                    #target_states = [s for s in self._states_ \
-                                     #if s.z_frame in new_frame_map.keys()]
-                
-                #if len(target_states):
-                    #for k, s in enumerate(target_states):
-                        #new_frame = values[s.z_frame]
-                        #s.z_frame = new_frame
-                        
-                #else:
-                    #warnings.warn("State-frame links could not be remapped")
-                    
-        #else: # erase frame information; retain current state as for all available frames
-            #current_state = self.currentState.copy()
-            #current_state.z_frame = None
-            
-            #self._states_[:] = [current_state]
-            
-        #### END old frameIndices() code; DO NOT DELETE
 
     @property
     def type(self):
@@ -4539,7 +4264,7 @@ class Cursor(PlanarGraphics):
             # NOTE FIXME what to do here?
             return
         
-        cPath = path.asPath()
+        cPath = path.objectForFrame()
         
         if all([isinstance(e, (Move, Line)) for e in cPath]):
             if len(cPath) == 2:
@@ -5762,10 +5487,10 @@ class Rect(PlanarGraphics):
     
     def convertToPath(self):
         frame_ndx = self.frameIndices()
-        ret = self.asPath(frame=frame_ndx[0], closed=True)
+        ret = self.objectForFrame(frame=frame_ndx[0], closed=True)
         
         for f in frame_ndx[1:]:
-            frame_path = self.asPath(frame=f, closed=True)
+            frame_path = self.objectForFrame(frame=f, closed=True)
             
             #ret.addState(f, frame_path.currentState)
             ret.addState(frame_path.currentState, f)
@@ -5803,8 +5528,7 @@ class Text(PlanarGraphics):
    
     @classmethod
     def defaultState(cls):
-        return DataBag(text="", x=0, y=0, z_frame=None, 
-                       use_mutable=True, allow_none=True)
+        return Bunch(text="", x=0, y=0, z_frame=None)
     
     def __init_from_descriptors__(self, *args, frameindex:typing.Optional[typing.Iterable]=[],
                                   currentframe:int=0) -> None:
@@ -5862,7 +5586,7 @@ class Text(PlanarGraphics):
     def controlPath(self, frame=None):
         return Path()
     
-    def asPath(self, frame=None, closed=False):
+    def objectForFrame(self, frame=None, closed=False):
         return Path()
     
     def qPoints(self, frame=None):
@@ -6115,7 +5839,9 @@ class Path(PlanarGraphics):
                     self._objects_.append(args[0].copy())
                     
                     if not isinstance(self._objects_[0], Move):
-                        self._objects_.insert(0, Move(position[0], position[1],
+                        x_ = self._objects_[0].x
+                        y_ = self._objects_[0].y
+                        self._objects_.insert(0, Move(x_, y_,
                                                       frameindex=frameindex, 
                                                       currentframe=currentframe))
                         
@@ -6321,7 +6047,7 @@ class Path(PlanarGraphics):
         
         """
         if path is None:
-            path = QtGui.QPainterPath()
+            path = QtGui.QPainterPath() # => return empty QPainterPath
             
         if closed is None:
             closePath = self.closed
@@ -6337,6 +6063,7 @@ class Path(PlanarGraphics):
                 # this calls the object's __call__ function
                 path = p(path, frame, closed=False, connected = connected) # just add the "primitive" element to the path
                     
+            #print(f"path elements {path.elementCount()}")
             if closePath:
                 # NOTE: ALWAYS  operate on current state (be it the common one,
                 # or the state associated with current frame)
@@ -6553,7 +6280,7 @@ class Path(PlanarGraphics):
         if not isinstance(states, (tuple, list)):
             return False
         
-        return all([isinstance(state, DataBag) and all([hasattr(state, a) for a in element._planar_descriptors_]) for (state, element) in zip(states, self._objects_)])
+        return all([isinstance(state, Bunch) and all([hasattr(state, a) for a in element._planar_descriptors_]) for (state, element) in zip(states, self._objects_)])
             
     def validateStates(self, value):
         if not isinstance(value, dict):
@@ -6569,8 +6296,8 @@ class Path(PlanarGraphics):
         if len(self._objects_) == 0:
             raise RuntimeError("This path object has no elements")
         
-        if not isinstance(state, DataBag):
-            raise TypeError("state expected to be a datatypes.DataBag; got %s instead" % type(state).__name__)
+        if not isinstance(state, Bunch):
+            raise TypeError("state expected to be a datatypes.Bunch; got %s instead" % type(state).__name__)
         
         if not self.validateState(state): # make sure state complies with this planar type
             raise TypeError("state %s does not contain the required descriptors %s" % (state, self._planar_descriptors_))
@@ -6704,10 +6431,9 @@ class Path(PlanarGraphics):
         """
         if len(self._objects_):
             states = self.objectForFrame(self.currentFrame, visible=True)
-            #states = self.getState(self.currentFrame, visible=True)
             
-            if len(states):
-                x = min([s.x for s in states])
+            if states:
+                x = min([o.x for o in self._objects_])
                 
             else:
                 x = 0
@@ -6756,10 +6482,16 @@ class Path(PlanarGraphics):
         path, in the current descriptor state
         """
         if len(self._objects_):
-            states = self.getState(self.currentFrame)
-            #states = [s for s in self.asPath(self.currentFrame) if s is not None]
-            if len(states):
-                y = min([s.y for s in states])
+            states = self.objectForFrame(self.currentFrame, visible=True)
+            if states:
+                y = min(o.y for o in self._objects_)
+            #states = self.getState(self.currentFrame)
+            #states = [s for s in self.objectForFrame(self.currentFrame) if s is not None]
+            #if isinstance(states, (tuple, list)) and len(states):
+                #y = min([s.y for s in states])
+            
+            #elif isinstance(states, PlanarGraphics):
+                #y = states.y
                 
             else:
                 y = 0
@@ -6772,9 +6504,10 @@ class Path(PlanarGraphics):
     @y.setter
     def y(self, value):
         if len(self._objects_):
-            states = self.getState(self.currentFrame)
+            states = self.objectForFrame(self.currentFrame, visible=True)
+            #states = self.getState(self.currentFrame)
             #states = [s for s in self.getState(self.currentFrame) if s is not None]
-            #states = [s for s in self.asPath(self.currentFrame) if s is not None]
+            #states = [s for s in self.objectForFrame(self.currentFrame) if s is not None]
             
             if len(states):
                 old_y = min([s.y for s in states])
@@ -7131,10 +6864,6 @@ class Path(PlanarGraphics):
         #return ret
             
     def objectForFrame(self, frame:typing.Optional[int]=None,
-                          visible:typing.Optional[bool] = True) -> object:
-        return self.asPath(frame, visible)
-    
-    def asPath(self, frame:typing.Optional[int]=None,
                visible:typing.Optional[bool] = True) -> object:
         """Returns a Path object made of graphics linked to the specified frame
         
@@ -7163,7 +6892,7 @@ class Path(PlanarGraphics):
         if frame is None:
             frame = self._currentframe_
             
-        states = list(o.getState(frame, visible=visible) for o in self._objects_)
+        states = list(filter(lambda o: o.getState(frame, visible=visible), self._objects_))
         
         if states:
             if len(states) > 1:
@@ -7914,7 +7643,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     #
     #
     
-    # NOTE: 2021-07-04 09:36:25 use plain dict here - avoid the DataBag
+    # NOTE: 2021-07-04 09:36:25 use plain dict here - avoid the Bunch
     # overhead since we don't necessarily need to observe the changes
     #
 
@@ -8380,7 +8109,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
     def _makeCursorLines_(self, state:dict, vert:bool=True, horiz:bool=True):
         """Draws the main cursor lines.
-        state: dict (or DataBag) with x, y, height and width attributes (see Cursor)
+        state: dict (or Bunch) with x, y, height and width attributes (see Cursor)
         vert, horiz: bool (by default, both True) 
         
             Which line to draw:
@@ -8412,7 +8141,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
 
     def _makeCursorWhiskers_(self, state:dict, vert:bool=False, horiz:bool=False):
         """Draws the whisker bars orthogonal to the main cursor line(s)
-        state: dict (or DataBag) with x, y, xwindow and ywindow attributes (see Cursor)
+        state: dict (or Bunch) with x, y, xwindow and ywindow attributes (see Cursor)
         vert:  draws the (horizontal) whisker for the vertical main line (horizontal whisker bar)
         horiz: draws the (vertical) whisker for horizontal main line (vertical whisker bar)
         
@@ -8586,10 +8315,10 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                             ##self._backend_.y + self._backend_.h))
                                     
         #elif isinstance(self._backend_, Path):
-            #self._cachedPath_ = self._backend_.asPath()
+            #self._cachedPath_ = self._backend_.objectForFrame()
                 
         #else:
-            #self._cachedPath_ = self._backend_.asPath()
+            #self._cachedPath_ = self._backend_.objectForFrame()
             
     def show(self):
         self.setVisible(True)
@@ -8623,7 +8352,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 # NOTE: 2021-05-07 13:34:17 
                 # Use mapRectFromScene to obtain a QRectF instead of a QPolygonF
                 # which would be returned by mapFromScene(rect)
-                if isinstance(state, DataBag): # and len(state):
+                if isinstance(state, Bunch): # and len(state):
                     if isinstance(self._backend_, VerticalCursor) or \
                         self._backend_.type & PlanarGraphicsType.vertical_cursor:
                         bRect = self.mapRectFromScene(QtCore.QRectF(state.x - state.xwindow/2,
@@ -9127,7 +8856,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     
             else: # non-cursor types
                 # NOTE: FIXME be aware of undefined behaviours !!! (check flags and types)
-                if self._buildMode_: # this only makes sense for ROIs
+                if self._buildMode_: # this only makes sense for non-cursors
                     if len(self._cachedPath_) == 0: # nothing to paint !
                         return
                     
@@ -9334,7 +9063,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             painter.drawEllipse(r_)
                             
                         else: # general Path backend, including polyline, polygon
-                            path = self._backend_.asPath() # this is a pictgui.Path
+                            path = self._backend_.objectForFrame() # this is a pictgui.Path
                             #qpath = self._backend_()
                             
                             # NOTE: 2021-05-04 14:10:24
@@ -9343,6 +9072,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             qpath = self.mapFromScene(path())
                             
                             painter.drawPath(qpath)
+                            
+                            if qpath.length() == 0:
+                                painter.drawPoint(QtCore.QPointF(qpath.elementAt(0).x, qpath.elementAt(0).y))
                             
                     labelPos = self.boundingRect().center()
                     
@@ -9764,7 +9496,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             distance = -1
             
             if self._cachedPath_ is None or len(self._cachedPath_) == 0:
-                self._cachedPath_ = self._backend_.asPath(self._currentframe_) 
+                self._cachedPath_ = self._backend_.objectForFrame(self._currentframe_) 
                 self._cachedPath_.frameIndices = [] # force current state into a common state
 
             for k, p in enumerate(self._cachedPath_):
