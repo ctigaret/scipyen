@@ -1273,6 +1273,9 @@ class PlanarGraphics():
         else:
             raise TypeError("closed expected to be a boolean or None; got %s instead" % type(closed).__name__)
         
+        if not isinstance(frame, int):
+            frame = self.currentFrame
+            
         state = self.getState(frame)
         
         if state: # is None: # or len(state) == 0:
@@ -1739,13 +1742,8 @@ class PlanarGraphics():
                 
         """
         
-        #if len(self._currentstates_):
-            #self._currentframe_ = self._currentstates_[0].z_frame
         return self._currentframe_
         
-        #return None
-    
-    
     @currentFrame.setter
     def currentFrame(self, value):
         """Sets the frame index in "value" as the "current" frame.
@@ -2613,16 +2611,12 @@ class PlanarGraphics():
             raise TypeError("'frame' expected to be an int; got %s instead" % type(frame).__name__)
             
         if visible:
-            visible_states = [s for s in self._states_ if self.__class__.isStateVisible(s, frame)]
-            
-            if visible_states:
-                return visible_states[0]
-            
+            states = list(s for s in self._states_ if self.__class__.isStateVisible(s, frame))
         else:
-            states = [s for s in self._states_ if s.z_frame == frame]
+            states = list(s for s in self._states_ if s.z_frame in (frame, None))
             
-            if states:
-                return states[0]
+        if states:
+            return states[0]
             
     def setFrameIndex(self, state:typing.Optional[typing.Union[Bunch, int]]=None, 
                       new_frame:typing.Optional[int]=None,
@@ -3270,20 +3264,27 @@ class PlanarGraphics():
         
     def objectForFrame(self, frame:typing.Optional[int]=None,
                        visible:typing.Optional[bool]=True) -> typing.Optional[object]:
-        """Returns a PlanarGraphics of the same type as self, linked to frame.
+        """Returns a new PlanarGraphics with frame-specific descriptors.
         
-        In contrast with getState(frame) which returns just the Bunch state for
-        the specified frame, this function constructs a new PlanarGraphics object
-        having a single ubiquitous state identical to the one returned by getState().
+        In contrast with getState(frame) which returns the Bunch state object
+        for the specified frame, this function constructs a new PlanarGraphics 
+        object of same type as self, with a single state identical to the one 
+        returned by getState().
         
-        This implies that the new PlanarGraphics is a copy of the 
+        WARNING: The function returns a NEW object (not a reference to the 
+        current one); hence any modifications to its descriptor values will NOT
+        be reflected in the original.
         
         This is used typically when dysplaying the PlanarGraphics in a frame (as
         "cached" object)
         """
         state = self.getState(frame, visible=visible)
         if state:
-            return self.__class__(state)
+            ret = self.__class__(state)
+            # NOTE: 2022-01-10 14:49:16# the below is REQUIRED because state may
+            # be frame-specific
+            ret.currentFrame = self.currentFrame 
+            return ret
     
     @staticmethod
     def getCurveLength(obj, prev=None):
@@ -6430,10 +6431,11 @@ class Path(PlanarGraphics):
         path, in the current descriptor state
         """
         if len(self._objects_):
-            states = self.objectForFrame(self.currentFrame, visible=True)
+            states = self.getState(self.currentFrame, visible=True)
+            #states = self.objectForFrame(self.currentFrame, visible=True)
             
             if states:
-                x = min([o.x for o in self._objects_])
+                x = min([s.x for s in states])
                 
             else:
                 x = 0
@@ -6459,13 +6461,13 @@ class Path(PlanarGraphics):
                 for s in states:
                     s.x += delta_x
                     
-                    if "cx" in s:#.["_planar_descriptors_"]:
+                    if "cx" in s:#.__class__._planar_descriptors_:
                         s.cx += delta_x
                         
-                    if "c1x" in s:#.["_planar_descriptors_"]:
+                    if "c1x" in s:#.__class__._planar_descriptors_:
                         s.c1x += delta_x
                         
-                    if "c2x" in s:#.["_planar_descriptors_"]:
+                    if "c2x" in s:#.__class__._planar_descriptors_:
                         s.c2x += delta_x
                     
         # this is a tuple !
@@ -6482,9 +6484,10 @@ class Path(PlanarGraphics):
         path, in the current descriptor state
         """
         if len(self._objects_):
-            states = self.objectForFrame(self.currentFrame, visible=True)
+            states = self.getState(self.currentFrame, visible=True)
+            #states = self.objectForFrame(self.currentFrame, visible=True)
             if states:
-                y = min(o.y for o in self._objects_)
+                y = min(s.y for s in states)
             #states = self.getState(self.currentFrame)
             #states = [s for s in self.objectForFrame(self.currentFrame) if s is not None]
             #if isinstance(states, (tuple, list)) and len(states):
@@ -6504,7 +6507,7 @@ class Path(PlanarGraphics):
     @y.setter
     def y(self, value):
         if len(self._objects_):
-            states = self.objectForFrame(self.currentFrame, visible=True)
+            states = self.getState(self.currentFrame, visible=True)
             #states = self.getState(self.currentFrame)
             #states = [s for s in self.getState(self.currentFrame) if s is not None]
             #states = [s for s in self.objectForFrame(self.currentFrame) if s is not None]
@@ -6512,7 +6515,7 @@ class Path(PlanarGraphics):
             if len(states):
                 old_y = min([s.y for s in states])
                 delta_y = value - old_y
-        
+                
                 # NOTE: 2018-01-20 22:33:12
                 # shift all elements vertically, by the distance between
                 # current y coordinate and value
@@ -6742,7 +6745,8 @@ class Path(PlanarGraphics):
         
     @property
     def currentFrame(self):
-        return self._objects_[0].currentFrame
+        self._currentframe_ = self._objects_[0].currentFrame
+        return self._currentframe_
         
     @currentFrame.setter
     def currentFrame(self, value):
@@ -6751,6 +6755,8 @@ class Path(PlanarGraphics):
         
         for e in self._objects_:
             e.currentFrame = value
+            
+        self._currentframe_ = self._objects_[0].currentFrame
             
     @property
     def currentState(self):
@@ -6848,24 +6854,12 @@ class Path(PlanarGraphics):
     def hasStateForFrame(self, frame:typing.Optional[int]=None):
         return any([o.hasStateForFrame(frame) for o in self])
         
-    #def objectForFrame(self, frame):
-        #"""See PlanarGraphics.objectForFrame
-        #"""
-        #if self.hasStateForFrame(frame):
-            #ret = Path()
-            #for p in self:
-                #ret.append(p.objectForFrame(frame))
-            
-            #ret.name = "copy of %s for frame %d" % (self.name, frame)
-                
-        #else:
-            #ret = None
-            
-        #return ret
-            
     def objectForFrame(self, frame:typing.Optional[int]=None,
                visible:typing.Optional[bool] = True) -> object:
-        """Returns a Path object made of graphics linked to the specified frame
+        """Returns a new Path object with frame-specific decriptors.
+        
+        WARNING: Since this is a new Path object, and NOT a reference to the 
+        current descriptor values, modyfing it does not affect the original
         
         Parameters:
         ========================
@@ -6877,8 +6871,11 @@ class Path(PlanarGraphics):
         """
         elements = [o for o in map(lambda x: x.objectForFrame(frame, visible=visible), self) if o is not None]
         if elements:
-            return Path(elements)
-        #return Path([o for o in map(lambda x: x.getObjectForFrame(frame), self) if o is not None])
+            ret = Path(elements)
+            # NOTE: 2022-01-10 14:50:04
+            # the below is REQUIRED as state may be frame-specific!
+            ret.currentFrame = self.currentFrame
+            return ret
         
     def getState(self, frame:typing.Optional[int]=None,
                  visible:typing.Optional[bool]=True) -> typing.Optional[list]:
@@ -6890,22 +6887,20 @@ class Path(PlanarGraphics):
         
         """
         if frame is None:
-            frame = self._currentframe_
+            frame = self.currentFrame
             
-        states = list(filter(lambda o: o.getState(frame, visible=visible), self._objects_))
+        # NOTE: 2022-01-10 12:58:33
+        # not sure why the line below returns a list of PlanarGraphics instead
+        # of a list of Bunch objects!
+        #obj_states = list(filter(lambda o: o.getState(frame, visible=visible), self))
         
-        if states:
-            if len(states) > 1:
-                return states
-            else:
-                return states[0]
-                
-        #return [o for o in [o.getState(frame) for o in self._objects_] if o is not None]
-    
+        obj_states = list(o.getState(frame, visible=visible) for o in self)
+        
+        return list(filter(lambda o:o, obj_states))
+        
     def removeState(self, value):
         for o in self._objects_:
             o.removeState(value)
-        #raise NotImplementedError("Path objects do not support this method")
             
     def controlPoints(self, frame=None):
         ret = list()
@@ -9062,7 +9057,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             painter.drawPoint(p_)
                             painter.drawEllipse(r_)
                             
-                        else: # general Path backend, including polyline, polygon
+                        else: # general Path backend, including polyline, polygon, etc.
                             path = self._backend_.objectForFrame() # this is a pictgui.Path
                             #qpath = self._backend_()
                             
