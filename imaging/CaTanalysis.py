@@ -9597,49 +9597,19 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         else:
             preSel = None
         
-        lsdata_vars = self.importWorkspaceData(title="Load ScanData Object",
-                                          single=True,
-                                          preSelected=preSel,
-                                          with_varName=True)
+        lsdata_vars = self.importWorkspaceData(dataTypes = ScanData,
+                                               title="Load ScanData Object",
+                                               single=True,
+                                               preSelected=preSel,
+                                               with_varName=True)
         
         if len(lsdata_vars) == 0:
             return
         
-        ldata_varname, lsdata = lsdata_vars[0]
+        lsdata_varname, lsdata = lsdata_vars[0]
         
         self.setData(newdata = lsdata, doc_title = lsdata_varname)
         
-        #from core.workspacefunctions import getvarsbytype
-
-        #scandata_name_vars = getvarsbytype(ScanData, ws = self._scipyenWindow_.workspace)
-        
-        ##print("scandata_name_vars", scandata_name_vars)
-        
-        #if len(scandata_name_vars) == 0:
-            #return
-        
-        ##name_list = sorted([name for name in scandata_name_vars.keys() if self._check_for_linescan_data_(scandata_name_vars[name])])
-        #name_list = sorted([name for name in scandata_name_vars.keys()])# if self._check_for_linescan_data_(scandata_name_vars[name])])
-        
-        #if self._data_ is not None and self._data_.name in name_list:
-            #pre_selected = self._data_.name
-            
-        #else:
-            #pre_selected = None
-            
-        ##print("name_list", name_list)
-        
-        #choiceDialog = pgui.ItemsListDialog(parent=self, title="Load ScanData Object", 
-                                            #itemsList = name_list, preSelected = pre_selected)
-        
-        #ans = choiceDialog.exec()
-        
-        #if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
-            #lsdata = scandata_name_vars[choiceDialog.selectedItemsText[0]]
-            #lsdata_varname = choiceDialog.selectedItems[0]
-            
-            #self.setData(newdata=lsdata, doc_title=lsdata_varname)
-                
     @pyqtSlot()
     @safeWrapper
     def slot_setDataName(self):
@@ -9731,10 +9701,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         if no corresponding viewer has been initialized, otherwise, calls
         self._update_viewer_.
         """
-        if section in ("electrophysiology", "ephys"):
-            section = "ephys"# LCD
-            
         wname, viewers, winFactory, winSetup = self._get_viewers_for_data_section(section)
+        
         if any((v is None for v in (wname, viewers))):
             return
         
@@ -9759,6 +9727,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 if k >= len(viewers):
                     # create new image viewer as needed
                     win = self._init_viewer_(winFactory, winTag, winSetup, winTitle, docTitle, nFrames)
+                    win.signal_graphicsObjectAdded[object].connect(self.slot_graphics_object_added_in_window)
                     viewers.append(win)
                 else:
                     # clear the contents of the current image viewer
@@ -9809,7 +9778,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             #if not self._data_.hasSignalData(section):
                 #return
         
-        if section in ("electrophysiology", "ephys"):
+        if section in ("electrophysiology"):
             return "Electrophysiology", self.ephysviewers, sv.SignalViewer, self._signalviewer_setup_
         
         elif section in ("scansBlock",):
@@ -9833,9 +9802,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         if self._data_ is None:
             return 0
         
-        if section in ("electrophysiology", "ephys"):
-            section = "ephys"
-            
         data = getattr(self._data_, section, None)
         
         if data is None:
@@ -9900,12 +9866,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         self.unlinkFromViewers()
         
-        self._init_data_viewers_("scene")
-        self._init_data_viewers_("scans")
-        self._init_data_viewers_("ephys")
-        self._init_data_viewers_("scansProfiles")
-        self._init_data_viewers_("scansBlock")
-        self._init_data_viewers_("sceneBlock")
+        for d in self._data_._data_children_ + self._data_._derived_data_children_:
+            self._init_data_viewers_(d[0])
         
         allviewers = [self] + self.sceneviewers + self.scansviewers + self.ephysviewers + self.profileviewers + self.scansblockviewers + self.sceneblockviewers
         

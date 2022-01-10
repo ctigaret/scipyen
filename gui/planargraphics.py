@@ -6488,13 +6488,6 @@ class Path(PlanarGraphics):
             #states = self.objectForFrame(self.currentFrame, visible=True)
             if states:
                 y = min(s.y for s in states)
-            #states = self.getState(self.currentFrame)
-            #states = [s for s in self.objectForFrame(self.currentFrame) if s is not None]
-            #if isinstance(states, (tuple, list)) and len(states):
-                #y = min([s.y for s in states])
-            
-            #elif isinstance(states, PlanarGraphics):
-                #y = states.y
                 
             else:
                 y = 0
@@ -6508,9 +6501,6 @@ class Path(PlanarGraphics):
     def y(self, value):
         if len(self._objects_):
             states = self.getState(self.currentFrame, visible=True)
-            #states = self.getState(self.currentFrame)
-            #states = [s for s in self.getState(self.currentFrame) if s is not None]
-            #states = [s for s in self.objectForFrame(self.currentFrame) if s is not None]
             
             if len(states):
                 old_y = min([s.y for s in states])
@@ -7427,7 +7417,8 @@ class GraphicsObjectLnF(object):
     #font = QtWidgets.QApplication.font()
     
     @staticmethod
-    def pen(graphic="pen_line", control:bool=False, selected:bool=False, linked:bool=False):
+    def pen(graphic="pen_line", control:bool=False, selected:bool=False, 
+            linked:bool=False):
         if graphic not in ("pen_line", "pen_point", "pen_text"):
             raise ValueError("Unexpected graphic item %s; should've been 'pen_line', 'pen_point' or 'pen_text'" % graphic)
         
@@ -7787,27 +7778,27 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     def _setAppearance_(self, cosmeticPen:bool=True):
         self.controlLnF = Bunch({"pen": Bunch({"line": GraphicsObjectLnF.pen(graphic ="pen_line", 
                                                                             control=True),
-                                                "text": GraphicsObjectLnF.pen(graphic="pen_text",
+                                               "text": GraphicsObjectLnF.pen(graphic="pen_text",
                                                                             control=True),
-                                                "point": GraphicsObjectLnF.pen(graphic="pen_point",
+                                               "point": GraphicsObjectLnF.pen(graphic="pen_point",
                                                                             control=True)}), 
-                                "brush": Bunch({"text": GraphicsObjectLnF.brush(graphic="brush_label",
+                                 "brush": Bunch({"text": GraphicsObjectLnF.brush(graphic="brush_label",
                                                                                         control=True),
-                                                "point": GraphicsObjectLnF.brush(graphic="brush_point",
+                                                 "point": GraphicsObjectLnF.brush(graphic="brush_point",
                                                                                         control=True)}),
                                 "font":QtWidgets.QApplication.font(),
                                 "pointsize": GraphicsObjectLnF.pointsize["control"]
                                 })
         
         self.basicLnF = Bunch({False: Bunch({"pen": Bunch({"line" : GraphicsObjectLnF.pen(graphic="pen_line"),
-                                                           "text": GraphicsObjectLnF.pen(graphic="pen_text"),
+                                                           "text":  GraphicsObjectLnF.pen(graphic="pen_text"),
                                                            "point": GraphicsObjectLnF.pen(graphic="pen_point")
                                                            }),
-                                            "brush": Bunch({"text": GraphicsObjectLnF.brush(graphic="brush_label"),
+                                             "brush": Bunch({"text": GraphicsObjectLnF.brush(graphic="brush_label"),
                                                             "point": GraphicsObjectLnF.brush(graphic="brush_point")
                                                             }),
-                                            "font":QtWidgets.QApplication.font(),
-                                            "pointsize": GraphicsObjectLnF.pointsize["basic"]
+                                             "font":QtWidgets.QApplication.font(),
+                                             "pointsize": GraphicsObjectLnF.pointsize["basic"]
                                             }), 
                                             
                                True: Bunch({"pen": Bunch({"line" : GraphicsObjectLnF.pen(graphic="pen_line",
@@ -7865,40 +7856,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                             })
                                 })
                          
-        ## pen for lineart including the points in non-cursors: style depends on selection; color on whether it is linked
-        #self._linePen                           = QtGui.QPen(self._defaultLinePen(cosmetic=cosmeticPen))
-        #self._linePenSelected                   = QtGui.QPen(self._defaultLinePen(selected=True,cosmetic=cosmeticPen))
-        #self._linePenLinked                     = QtGui.QPen(self._defaultLinePen(linked=True,cosmetic=cosmeticPen))
-        #self._linePenLinkedSelected             = QtGui.QPen(self._defaultLinePen(selected=True, linked=True,cosmetic=cosmeticPen))
-        ## labels text
-        #self._textPen                           = QtGui.QPen(self._defaultTextPen(cosmetic=cosmeticPen))
-        #self._textPenSelected                   = QtGui.QPen(self._defaultTextPen(selected=True,cosmetic=cosmeticPen))
-        #self._textPenLinked                     = QtGui.QPen(self._defaultTextPen(linked=True,cosmetic=cosmeticPen))
-        #self._textPenLinkedSelected             = QtGui.QPen(self._defaultTextPen(selected=True, linked=True,cosmetic=cosmeticPen))
-        ## labels background brush
-        #self._labelBrush                        = QtGui.QBrush(self._defaultLabelBrush())
-        #self._labelBrushSelected                = QtGui.QBrush(self._defaultLabelBrush(selected=True))
-        #self._labelBrushLinked                  = QtGui.QBrush(self._defaultLabelBrush(linked=True))
-        #self._labelBrushLinkedSelected          = QtGui.QBrush(self._defaultLabelBrush(selected=True, linked=True))
-        
-        ## control lineart for ROIs in build or edit mode
-        ## pen for control lines
-        #self._controlLinePen                    = QtGui.QPen(self._defaultControlLinePen(cosmetic=cosmeticPen))
-        ## pen for control points
-        #self._controlPointPen                   = QtGui.QPen(self._defaultControlPointPen(cosmetic=cosmeticPen))
-        ## fill (background) for control points
-        #self._controlPointBrush                 = QtGui.QBrush(self._defaultControlPointBrush())
-        ## control lineart label text
-        #self._controlTextPen                    = QtGui.QPen(self._defaultControlTextPen(cosmetic=cosmeticPen))
-        ## brush for control lineart labels
-        #self._controlLabelBrush                 = QtGui.QBrush(self._defaultControlLabelBrush())
-        
-        ## diameter (in pixels) of points and control points
-        #self._pointSize = 5
-        
-        ## label font
-        #self._textFont = self.defaultTextFont
-        
     @safeWrapper
     def _defaultLinePen(self, selected:bool=False, linked:bool=False, cosmetic:bool=True):
         pen = QtGui.QPen(self.link_colors["%s" % linked].pen,
@@ -8731,7 +8688,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 if self._backend_ is None or not self._backend_.hasStateForFrame():
                     return
                 
-            lnf = self.linkedLnF if self._backend_.isLinked else self.basicLnF
+            lnf = self.lnf # self.linkedLnF if self._backend_.isLinked else self.basicLnF
                     
             linePen = lnf[self.isSelected()]["pen"]["line"]
             textPen = lnf[self.isSelected()]["pen"]["text"]
@@ -10620,6 +10577,10 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             raise TypeError("Expecting a Qt Core Qt.PenStyle or Qt.BrushStyle; got %s instead" % type(style.__name__))
         
     @property
+    def lnf(self) -> Bunch:
+        return self.linkedLnF if self._backend_.isLinked else self.basicLnF
+    
+    @property
     def linkedColor(self):
         return self._linePenLinked.color()
     
@@ -10677,8 +10638,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             self.update()
         
     @property
-    def textBackground(self):
-        return self._textBackgroundBrush
+    def textBackground(self) -> QtGui.QBrush:
+        return self.lnf[self.isSelected()].brush.text # self._textBackgroundBrush.color()
+        #return self._textBackgroundBrush
     
     @textBackground.setter
     def textBackground(self, brush):
@@ -10687,13 +10649,14 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self.update()
         
     @property
-    def textBackgroundColor(self):
-        return self._textBackgroundBrush.color()
+    def textBackgroundColor(self) -> QtGui.QColor:
+        return self.lnf[self.isSelected()].brush.text.color() # self._textBackgroundBrush.color()
     
     @textBackground.setter
     def textBackgroundColor(self, qcolor):
         if isinstance(qcolor, QtGui.QColor) and qcolor.isValid():
-            self._textBackgroundBrush.setColor(qcolor)
+            self.lnf[self.isSelected()].brush.text.setColor(qcolor)
+            #self._textBackgroundBrush.setColor(qcolor)
             self.update()
         
     @property

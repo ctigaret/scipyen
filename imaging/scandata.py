@@ -7692,10 +7692,10 @@ class ScanData(BaseScipyenData):
             raise TypeError("Expecting a pictgui.Cursor; got %s instead" % type(cursor).__name__)
         
         if scans:
-            cursordict = self._scanscursors_
+            cursordict = self.scansCursors
             
         else:
-            cursordict = self._scenecursors_
+            cursordict = self.sceneCursors
         
         if append:
             if cursor.name in cursordict.keys():
