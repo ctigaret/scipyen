@@ -42,7 +42,7 @@ def _new_DataMark(cls, places = None, labels=None, units=None, name=None,
     return e
 
 def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None, 
-               file_origin=None, description=None, event_type=None,
+               description=None, file_origin=None, event_type=None,
                segment=None, array_annotations=None, annotations={}):
     """Keep for old pickles
     """
@@ -55,8 +55,8 @@ def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None,
             except:
                 annotations = dict() # just so that we aren't left hanging out
                 
-    e = TriggerEvent(times=times, labels=labels, units=units,name=name,
-                      file_origin=file_origin, description=description, 
+    e = TriggerEvent(times=times, labels=labels, units=units, name=name,
+                      description=description, file_origin=file_origin, 
                       event_type=event_type, array_annotations=array_annotations,
                       **annotations)
     
@@ -386,9 +386,8 @@ class DataMark(DataObject):
 
     
     def __init__(self, places=None, times=None, labels=None, units=None, 
-                 name=None, description=None,file_origin=None, 
-                 mark_type=None, event_type=None, 
-                 array_annotations=None, **annotations):
+                 name=None, description=None, file_origin=None, 
+                 mark_type=None, array_annotations=None, **annotations):
         """Constructs a DataMark.
         
         For DataMark objects, event_type is by default MarkType.place
@@ -407,22 +406,22 @@ class DataMark(DataObject):
         # NOTE: see NOTE: 2021-11-11 09:39:49
         
         if self.__class__.__name__ == "TriggerEvent":
-            if event_type is None:
+            if mark_type is None:
                 self.__mark_type__ = TriggerEventType.presynaptic
                 
-            elif isinstance(event_type, str):
-                if event_type in TriggerEventType.__members__:
-                    self.__mark_type__ = TriggerEventType[event_type]
+            elif isinstance(mark_type, str):
+                if mark_type in TriggerEventType.__members__:
+                    self.__mark_type__ = TriggerEventType[mark_type]
                     
                 else:
-                    warngins.warning("Unknown event type %s; event_type will be set to %s " % (event_type, TriggerEventType.presynaptic))
+                    warngins.warning("Unknown event type %s; mark_type will be set to %s " % (mark_type, TriggerEventType.presynaptic))
                     self.__mark_type__ = TriggerEventType.presynaptic
             
-            elif isinstance(event_type, TriggerEventType):
-                self.__mark_type__ = event_type
+            elif isinstance(mark_type, TriggerEventType):
+                self.__mark_type__ = mark_type
                 
             else:
-                warngins.warn("'event_type' parameter expected to be a TriggerEventType enum value, a TriggerEventType name, or None; got %s instead" % type(event_type).__name__)
+                warngins.warn("'mark_type' parameter expected to be a TriggerEventType enum value, a TriggerEventType name, or None; got %s instead" % type(mark_type).__name__)
                 self.__mark_type__ = TriggerEventType.presynaptic
                 
         else:
@@ -435,7 +434,7 @@ class DataMark(DataObject):
                 
         else:
             if self.__class__.__name__ == "TriggerEvent":
-                self._name_ = self.event_type.name
+                self._name_ = self.mark_type.name
             else:
                 self._name_ = "DataMark"
 
@@ -504,9 +503,10 @@ class DataMark(DataObject):
             else:
                 objs = ["%s" % self.times]
             
-        result = "TriggerEvent (%s): %s, %s" % (self.event_type.name, self.name, ", ".join(objs))
+        result = "TriggerEvent (%s): %s, %s" % (self.type.name, self.name, ", ".join(objs))
+        
         if self.__class__.__name__ == "TriggerEvent":
-            tail = f"({self.event_type.name}): {self.name}, {', '.join(objs)}"
+            tail = f"({self.type.name}): {self.name}, {', '.join(objs)}"
         else:
             tail = f": {self.name}, {', '.join(objs)}"
             
@@ -524,21 +524,19 @@ class DataMark(DataObject):
         if not hasattr(self, 'array_annotations'):
             self.array_annotations = ArrayDict(self._get_arr_ann_length())
 
-        new_fn = eval(f"_new_{self.__class__.__name__}")
-
         return _new_DataMark, (self.__class__, self.times, self.labels, 
-                               self.units, self.name, self.__mark_type__, 
-                               self.file_origin, self.description,
+                               self.units, self.name, self.description, 
+                               self.file_origin, self.__mark_type__, 
                                self.segment, self.array_annotations, annots)
     
+    def get_labels(self):
+        return self._labels
+    
     def set_labels(self, labels):
-        if self.labels is not None and self.labels.size > 0 and len(labels) != self.size:
+        if self._labels is not None and self._labels.size > 0 and len(labels) != self.size:
             raise ValueError("Labels array has different length to places ({} != {})"
                             .format(len(labels), self.size))
         self._labels = np.array(labels)
-
-    def get_labels(self):
-        return self._labels
 
     def merge(self, other):
         """Merge this event with the time stamps from other event
@@ -577,7 +575,7 @@ class DataMark(DataObject):
                 kwargs[name] = "merge(%s, %s)" % (attr_self, attr_other)
                 
         if isinstance(self, TriggerEvent):
-            kwargs["event_type"] = self.__mark_type__
+            kwargs["mark_type"] = self.__mark_type__
 
         merged_annotations = self.annotations.copy()
         
@@ -599,13 +597,12 @@ class DataMark(DataObject):
         return obj
 
     def setLabel(self, value):
-        #print("setLabel: event_type", self.__mark_type__)
         if isinstance(value, str):
-            setattr(self, "_labels", np.array([value] * self.times.size))
+            setattr(self, "labels", np.array([value] * self.times.size))
             
         elif isinstance(value, (tuple, list)) and all([isinstance(l, str) for l in value]):
             if len(value) == self.times.flatten().size:
-                setattr(self, "_labels", np.array(value))
+                setattr(self, "labels", np.array(value))
                 
             else:
                 raise ValueError("When given as a list, value must have as many elements as times (%d); got %d instead" % (self.times.flatten().size, len(value)))
@@ -613,15 +610,15 @@ class DataMark(DataObject):
         elif isinstance(value, np.ndarray) and is_string(value):
             if value.flatten().size == 0:
                 if isinstance(self, TriggerEvent):
-                    setattr(self, "_labels", np.array([TriggerEvent.defaultLabel(self.__mark_type__)] * self.times.size))
+                    setattr(self, "labels", np.array([TriggerEvent.defaultLabel(self.__mark_type__)] * self.times.size))
                 else:
-                    setattr(self, "_labels", np.array(["DataMark"] * self.times.size))
+                    setattr(self, "labels", np.array(["DataMark"] * self.times.size))
                     
             elif value.flatten().size != self.times.flatten().size:
-                setattr(self, "_labels", np.array([value.flatten()[0]] * self.times.size))
+                setattr(self, "labels", np.array([value.flatten()[0]] * self.times.size))
                 
             else:
-                setattr(self, "_labels", value)
+                setattr(self, "labels", value)
                 
         elif value is None:
             if isinstance(self, TriggerEvent):
@@ -630,9 +627,9 @@ class DataMark(DataObject):
                 def_label = "DataMark"
             #print("setLabel: def_label", def_label)
             if isinstance(self, TriggerEvent):
-                setattr(self, "_labels", np.full_like(self.times.magnitude, TriggerEvent.defaultLabel(self.__mark_type__), dtype=np.dtype(str)))
+                setattr(self, "labels", np.full_like(self.times.magnitude, TriggerEvent.defaultLabel(self.__mark_type__), dtype=np.dtype(str)))
             else:
-                setattr(self, "_labels", np.full_like(self.times.magnitude, "DataMark", dtype=np.dtype(str)))
+                setattr(self, "labels", np.full_like(self.times.magnitude, "DataMark", dtype=np.dtype(str)))
                     
     def setLabels(self, value):
         self.setLabel(value)
@@ -782,7 +779,7 @@ class DataMark(DataObject):
             
             kwargs[name] = getattr(self, name)
             
-        kwargs["event_type"] = self.__mark_type__
+        kwargs["mark_type"] = self.__mark_type__
 
         kwargs.update(self.annotations)
 
@@ -815,7 +812,7 @@ class DataMark(DataObject):
                                  **self.annotations)
         
         if isinstance(self, TriggerEvent):
-            new_obj.event_type = self.event_type
+            new_obj.type = self.type
         
         return new_obj
     
@@ -868,7 +865,7 @@ class DataMark(DataObject):
             raise TypeError(f"A {self.__class__.__name__} object was expected; got {type(other).__name__} instead")
         
         if isinstance(self, TriggerEvent):
-            result = other.event_type == self.event_type
+            result = other.type == self.type
             
         else:
             result = True
@@ -1197,18 +1194,17 @@ class TriggerEvent(DataMark):
         
         By default its __mark_type__ is TriggerEventType.presynaptic
         """
-        super().__init__(times=times, labels=labels, units=units, description=description,
-                         file_origin=file_origin, event_type=event_type,
-                         array_annotations=array_annotations, **annotations)
+        super().__init__(times=times, labels=labels, units=units, 
+                         description=description, file_origin=file_origin, 
+                         mark_type=event_type, array_annotations=array_annotations,
+                         **annotations)
         
     def __array_finalize__(self, obj):
         super(TriggerEvent, self).__array_finalize__(obj)
-        #print("TriggerEvent.__array_finalize__", type(obj).__name__)
-        #super().__array_finalize__(obj)
         
         self.__mark_type__ = getattr(obj, "__mark_type__", TriggerEventType.presynaptic)
         
-        self._labels = getattr(obj, 'labels', None)
+        self._labels = getattr(obj, '_labels', None)
         self.annotations = getattr(obj, 'annotations', None)
         self.name = getattr(obj, 'name', None)
         self.file_origin = getattr(obj, 'file_origin', None)
@@ -1219,8 +1215,22 @@ class TriggerEvent(DataMark):
         # This ensures the attribute exists
         if not hasattr(self, 'array_annotations'):
             self.array_annotations = ArrayDict(self._get_arr_ann_length())
+            
+    def __reduce__(self):
+        if not isinstance(self.annotations, dict):
+            annots = {}
+            
+        else:
+            annots = self.annotations
+        
+        if not hasattr(self, 'array_annotations'):
+            self.array_annotations = ArrayDict(self._get_arr_ann_length())
 
-
+        return _new_TriggerEvent, (self.__class__, self.times, self.labels, 
+                               self.units, self.name, self.description, 
+                               self.file_origin, self.event_type, 
+                               self.segment, self.array_annotations, annots)
+    
     def append_times(self, value):
         """Appends time values to this event.
         
@@ -1297,9 +1307,10 @@ class TriggerEvent(DataMark):
 
     @property
     def event_type(self):
-        return self.type
+        return self.__mark_type__
     
     @event_type.setter
     def event_type(self, value):
-        self.type = value
+        self.__mark_type__ = value
+        
         

@@ -943,8 +943,6 @@ class PVFrame(object):
                                                                           name=self.files[k]["channelName"]),
                                                         name = self.files[k]["channelName"],
                                                         index = self.files[k]["channel"])
-                #sdata_axis_2_cal.setChannelName(int(self.files[k]["channel"]), self.files[k]["channelName"])
-                #sdata_axis_2_cal.setChannelName(0, self.files[k]["channelName"])
 
                 sdata_axis_2_cal = sdata_axis_2_cal.calibrateAxis(sdata_axis_2_info)
                 
@@ -1994,20 +1992,30 @@ class PVScan(object):
         for future in concurrent.futures.as_completed(futures):
             (scans, scene) = future.result()
         
-        meta = self.metadata()
-
-        ret = ScanData(scene=scene, scans=scans, metadata=meta, name=self.name)
+        #meta = self.metadata()
         
-        if analysisOptions is not None:
-            ret.analysisOptions = analysisOptions
-            
+        kw = dict()
+        kw["name"] = self.name
+        kw["metadata"] = self.metadata()
+        
         if isinstance(electrophysiology, neo.Block):
-            ret.electrophysiology = electrophysiology
+            kw["electrophysiology"] = electrophysiology
             
-        if isinstance(name, str) and len(name) > 0:
-            ret.name = name
+        if analysisOptions is not None:
+            kw["analysisOptions"] = analysisOptions
             
-        return ret
+        return ScanData(scene=scene, scans=scans, **kw)
+            
+
+        #ret = ScanData(scene=scene, scans=scans, metadata=meta, name=self.name)
+        
+        #if isinstance(electrophysiology, neo.Block):
+            #ret.electrophysiology = electrophysiology
+            
+        #if isinstance(name, str) and len(name) > 0:
+            #ret.name = name
+            
+        #return ret
     
     def scandata(self, *args, **kwargs):
         return self.scanData(*args, **kwargs)
@@ -2045,7 +2053,6 @@ class PVScan(object):
         metadata["type"] = self.__class__.__name__
         
         return metadata
-        #return DataBag(metadata)
     
     def mergeChannels(self, filepath=None):
         """Coerce reading the files as a multiband image.

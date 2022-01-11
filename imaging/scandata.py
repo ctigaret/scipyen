@@ -2163,11 +2163,6 @@ class ScanData(BaseScipyenData):
         elif isinstance(image_data, vigra.VigraArray):
             assert(nChannels==image_data.channels), f"Mismatch between actual number of image channels ({image_data.channels}) and reported number of channels ({nChannels}) in {what}"
             
-            
-            
-        
-        
-    
     def _set_channel_name_(self, what:str, channel:int, value:typing.Optional[str]=None):
         if what not in ("scene", "scans"):
             raise ValueError(f"Cannot set channel names for {what}")
