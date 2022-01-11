@@ -250,6 +250,8 @@ from . import colorwidgets
 from . import stylewidgets
 from . import gradientwidgets
 
+from .triggerdetectgui import guiDetectTriggers
+
 from .workspacegui import (WorkspaceGuiMixin)
 from .workspacemodel import WorkspaceModel
 

@@ -550,7 +550,7 @@ class TriggerDetectDialog(qd.QuickDialog):
     def exec(self):
         if self._ephys_:
             self._ephysViewer_.plot(self.ephysdata)
-        super().exec()
+        return super().exec()
         
     def closeEvent(self, evt):
         """for when the dialog is closed from the window's close button
@@ -788,5 +788,13 @@ class TriggerDetectDialog(qd.QuickDialog):
             self.eventDetectionWidget.sgnalStop = float(max([sig.t_stop for sig in segment.analogsignals]).magnitude)
         
         
+def guiDetectTriggers(data:Block):
+    if isinstance(data, Block) and len(data.segments):
+        eventDetectionDialog = TriggerDetectDialog(ephysdata = data,
+                                                   clearEvents = True)
         
+        result = eventDetectionDialog.exec()
+        
+        if result == QtWidgets.QDialog.Accepted:
+            return eventDetectionDialog.triggerProtocols
     

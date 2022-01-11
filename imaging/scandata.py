@@ -1019,6 +1019,284 @@ class AnalysisUnit(BaseScipyenData):
         
         return result
         
+class ScanDataImageParser(AttributeAdapter):
+    def __init__(self, owner=None, fieldname=None):
+        self.fieldname = fieldname
+        self.obj = owner
+        
+    def __call__(self, obj=None, value=None):
+        self.parseImageData(value)
+        
+    def parseImageData(self, value):
+        if self.obj is None:
+            return
+        
+        if not hasattr(self.obj, "_data_children_"):
+            return
+        
+        if self.fieldname not in ("scans", "scene"):
+            return
+
+        if not hasattr(self.obj, self.fieldname):
+            return
+        
+        imageLayout = getattr(self.obj, f"{self.fieldname}Layout", None)
+        frameAxis = None if not isinstance(imageLayout, dict) else imageLayout.get(f"{self.fieldname}FrameAxis", None)
+        axesCalibration = getattr(self.obj, f"{self.fieldname}AxesCalibration", None)
+        
+        data, layout, axesCalibration = self.imageDataLayout(value, 
+                                                            frameAxis = frameAxis,
+                                                            axescal = axesCalibration)
+        
+        setattr(self.obj, f"{self.fieldname}Layout", layout)
+        setattr(self.obj, f"{self.fieldname}AxesCalibration", axesCalibration)
+    
+    def imageDataLayout(self,data, 
+                    frameAxis:typing.Optional[vigra.AxisInfo]=None, 
+                    horizontalAxis:typing.Optional[vigra.AxisInfo]=None, 
+                    verticalAxis:typing.Optional[vigra.AxisInfo]=None, 
+                    axescal:typing.Optional[AxesCalibration]=None):
+        """ Proposes an axes layout and axes calibration for the data.
+        
+        See also imaging.vigrautils.proposeLayout()
+        
+        Returns
+        --------
+        
+        The tuple (data, layout, axes_calibration):
+        
+        'data': VigraArray object, or sequence of at least one VigraArray 
+            object, or None.
+            When a sequence, the vigra arrays must have have identical 
+            shapes and axistag keys. If there is more than one vigra array
+            in the sequence then all the arrays must have one channel only.
+            
+        'layout': traitlets.Bunch or None. When a Bunch, it maps the following
+            key/value pairs:
+            
+            'nFrames':      int;
+                            This is the total number of 2D data 
+                            slices (or frames) that can be displayed in a 2D 
+                            viewer one at a time.
+                            
+                            The 'frames' are defined along the data array axis 
+                            that is orthogonal to the display plane. For more
+                            details see imaging.vigrautils.proposeLayout().
+                            
+            'horizontalAxis': int; 
+                            Index - or dimension - of the horizontal axis.
+                            This is the axis corresponding to the 'horizontal'
+                            dimension (or aspect) of the data for the purpose of
+                            being displayed in a 2D image viewer.
+                            
+            'verticalAxis': int;
+                            Index - or dimension - of the vertical axis
+                            This is the axis corresponding to the 'vertical'
+                            dimension (or aspect) of the data for the purpose of
+                            being displayed in a 2D image viewer.
+                            
+            'channelsAxis': int; 
+                            Index - or dimension - of the channels axis
+                            For VigraArray objects, the size of the image data
+                            array on this dimension (or axis) indicates the
+                            number of data channels in each pixel.
+                            
+            'framesAxis':   int; 
+                            Index - or dimenson - of the frames axis
+                            This is the axis (or axes) along which 2D data 
+                            frames (or slices) are taken to be displayed one at
+                            a time in a 2D image viewer.
+                            
+            For a detailed explanation of the concept of frames and frames axis
+            see imaging.vigrautils.proposeLayout()
+
+        'axes_calibration': an imaging.axiscalibration.AxesCalibration object, 
+                            or None.
+                            
+        """
+        if data is None:
+            return (None, None, None)
+        
+        if not isinstance(data, (vigra.VigraArray, tuple, list)):
+            raise TypeError(f"Expecting a VigraArray or a sequence (tuple, list) of VigraArrays; got {type(data).__name__} instead")
+        
+        if isinstance(data, vigra.VigraArray):
+            layout = proposeLayout(data, userFrameAxis = frameAxis, indices = True)
+            
+            if isinstance(axescal, AxesCalibration) and all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(axescal.axiskeys, data.axistags)):
+                axes_cal = [axscal]
+            else:
+                axes_cal = [AxesCalibration(data)]
+                
+            return ([data], layout, axes_cal)
+            
+        elif isinstance(data, (tuple, list)):
+            if len(data):
+                if not all([isinstance(s, vigra.VigraArray) for s in data]):
+                    raise TypeError("When not empty, data is expected to contain VigraArray objects")
+
+                if not all([s.shape == data[0].shape for s in data[1:]]):
+                    raise TypeError("Image arrays in a sequence must have identical shapes")
+
+                if not all([s.axistags == data[0].axistags for s in data[1:]]):
+                    raise TypeError("Image arrays in a sequence must have identical axistags")
+                
+                if len(data) > 1 and any(s.channels > 1 for s in data):
+                    raise TypeError("When more than one image array is supplied, these must have a single channel")
+
+                if not all([s.channels == data[0].channels for s in data[1:]]):
+                    raise TypeError("Image arrays in a sequence must have the same number of channels")
+
+                # NOTE: 2022-01-06 10:38:28
+                # when several images are contained in 'data' we assume they
+                # all have the same axes layout
+                layout = proposeLayout(data[0], userFrameAxis = frameAxis, indices = True)
+                
+                if isinstance(axescal, (tuple, list)):
+                    if len(axescal) != len(data):
+                        raise ValueError(f"Axes calibration expected to be a sequence with as many elements as 'data' ({len(data)}; got {len(axescal)} instead)")
+                    
+                    if not all(isinstance(ac, AxesCalibration) for ac in axescal):
+                        raise TypeError("Expecting a tuple of AxesCalibration objects")
+                    
+                    if all(all(axcal.typeFlags(key) == x.typeFlags for (key, x) in zip(axcal.axiskeys, img.axistags)) for axcal,img in zip(axescal,data)):
+                        axes_cal = [axcal for axcal in axescal]
+                    else:
+                        axes_cal = [AxesCalibration(img) for img in data]
+                else:
+                    axes_cal = [AxesCalibration(img) for img in data]
+                
+                return (data, layout, axes_cal)
+
+            return (list(), None, None)
+                
+        return (None, None, None)
+                    
+class ScanDataFramesMapUpdater(AttributeAdapter):
+    def __init__(self, owner=None, fieldname=None):
+        self.fieldname = fieldname
+        self.obj = owner
+        
+    def __call__(self, obj=None, value=None):
+        self.updateFramesMap(value)
+        
+    def updateFramesMap(self, value):
+        """Adapts the frames map to the electrophysiology's segments.
+        
+        Sets up a default correspondence:
+        
+        If the new electrophysiology Block has fewer segments that the number of 
+        virtual frames in this ScanData object, its segment indices are mapped 
+        to the first len(segments) data master frames, and the exceeding data 
+        virtual frames are mapped to the last segment in the electrophysiology
+        block.
+        
+        If the new electrophysiology block has more segments than the number of 
+        frames in the ScanData object, the ScanData frames map is adjusted such
+        that the total number of virtual frames equals len(segments), and the 
+        scans and scene frames are mapped to the first electrophysiology
+        segments ('sweeps' or 'frames'); the exceeding segments are mapped to
+        the last frame in scans and scene.
+        
+        When the number of electrophysiology segments equals that of the virtual
+        data frames, the segment indices are mapped 1-2-1 to the virtual frames
+        in increasing order.
+        
+        For a more atomic configuration use self.setFramesRelationship() after
+        assigning to self.electrophysiology
+        
+        """
+        #  NOTE: 2021-12-06 12:42:06 
+        # this is a "postset" validator - this means that value has already
+        # been assigned to field!
+        if self.obj is None:
+            return
+        
+        if not hasattr(self.obj, "_data_children_"):
+            return
+        
+        if self.fieldname not in tuple(c[0] for c in self.obj._data_children_):
+            return
+
+        if not hasattr(self.obj, self.fieldname):
+            return
+        
+        if not hasattr(self.obj, "framesMap"):
+            return
+        
+        framesMap = getattr(self.obj, "framesMap", None)
+        
+        field = getattr(self.obj, self.fieldname)
+        
+        if framesMap is None:
+            field_frames = dict((c[0], 0) for c in self.obj._data_children_)
+            for c in field_frames:
+                if c in ("scene","scans"):
+                    f = getattr(self.obj, f"{c}Layout", None)
+                    nFrames = f.get("nFrames", 0) if isinstance(f, dict) else 0
+                    val = nFrames if isinstance(nFrames, int) else np.prod(nFrames)
+                    
+                else:
+                    data = getattr(self.obj, c, None)
+                    val = len(data.segments) if isinstance(data, neo.Block) else 0
+            
+                field_frames[c] = val
+            
+            # NOTE: 2022-01-04 16:06:11
+            # FrameIndexLookup is now MANDATORY - see also NOTE: 2022-01-04 16:05:12
+            framesMap = FrameIndexLookup(field_frames)
+            
+            setattr(self.obj, "framesMap", framesMap)
+        
+        else:
+            nframes = len(framesMap)
+                
+            if isinstance(field, neo.Block):
+                newframes = len(field.segments)
+                
+            elif isinstance(field, list) and all(isinstance(v, vigra.VigraArray) for v in field):
+                userFrameAxis = getattr(self.obj, f"{self.fieldname}FrameAxis", None)
+                axesCalibration = getattr(self.obj, f"{self.fieldname}AxesCalibration", None)
+                data, layout, axesCalibration = self.obj.imageDataLayout(field,
+                                                                            frameAxis = userFrameAxis,
+                                                                            axescal = axesCalibration)
+                newframes = layout.nFrames
+                
+            else:
+                newframes=0
+            
+            if newframes == nframes:
+                # assume 1-2-1 correspondence with the index in framesMap
+                self.obj.framesMap[self.fieldname] = range(newframes)
+                
+            elif newframes < nframes:
+                value = list(range(newframes))
+                value.extend([self.obj.framesMap.missingFieldFrameIndex for k in range(newframes, nframes)])
+                        
+                framesMap[self.fieldname] = value
+                
+            else: # --> newframes > nframes
+                # concatenate a new frame index lookup
+                dd = dict()
+                for c in self.obj._data_children_:
+                    name = c[0]
+                    if name != self.fieldname:
+                        if np.any(self.obj.framesMap[name].isna()):
+                            val = None
+                        else:
+                            val = 0
+                        dd[name] = val
+                        
+                    else:
+                        dd[name] = newframes - nframes
+                        
+                fil = FrameIndexLookup(dd)
+                fil[self.fieldname] = range(nframes, newframes)
+                
+                newmap = pd.concat([self.obj.framesMap.map, fil.map], ignore_index=True)
+                
+                self.obj.framesMap.map = newmap
+
 class ScanData(BaseScipyenData):
     """An almost direct translation of matlab LSData data structure.
     Work in progress.
@@ -1127,6 +1405,11 @@ class ScanData(BaseScipyenData):
     """
     from gui import pictgui as pgui
     
+    # NOTE: 2022-01-11 13:48:37
+    # to be able to load older pickles:
+    ImageParser = ScanDataImageParser
+    FramesMapUpdater = ScanDataFramesMapUpdater
+    
     # TODO: provide for volume-mode analysis and ROIS; 
     class ScanDataType(enum.IntEnum):
         linescan    = 1
@@ -1136,284 +1419,6 @@ class ScanData(BaseScipyenData):
     class ScanDataAnalysisMode(enum.IntEnum):
         frame       = 1
         volume      = 2
-        
-    class ImageParser(AttributeAdapter):
-        def __init__(self, owner=None, fieldname=None):
-            self.fieldname = fieldname
-            self.obj = owner
-            
-        def __call__(self, obj=None, value=None):
-            self.parseImageData(value)
-            
-        def parseImageData(self, value):
-            if self.obj is None:
-                return
-            
-            if not hasattr(self.obj, "_data_children_"):
-                return
-            
-            if self.fieldname not in ("scans", "scene"):
-                return
-
-            if not hasattr(self.obj, self.fieldname):
-                return
-            
-            imageLayout = getattr(self.obj, f"{self.fieldname}Layout", None)
-            frameAxis = None if not isinstance(imageLayout, dict) else imageLayout.get(f"{self.fieldname}FrameAxis", None)
-            axesCalibration = getattr(self.obj, f"{self.fieldname}AxesCalibration", None)
-            
-            data, layout, axesCalibration = self.imageDataLayout(value, 
-                                                                frameAxis = frameAxis,
-                                                                axescal = axesCalibration)
-            
-            setattr(self.obj, f"{self.fieldname}Layout", layout)
-            setattr(self.obj, f"{self.fieldname}AxesCalibration", axesCalibration)
-        
-        def imageDataLayout(self,data, 
-                        frameAxis:typing.Optional[vigra.AxisInfo]=None, 
-                        horizontalAxis:typing.Optional[vigra.AxisInfo]=None, 
-                        verticalAxis:typing.Optional[vigra.AxisInfo]=None, 
-                        axescal:typing.Optional[AxesCalibration]=None):
-            """ Proposes an axes layout and axes calibration for the data.
-            
-            See also imaging.vigrautils.proposeLayout()
-            
-            Returns
-            --------
-            
-            The tuple (data, layout, axes_calibration):
-            
-            'data': VigraArray object, or sequence of at least one VigraArray 
-                object, or None.
-                When a sequence, the vigra arrays must have have identical 
-                shapes and axistag keys. If there is more than one vigra array
-                in the sequence then all the arrays must have one channel only.
-                
-            'layout': traitlets.Bunch or None. When a Bunch, it maps the following
-                key/value pairs:
-                
-                'nFrames':      int;
-                                This is the total number of 2D data 
-                                slices (or frames) that can be displayed in a 2D 
-                                viewer one at a time.
-                                
-                                The 'frames' are defined along the data array axis 
-                                that is orthogonal to the display plane. For more
-                                details see imaging.vigrautils.proposeLayout().
-                                
-                'horizontalAxis': int; 
-                                Index - or dimension - of the horizontal axis.
-                                This is the axis corresponding to the 'horizontal'
-                                dimension (or aspect) of the data for the purpose of
-                                being displayed in a 2D image viewer.
-                                
-                'verticalAxis': int;
-                                Index - or dimension - of the vertical axis
-                                This is the axis corresponding to the 'vertical'
-                                dimension (or aspect) of the data for the purpose of
-                                being displayed in a 2D image viewer.
-                                
-                'channelsAxis': int; 
-                                Index - or dimension - of the channels axis
-                                For VigraArray objects, the size of the image data
-                                array on this dimension (or axis) indicates the
-                                number of data channels in each pixel.
-                                
-                'framesAxis':   int; 
-                                Index - or dimenson - of the frames axis
-                                This is the axis (or axes) along which 2D data 
-                                frames (or slices) are taken to be displayed one at
-                                a time in a 2D image viewer.
-                                
-                For a detailed explanation of the concept of frames and frames axis
-                see imaging.vigrautils.proposeLayout()
-
-            'axes_calibration': an imaging.axiscalibration.AxesCalibration object, 
-                                or None.
-                                
-            """
-            if data is None:
-                return (None, None, None)
-            
-            if not isinstance(data, (vigra.VigraArray, tuple, list)):
-               raise TypeError(f"Expecting a VigraArray or a sequence (tuple, list) of VigraArrays; got {type(data).__name__} instead")
-            
-            if isinstance(data, vigra.VigraArray):
-                layout = proposeLayout(data, userFrameAxis = frameAxis, indices = True)
-                
-                if isinstance(axescal, AxesCalibration) and all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(axescal.axiskeys, data.axistags)):
-                    axes_cal = [axscal]
-                else:
-                    axes_cal = [AxesCalibration(data)]
-                    
-                return ([data], layout, axes_cal)
-                
-            elif isinstance(data, (tuple, list)):
-                if len(data):
-                    if not all([isinstance(s, vigra.VigraArray) for s in data]):
-                        raise TypeError("When not empty, data is expected to contain VigraArray objects")
-
-                    if not all([s.shape == data[0].shape for s in data[1:]]):
-                        raise TypeError("Image arrays in a sequence must have identical shapes")
-
-                    if not all([s.axistags == data[0].axistags for s in data[1:]]):
-                        raise TypeError("Image arrays in a sequence must have identical axistags")
-                    
-                    if len(data) > 1 and any(s.channels > 1 for s in data):
-                        raise TypeError("When more than one image array is supplied, these must have a single channel")
-
-                    if not all([s.channels == data[0].channels for s in data[1:]]):
-                        raise TypeError("Image arrays in a sequence must have the same number of channels")
-
-                    # NOTE: 2022-01-06 10:38:28
-                    # when several images are contained in 'data' we assume they
-                    # all have the same axes layout
-                    layout = proposeLayout(data[0], userFrameAxis = frameAxis, indices = True)
-                    
-                    if isinstance(axescal, (tuple, list)):
-                        if len(axescal) != len(data):
-                            raise ValueError(f"Axes calibration expected to be a sequence with as many elements as 'data' ({len(data)}; got {len(axescal)} instead)")
-                        
-                        if not all(isinstance(ac, AxesCalibration) for ac in axescal):
-                            raise TypeError("Expecting a tuple of AxesCalibration objects")
-                        
-                        if all(all(axcal.typeFlags(key) == x.typeFlags for (key, x) in zip(axcal.axiskeys, img.axistags)) for axcal,img in zip(axescal,data)):
-                            axes_cal = [axcal for axcal in axescal]
-                        else:
-                            axes_cal = [AxesCalibration(img) for img in data]
-                    else:
-                        axes_cal = [AxesCalibration(img) for img in data]
-                    
-                    return (data, layout, axes_cal)
-
-                return (list(), None, None)
-                    
-            return (None, None, None)
-                    
-    class FramesMapUpdater(AttributeAdapter):
-        def __init__(self, owner=None, fieldname=None):
-            self.fieldname = fieldname
-            self.obj = owner
-            
-        def __call__(self, obj=None, value=None):
-            self.updateFramesMap(value)
-            
-        def updateFramesMap(self, value):
-            """Adapts the frames map to the electrophysiology's segments.
-            
-            Sets up a default correspondence:
-            
-            If the new electrophysiology Block has fewer segments that the number of 
-            virtual frames in this ScanData object, its segment indices are mapped 
-            to the first len(segments) data master frames, and the exceeding data 
-            virtual frames are mapped to the last segment in the electrophysiology
-            block.
-            
-            If the new electrophysiology block has more segments than the number of 
-            frames in the ScanData object, the ScanData frames map is adjusted such
-            that the total number of virtual frames equals len(segments), and the 
-            scans and scene frames are mapped to the first electrophysiology
-            segments ('sweeps' or 'frames'); the exceeding segments are mapped to
-            the last frame in scans and scene.
-            
-            When the number of electrophysiology segments equals that of the virtual
-            data frames, the segment indices are mapped 1-2-1 to the virtual frames
-            in increasing order.
-            
-            For a more atomic configuration use self.setFramesRelationship() after
-            assigning to self.electrophysiology
-            
-            """
-            #  NOTE: 2021-12-06 12:42:06 
-            # this is a "postset" validator - this means that value has already
-            # been assigned to field!
-            if self.obj is None:
-                return
-            
-            if not hasattr(self.obj, "_data_children_"):
-                return
-            
-            if self.fieldname not in tuple(c[0] for c in self.obj._data_children_):
-                return
-
-            if not hasattr(self.obj, self.fieldname):
-                return
-            
-            if not hasattr(self.obj, "framesMap"):
-                return
-            
-            framesMap = getattr(self.obj, "framesMap", None)
-            
-            field = getattr(self.obj, self.fieldname)
-            
-            if framesMap is None:
-                field_frames = dict((c[0], 0) for c in self.obj._data_children_)
-                for c in field_frames:
-                    if c in ("scene","scans"):
-                        f = getattr(self.obj, f"{c}Layout", None)
-                        nFrames = f.get("nFrames", 0) if isinstance(f, dict) else 0
-                        val = nFrames if isinstance(nFrames, int) else np.prod(nFrames)
-                        
-                    else:
-                        data = getattr(self.obj, c, None)
-                        val = len(data.segments) if isinstance(data, neo.Block) else 0
-                
-                    field_frames[c] = val
-                
-                # NOTE: 2022-01-04 16:06:11
-                # FrameIndexLookup is now MANDATORY - see also NOTE: 2022-01-04 16:05:12
-                framesMap = FrameIndexLookup(field_frames)
-                
-                setattr(self.obj, "framesMap", framesMap)
-           
-            else:
-                nframes = len(framesMap)
-                    
-                if isinstance(field, neo.Block):
-                    newframes = len(field.segments)
-                    
-                elif isinstance(field, list) and all(isinstance(v, vigra.VigraArray) for v in field):
-                    userFrameAxis = getattr(self.obj, f"{self.fieldname}FrameAxis", None)
-                    axesCalibration = getattr(self.obj, f"{self.fieldname}AxesCalibration", None)
-                    data, layout, axesCalibration = self.obj.imageDataLayout(field,
-                                                                             frameAxis = userFrameAxis,
-                                                                             axescal = axesCalibration)
-                    newframes = layout.nFrames
-                    
-                else:
-                    newframes=0
-                
-                if newframes == nframes:
-                    # assume 1-2-1 correspondence with the index in framesMap
-                    self.obj.framesMap[self.fieldname] = range(newframes)
-                    
-                elif newframes < nframes:
-                    value = list(range(newframes))
-                    value.extend([self.obj.framesMap.missingFieldFrameIndex for k in range(newframes, nframes)])
-                            
-                    framesMap[self.fieldname] = value
-                    
-                else: # --> newframes > nframes
-                    # concatenate a new frame index lookup
-                    dd = dict()
-                    for c in self.obj._data_children_:
-                        name = c[0]
-                        if name != self.fieldname:
-                            if np.any(self.obj.framesMap[name].isna()):
-                                val = None
-                            else:
-                                val = 0
-                            dd[name] = val
-                            
-                        else:
-                            dd[name] = newframes - nframes
-                            
-                    fil = FrameIndexLookup(dd)
-                    fil[self.fieldname] = range(nframes, newframes)
-                    
-                    newmap = pd.concat([self.obj.framesMap.map, fil.map], ignore_index=True)
-                    
-                    self.obj.framesMap.map = newmap
         
     # NOTE: 2021-11-30 16:07:40
     # 'triggers' is inherited from BaseScipyenData along with others
@@ -2552,7 +2557,7 @@ class ScanData(BaseScipyenData):
             raise TypeError("Expecting one of: a neo.Block, a sequence of neo.Segment objects, a neo.Segment or None; got %s instead" % (type(value).__name__))
         
         # NOTE: the statement below does nothing, as the "src" is the actual
-        # electrophysiology data mebedded here
+        # electrophysiology data embedded here
         self.adoptTriggerProtocols(self.electrophysiology)
         
     def _concatenate_image_data_(self, other, scene=True, pad_value=None):

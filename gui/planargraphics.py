@@ -7242,9 +7242,9 @@ def simplifyPath(path, frame = None, max_adjacent_points = 5):
 
 
 class GraphicsObjectLnF(object):
-    """Spcified LnF for GraphicsObject components in Scipyen.
-    GraphicsObjects are used as frontends for PlanarGraphics which define
-    data cursors and landmarks(ROIs and lines) for the ImageViewer.
+    """Default styles and colours for GraphicsObject objects in Scipyen.
+    GraphicsObjects are used as frontends for PlanarGraphics (which define
+    data cursors and landmarks such as ROIs and lines for the ImageViewer).
     
     The following LnF components are defined:
     
@@ -7324,12 +7324,12 @@ class GraphicsObjectLnF(object):
     Linked              No                      Yes
     LinkedSelected      Yes                     Yes
         
-    This :class: takes an orthogonal approach by pre-defining values for the 
-    components listed above, from which a certain attribite of their look and feel
-    can be selected dynamically
+    This :class: takes an orthogonal approach by pre-defining default values for 
+    the components listed above, from which specific attributes of the object
+    look and feel can be selected dynamically
     """
     
-    # used for control lines and points
+    # Defaults used for control lines and points
     control_styles = Bunch(
         brush_label     = Bunch(style = QtCore.Qt.SolidPattern), # any of QBrushStyle, QGradient, QPixmap, QImage
         brush_point     = Bunch(style = QtCore.Qt.SolidPattern),
@@ -7410,7 +7410,7 @@ class GraphicsObjectLnF(object):
             ),
         })
         
-    pointsize = {"basic": 5, "control": 10}
+    pointsize = {"standard": 5, "control": 10}
     
     # won't work: when this code is executed there is no QGuiApplication running yet
     # therefore must be called in GUI client code
@@ -7798,7 +7798,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                                             "point": GraphicsObjectLnF.brush(graphic="brush_point")
                                                             }),
                                              "font":QtWidgets.QApplication.font(),
-                                             "pointsize": GraphicsObjectLnF.pointsize["basic"]
+                                             "pointsize": GraphicsObjectLnF.pointsize["standard"]
                                             }), 
                                             
                                True: Bunch({"pen": Bunch({"line" : GraphicsObjectLnF.pen(graphic="pen_line",
@@ -7814,7 +7814,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                                                                                 selected=True)
                                                             }),
                                             "font":QtWidgets.QApplication.font(),
-                                            "pointsize" : GraphicsObjectLnF.pointsize["basic"],
+                                            "pointsize" : GraphicsObjectLnF.pointsize["standard"],
                                             }),
                                 })
                                     
@@ -7831,7 +7831,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                                                                             linked=True)
                                                                 }),
                                                 "font":QtWidgets.QApplication.font(),
-                                                "pointsize": GraphicsObjectLnF.pointsize["basic"]
+                                                "pointsize": GraphicsObjectLnF.pointsize["standard"]
                                                 }),
                     
                                 True:  Bunch({"pen": Bunch({"line" : GraphicsObjectLnF.pen(graphic="pen_line",
@@ -7852,7 +7852,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                                                                                 selected=True)
                                                             }),
                                             "font":QtWidgets.QApplication.font(),
-                                            "pointsize": GraphicsObjectLnF.pointsize["basic"],
+                                            "pointsize": GraphicsObjectLnF.pointsize["standard"],
                                             })
                                 })
                          
@@ -8687,14 +8687,10 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             if not self._buildMode_:
                 if self._backend_ is None or not self._backend_.hasStateForFrame():
                     return
-                
-            #lnf = self.lnf # self.linkedLnF if self._backend_.isLinked else self.basicLnF
                     
             linePen = self.lnf["pen"]["line"]
             textPen = self.lnf["pen"]["text"]
             textBrush = self.lnf["brush"]["text"]
-            #linePen = lnf[self.isSelected()]["pen"]["line"]
-            #textPen = lnf[self.isSelected()]["pen"]["text"]
                 
             labelPos = None         # NOTE: 2017-06-23 09:41:24
                                     # below I calculate a default label position
@@ -8829,7 +8825,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                                      self._cachedPath_[k].point())
                         else:
                             painter.drawPath(self._cachedPath_)
-                            #painter.drawPath(self._cachedPath_())
                             
                             if self._curveBuild_ and self._hover_point is not None:
                                 if self._control_points[0] is not None:
@@ -8847,17 +8842,14 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                     painter.drawPath(path)
                                 
                     if len(self._cachedPath_) > 1:
-                        #if self.objectType & PlanarGraphicsType.line:
                         if isinstance(self._backend_, Line):
                             painter.drawLine(self._cachedPath_[-2].point(), 
                                             self._cachedPath_[-1].point())
                             
-                        #elif self.objectType & PlanarGraphicsType.rectangle:
                         elif isinstance(self._backend_, Rect):
                             painter.drawRect(QtCore.QRectF(self._cachedPath_[-2].point(), 
                                                         self._cachedPath_[-1].point()))
                             
-                        #elif self.objectType & PlanarGraphicsType.ellipse:
                         elif isinstance(self._backend_, Ellipse):
                             painter.drawEllipse(QtCore.QRectF(self._cachedPath_[-2].point(), 
                                                             self._cachedPath_[-1].point()))
@@ -8875,9 +8867,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     # draw control points
                     painter.setPen(self.controlLnF["pen"]["point"]) 
                     painter.setBrush(self.controlLnF["brush"]["point"])
-                    
-                    #painter.setPen(self._controlPointPen) 
-                    #painter.setBrush(self._controlPointBrush)
                     
                     for k, element in enumerate(self._cachedPath_):
                         painter.drawEllipse(element.x - self._pointSize,
@@ -8984,9 +8973,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     # NOTE: 2018-01-24 17:17:05
                     # WE SHOULD HAVE A _backend_ BY NOW
                     
-                    #if self._cachedPath_ is not None and len(self._cachedPath_):
                     if self._backend_ is not None:
-                        #if self._backend_.type == PlanarGraphicsType.ellipse:
                         if isinstance(self._backend_, Ellipse):
                             r_ = self.mapRectFromScene(self._backend_.x,
                                                        self._backend_.y,
@@ -8995,7 +8982,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             
                             painter.drawEllipse(r_)
 
-                        #elif self._planar_graphics_type_ == PlanarGraphicsType.rectangle:
                         elif isinstance(self._backend_, Rect):
                             r_ = self.mapRectFromScene(self._backend_.x,
                                                        self._backend_.y,
@@ -9004,7 +8990,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             
                             painter.drawRect(r_)
                                                                             
-                        #elif self._planar_graphics_type_ == PlanarGraphicsType.point:
                         elif self._backend_.type & PlanarGraphicsType.point:
                             p_ = self.mapFromScene(self._backend_.x,
                                                    self._backend_.y)
@@ -9043,7 +9028,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         # ATTENTION for paths, curves have extra control points!
                         
                         if self._cachedPath_ is not None and len(self._cachedPath_) > 0:
-                            #if self.objectType & PlanarGraphicsType.path:
                             if isinstance(self._backend_, Path):
                                 for k, element in enumerate(self._cachedPath_):
                                     if isinstance(element, Quad):
@@ -9183,14 +9167,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             if not self._backend_.hasStateForFrame() or not self.__objectVisible__:
                 return value
             
-            #self._oldPos = QtCore.QPointF(value)
-            
-            #state = self._backend_.currentState
-            
             if isinstance(self._backend_, Cursor): # cursor types
-                #if not state: #state is None: # or len(state) == 0:
-                    #return value
-                
                 # NOTE 2018-01-18 16:57:28
                 # ATTENTION This is also called by self.setPos() (inherited)
                 self._positionChangeHasBegun = True # flag used in _makeCursor_()
@@ -9308,27 +9285,27 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 mods = ""
                 
                 if evt.modifiers() == QtCore.Qt.ShiftModifier: 
-                    ###SHIFT => rectangle
+                    #### SHIFT => rectangle
                     self._planar_graphics_type_ = PlanarGraphicsType.rectangle
                     mods = "shift"
                     
                 elif evt.modifiers() == QtCore.Qt.ControlModifier: 
-                    ###CTRL => ellipse
+                    #### CTRL => ellipse
                     self._planar_graphics_type_ = PlanarGraphicsType.ellipse
                     mods = "ctrl"
                     
                 elif evt.modifiers() ==  QtCore.Qt.AltModifier: 
-                    ###ALT => path
+                    #### ALT => path
                     self._planar_graphics_type_ = PlanarGraphicsType.path
                     mods = "alt"
                 
                 elif evt.modifiers() == (QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier):
-                    ###CTRL+SHIFT => polygon
+                    #### CTRL+SHIFT => polygon
                     self._planar_graphics_type_ = PlanarGraphicsType.polygon
                     mods = "ctrl+shift"
                     
                 elif evt.modifiers() == (QtCore.Qt.AltModifier | QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier):
-                    ###ALt+CTRL+SHIFT => point
+                    #### ALt+CTRL+SHIFT => point
                     mods = "alt+=ctrl+shift"
                     self._planar_graphics_type_ = PlanarGraphicsType.point
                     
@@ -9336,7 +9313,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     if evt.modifiers() == QtCore.Qt.NoModifier:
                         mods = "none"
                         
-                    ###anything else, or no modifiers => line
+                    #### Anything else, or no modifiers => line
                     self._planar_graphics_type_ = PlanarGraphicsType.line
             
                 #print("press at: ", evt.pos(), " mods: ", mods)
@@ -9348,8 +9325,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 if self.objectType & PlanarGraphicsType.point:
                     # stop here if building just a point
                     self._finalizeShape_()
-                    
-                #return
                 
             else:
                 #print("last press: ", evt.pos(), " hover point: ", self._hover_point)
@@ -9385,8 +9360,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             
                             self._finalizeShape_()
                             
-                            #return
-                        
                     elif self.objectType & PlanarGraphicsType.polygon:
                         if self._constrainedPoint is not None:
                                 self._cachedPath_.append(Line(self._constrainedPoint.x(), self._constrainedPoint.y()))
@@ -9395,10 +9368,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         else:
                             self._cachedPath_.append(Line(evt.pos().x(), evt.pos().y()))
                             
-                        #self.update()
-                        
-                        #return
-                    
                     elif self.objectType & PlanarGraphicsType.path:
                         if self._curveBuild_:
                             # self._curveBuild_ is set in mouse move event handler
@@ -9696,9 +9665,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     def mouseReleaseEvent(self, evt):
         """Mouse release event handler
         """
-        #if not self.hasState:
-            #return
-            
         #print(self._backend_.x)
         self._c_activePoint = -1 # restore this anyway!
         
@@ -9736,14 +9702,12 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     
             self._hover_point = evt.pos()
             
-            #super(GraphicsObject, self).mouseReleaseEvent(evt)
             self.update()
             return
             
         if self.canMove:
             # together with itemChange, this implements special treatment
             # of the object shape in the case of cursors (see notes in itemChange code)
-            #if self.objectType & PlanarGraphicsType.allCursorTypes:
             if isinstance(self._backend_, Cursor):
                 state = self._backend_.getState()
                 
@@ -9752,8 +9716,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 
                 self._positionChangeHasBegun=False
                 
-            #self._oldPos = self.pos()
-            
         self.selectMe.emit(self.ID, True)
 
         super(GraphicsObject, self).mouseReleaseEvent(evt)
@@ -10033,14 +9995,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             
         self.update()
         
-    #def setSelected(self, selected:bool):
-        #self._makeSelectedLnF_(selected)
-            
-        #super().setSelected(selected)
-        
-    #def _makeSelectedLnF_(self, selected:bool):
-        
-            
     @safeWrapper
     def __updateBackendFromCachedPath__(self):
         """Updates the backend primitive from this object, it being a ROI
@@ -10664,7 +10618,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         if qcolor.isValid():
             self.lnf.brush.text.setColor(qcolor)
-            #self._textBackgroundBrush.setColor(qcolor)
             self.update()
         
     @property
@@ -10674,7 +10627,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     @opaqueLabel.setter
     def opaqueLabel(self, val):
         self._opaqueLabel_ = val
-        #self._makeObject_
         self.update()
         
     @property
@@ -10795,3 +10747,134 @@ def printQPainterPath(p):
     
     return "[" + ", ".join(s) + "]"
 
+def makeLnFBunch(linePen:typing.Optional[QtGui.QPen] = None, 
+                 textPen:typing.Optional[QtGui.QPen] = None, 
+                 pointPen:typing.Optional[QtGui.QPen] = None, 
+                 textBrush:typing.Optional[QtGui.QBrush] = None, 
+                 pointBrush:typing.Optional[QtGui.QBrush] = None,
+                 font:typing.Optional[QtGui.QFont] = None, 
+                 pointSize:typing.Optional[typing.Union[int, float]] = None, 
+                 control:bool = False,
+                 linked:bool = False,
+                 selected:bool = False) -> Bunch:
+    """Generates a LnF mapping (a traitlets.Bunch) for GraphicsObject instances.
+    The mapping has the following structure:
+    
+    "pen"       -> Bunch: 
+                    "line"  -> QtGui.QPen
+                    "text"  -> QtGui.QPen
+                    "point" -> QtGui.QPen
+                
+    "brush"     -> Bunch:
+                    "text"  -> QtGui.QBrush
+                    "point" -> QtGui.QBrush
+                
+    "font"      -> QtGui.QFont
+    "pointsize" -> int or float > 0
+    
+    Individual changes to colours and styles can be made subsequently on the
+    QtGui.QPen and QtGui.QBrush instances in the Bunch, using their appropriate
+    methods.
+    
+    Explainer
+    =========
+    
+    Scipyen's GraphicsObject objects are the visible frontend for Scipyen's
+    PlanarGraphics. They inherit from on QtWidgets.QGraphicsObject and their 
+    purpose is to render a PlanarGraphics in a QGraphicsScene (such as that used
+    by Scipyen's ImageViewer).
+    
+    GraphicsObject instances are built up from simple Qt graphics primitives:
+    lines (and curves), circles or squares (representing a 'point'), and text
+    (for labels).
+    
+    Their appearance (visual aspect, or 'look-and-feel', LnF) is standardized in
+    order to visually differentiate between the following five 'states':
+    
+    'control': LnF of control lines, points, and labels (where a 'point' is 
+        rawn as a circle, optionally with an opaque background)
+        
+    'standard, not selected':
+        LnF of lines, points and labels for standard, i.e. non-control,
+        and non-linked (see below) graphics objects that are NOT selected in the
+        scene.
+        
+    'standard, selected':
+        as above, but for graphics obejcts that are selected in the scene
+        
+    'linked, not selected':
+        LnF for graphics objects that are frontends for a common PlanarGraphics
+        'backend' (e.g., they render the same PlanarGraphics instance, typically
+        in two or more separate scenes); the frontends are NOT selected in their
+        respective scenes.
+        
+    'linked, selected':
+        as above, but the graphics objects are selected in their scene.
+        
+    The "standardization" consists of discrete changes in the specific aspects
+    of the GraphicsObject frontend. The simple, general rule, is that selected 
+    graphic objects are distinguished from non-selected ones by the style of 
+    their lines (and possibly of the background of their labels and points), 
+    whereas 'linked' graphics are distinguished from non-linked ones by the 
+    colour of their components.
+    
+    Positional or named parameters:
+    ===============================
+    linePen, etc: see the schematic above; optional.
+        Their default value (for this function) is None, in which case the 
+        corresponding key in the inner Bunch will be mapped to a value selected 
+        from GraphicsObjectLnF according to the parameters 'control', 'linked'
+        and 'selected'
+        
+    control: bool, default False; when True, the LnF Bunch relates to the
+        control lines and points drawn for a PlanarGraphics (currently, only
+        non-cursor objects support control elements)
+        
+    linked: bool, default is False; when True, the LnF Bunch relates to "linked" 
+        GraphicsObject instances (i.e. they act as frontends to the same
+        PlanarGraphics backend)
+        
+    selected: bool, default is False; when True, the LnF Bunch relates to the 
+        GraphicsObject instance in its 'selected' state.
+        
+        This parameter is only used when 'linked' is also True
+        
+    see also: GraphicsObjectLnF in this module
+    
+    """
+    
+    kw = dict()
+    
+    if control:
+        kw["control"] = True
+        
+    elif linked:
+        kw["linked"] = True
+        if selected:
+            kw["selected"] = True
+    
+    ret = Bunch()
+    ret.pen = Bunch()
+    ret.pen.line = linePen if isinstance(linePen, QtGui.QPen) else GraphicsObjectLnF.pen(graphic = "pen_line", *kw)
+    ret.pen.text = textPen if isinstance(textPen, QtGui.QPen) else GraphicsObjectLnF.pen(graphic = "pen_text", *kw)
+    ret.pen.point = pointPen if isinstance(pointPen, QtGui.QPen) else GraphicsObjectLnF.pen(graphics = "pen_point", *kw)
+    ret.brush = Bunch()
+    ret.brush.text = textBrush if isinstance(textBrush, QtGui.QBrush) else GraphicsObjectLnF.brush(graphic="brush_label", *kw)
+    ret.brush.point = pointBrush if isinstance(pointBrush, QtGui.QBrush) else GraphicsObjectLnF.brush(graphic = "brush_point", *kw)
+    ret.font = font if isinstance(font, QtGui.QFont) else QtWidgets.QApplication.font()
+    ret.pointsize = pointSize if isinstance(pointSize, (int, float)) and pointSize > 0 else GraphicsObjectLnF.pointsize["control"] if control else GraphicsObjectLnF.pointsize["standard"]
+    
+    return ret
+
+def makeControlLnF(linePen:typing.Optional[QtGui.QPen] = None, 
+                   textPen:typing.Optional[QtGui.QPen] = None, 
+                   pointPen:typing.Optional[QtGui.QPen] = None, 
+                   textBrush:typing.Optional[QtGui.QBrush] = None, 
+                   pointBrush:typing.Optional[QtGui.QBrush] = None,
+                   font:typing.Optional[QtGui.QFont] = None, 
+                   pointSize:typing.Optional[typing.Union[int, float]] = None):
+    """Shortcut to generate a LnF Bunch for control graphics"""
+    return makeLnFBunch(linePen=linePen, textPen=textPen, pointPen=pointPen,
+                        textBrush=textBrush, pointBrush=pointBrush,
+                        font=font, pointSize=pointSize, 
+                        control=True)

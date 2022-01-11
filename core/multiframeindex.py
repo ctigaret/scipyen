@@ -14,6 +14,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 class FrameIndexLookup(object):
+    
     """Wrapper around multi-frame indexing using sparse pandas DataFrames.
     
     The correspondence between data master ("virtual") frame index and the 
@@ -28,8 +29,8 @@ class FrameIndexLookup(object):
     FrameLookupIndex with the 'scans', 'scene' and 'electrophysiology' as 
     FrameLookupIndex descriptors, and column names in the underlying DataFrame.
     
-    To keep things simple, a FrameLookupIndex instance exposes item access to
-    these fields, as well as attribute access, e.g.:
+    To keep things simple, a FrameLookupIndex instance exposes item and attribute
+    access to these fields
     
     frames["scans"] is frames.scans --> True
     
@@ -39,8 +40,55 @@ class FrameIndexLookup(object):
     
     frames[2] --> Pandas Series with index set to the columns attribute of the 
         underlying DataFrame 'map'.
+        
+    The frame mapping across the fields can be modified via a combination of
+    attribute access (for the field) and index access for the master frame index
+    e.g.,
+    
+    Let 'framesMap' be a frame index lookup with contents shown below:
+    
+        FrameIndexLookup with 3 frames.
+        Data components: ('scans', 'scene', 'electrophysiology')
+        Frame Indices Map (frame index -> index of component frame or segment):
+                scans  scene  electrophysiology
+        Frame                                 
+        0          0      0                  0
+        1          1      1                  1
+        2          2      2               <NA>
+
+    In 'framesMap', the 'electrophysiology' has only two frames which by default
+    are mapped to the first two master frame indices.
+    
+    If this is not what was intended, the mapping can be modified with two calls:
+    
+        framesMap.electrophysiology[2] = 1
+        
+        framesMap.electrophysiology[1] = pd.NA
     
     
+    and the result is:
+    
+        FrameIndexLookup with 3 frames.
+        Data components: ('scans', 'scene', 'electrophysiology')
+        Frame Indices Map (frame index -> index of component frame or segment):
+                scans  scene  electrophysiology
+        Frame                                 
+        0          0      0                  0
+        1          1      1               <NA>
+        2          2      2                  1
+
+    WARNING: These operations REQUIRE attribute (NOT index) access to the 
+    particular field i.e., the following idiom does not work:
+    
+        framesMap["electrophysiology"][2] = 1
+        
+        --> TypeError: SparseArray does not support item assignment via setitem
+        
+        This is because the index access framesMap["electrophysiology"] returns
+        a pandas.SparseArray. 
+        
+        In contrast, attribute access as in the example above works due to the
+        descriptor protocol used in the implementation.
     
     """
     class __IndexProxy__(object):
@@ -51,6 +99,7 @@ class FrameIndexLookup(object):
         the owner being an instance of FrameIndexLookup.
         
         """
+        
         def __init__(self, field:str):
             """Creates the descriptor corresponding to a data field in the owner.
             Also sets up the field's name as a descriptor of FrameIndexLookup
@@ -388,7 +437,7 @@ class FrameIndexLookup(object):
         -----------
         key: str: for indexing into the columns of DataFrame objects
              int, range, slice, or object valid for indexing into the rows
-            of DataFrame objects
+             of DataFrame objects
             
         When 'key' is a str, populate the Series at column 'key' with 'value'.
         
@@ -443,6 +492,51 @@ class FrameIndexLookup(object):
     def keys(self):
         yield from self._map_.columns
         
+    def remap(self, field:str, newMap:dict={}):
+        """Remaps master frame indices to new frame indices of 'field'.
+        
+        Parameters:
+        ===========
+        field:str the name of the field; raises AttributeError if the name in 
+            'field' is not the name of an existing field in this FrameIndexLookup
+            instance.
+            
+        newMap:dict; optional, default is {} (the empty dict).
+            When not empty, it must satify the following constraints:
+            
+            1) contains unique int keys >=0 that mapped to int values or to 
+            self.missingFieldFrameIndex (which by default is Pandas' NA).
+            
+            2) the values must be unique
+            
+        
+        """
+        if len(newMap):
+            # NOTE: 2022-01-11 12:28:21
+            # check for validity of keys and values
+            if not all(isinstance(k, int) and k >= 0 for k in newMap.keys()):
+                raise TypeError(f"When given, the newMap must contain int keys >= 0")
+            
+            if not all((isinstance(v, int) and v >= 0) or self.__check_missing__(v) for v in newMap.values()):
+                raise ValueError(f"When given, the newMap must contain int values >= 0 or {self.missingFieldFrameIndex}")
+            
+            # NOTE: 2022-01-11 12:34:56
+            # check for uniqueness of keys and values
+            if len(set(newMap.values())) != len(newMap):
+                raise ValueError("Mapping values must be unique")
+        
+            if len(set(newMap.keys())) != len(newMap):
+                raise ValueError("Mapping keys must be unique")
+            
+            for k,v in newMap.items():
+                #print(f"newMap k = {k}: v = {v}")
+                getattr(self, field)[k] = v
+            
+    def __check_missing__(self, x):
+        """Quick check for valid missing field frame index value
+        """
+        return x is self.missingFieldFrameIndex if not isinstance(self.missingFieldFrameIndex, int) else x == self.missingFieldFrameIndex
+    
     @property
     def map(self):
         return self._map_
