@@ -22,8 +22,13 @@ import errno, os
 def is_path(s:str) -> bool:
     return any(c in s for c in (os.sep, os.pathsep, ";", "\\"))
     
-
-
+def str2range(s):
+    parts = list(int(s_) for s_ in s.split(":"))
+    if len(parts) <= 3:
+        return range(*parts)
+    else:
+        return range(*parts[0:3])
+        
 def is_pathname_valid(pathname: str) -> bool:
     '''
     `True` if the passed pathname is a valid pathname for the current OS;

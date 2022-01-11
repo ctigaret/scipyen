@@ -1232,6 +1232,20 @@ def processtimefunc(func):
         return r
     return wrapper
 
+def with_doc_after(f):
+    """TODO/FIXME
+    see for example vigra.arraytypes._preserve_doc decorator
+    """
+    def wrap(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            func.__doc__ = "\n".join([func.__doc__, f.__doc__])
+            print(func.__doc__)
+            return func
+        return wrapper
+    return wrap
+    
+
 def no_sip_autoconversion(klass):
     """Decorator for classes to suppresses sip autoconversion of Qt to Python
     types.

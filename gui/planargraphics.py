@@ -8688,10 +8688,13 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 if self._backend_ is None or not self._backend_.hasStateForFrame():
                     return
                 
-            lnf = self.lnf # self.linkedLnF if self._backend_.isLinked else self.basicLnF
+            #lnf = self.lnf # self.linkedLnF if self._backend_.isLinked else self.basicLnF
                     
-            linePen = lnf[self.isSelected()]["pen"]["line"]
-            textPen = lnf[self.isSelected()]["pen"]["text"]
+            linePen = self.lnf["pen"]["line"]
+            textPen = self.lnf["pen"]["text"]
+            textBrush = self.lnf["brush"]["text"]
+            #linePen = lnf[self.isSelected()]["pen"]["line"]
+            #textPen = lnf[self.isSelected()]["pen"]["text"]
                 
             labelPos = None         # NOTE: 2017-06-23 09:41:24
                                     # below I calculate a default label position
@@ -8974,7 +8977,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     painter.setPen(linePen)
                     
                     if self._backend_.type & PlanarGraphicsType.point:
-                        painter.setBrush(lnf[self.isSelected()]["brush"]["text"])
+                        painter.setBrush(textBrush)
 
                     # NOTE: 2018-01-24 16:13:03
                     # DRAW THE ACTUAL SHAPE
@@ -9119,7 +9122,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     
                     if self._opaqueLabel_:
                         painter.setBackgroundMode(QtCore.Qt.OpaqueMode)
-                        painter.setBackground(lnf[self.isSelected()]["brush"]["text"])
+                        painter.setBackground(textBrush)
                         
                     else:
                         painter.setBackgroundMode(QtCore.Qt.TransparentMode)
@@ -10578,7 +10581,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
     @property
     def lnf(self) -> Bunch:
-        return self.linkedLnF if self._backend_.isLinked else self.basicLnF
+        return self.linkedLnF[self.isSelected()] if self._backend_.isLinked else self.basicLnF[self.isSelected()]
     
     @property
     def linkedColor(self):
@@ -10639,23 +10642,28 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
     @property
     def textBackground(self) -> QtGui.QBrush:
-        return self.lnf[self.isSelected()].brush.text # self._textBackgroundBrush.color()
+        return self.lnf.brush.text # self._textBackgroundBrush.color()
         #return self._textBackgroundBrush
     
     @textBackground.setter
-    def textBackground(self, brush):
-        self._textBackgroundBrush = brush
-        #self._makeObject_
+    def textBackground(self, brush:QtGui.QBrush):
+        if not isinstance(brush, QtGui.QBrush):
+            raise TypeError(f"Expecting a QtGui.QBrush; got {type(brush).__name__} instead")
+        
+        self.lnf.brush.text = brush # self._textBackgroundBrush.color()
         self.update()
         
     @property
     def textBackgroundColor(self) -> QtGui.QColor:
-        return self.lnf[self.isSelected()].brush.text.color() # self._textBackgroundBrush.color()
+        return self.lnf.brush.text.color() # self._textBackgroundBrush.color()
     
     @textBackground.setter
     def textBackgroundColor(self, qcolor):
-        if isinstance(qcolor, QtGui.QColor) and qcolor.isValid():
-            self.lnf[self.isSelected()].brush.text.setColor(qcolor)
+        if not isinstance(qcolor, QtGui.QColor):
+            raise TypeError(f"Expecting a QtGui.QColor; got {type(qcolor).__name__} instead")
+        
+        if qcolor.isValid():
+            self.lnf.brush.text.setColor(qcolor)
             #self._textBackgroundBrush.setColor(qcolor)
             self.update()
         
