@@ -4856,22 +4856,24 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 return
             
         elif isinstance(self._frame_selector_, slice):
-            if value not in range(self._frame_selector_.indices(self._data_.scansFrames)):
+            #if value not in range(self._frame_selector_.indices(self._data_.scansFrames)):
+            if value not in range(self._frame_selector_.indices(self._data_.nFrames)):
                 return
             
         elif isinstance(self._frame_selector_, int):
             if value != self._frame_selector_:
                 return
-
-        if value >= 0:
-            if value < self._data_.scansFrames:
-                self.currentScanFrame = value
-        
-            if value < self._data_.sceneFrames:
-                self.currentSceneFrame = value
             
-        self._current_frame_index_ = self.currentScanFrame
+        if value >= self._data_.nFrames() or value < 0:
+            return
+
+        self._current_frame_index_ = value
+        #if value >= 0:
+            #if value < self._data_.scansFrames:
+                #self.currentScanFrame = value
         
+        # NOTE: 2022-01-12 09:30:49
+        # update currentFrame for PlanarGraphics
         if isinstance(self._data_.scanRegion, pgui.PlanarGraphics):
             self._data_.scanRegion.currentFrame = self._current_frame_index_
         
@@ -4891,12 +4893,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             obj.updateLinkedObjects()
             obj.updateFrontends()
             
-            
         for obj in self._data_.sceneCursors.values():
             obj.currentFrame = self._current_frame_index_
             obj.updateLinkedObjects()
             obj.updateFrontends()
-            
             
         if isinstance(self._data_.scanRegion, pgui.Path) and len(self._data_.scanRegion):
             self._data_.scanRegion.currentFrame = self._current_frame_index_
@@ -4906,6 +4906,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             self._current_frame_scan_region_[:] = self._data_.scanRegion.getState(self._current_frame_index_)
             
         # see NOTE: 2018-09-25 22:19:58
+        # update the display frame for data components
         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in \
             (self.frameQSlider, self.framesQSpinBox)]
         
@@ -9441,7 +9442,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
     @pyqtSlot(int)
     @safeWrapper
     def slot_setFrameNumber(self, value):
-        """Called by signals from frameQSlider or framesQSpinBox
+        """Called by frameQSlider or framesQSpinBox signals from child windows.
         """
         # NOTE: 2018-09-27 09:58:07
         # TODO: contemplate the following:

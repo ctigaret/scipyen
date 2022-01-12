@@ -1028,6 +1028,38 @@ class ScanDataImageParser(AttributeAdapter):
         self.parseImageData(value)
         
     def parseImageData(self, value):
+        """Proposes a layout and calubrarion for VigraArray axes.
+        Parameters:
+        ==========
+        value: VigraArray or list of VigraArray objects
+        
+        Returns
+        =======
+        layout:Bunch with the following key:str to value mapping 
+            (value types are indicated below):
+            
+            nFrames -> int # number of data frames in the VigraArray
+            
+            horizontalAxis -> int # index of the axis displayed horizontally
+            
+            verticalAxis -> int # index of the axis dusplayed vertically
+            
+            channelsAxis -> int # index of the Channels axis tag, or the number
+                of dimensions of the array (for 'virtual' Channels axis)
+                
+            framesAxis -> int or tuple of int # the index (or indices) of the 
+                axis along which 2D data slices (frames) are displayed, one at 
+                a time
+                
+        Side effects:
+        ============
+        The layout and the axes calibrations are assigned to the descriptors
+        '<self.fieldname>Layout' and '<self.fieldname>AxesCalibration' in the 
+        owner of this ScanDataImageParser object.
+                
+        See also: self.imageDataLayout method
+            
+        """
         if self.obj is None:
             return
         
@@ -1050,6 +1082,8 @@ class ScanDataImageParser(AttributeAdapter):
         
         setattr(self.obj, f"{self.fieldname}Layout", layout)
         setattr(self.obj, f"{self.fieldname}AxesCalibration", axesCalibration)
+        
+        return layout
     
     def imageDataLayout(self,data, 
                     frameAxis:typing.Optional[vigra.AxisInfo]=None, 
@@ -1484,8 +1518,25 @@ class ScanData(BaseScipyenData):
         return getattr(self, component, None)
     
     def _get_component_nFrames_(self, component:str):
-        data = self._get_data_child_component_(component)
+        """Returns the number of data frames in one of the data components.
         
+        Parameters:
+        ==========
+        component: str, one of "scene", "scans", "electrophysiology" 
+                    (case-sensitive)
+        """
+        
+        # NOTE: 2022-01-12 09:05:32
+        # * for a neo.Block, return the number of segments
+        # * for a VigraArray, return the size along its 'frames' axis defined
+        # in the '<component_name>Layout' property of the ScanData object, with
+        # 'component_name' being one of ('scene' , 'scans')
+        #
+        #   in the VigraArray case I use the 'nFrames' member of the layout 
+        #   directly, if available, otherwise I calculate it using frameAxis 
+        #   (as is it done below) and use the opportunity update the '<component_name>Layout'.
+        
+        data = self._get_data_child_component_(component)
         if isinstance(data, neo.Block):
             return len(data.segments)
         
@@ -1495,9 +1546,7 @@ class ScanData(BaseScipyenData):
                     return 0
                 layout = getattr(self, f"{component}Layout", None)
                 if not isinstance(layout, dict):
-                    dataFrameAxis = getattr(self, f"{component}FrameAxis", None)
-                    layout = self.imageDataLayout(data, frameAxis = dataFrameAxis)
-                    setattr(self, f"{component}Layout", layout)
+                    layout = self.ImageParser(owner=self, fieldname=component).parseImageData(data)
                     
                 nFrames = layout.get("nFrames", 0)
                 return nFrames if isinstance(nFrames, int) else np.prod(nFrames)
@@ -2186,137 +2235,6 @@ class ScanData(BaseScipyenData):
             axcal = getattr(self, f"{what}AxesCalibration")[channel]
             axcal["c"].setChannelName(0, value)
     
-    #def set_scene(self, data: (vigra.VigraArray, tuple, list, None), sceneFrameAxis: (vigra.AxisInfo, str, type(None))=None, clear_planar_graphics:bool=False):
-        #"""
-        #TODO
-        #"""
-        #warnings.warn("DEPRECATED", DeprecationWarning, stacklevel=2)
-        #if data is None:
-            #self._scene_ = None
-            
-        #elif isinstance(data, vigra.VigraArray):
-            #(nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo) = proposeLayout(img, userFrameAxis = sceneFrameAxis)
-            #self._scene_ = data
-            #self._scene_axes_calibrations_ = [AxesCalibration(data)]
-            
-            #if sceneFrameAxis is None:
-                #chindex = data.channelIndex
-                
-                #if chindex == data:
-                    #pass
-    #@staticmethod
-    #def imageDataLayout(data, 
-                    #frameAxis:typing.Optional[vigra.AxisInfo]=None, 
-                    #horizontalAxis:typing.Optional[vigra.AxisInfo]=None, 
-                    #verticalAxis:typing.Optional[vigra.AxisInfo]=None, 
-                    #axescal:typing.Optional[AxesCalibration]=None):
-                    ##electrophysiology:typing.Optional[neo.Block]=None):
-        #""" Proposes an axes layout and axes calibration for the data.
-        
-        #See also imaging.vigrautils.proposeLayout()
-        
-        #Returns
-        #--------
-        
-        #The tuple (data, layout, axes_calibration):
-        
-        #'data': list containing at least one VigraArray objects, or None.
-            #The arrays have identical shapes and axistag keys.
-            
-        #'layout': traitlets.Bunch or None. When a Bunch, it maps the following
-            #key/value pairs:
-            
-            #'nFrames':      int;
-                            #This is the total number of 2D data 
-                            #slices (or frames) that can be displayed in a 2D 
-                            #viewer one at a time.
-                            
-                            #The 'frames' are defined along the data array axis 
-                            #that is orthogonal to the display plane. For more
-                            #details see imaging.vigrautils.proposeLayout().
-                            
-            #'horizontalAxis': int; 
-                            #Index - or dimension - of the horizontal axis.
-                            #This is the axis corresponding to the 'horizontal'
-                            #dimension (or aspect) of the data for the purpose of
-                            #being displayed in a 2D image viewer.
-                            
-            #'verticalAxis': int;
-                            #Index - or dimension - of the vertical axis
-                            #This is the axis corresponding to the 'vertical'
-                            #dimension (or aspect) of the data for the purpose of
-                            #being displayed in a 2D image viewer.
-                            
-            #'channelsAxis': int; 
-                            #Index - or dimension - of the channels axis
-                            #For VigraArray objects, the size of the image data
-                            #array on this dimension (or axis) indicates the
-                            #number of data channels in each pixel.
-                            
-            #'framesAxis':   int; 
-                            #Index - or dimenson - of the frames axis
-                            #This is the axis (or axes) along which 2D data 
-                            #frames (or slices) are taken to be displayed one at
-                            #a time in a 2D image viewer.
-                            
-            #For a detailed explanation of the concept of frames and frames axis
-            #see imaging.vigrautils.proposeLayout()
-
-        #'axes_calibration': an imaging.axiscalibration.AxesCalibration object, 
-                            #or None.
-        
-        #"""
-        #if not isinstance(data, (vigra.VigraArray, tuple, list)):
-            #return (None, None, None)
-        
-        #if isinstance(data, vigra.VigraArray):
-            ## CAUTION 2021-12-03 10:21:58
-            ## this layout has axisInfo objects, not indices
-            #layout = proposeLayout(data, userFrameAxis = frameAxis, indices = True)
-            
-            #if isinstance(axescal, AxesCalibration) and all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(axescal.axiskeys, data.axistags)):
-                #axes_cal = [axscal]
-            #else:
-                #axes_cal = [AxesCalibration(data)]
-                
-            #return ([data], layout, axes_cal)
-            
-        #elif isinstance(data, (tuple, list)):
-            #if len(data):
-                #if not all([isinstance(s, vigra.VigraArray) for s in data]):
-                    #raise TypeError("When not empty, data is expected to contain VigraArray objects")
-
-                #if not all([s.shape == data[0].shape for s in data[1:]]):
-                    #raise TypeError("Image arrays in a sequence must have identical shapes")
-
-                #if not all([s.axistags == data[0].axistags for s in data[1:]]):
-                    #raise TypeError("Image arrays in a sequence must have identical axistags")
-
-                #if not all([s.channels == data[0].channels for s in data[1:]]):
-                    #raise TypeError("Image arrays in a sequence must have the same number of channels")
-
-                #layout = proposeLayout(data[0], userFrameAxis = frameAxis, indices = True)
-                
-                #if isinstance(axescal, (tuple, list)):
-                    #if len(axescal) != len(data):
-                        #raise ValueError(f"Axes calibration expected to be a sequence with as many elements as 'data' ({len(data)}; got {len(axescal)} instead)")
-                    
-                    #if not all(isinstance(ac, AxesCalibration) for ac in axescal):
-                        #raise TypeError("Expecting a tuple of AxesCalibration objects")
-                    
-                    #if all(all(axcal.typeFlags(key) == x.typeFlags for (key, x) in zip(axcal.axiskeys, img.axistags)) for axcal,img in zip(axescal,data)):
-                        #axes_cal = [axcal for axcal in axescal]
-                    #else:
-                        #axes_cal = [AxesCalibration(img) for img in data]
-                #else:
-                    #axes_cal = [AxesCalibration(img) for img in data]
-                
-                #return (data, layout, axes_cal)
-
-            #return (list(), None, None)
-                
-        #return (None, None, None)
-                
     #@safeWrapper
     def _parse_image_arrays_(self, scene, scans, sceneFrameAxis=None, scansFrameAxis=None):
         """Assigns image data to the scene and scans data sets.
@@ -9078,7 +8996,8 @@ class ScanData(BaseScipyenData):
         Parameters:
         ==========
         component: str, one of: "scans", "scene", "electrophysiology", 
-            Optional, default is None.
+            Optional, default is None, in which case it reports the number of
+            "master" frames in the framesMap property of the ScanData instance.
             
             
         NOTE: Secondary (derived) data children are organized in frames and
@@ -9108,15 +9027,12 @@ class ScanData(BaseScipyenData):
             return self._get_component_nFrames_(component)
 
         else:
-            # NOTE: 2021-12-06 14:31:43
-            # interrogate component sizes directly; framesMap may NOT necessarily
-            # reflect the true number of frames!
-            return  max(self._get_component_nFrames_(c[0]) for c in self._data_children_)
-            #if isinstance(self.framesMap, FrameIndexLookup):
-                #nFrames = len(self.framesMap)
-            
-            #return len(self.framesMap)
-            #pass # prode the framesMap descriptor!
+            # NOTE: 2022-01-12 09:02:05
+            # use framesMap when available
+            if isinstance(self.framesMap, FrameIndexLookup):
+                return len(self.framesMap.masterFrames)
+            else:
+                return max(self._get_component_nFrames_(c[0]) for c in self._data_children_)
                 
     
     def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
