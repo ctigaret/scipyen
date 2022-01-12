@@ -9034,7 +9034,7 @@ class ScanData(BaseScipyenData):
             else:
                 return max(self._get_component_nFrames_(c[0]) for c in self._data_children_)
                 
-    
+    #def remapFrames(self, )
     def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
                        entity_cache):
         

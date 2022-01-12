@@ -13,6 +13,92 @@ from core.basescipyen import BaseScipyenData
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
+class IndexProxy(object):
+    """Proxy for accessing a data field in the FrameIndexLookup.
+    
+    The data field itself is a Pandas Series with SparseDtype, contained
+    in the 'map' attribute (a DataFrame) of the owner of this proxy, with 
+    the owner being an instance of FrameIndexLookup.
+    
+    """
+    
+    def __init__(self, field:str):
+        """Creates the descriptor corresponding to a data field in the owner.
+        Also sets up the field's name as a descriptor of FrameIndexLookup
+        """
+        if not isinstance(field, str) or len(field.strip()) == 0:
+            raise ArgumentError(f"Expecting a non-empty str; got {field} instead")
+        self._obj_ = None
+        self._field_ = field
+        
+    def __get__(self, obj, objtype=None):
+        """Returns the descriptor itself.
+        
+        The descriptor forwards access & assignment to the corresponding
+        Pandas Series object in the owner's 'map' attribute so that the
+        special functions sp_set_loc and sp_get_loc (defined in the 
+        core.utilities module) can be applied.
+        
+        To obtain the actual data associated with the field use the call 
+        syntax.
+        """
+        #print(objtype)
+        self._obj_ = obj
+        return self
+    
+    def __len__(self):
+        """Returns the number of registered component frame indices.
+        
+        A registered frame index is an int. 
+        
+        Technically this is not necessarily the same thing as the actual 
+        number of frames in the data component although the two values MAY 
+        be identical.
+        
+        The actual number of frames in the data component SHOULD be obtained
+        by directly interrogating the data component itself.
+        
+        Contrived cases include:
+        a) a component having N frames but only m < N of these are mapped to
+        a virtual data frame
+        
+        b) a component for which a virtual data frame is mapped to the 
+        "missingFrameIndex" (by default this is -1, pointing to the last 
+        available frame in the component) which means it would appear to
+        have more frames than it actually does.
+        
+        """
+        data = self() # pandas Series
+        
+        return len(data.loc[~data.isna()])
+    
+    def __set_name__(self, owner, name):
+        self.private_name = "_" + name + "_"
+        
+    def __call__(self):
+        """Returns the pandas series corresponding to self._field_
+        
+        The caller is responsible for appropriate indexing into the result.
+        """
+        if self._field_ in self._obj_._map_.columns:
+            return self._obj_._map_.loc[:, self._field_] 
+        
+    def __set__(self, obj, value=None):
+        # NOTE: 2021-12-01 22:44:11 reference needed in __get/setitem__
+        self._obj_ = obj
+        if isinstance(value, collections.abc.Sequence) and len(value) == len(self._obj_._map_) and all(isinstance(v, (int, type(pd.NA))) for v in value):
+            sp_set_loc(self._obj_._map_, slice(None), self._field_, value)
+            
+        elif isinstance(value, pd.Series) and len(value) == len(self._obj_._map_):
+            sp_set_loc(self._obj_._map_, slice(None), self._field_, value.loc[:])
+            
+        
+    def __getitem__(self, key):
+        return sp_get_loc(self._obj_._map_, key, self._field_)
+    
+    def __setitem__(self, key, value):
+        sp_set_loc(self._obj_._map_, key, self._field_, value)
+                    
 class FrameIndexLookup(object):
     
     """Wrapper around multi-frame indexing using sparse pandas DataFrames.
@@ -91,92 +177,29 @@ class FrameIndexLookup(object):
         descriptor protocol used in the implementation.
     
     """
-    class __IndexProxy__(object):
-        """Proxy for accessing a data field in the FrameIndexLookup.
+    
+    def __new__(cls, field_frames:dict, field_missing=pd.NA, frame_missing = -1,
+                index_name="Frame", **kwargs):
         
-        The data field itself is a Pandas Series with SparseDtype, contained
-        in the 'map' attribute (a DataFrame) of the owner of this proxy, with 
-        the owner being an instance of FrameIndexLookup.
+        #if isinstance(field_frames, dict) and len(field_frames):
+            #field_nframes = dict((k,v) for k,v in field_frames.items() if k in field_frames and isinstance(v, int))
+            
+        #else:
+            #field_nframes = dict()
+            
+        for field in field_frames:
+            descr = IndexProxy(field)
+            setattr(cls, field, descr)
+            descr.__set_name__(cls, field)
+            
+        return super().__new__(cls)
         
-        """
-        
-        def __init__(self, field:str):
-            """Creates the descriptor corresponding to a data field in the owner.
-            Also sets up the field's name as a descriptor of FrameIndexLookup
-            """
-            if not isinstance(field, str) or len(field.strip()) == 0:
-                raise ArgumentError(f"Expecting a non-empty str; got {field} instead")
-            self._obj_ = None
-            self._field_ = field
-            
-        def __get__(self, obj, objtype=None):
-            """Returns the descriptor itself.
-            
-            The descriptor forwards access & assignment to the corresponding
-            Pandas Series object in the owner's 'map' attribute so that the
-            special functions sp_set_loc and sp_get_loc (defined in the 
-            core.utilities module) can be applied.
-            
-            To obtain the actual data associated with the field use the call 
-            syntax.
-            """
-            #print(objtype)
-            self._obj_ = obj
-            return self
-        
-        def __len__(self):
-            """Returns the number of registered component frame indices.
-            
-            A registered frame index is an int. 
-            
-            Technically this is not necessarily the same thing as the actual 
-            number of frames in the data component although the two values MAY 
-            be identical.
-            
-            The actual number of frames in the data component SHOULD be obtained
-            by directly interrogating the data component itself.
-            
-            Contrived cases include:
-            a) a component having N frames but only m < N of these are mapped to
-            a virtual data frame
-            
-            b) a component for which a virtual data frame is mapped to the 
-            "missingFrameIndex" (by default this is -1, pointing to the last 
-            available frame in the component) which means it would appear to
-            have more frames than it actually does.
-            
-            """
-            data = self() # pandas Series
-            
-            return len(data.loc[~data.isna()])
-            
-        def __call__(self):
-            """Returns the pandas series corresponding to self._field_
-            
-            The caller is responsible for appropriate indexing into the result.
-            """
-            if self._field_ in self._obj_._map_.columns:
-                return self._obj_._map_.loc[:, self._field_] 
-            
-        def __set__(self, obj, value=None):
-            # NOTE: 2021-12-01 22:44:11 reference needed in __get/setitem__
-            self._obj_ = obj
-            if isinstance(value, collections.abc.Sequence) and len(value) == len(self._obj_._map_) and all(isinstance(v, (int, type(pd.NA))) for v in value):
-                sp_set_loc(self._obj_._map_, slice(None), self._field_, value)
-                
-            elif isinstance(value, pd.Series) and len(value) == len(self._obj_._map_):
-                sp_set_loc(self._obj_._map_, slice(None), self._field_, value.loc[:])
-                
-            
-        def __getitem__(self, key):
-            return sp_get_loc(self._obj_._map_, key, self._field_)
-        
-        def __setitem__(self, key, value):
-            sp_set_loc(self._obj_._map_, key, self._field_, value)
-                        
-    def __init__(self, field_frames:dict, 
-                 field_missing=pd.NA, frame_missing = -1, index_name="Frame",
-                 **kwargs):
+    def __reduce__(self):
+        return (_new_FrameIndexLookup, 
+                )
+    
+    def __init__(self, field_frames:dict, field_missing=pd.NA, frame_missing = -1, 
+                 index_name="Frame", **kwargs):
         """
         Parameters:
         ------------
@@ -287,8 +310,6 @@ class FrameIndexLookup(object):
         # available to the owner of the FrameLookupIndex instance. Field that
         # ARE present but without frames have 0 frames
         
-        #print(f"FrameIndexLookup.__init__ field_frames = {field_frames}")
-        
         if isinstance(field_frames, dict) and len(field_frames):
             field_nframes = dict((k,v) for k,v in field_frames.items() if k in field_frames and isinstance(v, int))
             
@@ -319,7 +340,9 @@ class FrameIndexLookup(object):
                     
             dd[field] = pd.Series(sval, name=field, dtype = pd.SparseDtype("int", field_missing))
             
-            setattr(type(self), field, self.__IndexProxy__(field))
+            #descr = IndexProxy(field)
+            #setattr(type(self), field, descr)
+            #descr.__set_name__(type(self), field)
             
         # use the created dd dict to generate the map data frame
         self._map_ = pd.DataFrame(dd)
@@ -330,7 +353,7 @@ class FrameIndexLookup(object):
         
         # finally, apply specific frame relationships in kwargs: 
         for k, v in kwargs:
-            if k in field_frames: # only for named field we already know about
+            if k in field_frames: # only for a named field we already know about
                 if isinstance(v, tuple):
                     if len(v) == 2 and all(isinstance(v_, int) for v_ in v): # (master_index, field frame index)
                         
@@ -575,4 +598,7 @@ class FrameIndexLookup(object):
             raise ArgumentError(f"'val' expectd an int or pd.NA; got {val} instead")
         self._field_missing_ = val
         
+    
+def _new_FrameIndexLookup(field_frames, field_missing, frame_missing, index_name):
+    return FrameIndexLookup(field_frames, field_missing, frame_missing, index_name)
     
