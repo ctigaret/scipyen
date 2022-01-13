@@ -1305,7 +1305,7 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
                 
             elif newframes < nframes:
                 value = list(range(newframes))
-                value.extend([self.obj.framesMap.missingFieldFrameIndex for k in range(newframes, nframes)])
+                value.extend([self.obj.framesMap.missingFrameIndex for k in range(newframes, nframes)])
                         
                 framesMap[self.fieldname] = value
                 

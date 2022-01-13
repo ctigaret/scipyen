@@ -178,15 +178,9 @@ class FrameIndexLookup(object):
     
     """
     
-    def __new__(cls, field_frames:dict, field_missing=pd.NA, frame_missing = -1,
+    def __new__(cls, field_frames:dict, frame_missing = pd.NA,
                 index_name="Frame", **kwargs):
         
-        #if isinstance(field_frames, dict) and len(field_frames):
-            #field_nframes = dict((k,v) for k,v in field_frames.items() if k in field_frames and isinstance(v, int))
-            
-        #else:
-            #field_nframes = dict()
-            
         for field in field_frames:
             descr = IndexProxy(field)
             setattr(cls, field, descr)
@@ -196,9 +190,11 @@ class FrameIndexLookup(object):
         
     def __reduce__(self):
         return (_new_FrameIndexLookup, 
-                )
+                (self.childFrames(),
+                self._frame_missing_,
+                self._map_.index.name))
     
-    def __init__(self, field_frames:dict, field_missing=pd.NA, frame_missing = -1, 
+    def __init__(self, field_frames:dict, frame_missing = pd.NA, 
                  index_name="Frame", **kwargs):
         """
         Parameters:
@@ -206,8 +202,10 @@ class FrameIndexLookup(object):
         field_frames: dict 
             
             This maps a str (field name) to an int (>=0, the number of available 
-            data frames in that named field), or to None, if the named field is 
-            absent from the owner of this FrameIndexLookup instance.
+            data frames in that named field), or to None, if the named field has
+            no frames yet.
+            
+            Example: {'scans': 3, 'scene': 3, 'electrophysiology': 2}
             
             NOTE 1: Named fields are attributes, properties or data descriptors 
             defined in the owner's :class:, accessing data objects that are
@@ -229,14 +227,7 @@ class FrameIndexLookup(object):
             (2D views, or segments). In this case, the number of frames of the 
             data in the field is 0 (zero).
             
-        field_missing: int or pd.NA. Optional, default is pd.NA
-        
-            The frame index value standing in for a named field that is missing
-            in the owner (see above)
-            
-            Optional, default is pd.NA
-            
-        frame_missing: int or pd.NA. Optional, default is -1
+        frame_missing: int or pd.NA. Optional, default is pd.NA
         
             The frame index value standing for a missing frame in the named field
             (i.e., when the named field has fewer frames than the highest number 
@@ -286,20 +277,18 @@ class FrameIndexLookup(object):
         
                 scans  scene  electrophysiology
         0       0      0        0
-        1       1     -1        1
-        2       2     -1        2
+        1       1     <NA>      1
+        2       2     <NA>      2
         
         3) The case where the ScanData owner object has only one scene frame, 
-        ans no electrophysiology
+        and no electrophysiology
                 scans  scene  electrophysiology
         0       0      0        <NA>
-        1       1     -1        <NA>
-        2       2     -1        <NA>
+        1       1     <NA>      <NA>
+        2       2     <NA>      <NA>
         
-        NOTE 2: the field_missing and frame_missing values have no meaning for 
-        the FrameLookupIndex object: they are just placeholders for the missing 
-        field frames when the field is missing altogether, or when only some 
-        frames are missing. In Examples 2 and 3 above, acessing master frame
+        NOTE 2: the frame_missing value has no meaning for the FrameLookupIndex 
+        object: it is just placeholders for the missing field frames. In Examples 2 and 3 above, acessing master frame
         with index 1 in the owner will attempt to access the last available 
         frame in scene (-1); in example 3, accessing master frame 1 will 
         associate <NA> for electrophysilogy. It is up to the owner to decide
@@ -316,29 +305,38 @@ class FrameIndexLookup(object):
         else:
             field_nframes = dict()
             
-        maxFrames = max(v for v in field_nframes.values()) if len(field_nframes) else None
+        maxFrames = max(v for v in field_nframes.values()) if len(field_nframes) else 0
+        #maxFrames = max(v for v in field_nframes.values()) if len(field_nframes) else None
         
         # create a dictionary of pandas Series, mapping field name to either:
         # a) range(maxFrames), - when field in field_frames is mapped to a number of frames
         #   (this implies that maxFrames is known)
-        # b) [field_missing] * maxFrames, when field in field_frames is mapped to None AND maxFrames is known
-        # c) field_missing, when field in field_names is mapped to None and maxFrames is not known
+        # b) [frame_missing] * maxFrames, when field in field_frames is mapped to None AND maxFrames is known
+        # c) frame_missing, when field in field_names is mapped to 0 and maxFrames is not known
         #   (this implies that neither field is mapped to a number of frames in field_frames)
         dd = dict()
         
-        for field,value in field_frames.items():
-            if isinstance(value,int):
+        for field, value in field_frames.items():
+            if not isinstance(value, int):
+                raise TypeError(f"'field_frames' expected to have int values; got {type(value)} for field {field} instead")
+            
+            if value > 0:
                 sval = range(maxFrames)
                 if value < maxFrames:
                     sval = [k if k < value else frame_missing for k in sval]
                 
             else:
                 if isinstance(maxFrames, int):
-                    sval = [field_missing] * maxFrames
+                    sval = [frame_missing] * maxFrames
                 else:
-                    sval = field_missing
+                    sval = frame_missing
                     
-            dd[field] = pd.Series(sval, name=field, dtype = pd.SparseDtype("int", field_missing))
+                #if isinstance(maxFrames, int):
+                    #sval = [field_missing] * maxFrames
+                #else:
+                    #sval = field_missing
+                    
+            dd[field] = pd.Series(sval, name=field, dtype = pd.SparseDtype("int", frame_missing))
             
             #descr = IndexProxy(field)
             #setattr(type(self), field, descr)
@@ -380,7 +378,7 @@ class FrameIndexLookup(object):
                             self._map_ = sp_set_loc(self._map_, v_[0], k, v_[1])
                             
         self._frame_missing_ = frame_missing
-        self._field_missing_ = field_missing
+        #self._field_missing_ = field_missing
                             
     def __len__(self):
         return len(self._map_)
@@ -505,12 +503,17 @@ class FrameIndexLookup(object):
         p.pretty(self._map_)
         #p.text(f"{self._map_}")
         
-    def childFrames(self, field:str):
-        if field in self._map_.columns:
-            frames = self._map_.loc[~self._map_.loc[:,field].isna(), field]
-            if len(frames):
-                return max(frames) + 1
-            return self._field_missing_
+    def childFrames(self, field:typing.Optional[str]=None):
+        if isinstance(field, str):
+            if field in self._map_.columns:
+                frames = self._map_.loc[~self._map_.loc[:,field].isna(), field]
+                if len(frames):
+                    return int(max(frames)) + 1
+            
+            return self._frame_missing_
+
+        else:
+            return dict((field, self.childFrames(field)) for field in self._map_.columns)
         
     def keys(self):
         yield from self._map_.columns
@@ -558,7 +561,7 @@ class FrameIndexLookup(object):
     def __check_missing__(self, x):
         """Quick check for valid missing field frame index value
         """
-        return x is self.missingFieldFrameIndex if not isinstance(self.missingFieldFrameIndex, int) else x == self.missingFieldFrameIndex
+        return x is self.missingFrameIndex if not isinstance(self.missingFrameIndex, int) else x == self.missingFrameIndex
     
     @property
     def map(self):
@@ -588,17 +591,17 @@ class FrameIndexLookup(object):
             raise ArgumentError(f"'val' expectd an int or pd.NA; got {val} instead")
         self._frame_missing_ = val
         
-    @property
-    def missingFieldFrameIndex(self):
-        return self._field_missing_
+    #@property
+    #def missingFieldFrameIndex(self):
+        #return self._field_missing_
     
-    @missingFieldFrameIndex.setter
-    def missingFieldFrameIndex(self, val:typing.Union[int, type(pd.NA)]):
-        if not isinstance(val, (int, type(pd.NA))):
-            raise ArgumentError(f"'val' expectd an int or pd.NA; got {val} instead")
-        self._field_missing_ = val
+    #@missingFieldFrameIndex.setter
+    #def missingFieldFrameIndex(self, val:typing.Union[int, type(pd.NA)]):
+        #if not isinstance(val, (int, type(pd.NA))):
+            #raise ArgumentError(f"'val' expectd an int or pd.NA; got {val} instead")
+        #self._field_missing_ = val
         
     
-def _new_FrameIndexLookup(field_frames, field_missing, frame_missing, index_name):
-    return FrameIndexLookup(field_frames, field_missing, frame_missing, index_name)
+def _new_FrameIndexLookup(field_frames, frame_missing, index_name):
+    return FrameIndexLookup(field_frames, frame_missing, index_name)
     
