@@ -189,10 +189,13 @@ class FrameIndexLookup(object):
         return super().__new__(cls)
         
     def __reduce__(self):
+        frames_indices = dict((field, tuple(zip(list(self._map_.index), list(None if v is pd.NA else int(v) for v in self._map_.loc[:,field])))) for field in self._map_.columns)
         return (_new_FrameIndexLookup, 
                 (self.childFrames(),
                 self._frame_missing_,
-                self._map_.index.name))
+                self._map_.index.name,
+                frames_indices,
+                ))
     
     def __init__(self, field_frames:dict, frame_missing = pd.NA, 
                  index_name="Frame", **kwargs):
@@ -235,6 +238,8 @@ class FrameIndexLookup(object):
             
         Var-keyword parameters:
         ------------------------
+        field : (master_index, field_frame_index)
+        
         When given, their names must be present in field_frames keys (otherwise
         are ignored) and their values are tuples of the form
             (master index:int, field frame index:int),
@@ -344,16 +349,17 @@ class FrameIndexLookup(object):
             
         # use the created dd dict to generate the map data frame
         self._map_ = pd.DataFrame(dd)
+        self._frame_missing_ = frame_missing
         
         ndxname = index_name if isinstance(index_name, str) and len(index_name.strip()) else "Frame"
         
         self._map_.index.name = ndxname
-        
+        print(f"FrameIndexLookup.__init__ kwargs:\n{kwargs}")
         # finally, apply specific frame relationships in kwargs: 
-        for k, v in kwargs:
+        for k, v in kwargs.items():
             if k in field_frames: # only for a named field we already know about
                 if isinstance(v, tuple):
-                    if len(v) == 2 and all(isinstance(v_, int) for v_ in v): # (master_index, field frame index)
+                    if len(v) == 2 and isinstance(v[0], int) and (isinstance(v[1], int) or v[1] is frame_missing): # (master_index, field frame index)
                         
                         # check specified master index and field frame index are
                         # in their respective ranges, if possible
@@ -361,23 +367,22 @@ class FrameIndexLookup(object):
                             raise ValueError(f"master index {v[0]} out of range {(-maxFrames, maxFrames-1)}")
                         
                         if isinstance(field_frames[k], int):
-                            if v[1] not in range(-field_frames[k], field_frames[k]):
+                            if isinstance(v[1], int) and v[1] not in range(-field_frames[k], field_frames[k]):
                                 raise ValueError(f"frame index {v[1]} for {k} out of range {(-field_frames[k], field_frames[k]-1)}")
                         
                         self._map_ = sp_set_loc(self._map_, v[0], k, v[1])
                         
-                    elif all(isinstance(v_, tuple) and len(v_) == 2 and all(isinstance(_v_, int) for _v_ in v_) for v_ in v):
+                    elif all(isinstance(v_, tuple) and len(v_) == 2 and (isinstance(v_[0], int) and (isinstance(v_[1], int) or v_[1] is frame_missing)) for v_ in v):
                         for v_ in v:
                             if isinstance(maxFrames, int) and v_[0] not in range(-maxFrames, maxFrames): # allow negative indices
                                 raise ValueError(f"master index {v_[0]} out of range {(-maxFrames, maxFrames-1)}")
                             
                             if isinstance(field_frames[k], int):
-                                if v_[1] not in range(-field_frames[k], field_frames[k]):
+                                if isinstance(v_[1], int) and v_[1] not in range(-field_frames[k], field_frames[k]):
                                     raise ValueError(f"frame index {v_[1]} for {k} out of range {(-field_frames[k], field_frames[k]-1)}")
                             
                             self._map_ = sp_set_loc(self._map_, v_[0], k, v_[1])
                             
-        self._frame_missing_ = frame_missing
         #self._field_missing_ = field_missing
                             
     def __len__(self):
@@ -555,7 +560,7 @@ class FrameIndexLookup(object):
                 raise ValueError("Mapping keys must be unique")
             
             for k,v in newMap.items():
-                #print(f"newMap k = {k}: v = {v}")
+                print(f"newMap k = {k}: v = {v}")
                 getattr(self, field)[k] = v
             
     def __check_missing__(self, x):
@@ -602,6 +607,6 @@ class FrameIndexLookup(object):
         #self._field_missing_ = val
         
     
-def _new_FrameIndexLookup(field_frames, frame_missing, index_name):
-    return FrameIndexLookup(field_frames, frame_missing, index_name)
+def _new_FrameIndexLookup(field_frames, frame_missing, index_name, mapping):
+    return FrameIndexLookup(field_frames, frame_missing, index_name, **mapping)
     

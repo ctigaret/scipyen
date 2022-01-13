@@ -2550,11 +2550,11 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
         raise TypeError("first parameter should be a datatypes.ScanData object; got %s instead" % type(scandata).__name__)
     
     if analysis_unit is None: # when analysis unit is None, take the whole data as an analysis unit
-        analysis_units = [scandata.analysisUnit()]
+        analysis_units = [scandata.analysisUnit]
         
     elif isinstance(analysis_unit, str): # analysis unit specified by its name
         if scandata.hasAnalysisUnit(analysis_unit) or analysis_unit is scandata.analysisUnit():
-            analysis_units = [scandata.analysisUnit(analysis_unit)]
+            analysis_units = [scandata.getAnalysisUnit(analysis_unit)]
             
         else:
             raise ValueError("analysis unit %s not found in scandata %s" % (analysis_unit, scandata.name))
@@ -2592,6 +2592,8 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
     
     # iterate through the specified analysis unit and collect analysis data
     for analysis_unit in analysis_units:
+        if not analysis_unit:
+            continue
         # NOTE: 2018-10-14 11:05:29
         # generate a dict for each frame, for each analysis unit -- see NOTE: 2018-10-14 11:14:19
         # that we then collect into a list (result)

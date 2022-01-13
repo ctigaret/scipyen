@@ -1551,6 +1551,14 @@ class ScanData(BaseScipyenData):
                 nFrames = layout.get("nFrames", 0)
                 return nFrames if isinstance(nFrames, int) else np.prod(nFrames)
             
+    def __reduce__(self):
+        kw = dict((name, getattr(self, name, )))
+        kw["name"] = self.name
+        #kw[""]
+        
+        return (_new_ScanData, (self.scans, self.scene, self.electrophysiology, 
+                                self.metadata, **kw))
+            
     @safeWrapper
     def __init__(self, scans=None, scene=None, electrophysiology=None, metadata=None, **kwargs):
         """Constructs a ScanData object.
@@ -1624,448 +1632,6 @@ class ScanData(BaseScipyenData):
             When "auto", try to "parse" TriggerProtocol from ephys neo.Block data.
                 
         """
-        
-        # BEGIN comments
-        #NOTE: 2017-12-15 23:36:22
-        # Stimulation protocols:
-        #
-        # These are defined as a list of TriggerProtocol objects (defined in this module)
-        #
-        # Each TriggerProtocol can contain several types of TriggerEvent objects
-        # embedded in the _electrophysiology_ neo.Block _AND_ in the 
-        # _scans_block_ neo.Block object (both of these MUST have the same number
-        # of frames, and this must equal the number of scans frames in ScanData)
-        #
-        # When electrophysiology block provides its own set of TriggerEvent objects
-        # these MAY be used to define the TriggerProtocols list 
-        #
-        # NOTE: 2017-12-20 23:38:06
-        # There will be a delay between electrophysiology and image acquisition,
-        # depending on which triggers what.
-        #
-        # This delay (by default set to 0) indicated the amount of time lapsed 
-        # between the start of the electrophysiology sweep acquisition and that
-        # of the imaging scan frame.
-        #
-        # WARNING: By convention, imaging delay is always given relative to 
-        #   the start of the electrophysiology sweep acquisition. It follows 
-        #   that ALL timings in the triggerProtocols list are also relative to 
-        #   the start of the electrophysiology sweep acquisition.
-        #
-        #   This convention is reflected in the sign of the "imagingDelay" 
-        #   attribute of a trigger protocol, and in the signs of the time values
-        #   of the imaging events in the data segments.
-        # WARNING 
-        #
-        #
-        # There are three mutually exclusive cases:
-        #
-        # A) electrophysiology TRIGGERS imaging 
-        #   (image frame acquisition is triggered by the electrophysiology
-        #    system, possibly some time AFTER the electrophysiology sweep has 
-        #   started)
-        #
-        #    => imagingDelay is 0 or POSITIVE
-        #
-        #
-        # B) imaging TRIGGERS electrophysiology
-        #   (electrophysiology sweep is triggered externally by the imaging 
-        #   system, possibly some time AFTER imaging frame has started)
-        #
-        #   => imagingDelay is 0 or NEGATIVE
-        #
-        # C) both imaging and electrophysiology are triggered internally (and 
-        # independently of each other)
-        #
-        #   => imagingDelay is 0 
-        #
-        #   WARNING: you're on your own here!
-        #
-        #
-        # When events are generated from a list of trigger protocols to be embedded
-        # in the _scans_block_ segments (see below), the imagingDelay value
-        # needs to be subtracted from the non-imaging events.
-        #
-        # Conversely, when trigger protocols are generated from events embedded 
-        # in the _scans_block_ segments, the first imaging event is
-        # subtracted from the event times.
-        #
-        # As a result, the events in the trigger protocols list are ALWAYS timed
-        # relative to the electrophysiology segment start (as long as the sign
-        # convention noted above is followed).
-        
-        #NOTE: 2017-08-07 22:43:22
-        # vigra.VigraArray objects can contain at most ONE channel axis
-        
-        # NOTE: 2017-11-09 09:26:01 KISS!!!
-        
-        # channel names are given here some defaults, in case metadata parsing 
-        # does not resolve this
-        # these defaults are the string representation of the channel index
-        
-        # NOTE: 2017-12-04 09:17:11
-        # storing scene and scans data as lists of arrays seems a good idea but
-        # complicates things when it comes to data processing where we would need
-        # to do channel-wise filtering etc. The complications arise when we don't
-        # filter all channels in the source data (at first) but then we decide we
-        # want to filter an additonalchannel, or re-filter a given channel
-        #
-        # This means that we need ot keep separate lists of channel names: one 
-        # for the source data subset, and one for the target (i.e. filtered) data 
-        # subset and the order of these names must reflect the order of the arrays
-        # in their corresponding data lists.
-        #
-        # These lists then must be kept in sync whenever we filter or re-filter
-        # a given channel which requires some indexing gymnastics in the code.
-        
-        #
-        # NOTE: 2017-12-04 09:34:26
-        #   This leads ot the idea of enforcing data arrays to have a channel axis
-        #   (even for single-band arrays) with the channel name to be written in
-        #   the axis description attribute, e.g. in an XML-formatted string. 
-        #
-        #   (1) For multi-channel data stored as a list of single-band arrays, or 
-        #   single-channel data (a single-band array by definition) this would 
-        #   inherently guarantee the 1-2-1 correspondence between channel name and
-        #   data array.
-        #
-        #   (2) For multi-channel data stored as a list of one multi-band array, 
-        #   there would have to be a way to store the channel names in a form 
-        #   that guarantees the correspondence of the channel name to the channel
-        #   index (i.e., the index along the channel axis).
-        #
-        #   An almost generic solution to satisfy both the above conditions might 
-        #   be an XML string of the form:
-        #
-        #   <name><index1> string </index1> <index2> string </index2> ... </name>
-        #
-        #   Where the index1, index2, etc are string representations of the channel
-        #   index. 
-        #
-        #   For single-band arrays this would look like:
-        #
-        #   <name><channel0>"Ch1"</channel0></name>, or <name><channel0>"Dodt"</channel0></name>, etc.
-        #   
-        #
-        #   NOTE that XML does not allow tag names to be digits!
-        #
-        #   For multi-band arrays this would look like:
-        #
-        #   <name><channel0>"Ch1"</channel0><channel1>"Ch2"</channel1><channel2><"Dodt"</channel2></name>
-        #
-        #   This would ONLY appply to channel axes, whereas non-channel axes might
-        #   contain just <name> string </name> in their description, e.g.
-        #
-        #   <name> "width" </name> or <name> "linescantime" </name>
-        #
-        # NOTE: 2017-12-04 09:47:47
-        #   Implementation of the above would require some functions at the module
-        #   level, similar to those used in relation to axis calibration
-        #
-        #
-        # NOTE: all vigra arrays should have a channel axis, and the "description"
-        # attribute of this axis must contain a XML-formatted string for channel 
-        # name. ATTENTION: In this context a channel is semantically equivalent
-        # to an imaging channel (e.g. fluorescence, Dodt contrast, etc) and is stored
-        # as either a single-band array, or a band in a multi-band array.
-        #
-        #
-        # 
-        # NOTE: 2017-12-05 15:14:18 Attributes of special interest:
-        #
-        ####
-        # _scans_block_ 
-        ####
-        #
-        # neo.Block object containing time-varying imaging data derived from
-        # the analysis of ROIs or cursors in the scans data subset.
-        #
-        # NOTE: Referred to as "imaging block" in this documentation
-        #
-        # Only relevant when this is a linescan data or a time series with raster 
-        # scans.
-        # 
-        # _scans_block_.segments
-        #
-        # Each segment corresponds to a single "trial" or "repetition", or "cycle", 
-        # and its "analogsignals" contain the time-varying image parameters
-        # measured in ROIs or along Cursors. See neo.Segment and neo.AnalogSignal.
-        # 
-        # For time series, the _scans_block_ contains only one segment.
-        #
-        # _scans_block_.segments[k].analogsignals:
-        #
-        # The analogsignals are generated from the imaging data, and attributed 
-        # a channel index that semantically corresponds to a structure where an 
-        # image parameter was measured over time (e.g. "spine" or "dendrite", or
-        # "neuron").
-        #
-        # For linescans these signals must be derived from cursors in the scans
-        # data subset e.g. vertical cursors, which extend along the entire
-        # vertical (temporal) axis of a linescan frame.
-        #
-        # For time series data, which contain raster scans over time, there is 
-        # only one repetition and therefore only one segment, whereras each frame
-        # corresponds to one time point in the series. By consequence, the 
-        # analogsignals must be derived from ROIs set in the 2D scan frames.
-        #
-        # _scans_block_.segments[k].events
-        #
-        # May contain TriggerEvent objects (defined in this module).
-        #
-        # _scans_block_.channel_indexes -- ?
-        #
-        # Semantically links analogsignals across the segments in the _scans_block_
-        # to a defined "structure"
-        # 
-        # _scene_block_ : similar role as _scans_block_; -- ?
-        #
-        #
-        ####
-        # __scanline_profiles_scene__ and __scanline_profiles_scans__
-        # NOTE: 2018-06-17 16:29:57
-        # renamed to _scan_region_scene_profiles_ 
-        # _scan_region_scans_profiles_
-        ####
-        #
-        #   neo.Block objects
-        #
-        #   For linescan mode:
-        #
-        #   Their purpose is to allow the definition of ROIs for deriving
-        #   time-varying image data in the linescan frames
-        #
-        #   one segment per frame: the block's segments hold DataSignals 
-        #   containing, respectively:
-        #
-        #   * the image pixel values along the scanline trajectory in the scene,
-        #   in the reference channel (one per channel, one signal per segment)
-        #
-        #   * the time-averages of the linescan in the reference channel 
-        #   (one per channel, one signal per segment)
-        #
-        #   These signals must have a common domain (i.e. space domain) and sampling
-        #   rate. NOTE: ATTENTION This may require interpolation for ScanImage data
-        #   where the linescans are mapped to an image size independent of the 
-        #   scanline trajectory length.
-        #
-        #   For time and Z- series: they have a similar purpose as for linescan mode,
-        #
-        #  neo.Block objects similar to  for processed (filtered/de-noised) image data
-        #
-        # _electrophysiology_ 
-        #
-        # this neo.Block contains the electrophysiology data associated with the
-        # imaging experiment; it may be empty
-        #
-        # Each segment in this block contains the recordings that correspond to a
-        # segment in the _scans_block_. If this block is NOT empty, it MUST
-        # contain the same number of segments as the _scans_block_
-        #
-        
-        # END comments
-        # BEGIN old stuff
-        #self.apiversion = (0,3) # MAJOR, MINOR
-        #print("ScanData.__init__ start")
-        # user-defined (meta) data
-        #self._annotations_ = dict()
-        
-        # NOTE: 2019-01-16 15:16:17
-        # enable storage of custom unit type and genotype with ScanData
-        
-        #self._availableGenotypes_ = ["NA", "wt", "het", "hom"]
-        # NOTE: 2021-11-26 13:32:58 
-        # _descriptor_attributes_
-        # see BaseScipyenData
-        #self._scans_axes_calibrations_ = []
-        #self._scene_axes_calibrations_ = []
-        
-        # what does this hold? -- Answer: 1D signals derived from the scene
-        # -- the scene equivalent of _scans_block_
-        # NOTE: 2018-05-19 08:16:40 - not sure how useful this is 
-        # even for ZSeries stacks, the relevant data is contained in the 
-        # scans attribute (scene attribute is empty)
-        #self._scene_block_                        = neo.Block(name="Scene")
-        
-        # NOTE: 2017-12-06 10:39:24
-        # especially for linescan mode, these require special treatment
-        #self.__scanline_profiles_scene__            = neo.Block(name="Scanline_profiles_scene")
-        #self._scan_region_scene_profiles_         = neo.Block(name="Scan region scene profiles")
-        
-        # NOTE: 2017-12-06 10:37:30
-        # hold data signals from scans, frame-wise 
-        # e.g. EPSCaTs
-        #self._scans_block_                        = neo.Block(name="Scans")
-
-        # NOTE: 2017-12-06 10:39:24
-        # especially for linescan mode, these require special treatment
-        #self.__scanline_profiles_scans__            = neo.Block(name="Scanline_profiles_scans")
-        #self._scan_region_scans_profiles_         = neo.Block(name="Scan region scans profiles")
-        
-        # NOTE: 2017-12-06 10:40:13
-        # when not empty, must have as many segments as scans frames
-        #self._electrophysiology_                  = neo.Block(name="Electrophysiology")
-        
-        #self._scene_ = list()
-        #self._scene_frame_axis_ = None
-        #self._scene_frames_ = 0
-    
-        #self._scans_ = list()
-        #self._scans_frame_axis_ = None
-        #self._scans_frames_ = 0
-        
-        # NOTE: 2021-10-29 23:31:41
-        # mapping of primary data frame indices to scene frame indices
-        # maps scans frame indices (if scans exist) to scene frame indices
-        # not used if neither scans nor scene exist
-        #self._scene_frame_mapping_ = scene_mapping
-        # mapping of primary data frame indices to electrophysiology segment indices
-        # maps scans frame indices to ephys segment indices, if scans exist, else
-        # maps scene frame indcies to ephys segent indices, if scene exists
-        # not used when electrophysiology data is absent
-        #self._ephys_frame_mapping_ = ephys_mapping
-            
-        # CAUTION: the contents of _analysis_options_ are problem-dependent
-        # and typically will be changed at application level
-        #if isinstance(analysisOptions, dict):
-            #self._analysis_options_ = analysisOptions
-            
-        #else:
-            #self._analysis_options_ = dict()
-            
-        # NOTE: 2017-12-03 21:14:10
-        # BEGIN comment on filters
-        # Dictionaries where keys are channel names and values are dictionaries
-        # with three mandatory fields: "function", "args", and "kwargs", where:
-        #
-        #   "function": a str (default is "None") that can be evaluated to a 
-        #               function in the caller's namespace and has the signature:
-        #
-        #    result = func(source, *args, **kwargs) -> None
-        #
-        #       where:
-        #
-        #       "source" is the source image: a VigraArray with two non-channel
-        #       axes.
-        #   
-        #       "args" and "kwargs" are as supplied by the other two keys in the 
-        #       dictionary:
-        #
-        #   "args": a sequence with var-positional parameters to func; 
-        #           default is []
-        #
-        #   "kwargs": a dictionary of var-keyword parameters to func;
-        #           default is {}
-        #
-        #   "result" is the destination image with same shape and axistags as 
-        #       the source
-        #
-        # There is exactly one such dictionary per channel name, and thus
-        # a filter function and its parameters apply to the whole channel in the
-        # data.
-        #
-        # The corollary is that filter functions are stored separately, one per 
-        # channel.
-        #
-        # For multi-band data _ALL_ channels are filtered with the same
-        # function and parameters as stored under the first channel name.
-        #
-        # Otherwise, channels _MUST_ be stored as separate arrays and be filtered
-        # with different filters.
-        #
-        # NOTE: by convention, all filtering functions are defined in the
-        # imageprocessing module, so they could all be brought into this
-        # module's namespace and thus made available to ScanData, by calling:
-        #
-        # from imageprocessing import *
-        # 
-        # Example 1) 
-            #
-            # pureDenoise(image, nLevels=None, sigma2=None, alpha=1, beta=0, threshold=none)
-            #
-            # function  = "pureDenoise"
-            # args      = []
-            # kwargs    = {"nLevels":nLevels, "sigma2":sigma2, "thr":thr, "alpha":alpha, "beta":beta}
-        #
-        #
-        # Example 2) 
-            # 
-            # binomialFilter(image,radius)
-            # 
-            # function  = "binomialFilter"
-            # args      = [radius]
-            # kwargs    = {}
-        #
-        #
-        # Example 3) 
-            # 
-            # gaussianFilter(image,scale, window=0.0)
-            # 
-            # function  = "gaussianFilter"
-            # args      = [scale]
-            # kwargs    = {"window": window}
-            #
-            #
-        # END
-
-        # BEGIN comment on analysisMode and scandatatype
-            # NOTE: 2017-11-19 22:27:30 _analysismode_ and _scandatatype_
-            # how is the "scans" data subset going to be analysed?
-            #
-            # there are basically two options:
-            # 1) frame by frame (eg. for linescans): filters and analysis functions
-            # are to be applied frame-wise to the "scans" data subset
-            #
-            # 2) as a whole data volume: filters and analysis functions are to be
-            # be applied to all non-channel dimensions)
-            #
-            # NOTE: this has to be somewhat in sync with _scandatatype_
-            # NOTE: _analysismode_ probably makes _scandatatype_ obsolete
-            #
-        # END comment on analysisMode and scandatatype
-        
-        # TODO (maybe) to be assigned by self._parse_metadata_()
-        # valid values are "frame", "volume"
-        
-        # NOTE: 2019-07-20 23:27:10
-        # these are just some sensible (?) defaults
-        #self._analysismode_ = ScanData.ScanDataAnalysisMode.frame 
-        
-        #self._scandatatype_ = ScanData.ScanDataType.linescan # to be assigned by self._parse_metadata_()
-        
-        # NOTE: 2018-06-16 18:37:07
-        # these are now ordered dictionaries
-        #self._scansrois_ = collections.OrderedDict()   # use for general analysis
-        #self._scansrois_ = dict()   # use for general analysis
-            
-        ##self._scenerois_ = collections.OrderedDict()
-        #self._scenerois_ = dict()
-        
-        #self._scanscursors_ = dict()
-        
-        #self._scenecursors_ = dict()
-        
-        # NOTE: 2018-04-13 10:22:10
-        # A PlanarGraphics object in the scene data set, defining the scanning 
-        # trajectory or sub-region in the scene; might be a line, polyline, 
-        # rectangle, a disjoint set of rois, etc.
-        # For linescan data, this is usually called "scanline"
-        #self._scan_region_ = None
-        
-        #self._trigger_protocols_ = list() # of TriggerProtocol objects
-        
-        # the entire ScanData as an AnalysisUnit object -- this must always be
-        # present by default, event if there are no nested analysis units in the
-        # data
-        #self._analysis_unit_ = AnalysisUnit(self)
-        #self._analysis_unit_.protocols = self._trigger_protocols_ # reference !
-        
-        # a set of nested analysis units defined within the data -- all analysis units
-        # in this set are landmark-based and thus are different from self._analysis_unit_
-        #self._analysis_units_ = set() 
-        # END old stuff
-        
-        #self._name_ = name
         
         if isinstance(scans, ScanData):
             self = scans.copy() # make a deep copy
@@ -4531,7 +4097,7 @@ class ScanData(BaseScipyenData):
             
     @property
     def defaultAnalysisUnit(self):
-        return self.analysisUnit
+        return self.getAnalysisUnit()
     
     @safeWrapper
     def analysisUnitSignal(self, landmark=None):
@@ -4554,7 +4120,8 @@ class ScanData(BaseScipyenData):
         pass
             
     @safeWrapper
-    def analysisUnit(self, landmark=None):
+    
+    def getAnalysisUnit(self, landmark=None):
         """Access an AnalysisUnit object defined in this ScanData object.
         
         This can be an AnalysisUnit object associated with a specified landmark,
@@ -4617,7 +4184,7 @@ class ScanData(BaseScipyenData):
                 return None
             
         elif landmark is None:
-            return self._analysis_unit_
+            return self.analysisUnit
         
         else:
             raise TypeError("landmark expected to be a string, a pictgui.PlanarGraphics, or None; got %s instead" % type(landmark).__name__)
@@ -8609,7 +8176,7 @@ class ScanData(BaseScipyenData):
         The list is sorted by the names of the analysis units; it may be empty.
         
         NOTE: This property excludes the default analysis unit defined on the data.
-        Instead, the latter is obtained by calling ScanData.analysisUnit() 
+        Instead, the latter is obtained by calling ScanData.getAnalysisUnit() 
         without parameters, or as the property ScanData.defaultAnalysisUnit
         
         See also ScanData.analysisUnit(...) for details.
@@ -9477,3 +9044,5 @@ def scanDataOptions(detection_predicate=1.3, roi_width = 10,
     
     return ret
 
+def _new_ScanData(scans, scene, electrophysiology, metadata, kw):
+    return ScanData(scans, scene, electrophysiology, metadata, **kw)
