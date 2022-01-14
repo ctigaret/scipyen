@@ -1552,12 +1552,10 @@ class ScanData(BaseScipyenData):
                 return nFrames if isinstance(nFrames, int) else np.prod(nFrames)
             
     def __reduce__(self):
-        kw = dict((name, getattr(self, name, )))
-        kw["name"] = self.name
-        #kw[""]
+        kw = dict((d[0], getattr(self, d[0], None)) for d in self._descriptor_attributes_ if d[0] not in ("scene", "scans", "electrophysiology", "metadata"))
         
         return (_new_ScanData, (self.scans, self.scene, self.electrophysiology, 
-                                self.metadata, **kw))
+                                self.metadata, kw))
             
     @safeWrapper
     def __init__(self, scans=None, scene=None, electrophysiology=None, metadata=None, **kwargs):

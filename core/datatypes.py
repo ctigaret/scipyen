@@ -17,6 +17,8 @@ import datetime
 from enum import (Enum, IntEnum,)
 import inspect
 import numbers
+import math
+import dataclasses
 import sys
 import time
 import traceback
@@ -370,6 +372,9 @@ def array_slice(data:np.ndarray, slicing:(dict, type(None))):
         #return issubclass(x, y)
     
     #return isinstance(x, y)
+    
+def is_unavailable(x):
+    return x is pd.NA or x is np.nan or x is math.nan or x is dataclasses.MISSING
     
 def is_dotted_name(s):
     return isinstance(s, str) and '.' in s

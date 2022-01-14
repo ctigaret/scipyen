@@ -1,10 +1,12 @@
-import os, typing, types
+import os, typing, types, math
 from functools import partial, partialmethod
+from dataclasses import MISSING
 from collections import namedtuple
 import collections.abc
 from inspect import (getmembers, getattr_static)
 import numpy as np
 import pandas as pd
+from core.datatypes import is_unavailable
 from core.prog import (ArgumentError,  WithDescriptors, 
                        get_descriptors, signature2Dict)
 from core.utilities import (nth, normalized_index, sp_set_loc, sp_get_loc)
@@ -230,7 +232,11 @@ class FrameIndexLookup(object):
             (2D views, or segments). In this case, the number of frames of the 
             data in the field is 0 (zero).
             
-        frame_missing: int or pd.NA. Optional, default is pd.NA
+        frame_missing: int or any of: 
+            pd.NA, None, np.nan, math.nan, deataclasses.MISSING.
+            
+            Optional, default is pd.NA.
+            
         
             The frame index value standing for a missing frame in the named field
             (i.e., when the named field has fewer frames than the highest number 
@@ -300,6 +306,20 @@ class FrameIndexLookup(object):
         what to do with these values.
         
         """
+        
+        # NOTE: 2022-01-14 23:02:54
+        # make sure frame_missing is either an int or any of the "unavailable"
+        # constants; set it to pd.NA otherwise:
+        if not isinstance(frame_missing, int) or not any(frame_missing is None, 
+                                                         frame_missing is pd.NA,
+                                                         frame_missing is np.nan,
+                                                         frame_missing is math.nan,
+                                                         frame_missing is MISSING):
+            
+            frame_missing = pd.NA
+        
+        
+        
         # filter out missing fields, to figure out the maximum number of frames 
         # available to the owner of the FrameLookupIndex instance. Field that
         # ARE present but without frames have 0 frames
@@ -354,12 +374,12 @@ class FrameIndexLookup(object):
         ndxname = index_name if isinstance(index_name, str) and len(index_name.strip()) else "Frame"
         
         self._map_.index.name = ndxname
-        print(f"FrameIndexLookup.__init__ kwargs:\n{kwargs}")
+        #print(f"FrameIndexLookup.__init__ kwargs:\n{kwargs}")
         # finally, apply specific frame relationships in kwargs: 
         for k, v in kwargs.items():
             if k in field_frames: # only for a named field we already know about
                 if isinstance(v, tuple):
-                    if len(v) == 2 and isinstance(v[0], int) and (isinstance(v[1], int) or v[1] is frame_missing): # (master_index, field frame index)
+                    if len(v) == 2 and isinstance(v[0], int) and (v[1] is frame_missing or v[1] is None or isinstance(v[1], int)): # (master_index, field frame index)
                         
                         # check specified master index and field frame index are
                         # in their respective ranges, if possible
@@ -369,10 +389,10 @@ class FrameIndexLookup(object):
                         if isinstance(field_frames[k], int):
                             if isinstance(v[1], int) and v[1] not in range(-field_frames[k], field_frames[k]):
                                 raise ValueError(f"frame index {v[1]} for {k} out of range {(-field_frames[k], field_frames[k]-1)}")
+                        value = frame_missing if v[1] is frame_missing or v[1] is None else v[1]
+                        self._map_ = sp_set_loc(self._map_, v[0], k, value)
                         
-                        self._map_ = sp_set_loc(self._map_, v[0], k, v[1])
-                        
-                    elif all(isinstance(v_, tuple) and len(v_) == 2 and (isinstance(v_[0], int) and (isinstance(v_[1], int) or v_[1] is frame_missing)) for v_ in v):
+                    elif all(isinstance(v_, tuple) and len(v_) == 2 and (isinstance(v_[0], int) and (v_[1] is frame_missing or v_[1] is None or isinstance(v_[1], int))) for v_ in v):
                         for v_ in v:
                             if isinstance(maxFrames, int) and v_[0] not in range(-maxFrames, maxFrames): # allow negative indices
                                 raise ValueError(f"master index {v_[0]} out of range {(-maxFrames, maxFrames-1)}")
@@ -381,7 +401,9 @@ class FrameIndexLookup(object):
                                 if isinstance(v_[1], int) and v_[1] not in range(-field_frames[k], field_frames[k]):
                                     raise ValueError(f"frame index {v_[1]} for {k} out of range {(-field_frames[k], field_frames[k]-1)}")
                             
-                            self._map_ = sp_set_loc(self._map_, v_[0], k, v_[1])
+                            value = frame_missing if v_[1] is frame_missing or v_[1] is None else v_[1]
+                                
+                            self._map_ = sp_set_loc(self._map_, v_[0], k, value)
                             
         #self._field_missing_ = field_missing
                             
@@ -560,7 +582,7 @@ class FrameIndexLookup(object):
                 raise ValueError("Mapping keys must be unique")
             
             for k,v in newMap.items():
-                print(f"newMap k = {k}: v = {v}")
+                #print(f"newMap k = {k}: v = {v}")
                 getattr(self, field)[k] = v
             
     def __check_missing__(self, x):
