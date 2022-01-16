@@ -43,16 +43,14 @@ matplotlib for colormaps & colors
 # 4. ROIs: probably the best approach is to inherit from QGraphicsObject, see GraphicsObject
 # 
 
-# KISS = Keep It Simple, Stupid !
-
 #### BEGIN core python modules
 from __future__ import print_function
-import sys, os, numbers, traceback, inspect, threading, warnings, typing
+import sys, os, numbers, traceback, inspect, threading, warnings, typing, math
 import weakref, copy, itertools
 from functools import partial
 from collections import ChainMap, namedtuple, defaultdict
 from enum import Enum, IntEnum
-
+from dataclasses import MISSING
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -62,6 +60,7 @@ import quantities as pq
 import pyqtgraph as pgraph
 import neo
 import vigra
+from pandas import NA
 #import vigra.pyqt 
 import matplotlib as mpl
 
@@ -2525,6 +2524,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     def setPlanarGraphicsColor(self, ID, val):
         pass
         
+    def setDataDisplayEnabled(self, value):
+        self.viewerWidget.setEnabled(value is True)
+        self.viewerWidget.setVisible(value is True)
+            
     @property
     def currentFrame(self):
         return self._current_frame_index_
@@ -2534,11 +2537,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         """
         Emits self.frameChanged signal
         """
-        totalFrames = self._number_of_frames_ if isinstance(self._number_of_frames_, int) else \
-                    np.prod(self._number_of_frames_)
+        missing = (isinstance(self._missing_frame_value_, (int, float)) and val == self._missing_frame_value_) or \
+            self._missing_frame_value_ in (MISSING, NA) and val is self._missing_frame_value_
         
-        if not isinstance(val, int) or val >= totalFrames or val < 0: 
+        if missing or val not in self.frameIndex:
+            self.setDataDisplayEnabled(False)
             return
+        else:
+            self.setDataDisplayEnabled(True)
+            
+        self._current_frame_index_ = int(val)
         
         # NOTE: 2018-09-25 23:06:55
         # recipe to block re-entrant signals in the code below
@@ -2550,9 +2558,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.framesQSpinBox.setValue(val)
         self.framesQSlider.setValue(val)
-
-        self._current_frame_index_ = val
-        #print("ImageViewer %s currentFrame: " % self.windowTitle(), self._current_frame_index_)
 
         self.displayFrame()
 
@@ -3473,7 +3478,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             if self._data_ is not None and len(self.dataCursors) > 0: # parse width/height of previos image if any, to check against existing cursors
                 if self._data_.shape[layout.horizontalAxis] != img.shape[layout.horizontalAxis] or \
                     self._data_.shape[layout.verticalAxis] != img.shape[layout.verticalAxis]:
-                    self.questionMessage("Imageviewer:", "New image frame geometry will invalidate existing cursors.\nLoad image and bring all cursors to center?")
+                    self.questionMessage("Imageviewer:", "New image geometry will invalidate existing cursors.\nLoad image and bring all cursors to center?")
                     
                     ret = msgBox.exec()
                     
@@ -3485,11 +3490,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                         c.rangeY = img.shape[layout.verticalAxis]
                         c.setPos(img.shape[layout.horizontalAxis]/2, img.shape[layout.verticalAxis]/2)
             
-            self._number_of_frames_ = layout.nFrames 
+            self._number_of_frames_ = layout.nFrames if isinstance(layout.nFrames, (int, type(None))) else np.prod(layout.nFrames)
 
             if self._number_of_frames_ is None:
                 self.criticalMessage("Error", "Cannot determine the number of frames in the data")
                 return False
+            
+            self.frameIndex = range(self._number_of_frames_)
         
             self.frameAxis  = layout.framesAxis
             
@@ -4084,6 +4091,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         The valueChanged signal of the widget used to select the index of the 
         displayed data frame should be connected to this slot in _configureUI_()
         
+        Parameters:
+        ==========
+        value: int, float, dataclasses.MISSING or pd.NA
+            When a float, the only admissible value is numpy.nan or math.nan
+            
         NOTE: Overrides ScipyenFrameViewer.slot_setFrameNumber
         """
         if isinstance(self._number_of_frames_, int):
@@ -4706,12 +4718,14 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 
             if self._parseVigraArrayData_(data):
                 self._data_  = data
+                self.frameIndex = frameIndex or range(self._number_of_frames_) # set by _parseVigraArrayData_
                 self._axes_calibration_ = AxesCalibration(data)
                 self._setup_channels_display_actions_()
                 self.displayFrame(asAlphaChannel=asAlphaChannel)
             
         elif isinstance(data, (QtGui.QImage, QtGui.QPixmap)):
             self._number_of_frames_ = 1
+            self.frameIndex = range(self._number_of_frames_)
             self._data_  = data
             self.frameAxis = None
             self.displayFrame()
@@ -4737,6 +4751,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             array_data = vigra.VigraArray(data, axistags=arrayAxes)
             if self._parseVigraArrayData_(array_data):
                 self._data_  = array_data
+                self.frameIndex = frameIndex or range(self._number_of_frames_) # set by _parseVigraArrayData_
                 self._axes_calibration_ = AxesCalibration(array_data)
                 self._setup_channels_display_actions_()
                 self.displayFrame(asAlphaChannel=asAlphaChannel)

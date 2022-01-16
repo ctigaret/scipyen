@@ -3547,8 +3547,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         self.profileviewers = list()    # list of SignalViewer - only ONE window
         
-        #self._linkedViewers_ = list()
-        
         # ###
         # END window lists
         # ###
@@ -3691,6 +3689,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             if len(args) == 2 and (isinstance(args[1], str) and len(args[1].strip())):
                 self._data_var_name_ = args[1]
                 
+        # NOTE: 2022-01-16 13:08:12
+        # super()._init__(...) below also calls self._configureUI_()
         super().__init__(data=scandata, win_title=win_title, doc_title=self._data_var_name_, 
                          parent=parent, **kwargs) # also calls self._configureUI_()
         
@@ -3928,6 +3928,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 [self.ageLineEdit.editingFinished,                      self.slot_gui_age_changed,          QtCore.Qt.QueuedConnection]
             ]
         
+        # NOTE: 2022-01-16 11:45:41
+        # signal from client ScipyenFrameViewer frame navigator widgets carry
+        # the viewer's data frame index (which may or may NOT be the same as 
+        # the master frame index, depending on ScanData framesMap)
+        # therefore self.slot_setFrameNumber should determine this;
+        # however, below, the connection is for signals emitted by LSCaTWindow's
+        # own navigation widgets.
         self._navigation_gui_signal_slots_ = [
                 [self.frameQSlider.valueChanged[int],    self.slot_setFrameNumber, QtCore.Qt.QueuedConnection],
                 [self.framesQSpinBox.valueChanged[int],  self.slot_setFrameNumber, QtCore.Qt.QueuedConnection]
@@ -4729,10 +4736,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
     # ###
     # BEGIN Properties
     # ###
-    
-    #@property
-    #def linkedViewers(self):
-        #return self._linkedViewers_
     
     @property
     def currentProtocols(self):
@@ -9384,56 +9387,91 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
     @pyqtSlot(int)
     @safeWrapper
     def slot_setFrameNumber(self, value):
-        """Called by frameQSlider or framesQSpinBox signals from child windows.
+        """Connected to frameQSlider or framesQSpinBox signals.
         """
-        # NOTE: 2018-09-27 09:58:07
-        # TODO: contemplate the following:
-        # identify sender;
-        # if one of the linked viewers, block its signals then call its slot_setFrameNumber
+
+        # NOTE: 2022-01-16 13:14:04
+        # Broadcasts a corresponding frame index to the child data viewers
+        # according to the FrameIndexLookup in self._data_.framesMap.
+        # The child window may be showing a data with fewer frames than the
+        # master frames index (see ScanData.framesMap property).
+        # This slot takes care of this by selecting the corresponding master 
+        # frame index in ScanData.
+        # ATTENTION: LSCaTWindow frame navigation widgets ONLY deal with master 
+        # frame indices.
+        
         if self._data_ is None:
             return
         
-        if value < 0:
+        if value in range(0, self._data_.nFrames()):
+            self._current_frame_index_ = value
+        else:
             return
+            
+        # NOTE: 2022-01-16 13:20:04
+        # Data frame mismatches are now ALLOWED between the primary data components
+        # of the ScanData objects: scans, scene, and electrophysiology; therefore
+        # the child viewers that display these components (respectively, 
+        # scansviewers, sceneviewers, and ephysviewers) need to be sent a frame 
+        # index value that is appropriate to the layout of the specific data
+        # component.
+        #
+        # In addition, scansblockviewers, sceneblockviewers, and profileviewers
+        # display data derived from these three primary data components, hence
+        # their frame layout reflects that of the source primary data component
+        # as follows:
+        #
+        # scansblockviewers <-> scansFrames
+        # sceneblockviewers <-> sceneFrames
+        # profileviewers    <-> master frames (each frame shows the scan 
+        # trajectory profile simultaneously in scans and scene, or in one of
+        # them if the other does not have a corresponding frame.
         
-        if value < self._data_.scansFrames:
-            self.currentScanFrame = value
-    
-        if value < self._data_.sceneFrames:
-            self.currentSceneFrame = value
-    
-        # see NOTE: 2018-09-25 22:19:58
-        signalBlockers = [QtCore.QSignalBlocker(w) for w in self.scansviewers + self.sceneviewers]
+        childViewers = self.scansviewers + self.sceneviewers + self.ephysviewers + self.profileviewers + self.scansblockviewers + self.sceneblockviewers
+        
+        signalBlockers = [QtCore.QSignalBlocker(w) for w in childViewers]
         
         try:
-            if value != self.currentFrame:
-                self._current_frame_index_ = self.currentScanFrame
-                
-                #if len(self._linkedViewers_) > 0:
-                for viewer in self._linkedViewers_: 
-                    viewer.currentFrame = value # this should also change currentFrame in that window's graphics objects
+            for viewer in self._linkedViewers_:  
+                # NOTE: 2022-01-16 21:59:45
+                # self._linkedViewers_ is defined in ScipyenFrameViewer
+                if viewer in self.scansviewers + self.scansblockviewers:
+                    frindex = self._data_.framesMap["scans"][value]
+                    component = "scans"
+                elif viewer in self.sceneviewers + self.sceneblockviewers:
+                    frindex = self._data_.framesMap["scene"][value]
+                    component = "scene"
+                elif viewer in self.ephysviewers:
+                    frindex = self._data_.framesMap["electrophysiology"][value]
+                    component = "electrophysiology"
+                else:
+                    frindex = value
+                    component = "master"
+                    # get the scans frame index
+                #print(f"LSCaTWindow.slot_setFrameNumber: nFrames: {self._data_.nFrames()}; value: {value} => frindex: {frindex} for component {component}")
+                viewer.currentFrame = frindex # this should also change currentFrame in that window's graphics objects
 
-                landmarks = [o for o in self._data_.sceneRois.values()]     + \
-                            [o for o in self._data_.sceneCursors.values()]  + \
-                            [o for o in self._data_.scansRois.values()]     + \
-                            [o for o in self._data_.scansCursors.values()]  + \
-                            [self._data_.scanRegion]
+            landmarks = [o for o in self._data_.sceneRois.values()]     + \
+                        [o for o in self._data_.sceneCursors.values()]  + \
+                        [o for o in self._data_.scansRois.values()]     + \
+                        [o for o in self._data_.scansCursors.values()]  + \
+                        [self._data_.scanRegion]
+            
+            for landmark in landmarks:
+                if landmark is not None:
+                    landmark.currentFrame = self._current_frame_index_
+                    landmark.updateLinkedObjects()
+                    landmark.updateFrontends()
                 
-                for landmark in landmarks:
-                    if landmark is not None:
-                        landmark.currentFrame = self._current_frame_index_
-                        landmark.updateLinkedObjects()
-                        landmark.updateFrontends()
-                    
-                self._update_analysis_unit_ui_fields_()
+            self._update_analysis_unit_ui_fields_()
+            
+            if self.sender() == self.framesQSpinBox:
+                sigBlock = QtCore.QSignalBlocker(self.frameQSlider)
+                self.frameQSlider.setValue(int(self._current_frame_index_))
                 
-                if self.sender() == self.framesQSpinBox:
-                    sigBlock = QtCore.QSignalBlocker(self.frameQSlider)
-                    self.frameQSlider.setValue(int(self._current_frame_index_))
-                    
-                elif self.sender() == self.frameQSlider:
-                    sigBlock = QtCore.QSignalBlocker(self.framesQSpinBox)
-                    self.framesQSpinBox.setValue(int(self._current_frame_index_))
+            elif self.sender() == self.frameQSlider:
+                sigBlock = QtCore.QSignalBlocker(self.framesQSpinBox)
+                self.framesQSpinBox.setValue(int(self._current_frame_index_))
             
         except Exception as e:
             traceback.print_exc()
@@ -9626,8 +9664,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             if getattr(win, "framesSpinner", None) is not None:
                 win.framesSpinner.setMaximum(nFrames)
         
-        
-        
     @safeWrapper
     def _init_data_viewers_(self, section:str):
         """Sets up the viewer(s) for a specific ScanData section
@@ -9815,7 +9851,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         allviewers = [self] + self.sceneviewers + self.scansviewers + self.ephysviewers + self.profileviewers + self.scansblockviewers + self.sceneblockviewers
         
         for viewer in allviewers:
-            viewer.linkToViewers(*allviewers)
+            viewer.linkToViewers(*allviewers, broadcast=False)
         
     @safeWrapper
     def _data_modifed_(self, value=False):
@@ -11217,23 +11253,23 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         #print("LSCaTWindow._update_ui_fields_ END")
         
-    @safeWrapper
-    def _link_window_navigation_(self):
-        if self._data_ is None:
-            return
+    #@safeWrapper
+    #def _link_window_navigation_(self):
+        #if self._data_ is None:
+            #return
         
-        viewers = [w for w in self.sceneviewers] + \
-                  [w for w in self.scansviewers] + \
-                  [w for w in self.ephysviewers] + \
-                  [w for w in self.profileviewers] + \
-                  [w for w in self.scansblockviewers] + \
-                  [w for w in self.sceneblockviewers]
+        #viewers = [w for w in self.sceneviewers] + \
+                  #[w for w in self.scansviewers] + \
+                  #[w for w in self.ephysviewers] + \
+                  #[w for w in self.profileviewers] + \
+                  #[w for w in self.scansblockviewers] + \
+                  #[w for w in self.sceneblockviewers]
               
-        #print("LSCaTWindow _link_window_navigation_: %d windows" % len(viewers))
-        for w in viewers:
-            print(w.windowTitle())
+        ##print("LSCaTWindow _link_window_navigation_: %d windows" % len(viewers))
+        ##for w in viewers:
+            ##print(w.windowTitle())
         
-        self.linkToViewers(*viewers)
+        #self.linkToViewers(*viewers)
         
     @safeWrapper
     def _parsedata_(self, newdata=None, varname=None):

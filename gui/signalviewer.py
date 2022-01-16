@@ -85,7 +85,7 @@ CHANGELOG
 
 from pprint import pprint
 
-import sys, os, traceback, numbers, warnings, weakref, inspect, typing
+import sys, os, traceback, numbers, warnings, weakref, inspect, typing, math
 
 import collections
 from collections.abc import Iterable
@@ -93,6 +93,7 @@ from functools import partial, singledispatch, singledispatchmethod
 from itertools import (cycle, accumulate, chain, )
 from operator import attrgetter, itemgetter, methodcaller
 from enum import Enum, IntEnum
+from dataclasses import MISSING
 
 from traitlets import Bunch
 
@@ -107,6 +108,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 
 import numpy as np
 import pandas as pd
+from pandas import NA
 import pyqtgraph as pg
 pg.Qt.lib = "PyQt5"
 import quantities as pq
@@ -120,6 +122,7 @@ from matplotlib.backends.backend_qt5agg import (FigureCanvasQTAgg as FigureCanva
 import neo
 
 import vigra
+
 
 from traitlets import Bunch
 
@@ -1549,6 +1552,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.signalsLayout.layout.setVerticalSpacing(0)
 
         self.fig = pg.GraphicsLayoutWidget(parent = self.viewerWidgetContainer) 
+        styleHint = QtWidgets.QStyle.SH_DitherDisabledText
+        self.fig.style().styleHint(styleHint)
         
         #self.viewerWidgetLayout.addWidget(self.fig)
         self.viewerWidget = self.fig
@@ -1643,7 +1648,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     # ### END private methods
     
     def setDataDisplayEnabled(self, value):
-        self.viewerWidgetContainer.setEnabled(value is True)
+        self.viewerWidget.setEnabled(value is True)
+        self.viewerWidget.setVisible(value is True)
+            
         
     def closeEvent(self, evt):
         """Override ScipyenViewer.closeEvent.
@@ -5293,28 +5300,35 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return self._current_frame_index_
     
     @currentFrame.setter
-    def currentFrame(self, val):
+    def currentFrame(self, val:typing.Union[int, type(MISSING), type(NA), type(None), float]):
         """ Programmatically sets up the index of the displayed frame.
         Emits self.frameChanged signal
         """
-        if not isinstance(val, int) or val not in self.frameIndex: 
+        missing = (isinstance(self._missing_frame_value_, (int, float)) and val == self._missing_frame_value_) or \
+            self._missing_frame_value_ in (MISSING, NA) and val is self._missing_frame_value_
+        
+        if missing or val not in self.frameIndex:
+            self.setDataDisplayEnabled(False)
             return
+        else:
+            self.setDataDisplayEnabled(True)
+            
+        self._current_frame_index_ = int(val)
         
         # NOTE: 2018-09-25 23:06:55
         # recipe to block re-entrant signals in the code below
-        # cleaner than manually docinenctign and re-connecting
+        # cleaner than manually connecting and re-connecting
         # and also exception-safe
         
         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in \
             (self.framesQSpinBox, self.framesQSlider)]
         
-        self.framesQSpinBox.setValue(val)
-        self.framesQSlider.setValue(val)
+        self.framesQSpinBox.setValue(self._current_frame_index_)
+        self.framesQSlider.setValue(self._current_frame_index_)
 
-        self._current_frame_index_ = val
 
         self.displayFrame()
-        self.frameChanged.emit(val)
+        self.frameChanged.emit(self._current_frame_index_)
 
     @property
     def plotItemsWithLayoutPositions(self) -> typing.List:
@@ -5597,7 +5611,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @safeWrapper
     def displayFrame(self):
         """ Plots individual frame (data "sweep" or "segment")
-
+        
+        Implements gui.scipyenviewer.ScipyenFrameViewer.displayFrame
+        
         Delegates plotting as follows:
         
         neo.Segment                     -> _plotSegment_ # needed to pick up which signal from segment

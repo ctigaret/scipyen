@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """Superclass for Scipyen viewer windows
 """
-import typing, warnings, dataclasses
+import typing, warnings
+from dataclasses import MISSING
 from abc import (ABC, ABCMeta, abstractmethod,)
 from traitlets import Bunch
 #from abc import (abstractmethod,)
@@ -11,6 +12,8 @@ from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 
 from core.utilities import safeWrapper
 from .workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
+from pandas import NA
+
 
 class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     """Base type for all Scipyen viewers.
@@ -317,8 +320,11 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         Abstract method; it must be implemented in subclasses, which have full
         control if and how a central data duisplay widget is implemented.
         """
-        pass
-
+        w = getattr(self, "viewerWidget", None)
+        if w:
+            w.setEnabled(value is True)
+            w.setVisible(value is True)
+            
     @abstractmethod
     def _configureUI_(self):
         """Custom GUI initialization.
@@ -663,14 +669,10 @@ class ScipyenFrameViewer(ScipyenViewer):
                  ID: typing.Optional[int] = None,
                  win_title: typing.Optional[str] = None, 
                  doc_title: typing.Optional[str] = None,
-                 nFrames: typing.Optional[int]=None,
                  frameIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None,
                  currentFrame: typing.Optional[int] = None,
-                 missingFrameIndex:typing.Optional[typing.Tuple[int]]=None,
+                 missingFrameValue:typing.Optional[object]=None,
                  *args, **kwargs):
-        super().__init__(data=data, parent=parent, ID=ID,
-                         win_title=win_title, doc_title=doc_title,
-                         *args, **kwargs)
         """Constructor for ScipyenFrameViewer.
         
         Parameters:
@@ -706,19 +708,34 @@ class ScipyenFrameViewer(ScipyenViewer):
         
         currentFrame: int or None (default). The index of the currentFrame.
         
+        missingFrameValue: any object or None;
+            When not None, this is the value that, when passed to the setter of
+            the currentFrame property will disable the current display, to 
+            visually indicate a missing data frame
+        
         *args, **kwargs: variadic argument and keywords specific to the constructor of the
             derived subclass.
         """
         
         self._current_frame_index_      = 0 
         self._number_of_frames_         = 1 # determined from the data
-        self.frameIndex                  = range(self._number_of_frames_)
+        self._frameIndex_               = range(self._number_of_frames_)
         #self._linkedViewers_            = list()
         
         # These two should hold a reference to the actual QSlider and QSpinBox
         # defined in the subclass, or in *.ui file used by the subclass
         self._frames_spinner_           = None
         self._frames_slider_            = None
+        
+        self._missing_frame_value_ = missingFrameValue or NA
+        
+        # NOTE: 2022-01-16 13:09:44
+        # super().__init__(...) below also calls self._configureUI_()
+        # 
+        super().__init__(data=data, parent=parent, ID=ID,
+                         win_title=win_title, doc_title=doc_title,
+                         *args, **kwargs)
+        
         
     @abstractmethod
     def displayFrame(self, *args, **kwargs):
@@ -737,7 +754,8 @@ class ScipyenFrameViewer(ScipyenViewer):
     
     @property
     def nFrames(self):
-        """The number of display "frames" this viewer knows of.
+        """The number of data "frames" this viewer knows of; read-only.
+        
         The displayed frames may be a subset of the frames that the data is 
         logically organized in, consisting of the frames selected for viewing.
         
@@ -750,6 +768,20 @@ class ScipyenFrameViewer(ScipyenViewer):
         organized in just one frame.
         """
         return self._number_of_frames_
+    
+    @property
+    def frameIndex(self):
+        """Indices of frames.
+        By default, this is range(self.nFrames) but can be set up in the 
+        initializer to a sequence such that only a subset of the available 
+        data frames are displayed by the ScipyenFrameViewer instance.
+        """
+        return self._frameIndex_
+    
+    @frameIndex.setter
+    def frameIndex(self, value=None):
+        if value is None:
+            self._frameIndex_ = range(self.nFrames)
         
     @property
     def currentFrame(self):
@@ -785,6 +817,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         However derived subclasses may override this function to implement more
         specific functionality.
         """
+        print(f"{self.__class__.__name__}.currentFrame.setter({val}) ")
         if not isinstance(value, int) or value >= self._number_of_frames_ or value < 0:
             return
         
@@ -839,7 +872,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         return self._frames_spinner_
     
     @safeWrapper
-    def linkToViewers(self, broadcast: bool = True, *viewers):
+    def linkToViewers(self, *viewers, broadcast: bool = True):
         """Synchronizes frame navigation with the specified viewer(s).
         
         CAUTION: Assumes each viewer in viewers manages data with the same 
@@ -914,7 +947,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         
     @pyqtSlot(int)
     @safeWrapper
-    def slot_setFrameNumber(self, value:typing.Union[int, type(dataclasses.MISSING)]):
+    def slot_setFrameNumber(self, value:typing.Union[int, type(MISSING), type(NA), type(None), float]):
         """Drives frame navigation from the GUI.
         
         The valueChanged signal of the widget used to select the index of the 
@@ -923,8 +956,10 @@ class ScipyenFrameViewer(ScipyenViewer):
         NOTE: Subclasses can override this function.
         """
         #print("ScipyenFrameViewer %s slot_setFrameNumber %d" % (type(self).__name__, value))
+        
         if isinstance(value, int):
             if value >= self._number_of_frames_ or value < 0:
+            #if value not in self.frameIndex:
                 return
             
             # NOTE: 2021-01-07 14:36:54
