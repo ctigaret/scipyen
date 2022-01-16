@@ -1154,25 +1154,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         return ret
     
-    #@_interpret_signal.register
-    #def _(self, x:Iterable, **kwargs):
-        ## TODO
-        #separateSignalChannels  = kwargs.pop("separateSignalChannels", False)
-        #signalChannelAxis       = kwargs.pop("signalChannelAxis", 1)
-        #frameIndex              = kwargs.pop("frameIndex", range(len(x)))
-        #signalIndex             = kwargs.pop("signalIndex", 1)
-        #dataAxis                = kwargs.pop("dataAxis", 0)
-        
-        #dcts = [self._interpret_signal(x_) for x_ in x]
-        
-        #xx = [dct["x"] for dct in dcts]
-        #yy = [dct["y"] for dct in dcts]
-        
-        #dataAxis                = 0
-        #_number_of_frames_      = len(frameIndex)
-        
-        #pass
-        
     def _clear_lris_(self):
         for k, ax in enumerate(self.axes):
             lris = [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]
@@ -1661,6 +1642,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
     # ### END private methods
     
+    def setDataDisplayEnabled(self, value):
+        self.viewerWidgetContainer.setEnabled(value is True)
+        
     def closeEvent(self, evt):
         """Override ScipyenViewer.closeEvent.
         Attempt to deal with situations where C/C++ objects are deleted before 

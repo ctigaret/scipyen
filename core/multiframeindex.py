@@ -34,7 +34,7 @@ class IndexProxy(object):
         self._field_ = field
         
     def __get__(self, obj, objtype=None):
-        """Returns the descriptor itself.
+        """Returns the descriptor itself (i.e., this IndexProxy instance).
         
         The descriptor forwards access & assignment to the corresponding
         Pandas Series object in the owner's 'map' attribute so that the
@@ -100,7 +100,7 @@ class IndexProxy(object):
     
     def __setitem__(self, key, value):
         sp_set_loc(self._obj_._map_, key, self._field_, value)
-                    
+        
 class FrameIndexLookup(object):
     
     """Wrapper around multi-frame indexing using sparse pandas DataFrames.
@@ -356,16 +356,7 @@ class FrameIndexLookup(object):
                 else:
                     sval = frame_missing
                     
-                #if isinstance(maxFrames, int):
-                    #sval = [field_missing] * maxFrames
-                #else:
-                    #sval = field_missing
-                    
             dd[field] = pd.Series(sval, name=field, dtype = pd.SparseDtype("int", frame_missing))
-            
-            #descr = IndexProxy(field)
-            #setattr(type(self), field, descr)
-            #descr.__set_name__(type(self), field)
             
         # use the created dd dict to generate the map data frame
         self._map_ = pd.DataFrame(dd)
@@ -374,7 +365,7 @@ class FrameIndexLookup(object):
         ndxname = index_name if isinstance(index_name, str) and len(index_name.strip()) else "Frame"
         
         self._map_.index.name = ndxname
-        #print(f"FrameIndexLookup.__init__ kwargs:\n{kwargs}")
+
         # finally, apply specific frame relationships in kwargs: 
         for k, v in kwargs.items():
             if k in field_frames: # only for a named field we already know about
@@ -404,8 +395,6 @@ class FrameIndexLookup(object):
                             value = frame_missing if v_[1] is frame_missing or v_[1] is None else v_[1]
                                 
                             self._map_ = sp_set_loc(self._map_, v_[0], k, value)
-                            
-        #self._field_missing_ = field_missing
                             
     def __len__(self):
         return len(self._map_)
@@ -474,7 +463,7 @@ class FrameIndexLookup(object):
             return self._map_.loc[key, :]
         
         else:
-            return sp_get_loc(self._map_, key, slice(None)) # use all columns (slice(None))
+            return sp_get_loc(self._map_, key, slice(None)) # using all columns: pass slice(None)
                 
         # NOTE: return the key when nothing is mapped to it
         
@@ -528,7 +517,6 @@ class FrameIndexLookup(object):
         p.text(f"Data components: {tuple(self.keys())}\n")
         p.text(f"Frame Indices Map (frame index -> index of component frame or segment):\n")
         p.pretty(self._map_)
-        #p.text(f"{self._map_}")
         
     def childFrames(self, field:typing.Optional[str]=None):
         if isinstance(field, str):
@@ -544,6 +532,23 @@ class FrameIndexLookup(object):
         
     def keys(self):
         yield from self._map_.columns
+        
+    def where(self, field:str, value:int):
+        """Returns the master frame index for the 'field' index 'value'
+        
+        Raises KeyError if field is not found.
+        """
+        pds = self.__getitem__(field)
+        
+        cond = pds == value
+        
+        ret = list(pds.where(cond).dropna().index)
+        
+        if len(ret) == 1:
+            return ret[0]
+        
+        return ret
+        
         
     def remap(self, field:str, newMap:dict={}):
         """Remaps master frame indices to new frame indices of 'field'.

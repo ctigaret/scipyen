@@ -4452,7 +4452,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         self.epscatComponentsTableWidget.addAction(self.addEPSCaTAction)
         self.epscatComponentsTableWidget.addAction(self.removeEPSCaTAction)
-        #self.epscatComponentsTableWidget.customContextMenuRequested[QtCore.QPoint].connect(self.slot_epscatComponentsTableContextMenuRequested)
 
         
         # END epscat tab
@@ -4486,66 +4485,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         self._connect_gui_slots_(self._epscat_parameters_table_gui_signal_slots_)
         self._connect_gui_slots_(self._process_buttons_gui_signal_slots_)
         self._connect_gui_slots_(self._analyse_buttons_gui_slots_)
-        #self._connect_gui_slots_(self.__output_gui_signal_slots__)
         
-    #@safeWrapper
-    #def linkToViewers(self, *others):
-        #if len(others) == 0:
-            #return
-        
-        #for other in others:
-            #if isinstance(other, QtWidgets.QMainWindow) and \
-                #hasattr(other, "_linkedViewers_") and \
-                    #hasattr(other, "currentFrame") and \
-                        #other not in self._linkedViewers_:
-                #self._linkedViewers_.append(other)
-                
-                #if self not in other._linkedViewers_: # avoid linking to self
-                    ## bidirectional link
-                    #other._linkedViewers_.append(self)
-                    
-                ## link the others to each other as well
-                #for v in others:
-                    #if v is not other and other not in v._linkedViewers_: # avoid  linking to self
-                        #v._linkedViewers_.append(other)
-        
-    #@safeWrapper
-    #def unlinkFromViewers(self, *others):
-        #"""Breaks the bidirectional frame navigation link with other viewer(s).
-        
-        #Breaks all existing links of self if others is empty.
-        
-        #Var-positional parmeters:
-        #=========================
-        #"others" : a sequence of viewers that supports multiple data frames
-        #(sweeps) and have a slot named "slot_setFrameNumber", i.e. ImageViewer and 
-        #SignalViewer.
-        
-        #Any navigation links between the others are left intact. This asymmetry 
-        #with linkToViewers() is deliberate.
-        
-        #"""
-        
-        #if len(other) == 0: # break all bidirectional links
-            #if len(self._linkedViewers_) > 0:
-                #for viewer in self._linkedViewers_:
-                    #if self in viewer._linkedViewers_:
-                        #viewer._linkedViewers_.remove(self)
-                #self._linkedViewers_.clear()
-                
-        #else: # break bidirectional links between self and each of the other
-            ## but leave any connection between the others intact
-            #for other in others:
-                #if not isinstance(other, (ImageViewer, sv.SignalViewer)) or other not in self._linkedViewers_:
-                    #continue
-                
-                #if self in other._linkedViewers_:
-                    #other._linkedViewers_.remove(self)
-                
-                #self._linkedViewers_.remove(other)
-                
-    #def processFrame(self, fn, )
-                
     @safeWrapper
     def filterData(self, scene=True, scans=True):#, frames = None):
         """ Filters data with functions selected in the "Filters" tab.
@@ -10071,8 +10011,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             elif isinstance(self._frame_selector_, int):
                 self.ephysviewers[0].currentFrame = self._frame_selector_
 
-        #self.ephysviewers[0].setWindowTitle("%s %s (%s)" % ("Electrophysiology", self._data_.name, self._data_.ephys.name))
-                
     @safeWrapper
     def _trigger_events_detection_gui_(self, options, ephys_start, ephys_end, dlg = None, title = "Detect triggers"):
         
@@ -10482,7 +10420,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         for k in range(len(self._data_.scans)):
             self.scansviewers[k].view(self._data_.scans[k])
-            #self.scansviewers[k].guiClient = True
             
             if len(self._data_.scans) > 1:
                 # multiple single-channel arrays

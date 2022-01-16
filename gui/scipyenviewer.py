@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Superclass for Scipyen viewer windows
 """
-import typing, warnings
+import typing, warnings, dataclasses
 from abc import (ABC, ABCMeta, abstractmethod,)
 from traitlets import Bunch
 #from abc import (abstractmethod,)
@@ -310,6 +310,14 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             
         else:
             self.setWindowTitle(self._winTitle_)
+            
+    @abstractmethod
+    def setDataDisplayEnabled(self, value):
+        """Enable/disable the central data display widget.
+        Abstract method; it must be implemented in subclasses, which have full
+        control if and how a central data duisplay widget is implemented.
+        """
+        pass
 
     @abstractmethod
     def _configureUI_(self):
@@ -650,13 +658,15 @@ class ScipyenFrameViewer(ScipyenViewer):
     # index of the frame in the data
     frameChanged            = pyqtSignal(int, name="frameChanged")
     
-    def __init__(self, data: (object, type(None)) = None, 
-                 parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 ID:(int, type(None)) = None,
-                 win_title: (str, type(None)) = None, 
-                 doc_title: (str, type(None)) = None,
-                 frameIndex:(int, tuple, list, range, slice, type(None)) = None,
-                 currentFrame:(int, type(None)) = None,
+    def __init__(self, data: typing.Optional[object] = None, 
+                 parent: typing.Optional[QtWidgets.QMainWindow] = None, 
+                 ID: typing.Optional[int] = None,
+                 win_title: typing.Optional[str] = None, 
+                 doc_title: typing.Optional[str] = None,
+                 nFrames: typing.Optional[int]=None,
+                 frameIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None,
+                 currentFrame: typing.Optional[int] = None,
+                 missingFrameIndex:typing.Optional[typing.Tuple[int]]=None,
                  *args, **kwargs):
         super().__init__(data=data, parent=parent, ID=ID,
                          win_title=win_title, doc_title=doc_title,
@@ -691,8 +701,10 @@ class ScipyenFrameViewer(ScipyenViewer):
             
             When None (the default) the window title will contain only the
             viewer name suffixed with the window ID.
-        
+            
         frameIndex: int or None (default). The index of the data frameIndex to be displayed.
+        
+        currentFrame: int or None (default). The index of the currentFrame.
         
         *args, **kwargs: variadic argument and keywords specific to the constructor of the
             derived subclass.
@@ -830,6 +842,9 @@ class ScipyenFrameViewer(ScipyenViewer):
     def linkToViewers(self, broadcast: bool = True, *viewers):
         """Synchronizes frame navigation with the specified viewer(s).
         
+        CAUTION: Assumes each viewer in viewers manages data with the same 
+        number of data frames.
+        
         Named parameters:
         ----------------
         broadcast: bool (default True). If True, also synchronizes frame
@@ -899,23 +914,24 @@ class ScipyenFrameViewer(ScipyenViewer):
         
     @pyqtSlot(int)
     @safeWrapper
-    def slot_setFrameNumber(self, value:int):
+    def slot_setFrameNumber(self, value:typing.Union[int, type(dataclasses.MISSING)]):
         """Drives frame navigation from the GUI.
         
         The valueChanged signal of the widget used to select the index of the 
         displayed data frame should be connected to this slot in _configureUI_()
         
-        NOTE: the subclass can override this function.
+        NOTE: Subclasses can override this function.
         """
         #print("ScipyenFrameViewer %s slot_setFrameNumber %d" % (type(self).__name__, value))
-        if value >= self._number_of_frames_ or value < 0:
-            return
-        
-        # NOTE: 2021-01-07 14:36:54
-        # subclasses should override this setter to emit frameChanged(int) signal
-        self.currentFrame = value
-        
-        for viewer in self.linkedViewers:
-            viewer.currentFrame = value
+        if isinstance(value, int):
+            if value >= self._number_of_frames_ or value < 0:
+                return
+            
+            # NOTE: 2021-01-07 14:36:54
+            # subclasses should override this setter to emit frameChanged(int) signal
+            self.currentFrame = value
+            
+            for viewer in self.linkedViewers:
+                viewer.currentFrame = value
             
         

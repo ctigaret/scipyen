@@ -3678,7 +3678,8 @@ def sp_set_loc(x, index, columns, val):
     """
     if isinstance(x, pd.Series):
         spdtypes = x.dtype
-        if np.any(x.isna):
+        #if np.any(x.isna):
+        if np.any(x.isna()):
             x = np.asarray(x, dtype=np.dtype(object), order="k")
         else:
             x.sparse.to_dense()
@@ -3699,7 +3700,8 @@ def sp_set_loc(x, index, columns, val):
     
     if isinstance(columns, (list, pd.Index)): # tuples (not lists) are used for multi-index
         for c in columns:
-            if np.any(x[c].isna):
+            #if np.any(x[c].isna):
+            if np.any(x[c].isna()):
                 # NOTE: see NOTE: 2021-12-04 20:06:50
                 x[c] = np.asarray(x[c], dtype = np.dtype(object), order = "K")
             else:
@@ -3709,7 +3711,8 @@ def sp_set_loc(x, index, columns, val):
 
     else: 
         # Convert concerned Series to dense format
-        if np.any(x[columns].isna):
+        #if np.any(x[columns].isna):
+        if np.any(x[columns].isna()):
             # NOTE: see NOTE: 2021-12-04 20:06:50
             x[columns] = np.asarray(x[columns], dtype = np.dtype(object), order = "K")
         else:
@@ -3758,7 +3761,8 @@ def sp_get_loc(x, index, columns):
     # trimmed-down version of full code for data frames, further below 
     if isinstance(x, pd.Series):
         spdtypes = x.dtype
-        if np.any(x.isna):
+        #if np.any(x.isna):
+        if np.any(x.isna()):
             x = np.asarray(x, dtype=np.dtype(object), order="k")
         else:
             x.sparse.to_dense()
@@ -3782,7 +3786,8 @@ def sp_get_loc(x, index, columns):
     
     if isinstance(columns, (list, pd.Index)): # tuples (not lists) are used for multi-index
         for c in columns:
-            if np.any(x[c].isna):
+            #if np.any(x[c].isna):
+            if np.any(x[c].isna()):
                 # NOTE: see NOTE: 2021-12-04 20:06:50
                 x[c] = np.asarray(x[c], dtype = np.dtype(object), order = "K")
             else:
@@ -3793,7 +3798,8 @@ def sp_get_loc(x, index, columns):
     else: 
         # NOTE: should also cover tuples of columns (multiindex) but haven't checked yet        
         # Convert concerned Series to dense format
-        if np.any(x[columns].isna):
+        #if np.any(x[columns].isna):
+        if np.any(x[columns].isna()):
             # NOTE: see NOTE: 2021-12-04 20:06:50
             x[columns] = np.asarray(x[columns], dtype = np.dtype(object), order = "K")
         else:

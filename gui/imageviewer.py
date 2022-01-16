@@ -3763,6 +3763,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         z_coord_str = self._display_Z_coordinate()
         if len(z_coord_str.strip()):
             self.statusBar().showMessage(z_coord_str)
+            
+    def setDataDisplayEnabled(self, value):
+        self.viewerWidgetContainer.setEnabled(value is True)
         
     def _configureUI_(self):
         self.setupUi(self)

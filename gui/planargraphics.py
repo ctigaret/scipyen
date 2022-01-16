@@ -5990,7 +5990,7 @@ class Path(PlanarGraphics):
     
     def _repr_pretty_(self, p, cycle):
         if cycle:
-            p.text(f"{self.__class__.__name__}(...)")
+            p.text(f"{self.__class__.__name__}")
         else:
             p.text(f"{self.__class__.__name__}:")
             p.breakable()

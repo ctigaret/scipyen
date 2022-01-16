@@ -1647,7 +1647,7 @@ class ScanData(BaseScipyenData):
         self._scans_parser_ = self.ImageParser(self, "scans")
         self._scene_parser_ = self.ImageParser(self, "scene")
         
-        # parse parameters, check images, frame axes & calibrations, electorphys.
+        # parse parameters, check images, frame axes & calibrations, electrophys.
         # and metadata --> populate kwargs and let super().init populate self
         # with everything else
 
@@ -1722,6 +1722,50 @@ class ScanData(BaseScipyenData):
         self._parse_metadata_()
         
         self._modified_ = False
+        
+    def _repr_pretty_(self, p, cycle):
+        if cycle:
+            p.text(f"{self.__class__.__name__} {self.name}")
+        else:
+            p.text(f"{self.__class__.__name__} {self.name}")
+            p.breakable()
+            p.text("With components:\n")
+            for c in ("scene", "scans", "electrophysiology"):
+                attr = getattr(self, c)
+                frames = getattr(self, f"{c}Frames")
+                if isinstance(attr, neo.Block):
+                    p.text(f"\t{c} with {frames} segments")
+                else:
+                    channels = getattr(self, f"{c}Channels")
+                    p.text(f"\t{c} with {frames} frames and {channels} channels: ")
+                    with p.group(8, "(", ")"):
+                        for idx, chn in enumerate(getattr(self, f"{c}ChannelNames")):
+                            if idx:
+                                p.text(",")
+                                p.breakable()
+                            p.pretty(chn)
+                    
+                p.breakable()
+                
+            p.text("\n")
+            p.text("With frames map:")
+            p.breakable()
+            p.pretty(self.framesMap)
+            p.text("\n")
+            
+            p.text("\n")
+            p.text("With trigger protocols:")
+            p.breakable()
+            p.pretty(self.triggers)
+            
+            if len(self.analysisUnits):
+                for a in self.analysisUnits:
+                    p.pretty(a)
+                    
+            elif self.analysisUnit is not None:
+                p.pretty(self.analysisUnit)
+                
+            
     
     def __str__(self):
         """
