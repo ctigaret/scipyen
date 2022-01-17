@@ -1589,7 +1589,7 @@ def analyseFrame(lsdata, frame, unit=None,
         raise ValueError("no linescan data was found in %s" % lsdata.name)
     
     if lsdata.scanType != ScanData.ScanDataType.linescan:
-        raise ValueError("%s was expected to be a ScanData.ScanDataType.linescan experiment; it has %s instead" % (lsdata.name, lsdata.scanType))
+        raise ValueError("%s was expected to be a ScanData.ScanDataType.linescan experiment; it has %s instead" % (lsdata.name, lsdata.type))
         
     if lsdata.analysisMode != ScanData.ScanDataAnalysisMode.frame:
         raise ValueError("%s was expected to have a ScanData.ScanDataAnalysisMode.frame analysis mode; it has %s instead" % (lsdata.name, lsdata.analysisMode))
@@ -4776,9 +4776,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
     
     @currentFrame.setter
     def currentFrame(self, value:int):
-        """Programmatically sets the current frame number without emitting frameChanged signal.
+        """Sets the current frame number without emitting signals.
         Updates the currentFrame attribute of various graphics objects.
-        Call this whe changing frame from outside this window
+        Call this when changing frame from outside this window
         """
         if self._data_ is None:
             return
@@ -4813,9 +4813,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             return
 
         self._current_frame_index_ = value
-        #if value >= 0:
-            #if value < self._data_.scansFrames:
-                #self.currentScanFrame = value
         
         # NOTE: 2022-01-12 09:30:49
         # update currentFrame for PlanarGraphics
@@ -9383,7 +9380,80 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
     @safeWrapper
     def slot_enterWhatsThisMode(self):
         QtWidgets.QWhatsThis.enterWhatsThisMode()
-
+        
+    @pyqtSlot(int)
+    @safeWrapper
+    def _slot_frameChangedInChildViewer(self, value):
+        """Captures frame index change in the child viewer
+        Parameters:
+        ===========
+        value:int, index of the newly displayed frame in the viewer.
+        This will be used to get the master index frame in the ScanData 
+        'framesMap' attribute.
+        """
+        viewer = self.sender()
+        winTitle = viewer.windowTitle().lower()
+        
+        childViewers = list(w for w in self.scansviewers + self.sceneviewers + self.ephysviewers + self.profileviewers + self.scansblockviewers + self.sceneblockviewers if w is not viewer)
+        signalBlockers = [QtCore.QSignalBlocker(w) for w in childViewers]
+        
+        if "profile" in winTitle:
+            self.currentFrame = value
+            
+            for win in self.sceneviewers + self.sceneblockviewers:
+                frindex = self._data_.framesMap["scene"][self.currentFrame]
+                win.currentFrame = frindex
+        
+            for win in self.scansviewers + self.scansblockviewers:
+                frindex = self._data_.framesMap["scans"][self.currentFrame]
+                win.currentFrame = frindex
+                
+            for win in self.ephysviewers:
+                frindex = self._data_.framesMap["electrophysiology"][self.currentFrame]
+                win.currentFrame = frindex
+                
+        else:
+            if "scans" in winTitle:
+                self.currentFrame = self._data_.framesMap.where("scans", value)
+                
+                for win in self.scansviewers + self.scansblockviewers:
+                    if win is not viewer:
+                        win.currentFrame = value
+                        
+                for win in self.sceneviewers + self.sceneblockviewers:
+                    frindex = self._data_.framesMap["scene"][self.currentFrame]
+                    win.currentFrame = frindex
+                    
+                for win in self.ephysviewers:
+                    frindex = self._data_.framesMap["electrophysiology"][self.currentFrame]
+                    win.currentFrame = frindex
+                    
+            elif "scene" in winTitle:
+                for win in self.sceneviewers + self.sceneblockviewers:
+                    if win is not viewer:
+                        win.currentFrame = value
+                
+                self.currentFrame = self._data_.framesMap.where("scene", value)
+                
+                for win in self.scansviewers + self.scansblockviewers:
+                    frindex = self._data_.framesMap["scans"][self.currentFrame]
+                    win.currentFrame = frindex
+                
+                for win in self.ephysviewers:
+                    frindex = self._data_.framesMap["electrophysiology"][self.currentFrame]
+                    win.currentFrame = frindex
+                    
+            elif "electrophysiology" in winTitle:
+                self.currentFrame = self._data_.framesMap.where("electrophysiology", value)
+                
+                for win in self.sceneviewers + self.sceneblockviewers:
+                    frindex = self._data_.framesMap["scene"][self.currentFrame]
+                    win.currentFrame = frindex
+            
+                for win in self.scansviewers + self.scansblockviewers:
+                    frindex = self._data_.framesMap["scans"][self.currentFrame]
+                    win.currentFrame = frindex
+                    
     @pyqtSlot(int)
     @safeWrapper
     def slot_setFrameNumber(self, value):
@@ -9432,24 +9502,43 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         signalBlockers = [QtCore.QSignalBlocker(w) for w in childViewers]
         
         try:
-            for viewer in self._linkedViewers_:  
-                # NOTE: 2022-01-16 21:59:45
-                # self._linkedViewers_ is defined in ScipyenFrameViewer
-                if viewer in self.scansviewers + self.scansblockviewers:
-                    frindex = self._data_.framesMap["scans"][value]
-                    component = "scans"
-                elif viewer in self.sceneviewers + self.sceneblockviewers:
-                    frindex = self._data_.framesMap["scene"][value]
-                    component = "scene"
-                elif viewer in self.ephysviewers:
-                    frindex = self._data_.framesMap["electrophysiology"][value]
-                    component = "electrophysiology"
-                else:
-                    frindex = value
-                    component = "master"
-                    # get the scans frame index
-                #print(f"LSCaTWindow.slot_setFrameNumber: nFrames: {self._data_.nFrames()}; value: {value} => frindex: {frindex} for component {component}")
-                viewer.currentFrame = frindex # this should also change currentFrame in that window's graphics objects
+            # NOTE: 2022-01-17 16:58:52 see # NOTE: 2022-01-17 16:57:06
+            for viewer in self.scansviewers + self.scansblockviewers:
+                frindex = self._data_.framesMap["scans"][value]
+                viewer.currentFrame = frindex
+                
+            for viewer in self.sceneviewers + self.sceneblockviewers:
+                frindex = self._data_.framesMap["scene"][value]
+                viewer.currentFrame = frindex
+                
+            for viewer in self.ephysviewers:
+                frindex = self._data_.framesMap["electrophysiology"][value]
+                viewer.currentFrame = frindex
+                
+            for viewer in self.profileviewers: 
+                # TODO: 2022-01-17 17:01:51
+                # include results window here? - it is NOT a ScipyenFrameViewer!
+                viewer.currentFrame = value # this should also change currentFrame in that window's graphics objects
+                
+                
+            #for viewer in self._linkedViewers_:  
+                ## NOTE: 2022-01-16 21:59:45
+                ## self._linkedViewers_ is defined in ScipyenFrameViewer
+                #if viewer in self.scansviewers + self.scansblockviewers:
+                    #frindex = self._data_.framesMap["scans"][value]
+                    #component = "scans"
+                #elif viewer in self.sceneviewers + self.sceneblockviewers:
+                    #frindex = self._data_.framesMap["scene"][value]
+                    #component = "scene"
+                #elif viewer in self.ephysviewers:
+                    #frindex = self._data_.framesMap["electrophysiology"][value]
+                    #component = "electrophysiology"
+                #else:
+                    #frindex = value
+                    #component = "master"
+                    ## get the scans frame index
+                ##print(f"LSCaTWindow.slot_setFrameNumber: nFrames: {self._data_.nFrames()}; value: {value} => frindex: {frindex} for component {component}")
+                #viewer.currentFrame = frindex # this should also change currentFrame in that window's graphics objects
 
             landmarks = [o for o in self._data_.sceneRois.values()]     + \
                         [o for o in self._data_.sceneCursors.values()]  + \
@@ -9638,8 +9727,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             return False
         
     def _init_viewer_(self, winFactory, configTag, winSetup, winTitle, docTitle, nFrames):
+        #print(f"{self.__class__.__name__}._init_viewer_: winFactory = {winFactory}")
         win = winFactory(win_title=winTitle, doc_title=docTitle, parent=self, configTag=configTag)
-        
+        #print(f"{self.__class__.__name__}._init_viewer_: win = {win}")
+        #print(f"{self.__class__.__name__}._init_viewer_: winSetup = {winSetup}")
         if inspect.isfunction(winSetup):
             winSetup(self)
             
@@ -9707,6 +9798,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                     # create new image viewer as needed
                     win = self._init_viewer_(winFactory, winTag, winSetup, winTitle, docTitle, nFrames)
                     win.signal_graphicsObjectAdded[object].connect(self.slot_graphics_object_added_in_window)
+                    win.frameChanged.connect(self._slot_frameChangedInChildViewer)
                     viewers.append(win)
                 else:
                     # clear the contents of the current image viewer
@@ -9718,7 +9810,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 win.view(data[k], get_focus=False)
                 
         elif isinstance(data, neo.Block) and not neoutils.is_empty(data, ignore=(neo.Event, TriggerEvent, neo.Epoch)):
-            #print(f"LSCaT _init_data_viewers_ {section}")
+            #print(f"{self.__class__.__name__}._init_data_viewers_ {section}")
             winTag = f"{section}"
             winTitle = f"{wname}"
             docTitle = f"{self._data_var_name_}"
@@ -9731,9 +9823,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 
             else:
                 win = self._init_viewer_(winFactory, winTag, winSetup, winTitle, docTitle, nFrames)
+                win.frameChanged.connect(self._slot_frameChangedInChildViewer)
                 viewers.append(win)
                 
             win.view(data, get_focus=False)
+            win.setVisible(True)
                 
         else:
             for w in viewers:
@@ -9761,7 +9855,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             return "Electrophysiology", self.ephysviewers, sv.SignalViewer, self._signalviewer_setup_
         
         elif section in ("scansBlock",):
-            return "Scan Data", self.scansblockviewers, sv.SignalViewer, self._signalviewer_setup_
+            return "Scans Data", self.scansblockviewers, sv.SignalViewer, self._signalviewer_setup_
            
         elif section in ("sceneBlock",):
             return "Scene Data", self.sceneblockviewers, sv.SignalViewer, self._signalviewer_setup_
@@ -9850,8 +9944,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         allviewers = [self] + self.sceneviewers + self.scansviewers + self.ephysviewers + self.profileviewers + self.scansblockviewers + self.sceneblockviewers
         
-        for viewer in allviewers:
-            viewer.linkToViewers(*allviewers, broadcast=False)
+        # NOTE: 2022-01-17 16:57:06
+        # to properly deal with frame indices from the ScanData.framesMap we 
+        # don't link viewers anymore; instead, we capture their frame number
+        # change via the separate slot _slot_frameChangedInChildViewer
+        #for viewer in allviewers:
+            #viewer.linkToViewers(*allviewers, broadcast=False)
         
     @safeWrapper
     def _data_modifed_(self, value=False):
@@ -11681,8 +11779,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         if self._data_.analysisMode != ScanData.ScanDataAnalysisMode.frame:
             raise NotImplementedError("%s analysis not yet supported" % self._data_.analysisMode)
         
-        if self._data_.scanType != ScanData.ScanDataType.linescan:
-            raise NotImplementedError("%s not yet supported" % self._data_.scanType)
+        if self._data_.type != ScanData.ScanDataType.linescan:
+            raise NotImplementedError("%s not yet supported" % self._data_.type)
 
         self.generateScanRregionProfilesFromScans() 
         self.generateScanRegionProfilesFromScene() 
@@ -11706,8 +11804,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         if self._data_.analysisMode != ScanData.ScanDataAnalysisMode.frame:
             raise NotImplementedError("%s analysis not yet supported" % self._data_.analysisMode)
         
-        if self._data_.scanType != ScanData.ScanDataType.linescan:
-            raise NotImplementedError("%s not yet supported" % self._data_.scanType)
+        if self._data_.type != ScanData.ScanDataType.linescan:
+            raise NotImplementedError("%s not yet supported" % self._data_.type)
         
         data = self._data_.scene
         target = self._data_.scanRegionSceneProfiles
@@ -11793,8 +11891,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         if self._data_.analysisMode != ScanData.ScanDataAnalysisMode.frame:
             raise NotImplementedError("%s analysis not yet supported" % self._data_.analysisMode)
         
-        if self._data_.scanType != ScanData.ScanDataType.linescan:
-            raise NotImplementedError("%s not yet supported" % self._data_.scanType)
+        if self._data_.type != ScanData.ScanDataType.linescan:
+            raise NotImplementedError("%s not yet supported" % self._data_.type)
 
         data = self._data_.scans
         target = self._data_.scanRegionSceneProfiles

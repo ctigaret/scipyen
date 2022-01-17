@@ -116,7 +116,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     supported_types = (object, )
     view_action_name = None
     
-    def __init__(self, data: (object, type(None))=None, 
+    def __init__(self, data: object = None, 
                  parent: (QtWidgets.QMainWindow, type(None)) = None, 
                  ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, 
@@ -162,6 +162,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         *args, **kwargs: variadic argument and keywords specific to the constructor of the
             derived subclass.
         """
+        #print(f"ScipyenViewer<{self.__class__.__name__}>.__init__ data: {type(data).__name__}")
         super().__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         
@@ -218,7 +219,9 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # setData ALMOST SURELY needs the ui elements to be initialized - hence 
         # it is called here, AFTER self._configureUI_()
         if data is not None:
-            self.setData(data = data, doc_title = doc_title) # , varname = varname)
+            # NOTE: 2022-01-17 12:39:49 this will call setData in the derived
+            # _class_, if defined
+            self.setData(data = data, doc_title = doc_title)
             
         else:
             self.update_title(win_title = win_title, doc_title = doc_title)
@@ -402,10 +405,9 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # Subclasses may also override this method if necessary, but then call
         # super().setData(...) from within theis own setData()
         #
-        # Of course, viewers 
         
         if not any([self._check_supports_parameter_type_(a) for a in args]):
-            raise TypeError("Expecting a %s; got %s instead" % (" ".join([s.__name__ for s in self.supported_types]), type(data).__name__))
+            raise TypeError("Expecting one of the supported types: %s" % " ".join([s.__name__ for s in self.supported_types]))
             
             
         get_focus = kwargs.get("get_focus", False)
@@ -717,10 +719,9 @@ class ScipyenFrameViewer(ScipyenViewer):
             derived subclass.
         """
         
+        #print(f"ScipyenFrameViewer<{self.__class__.__name__}>.__init__ data: {type(data).__name__}")
+ 
         self._current_frame_index_      = 0 
-        self._number_of_frames_         = 1 # determined from the data
-        self._frameIndex_               = range(self._number_of_frames_)
-        #self._linkedViewers_            = list()
         
         # These two should hold a reference to the actual QSlider and QSpinBox
         # defined in the subclass, or in *.ui file used by the subclass
@@ -729,9 +730,15 @@ class ScipyenFrameViewer(ScipyenViewer):
         
         self._missing_frame_value_ = missingFrameValue or NA
         
+        # NOTE: 2022-01-17 13:02:27
+        # the attributes below (and their properties with unmangled names)
+        # MUST have their final values assigned by setData(...)
+        self._data_frames_              = 0
+        self._number_of_frames_         = 1 # determined from the data
+        self._frameIndex_               = range(self._number_of_frames_)
+        
         # NOTE: 2022-01-16 13:09:44
-        # super().__init__(...) below also calls self._configureUI_()
-        # 
+        # This also calls self._configureUI_() and self.setData(...)
         super().__init__(data=data, parent=parent, ID=ID,
                          win_title=win_title, doc_title=doc_title,
                          *args, **kwargs)
@@ -749,6 +756,8 @@ class ScipyenFrameViewer(ScipyenViewer):
     @property
     def dataFrames(self):
         """The number of "frames" (segments, sweeps) in which data is organized.
+        This may be larger than nFrames which is the number of frames the viewer
+        can actually display.
         """
         return self._data_frames_
     
@@ -762,8 +771,10 @@ class ScipyenFrameViewer(ScipyenViewer):
         In the general case,
             self.nFrames <= self.dataFrames
             
-        An exception from this rule is case multi-channel signal plotted in
-        SignalViewer, with one channel being plotted per frame - hence, there
+        This can happen when only a subset of the data frames are to be shown.
+            
+        An exception from this rule is the case case of multi-channel signals 
+        plotted in SignalViewer, with one channel per frame - hence, there
         are several frames displayed one at a time, even if data is logically
         organized in just one frame.
         """
@@ -772,16 +783,41 @@ class ScipyenFrameViewer(ScipyenViewer):
     @property
     def frameIndex(self):
         """Indices of frames.
-        By default, this is range(self.nFrames) but can be set up in the 
-        initializer to a sequence such that only a subset of the available 
-        data frames are displayed by the ScipyenFrameViewer instance.
+        By default, this is range(self.nFrames). In turn, by default:
+        self.nFrames == self.dataFrames.
+        
+        However, assigning a sequence of int (tuple, list, range) here or in the 
+        initializer effectively limits the display to a subset of the available 
+        data frames (and thus self.nFrames becomes less than self.dataFrames)
+        
         """
         return self._frameIndex_
     
     @frameIndex.setter
-    def frameIndex(self, value=None):
+    def frameIndex(self, value:typing.Optional[typing.Union[tuple, list, range]]=None):
         if value is None:
             self._frameIndex_ = range(self.nFrames)
+            return 
+        
+        elif isinstance(value, (tuple, list)):
+            if not all(isinstance(v, int) for v in value):
+                raise TypeError("'frameIndex' can only accept a sequence of int")
+            
+            if not all(v in range(self.dataFrames) for v in value):
+                raise ValueError(f"'frameIndex' cannot contain values outside {range(self.dataFrames)}")
+            
+            if len(set(value)) != len(value):
+                raise ValueError("'frameIndex' does not accept duplicate values")
+            
+        #elif isinstance(value, range):
+            #if len(value) > self.dataFrames:
+                #raise ValueError(f"'frameIndex {value} goes beyound the total number of data frames {self.dataFrames}")
+            
+        elif not isinstance(value, range):
+            raise TypeError(f"New frameIndex must be a range, or sequence (tuple, list) of int with unique values in {range(self.dataFrames)}; got {type(value).__name__} instead")
+        #else:
+            #raise TypeError(f"New frameIndex must be a range, or sequence (tuple, list) of int with unique values in {range(self.dataFrames)}; got {type(value).__name__} instead")
+        self._frameIndex_ = value
         
     @property
     def currentFrame(self):
@@ -824,7 +860,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         self._current_frame_index_ = value
         
         # widgets which we want to prevent from emitting signals, temporarily
-        # signals from wudgets in this list will be blocked for the lifetime of
+        # signals from widgets in this list will be blocked for the lifetime of
         # this list (i.e. until and just before the function returns)
         blocked_signal_emitters = list()
         
@@ -881,7 +917,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         Named parameters:
         ----------------
         broadcast: bool (default True). If True, also synchronizes frame
-            navigation among the viewers.
+            navigation among the additional viewers directly.
         
         Var-positional parameters:
         -------------------------
@@ -955,16 +991,19 @@ class ScipyenFrameViewer(ScipyenViewer):
         
         NOTE: Subclasses can override this function.
         """
-        #print("ScipyenFrameViewer %s slot_setFrameNumber %d" % (type(self).__name__, value))
+        #print(f"ScipyenFrameViewer<{self.__class__.__name__}> slot_setFrameNumber {value}")
         
         if isinstance(value, int):
-            if value >= self._number_of_frames_ or value < 0:
+            if value not in range(self._number_of_frames_):
+            #if value >= self._number_of_frames_ or value < 0:
             #if value not in self.frameIndex:
                 return
             
             # NOTE: 2021-01-07 14:36:54
             # subclasses should override this setter to emit frameChanged(int) signal
             self.currentFrame = value
+            
+            self.frameChanged.emit(value)
             
             for viewer in self.linkedViewers:
                 viewer.currentFrame = value

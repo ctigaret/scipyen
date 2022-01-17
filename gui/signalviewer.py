@@ -117,7 +117,8 @@ from matplotlib import pyplot as plt
 from matplotlib import cm, colors
 import matplotlib.widgets as mpw
 from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import (FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
+from matplotlib.backends.backend_qt5agg import (FigureCanvasQTAgg as FigureCanvas, 
+                                                NavigationToolbar2QT as NavigationToolbar)
 
 import neo
 
@@ -135,9 +136,11 @@ from iolib import pictio as pio
 #### BEGIN pict.core modules
 import core.signalprocessing as sgp
 from core import (xmlutils, strutils, neoutils, )
-from core.neoutils import (get_non_empty_spike_trains,get_non_empty_events,
+from core.neoutils import (get_non_empty_spike_trains,
+                           get_non_empty_events,
                            normalized_signal_index,
-                           check_ephys_data, check_ephys_data_collection,
+                           check_ephys_data, 
+                           check_ephys_data_collection,
                            )
 
 from core.prog import safeWrapper
@@ -444,8 +447,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 x = None  # argument (X) and the expected Y will be None by default
                             # here we swap these two variables and we end up with X as None
                             
-        self.x = x
-        self.y = y
+        #self.x = x
+        #self.y = y
         
         self._plot_names_ = dict() # maps item row position to name
         
@@ -472,7 +475,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # see _set_data_ for their use
         # NOTE: self._number_of_frames_ is defined in ScipyenFrameViewer
         self.frameAxis = None
-        self.frameIndex = None
+        #self._frameIndex_ = None
         
         # data axis for numpy arrays - ionly used to plot numpy arrays
         self.dataAxis = None
@@ -624,8 +627,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.axis_tick_font = self.default_axis_tick_font
         
-        self.plotStyle = "plot"
-        
         self.selectedDataCursor = None
         
         self._cursorColors_ = self.defaultCursorColors
@@ -641,44 +642,28 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #
         # 3) calls self.loadSettings inherited from 
         # ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
-        super().__init__(data=y, parent=parent, ID=ID, win_title=win_title, 
-                         doc_title=doc_title, frameIndex=frameIndex, *args, **kwargs)
         
-        #self.loadSettings() # now called by ScipyenViewer.__init__()
-
-        if self.y is not None:
-            if self.x is None:
-                self._set_data_(y, frameIndex=frameIndex, 
-                                frameAxis=frameAxis,
-                                signalIndex=signalIndex,
-                                signalChannelAxis=signalChannelAxis,
-                                signalChannelIndex=signalChannelIndex,
-                                separateSignalChannels=separateSignalChannels,
-                                irregularSignalIndex=irregularSignalIndex,
-                                irregularSignalChannelAxis=irregularSignalChannelAxis,
-                                irregularSignalChannelIndex=irregularSignalChannelIndex,
-                                interval=interval, 
-                                channelIndex = channelIndex,
-                                plotStyle = plotStyle, 
-                                doc_title = doc_title,
-                                *args, **kwargs)
-                
-            else:
-                self._set_data_(x, y, frameIndex=frameIndex, 
-                                frameAxis=frameAxis,
-                                signalIndex=signalIndex,
-                                signalChannelAxis=signalChannelAxis,
-                                signalChannelIndex=signalChannelIndex,
-                                separateSignalChannels=separateSignalChannels,
-                                irregularSignalIndex=irregularSignalIndex,
-                                irregularSignalChannelAxis=irregularSignalChannelAxis,
-                                irregularSignalChannelIndex=irregularSignalChannelIndex,
-                                interval=interval, 
-                                channelIndex = channelIndex,
-                                plotStyle = plotStyle, 
-                                doc_title = doc_title,
-                                *args, **kwargs)
-                
+        # NOTE: 2022-01-17 11:48:04
+        # call super().__init__ with data set to None explicitly; this will 
+        # initialize the ancestors but will avoid calling super().setData(...)
+        # We then call self.setData(...) below, tailored for SignalViewer.
+        super().__init__(data=None, parent=parent, ID=ID, win_title=win_title, 
+                         doc_title=doc_title, *args, **kwargs)
+        
+        self.setData(x,y, frameIndex=frameIndex, 
+                         frameAxis=frameAxis, signalIndex=signalIndex,
+                         signalChannelAxis=signalChannelAxis,
+                         signalChannelIndex=signalChannelIndex,
+                         irregularSignalIndex=irregularSignalIndex,
+                         irregularSignalChannelAxis = irregularSignalChannelAxis,
+                         irregularSignalChannelIndex = irregularSignalChannelIndex,
+                         separateSignalChannels = separateSignalChannels,
+                         interval = interval,
+                         channelIndex = channelIndex,
+                         currentFrame = currentFrame,
+                         plotStyle = plotStyle,
+                         *args, **kwargs)
+        
     # ### BEGIN properties
     @property
     def dockWidgets(self):
@@ -860,7 +845,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     frameAxis = kwargs.get("frameAxis", None),
                     frameIndex = kwargs.get("frameIndex", None),
                     _data_frames_ = 0,
-                    _number_of_frames_ = 1,
+                    _number_of_frames_ = 0,
                     signalChannelIndex = kwargs.get("signalChannelIndex", None),
                     irregularSignalChannelAxis = kwargs.get("irregularSignalChannelAxis", None),
                     irregularSignalChannelIndex = kwargs.get("irregularSignalChannelIndex", None),
@@ -4402,24 +4387,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         TODO: Pandas dataframes and series
         """
-        
-        
-        
-        # NOTE: 2019-04-30 09:55:33
-        # assign to x and y, BUT:
-        # is an Epoch, SpikeTrain or Event array is passed AND there already
-        # is an "y", don't assign to it (just overlay stuff)
-        
-        if y is None:
-            if x is not None:  # only the data variable Y is passed, 
-                y = x
-                x = None  # argument (X) and the expected Y will be None by default
-                            # here we swap these two variables and we end up with X as None
-                
-            else:
-                warngins.warn("I need something to plot")
-                return False
-            
         # default param values
         self.separateSignalChannels = False
         self.signalChannelAxis = 1
@@ -4431,7 +4398,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(y, neo.core.Block):
             self.x = None # domain is contained in the signals inside the block
             self.y = y
-            self._data_frames_ = len(self.y.segments)
+            
+            # NOTE : 2022-01-17 14:17:23
+            # if frameIndex was passed, then self._number_of_frames_ might turn
+            # out to be different than self._data_frames_!
+            self._data_frames_ = self._number_of_frames_ = len(self.y.segments)
             
             #### BEGIN NOTE 2019-11-24 22:32:46: 
             # no need for these so reset to None
@@ -4458,6 +4429,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # NOTE: 2021-11-13 19:00:47
             # ChannelIndex is out of neo
                     
+            # NOTE: 2022-01-17 14:18:30 see NOTE : 2022-01-17 14:17:23
+            # Furthermore, separateSignalChannels only has effect when y is a
+            # single neo signal or a numpy ndarray, and is forcefully set to False
+            # for neo.Block, neo.Segment, or sequence of neo.Segment, neo signals,
+            # or numpy ndarray objects.
+            # NOTE: As a reminder: when separateSignalChannels is True, each
+            # channel will be plotted on a different axis system (i.e., in its
+            # own pyqtgraph.plotItem); separateSignalChannels does NOT affect the
+            # frames layout!
             self.frameIndex = normalized_index(self._data_frames_, frameIndex)
             self._number_of_frames_ = len(self.frameIndex)
             
@@ -4971,14 +4951,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #self.train_plot_options["train_hoverPen"] = kwargs.pop("train_hoverPen", None)
         #self.train_plot_options["train_hoverBrush"] = kwargs.pop("train_hoverBrush", None)
         
-            
-        # TODO: 2019-11-21 17:05:27
-        # verify/adapt plot_start and plot_end (according) to the domain of the signal
-        # we need to do this at plotting time
-            
         self.plot_start = None
         self.plot_stop = None
-        
         
         self.epoch_plot_options["epoch_pen"] = kwargs.pop("epoch_pen", None)
         self.epoch_plot_options["epoch_brush"] = kwargs.pop("epoch_brush", None)
@@ -5002,13 +4976,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # remove gremlins from previous plot
             self._plotEpochs_(clear=True)
 
-            dataOK = self._parse_data_(x=x, y=y, frameIndex=frameIndex, frameAxis=frameAxis,
-                              signalIndex=signalIndex, signalChannelAxis=signalChannelAxis,
-                              signalChannelIndex=signalChannelIndex,
-                              irregularSignalIndex=irregularSignalIndex,
-                              irregularSignalChannelAxis=irregularSignalChannelAxis,
-                              irregularSignalChannelIndex=irregularSignalChannelIndex,
-                              separateSignalChannels=separateSignalChannels)
+            dataOK = self._parse_data_(x=x,
+                                       y=y, 
+                                       frameIndex=frameIndex, 
+                                       frameAxis=frameAxis,
+                                       signalIndex=signalIndex, 
+                                       signalChannelAxis=signalChannelAxis,
+                                       signalChannelIndex=signalChannelIndex,
+                                       irregularSignalIndex=irregularSignalIndex,
+                                       irregularSignalChannelAxis=irregularSignalChannelAxis,
+                                       irregularSignalChannelIndex=irregularSignalChannelIndex,
+                                       separateSignalChannels=separateSignalChannels)
             
             self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self.y))
                         
@@ -5042,7 +5020,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if dataOK:
                 self.displayFrame()
             else:
-                warnings.warn("Could not parse the data")
+                warnings.warn(f"Could not parse the data x: {x}, y: {y}")
                 return
             
             self._update_annotations_()
@@ -5053,7 +5031,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             traceback.print_exc()
             
     @safeWrapper
-    def setData(self,  
+    def setData(self,
                 x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
                 y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
                 doc_title:(str, type(None)) = None, 
@@ -5076,8 +5054,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         Plotting is executed by displayFrame().
         
                 
-        Positional parameters:
-        ----------------------
+        Named parameters (see Glossary of terms in SignalViewer doctring):
+        ------------------------------------------------------------------
         x: object = data to be plotted, or the data domain, if data is given 
             separately as "y"
             
@@ -5091,8 +5069,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         When x is not supplied, SignalViewer tries to create a signal domain
         as an undimensioned linear space based on the length of the signal.
         
-        Named parameters (see Glossary of terms in SignalViewer doctring):
-        ------------------------------------------------------------------
         y: object or None = data to be plotted; when None, then "x" is taken as 
             the plot data, and the data "domain" is calculated or extracted from
             it.
@@ -5233,12 +5209,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             with one channel per frame, the number of frames
         
         """ 
-        # 1. check that first arguments resolve to something,
-        # 2. figure out doc_title
-        # 3. finally call super().setdata(...) with the (possibly new) doc_title
-        #   * this in turn calls self._set_data_(...) overridden here, which:
-        #     will then set up instance variables - which includes a call to
-        #     self._parse_data_(...)
+        #print(f"{self.__class__.__name__}.setData: x = {x}, y = {y}")
+        ## 1. check that first arguments resolve to something,
+        ## 2. figure out doc_title
+        ## 3. finally call super().setdata(...) with the (possibly new) doc_title
+        ##   * this in turn calls self._set_data_(...) overridden here, which:
+        ##     will then set up instance variables - which includes a call to
+        ##     self._parse_data_(...)
         if y is None:
             if x is not None:  # only the data variable Y is passed, 
                 y = x
@@ -5246,55 +5223,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             # here we swap these two variables and we end up with X as None
                 
             else:
-                warngins.warn("I need something to plot")
+                #warngins.warn("I need something to plot")
                 return
             
-        if not isinstance(doc_title, str) or len(doc_title.strip()) == 0:
-            dataVarName = ""
+        self._set_data_(x,y, **kwargs)
             
-            cframe = inspect.getouterframes(inspect.currentframe())[1][0]
-            try:
-                for (k,v) in cframe.f_globals.items():
-                    if not type(v).__name__ in ("module","type", "function", "builtin_function_or_method"):
-                        if v is y and not k.startswith("_"):
-                            dataVarName = k
-            finally:
-                del(cframe)
-                
-            name = getattr(y, "name", "<nameless>")
+        ## NOTE: 2020-09-25 10:07:37
+        ## Calls ScipyenViewer setData() which in turn delegates to self._set_data_()
+        #super().setData(*args, **kwargs)
             
-            if len(dataVarName.strip()):
-                doc_title = "%s [%s] (%s)" % (name, dataVarName, type(y).__name__)
-                
-            else:
-                doc_title = "%s (%s)" % (name, type(y).__name__)
-                
-        
-        # NOTE: 2020-09-25 10:07:37
-        # Calls ScipyenViewer setData() which in turn delegates to self._set_data_()
-        super().setData(x,y,doc_title=doc_title,frameAxis=frameAxis,frameIndex=frameIndex,
-                        signalChannelAxis=signalChannelAxis,signalIndex=signalIndex,
-                        signalChannelIndex=signalChannelIndex, 
-                        irregularSignalIndex=irregularSignalIndex,
-                        irregularSignalChannelAxis=irregularSignalChannelAxis,
-                        irregularSignalChannelIndex=irregularSignalChannelIndex,
-                        separateSignalChannels=separateSignalChannels,
-                        interval=interval, plotstyle=plotStyle, get_focus=get_focus,
-                        showFrame=showFrame,  *args, **kwargs)
-            
-        #super().setData(x,y,doc_title=doc_title,frameAxis=frameAxis,frameIndex=frameIndex,
-                        #signalChannelAxis=signalChannelAxis,signalIndex=signalIndex,
-                        #signalChannelIndex=signalChannelIndex, 
-                        #irregularSignalIndex=irregularSignalIndex,
-                        #irregularSignalChannelAxis=irregularSignalChannelAxis,
-                        #irregularSignalChannelIndex=irregularSignalChannelIndex,
-                        #separateSignalChannels=separateSignalChannels,
-                        #interval=interval, unitIndex=unitIndex,channelIndex=channelIndex,
-                        #plotstyle=plotStyle, get_focus=get_focus, showFrame=showFrame,
-                        #*args, **kwargs)
-            
-
-
     @property
     def currentFrame(self):
         return self._current_frame_index_

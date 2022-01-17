@@ -2285,7 +2285,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                  ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
                  frame:(int, type(None)) = None, 
-                 displayChannel = None, normalize: (bool, ) = False, gamma: (float, ) = 1.0, 
+                 displayChannel = None, 
+                 normalize: (bool, ) = False, 
+                 gamma: (float, ) = 1.0, 
                  *args, **kwargs):
 
         self._image_width_ = 0
@@ -2386,13 +2388,18 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         #
         # 2) calls self.loadSettings() inherited from 
         # ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
-        super().__init__(data=data, parent=parent, ID=ID, win_title=win_title, 
+        #
+        # NOTE: 2022-01-17 16:27:30
+        # pass None for data to prevent super().__init__ from calling setData
+        # next call our own setData
+        super().__init__(data=None, parent=parent, ID=ID, win_title=win_title, 
                          doc_title=doc_title, frameIndex=frame, **kwargs)
         
-        #self.loadSettings() # now called by ScipyenViewer.__init__()
-        
-        # TODO: migrate this to ScipyenViewer.__init__
-        # specify supported_types for all viewers.
+        # NOTE: 2022-01-17 16:29:57
+        # call super.setData() directly, as we don't need to treat 'data' 
+        # speacially (unlike in SignalViewer's case)
+        #
+        # in turn, super.setData() calls self._set_data_(...)
         if isinstance(data, ImageViewer.supported_types) or any([t in type(data).mro() for t in ImageViewer.supported_types]):
             self.setData(data, doc_title=self._docTitle_)
         
@@ -2582,9 +2589,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     o.currentFrame = self._current_frame_index_
                     
             self.frameChanged.emit(self.currentFrame)
-        
-        #self.framesQSpinBox.valueChanged.connect(self.slot_setFrameNumber)
-        #self.framesQSlider.valueChanged.connect(self.slot_setFrameNumber)
         
         # NOTE: 2018-05-21 20:59:18
         # managed to do away with guiClient here
@@ -3490,28 +3494,19 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                         c.rangeY = img.shape[layout.verticalAxis]
                         c.setPos(img.shape[layout.horizontalAxis]/2, img.shape[layout.verticalAxis]/2)
             
-            self._number_of_frames_ = layout.nFrames if isinstance(layout.nFrames, (int, type(None))) else np.prod(layout.nFrames)
+            #self._number_of_frames_ = layout.nFrames if isinstance(layout.nFrames, (int, type(None))) else np.prod(layout.nFrames)
+            self._data_frames_ = 0 if layout.nFrames is None else layout.nFrames if isinstance(layout.nFrames, int) else np.prod(layout.nFrames)
 
-            if self._number_of_frames_ is None:
+            if self._data_frames_ is None:
                 self.criticalMessage("Error", "Cannot determine the number of frames in the data")
                 return False
             
-            self.frameIndex = range(self._number_of_frames_)
+            #self.frameIndex = range(self._data_frames_)
         
             self.frameAxis  = layout.framesAxis
             
             self.widthAxis  = layout.horizontalAxis
             self.heightAxis = layout.verticalAxis
-            
-            totalFrames = self._number_of_frames_ if isinstance(self._number_of_frames_, int) else \
-                        np.prod(self._number_of_frames_)
-        
-            self.framesQSlider.setMaximum(totalFrames-1)
-            self.framesQSlider.setToolTip("Select frame.")
-            
-            self.framesQSpinBox.setMaximum(totalFrames-1)
-            self.framesQSpinBox.setToolTip("Select frame.")
-            self.nFramesLabel.setText("of %d" % totalFrames)
             
             return True
                 
@@ -4083,36 +4078,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.colorMap = self._prevColorMap
             self.displayFrame()
 
-    @pyqtSlot(int)
-    @safeWrapper
-    def slot_setFrameNumber(self, value:int):
-        """Drives frame navigation from the GUI.
-        
-        The valueChanged signal of the widget used to select the index of the 
-        displayed data frame should be connected to this slot in _configureUI_()
-        
-        Parameters:
-        ==========
-        value: int, float, dataclasses.MISSING or pd.NA
-            When a float, the only admissible value is numpy.nan or math.nan
-            
-        NOTE: Overrides ScipyenFrameViewer.slot_setFrameNumber
-        """
-        if isinstance(self._number_of_frames_, int):
-            if value >= self._number_of_frames_:
-                return
-            
-        elif value >= np.prod(self._number_of_frames_):
-            return
-        
-        # NOTE: 2021-01-07 14:36:54
-        # subclasses should override this setter to emit frameChanged(int) signal
-        self.currentFrame = value
-        
-        for viewer in self.linkedViewers:
-            viewer.currentFrame = value
-            
-        
     def _editImageBrightness(self):
         dlg = pgui.ImageBrightnessDialog(self)
         dlg.show()
@@ -4717,12 +4682,26 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 self.userFrameAxisInfo  = frameAxis
                 
             if self._parseVigraArrayData_(data):
+                # NOTE: 2022-01-17 16:32:15
+                # self._parseVigraArrayData_ sets up _number_of_frames_ and 
+                # _data_frames_
                 self._data_  = data
-                self.frameIndex = frameIndex or range(self._number_of_frames_) # set by _parseVigraArrayData_
+                self.frameIndex = frameIndex or range(self._data_frames_) # set by _parseVigraArrayData_
+                self._number_of_frames_ = len(self.frameIndex)
                 self._axes_calibration_ = AxesCalibration(data)
                 self._setup_channels_display_actions_()
                 self.displayFrame(asAlphaChannel=asAlphaChannel)
-            
+                
+                #totalFrames = self._number_of_frames_ if isinstance(self._number_of_frames_, int) else np.prod(self._number_of_frames_)
+        
+                self.framesQSlider.setMaximum(self._number_of_frames_ - 1)
+                self.framesQSlider.setToolTip("Select frame.")
+                
+                self.framesQSpinBox.setMaximum(self._number_of_frames_ - 1)
+                self.framesQSpinBox.setToolTip("Select frame.")
+                self.nFramesLabel.setText("of %d" % self._number_of_frames_)
+                
+  
         elif isinstance(data, (QtGui.QImage, QtGui.QPixmap)):
             self._number_of_frames_ = 1
             self.frameIndex = range(self._number_of_frames_)
