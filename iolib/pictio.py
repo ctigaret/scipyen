@@ -93,9 +93,6 @@ except Exception as e:
     #warnings.warn("Python module 'magic' not found; advanced file type identification will be limited")
     libmagic = None
 
-
-
-
 # NOTE: 2016-04-01 10:58:32
 # let's have this done once and for all
 __ephys_formats__ = ["abf"]
@@ -1540,6 +1537,8 @@ def getLoaderForFile(fName):
         return fileLoaders["application/x-pickle"]
     
     mime_type, file_type, _ = getMimeAndFileType(fName)
+
+    #print(f"in getLoaderForFile: mime_type: {mime_type} file_type: {file_type}")
     
     ret = fileLoaders[mime_type] # fileLoaders is a default dict with None the default value
     
@@ -1615,7 +1614,7 @@ def getMimeAndFileType(fileName):
     # NOTE: 2020-02-16 18:15:34
     # 1) DETERMINE THE FILE TYPE
     # 1.1) try the python-magic first
-    if libmagic is not None:
+    if libmagic: # is not None:
         # magic module is loaded
         try:
             if os.path.isfile(fileName):
@@ -1626,19 +1625,29 @@ def getMimeAndFileType(fileName):
                 
         except Exception as e:
             traceback.print_exc()
-            
-    # 1.2) try the system "file" command
-    if file_type is None:
-        try:
-            if os.path.isfile(fileName):
-                file_type = os.popen("file %s" % fileName).read()
 
-        except Exception as e:
-            traceback.print_exc()
+    #print(f"file_type: {file_type}")
+    #print(f"sys.platform: {sys.platform}")
+
+    # 1.2) try the system "file" command
+    # NOTE: 2022-01-18 13:13:26
+    # 'file' is NOT available on win32 platform
+    if file_type is None:
+        if sys.platform == "linux":
+            try:
+                if os.path.isfile(fileName):
+                    file_type = os.popen("file %s" % fileName).read()
+
+            except Exception as e:
+                traceback.print_exc()
+
+        elif sys.platform == "win32":
+            file_type, encoding = mimetypes.guess_type(fileName)
+            mime_type = file_type
             
     # 2) DETERMINE THE MIME TYPE
     # 2.1) try the pyxdg module
-    if xdgmime is not None:
+    if mime_type is None and  xdgmime: # is not None:
         try:
             mime = xdgmime.get_type(fileName)
             mime_type = "/".join([mime.media, mime.subtype]) # e.g. "text/plain"
@@ -1646,7 +1655,9 @@ def getMimeAndFileType(fileName):
         
         except Exception as e:
             traceback.print_exc()
-            
+
+    #print(f"in getMimeAndFileType: mime_type: {mime_type} file_type: {file_type}")
+
     # 2.2) try the mimetypes module
     # NOTE: 2021-04-12 11:31:29
     # this is in case the actual file type and mime type are not registered
