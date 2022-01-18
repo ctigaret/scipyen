@@ -426,6 +426,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self._set_data_(*args, **kwargs)
         
+        #print(f"In ScipyenViewer<{self.__class__.__name__}>.setData(): is visible: {self.isVisible()}")
+        
         if not self.isVisible():
             self.setVisible(True)
         

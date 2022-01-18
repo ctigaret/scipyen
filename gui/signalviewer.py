@@ -441,15 +441,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         #self.threadpool = QtCore.QThreadPool()
         
-        if y is None:
-            if x is not None:  # only the data variable Y is passed, 
-                y = x
-                x = None  # argument (X) and the expected Y will be None by default
-                            # here we swap these two variables and we end up with X as None
-                            
-        #self.x = x
-        #self.y = y
-        
         self._plot_names_ = dict() # maps item row position to name
         
         self._cursorWindowSizeX_ = self.defaultCursorWindowSizeX
@@ -650,19 +641,20 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         super().__init__(data=None, parent=parent, ID=ID, win_title=win_title, 
                          doc_title=doc_title, *args, **kwargs)
         
-        self.setData(x,y, frameIndex=frameIndex, 
-                         frameAxis=frameAxis, signalIndex=signalIndex,
-                         signalChannelAxis=signalChannelAxis,
-                         signalChannelIndex=signalChannelIndex,
-                         irregularSignalIndex=irregularSignalIndex,
-                         irregularSignalChannelAxis = irregularSignalChannelAxis,
-                         irregularSignalChannelIndex = irregularSignalChannelIndex,
-                         separateSignalChannels = separateSignalChannels,
-                         interval = interval,
-                         channelIndex = channelIndex,
-                         currentFrame = currentFrame,
-                         plotStyle = plotStyle,
-                         *args, **kwargs)
+        if isinstance(y, self.supported_types) or any([t in type(y).mro() for t in self.supported_types]):
+            self.setData(x, y, frameIndex=frameIndex, 
+                            frameAxis=frameAxis, signalIndex=signalIndex,
+                            signalChannelAxis=signalChannelAxis,
+                            signalChannelIndex=signalChannelIndex,
+                            irregularSignalIndex=irregularSignalIndex,
+                            irregularSignalChannelAxis = irregularSignalChannelAxis,
+                            irregularSignalChannelIndex = irregularSignalChannelIndex,
+                            separateSignalChannels = separateSignalChannels,
+                            interval = interval,
+                            channelIndex = channelIndex,
+                            currentFrame = currentFrame,
+                            plotStyle = plotStyle,
+                            *args, **kwargs)
         
     # ### BEGIN properties
     @property
@@ -4430,9 +4422,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # ChannelIndex is out of neo
                     
             # NOTE: 2022-01-17 14:18:30 see NOTE : 2022-01-17 14:17:23
-            # Furthermore, separateSignalChannels only has effect when y is a
-            # single neo signal or a numpy ndarray, and is forcefully set to False
-            # for neo.Block, neo.Segment, or sequence of neo.Segment, neo signals,
+            # SeparateSignalChannels only has effect when y is a single neo 
+            # signal or a numpy ndarray. It is forcefully set to False for
+            # neo.Block, neo.Segment, or sequence of neo.Segment, neo signals,
             # or numpy ndarray objects.
             # NOTE: As a reminder: when separateSignalChannels is True, each
             # channel will be plotted on a different axis system (i.e., in its
@@ -4943,7 +4935,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                    separateSignalChannels:bool = False, 
                    interval:(tuple, list, neo.Epoch, type(None)) = None,
                    plotStyle:str = "plot",
-                   get_focus:bool = True,
                    showFrame:int = None,
                    *args, **kwargs):
     
@@ -5046,7 +5037,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 separateSignalChannels:bool = False, 
                 interval:(tuple, list, neo.Epoch, type(None)) = None,
                 plotStyle:str = "plot",
-                get_focus:bool = True,
+                get_focus:bool = False,
                 showFrame = None,
                 *args, **kwargs):
         """ Sets up the plot data and updates the plot.
@@ -5209,13 +5200,20 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             with one channel per frame, the number of frames
         
         """ 
-        #print(f"{self.__class__.__name__}.setData: x = {x}, y = {y}")
-        ## 1. check that first arguments resolve to something,
-        ## 2. figure out doc_title
-        ## 3. finally call super().setdata(...) with the (possibly new) doc_title
-        ##   * this in turn calls self._set_data_(...) overridden here, which:
-        ##     will then set up instance variables - which includes a call to
-        ##     self._parse_data_(...)
+        
+        # NOTE: 2022-01-18 08:39:13
+        # Intuitively, one would pass both 'x' (the data domain) and y (the data
+        # itself) in order for the viewer to plot 'y' vs 'x' (similar to matplotlib 
+        # plot API, etc). 
+        # However, particular data types such as instances of neo.AnalogSignal
+        # already 'embed' the data 'domain' (or the 'x') therefore only 'y' (the
+        # instance of neo.AnalogSignal, in this example) needs be passed.
+        # We generalize this and make 'x' optional; when 'y' is a more generic
+        # sequence of numeric data (e.g., numpy ndarray, or even a list or tuple)
+        # and None is passed for 'x', the domain 'x' implicitly is the running
+        # sample number (the 'index') into the sequence 'y'.
+        #
+        # The following 4 lines try to guess whether only 'y' was passed
         if y is None:
             if x is not None:  # only the data variable Y is passed, 
                 y = x
@@ -5227,6 +5225,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 return
             
         self._set_data_(x,y, **kwargs)
+        
+        if not self.isVisible():
+            self.setVisible(True)
+            
+        if get_focus:
+            self.activateWindow()
             
         ## NOTE: 2020-09-25 10:07:37
         ## Calls ScipyenViewer setData() which in turn delegates to self._set_data_()

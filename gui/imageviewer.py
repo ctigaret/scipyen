@@ -4602,7 +4602,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         # which then delegates back to _set_data() here.
         self.setData(image, doc_title=doc_title, normalize=normalize, colormap=colormap, gamma=gamma,
                      frameAxis=frameAxis, frameIndex=None, displayChannel=displayChannel, 
-                     asAlphaChannel=asAlphaChannel,get_focus=get_focus)
+                     asAlphaChannel=asAlphaChannel, get_focus=get_focus)
         
     def _set_data_(self, data, normalize=True, colormap = None, gamma = None, 
                    tempColorMap = None,

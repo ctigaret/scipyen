@@ -9520,26 +9520,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 # include results window here? - it is NOT a ScipyenFrameViewer!
                 viewer.currentFrame = value # this should also change currentFrame in that window's graphics objects
                 
-                
-            #for viewer in self._linkedViewers_:  
-                ## NOTE: 2022-01-16 21:59:45
-                ## self._linkedViewers_ is defined in ScipyenFrameViewer
-                #if viewer in self.scansviewers + self.scansblockviewers:
-                    #frindex = self._data_.framesMap["scans"][value]
-                    #component = "scans"
-                #elif viewer in self.sceneviewers + self.sceneblockviewers:
-                    #frindex = self._data_.framesMap["scene"][value]
-                    #component = "scene"
-                #elif viewer in self.ephysviewers:
-                    #frindex = self._data_.framesMap["electrophysiology"][value]
-                    #component = "electrophysiology"
-                #else:
-                    #frindex = value
-                    #component = "master"
-                    ## get the scans frame index
-                ##print(f"LSCaTWindow.slot_setFrameNumber: nFrames: {self._data_.nFrames()}; value: {value} => frindex: {frindex} for component {component}")
-                #viewer.currentFrame = frindex # this should also change currentFrame in that window's graphics objects
-
             landmarks = [o for o in self._data_.sceneRois.values()]     + \
                         [o for o in self._data_.sceneCursors.values()]  + \
                         [o for o in self._data_.scansRois.values()]     + \
@@ -9827,7 +9807,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 viewers.append(win)
                 
             win.view(data, get_focus=False)
-            win.setVisible(True)
                 
         else:
             for w in viewers:
