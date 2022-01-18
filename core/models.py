@@ -326,10 +326,12 @@ def Talbot_Sayer(x, a, b, c, x0, **kwargs):# t = 33 * pq.degC, o = 2.5 * pq.mM):
     
     #k = 0.0379
     
+    # see Kay & Wong (1987) J. Physiol, 392:603-616
     boltzman = 1 / (1 + np.exp(-a * k.magnitude * (x-x0)))**2
     
     ghkexp = np.exp(-2 * x * k.magnitude)
     
+    # Goldman-Hogkin-Katz
     ghk = x * b * (c - o.magnitude * ghkexp) / (1-ghkexp)
 
     return boltzman * ghk

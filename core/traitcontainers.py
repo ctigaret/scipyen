@@ -1,73 +1,49 @@
 # -*- coding: utf-8 -*-
-"""traitlets-aware containers
 """
-from inspect import getcallargs
-from traitlets import (HasTraits, TraitType, Int, Bool, All, is_trait, observe,)
+Traitlets-aware containers
+An attempt to supplement traitlets package with container traits that can trigger
+notifications if their contents change.
+
+2020-09-05 14:20:18 Implemented so far: 
+
+DataBag = behaves like a dictionary where its keys are also
+accessed using attribute syntax.
+
+"""
+import traceback
+from inspect import getcallargs, isfunction, ismethod
+from functools import partial
+from pprint import pformat
+#from traitlets import (HasTraits, TraitType, Eventhandler, Int, Bool, All, 
+                       #is_trait, observe,TraitError,)
 from traitlets.utils.bunch import Bunch
-from .traitutils import (gen_trait_from_type, transform_link, 
-                        TraitsObserver, ContainerTraitsObserver,
-                        HasTraits, TraitType, Int, Bool, All, is_trait, observe)
+
+from .traitutils import (traitlets, dynamic_trait, transform_link,
+                         HasTraits, TraitType, TraitsObserver, 
+                         ContainerTraitsObserver, Int, Bool, All, observe)
 
 from .prog import safeWrapper
-from .strutils import string_to_valid_identifier
+from .strutils import str2symbol
 
-#class DataList(list):
-    #"""A list which dynamically generates a TraitType for its elements
-    #CAUTION Use sparingly, as this may incur large overheads, depending on the size of the list
-    #"""
-    #__observer__ = ContainerTraitsObserver()
+class DataBagTraitsObserver(HasTraits):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
     
-    #def __init__(self, *args, **kwargs):
-        #use_mutable = kwargs.pop("mutable_types", False)
-        #do_type_cast = kwargs.pop("cast_types", False)
+    def remove_traits(self, **traits):
+        current_traits = self.traits()
+        keep_traits  = dict([(k, current_traits[k]) for k in current_traits if k not in traits])
         
-        #super().__init__(*args, **kwargs)
+        self._trait_values.clear()
         
-        #try:
-            #trdict = dict(map(lambda k: ("%s"%k, gen_trait_from_type(self[k])), range(self.__len__())))
-            
-            ##callargs = getcallargs(self.__init__, *args, **kwargs)
-            ##print(callargs)
-            
-            ##if len(args):
-                ### NOTE 2020-07-06 12:00:35 list takes at most one argument (an iterable)
-                ##if isinstance(args[0], (tuple, list, range)):
-                    ### parameter is an iterable
-                    ##trdict = dict(map(lambda k: ("_%s"%k, gen_trait_from_type(args[0][k])), range(len(args[0]))))
-                    
-                    
-            
-            ##dd = dict(*args, **kwargs)
-            
-            ##trdict = dict(map(lambda x: (x, gen_trait_from_type(dd[x])), dd.keys()))
-            
-            #trdict.update({"__length__": gen_trait_from_type(self.__len__()),
-                           #"__mutable_trait_types__": gen_trait_from_type(use_mutable==True),
-                           #"__cast_trait_types__": gen_trait_from_type(do_type_cast==True)})
-            
-            ## NOTE 2020-07-05 11:54:44
-            ## this is so that each DataBag instance carries its own instance of
-            ## TraitsObserver
-            ##
-            ## Because of this, self.copy() creates a new object (i.e. does not
-            ## have shallow copy semantics anymore)
-            #obs = ContainerTraitsObserver()
-            
-            #object.__setattr__(self, "__observer__", obs)
-            
-            #super(ContainerTraitsObserver, obs).add_traits(**trdict)
-            
-            #obs.__setattr__("parent", self)
-            #obs.__length__ = self.__len__()
-            
-        #except:
-            #raise
+        self.__class__ = type(self.__class__.__name__,
+                              (HasTraits, ), 
+                              {"remove_traits":self.remove_traits})
         
-    #def append(self, item):
-        
+        self.add_traits(**keep_traits)
         
 class DataBag(Bunch):
     """Dictionary with semantics for direct attribute reference and attribute change observer.
+    
     NOTE 2020-07-04 17:48:10
     The implementation is based on traitlets.utils.bunch.Bunch
     ("Yet another implementation of bunch - attribute-access of items on a dict"
@@ -91,132 +67,198 @@ class DataBag(Bunch):
     items()
     __str__()
     __len__()
-
-    TODO upgrade to defaultdict!
     
+    NOTE: 2021-10-10 17:00:26
+    Acquired traitlets.HasTraits functionality through composition, via the
+    'observer' property which inherits from traitlets.HasTraits.
+    
+    The following DataBag instance methods are exposed from traitlets.HasTraits:
+    
+    traits()
+    trait_values()
+
     TODO 2020-07-04 23:44:59
     customize observer handlers
     customize link & directional link
     deep copy
     
-    Originally defined in Scipyen.core.datatypes using self.__dict__ = self paradigm
-
     """
     # Acquire HasTraits functionality through composition:
     
     # FIXME 2020-07-04 22:50:47
-    # when __mutable_trait_types__ is True, TraitType._cast_types kicks in
+    # when mutable_types is True, TraitType._cast_types kicks in
     # preventing a real trait type change - this may be desirable but should be
     # controlled/configurable
     
-            
-    class __TraitsObserver__(HasTraits):
-        __length__ = Int(default_value=0)
-        __mutable_trait_types__ = Bool(default=False) # WARNING experimental
-        __cast_trait_types__ = Bool(default=False)
-        
-        def add_traits(self, **traits):
-            # NOTE 2020-07-04 22:43:58
-            # the super's add_traits blows away non-trait attributes
-            # because existing traits are reverted to the default value
-            length = object.__getattribute__(self, "__length__")
-            mutable = object.__getattribute__(self,"__mutable_trait_types__")
-            do_type_casting = object.__getattribute__(self, "__cast_trait_types__")
-            
-            # NOTE 2020-07-04 22:42:42
-            # __length__ and __mutable_trait_types__ need to be reset to their
-            # current values (see NOTE 2020-07-04 22:43:58)
-            # we do this here in order to avoid triggering a change notification
-            traits.update({"__length__":gen_trait_from_type(length), 
-                           "__mutable_trait_types__":gen_trait_from_type(mutable),
-                           "__cast_trait_types__": gen_trait_from_type(do_type_casting)})
-            
-            super().add_traits(**traits) # this DOES keep __length__ and __mutable_trait_types__ traits but reverts them to the defaults
-            
-            # this also works, but triggers a change notification, which we don't 
-            # need right now
-            #self.__length__ = length
-            #self.__mutable_trait_types__ = mutable
-            
-        def remove_traits(self, **traits):
-            current_traits = self.traits()
-            keep_traits  = dict([(k, current_traits[k]) for k in current_traits if k not in traits])
-            
-            length = self.__length__
-            mutable = self.__mutable_trait_types__
-            do_type_casting = self.__cast_trait_types__
-            
-            
-            # again, this resets the maintenance traits to their default values, 
-            # so we need to restore them (see NOTE 2020-07-04 22:43:58 and 
-            # NOTE 2020-07-04 22:42:42)
-            keep_traits.update({"__length__":gen_trait_from_type(length), 
-                                "__mutable_trait_types__":gen_trait_from_type(mutable),
-                                "__cast_trait_types__": gen_trait_from_type(do_type_casting)})
-            
-            self.__class__ = type(self.__class__.__name__, (HasTraits, ), {"changed":self.changed, "remove_traits":self.remove_traits})
-            
-            self.add_traits(**keep_traits)
-            
-        @observe(All)
-        def changed(self, change):
-            return
-            ## NOTE: 2020-07-05 18:01:01 that's what you can to with these
-            #print("self.changed: change['owner']:\n",change["owner"], "\n")
-            #print("self.changed: change['name']:\n",change["name"], "\n")
-            #print("self.changed: change['old']:\n",change["old"], "\n")
-            #print("self.changed: change['new']:\n",change["new"], "\n")
+    # NOTE 2020-09-05 12:31:25
+    # item ACCESS accepts subscript syntax: obj['key']
+    # and attribute syntax: obj.key
+    # 
+    # both access the same entity:
+    # 
+    #   obj['key'] == obj.key is True
+    #
+    # item ASSIGNMENT accepts subscript syntax: obj['key'] = value
+    # and attribute syntax: obj.key = value
+    #
+    # both assign to the same entity.
+    #
+    # the entities are stored as traits inside DataBagTraitsObserver
+    # so DataBag API queries/assigns values from/to the traits stored in
+    # DataBagTraitsObserver.
+    #
+    # ATTENTION Whe assigning a new value to an existing trait:
+    #
+    # By default(*) the type of the new value is expected to be the same as the 
+    # type of the trait. For example:
+    # 
+    #   d = DataBag()
+    #   d.x = 1 (an int) - this creates an Int trait type 
+    #
+    #   d
+    #   {'x': 1}
+    #
+    #   d.x = 1. (a float) ==> TypeError !
+    #
+    # However, this behaviour can be circumvented (with CAUTION) in two ways:
+    #
+    # a) casting the type of the new value to the expected type (i.e that of 
+    # the trait)
+    #
+    #   d.use_casting = True
+    #   d.x = 1. (a float) ==> OK, but:
+    #   
+    #   d
+    #   {'x': 1} (an int, because the new value 1.0 was cast to an int (which was expected)
+    #
+    #   WARNING This will fail if the new value cannot be cast to the expected type
+    #   d.x = "z" ==> ValueError
+    #
+    # b) mutating the trait type to accommodate the type of the new value 
+    #   WARNING This involves replacing the old trait with a new one, but more
+    #   importantly, it may break code that uses the DataBag's attributes expecting
+    #   data of a specific type
+    #
+    #   d.use_casting = False (to avoid casting)
+    #   d.mutable_types = True
     
-    __observer__ = __TraitsObserver__()
+            
+    hidden_traits = ("length", "use_mutable", "use_casting", "allow_none","verbose")
+    
+    #@staticmethod
+    @classmethod
+    def _make_hidden(cls, **kwargs):
+        if not issubclass(cls, DataBag):
+            raise TypeError(f"Expecting a DataBag or a type derived from DataBag; got {cls.__name__} instead")
+        ret = Bunch([(name, kwargs.pop(name, False)) for name in list(cls.hidden_traits) + ["mutable_types"]])
+        #ret = Bunch([(name, kwargs.pop(name, False)) for name in list(DataBag.hidden_traits) + ["mutable_types"]])
+        ret.length = 0
+        ret.allow_none = True
+        ret.use_mutable = True
+        ret.verbose=False
+        return ret
     
     def __init__(self, *args, **kwargs):
-        use_mutable = kwargs.pop("mutable_types", False)
-        do_type_cast = kwargs.pop("cast_types", False)
+        """Constructor for a DataBag.
         
-        super().__init__(*args, **kwargs)
+        *args    : a DataBag, or None;
+            When a DataBag (or a type that inherits it) this behaves like a 
+            copy constructor.
+            
+            Otherwise it is ignored.
+            
+        **kwargs : key, value pairs to go into the data bag, and the following
+                    options:
         
-        try:
+        use_casting: bool, default is False
+            When True, the value set to an EXISTING attribute is cast to the type
+            of that attribute, if possible. For example one can assign a float 
+            value to an int attribute by automatically casting the float to an int
+            (or vice-versa). 
             
-            dd = dict(*args, **kwargs)
-            trdict = dict(map(lambda x: (x, gen_trait_from_type(dd[x])), dd.keys()))
+            The casting is done through a "copy constructor" mechanism:
             
-            trdict.update({"__length__": gen_trait_from_type(self.__len__()),
-                           "__mutable_trait_types__": gen_trait_from_type(use_mutable==True),
-                           "__cast_trait_types__": gen_trait_from_type(do_type_cast==True)})
+            e.g. trait expects an int, and the supplied value is a float => the 
+            trait will get int(value).
             
-            # NOTE 2020-07-05 11:54:44
-            # this is so that each DataBag instance carries its own instance of
-            # TraitsObserver
-            #
-            # Because of this, self.copy() creates a new object (i.e. does not
-            # have shallow copy semantics anymore)
-            obs = DataBag.__TraitsObserver__()
+        use_mutable: bool, default is False
+            When True, allows a new value type to be assigned to an EXISTING
+            attribute.
             
-            object.__setattr__(self, "__observer__", obs)
+        mutable_types: alias for use_mutable (for backward compatibility)
             
-            super(DataBag.__TraitsObserver__, obs).add_traits(**trdict)
+        allow_none: bool, default False
+            When True, a trait value can be None
             
-            obs.__setattr__("parent", self)
+        handler: a function or method accepting a dict (or Bunch) with the 
+            following keys: 'owner', 'type', 'name', 'old', 'new'
             
-        except:
-            raise
+            Optional, default is None
+            
+            When given, all the key/value pairs in the DataBag will be observed
+            for change (whenever possible)
+            
+        ATTENTION   mutable_types and use_casting cannot be simultaneously True,
+                    but can be simultaneously False.
+        
+        When both mutable_types and use_casting are given True values, then 
+        use_casting takes precedence over mutable_types.
+            
+        """
+        self.__observer__ = DataBagTraitsObserver()
+        # NOTE: so that derived types can use their OWN hidden_traits 
+        self.__hidden__ = self.__class__._make_hidden(**kwargs)
+
+        for name in self.__hidden__.keys():
+            kwargs.pop(name, None)
+        
+        if self.use_casting:
+            self.use_mutable = False
+                
+        elif self.use_mutable:
+            self.use_casting = False
+            
+        if len(args)==1 and isinstance(args[0], dict):
+            dd = args[0]
+        else:
+            dd = kwargs
+            
+        traits = dict(map(lambda x: (x[0], self._light_trait_(x[1])), dd.items()))
+        
+        self.__hidden__.length = len(traits)
+
+        self.__observer__.add_traits(**traits)
+        
+        # FIXME:L 2021-10-10 15:59:37
+        # Why is this needed: because otherwise DataBag shows no contents
+        for k,v in dd.items():
+            object.__setattr__(self.__observer__, k, v)
+            
+        super().__init__(**dd)
+        
+    def _light_trait_(self, obj):
+        # NOTE: 2021-09-14 13:00:51 
+        # Might have to force dictionaries to behave as Any
+        # because of the long processing times
+        
+        if obj is self:
+            dtrait = partial(dynamic_trait, 
+                             allow_none=self.__hidden__.allow_none, 
+                             content_traits=False,
+                             force_trait=traitlets.Any)
+            
+        else:
+            dtrait = partial(dynamic_trait, 
+                             allow_none=self.__hidden__.allow_none, 
+                             content_traits=True,
+                             use_mutable=self.__hidden__.use_mutable,
+                             force_trait=traitlets.Any)
+            
+        return dtrait(obj)#, force_trait=traitlets.Any)
         
     def __setitem__(self, key, val):
-        if key == "__length__":
-            raise KeyError("Key '__length__' is read-only")
-        
-        if key =="__mutable_trait_types__":
-            raise KeyError("Key '__mutable_trait_types__' is read-only")
-            
-        if key == "__cast_trait_types__":
-            raise KeyError("Key '__cast_trait_types__' is read-only")
-            
-        if key == "mutable_types" and isinstance(val, bool):
-            self.__observer__.__mutable_trait_types__ = val
-            return
-        
-        if key == "cast_types" and isinstance(val, bool):
-            self.__observer__.__cast_trait_types__ = val
+        """Implements indexed (subscript) assignment: obj[key] = val
+        """
             
         # NOTE 2020-07-04 17:32:16 :
         # Unlike an ordinary dict which accepts all sorts of hashable objects as
@@ -231,8 +273,8 @@ class DataBag(Bunch):
         # inside the dict 'd' (even though it's a weird thing to do).
         #
         # However, this paradigm does not translate to that of object attribute 
-        # reference, where attributes are "stored" by their name (strings containing
-        # valid pythonic identifiers).
+        # assignment, where attributes are "stored" by a name/identifier
+        # (strings containing valid pythonic identifiers).
         #
         # The expected attribute access statement corresponding to the assignment
         # statement shown above would be:
@@ -245,108 +287,173 @@ class DataBag(Bunch):
         # Therefore, attribute access emulation comes with the price that the key
         # in the key/value pair passed to __setattr__ must be a str, and that str
         # must be a valid Python identifier.
+        #
+        # NOTE 2020-09-05 12:47:37 One may be tempted to convert the non-string
+        # key to its string representation - but that would open a can of worms:
+        # the string representation of non numeric types and custom objects is
+        # too complex for this purpose.
         
         if not isinstance(key, str):
-            raise TypeError("Expecting a string key; got %s instead" % type(key).__name__)
+            raise TypeError("Expecting a str key; got %s instead" % type(key).__name__)
         
-        obs = object.__getattribute__(self, "__observer__")
+        try:
+            obs = object.__getattribute__(self, "__observer__") # bypass usual API
+            
+        except:
+            # unpickling doesn't find an observer yet ('cause it is an instance 
+            # var but is not pickled in the usual way; restoring it creates 
+            # problems therefore we re-create it here)
+            obs = DataBagTraitsObserver()
+            object.__setattr__(self, "__observer__", obs)
+
+        try:
+            hid = object.__getattribute__(self, "__hidden__")
+            
+        except:
+            hid = DataBag._make_hidden()
+            object.__setattr__(self, "__hidden__", hid)
+            
+        if key in hid:
+            hid[key]=val
+            
+            if key == "use_casting" and hid["use_casting"]:
+                hid["use_mutable"] = False
+                
+            if key == "use_mutable" and hid["use_mutable"]:
+                hid["use_casting"] = False
+
+            return
         
-        #if isinstance(obs, HasTraits):
-        if obs.has_trait(key):
-            # NOTE 2020-07-04 21:47:57
-            # Emulate a "dict" behaviour, where one can assign to a pre-exising
-            # key an object of a different type than the object previously assigned
-            # to that key.
-            #
-            # I agree this is pretty unorthodox and kind of defeats the purpose
-            # of having observable traits in the first place, but I could imagine 
-            # cases where this may be desirable.
-            #
+        if obs.has_trait(key): # assign value to an existing trait
+            # NOTE 2020-09-05 12:52:39 Below, one could use getattr(obs, key)
+            # to achieve the same thing as object.__getattribute__(obs, key)
             try:
-                # checks that val is of the type expected by the trait
-                # NOTE 2020-07-04 23:00:47 this may cause casting
-                if object.__getattribute__(obs, "__cast_trait_types__"):
-                    # allow type casting regardless of whether we allow mutation
-                    # of the trait type associated with 'key'
-                    #
-                    # the following statement will check if val type can be 
-                    # casted to the type expected by the current trait
-                    #
-                    # if type(val) cannot be casted (hence fails validation by
-                    # the trait type) the code falls through the except clause,
-                    # below, thus causing a type mutation only if allowed by the
-                    # '__mutable_trait_types__' flag.
-                    #
-                    # if type(val) is not the type expected by the trait, but
-                    # casting is allowed, then val will be casted to the type 
-                    # encapsulated by the trait type
-                    object.__setattr__(obs, key, val)
-                    
-                else:
-                    # explicitly check for type validity
-                    if type(object.__getattribute__(obs, key)) != type(val):
-                        if object.__getattribute__(obs, "__mutable_trait_types__"):
-                            self.__coerce_trait__(obs, key, val)
-                            
-                        else:
-                            raise TraitError("Unexpected value type (%s) for %s trait '%s'" %
-                                            (type(val).__name__, type(obs.traits()[key]).__name__, key))
+                old_value = object.__getattribute__(obs, key)
+                target_type = type(old_value)
+                
+                if type(val) != target_type:
+                    if hid["use_casting"]:
+                        new_val = target_type(val) # this may fail !
+                        object.__setattr__(obs, key, new_val)
+                        
+                    elif hid["use_mutable"]:
+                        self.__coerce_trait__(obs, key, val)
                         
                     else:
-                        object.__setattr__(obs, key, val)
-                
-                super().__setitem__(key, val) # when all fails don't get here
-                object.__setattr__(obs, "__length__", self.__len__())
-                
-            except:
-                # NOTE 2020-07-04 21:48:08
-                # One option is to remove the previous trait and assign a new
-                # trait based on the new type(val), bound to the same 'key'
-                #
-                # Another option would be to use traitlets.Union(...) from the 
-                # get go, instead of atomic traitlets.TraitType types, but 
-                # depending on what the Union "contains", this could be either 
-                # too prescriptive, or too general.
-                #
-                # The first approach may be a more constly in terms of function
-                # calls. Changes are notified in terms of change in the value of
-                # the trait (implicitly, signalling a new type)
-                if object.__getattribute__(obs, "__mutable_trait_types__"):
-                    # is val has a different type than what's expected by the 
-                    # existing trait, then replace the existing trait with a new
-                    # one, with the same name (key)
-                    #
-                    self.__coerce_trait__(obs, key, val)
-                    super().__setitem__(key, val) # when all fails don't get here
-                    object.__setattr__(obs, "__length__", self.__len__())
-                    
+                        # allow_none takes effect in the call below
+                        object.__setattr__(obs, key, val) # may raise TraitError
+                        
                 else:
-                    raise 
+                    object.__setattr__(obs, key, val)
+
+                super().__setitem__(key, val)
+                        
+            except:
+                traceback.print_exc()
                 
         else:
-            trdict = {key:gen_trait_from_type(val)}
-            obs.add_traits(**trdict)
-            super().__setitem__(key, val) # when all fails we don't get here
-            obs.__length__ = self.__len__()
+            # add a new trait
+            if key not in ("__observer__", "__hidden__") and key not in self.__hidden__.keys():
+                trdict = {key: self._light_trait_(val)}
+                obs.add_traits(**trdict)
+                object.__setattr__(obs, key, val)
+                object.__getattribute__(self, "__hidden__").length = len(trdict)
+                
+            super().__setitem__(key, val)
             
+    #def __setattr__(self, key, val):
+        #"""Implements dotted assignment: obj.key = val
+        #"""
+        #if not isinstance(key, str):
+            #raise TypeError(f"Expecting a str; got {type(val).__name__} instead")
+        
+        #try:
+            #obs = object.__getattribute__(self, "__observer__")
+        #except:
+            #obs = DataBagTraitsObserver()
+            #object.__setattr__(self, "__observer__", obs)
+            
+        #try:
+            #hid = object.__getattribute__(self, "__hidden__")
+            
+        #except:
+            #hid = DataBag._make_hidden()
+            #object.__setattr__(self, "__hidden__", hid)
+            
+        #if key in hid:
+            #hid[key] = val
+            
+            #if key == "use_casting" and hid["use_casting"]:
+                #hid["use_mutable"] = False
+                
+            #if key == "use_mutable" and hid["use_mutable"]:
+                #hid["use_casting"] = False
+
+            #return
+        
+        #if obs.has_trait(key):
+            #try:
+                #old_value = object.__getattribute__(obs,key)
+                #target_type = type(old_value)
+                
+                #if type(val) != target_type:
+                    #if hid["use_casting"]:
+                        #new_val = target_type(val)
+                        #object.__setattr__(obs, key, new_val)
+                        
+                    #elif hid["use_mutable"]:
+                        #self.__coerce_trait__(obs, key, val)
+                        
+                    #else:
+                        #object.__setattr__(obs, key, val)
+                #else:
+                    #object.__setattr__(obs, key, val)
+                    
+                #super().__setitem__(key, val)
+            #except:
+                #traceback.print_exc()
+                
+        #else: #add new trait
+            #if key not in ("__observer__", "__hidden__") and key not in hid.keys():
+                #trdict = {key:self._light_trait_(val)}
+                #obs.add_traits(**trdict)
+                #object.__setattr__(obs, key, val)
+                #object.__getattribute__(self, "__hidden__").length = len(trdict)
+                
+            #super().__setitem__(key, val)
+                        
+    def __len__(self):
+        obs = object.__getattribute__(self, "__observer__") # bypass self.__getitem__()
+        ret = len(obs.traits())
+        object.__getattribute__(self, "__hidden__")["length"] = ret
+        return ret
+
+    def __str__(self):
+        #return pformat(self)
+        obs = object.__getattribute__(self, "__observer__")
+        d = dict(map(lambda x: (x[0], x[1] if x[1] is not self else "<Reference to %s object with id=%d>" % (self.__class__.__name__, id(self)) ), obs._trait_values.items()))
+        return pformat(d)
+    
+    def __repr__(self):
+        #return "%s:\n%s" % (self.__class__, pformat(self))
+        obs = object.__getattribute__(self, "__observer__")
+        d = dict(map(lambda x: (x[0], x[1] if x[1] is not self else "<Reference to %s object with id=%d>" % (self.__class__.__name__, id(self)) ), obs._trait_values.items()))
+        return pformat(d)
+    
     def __getitem__(self, key):
+        """Implements obj[key] (subscript access, or "bracket syntax"")
+        """
         try:
             obs = object.__getattribute__(self, "__observer__")
-            if obs.has_trait(key):
-                val = getattr(obs, key)
-            else:
-                val = super().__getitem__(key)
-                
-            if isinstance(val, TraitType):
-                return val.get(obs)
-            
-            else:
-                return val
-            
+            return getattr(obs, key)
+        except AttributeError:
+            return object.__getattribute__(self, key)
         except:
-            raise KeyError("%s" % key)
+            raise
     
     def __getattr__(self, key):
+        """Implements obj.key (attribute access, or "dot syntax")
+        """
         try:
             obs = object.__getattribute__(self, "__observer__")
             
@@ -354,7 +461,7 @@ class DataBag(Bunch):
                 val = getattr(obs, key)
                 
             else:
-                val = self.__getitem__(key)
+                val = self.__getitem__(key) # this exposes access to observer's methods
                 
             if isinstance(val, TraitType):
                 return val.get(obs)
@@ -365,45 +472,98 @@ class DataBag(Bunch):
         except:
             raise #KeyError("%s" % key)
         
-    def __getattribute__(self, key):
-        try:
-            val = object.__getattribute__(self,key)
-            
-            if is_trait(val):
-                obs = object.__getattribute__(self, "__observer__")
-                
-                if obs.has_trait(key):
-                    getattr(obs, key)
-                    
-            return val
-        
-        except:
-            raise #KeyError("%s" % key)
+    def __iter__(self):
+        """Restricted membership test ('in' keyword).
+        Overloads super().__iter__(self) to restrict membership test for trait
+        values.
+        """
+        return (k for k in self.trait_values())
     
+    def __iter_full__(self):
+        return super().__iter__(self)
+        
+    def __hash__(self):
+        return sum((hash(v) for v in self.items()))
+        
     def __delitem__(self, key):
+        """Implements del obj[key] where a is a DataBag and key is a str
+        """
         try:
             obs = object.__getattribute__(self, "__observer__")
             super().__delitem__(key)
-            obs.__length__ = self.__len__()
-            if obs.has_trait(key):
+            #obs.length = self.__len__()
+            
+            #if obs.has_trait(key):
+            if key in obs.traits():
                 out_traits = {key: obs.traits()[key]}
                 obs.remove_traits(**out_traits)
-            
+                #obs._trait_values.pop(key, None) # taken care of by obs.remove_traits
+                
+            object.__getattribute__(self, "__hidden__")["length"] = len(obs.traits())
             
         except:
             raise #KeyError("%s" % key)
         
-    def __getstate__(self):
-        return self.__observer__.__getstate__()
-    
-    def __setstate__(self, state):
-        self.__observer__.__setstate__(state)
+    #def __contains__(self, key):
+        #"""Implements membership test ("in" keyword).
         
+    
+        #"""
+        # NOTE: 2021-10-11 12:08:05 
+        # This doesn't work because the base type dict has __iter__(), and 'in'
+        # keyword goes for it first
+        #try:
+            #obs = object.__getattribute__(self, "__observer__")
+            #return obs.has_trait(key)
+        #except:
+            #raise
+        
+    def __getstate__(self):
+        """Returns the state of this object's observer wrapped in a dict
+        """
+        # NOTE: Python 3.9 way
+        if hasattr(self , "__observer__"): 
+            obs = object.__getattribute__(self, "__observer__")
+            state = obs.__getstate__()
+            d = {"__observer__": state}
+        
+        else:
+            d = {"__observer__": {"_trait_notifiers":{}, "_trait_validators":{}}}
+            
+        #obs = object.__getattribute__(self, "__observer__", None)
+        #if obs is None:
+            #d = {"__observer--": {"_trait_notifiers":{}, "_trait_validators":{}}}
+        #else:
+            #state = obs.__getstate__()
+            #d = {"__observer__": state}
+        return d
+    
+    def __setstate__(self, state:dict):
+        """Restores the state dictionary
+        state: dict
+        """
+        
+        #print("DataBag.__setstate__", [k for k in state])
+        if "__observer__" in state:
+            observer_state = state["__observer__"]
+            
+        else:
+            observer_state = state
+            
+        if not hasattr(self, "__observer__"):
+            # old DataBag versions pickled w/o __observer__
+            object.__setattr__(self, "__observer__", DataBagTraitsObserver())
+            
+        obs = object.__getattribute__(self, "__observer__")
+            
+        obs.__setstate__(observer_state)
+            
     def __coerce_trait__(self, obs, key, val):
         old_trait = obs.traits()[key]
         old_type = type(object.__getattribute__(obs, key))
         
-        new_trait = gen_trait_from_type(val)
+        #new_trait = dynamic_trait(val, allow_none = self.allow_none, content_traits=True)
+        new_trait = self._light_trait_(val)
         new_type = type(val)
         
         obs.remove_traits(**{key:old_trait})
@@ -411,51 +571,149 @@ class DataBag(Bunch):
         obs.add_traits(**{key:new_trait})
         
         object.__setattr__(obs, key, val)
-        
+            
         # NOTE 2020-07-05 16:17:27
         # signal the change of trait type
         obs._notify_trait(key, old_type, new_type)
         
+    @property
+    def observer(self):
+        """The HasTraits observer. Read-only
+        """
+        return self.__observer__
+    
+    def as_dict(self):
+        """Dictionary view - DEPRECATED; use self.trait_values()
+        
+        """
+        return self._trait_values
+        #return dict((k,v) for k,v in self.items())
+        
+    def remove_members(self, *keys):
+        try:
+            obs = object.__getattribute__(self, "__observer__")
+            
+            current_traits = dict(obs.traits())
+            
+            current_traits_keys = current_traits.keys()
+            
+            traits = dict([(key, current_traits[key]) for key in keys if key in current_traits_keys])
+            
+            obs.remove_traits(**traits)
+            
+            object.__getattribute__(self, "__hidden__")["length"] = len(obs.traits())
+        
+        except:
+            traceback.print_exc()
+            raise
         
     def clear(self):
         try:
-            # simply inheriting from Bunch just won't do: we also need to get rid
-            # of the traits (except for the maintenance ones)
             super().clear()
             
             obs = object.__getattribute__(self, "__observer__")
-            traits = dict([(k, obs.traits()[k]) for k in obs.traits() if k not in ("__length__", "__mutable_trait_types__")])
+            traits = dict(obs.traits())
             obs.remove_traits(**traits)
-            obs.__length__ = self.__len__()
+            #obs._trait_values.clear() # taken care of by obs.remove_traits
+            object.__getattribute__(self, "__hidden__")["length"] = len(obs.traits())
             
         except:
+            traceback.print_exc()
             raise
         
-    def pop(self, key, default=None):
+    def pop(self, key, *args):
+        """Implements a.pop(key, default).
+        'a' is a DataBag, 'key' is a str and 'default' is the default value if 
+        'key' not in 'a'.
+        """
         try:
             ret = self.__getitem__(key)
-            self.__delitem__(key)
+            self.__delitem__(key) # also updates __hidden__.length
             return ret
         except:
-            return default
+            if len(args) == 0:
+                raise
+            else:
+                return args[0]
         
     @property
     def mutable_types(self):
-        obs = object.__getattribute__(self, "__observer__")
-        return getattr(obs, "__mutable_trait_types__")
+        return self.__hidden__.use_mutable
     
     @mutable_types.setter
-    def mutable_types(self, value):
-        self.__observer__.__mutable_trait_types__ = value
+    def mutable_types(self, val:bool):
+        if not isinstance(val, bool):
+            raise TypeError("Expecting a bool; got %s instead" % type(val).__name__)
+        
+        self.__hidden__.use_mutable = val
+        
+        if val:
+            self.__hidden__.use_casting = False
         
     @property
-    def cast_types(self):
-        obs = object.__getattribute__(self, "__observer__")
-        return getattr(obs, "__cast_trait_types__")
+    def use_mutable(self):
+        return self.__hidden__.use_mutable
     
-    @cast_types.setter
-    def cast_types(self, value):
-        self.__observer__.__cast_trait_types__ = value
+    @mutable_types.setter
+    def use_mutable(self, val:bool):
+        if not isinstance(val, bool):
+            raise TypeError("Expecting a bool; got %s instead" % type(val).__name__)
+        
+        self.__hidden__.use_mutable = val
+        
+        if val:
+            self.__hidden__.use_casting = False
+        
+    @property
+    def use_casting(self):
+        return self.__hidden__.use_casting
+    
+    @use_casting.setter
+    def use_casting(self, val:bool):
+        if not isinstance(val, bool):
+            raise TypeError("Expecting a bool; got %s instead" % type(val).__name__)
+        
+        self.__hidden__.use_casting = val
+        
+        if val == True:
+            self.__hidden__.use_mutable = False
+            
+    @property
+    def verbose(self):
+        return self.__hidden__.verbose
+    
+    @verbose.setter
+    def verbose(self, val):
+        self.__hidden__.verbose = (val == True)
+        
+    @property
+    def allow_none(self):
+        return self.__hidden__.allow_none
+        
+    @allow_none.setter
+    def allow_none(self, val):
+        if not isinstance(val, bool):
+            raise TypeError("Expecting a bool; got %s instead" % type(val).__name__)
+        
+        self.__hidden__.allow_none = val
+        
+    def keys(self):
+        """Generates a keys 'view'
+        """
+        obs = object.__getattribute__(self, "__observer__")
+        return obs._trait_values.keys()
+    
+    def values(self):
+        """Generates a values 'view'
+        """
+        obs = object.__getattribute__(self, "__observer__")
+        return obs._trait_values.values()
+    
+    def items(self):
+        """Generates an items 'view'
+        """
+        obs = object.__getattribute__(self, "__observer__")
+        return obs._trait_values.items()
         
     @property
     def notifiers(self):
@@ -486,7 +744,7 @@ class DataBag(Bunch):
             return sorted([i for i in self.items()], key=lambda t: t[1])
         
     def copy(self):
-        """Deep copy.
+        """Creates a deep copy of this DataBag object.
         
         In: bag1=databag.DataBag({"a":1, "b":2})                                                             
 
@@ -512,16 +770,22 @@ class DataBag(Bunch):
         with self.observe(...))
         
         """
-        dd = dict(self)
-        return DataBag(dd, mutable_types = self.mutable_types, cast_types=self.cast_types)
+        dd = dict(self.items())
+        
+        # NOTE: 2020-11-02 16:16:28
+        # need self.__class__ here for subclasses that call this function
+        return self.__class__(dd, 
+                       mutable_types = self.mutable_types, 
+                       use_casting=self.use_casting,
+                       allow_none=self.allow_none)
             
-        #result.mutable_types = self.mutable_types
-        #result.cast_types = self.cast_types
-            
-        #return result
-    
     def update(self, other):
-        # leaves self.mutable_types and self.cast_types unchanged
+        """Updates this DataBag with key/value pairs from 'other'.
+        
+        'other' is a subclass of dict.
+        
+        """
+        # leaves self.mutable_types and self.use_casting unchanged
         # the behaviour depends on whether self accepts mutating or casting type
         # traits
         
@@ -530,13 +794,9 @@ class DataBag(Bunch):
                 self[key] = value
                 
     def observe(self, handler, names=All, type="change"):
-        if names == "length":
-            names = "__length__"
         self.__observer__.observe(handler, names=names, type=type)
         
     def unobserve(self, handler, names=All, type="change"):
-        if names == "length":
-            names = "__length__"
         self.__observer__.unobserve(handler, names=names, type=type)
         
     def link(self, name, other, other_name):
@@ -666,9 +926,26 @@ class DataBag(Bunch):
         else:
             raise TypeError("'source' expected to be a DataBag or HasTraits; got %s instead" % type(source).__name__)
         
-    
-def generic_change_handler(chg):
-    print("change_handler chg['owner']:\n",chg["owner"], "\n")
-    print("change_handler chg['name']:\n",chg["name"], "\n")
-    print("change_handler chg['old']:\n",chg["old"], "\n")
-    print("change_handler chg['new']:\n",chg["new"], "\n")
+        
+def generic_change_handler(c, show:str="all"):
+    if isinstance(show, str):
+        if len(show.strip()) == 0:
+            show="all"
+            
+        elif show not in c:
+           show="all"
+           
+    else:
+        show = "all"
+        
+    herald="#debug generic_change_handler"
+        
+    if show == "all":
+        print(f"{herald} type:",  c.type)
+        print(f"{herald} owner:", c.owner)
+        print(f"{herald} name:",  c.name)
+        print(f"{herald} old:",   c.old)
+        print(f"{herald} new:",   c.new)
+        
+    else:
+        print(f"{herald} {show}", c[show])

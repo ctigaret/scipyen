@@ -1,0 +1,59 @@
+# Libraries and Tools   Required for                Observations (see footnotes)
+# ==============================================================================
+libnsl,                 # Python                    If building from sources
+openssl>=1.1.1          # Python                    If building from sources
+                        # Qt5t5                     If building from sources
+tk                      # Python                    If building from sources
+sqlite3                 # Python                    If building from sources
+
+Python-3.9.7            # everything (:-)           Use Windows installer; 
+                        #                           On Unix, build from sources,
+                        #                           configure with:
+                        #                           --enable-optimizations
+                        #                           --enable-shared
+                        #                           --with-lto
+git                     # access to repositories
+GitHub Desktop          # as above                  Windows only
+GutHub CLI              # as above
+VisualStudio 2019       # Most of below             Windows only
+cmake v3.x              # most of below
+doxygen                 # VIGRA, NEURON             (1)
+zlib                    # libjpeg, linpng libtiff   (1)
+                        # boost, VIGRA                     
+libjpeg                 # VIGRA                     (1)
+libpng                  # VIGRA                     (1)
+libtiff                 # VIGRA                     (1)
+boost_1_77_0            # VIGRA                     (3) build SHARED libraries!
+HDF5                    # VIGRA                     (1) but also possibly (3)
+OpenEXR                 # VIGRA                     (1)
+mpich                   # NEURON                    (1)
+VIGRA                   # imaging in scipyen        (2,3)
+dwarf                   # NEURON                    (1)
+NEURON                  # modelling                 Optional (3)
+nodejs                  # bokeh/jupyter             Optional (3)
+sip-5.5.1-dev           # scipyen GUI               Only on Unix (4,5)
+PyQt5-5.15.3-dev        # scipyen GUI               Only on Unix (4,5)
+PyQt5_sip-12.8.1        # scipyen GUI               Only on Unix (4,5)
+# ================================================================================
+
+
+# FOOTNOTES:
+# (1) 
+#     on Windows, build from sources, possibly using VisualStudio 2019;
+#     on Unix, install the corresponding devel packages using your ditribution's
+#     software manager
+#     
+# (2)
+#     on Windows, build with stand-alone cmake-gui using VisualStudio2019 toolset
+#     -> generate *.sln (solution) then build & install
+#     
+# (3) build from sources on Windows and Unix
+# 
+# (4) build from sources on Unix
+#
+# (5) PyQt5 can also be installed as a wheel using pip - recommended on Windows;
+#       However, on Unix, and depending on the OS distribution, the PyQt5 modules
+#       may NOT 'see' the system-wide  Qt5 modules (especially the style plugins).
+#       Therefore I prefer to build this from sources on Unix, which requires
+#       installation of several devel packages (not least Qt5) and building the
+#       sipmanually beforehand, followed by building Pyqt5.sip after Pyqt5

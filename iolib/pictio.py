@@ -12,12 +12,17 @@ Add signature annotations to file loaders to help file data handling
 #### BEGIN core python modules
 from __future__ import print_function
 
-import os, sys, traceback, inspect, keyword, warnings
+import inspect, os, sys, traceback, typing, warnings, io
+import contextlib, pathlib
 # import  threading
+import csv, numbers, mimetypes
+import dill as pickle
+#import pickle, pickletools, copyreg
 import concurrent.futures
-import pickle, pickletools, copyreg, csv, numbers, mimetypes
 import collections
-from functools import singledispatch
+#from functools import singledispatch
+#from contextlib import (contextmanager,
+                        #ContextDecorator,)
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -26,23 +31,32 @@ import scipy.io as sio
 import quantities as pq
 import numpy as np
 import pandas as pd
-import xarray as xa
+#import xarray as xa
 import h5py
 import vigra
 import neo
+import confuse # for programmatic read/write of non-gui settings
 from PyQt5 import QtCore, QtGui, QtWidgets
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
 #from core import neo
 #from core import patchneo
-from core import (xmlutils, strutils, axisutils, datatypes, datasignal,
-                  scandata, analysisunit, axiscalibration, triggerprotocols,
-                  neoutils,)
+from core import (xmlutils, strutils, datatypes, datasignal,
+                  triggerprotocols, neoutils,)
 
-from core.axisutils import *
 
-from core.prog import safeWrapper
+from core.prog import (ContextExecutor, safeWrapper,)
+
+from core.monkey import (check_neo_patch, 
+                       identify_neo_patch,  import_relocated_module)
+
+from core.workspacefunctions import (user_workspace, assignin, debug_scipyen,
+                                     get_symbol_in_namespace,)
+
+from imaging import (axisutils, axiscalibration, scandata, )
+from imaging.axisutils import *
+from iolib import h5io
 
 #import datatypes
 #### END pict.core modules
@@ -58,46 +72,48 @@ from core.prog import safeWrapper
 # in case it is not, call pip3 install --user pyxdg
 try:
     import xdg # CAUTION this is from pyxdg
-    from xdg import Mime
+    from xdg import Mime as xdgmime
     
 except Exception as e:
     warnings.warn("Python module 'pyxdg' not found; xdg mime info utilities not available")
     xdg = None
-    Mime = None
+    xdgmime = None
 
 # NOTE: 2019-04-21 18:34:08 
-# somewhat reductant but I found that the Mime module in pyxdg distributed with
+# somewhat redundant but I found that the Mime module in pyxdg distributed with
 # openSUSE does not do is_plain_text(), or get_type2()
 # so also use the binding to libmagic here
 # ATTENTION: for Windows you need DLLs for libmagic installed separately
 # for 64 bit python, install libmagicwin64
 # ATTENTION: on Mac OSX you also needs to install libmagic (homebrew) or file (macports)
 try:
-    import magic # file identification using libmagic
+    import magic as libmagic # file identification using libmagic
     
 except Exception as e:
-    warnings.warn("Python module 'magic' not found; advanced file type identification will be limited")
-    magic = None
+    #warnings.warn("Python module 'magic' not found; advanced file type identification will be limited")
+    libmagic = None
 
 
 
 
 # NOTE: 2016-04-01 10:58:32
 # let's have this done once and for all
-__vigra_formats__ = vigra.impex.listExtensions()
 __ephys_formats__ = ["abf"]
 __generic_formats__ = ["pkl", "h5", "csv"]
-
-#SUPPORTED_IMAGE_TYPES = __vigra_formats__.split() + [i for i in bioformats.READABLE_FORMATS if i not in __vigra_formats__]
-SUPPORTED_IMAGE_TYPES = __vigra_formats__.split() # + [i for i in bioformats.READABLE_FORMATS if i not in __vigra_formats__]
-#del(i)
-SUPPORTED_IMAGE_TYPES.sort()
+__tabular_formats__ = ["xls", "xlsx", "xlsm", "xlsb", "odf", "ods", "odt", "csv", "tsv" ]
 
 SUPPORTED_EPHYS_FILES = __ephys_formats__
 SUPPORTED_EPHYS_FILES.sort()
 
 SUPPORTED_GENERIC_FILES = __generic_formats__
 SUPPORTED_GENERIC_FILES.sort()
+
+#if has_vigra:
+__vigra_formats__ = vigra.impex.listExtensions()
+#SUPPORTED_IMAGE_TYPES = __vigra_formats__.split() + [i for i in bioformats.READABLE_FORMATS if i not in __vigra_formats__]
+SUPPORTED_IMAGE_TYPES = __vigra_formats__.split() # + [i for i in bioformats.READABLE_FORMATS if i not in __vigra_formats__]
+#del(i)
+SUPPORTED_IMAGE_TYPES.sort()
 
 # NOTE: 2017-06-29 14:36:20
 # move file handling from ScipyenWindow here
@@ -113,12 +129,11 @@ user_mime_types_file = os.path.join(os.path.expanduser("~"), ".mime.types")
 if os.path.isfile(user_mime_types_file):
     mimetypes_knownfiles.append(user_mime_types_file)
 
-
 mimetypes.init(mimetypes_knownfiles)
-
 for ext in SUPPORTED_IMAGE_TYPES:
     if mimetypes.guess_type("_."+ext)[0] is None:
-        mimetypes.add_type("image/"+ext, "."+ext)
+        mimetypes.add_type(f"image/{ext}", "."+ext)
+        mimetypes.add_type(f"image/x-{ext}", "."+ext)
         
 # NOTE: 2019-04-21 18:16:01
 # manual, old & cumbersome way
@@ -137,12 +152,22 @@ def __ndArray2csv__(data, writer):
     for l in data:
         writer.writerow(l)
         
+        
+def loadHDF5File(fName:str):
+    """FIXME/TODO 2021-12-08 12:19:08
+    """
+    raise NotImplementedError("Not yet...")
+    with h5py.File(fName) as h5file:
+        return h5io.read_hdf5(h5file)
+        
     
 # NOTE: 2017-09-21 16:34:21
-# BioFormats dumped mid 2017 because there are nor good python ports to it
+# BioFormats dumped mid 2017 because there are no good python ports to it
 # (it uses javabridge which is suboptimal)
-def loadImageFile(fileName:str, asVolume:bool=False, axisspec:[collections.OrderedDict, None]=None) -> ([vigra.VigraArray, np.ndarray],):
-    ''' Reads pixel data from an image file
+#def loadImageFile(fileName:str, asVolume:bool=False, axisspec:[collections.OrderedDict, None]=None) -> ([vigra.VigraArray, np.ndarray],):
+def loadImageFile(fileName:str, asVolume:bool=False, 
+                  suppress_cpp_warnings=False) -> vigra.VigraArray:
+    ''' Reads pixel data from a raster image file
     Uses the vigra impex library.
     
     
@@ -156,27 +181,18 @@ def loadImageFile(fileName:str, asVolume:bool=False, axisspec:[collections.Order
         by the "fileName" argument. If this is not what is wanted, then pass
         "asVolume = True" in the call.
         
-    
-    axisspec: a collections.OrderedDict with valid keys (x, y, z, c, t) and integer values,
-                with the constraint that the product of the values MUST equal the
-                numbr of pixels in the data
-    
-    TODO: come up with  smart way of "guessing" which of the xyzct dimensions are actually used in the TIFF
-            this could be very hard, because TIFF specification does not mandate this, 
-            and therefore TIFF writers do no necessarily include this information either.
-            
-    axisspec = collections.OrderedDict with the following constraints:
-            1) must contain maximum five elements
-            2) acceptable keys: 'x', 'y', 'z', 'c', and 't'
-            3) values are 'k', '~', or integers: when 'k', they will be replaced by the values 
-             read from the file; when '~', they are calculated from the total numbers of samples
-            4) the _order_ of the keys as specified in the axisspec will take
-             precedence over what is read from the file
-             
-             This may result in a reshape() called on the returned data.
-             
-             Raises an error if the new shape is not compatible with the number of samples in the data.
-             
+        
+    suppress_cpp_warnings:bool, default False
+        When True, it will suppress warnings issued by the vigra impex library
+        (C++ side)
+        
+        WARNING: this is a hack: while it successfully suppresses warning #
+        messages issued by vigra impex library, it will also "mute" the 
+        error messages subsewuenly raised in Python code
+        I guess this is because of code in the io.redirections module.
+        
+        Until that is fixed, keep this parameter to False/
+        
     NOTE: Things to be aware of:
     
     If fileName is the first in what looks like an image series, asVolume=True 
@@ -186,39 +202,35 @@ def loadImageFile(fileName:str, asVolume:bool=False, axisspec:[collections.Order
     form within a scan object (e.g. a PVScan object) and stop after the first cycle.
     
     '''    
-    #else:
-    
-    # NOTE: 2018-02-20 12:56:02
-    # coerce reading a volume as a volume!
-    nFrames = vigra.impex.numberImages(fileName)
-    
-    if nFrames > 1:
-        asVolume = True
-    
-    if asVolume:
-        ret = vigra.readVolume(fileName)
-        
+    # NOTE: 2021-11-30 11:46:12
+    # suppress warnings from vigra impex
+    from . import redirections
+    #f = io.StringIO()
+    #with warnings.catch_warnings():
+    #with contextlib.redirect_stderr(f):
+    #with redirections.output_stream_redirector(f, "stderr"):
+    if suppress_cpp_warnings:
+        cman = redirections.stderr_redirector(io.StringIO())
     else:
-        ret = vigra.readImage(fileName)
+        cman = contextlib.nullcontext()
         
-    #mdata = readImageMetadata(fileName)
-    
-    if axisspec is not None:# TODO FIXME we're not using this kind of axisspec anymore, are we?
-        if type(axisspec) is collections.OrderedDict:
-            parsedAxisspec = collections.OrderedDict(zip(ret.axistags.keys(), ret.shape))
+    with cman:
+        #if not sys.warnoptions:
+            #warnings.simplefilter("ignore")
             
-            axisspec = verifyAxisSpecs(axisspec, parsedAxisspec)
+        # NOTE: 2018-02-20 12:56:02
+        # coerce reading a volume as a volume!
+        nFrames = vigra.impex.numberImages(fileName)
+        
+        if nFrames > 1:
+            asVolume = True
+        
+        if asVolume:
+            ret = vigra.readVolume(fileName)
             
-            # by now, all tags given in axisspec should have values different than None
-            #print("axisspec: ", axisspec)
-            
-            ret.shape = axisspec.values()
-            ret.axistags = vigra.VigraArray.defaultAxistags(tagKeysAsString(axisspec))
-                    
         else:
-            raise ValueError('axisspec must be a collections.OrderedDict, or None')
+            ret = vigra.readImage(fileName)
         
-    #return (ret, mdata)
     return ret
         
 # TODO: diverge onto HDF5, and bioformats handling
@@ -729,10 +741,10 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
                 channel_units = [pq.dimensionless for c in channel_names]
                 
             
-            chndx = neo.ChannelIndex(index=np.arange(len(channel_names)),
-                                        channel_ids = range(len(channel_names)),
-                                        channel_names = channel_names,
-                                        name = "Channels")
+            #chndx = neo.ChannelIndex(index=np.arange(len(channel_names)),
+                                        #channel_ids = range(len(channel_names)),
+                                        #channel_names = channel_names,
+                                        #name = "Channels")
 
             # try to guess if this is a regularly sampled signal
             dtime = np.ediff1d(time_vector)
@@ -760,8 +772,8 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
                                                         name = name) \
                         for k, name in enumerate(channel_names)]
                 
-            for k, sig in enumerate(signals):
-                sig.channel_index = chndx[k]
+            #for k, sig in enumerate(signals):
+                #sig.channel_index = chndx[k]
                     
         else: # no "Time" column
             # we assume all data columns are analog signals, sampled at 1 Hz
@@ -770,10 +782,10 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
             t_start = 0 * time_units
             sampling_period = 1 * pq.s
             
-            chndx = neo.ChannelIndex(index = np.arange(len(data_col_names)),
-                                        channel_ids = range(len(data_col_names)),
-                                        channel_names = data_col_names,
-                                        name = "Channels")
+            #chndx = neo.ChannelIndex(index = np.arange(len(data_col_names)),
+                                        #channel_ids = range(len(data_col_names)),
+                                        #channel_names = data_col_names,
+                                        #name = "Channels")
             
             if len(data_units):
                 signals = [neo.AnalogSignal(data[name],
@@ -791,8 +803,8 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
                                         name = name) \
                         for name in data_col_names]
                 
-            for k, sig in enumerate(signals):
-                sig.channel_index = chndx[k]
+            #for k, sig in enumerate(signals):
+                #sig.channel_index = chndx[k]
                 
                 
     else:
@@ -802,10 +814,10 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
         t_start = 0 * time_units
         sampling_period = 1 * pq.s
         
-        chndx = neo.ChannelIndex(index = np.arange(len(data_col_names)),
-                                    channel_ids = range(len(data_col_names)),
-                                    channel_names = data_col_names,
-                                    name = "Channels")
+        #chndx = neo.ChannelIndex(index = np.arange(len(data_col_names)),
+                                    #channel_ids = range(len(data_col_names)),
+                                    #channel_names = data_col_names,
+                                    #name = "Channels")
         
         if len(data_units):
             signals = [neo.AnalogSignal(data[:,k],
@@ -823,8 +835,8 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
                                         name = data_col_names[k]) \
                     for k in range(data.shape[1])]
             
-        for k, sig in enumerate(signals):
-            sig.channel_index = chndx[k]
+        #for k, sig in enumerate(signals):
+            #sig.channel_index = chndx[k]
             
             
     segment = neo.Segment()
@@ -836,7 +848,7 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
     result = neo.Block(name=os.path.basename(fileName),
                        file_origin = fileName)
     
-    result.channel_indexes.append(chndx)
+    #result.channel_indexes.append(chndx)
     
     result.segments.append(segment)
     
@@ -848,7 +860,8 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
     
     #return result
 
-def loadAxonFile(fileName:str) -> neo.Block:
+def loadAxonFile(fileName:str, create_group_across_segment:typing.Union[bool, dict]=False,
+                 signal_group_mode:typing.Optional[str]="split-all") -> neo.Block:
     """Loads a binary Axon file (*.abf).
     
     Parameters:
@@ -856,10 +869,57 @@ def loadAxonFile(fileName:str) -> neo.Block:
     
     fileName : str; a fully qualified path & file name
     
+    create_group_across_segment: bool or dict (optional, default is False)
+        Controls grouping of signal types.
+        
+        Propagated to neo 0.9.0 neo.io.axonio.AxonIO
+        
+        If True :
+        * Create a neo.Group to group AnalogSignal segments
+        * Create a neo.Group to group SpikeTrain across segments
+        * Create a neo.Group to group Event across segments
+        * Create a neo.Group to group Epoch across segments
+        
+        With a dict the behavior can be controlled more finely
+        create_group_across_segment = { 'AnalogSignal': True, 'SpikeTrain': False, ...}
+
+        When False (default): no grouping occurs.
+        
+        
+    signal_group_mode: str (optional, default is "split-all")
+        Possible values:
+            None - default behaviour according to the IO type
+            "split-all" - each channel gives an AnalogSignal
+            "group-by-same-units" - all channels sharing same quantity units are
+                grouped in a 2D Analogsignal.
+            
+        Controls grouping of channels in the ABF file into AnalogSignal.
+        
+        Propagated to neo 0.9.0 neo.io.axonio.AxonIO.
+        
+        Since version 0.9.0, channels are, by default, grouped in "ChannelView"
+        objects. While this is seemingly OK for tetrode recordings, it breaks
+        the "one channel per signal" view of "traditional" in vitro or ex vivo 
+        recordings such as those obtained with Axon, or CED, software.
+        
+        The 'signal_group_mode' parameter allows to control this behaviour, with
+        its default value of "split-all" being conducive of the traditional
+        "one channel per signal" view.
+        
+        When None, this is supposed to get a default value that depends on the 
+        specific IO object; however, this default seems inappropriate for Axon
+        files where the "split-all" (allowing for one channel per signal) might
+        be expected.
+        
+        Should the user NOT wish to enforce this "traditional" behaviour, then 
+        the signal_group_mode should be given one of the other values, i.e.
+            None --> to revert to the current default behaviour
+            "group-by-same-units"
+    
     Returns:
     ---------
     
-    data : neo.Block; its "annotatins" attribute is updated to include
+    data : neo.Block; its "annotations" attribute is updated to include
         the axon_info "meta data" augumented with t_start and sampling_rate
         
     NOTE: 2020-02-17 09:31:05
@@ -882,7 +942,10 @@ def loadAxonFile(fileName:str) -> neo.Block:
     try:
         axonIO = neo.io.AxonIO(filename=fileName)
         
-        data = axonIO.read_block()
+        # NOTE: 2020-12-23 17:33:36
+        # adapt to the neo 0.9.0 API
+        data = axonIO.read_block(signal_group_mode=signal_group_mode)
+        #data = axonIO.read_block()
         
         if isinstance(data, list) and len(data) == 1:
             data = data[0]
@@ -916,170 +979,78 @@ def loadAxonFile(fileName:str) -> neo.Block:
     except Exception as e:
         traceback.print_exc()
         
-def loadPickleFile(fileName):
-    #from core import neoepoch, neoevent
-    from core import neoepoch as neoepoch
-    from core import neoevent as neoevent
-    #from core import scandata, analysisunit, axiscalibration, triggerprotocols
-    #from core import 
-    #from core import datatypes
-    from core.workspacefunctions import assignin
-    from gui import pictgui
-    from plugins import CaTanalysis
-    result = None
-    # NOTE: 2019-10-08 10:46:46
-    # migration to a new package directory layout
-    # breaks loading of old pickle files
-    # this affects all pickles that rely on classes previosuly defined in 
-    # modules that were present in the top level package but now have been
-    # modev to sub-packages (notably, in core)
-    # the following attempts to fix this
-    sys.modules["neoevent"] = neoevent
-    sys.modules["neoepoch"] = neoepoch
-    #sys.modules["datatypes"] = datatypes
-    sys.modules["pictgui"] = pictgui
-    sys.modules["CaTanalysis"] = CaTanalysis
+@safeWrapper
+def importDataFrame(fileName):
+    fileType = getMimeAndFileType(fileName)[0]
     
-    try:
-        with open(fileName, mode="rb") as fileSrc:
-            result = pickle.load(fileSrc)
-            
-    except Exception as e:
-        exc_info = sys.exc_info()
-        frame_summaries = traceback.extract_tb(exc_info[2])
+    if any([s in fileType for s in ("excel", "spreadsheet")]):
+        return pd.read_excel(fileName)
         
-        #for kf, frame_summary in enumerate(frame_summaries):
-            #print("frame %d" % kf, frame_summary.name)
+    elif any([s in fileType for s in ("csv", "tab-separated-values")]):
+        # figure out separator: tab or comma?
+        # NOTE: 2020-10-01 23:29:35 csv can also be tab-separated !!!
+        with open(fileName, "rt") as csvfile:
+            dialect = csv.Sniffer().sniff(csvfile.read(2048))
             
-        frame_names = [f.name for f in frame_summaries]
+        if dialect.delimiter in ("\t", " "): # tab-separated
+            return pd.read_table(fileName)
             
-        last_frame = frame_summaries[-1]
-        offending_module_filename = last_frame.filename
-        offending_function = last_frame.name
+        elif dialect.delimiter == ",": # comma-separated
+            return pd.read_csv(fileName)
         
-        #print("offending module:", offending_module_filename)
-        
-        #if "neo" in offending_module_filename or any(["neo" in frn for frn in frame_names]):
-        if any([any([s in frn for frn in frame_names]) for s in ("neo", "event", "epoch", "analogsignal", "irregularlysampledsignal")]):
-            result = unpickleNeoData(fileName)
-            
         else:
-            raise e
-        
-    if isinstance(result, (scandata.ScanData, analysisunit.AnalysisUnit, axiscalibration.AxisCalibration, pictgui.PlanarGraphics)):
-        result._upgrade_API_()
-    
-    if "neoevent" in sys.modules:
-        del sys.modules["neoevent"]
-        
-    if "neoepoch" in sys.modules:
-        del sys.modules["neoepoch"]
-        
-    #if "datatypes" in sys.modules:
-        #del sys.modules["datatypes"]
-        
-    if "pictgui" in sys.modules:
-        del sys.modules["pictgui"]
-        
-    if "CaTanalysis" in sys.modules:
-        del sys.modules["CaTanalysis"]
-    
-    return result
-
-def unpickleNeoData(fileName):
-    import core.patchneo as patchneo
-    import core.neoevent as neoevent
-    import core.neoepoch as neoepoch
-    
-    current_new_AnalogSignalArray = neo.core.analogsignal._new_AnalogSignalArray
-    current_new_IrregularlySampledSignal = neo.core.irregularlysampledsignal._new_IrregularlySampledSignal
-    current_new_spiketrain = neo.core.spiketrain._new_spiketrain
-    
-    current_new_event = neo.core.event._new_event
-    current_Event = neo.core.event.Event
-    current_Epoch = neo.core.epoch.Epoch
-    
-    current_normalize_array_annotations = neo.core.dataobject._normalize_array_annotations
-    
-    
-    try:
-        sys.modules["neoevent"] = neoevent
-        sys.modules["neoepoch"] = neoepoch
-        
-        neo.core.dataobject._normalize_array_annotations = patchneo._normalize_array_annotations
-        
-        neo.core.analogsignal._new_AnalogSignalArray = patchneo._new_AnalogSignalArray_v1
-        neo.core.spiketrain._new_spiketrain = patchneo._new_spiketrain_v1
-        neo.core.irregularlysampledsignal._new_IrregularlySampledSignal = patchneo._new_IrregularlySampledSignal_v1
-        
-        neo.core.event._new_event = neoevent._new_event
-        neo.core.event.Event = neoevent.Event
-        neo.core.Event = neoevent.Event
-        neo.io.axonio.Event = neoevent.Event
-        neo.Event = neoevent.Event
-        
-        neo.core.epoch.Epoch = neoepoch.Epoch
-        neo.core.Epoch = neoepoch.Epoch
-        neo.Epoch = neoepoch.Epoch
-        
-        
-        with open(fileName, mode="rb") as fileSrc:
-            result = pickle.load(fileSrc)
+            warnings.warn("Unsupported delimiter: %s" % dialect.delimiter)
             
-        del sys.modules["neoevent"]
-        del sys.modules["neoepoch"]
-                
-    except:
-        sys.modules["neoevent"] = neoevent
-        sys.modules["neoepoch"] = neoepoch
+    else:
+        warnings.warn("Unsupported file type: %s" % fileType)
         
-        neo.core.dataobject._normalize_array_annotations = patchneo._normalize_array_annotations
+#def custom_unpickle(src:typing.Union[str, io.BufferedReader]):#, 
+                    ##exc_info:typing.Optional[typing.Tuple[typing.Any, ...]]=None) -> object:
+    #if isinstance(src, str):
+        #if os.path.isfile(src):
+            #with open(src, mode="rb") as fileSrc:
+                #return PatchUnpickler(fileSrc).load()
+                ##return PatchUnpickler(fileSrc, exc_info=exc_info).load()
+            
+        #else:
+            #raise FileNotFoundError()
+            
+    #elif isinstance(src, io.BufferedReader):
+        #return PatchUnpickler(src).load()
+        ##return PatchUnpickler(src, exc_info=exc_info).load()
+    
+    #else:
+        #raise TypeError("Expecting a str containing an exiting file name or a BufferedReader; got %s instead" % type(src).__name__)
         
-        neo.core.analogsignal._new_AnalogSignalArray = patchneo._new_AnalogSignalArray_v2
-        neo.core.spiketrain._new_spiketrain = patchneo._new_spiketrain_v1
-        neo.core.irregularlysampledsignal._new_IrregularlySampledSignal = patchneo._new_IrregularlySampledSignal_v1
-        
-        neo.core.event._new_event = neoevent._new_event
-        neo.core.event.Event = neoevent.Event
-        neo.core.Event = neoevent.Event
-        neo.io.axonio.Event = neoevent.Event
-        neo.Event = neoevent.Event
-        
-        neo.core.epoch.Epoch = neoepoch.Epoch
-        neo.core.Epoch = neoepoch.Epoch
-        neo.Epoch = neoepoch.Epoch
-        
-        with open(fileName, mode="rb") as fileSrc:
-            result = pickle.load(fileSrc)
-                
-        del sys.modules["neoevent"]
-        del sys.modules["neoepoch"]
-                
-    neo.core.dataobject._normalize_array_annotations = current_normalize_array_annotations
-    
-    neo.core.analogsignal._new_AnalogSignalArray = current_new_AnalogSignalArray
-    neo.core.spiketrain._new_spiketrain = current_new_spiketrain
-    neo.core.irregularlysampledsignal._new_IrregularlySampledSignal = current_new_IrregularlySampledSignal
-    
-    neo.core.event._new_event = current_Event
-    neo.core.event.Event = current_Event
-    neo.core.Event = current_Event
-    neo.io.axonio.Event = current_Event
-    neo.Event = current_Event
-    neo.core.event._new_event = current_new_event
-    
-    neo.core.epoch.Epoch = current_Epoch
-    neo.core.Epoch = current_Epoch
-    neo.Epoch = current_Epoch
-    
-    if "neoevent" in sys.modules:
-        del sys.modules["neoevent"]
-    
-    if "neoepoch" in sys.modules:
-        del sys.modules["neoepoch"]
-    
-    return result
+    #return ret
 
+@safeWrapper
+def loadPickleFile(fileName):
+    """Loads pickled data.
+    ATTENTION: 
+    Doesn't load data from pickle files saved with old (pre-git) Scipyen versions
+    where module hierarchies (and paths) have changed.
+    
+    Will also fail to load pickle files that contain objects of dynamic types
+    such as those created in the user workspace - a good example is that of
+    namedtuple instances - unless they are defined in a loaded module.
+    
+    Moreover it will fail to load neo objects created with older neo versions.
+    
+    """
+    from core import patchneo as pneo
+    try:
+        pneo.patch_neo_new()
+        with open(fileName, mode="rb") as fileSrc:
+            ret = pickle.load(fileSrc)
+        pneo.restore_neo_new()
+    except:
+        pneo.restore_neo_new()
+        raise
+    return ret
+        
+    
+            
 def savePickleFile(val, fileName, protocol=None):
     #if inspect.isfunction(val): # DO NOT attempt to pickle unbound functions
         #return
@@ -1097,19 +1068,24 @@ def savePickleFile(val, fileName, protocol=None):
     
 def saveNixIOFile(val, fileName):
     (name,extn) = os.path.splitext(fileName)
-    if len(extn)==0 or extn != ".h5":
-        fileName += ".h5"
+    if len(extn)==0 or extn not in neo.NixIO.extensions:
+        fileName += ".nix"
+    #if len(extn)==0 or extn != ".h5":
+        #fileName += ".h5"
         
-    nixio = neo.NixIO(fileName=fileName)
+    nixio = neo.NixIO(fileName)
+    #nixio = neo.NixIO(fileName=fileName)
     nixio.write(val)
     
     nixio.close()
     
 def loadNixIOFile(fileName):
     if os.path.isfile(fileName):
-        nixio = neo.NixIO(fileName=fileName)
-        ret = nixio.read()
+        nixio = neo.NixIO(fileName)
+        ret = nixio.read() # always returns a list of neo.Block objects
         nixio.close()
+        if len(ret) == 1:
+            return ret[0] # just return a block
         return ret
     else:
         raise OSError("File Not Found)")
@@ -1124,7 +1100,7 @@ def signal_to_atf(data, fileName=None):
             for (k,v) in cframe.f_globals.items():
                 if not type(v).__name__ in ("module","type", "function", "builtin_function_or_method"):
                     if v is data and not k.startswith("_"):
-                        fileName = strutils.string_to_valid_identifier(k)
+                        fileName = strutils.str2symbol(k)
                         #print(fileName)
                     #print(type(v).__name__)
         finally:
@@ -1243,7 +1219,7 @@ def segment_to_atf(segment, fileName=None,
             for (k,v) in cframe.f_globals.items():
                 if not type(v).__name__ in ("module","type", "function", "builtin_function_or_method"):
                     if v is data and not k.startswith("_"):
-                        fileName = strutils.string_to_valid_identifier(k)
+                        fileName = strutils.str2symbol(k)
 
         finally:
             del(cframe)
@@ -1283,31 +1259,10 @@ def segment_to_atf(segment, fileName=None,
     except Exception as e:
         traceback.print_exc()
         csvfile.close()
-
-
-    #elif isinstance(data, np.ndarray):
-        #if header is not None:
-            #if isinstance(header, (tuple, list)):
-                #if data.ndim != 2:
-                    #raise ValueError("When header is given, data is expected to have two dimensions; instead, it has %d" % data.ndim)
-                
-                #if len(header) != data.shape[1]:
-                    #raise ValueError("When header is given, it must have as many elements as columns in data (%d); instead it has %d" %(data.shape[1], len(header)))
-                
-                #if isinstance(header, tuple):
-                    #headerlist = list(header)
-                    
-                #else:
-                    #headerlist = header
-
-            #elif isinstance(header, np.ndarray) and header.dtype.str.startswith("<U") and header.shape[1]==data.shape[1]:
-                #headerlist = [list(r) for r in header]
-                
-            #else:
-                #raise TypeError("Unexpected data type for header; should have been a list or tuple with %d element or a np.ndarray with %d columns and %s dtype; instead I've got %s" %(data.shape[1], data.shape[1], "<U10", type(header).__name__))
             
-        #else:
-            #headerlist = None
+def saveText(s, fileName):
+    with open(fileName, mode="wt") as fileDest:
+        fileDest.write(s)
             
 @safeWrapper
 def writeCsv(data, fileName=None, header=None):
@@ -1337,7 +1292,7 @@ def writeCsv(data, fileName=None, header=None):
             for (k,v) in cframe.f_globals.items():
                 if not type(v).__name__ in ("module","type", "function", "builtin_function_or_method"):
                     if v is data and not k.startswith("_"):
-                        fileName = strutils.string_to_valid_identifier(k)
+                        fileName = strutils.str2symbol(k)
                         #print(fileName)
                     #print(type(v).__name__)
         finally:
@@ -1417,8 +1372,8 @@ def writeCsv(data, fileName=None, header=None):
                 raise TypeError("Unexpected data type for header; should have been a list or tuple with %d element or a np.ndarray with %d columns and %s dtype; instead I've got %s" %(data.shape[1], data.shape[1], "<U10", type(header).__name__))
             
         else:
-            headerlist = ["Time", strutils.string_to_valid_identifier(data.name)] if isinstance(data, neo.IrregularlySampledSignal) else [strutils.string_to_valid_identifier(data.domain_name), 
-                                                                                                                                            strutils.string_to_valid_identifier(data.name)]
+            headerlist = ["Time", strutils.str2symbol(data.name)] if isinstance(data, neo.IrregularlySampledSignal) else [strutils.str2symbol(data.domain_name), 
+                                                                                                                                            strutils.str2symbol(data.name)]
             
         csvfile = open(fileName, "w", newline="")
         writer = csv.writer(csvfile, delimiter="\t")
@@ -1510,7 +1465,7 @@ def loadXMLFile(fileName):
     #else:
         #raise OSError("File %s not found" % fileName)
 
-def loadTextFile(fileName):
+def loadTextFile(fileName, forceText=False):
     if os.path.isfile(fileName):
         # we may have been landed here from an Axon Text File
         root, ext = os.path.splitext(fileName)
@@ -1527,7 +1482,7 @@ def loadTextFile(fileName):
         # NOTE: 2017-06-29 14:29:01
         # sometimes a text file contains XML data but it has not been recognized
         # as such by the mime type / magic systems
-        if "<?xml version" in text[0]:
+        if "<?xml version" in text[0] and not forceText:
             import xml.dom.minidom
             try:
                 text1 = ret.replace("&#x1;", "; ")
@@ -1563,7 +1518,8 @@ def loadTextFile(fileName):
 fileLoaders = collections.defaultdict(lambda: None) # default dict where missing keys return None
 
 for e in SUPPORTED_IMAGE_TYPES:
-    fileLoaders["image/"+e] = loadImageFile
+    fileLoaders[f"image/{e}"] = loadImageFile
+    fileLoaders[f"image/x-{e}"] = loadImageFile
     
 fileLoaders["application/axon-data"] = loadAxonFile
 fileLoaders["application/x-crossover-abf"] = loadAxonFile
@@ -1571,7 +1527,8 @@ fileLoaders["application/axon-binary-file"] = loadAxonFile
 fileLoaders["application/x-crossover-atf"] = loadAxonTextFile
 fileLoaders["application/axon-text-file"] = loadAxonTextFile
 fileLoaders["application/x-pickle"] = loadPickleFile
-fileLoaders["application/x-hdf"] = loadNixIOFile
+fileLoaders["application/x-hdf"] = loadHDF5File
+#fileLoaders["application/x-hdf"] = loadNixIOFile
 fileLoaders["text/xml"] = loadXMLFile
 fileLoaders["text/plain"] = loadTextFile
 fileLoaders["application/x-matlab"] = loadMatlab
@@ -1579,6 +1536,9 @@ fileLoaders["application/x-octave"] = loadOctave
 fileLoaders["application/octet-stream"]
 
 def getLoaderForFile(fName):
+    if "pkl" in os.path.splitext(fName)[-1]:
+        return fileLoaders["application/x-pickle"]
+    
     mime_type, file_type, _ = getMimeAndFileType(fName)
     
     ret = fileLoaders[mime_type] # fileLoaders is a default dict with None the default value
@@ -1594,7 +1554,7 @@ def getLoaderForFile(fName):
                     ret = loadAxonFile
                     
                 else:
-                    warnings.warning("Don't know how to open %s" % fName, RuntimeWarning)
+                    warnings.warn("Don't know how to open %s" % fName, RuntimeWarning)
 
         
         ## plain python mimtype module has failed;
@@ -1644,22 +1604,22 @@ def getMimeAndFileType(fileName):
         
         Will be set to None if the file type could not be determined
         
+    encoding: str or None; 
+        the encoding of the file as reported by the system's mime-type utilities 
     """
-    #encoding: str or None; 
-        #the encoding of the file as reported by the system's mime-type utilities 
     
     file_type = None
     mime_type = None
     encoding = None
     
     # NOTE: 2020-02-16 18:15:34
-    # 1) find out the file type
+    # 1) DETERMINE THE FILE TYPE
     # 1.1) try the python-magic first
-    if magic is not None:
+    if libmagic is not None:
         # magic module is loaded
         try:
             if os.path.isfile(fileName):
-                file_type = magic.from_file(fileName)
+                file_type = libmagic.from_file(fileName)
             
                 if isinstance(file_type, bytes):
                     file_type = file_type.decode()
@@ -1676,20 +1636,27 @@ def getMimeAndFileType(fileName):
         except Exception as e:
             traceback.print_exc()
             
-    # 2) determine the mime type
+    # 2) DETERMINE THE MIME TYPE
     # 2.1) try the pyxdg module
-    if Mime is not None:
+    if xdgmime is not None:
         try:
-            mime = Mime.get_type(fileName)
+            mime = xdgmime.get_type(fileName)
             mime_type = "/".join([mime.media, mime.subtype]) # e.g. "text/plain"
             #mime_type = mime.get_comment() # don't rely on this as it can have more than just "media/subtype" !
         
         except Exception as e:
-            traceback_print_exc()
+            traceback.print_exc()
             
     # 2.2) try the mimetypes module
-    if mime_type is None:
-        mime_type, encoding = mimetypes.guess_type(fileName)
+    # NOTE: 2021-04-12 11:31:29
+    # this is in case the actual file type and mime type are not registered
+    # with either the global or the user mime data base(s)
+    if mime_type in ["application/executable", None] or file_type == "data":
+        _mime_type, encoding = mimetypes.guess_type(fileName)
+        if _mime_type is not None:
+            # NOTE: 2021-04-12 11:31:24
+            # if mimetypes report None for type, revert to what xdgmime returned
+            mime_type = _mime_type
         
     return mime_type, file_type, encoding
         
@@ -1703,110 +1670,189 @@ def loadFile(fName):
     
     return value
 
+#@safeWrapper
+#def writeHDF5(obj, filenameOrGroup, pathInFile, compression=None, chunks=None, track_order=True):
+    #"""
+    #TODO Work in progress, do NOT use
+    #"""
+    #if not isinstance(obj, dict):
+        #raise TypeError("Expecting a dict; got %s instead" % type(obj).__name__)
+    
+    #group = None
+    
+    #if isinstance(filenameOrGroup, str):
+        #if len(filenameOrGroup.strip()) == 0:
+            #raise ValueError("when a str, 'filenameOrGroup' must not be empty")
+        
+        #else:
+            #filenameOrGroup = h5py.File(filenameOrGroup, "w")
+            
+    #elif not isinstance(filenameOrGroup, h5py.Group):
+        #raise TypeError("'filenameOrGroup' expected to be a str or a h5py.Group; got %s instead" % type(filenameOrGroup).__name__)
+    
+    #if isinstance(pathInFile, str):
+        #if len(pathInFile.strip()) == 0:
+            #raise ValueError("'pathInFile' must not be empty")
+        
+    #else:
+        #raise TypeError("'pathInFile' expected to be astr; got %s instead" % pathInFile)
+    
+    #group = filenameOrGroup.create_group(pathInFile, track_order=track_order)
+    
+    #if isinstance(obj. dict):
+        #for key, value in obj.items():
+            #key_group = writeHDF5(value, group, key, track_order = track_order)
+            
+    #elif isinstance(value, vigra.VigraArray):
+        #vigra.impex.writeHDF5(value, group, key,compression=compression, chunks=chunks)
+        
+    #elif isinstance(value, np.ndarray):
+        #group.create_dataset(key, shape=value.shape, dtype=value.dtype, data=data, 
+                            #chunks=chunks, compression=compression, track_order=track_order)
+        
+    #elif isinstance(value, (tuple, list)):
+        #array = np.array(value)
+        #group.create_dataset(key, shape=array.shape, dtype=array.dtype, data=array, 
+                            #chunks=chunks, compression=compression, track_order=track_order)
+        
+
+    ##if "/" in pathInFile:
+        ##group_path = [s for s in pathInFile.split("/") if len(s.strip())]
+        
+    #if isinstance(filenameOrGroup, h5py.File):
+        #filenameOrGroup.close()
+        
+    #return filenameOrGroup
+    
+#@safeWrapper
+#def export_to_hdf5(obj, filenameOrGroup, name=None):
+    #"""
+    #Parameters:
+    #----------
+    
+    #obj: Python object
+    
+    #file_name: str
+        #name of the hdf5 file written to disk
+        
+    #name: str or None (default)
+        #group name for storing the object inside the file
+        
+        #When None (default) or an empty string, the object is stored under a 
+        #group called "object" unless object is a dict in which case its members are
+        #stored at the top level in the file.
+        
+    #"""
+    ## TODO
+    #if not isinstance(filenameOrGroup, str):
+        #raise TypeError("file_name must be a str; got %s instead" % type(file_name).__name__)
+    
+    #if len(file_name.strip()) == 0:
+        #raise ValueError("file_name is empty")
+    
+    #fn, fext = os.path.splitext(file_name)
+    
+    #if len(fext.strip) <= 1:
+        #fext = ".hdf5"
+        
+        #file_name = "".join((fn, fext))
+
+    #f = h5py.File(file_name, "w")
+    
+    #if isinstance(obj, dict):
+        #if isinstance(name, str) and len(name.strip()):
+            #obj_group = f.create_group(name, track_order=True)
+            
+        #else:
+            #for k, v in obj.items():
+                #key_group = f.create_group("%s" % k, track_order=True)
+            
+    #else:
+        #if isinstance(name, str) and len(name.strip()):
+            #obj_group = f.create_group(name, track_order=True)
+            
+        #else:
+            #obj_group = f.create_group("object", track_order=True)
+            
+    #f.close()
+    
 @safeWrapper
-def writeHDF5(obj, filenameOrGroup, pathInFile, compression=None, chunks=None, track_order=True):
-    """
-    TODO Work in progress, do NOT use
-    """
-    if not isinstance(obj, dict):
-        raise TypeError("Expecting a dict; got %s instead" % type(obj).__name__)
+def saveHDF5(data, fileName):
+    (name,extn) = os.path.splitext(fileName)
+    if isinstance(extn, str) and len(extn.strip())==0 or extn not in (".h5", ".hdf5"):
+        fileName += ".h5"
+        
+    with h5py.File(fileName, mode="w") as h5file:
+        h5io.make_hdf5_entity(data, h5file, name=name)
     
-    group = None
+@safeWrapper
+def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None, 
+             ws:typing.Optional[dict]=None, mode:str="pkl", **kwargs):
+    """Saves variable(s) in the current working directory.
+    WARNING Do not confuse with IPython %save line magic
+    TODO adapt to other modes
+    """
     
-    if isinstance(filenameOrGroup, str):
-        if len(filenameOrGroup.strip()) == 0:
-            raise ValueError("when a str, 'filenameOrGroup' must not be empty")
+    # NOTE: 2020-10-22 13:41:18
+    # better to set this here so that get_symbol_in_namespace looks up in the
+    # correct namespace
+    if ws is None:
+        ws = user_workspace()
+        
+    if len(args) == 1:
+        x = args[0]
+        
+        if name is None or (isinstance(name, str) and len(name.strip()) == 0):
+            names = get_symbol_in_namespace(x, ws=ws)
+            
+        if len(names):
+            fileName = names[0]
+            
+        else:
+            fileName = "object"
+            
+        if mode == "pkl":
+            savePickleFile(x, fileName)
+            
+        elif mode == "csv":
+            writeCsv(x, fileName)  # this picks up if x is a pandas data object and calls the appropriate function
+            
+        elif mode == "hdf":
+            raise NotImplementedError("Saving to HDF5 files not yet supported")
+        
+        elif mode in ("tif", "png", "jpg"):
+            saveImageFile(x, fileName)
+            
+        elif mode in ("txt", "ascii"):
+            with open(fileName, mode="wt") as fileDest:
+                fileDest.write(x)
         
         else:
-            filenameOrGroup = h5py.File(filenameOrGroup, "w")
-            
-    elif not isinstance(filenameOrGroup, h5py.Group):
-        raise TypeError("'filenameOrGroup' expected to be a str or a h5py.Group; got %s instead" % type(filenameOrGroup).__name__)
-    
-    if isinstance(pathInFile, str):
-        if len(pathInFile.strip()) == 0:
-            raise ValueError("'pathInFile' must not be empty")
+            raise ValueError("Unexpected mode %s" % mode)
         
     else:
-        raise TypeError("'pathInFile' expected to be astr; got %s instead" % pathInFile)
-    
-    group = filenameOrGroup.create_group(pathInFile, track_order=track_order)
-    
-    if isinstance(obj. dict):
-        for key, value in obj.items():
-            key_group = writeHDF5(value, group, key, track_order = track_order)
+        if len(kwargs) > 0:
+            if len(kwargs) != len(args):
+                raise ValueError("For saving multiple variables, keyword params must be either empty or have the same length as the variadic parameter")
             
-    elif isinstance(value, vigra.VigraArray):
-        vigra.impex.writeHDF5(value, group, key,compression=compression, chunks=chunks)
-        
-    elif isinstance(value, np.ndarray):
-        group.create_dataset(key, shape=value.shape, dtype=value.dtype, data=data, 
-                            chunks=chunks, compression=compression, track_order=track_order)
-        
-    elif isinstance(value, (tuple, list)):
-        array = np.array(value)
-        group.create_dataset(key, shape=array.shape, dtype=array.dtype, data=array, 
-                            chunks=chunks, compression=compression, track_order=track_order)
-        
-
-    #if "/" in pathInFile:
-        #group_path = [s for s in pathInFile.split("/") if len(s.strip())]
-        
-    if isinstance(filenameOrGroup, h5py.File):
-        filenameOrGroup.close()
-        
-    return filenameOrGroup
-    
-@safeWrapper
-def export_to_hdf5(obj, filenameOrGroup, name=None):
-    """
-    Parameters:
-    ----------
-    
-    obj: Python object
-    
-    file_name: str
-        name of the hdf5 file written to disk
-        
-    name: str or None (default)
-        group name for storing the object inside the file
-        
-        When None (default) or an empty string, the object is stored under a 
-        group called "object" unless object is a dict in which case its members are
-        stored at the top level in the file.
-        
-    """
-    # TODO
-    if not isinstance(filenameOrGroup, str):
-        raise TypeError("file_name must be a str; got %s instead" % type(file_name).__name__)
-    
-    if len(file_name.strip()) == 0:
-        raise ValueError("file_name is empty")
-    
-    fn, fext = os.path.splitext(file_name)
-    
-    if len(fext.strip) <= 1:
-        fext = ".hdf5"
-        
-        file_name = "".join((fn, fext))
-
-    f = h5py.File(file_name, "w")
-    
-    if isinstance(obj, dict):
-        if isinstance(name, str) and len(name.strip()):
-            obj_group = f.create_group(name, track_order=True)
+            kw = [k for k in kwargs]
             
         else:
-            for k, v in obj.items():
-                key_group = f.create_group("%s" % k, track_order=True)
+            kw = []
             
-    else:
-        if isinstance(name, str) and len(name.strip()):
-            obj_group = f.create_group(name, track_order=True)
+        for k,x in enumerate(args):
+            if len(kw):
+                name = kw[k]
+                mode = kwargs[kw[k]]
             
-        else:
-            obj_group = f.create_group("object", track_order=True)
-            
+            save(x, name=name, mode=mode, ws = ws)
+        
     
-
-    f.close()
+def checkFileReadAccess(x):
+    if isinstance(x, str):
+        return os.path.isfile(x) and os.access(x, os.R_OK)
+    
+    if isinstance(x, (tuple, list, collections.deque)):
+        return all((isinstance(v, str) and os.path.isfile(v) and os.access(v, R_OK)) for v in x)
+    
+    return False

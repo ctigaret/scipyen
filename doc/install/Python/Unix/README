@@ -1,0 +1,180 @@
+###############################################################################                                                                      
+#               Copyright (C) 2021 Cezar M. Tigaret                
+#                                                                       
+#  This program is free software: you can redistribute it and/or modify 
+#  it under the terms of the GNU General Public License as published by 
+#  the Free Software Foundation, either version 3 of the License, or    
+#  (at your option) any later version.                                  
+#                                                                       
+#  This program is distributed in the hope that it will be useful,      
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of       
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the        
+#  GNU General Public License for more details.                         
+#                                                                       
+#  You should have received a copy of the GNU General Public License    
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#                                                                       
+#                                                                       
+#     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND    
+#     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES   
+#     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND          
+#     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT       
+#     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,      
+#     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING      
+#     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR     
+#     OTHER DEALINGS IN THE SOFTWARE.                                   
+###############################################################################
+
+NOTE: This is for building Python (3.9.7 or later) on Unix
+
+For Windows 10 see the accompanying "README Windows 10 file.txt"
+
+================================================================================
+Install prerequisites for building Python (disregard on Windows 10)
+================================================================================
+
+Use the distribution's Software manager (e.g. YaST/zypper on OpenSuSE, yum, apt,
+etc., on others) search for and install, TOGETHER WITH THEIR CORRESPONDING 
+"devel" PACKAGES:
+
+    libnsl, 
+    openssl (>= 1.1.1)
+    tk
+    sqlite3
+
+Exrtact the Python source code archive (e.g., Python-3.9.7.tar.xz) into your
+chosen place (e.g., ~/src)
+
+The cd into the chosen Python source tree (e.g. ~/src/Python-3.9.7) and run
+(in a Unix shell)
+
+./configure --enable-optimizations --with-lto --enable-shared --enable-loadable-sqlite-extensions > config_output 2>&1
+# NOTE: VIGRA requires shared python library !!!
+# NOTE: IPython requires the sqlite3 module
+
+make
+
+# run as superuser (either call su, or via sudo):
+
+make altinstall # NOTE: DO NOT CALL make install !!!! (this will overwrite your
+                #   ditribution's pytnhon executable)
+                
+                # NOTE: you could try to install Python locally somewhere under 
+                # your own $HOME tree
+
+ldconfig        # NOTE: required to update the records for the shared python library
+                # NOTE: this MUST be run as superuser (administrator) which is
+                # why it is a BAD IDEA to instal Pyton anywhere in your $HOME
+                # tree
+                
+ATTENTION: DO NOT RUN 'make install' (it will overwrite/overshadow the 
+distribution's own python executable and mess everything up)
+
+By default, the build toolkit will install Python in /usr/local/ but you could
+try to install it in a nonstandard location e.g. ~/Python
+
+Both strategies MIGHT survive an OS upgrade if /usr/local/ or /home/ are on a 
+partition distinct from root partition (where you install the OS). Even so, after
+upgrading you MAY have to rebuild Python (especially if the upgrade brings new 
+versions of gcc, nsl, oppenssl, sqlite3, tk, etc).
+
+As a rule of thumb, ALWAYS REBUILD Python (and other Scipyen ependencies) after
+an OS ugrade.
+
+If you decide to install Python in a non-standard place (e.g. ~/Python-3.9.7)
+you MUST add this directory to your PATH (edit ~/.bashrc)
+
+To run Scipyen YOU NEED TO MAKE AND ACTIVATE THE PYTHON ENVIRONMENT USING THE 
+BUILT PYTHON.
+
+================================================================================
+VIRTUAL PYTHON ENVIRONMENT ACTIVATION SCRIPTS:
+================================================================================
+
+NOTE: These have been created with the assumption that the build was configured 
+    using the default value for the '--prefix' option (which sets the FINAL 
+    location of Python after installation). By default, this is '/usr/local'
+    
+    Should you decide to ./configure with a specific --prefix value (e.g. 
+    ./configure --prefix=$HOME/Python-x.x.x) then you should modify the contents
+    of these scripts accordingly.
+    
+    It is a BadIdea(TM) to install Pythnon DIRECTLY in $HOME (it will populate
+    it with a lot of stuff, and may even overwrite scripts and binaries in your
+    $HOME/bin).
+    
+    HOWEVER: Because you have to call ldconfig (as superuser) after make install,
+    is is a BadIdea NOT to install Python in the default location (/usr/local)
+
+Copy the pyenv bash script to your $HOME/bin directory
+
+You MUST NOT make this executable.
+
+In your ~/.bashrc file (located in your HOME directory; this is hidden in 
+your file manager unless you set it to display hidden files) add the following
+line:
+
+alias usepy='source $HOME/bin/pyenv'
+
+This script IS REQUIRED to set up environment variables telling the Python 
+interpreter where its extensions & platform dependent libraries are.
+
+================================================================================
+CREATE A VIRTUAL PYTHON ENVIRONMENT
+================================================================================
+
+You MUST create a virtual python environment specific for the version of Python
+you are planning to use, for the following reasons:
+    1. everything else that relies on the specifc Python version can properly 
+    locate what it needs, without interference from the system's default Python
+    interpreter
+    2. Any Python packages installed specifically for the Python version using 
+    the version-specifc 'pip' tool will not interfere (or worse, ovderwrite)
+    system-wide packages
+
+Do the following:
+    1. Add $HOME/.local/bin LAST on your $PATH environment variable, if not 
+    already there  
+    
+    CAREFUL! $HOME/.local/bin would also contain python executables you may
+    have installed via the system's pip (using the '--user' option). In that
+    case, locate an old virtualenv script in there are rename it e.g
+    virtualenvX_Y were X and Y are the major and minor Python version 
+    corresponding to it (these are found in the first line of the script)
+    
+    2. call the usepy with the desired python version (major.minor)
+    
+    3. run 'pip install --user virtualenv'
+        NOTE: this will install an executable Python script called 'virtualenv'
+        in $HOME/.local/bin
+        
+        If you want to have separate virtual environments for different Python
+        versions then rename that script to 'virtualenvX_Y' where X and Y are 
+        the major and minor version numbers of the specific Python you used to
+        create the virtualenv script
+        
+    4. call virtualenvX_Y to generate a virtual environment with the desired
+    Python version (you can omit the -p option there)
+    
+    5. Proceed with the installation of virtual environment activation scripts
+    
+
+
+Therefore, in your ~/.bashrc also create an alias to source the activation
+script of the nbewly created Python environment AND set up the use of the built
+Pyton (this sets up environment variables required for third party software used 
+Scipyen).
+
+For example, add the following line to ~/.bashrc:
+
+alias scipyact39='source $HOME/scipyenv39/bin/activate && usepy 3.9'
+
+(NOTE: This activated the virtual python environment AND makes it aware of where
+the custom built Python stack is located)
+
+(NOTE: adapt to reflect the correct path names on your machine)
+
+        
+
+
+

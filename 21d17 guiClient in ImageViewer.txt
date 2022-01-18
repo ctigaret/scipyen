@@ -1,0 +1,4 @@
+guiClient property of ScipyenViewer was introduced to allow roi & cursors to be notified
+of a change in their associated frame when the viewer is not managed by Scipyen.
+
+Not sure this was a good tactic - must check!

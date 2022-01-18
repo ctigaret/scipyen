@@ -48,7 +48,7 @@
      <x>0</x>
      <y>0</y>
      <width>1115</width>
-     <height>29</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -59,15 +59,11 @@
      <property name="title">
       <string>&amp;Import</string>
      </property>
-     <addaction name="actionImport_Fluorescence_Time_Series_File"/>
-     <addaction name="actionImport_XY_Raster_Scan_File"/>
-     <addaction name="actionImport_Electrophysiology_File"/>
-     <addaction name="actionImport_Protocol_File"/>
+     <addaction name="actionImport_PrairieView_data"/>
     </widget>
     <addaction name="actionOpen"/>
     <addaction name="menuImport"/>
     <addaction name="actionSave"/>
-    <addaction name="actionSave_pickle"/>
     <addaction name="actionChange_Working_Directory"/>
     <addaction name="separator"/>
     <addaction name="separator"/>
@@ -103,21 +99,29 @@
     <property name="title">
      <string>Settings</string>
     </property>
-    <addaction name="actionConsole_font"/>
+    <addaction name="actionGUI_Style"/>
    </widget>
    <widget class="QMenu" name="menuConsoles">
     <property name="title">
      <string>Consoles</string>
     </property>
+    <widget class="QMenu" name="menuWith_Running_Kernel">
+     <property name="title">
+      <string>With Running Kernel</string>
+     </property>
+     <addaction name="actionRunning_IPython"/>
+     <addaction name="actionRunning_IPython_for_Neuron"/>
+    </widget>
     <addaction name="actionConsole"/>
     <addaction name="actionExternalIPython"/>
     <addaction name="actionExternalNrnIPython"/>
+    <addaction name="menuWith_Running_Kernel"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuView"/>
-   <addaction name="menuSettings"/>
    <addaction name="menuViewers"/>
    <addaction name="menuConsoles"/>
+   <addaction name="menuSettings"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -128,16 +132,20 @@
      <verstretch>0</verstretch>
     </sizepolicy>
    </property>
+   <property name="windowIcon">
+    <iconset theme="user-home">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
    <property name="features">
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
    <property name="windowTitle">
-    <string>&amp;User variables</string>
+    <string>&amp;User Variables</string>
    </property>
    <attribute name="dockWidgetArea">
     <number>8</number>
    </attribute>
-   <widget class="QWidget" name="dockWidgetWorkspace_Contents">
+   <widget class="QWidget" name="dockWidgetWorkspaceContents">
     <layout class="QVBoxLayout" name="verticalLayout_3">
      <item>
       <widget class="QTableView" name="workspaceView">
@@ -237,23 +245,27 @@ NOTE: you can click anywhere in the row to select</string>
     </layout>
    </widget>
   </widget>
-  <widget class="QDockWidget" name="dockWidget_History">
+  <widget class="QDockWidget" name="dockWidgetHistory">
    <property name="sizePolicy">
     <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
      <horstretch>0</horstretch>
      <verstretch>0</verstretch>
     </sizepolicy>
    </property>
+   <property name="windowIcon">
+    <iconset theme="folder-recent">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
    <property name="features">
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
    <property name="windowTitle">
-    <string>&amp;Command history</string>
+    <string>&amp;Command History</string>
    </property>
    <attribute name="dockWidgetArea">
     <number>8</number>
    </attribute>
-   <widget class="QWidget" name="dockWidgetHistory_Contents">
+   <widget class="QWidget" name="dockWidgetHistoryContents">
     <layout class="QVBoxLayout" name="verticalLayout_4">
      <item>
       <widget class="QTreeWidget" name="historyTreeWidget">
@@ -351,12 +363,16 @@ NOTE: you can click anywhere in the row to select</string>
     </layout>
    </widget>
   </widget>
-  <widget class="QDockWidget" name="FileSystemBrowser">
+  <widget class="QDockWidget" name="dockWidgetFileSystem">
    <property name="sizePolicy">
     <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
      <horstretch>0</horstretch>
      <verstretch>0</verstretch>
     </sizepolicy>
+   </property>
+   <property name="windowIcon">
+    <iconset theme="folder">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="features">
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
@@ -367,7 +383,7 @@ NOTE: you can click anywhere in the row to select</string>
    <attribute name="dockWidgetArea">
     <number>8</number>
    </attribute>
-   <widget class="QWidget" name="dockWidgetContents">
+   <widget class="QWidget" name="dockWidgetFileSystemContents">
     <layout class="QVBoxLayout" name="verticalLayout_5">
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout">
@@ -388,26 +404,6 @@ NOTE: you can click anywhere in the row to select</string>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="dirUpBtn">
-         <property name="toolTip">
-          <string>Go to parent directory</string>
-         </property>
-         <property name="text">
-          <string>Parent directory</string>
-         </property>
-         <property name="icon">
-          <iconset theme="go-up">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-         <property name="autoRaise">
-          <bool>true</bool>
-         </property>
-         <property name="arrowType">
-          <enum>Qt::UpArrow</enum>
          </property>
         </widget>
        </item>
@@ -452,14 +448,33 @@ NOTE: you can click anywhere in the row to select</string>
         </widget>
        </item>
        <item>
+        <widget class="QToolButton" name="dirUpBtn">
+         <property name="toolTip">
+          <string>Go to parent directory</string>
+         </property>
+         <property name="text">
+          <string>Parent directory</string>
+         </property>
+         <property name="icon">
+          <iconset theme="go-up">
+           <normaloff>.</normaloff>.</iconset>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+         <property name="arrowType">
+          <enum>Qt::UpArrow</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QToolButton" name="viewFilesFilterToolBtn">
          <property name="text">
           <string/>
          </property>
          <property name="icon">
-          <iconset resource="resources/resources.qrc">
-           <normaloff>:/images/view-filter.svg</normaloff>
-           <normalon>:/images/view-filter.svg</normalon>:/images/view-filter.svg</iconset>
+          <iconset theme="view-filter">
+           <normaloff>.</normaloff>.</iconset>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -637,8 +652,8 @@ NOTE: you can click anywhere in the row to select</string>
              <string/>
             </property>
             <property name="icon">
-             <iconset resource="resources/resources.qrc">
-              <normaloff>:/images/window-close.svg</normaloff>:/images/window-close.svg</iconset>
+             <iconset theme="window-close">
+              <normaloff>.</normaloff>.</iconset>
             </property>
             <property name="autoRaise">
              <bool>true</bool>
@@ -688,6 +703,20 @@ NOTE: you can click anywhere in the row to select</string>
     </layout>
    </widget>
   </widget>
+  <widget class="QToolBar" name="toolBar">
+   <property name="windowTitle">
+    <string>toolBar</string>
+   </property>
+   <property name="toolButtonStyle">
+    <enum>Qt::ToolButtonFollowStyle</enum>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+  </widget>
   <action name="actionSave">
    <property name="text">
     <string>&amp;Save As ...</string>
@@ -713,9 +742,9 @@ NOTE: you can click anywhere in the row to select</string>
     <string>&amp;On Console</string>
    </property>
   </action>
-  <action name="actionImport_Fluorescence_Time_Series_File">
+  <action name="actionImport_PrairieView_data">
    <property name="text">
-    <string>&amp;Fluorescence Time Series</string>
+    <string>PrairieView data</string>
    </property>
   </action>
   <action name="actionImport_XY_Raster_Scan_File">
@@ -836,6 +865,26 @@ NOTE: you can click anywhere in the row to select</string>
   <action name="actionExternalNrnIPython">
    <property name="text">
     <string>External IPython for Neuron</string>
+   </property>
+  </action>
+  <action name="actionConsole_Client_for_Neuron">
+   <property name="text">
+    <string>Console Client wirh Neuron IPython</string>
+   </property>
+  </action>
+  <action name="actionRunning_IPython">
+   <property name="text">
+    <string>Choose kernel...</string>
+   </property>
+  </action>
+  <action name="actionRunning_IPython_for_Neuron">
+   <property name="text">
+    <string>Choose kernel and launch Neuron</string>
+   </property>
+  </action>
+  <action name="actionGUI_Style">
+   <property name="text">
+    <string>GUI Style...</string>
    </property>
   </action>
  </widget>

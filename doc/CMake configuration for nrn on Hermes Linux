@@ -1,0 +1,198 @@
+heads/master
+
+Found BISON: /usr/bin/bison (found version "3.0.4") 
+Found FLEX: /usr/bin/flex (found version "2.6.4") 
+Found PythonInterp: /home/cezar/scipyenv39/bin/python3 (found version "3.9.7") 
+Sub-project : using backward from from /home/cezar/scipyenv39/src/nrn/external/backward
+Sub-project : using iv from from /home/cezar/scipyenv39/src/nrn/external/iv
+Checking for include files
+Checking for functions
+Checking for include directories
+Checking for types
+
+Configured INTERVIEWS 0.1
+
+Some things you can do now:
+--------------+--------------------------------------------------------------
+Command       |   Description
+--------------+--------------------------------------------------------------
+make install  | Will install INTERVIEWS to: /home/cezar/scipyenv39
+              | Change the install location of NEURON using:
+              |     cmake <src_path> -DCMAKE_INSTALL_PREFIX=<install_path>
+--------------+--------------------------------------------------------------
+Build option  | Status
+--------------+--------------------------------------------------------------
+BUILD_TYPE    | RelWithDebInfo (allowed: Debug;Release;RelWithDebInfo)
+SHARED        | ON
+X11_DYNAMIC   | OFF
+--------------+--------------------------------------------------------------
+ See more : https://github.com/neuronsimulator/iv
+--------------+--------------------------------------------------------------
+
+Found PythonInterp: /home/cezar/scipyenv39/bin/python3 (found suitable version "3.9.7", minimum required is "3.6") 
+Found PythonInterp: /home/cezar/scipyenv39/bin/python3 (found suitable version "3.9.7", minimum required is "3") 
+Building CoreNEURON from submodule
+Sub-project : using coreneuron from from /home/cezar/scipyenv39/src/nrn/external/coreneuron
+CORENRN_FORMATTING: OFF
+CORENRN_FORMATTING_ON: all
+CORENRN_FORMATTING_CPP_CHANGES_ONLY: OFF
+CORENRN_TEST_FORMATTING: OFF
+CORENRN_FORMATTING_NO_SUBMODULES: ON
+CORENRN_CLANG_FORMAT: OFF
+CORENRN_CMAKE_FORMAT: OFF
+CORENRN_GIT_HOOKS: OFF
+CORENRN_GIT_COMMIT_HOOKS: 
+CORENRN_GIT_PUSH_HOOKS: courtesy-msg
+CORENRN_STATIC_ANALYSIS: OFF
+CORENRN_TEST_STATIC_ANALYSIS: OFF
+Found PythonInterp: /home/cezar/scipyenv39/bin/python3 (found version "3.9.7") 
+Could NOT find nmodl (missing: nmodl_BINARY nmodl_INCLUDE nmodl_PYTHONPATH) 
+Using nmodl submodule from /home/cezar/scipyenv39/src/nrn/external/coreneuron/external/nmodl
+CHECKING FOR FLEX/BISON
+Found FLEX: /usr/bin/flex (found suitable version "2.6.4", minimum required is "2.6") 
+Found BISON: /usr/bin/bison (found suitable version "3.0.4", minimum required is "3.0") 
+Sub-project : using fmt from "/home/cezar/scipyenv39/src/nrn/external/coreneuron/external/nmodl/ext/fmt"
+Sub-project : using spdlog from "/home/cezar/scipyenv39/src/nrn/external/coreneuron/external/nmodl/ext/spdlog"
+Sub-project : using pybind11 from "/home/cezar/scipyenv39/src/nrn/external/coreneuron/external/nmodl/ext/pybind11"
+pybind11 v2.6.1 
+Sub-project : using cli11 from "/home/cezar/scipyenv39/src/nrn/external/coreneuron/external/nmodl/ext/cli11"
+Sub-project : using eigen from "/home/cezar/scipyenv39/src/nrn/external/coreneuron/external/nmodl/ext/eigen"
+Version: 6.2.0
+Build type: RelWithDebInfo
+CXX_STANDARD: 14
+Required features: cxx_variadic_templates
+Sub-module : missing /home/cezar/scipyenv39/src/nrn/external/coreneuron/external/nmodl/cmake/hpc-coding-conventions: running git submodule update --init
+CORENRN_FORMATTING: OFF
+CORENRN_FORMATTING_ON: all
+CORENRN_FORMATTING_CPP_CHANGES_ONLY: OFF
+CORENRN_TEST_FORMATTING: OFF
+CORENRN_FORMATTING_NO_SUBMODULES: ON
+CORENRN_CLANG_FORMAT: OFF
+CORENRN_CMAKE_FORMAT: OFF
+CORENRN_GIT_HOOKS: OFF
+CORENRN_GIT_COMMIT_HOOKS: 
+CORENRN_GIT_PUSH_HOOKS: courtesy-msg
+CORENRN_STATIC_ANALYSIS: OFF
+CORENRN_TEST_STATIC_ANALYSIS: OFF
+CHECKING FOR PYTHON
+Found PythonInterp: /home/cezar/scipyenv39/bin/python3 (found suitable version "3.9.7", minimum required is "3.5") 
+
+Configured NMODL 0.3 (b0fe3279 2021-09-29 18:16:30 +0200)
+
+You can now build NMODL using:
+  cmake --build . --parallel 8 [--target TARGET]
+You might want to adjust the number of parallel build jobs for your system.
+Some non-default targets you might want to build:
+--------------------+--------------------------------------------------------
+ Target             |   Description
+--------------------+--------------------------------------------------------
+test                | Run unit tests
+install             | Will install NMODL to: /home/cezar/scipyenv39
+--------------------+--------------------------------------------------------
+ Build option       | Status
+--------------------+--------------------------------------------------------
+CXX COMPILER        | /usr/bin/c++
+COMPILE FLAGS       |  -fopenmp  -g  -O2 -Wno-write-strings
+Build Type          | RelWithDebInfo
+Legacy Units        | OFF
+Python Bindings     | OFF
+Flex                | /usr/bin/flex
+Bison               | /usr/bin/bison
+Python              | /home/cezar/scipyenv39/bin/python3
+--------------+--------------------------------------------------------------
+ See documentation : https://github.com/BlueBrain/nmodl/
+--------------+--------------------------------------------------------------
+
+
+Configured CoreNEURON 1.0
+
+You can now build CoreNEURON using:
+  cmake --build . --parallel 8 [--target TARGET]
+You might want to adjust the number of parallel build jobs for your system.
+Some non-default targets you might want to build:
+--------------------+--------------------------------------------------------
+ Target             |   Description
+--------------------+--------------------------------------------------------
+install             | Will install CoreNEURON to: /home/cezar/scipyenv39
+docs                | Build full docs. Calls targets: doxygen, sphinx
+--------------------+--------------------------------------------------------
+ Build option       | Status
+--------------------+--------------------------------------------------------
+CXX COMPILER        | /usr/bin/c++
+COMPILE FLAGS       |  -fopenmp  -Wno-unknown-pragmas -g  -O2 -Wno-write-strings -std=c++14 
+Build Type          | SHARED
+MPI                 | ON
+  INC               | /usr/lib64/mpi/gcc/mpich/include
+OpenMP              | ON
+Use legacy units    | OFF
+NMODL               | ON
+  ISPC              | OFF
+  FLAGS             | 
+MOD2CPP PATH        | /home/cezar/scipyenv39/src/nrn-build/bin/nmodl
+GPU Support         | OFF
+Auto Timeout        | ON
+Wrap exp()          | OFF
+SplayTree Queue     | ON
+NetReceive Buffer   | ON
+Caliper             | OFF
+Likwid              | OFF
+Unit Tests          | OFF
+Reporting           | OFF
+--------------+--------------------------------------------------------------
+ See documentation : https://github.com/BlueBrain/CoreNeuron/
+--------------+--------------------------------------------------------------
+
+Using Target in compiling and linking, you should take care of it if
+                    it fail miserabily (CODE: 1234567890)
+
+Configured NEURON 8.0
+
+You can now build NEURON using:
+  cmake --build . --parallel 8 [--target TARGET]
+You might want to adjust the number of parallel build jobs for your system.
+Some non-default targets you might want to build:
+--------------+--------------------------------------------------------------
+ Target       |   Description
+--------------+--------------------------------------------------------------
+install       | Will install NEURON to: /home/cezar/scipyenv39
+              | Change the install location of NEURON using:
+              |   cmake <src_path> -DCMAKE_INSTALL_PREFIX=<install_path>
+docs          | Build full docs. Calls targets: doxygen, notebooks, sphinx
+uninstall     | Removes files installed by make install (todo)
+--------------+--------------------------------------------------------------
+ Build option | Status
+--------------+--------------------------------------------------------------
+C COMPILER    | /usr/bin/cc
+CXX COMPILER  | /usr/bin/c++
+BUILD_TYPE    | RelWithDebInfo (allowed: Custom;Debug;Release;RelWithDebInfo;Fast)
+COMPILE FLAGS | -g  -O2 -Wno-write-strings
+Shared        | ON
+Default units | modern units (2019 nist constants)
+MPI           | ON
+  INC         | /usr/lib64/mpi/gcc/mpich/include
+  LIB         | /usr/lib64/mpi/gcc/mpich/lib64/libmpicxx.so
+  DYNAMIC     | OFF
+Python        | ON
+  EXE         | /home/cezar/scipyenv39/bin/python3
+  INC         | /usr/local/include/python3.9
+  LIB         | /usr/local/lib64/libpython3.9.so
+  MODULE      | ON
+  DYNAMIC     | OFF
+Readline      | /usr/lib64/libreadline.so
+Curses        | /usr/lib64/libncurses.so;/usr/lib64/libform.so
+RX3D          | ON
+  OptLevel    | 0
+Interviews    | ON
+  PATH        | /home/cezar/scipyenv39/src/nrn/external/iv
+  INC         | /home/cezar/scipyenv39/src/nrn/external/iv/src/include
+  X11 (INC)   | /usr/include
+      (LIBDIR)| /usr/lib64
+CoreNEURON    | ON
+  PATH        | /home/cezar/scipyenv39/src/nrn/external/coreneuron
+  LINK FLAGS  | -Lx86_64 -lcorenrnmech
+  Legacy Units| OFF
+--------------+--------------------------------------------------------------
+ See documentation : https://www.neuron.yale.edu/neuron/
+--------------+--------------------------------------------------------------
+
+Configuring done

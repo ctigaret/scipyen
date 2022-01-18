@@ -18,13 +18,13 @@ matplotlib for colormaps & colors
 # TODO:
 # 1. colormap editor
 # 
-# 2. remember last applied colormap or rather make a default colormap configurable
+# 2. DONE remember last applied colormap or rather make a default colormap configurable
 # 
 # 3. cursors:
 #
 # 3.1. really constrain the movement of cursors within the image boundaries; -- DONE
 # 
-# 3.2. implement edit cursor properties dialog
+# 3.2. implement edit cursor properties dialog NEARLY DONE
 # 
 # 3.3. streamline cursor creation from a neo.Epoch -- check if they support
 #      spatial units, not just time -- it apparently DOES WORK:
@@ -43,31 +43,26 @@ matplotlib for colormaps & colors
 # 4. ROIs: probably the best approach is to inherit from QGraphicsObject, see GraphicsObject
 # 
 
-# KISS = Keep It Simple, Stupid !
-
 #### BEGIN core python modules
 from __future__ import print_function
-import sys, os, numbers, traceback, inspect, threading, warnings
-import weakref, copy
+import sys, os, numbers, traceback, inspect, threading, warnings, typing, math
+import weakref, copy, itertools
+from functools import partial
 from collections import ChainMap, namedtuple, defaultdict
 from enum import Enum, IntEnum
-
+from dataclasses import MISSING
 #### END core python modules
 
 #### BEGIN 3rd party modules
+from traitlets import Bunch
 import numpy as np
 import quantities as pq
 import pyqtgraph as pgraph
 import neo
 import vigra
+from pandas import NA
 #import vigra.pyqt 
 import matplotlib as mpl
-from matplotlib import cm, colors
-
-try:
-    import cmocean # some cool palettes/luts
-except:
-    pass
 
 from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
@@ -75,52 +70,53 @@ from PyQt5.uic import loadUiType as __loadUiType__
 
 #### END 3rd party modules
 
-#### BEGIN pict.core modules
+#### BEGIN scipyen core modules
 from core import utilities
-from core.utilities import safeWrapper
+from core.prog import (safeWrapper, deprecation, iter_attribute,
+                       filter_type, filterfalse_type, 
+                       filter_attribute, filterfalse_attribute,
+                       filter_attr, filterfalse_attr)
+
 from core import strutils as strutils
 from core import datatypes as dt
+from core.quantities import quantity2str
+from core.traitcontainers import DataBag
+from core.scipyen_config import markConfigurable
+
+from imaging import (axisutils, axiscalibration, vigrautils as vu,)
+from imaging.axisutils import (axisTypeFromString,
+                               axisTypeName, 
+                               axisTypeSymbol, 
+                               axisTypeUnits, )
+
+from imaging.axiscalibration import (AxesCalibration, AxisCalibrationData,)
+
 #from core import neo
 #from core import metaclass_solver
-#### END pict.core modules
+#### END scipyen core modules
 
-#### BEGIN pict.iolib modules
+#### BEGIN scipyen iolib modules
 from iolib import pictio as pio
-#### END pict.iolib modules
+from iolib import h5io
+#### END scipyen iolib modules
 
-#### BEGIN pict.gui modules
+#### BEGIN scipyen gui modules
 from .scipyenviewer import ScipyenViewer, ScipyenFrameViewer
+
 
 from . import signalviewer as sv
 from . import pictgui as pgui
-from . import custom_colormaps as customcm
+
+# NOTE 2020-11-28 10:04:05
+# this should automatically import our custom colormaps AND ocean colormaps if found
+from . import scipyen_colormaps as colormaps 
 from . import quickdialog
-#### END pict.gui modules
+from . import painting_shared
+#### END scipyen gui modules
 
 mpl.rcParams['backend']='Qt5Agg'
 
 #__viewer_info__ = {"alias": "iv", "class": "ImageViewer"}
-
-
-# NOTE: 2017-06-22 14:22:00 added custom color maps
-customcm.register_custom_colormaps()
-
-
-colormaps = cm.cmap_d.copy() # now this has all mpl and custom colormaps
-
-# NOTE: 2019-03-26 09:54:59
-# add a "None" colormap NOW (actually, map it to "gray")
-colormaps["None"] = cm.cmap_d["gray"]
-
-try:
-    colormaps.update(cmocean.cm.cmap_d)
-except:
-    pass
-
-#colormapnames = [n for n in colormaps.keys()]
-#colormapnames.sort()
-#colormapnames.insert(0, "None") #prepend None to remove any applied colormap
-
 
 if sys.version_info[0] >= 3:
     xrange = range
@@ -129,8 +125,8 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 #print(__module_path__)
 
-#import qimage2ndarray 
-#from qimage2ndarray import gray2qimage, array2qimage, alpha_view, rgb_view, byte_view
+import qimage2ndarray 
+from qimage2ndarray import gray2qimage, array2qimage, alpha_view, rgb_view, byte_view
 
 # don't use this yet, until we fully understand how to deal with VigraQt colormap
 #mechanism from Python side
@@ -143,7 +139,7 @@ Ui_ImageViewerWindow, QMainWindow = __loadUiType__(os.path.join(__module_path__,
 
 Ui_GraphicsImageViewerWidget, QWidget = __loadUiType__(os.path.join(__module_path__,'graphicsimageviewer.ui'))
 
-Ui_AxisCalibrationDialog, QDialog = __loadUiType__(os.path.join(__module_path__, "axescalibrationdialog.ui"))
+Ui_AxesCalibrationDialog, QDialog = __loadUiType__(os.path.join(__module_path__, "axescalibrationdialog.ui"))
 
 Ui_TransformImageValueDialog, QDialog = __loadUiType__(os.path.join(__module_path__,"transformimagevaluedialog.ui"))
 
@@ -259,9 +255,8 @@ class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
     def slot_newMaxRangeValueReceived(self, val):
         self.rangeMaxSpinBox.setValue(val)
         
-    
 
-class AxesCalibrationDialog(QDialog, Ui_AxisCalibrationDialog):
+class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
     def __init__(self, image, pWin=None, parent=None):
         super(AxesCalibrationDialog, self).__init__(parent)
         
@@ -288,21 +283,23 @@ class AxesCalibrationDialog(QDialog, Ui_AxisCalibrationDialog):
         
         self.selectedAxisIndex = 0
         
+        #self.axesCalibration = AxesCalibration(img)
+        
         self.axisMetaData = dict()
         
         for axisInfo in self.axistags:
-            self.axisMetaData[axisInfo.key]["calibration"] = dt.AxisCalibration(axisInfo)
+            self.axisMetaData[axisInfo.key]["calibration"] = axiscalibration.AxesCalibration(axisInfo)
                 
-            self.axisMetaData[axisInfo.key]["description"] = dt.AxisCalibration.removeCalibrationFromString(axisInfo.description)
+            self.axisMetaData[axisInfo.key]["description"] = axiscalibration.AxesCalibration.removeCalibrationFromString(axisInfo.description)
 
         self.units          = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
         self.origin         = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
         self.resolution     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
         self.description    = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
         
-        self._configureGUI_()
+        self._configureUI_()
         
-    def _configureGUI_(self):
+    def _configureUI_(self):
         self.setupUi(self)
         
         self.setWindowTitle("Calibrate axes")
@@ -312,9 +309,9 @@ class AxesCalibrationDialog(QDialog, Ui_AxisCalibrationDialog):
         self.axisIndexSpinBox.setValue(self.selectedAxisIndex)
         
         if self.arrayshape is None:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, dt.defaultAxisTypeName(self.axistags[self.selectedAxisIndex])))
+            self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex])))
         else:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, dt.defaultAxisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
+            self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
             
         self.unitsLineEdit.setClearButtonEnabled(True)
         
@@ -367,9 +364,9 @@ class AxesCalibrationDialog(QDialog, Ui_AxisCalibrationDialog):
         self.description    = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
 
         if self.arrayshape is None:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, dt.defaultAxisTypeName(self.axistags[self.selectedAxisIndex])))
+            self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex])))
         else:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, dt.defaultAxisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
+            self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
             
         self.unitsLineEdit.setText(self.units.__str__().split()[1])
         self.originSpinBox.setValue(self.origin)
@@ -507,15 +504,11 @@ class AxesCalibrationDialog(QDialog, Ui_AxisCalibrationDialog):
 
         self.slot_generateCalibration()
         
-        
-
 class GraphicsImageViewerScene(QtWidgets.QGraphicsScene):
     signalMouseAt = pyqtSignal(int,int,name="signalMouseAt")
     
     signalMouseLeave = pyqtSignal()
     
-    #signalDeselectGraphics = pyqtSignal()
-
     def __init__(self, gpix=None, rect = None, **args):
         if rect is not None:
             super(GraphicsImageViewerScene, self).__init__(rect = rect, **args)
@@ -527,12 +520,6 @@ class GraphicsImageViewerScene(QtWidgets.QGraphicsScene):
         
         self.graphicsItemDragMode=False
 
-        #self._contextMenu = QtWidgets.QMenu("Scene Menu", super())
-        
-        #self._addCursorAction = self._contextMenu.addAction("Add cursor")
-        #self._addCursorAction.triggered.connect(self._slotAddCursor)
-        
-        
     ####
     # public methods
     ####
@@ -614,16 +601,6 @@ class GraphicsImageViewerScene(QtWidgets.QGraphicsScene):
     def wheelEvent(self, evt):
         evt.ignore()
         
-#"class" ImageGraphicsView(QtWidgets.QGraphicsView):
-    #"""
-    #TODO contemplate this to customize the graphicsivew in the GraphicsImageViewerWidget
-    #(_imageGraphicsView member)
-    #"""
-    #"def" __init__(*args, **kwargs):
-        #super(ImageGraphicsView, self).__init__(*args, **kwargs)
-        
-        
-        
 class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     """
     A simple image view widget based on Qt5 graphics view framework
@@ -656,7 +633,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     signalCursorAdded         = pyqtSignal(object, name="signalCursorAdded")
     signalCursorChanged       = pyqtSignal(object, name="signalCursorChanged")
     signalCursorRemoved       = pyqtSignal(object, name="signalCursorRemoved")
-    signalCursorSelected      = pyqtSignal(object, name="signalCursorSelected")
+    signalGraphicsObjectSelected      = pyqtSignal(object, name="signalGraphicsObjectSelected")
     signalRoiAdded            = pyqtSignal(object, name="signalRoiAdded")
     signalRoiChanged          = pyqtSignal(object, name="signalRoiChanged")
     signalRoiRemoved          = pyqtSignal(object, name="signalRoiRemoved")
@@ -669,7 +646,9 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     
     def __init__(self, img=None, parent=None, imageViewer=None):
         super(GraphicsImageViewerWidget, self).__init__(parent=parent)
-        self._configureGUI_()
+        
+        # NOTE: 2021-05-08 10:46:01 NEW API
+        self._planargraphics_ = list()
         
         self.__zoomVal__ = 1.0
         self._minZoom__ = 0.1
@@ -688,23 +667,24 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.__cursorWindow__ = self.__defaultCursorWindow__
         self.__cursorRadius__ = self.__defaultCursorRadius__
 
+        
         # NOTE: 2017-08-10 13:45:17
         # make separate dictionaries for each roi type -- NOT a chainmap!
-        self.__graphicsObjects__ = dict([(k.value, dict()) for k in pgui.GraphicsObjectType])
+        self._graphicsObjects_ = dict([(k.value, dict()) for k in pgui.PlanarGraphicsType])
         
         # grab dictionaries for cursor types in a chain map
-        cursorTypeInts = [t.value for t in pgui.GraphicsObjectType if \
-            t.value < pgui.GraphicsObjectType.allCursorTypes]
+        cursorTypeInts = [t.value for t in pgui.PlanarGraphicsType if \
+            t.value < pgui.PlanarGraphicsType.allCursorTypes]
         
         self.__cursors__ = ChainMap() # almost empty ChainMap
         self.__cursors__.maps.clear() # make sure it is empty
         
         for k in cursorTypeInts:    # now chain up the cursor dictionaries
-            self.__cursors__.maps.append(self.__graphicsObjects__[k])
+            self.__cursors__.maps.append(self._graphicsObjects_[k])
         
         # do the same for roi types
-        roiTypeInts = [t.value for t in pgui.GraphicsObjectType if \
-            t.value > pgui.GraphicsObjectType.allCursorTypes]
+        roiTypeInts = [t.value for t in pgui.PlanarGraphicsType if \
+            t.value > pgui.PlanarGraphicsType.allCursorTypes]
         
         self.__rois__ = ChainMap()
         self.__rois__.maps.clear()
@@ -713,21 +693,10 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         # maps attribute is a list !!!
         # would ChainMap.new_child() be more appropriate, below?
         for k in roiTypeInts:
-            self.__rois__.maps.append(self.__graphicsObjects__[k])
+            self.__rois__.maps.append(self._graphicsObjects_[k])
 
-        #### NOTE: 2017-11-26 22:53:12
-        ####
-        #### not needed anymore: coordinate linking between instances of 
-        #### GraphicsObject of the same type is now handled by the instances
-        #### themselves
-        #self._linkedCrosshairCursors = []
-        #self._linkedHorizontalCursors = []
-        #self._linkedVerticalCursors = []
-        #self._linkedRois = []
         
         self.selectedCursor = None
-        
-        #self.__rois__ = dict()
         
         self.selectedRoi = None
         
@@ -739,12 +708,9 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.__scene__ = GraphicsImageViewerScene(parent=self)
         self.__scene__.setItemIndexMethod(QtWidgets.QGraphicsScene.NoIndex)
         
-        self._imageGraphicsView.setScene(self.__scene__)
+        self._configureUI_()
         
-        #NOTE: 2017-03-25 22:31:12
-        # this is unnecessary: just connect the signal from the scene to the 
-        # container of this widget direcly (we get access to the scene by calling self.scene())
-        #self.__scene__.signalMouseAt[int,int].connect(self._reportPixelValueAtMousePosInWidget)
+        self._imageGraphicsView.setScene(self.__scene__)
         
         if img is not None:
             if isinstance(img, QtGui.QImage):
@@ -754,14 +720,16 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 self.__scene__.rootImage = QtWidgets.QGraphicsPixmapItem(img)
 
         self.__image_viewer__ = imageViewer
+        
     ####
     # private methods
     ####
     
-    def _configureGUI_(self):
+    def _configureUI_(self):
         self.setupUi(self)
         self._imageGraphicsView.setViewportUpdateMode(QtWidgets.QGraphicsView.FullViewportUpdate)
         self._imageGraphicsView.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
+        self._imageGraphicsView.setBackgroundBrush(QtGui.QBrush(painting_shared.make_transparent_bg(size=24)))
         self._topLabel.clear()
         
     def _zoomView(self, val):
@@ -770,55 +738,162 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.__zoomVal__ = val
         self.signalZoomChanged[float].emit(self.__zoomVal__)
         
-    def _cursorEditor(self, crsId=None):
-        if len(self.__cursors__) == 0:
-            return
+    def _removeGraphicsObject(self, o):
+        o.backend.frontends.clear()
+        self.scene.removeItem(o)
+        if isinstance(o.backend, pgui.Cursor):
+            self.signalCursorRemoved.emit(o.backend)
+            if self.selectedCursor is o:
+                self.selectedCursor = None
+        else:
+            self.signalRoiRemoved.emit(o.backend)
+            if self.selectedRoi is o:
+                self.selectedRoi = None
         
-        if crsId is None:
-            cselectDlg = pgui.ItemsListDialog(self, sorted([cId for cId in self.__cursors__.keys()]), "Select cursor")
+    def _removeSelectedPlanarGraphics(self, cursors:bool=True):
+        if cursors and self.selectedCursor:
+            self._removeGraphicsObject(self.selectedCursor)
             
-            a = cselectDlg.exec_()
+        elif self.selectedRoi:
+            self._removeGraphicsObject(self.selectedRoi)
             
-            if a == QtWidgets.QDialog.Accepted:
-                crsId = cselectDlg.selectedItemText
+    def _removeAllPlanarGraphics(self, cursors:typing.Optional[bool] = None):
+        predicate = lambda x: isinstance(x.backend, pgui.Cursor)
+        
+        if isinstance(cursors, bool):
+            if cursors:
+                objs = [o for o in filter(predicate, self.graphicsObjects)]
+            else:
+                objs = [o for o in itertools.filterfalse(predicate, self.graphicsObjects)]
+                
+        else:
+            objs = self.graphicsObjects
+            
+        for o in objs:
+            self._removeGraphicsObject(o)
+
+    def _removePlanarGraphicsByName(self, name, cursors:bool=True):
+        objs = []
+        if cursors:
+            if name in iter_attribute(self.dataCursors, "name"):
+                objs = [o for o in self.graphicsObjects if isinstance(o.backend, pgui.Cursor) and o.backend.name == name]
             else:
                 return
+        else:
+            if name in iter_attribute(self.rois, "name"):
+                objs = [o for o in self.graphicsObjects if not isinstance(o.backend, pgui.Cursor) and o.backend.name == name]
+            else:
+                return
+            
+        for o in objs:
+            self._removeGraphicsObject(o)
+                
+    def _removePlanarGraphics(self, name:typing.Optional[str]=None, cursors:bool=True):
+        if cursors:
+            if len([o for o in self.dataCursors]) == 0:
+                return
+            
+            objNames = sorted([o.name for o in self.dataCursors])
+
+        else:
+            if len([o for o in self.rois]) == 0:
+                return
+            
+            objNames = sorted([o.name for o in self.rois])
+            
+        if isinstance(name, (tuple, list)) and len(name) and all([isinstance(n, str) and len(n.strip())]):
+            objIds = name
+            
+        elif isinstance(name, str) and len(name.strip()):
+            objIds = [name]
+            
+        else:
+            dlgTitle = "Remove %ss" % "cursor" if cursors else "ROI"
+            
+            selectionDialog = pgui.ItemsListDialog(self, objNames,
+                                                title = dlgTitle,
+                                                selectmode = QtWidgets.QAbstractItemView.MultiSelection)
+            
+            ans = selectionDialog.exec_()
+            
+            if ans != QtWidgets.QDialog.Accepted:
+                return
+            
+            objIds = selectionDialog.selectedItemsText # this is a list of str
+            
+        if len(objIds) == 0:
+            return
         
-        cursor = self.__cursors__[crsId]
+        if cursors:
+            objs = [o for o in filter(lambda x: isinstance(x.backend, pgui.Cursor) and x.backend.name in objIds, self.graphicsObjects)]
+        else:
+            objs = [o for o in filter(lambda x: not isinstance(x.backend, pgui.Cursor) and x.backend.name in objIds, self.graphicsObjects)]
         
-        cursor_type = cursor.objectType
+        if cursors:
+            if self.selectedCursor in objs:
+                self.selectedCursor = None
+        else:
+            if self.selectedRoi in objs:
+                self.selectedRoi = None
+            
+        for o in objs:
+            self._removeGraphicsObject(o)
+                
         
-        cDict = self.__graphicsObjects__[cursor_type]
+    def _cursorEditor(self, crsId:str=None):
+        if len([o for o in self.dataCursors]) == 0:
+            return
+        
+        if not isinstance(crsId, str) or len(crsId.strip()) == 0:
+            selectionDialog = pgui.ItemsListDialog(self, sorted([c.name for c in self.dataCursors]), "Select cursor")
+            
+            a = selectionDialog.exec_()
+            
+            if a == QtWidgets.QDialog.Accepted:
+                crsId = selectionDialog.selectedItemsText
+            else:
+                return
+
+            if len(crsId) == 0:
+                return
+        
+            crsId = crsId[0]
+        
+        cursor = [o for o in filter(lambda x: isinstance(x.backend, pgui.Cursor) and x.backend.name == crsId, self.graphicsObjects)]
+        
+        if len(cursor) == 0:
+            return
+        
+        cursor = cursor[0]
         
         d = quickdialog.QuickDialog(self, "Edit cursor %s" % cursor.name)
-        #d = vigra.pyqt.quickdialog.QuickDialog(self, "Edit cursor %s" % cursor.name)
+
         d.promptWidgets = list()
         
         namePrompt = quickdialog.StringInput(d, "New label:")
-        #namePrompt = vigra.pyqt.quickdialog.StringInput(d, "New label:")
         namePrompt.variable.setClearButtonEnabled(True)
         namePrompt.variable.redoAvailable=True
         namePrompt.variable.undoAvailable=True
-        namePrompt.setText(cursor.ID)
+        namePrompt.setText(crsId)
         
         d.promptWidgets.append(namePrompt)
         
         showsPositionCheckBox = quickdialog.CheckBox(d, "Label shows position")
-        #showsPositionCheckBox = vigra.pyqt.quickdialog.CheckBox(d, "Label shows position")
         showsPositionCheckBox.setChecked(cursor.labelShowsPosition)
         
         
         d.promptWidgets.append(showsPositionCheckBox)
         
         showsOpaqueLabel = quickdialog.CheckBox(d, "Opaque label")
-        #showsOpaqueLabel = vigra.pyqt.quickdialog.CheckBox(d, "Opaque label")
         showsOpaqueLabel.setChecked(not cursor.hasTransparentLabel)
         
         d.promptWidgets.append(showsOpaqueLabel)
         
-        if cursor.isVerticalCursor:
+        # NOTE: 2021-05-04 15:53:58
+        # old style type checks based on PlanarGraphicsType kept for backward compatibility
+        # NOTE: 2021-05-10 14:27:11 transition to complete removal or PlanarGraphicsType enum
+        if isinstance(cursor.backend, pgui.VerticalCursor):
             promptX = quickdialog.FloatInput(d, "X coordinate (pixels):")
-            #promptX = vigra.pyqt.quickdialog.FloatInput(d, "X coordinate (pixels):")
             promptX.variable.setClearButtonEnabled(True)
             promptX.variable.redoAvailable=True
             promptX.variable.undoAvailable=True
@@ -826,16 +901,14 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             d.promptWidgets.append(promptX)
         
             promptXWindow = quickdialog.FloatInput(d, "Horizontal window size (pixels):")
-            #promptXWindow = vigra.pyqt.quickdialog.FloatInput(d, "Horizontal window size (pixels):")
             promptXWindow.variable.setClearButtonEnabled(True)
             promptXWindow.variable.redoAvailable=True
             promptXWindow.variable.undoAvailable=True
             promptXWindow.setValue(cursor.xwindow)
             d.promptWidgets.append(promptXWindow)
             
-        elif cursor.isHorizontalCursor:
+        elif isinstance(cursor.backend, pgui.HorizontalCursor):
             promptY = quickdialog.FloatInput(d, "Y coordinate (pixels):")
-            #promptY = vigra.pyqt.quickdialog.FloatInput(d, "Y coordinate (pixels):")
             promptY.variable.setClearButtonEnabled(True)
             promptY.variable.redoAvailable=True
             promptY.variable.undoAvailable=True
@@ -843,16 +916,14 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             d.promptWidgets.append(promptY)
             
             promptYWindow = quickdialog.FloatInput(d, "Vertical window size (pixels):")
-            #promptYWindow = vigra.pyqt.quickdialog.FloatInput(d, "Vertical window size (pixels):")
             promptYWindow.variable.setClearButtonEnabled(True)
             promptYWindow.variable.redoAvailable=True
             promptYWindow.variable.undoAvailable=True
             promptYWindow.setValue(cursor.ywindow)
             d.promptWidgets.append(promptYWindow)
             
-        else:
+        else: # crosshair / point cursors
             promptX = quickdialog.FloatInput(d, "X coordinate:")
-            #promptX = vigra.pyqt.quickdialog.FloatInput(d, "X coordinate:")
             promptX.variable.setClearButtonEnabled(True)
             promptX.variable.redoAvailable=True
             promptX.variable.undoAvailable=True
@@ -860,7 +931,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             d.promptWidgets.append(promptX)
             
             promptXWindow = quickdialog.FloatInput(d, "Horizontal window size:")
-            #promptXWindow = vigra.pyqt.quickdialog.FloatInput(d, "Horizontal window size:")
             promptXWindow.variable.setClearButtonEnabled(True)
             promptXWindow.variable.redoAvailable=True
             promptXWindow.variable.undoAvailable=True
@@ -868,7 +938,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             d.promptWidgets.append(promptXWindow)
             
             promptY = quickdialog.FloatInput(d, "Y coordinate:")
-            #promptY = vigra.pyqt.quickdialog.FloatInput(d, "Y coordinate:")
             promptY.variable.setClearButtonEnabled(True)
             promptY.variable.redoAvailable=True
             promptY.variable.undoAvailable=True
@@ -876,16 +945,13 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             d.promptWidgets.append(promptY)
             
             promptYWindow = quickdialog.FloatInput(d, "Vertical window size:")
-            #promptYWindow = vigra.pyqt.quickdialog.FloatInput(d, "Vertical window size:")
             promptYWindow.variable.setClearButtonEnabled(True)
             promptYWindow.variable.redoAvailable=True
             promptYWindow.variable.undoAvailable=True
             promptYWindow.setValue(cursor.ywindow)
             d.promptWidgets.append(promptYWindow)
                 
-        
         framesWhereVisible = quickdialog.StringInput(d, "Visible frames:")
-        #framesWhereVisible = vigra.pyqt.quickdialog.StringInput(d, "Visible frames:")
         framesWhereVisible.setToolTip("Enter comma-separated list of visible frames, the keyword 'all', or 'range(start,[stop,[step]]')")
         framesWhereVisible.setWhatsThis("Enter comma-separated list of visible frames, the keyword 'all', or 'range(start,[stop,[step]]')")
         
@@ -914,15 +980,11 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         d.promptWidgets.append(framesWhereVisible)
         
         linkToFramesCheckBox = quickdialog.CheckBox(d, "Link position to frame number")
-        #linkToFramesCheckBox = vigra.pyqt.quickdialog.CheckBox(d, "Link position to frame number")
-        
-        #linkToFramesCheckBox.setChecked( not cursor.backend.hasCommonState)
         linkToFramesCheckBox.setChecked( len(cursor.backend.states) > 1)
         
         d.promptWidgets.append(linkToFramesCheckBox)
         
         for w in d.promptWidgets:
-            #if not isinstance(w, vigra.pyqt.quickdialog.CheckBox):
             if not isinstance(w, quickdialog.CheckBox):
                 w.variable.setClearButtonEnabled(True)
                 w.variable.redoAvailable=True
@@ -935,23 +997,23 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
             if newName is not None and len(newName.strip()) > 0:
                 if newName != old_name:
-                    if newName in cDict:
+                    if newName in [o.name for o in self.dataCursors]:
                         QtWidgets.QMessageBox.critical(self, "Cursor name clash", "A cursor named %s already exists" % newName)
                         return
                     
-            if cursor.isVerticalCursor:
-                cursor.x = promptX.value()
-                cursor.xwindow = promptXWindow.value()
+            if isinstance(cursor.backend, pgui.VerticalCursor) or cursor.backend.type & pgui.PlanarGraphicsType.vertical_cursor:
+                cursor.backend.x = promptX.value()
+                cursor.backend.xwindow = promptXWindow.value()
                 
-            elif cursor.isHorizontalCursor:
-                cursor.y = promptY.value()
-                cursor.ywindow = promptYWindow.value()
+            elif isinstance(cursor.backend, pgui.HorizontalCursor) or cursor.backend.type & pgui.PlanarGraphicsType.horizontal_cursor:
+                cursor.backend.y = promptY.value()
+                cursor.backend.ywindow = promptYWindow.value()
 
             else:
-                cursor.x = promptX.value()
-                cursor.y = promptY.value()
-                cursor.xwindow = promptXWindow.value()
-                cursor.ywindow = promptYWindow.value()
+                cursor.backend.x = promptX.value()
+                cursor.backend.y = promptY.value()
+                cursor.backend.xwindow = promptXWindow.value()
+                cursor.backend.ywindow = promptYWindow.value()
         
             cursor.labelShowsPosition = showsPositionCheckBox.selection()
             
@@ -962,19 +1024,12 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
             txt = framesWhereVisible.text()
             
-            #print("txt", txt)
-            
-            #print("GraphicsImageViewerWidget._cursorEditor imageViewer:", self.__image_viewer__)
-            
             if len(txt.strip()) == 0:
                 newFrames = []
                 
             elif txt.strip().lower() == "all":
                 if self.__image_viewer__ is not None:
-                    #print("GraphicsImageViewerWidget._cursorEditor imageViewer.nFrames:", self.__image_viewer__.nFrames)
-                    
                     newFrames = [f for f in range(self.__image_viewer__.nFrames)]
-                    
                 else:
                     newFrames = []
                 
@@ -983,54 +1038,61 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 
                 newFrames = [f for f in val]
                 
-            elif txt.find(":") > 0:
+            elif any(c in txt for c in (":", ",")):
                 try:
-                    newFrames = [int(f_) for f_ in txt.split(":")]
-                    if len(newFrames) > 3:
-                        newFrames = []
-                        
-                    else:
-                        newFrames = range(*newFrames)
-                        
-                except Exception as e:
+                    c_parts = txt.split(",")
+                    new_frames = list()
+                    for c in c_parts:
+                        if ":" in c:
+                            new_frames.extend(i for i in strutils.str2range(c))
+                        else:
+                            new_frames.append(int(c))
+                except:
                     traceback_print_exc()
+                
+            #elif txt.find(":") > 0:
+                #try:
+                    #newFrames = [int(f_) for f_ in txt.split(":")]
+                    #if len(newFrames) > 3:
+                        #newFrames = []
+                        
+                    #else:
+                        #newFrames = range(*newFrames)
+                        
+                #except Exception as e:
+                    #traceback_print_exc()
                     
-            else:
-                try:
-                    newFrames = [int(f_) for f_ in txt.split(",")]
+            #else:
+                #try:
+                    #newFrames = [int(f_) for f_ in txt.split(",")]
                     
-                except Exception as e:
-                    traceback.print_exc()
-                    
-            #print(newFrames)
+                #except Exception as e:
+                    #traceback.print_exc()
                     
             linkToFrames = linkToFramesCheckBox.selection()
-            
-            #print(linkToFrames)
             
             if linkToFrames:
                 cursor.frameVisibility = newFrames
                 
-                cursor.__backend__.linkFrames(newFrames)
+                cursor.backend.linkFrames(newFrames)
                 
             else:
-                # no frame linking required
                 cursor.frameVisibility = []
             
-            cursor.__backend__.name = newName
+            cursor.backend.name = newName
             
-            if old_name != cursor.name:
-                cDict = self.__graphicsObjects__[cursor.objectType]
-                cDict.pop(old_name, None)
-                cDict[cursor.name] = cursor
-                
             self.signalCursorChanged.emit(cursor.backend)
 
         self._cursorContextMenuSourceId = None
         
+    @pyqtSlot()
     def buildROI(self):
-        """Interactively builds a new ROI.
+        """Interactively builds a new ROI (i.e. using the GUI).
         """
+        # NOTE: triggered by ImageViewer.newROIAction
+        # once the ROI is build, the ROI is set to emit signalROIConstructed
+        # which is connected to slot_newROIConstructed, which in turn emits
+        # signalRoiAdded (so that "sister" windows can be notified)
         #print("buildROI")
         params = None
         pos = QtCore.QPointF(0,0)
@@ -1048,7 +1110,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
 
         newROI = pgui.GraphicsObject(params, 
                                 pos=pos,
-                                objectType=pgui.GraphicsObjectType.allShapeTypes,
+                                objectType=pgui.PlanarGraphicsType.allShapeTypes,
                                 visibleFrames=[],
                                 label=None,
                                 currentFrame=frame,
@@ -1065,7 +1127,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                      editable=True, frameVisibility=[], 
                      showLabel=True, labelShowsPosition=True,
                      autoSelect=False, parentWidget=None):
-        """
+        """Creates a ROI programmatically, or interactively
         """
         if self.__scene__.rootImage is None:
             return
@@ -1075,31 +1137,32 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 parentWidget = self.__image_viewer__
             else:
                 parentWidget = self
-            
-        if roiType is None or params is None:
+                
+        if all([v is None for v in (params, roiType, )]):
             self.buildROI()
             
         rTypeStr = ""
         
+        # NOTE: 2021-05-04 16:16:24
+        # old style type check for backward compatibility
         if isinstance(params, pgui.PlanarGraphics):
-            if params.type & pgui.GraphicsObjectType.allShapeTypes:
+            if params.type & pgui.PlanarGraphicsType.allShapeTypes:
                 roiType = params.type
                 
             else:
                 raise TypeError("Cannot build a ROI with this PlanarGraphics type: %s" % params.type)
-            
-            
-        if roiType & pgui.GraphicsObjectType.point:
+
+        if roiType & pgui.PlanarGraphicsType.point:
             rTypeStr = "p"
-        elif roiType & pgui.GraphicsObjectType.line:
+        elif roiType & pgui.PlanarGraphicsType.line:
             rTypeStr = "l"
-        elif roiType & pgui.GraphicsObjectType.rectangle:
+        elif roiType & pgui.PlanarGraphicsType.rectangle:
             rTypeStr = "r"
-        elif roiType & pgui.GraphicsObjectType.ellipse:
+        elif roiType & pgui.PlanarGraphicsType.ellipse:
             rTypeStr = "e"
-        elif roiType & pgui.GraphicsObjectType.polygon:
+        elif roiType & pgui.PlanarGraphicsType.polygon:
             rTypeStr = "pg"
-        elif roiType & (pgui.GraphicsObjectType.path | pgui.GraphicsObjectType.polyline):
+        elif roiType & (pgui.PlanarGraphicsType.path | pgui.PlanarGraphicsType.polyline):
             rTypeStr = "pt"
         else:
             return
@@ -1122,7 +1185,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 frame = nFrames-1
                 
         if frameVisibility is None:
-            if isinstance(params, pgui.PlanarGraphics) and params.type & pgui.GraphicsObjectType.allShapeTypes:
+            if isinstance(params, pgui.PlanarGraphics) and params.type & pgui.PlanarGraphicsType.allShapeTypes:
                 if not isinstance(params, pgui.Path):
                     frameVisibility = params.frameIndices
                     
@@ -1144,16 +1207,16 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                     frameVisibility = [0]
             
         if isinstance(roiType, int):
-            rDict = self.__graphicsObjects__[roiType]
+            rDict = self._graphicsObjects_[roiType]
             
         else:
-            rDict = self.__graphicsObjects__[roiType.value]
+            rDict = self._graphicsObjects_[roiType.value]
             
         if label is None or (isinstance(label, str) and len(label) == 0):
             if isinstance(params, pgui.PlanarGraphics) and (isinstance(params.name, str) and len(params.name) > 0):
                 tryName = params.name
                 if tryName in rDict.keys():
-                    tryName = utilities.counterSuffix(tryName, [s for s in rDict.keys()])
+                    tryName = utilities.counter_suffix(tryName, [s for s in rDict.keys()])
                     
                 roiId = tryName
                 
@@ -1178,20 +1241,18 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         #print("GraphicsImageViewerWidget.createNewRoi params %s" % params)
         #print("GraphicsImageViewerWidget.createNewRoi frameVisibility %s" % frameVisibility)
         
-        roi = pgui.GraphicsObject(parameters            = params,
-                                    pos                 = pos,
-                                    objectType          = roiType,
-                                    currentFrame        = frame,
-                                    visibleFrames       = frameVisibility, 
-                                    label               = roiId, 
-                                    showLabel           = showLabel,
-                                    labelShowsPosition  = labelShowsPosition,
-                                    parentWidget        = parentWidget)
+        roi = pgui.GraphicsObject(obj                 = params,
+                                  showLabel           = showLabel,
+                                  labelShowsPosition  = labelShowsPosition,
+                                  parentWidget        = parentWidget)
         
         roi.canMove = movable
         roi.canEdit = editable
         
-        if isinstance(parentWidget, ImageViewer) and not parentWidget.guiClient:
+        # NOTE: 2021-04-18 12:13:21 FIXME
+        # do I reallly need guiClient, here? rois and cursors should always be 
+        # notified of frame change, right?
+        if isinstance(parentWidget, ImageViewer):# and not parentWidget.guiClient:
             parentWidget.frameChanged[int].connect(roi.slotFrameChanged)
             
         if autoSelect:
@@ -1205,371 +1266,234 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         roi.signalPosition.connect(self.slot_reportCursorPos)
         roi.selectMe[str, bool].connect(self.slot_setSelectedRoi)
         roi.requestContextMenu.connect(self.slot_graphicsObjectMenuRequested)
-        roi.signalBackendChanged[object].connect(self.slot_roiChanged)
+        #roi.signalBackendChanged[object].connect(self.slot_roiChanged)
         
         rDict[roiId] = roi
         
-        self.scene.update(self.scene.sceneRect().x(), \
-                          self.scene.sceneRect().y(), \
-                          self.scene.sceneRect().width(), \
+        self.scene.update(self.scene.sceneRect().x(), 
+                          self.scene.sceneRect().y(), 
+                          self.scene.sceneRect().width(), 
                           self.scene.sceneRect().height())
         
-        self.signalRoiAdded.emit(roi.backend)
+        #self.signalRoiAdded.emit(roi.backend)
         
         return roi
+    
+    def newGraphicsObject(self, item:typing.Optional[typing.Union[pgui.PlanarGraphics, type]], 
+                          movable=True, editable=True, showLabel=True, 
+                          labelShowsPosition=True, autoSelect=False) -> typing.Optional[pgui.GraphicsObject]:
+        """Creates a GraphicsObject that represents a PlanarGraphics for display.
         
-    def createNewCursor(self, cType, window=None, radius=None, pos=None, movable=True, 
-                        editable=True, frame=None,  label=None, frameVisibility=[],
-                        showLabel=True, labelShowsPosition = True, 
-                        autoSelect=False, parentWidget = None):
-        """
-        
-        cType: int or one of the pictgui.GraphicsObjectType cursor type enum values, 
-            or a pictgui.Cursor object
-        
-        When cType is an int or GraphicsObjecType enum value, then the keyword
-            parameters are used for constructing a pictgui.GraphicsObject 
-            representation of a pictgui.Cursor
-
-        When cType is a pictgui.Cursor object, keyword parameters given may
-            override the Cursor's own values.
-        
-            NOTE: pictgui.Cursor objects can have both width and height None. 
-            When this happens, the width/height will be taken from the scene 
-            geometry.
-        
-            The Cursor window (in x or y direction) can be None for vertical or 
-            horizontal cursors, respectively. It can be overridden by the "window" 
-            keyword parameter here (default is the default _cursorWindow value 
-            in GraphicsImageViewerWidget).
-        
-            By design, neither xwindow nor ywindow can be None in crosshair and 
-            point cursors.
+        The object is created by either:
+        1) passing a PlanarGraphics (e.g. constructed in separate code then 
+           passed to this function call as the 'item' parameter).
+           
+           NOTE: This is the way to parametrically create a GraphicsObject:
+           create the PlanarGraphics 'backend' first, then use it to construct
+           the GraphicsObject 'frontend' which will be added to the scene.
+           
+        2) using GUI interaction (mouse events with key modifiers): here, a
+            GraphicsObject is constructed in "buildMode", which will create its
+            own 'backend'; the management of mouse events (and associated key 
+            modifiers) is taken care of by the GraphicsObject :class:.
             
-            NOTE: special attention should be given to the "name" attribute of
-            the cursor object, which is also used to assign the ID of the 
-            graphics object. 
+            In this case, the type of the PlanarGraphics 'backend' is specified
+            by passing its :class: as the 'item' parameter.
             
+            To keep things simple, all GraphicsObject/PlanarGraphics constructed
+            via GUI will get a default name as specified by the concrete 'backend'
+            type, will be visible in all available frames, and their 'currentFrame'
+            attribute will be set to the current frame of the viewer, or 0 (zero).
+            
+        Parameters:
+        ===========
         
-        
+        item: a pgui.PlanarGraphics object, or a :class: object that is a
+            concrete subclass of pgui.PlanarGraphics.
+            
+        movable:bool, optional (default is True)
+            When True, the user can move the object in the scene using the mouse
+            
+        editable:bool, optional (default is True)
+            When True, the user can edit the object (and indirectly its 'backend' 
+            shape) using mouse actions and associated key modifiers
+            
+        labelShowsPosition:bool optional (default is True)
+            When True, the displayed label also shows the object's position.
+            
+            This is mostly useful for cursors, where is displays:
+            the 'x' coordinate for Vertical cursors
+            the 'y' coordinate for Horizontal cursors
+            the 'x,y' coordinates pair for Crosshair and Point cursors
+            
+            NOTE: The coordinate values are NOT calibrated (i.e. they are in pixels)
+            
+            ATTENTION: To avoid clutter, this parameter should be set to False
+                for non-cursor PlanarGraphics.
+                
+        autoSelect:bool, optional (default is True)
+            When True, the GraphicsObject will be selected after adding to the
+            scene.
+            
         """
         if self.__scene__.rootImage is None:
             return
         
-        if parentWidget is None:
-            if isinstance(self.__image_viewer__, ImageViewer):
-                parentWidget = self.__image_viewer__
-            else:
-                parentWidget = self
+        qobj = None
+        
+        if isinstance(self.__image_viewer__, ImageViewer):
+            parentWidget = self.__image_viewer__
+        else:
+            parentWidget = self
             
-        if window is None:
-            window = self.__cursorWindow__
+        if isinstance(item, pgui.PlanarGraphics):
+            maxWidth  = self.__scene__.rootImage.boundingRect().width()
+            maxHeight = self.__scene__.rootImage.boundingRect().height()
             
-        if radius is None:
-            radius = self.__cursorRadius__
+            if isinstance(item, pgui.Cursor):
+                # FIXME 2021-08-18 10:31:43 in planargraphics
+                # cursor width & height should NEVER be none!
+                if item.width is None: 
+                    item.width = maxWidth
+                    
+                if item.width <= 0 or item.width > maxWidth:
+                    item.width = maxWidth
+                    
+                if item.height is None:
+                    item.height = maxHeight
+                    
+                if item.height <= 0 or item.height > maxHeight:
+                    item.height = maxHeight
+                    
+                if item.x < 0:
+                    item.x = 0
+                    
+                if item.x > maxWidth:
+                    item.x  = maxWidth
+                    
+            qobj = pgui.GraphicsObject(obj=item, showLabel=showLabel, 
+                                       labelShowsPosition = labelShowsPosition,
+                                       parentWidget = parentWidget)
             
-        if frame is None:
+        elif isinstance(item, type) and pgui.PlanarGraphics in item.__mro__:
+            # NOTE: 2021-05-10 11:47:48 
+            # The user creates a new object by GUI interaction:
+            # * for cursors, we only need a single mouse click in the scene, to
+            #   indicate where the initial cursor position
+            # * for non-cursors, we need a more elaborate set of actions to "draw"
+            #   the PlanarGraphics backend, which can be:
+            #   a) a primitive (Move, Line, Ellipse, Retangle)
+            #   b) a Path constructed from any number of the above primitives
+            #      plus Arc, ArcMove, Cubic and Quad, and other Path objects
+            
+            default_x = np.floor(self.__scene__.rootImage.boundingRect().center().x())
+            default_y = np.floor(self.__scene__.rootImage.boundingRect().center().y())
+            
+            name = "%s%d" % (item._default_label_, len([o for o in filter_type(self.planarGraphics, item)]))
+            
             if isinstance(parentWidget, ImageViewer):
                 frame = parentWidget.currentFrame
             else:
                 frame = 0
                 
-        nFrames = 1
+            if pgui.Cursor in item.__mro__:
+                # Construct a concrete Cursor type by clicking in the scene
+                # requires that the scene has a rootImage.
+                if item not in (pgui.CrosshairCursor, pgui.HorizontalCursor, pgui.PointCursor, pgui.VerticalCursor):
+                    raise TypeError("Expecting a CrosshairCursor, HorizontalCursor, PointCursor, or VerticalCursor")
                 
-        if isinstance(parentWidget, ImageViewer):
-            nFrames = parentWidget.nFrames
-            
-            if frame < 0 :
-                frame = nFrames
-                
-            if frame >= nFrames:
-                frame = nFrames-1
-                
-        if isinstance(cType, pgui.Cursor): # construct from a pgui.Cursor
-            # builds a GUI cursor for a backend PlanarGraphics object (a pictgui.Cursor)
-            # this comes with its own coordinates, but we allow these to be
-            # overridden here by this constructor's optional "pos" parameter
-            cDict = self.__graphicsObjects__[cType.type.value]
-            
-            valx = np.floor(self.__scene__.rootImage.boundingRect().center().x())
-            valy = np.floor(self.__scene__.rootImage.boundingRect().center().y())
-            
-            if cType.xwindow is None:
-                cType.xwindow = window
-    
-            if cType.ywindow is None:
-                cType.ywindow = window
-                
-            if isinstance(pos, (tuple, list)) and \
-                len(pos) == 2 and all([isinstance(a, (numbers.Real, pq.Quantity)) for a in pos]):
-                cType.x = pos[0]
-                cType.y = pos[1]
-            
-            elif isinstance(pos, (QtCore.QPoint, QtCore.QPointF)):
-                cType.x = pos.x()
-                cType.y = pos.y()
-        
-            else:
-                # no pos specified -- unlikely but anyhow...
-                if cType.x is None or cType.y is None:
-                    # just in case the PlanarGraphics object x or y are not set
-                    if len(cDict) > 0:
-                        # find a suitable position so we don't land on previous objects
-                        if cType.type & pgui.GraphicsObjectType.vertical_cursor or \
-                            cType.type & pgui.GraphicsObjectType.crosshair_cursor or \
-                                cType.type & pgui.GraphicsObjectType.point_cursor:
-                            
-                            max_x = max([o.x for o in cDict.values()])
-                            min_x = min([o.x for o in cDict.values()])
-                            
-                            valx = (self.__scene__.rootImage.boundingRect().width() + max_x) / 2
-                            
-                        if cType.type & pgui.GraphicsObjectType.horizontal_cursor or \
-                            cType.type & pgui.GraphicsObjectType.crosshair_cursor or \
-                                cType.type & pgui.GraphicsObjectType.point_cursor:
-                        
-                            max_y = max([o.y for o in cDict.values()])
-                            valy = (self.__scene__.rootImage.boundingRect().height() + max_y) / 2
-                            
-                    if cType.x is None:
-                        cType.x = valx
-                        
-                    if cType.y is None:
-                        cType.y = valy
-                    
-            if cType.width is None:
-                cType.width = self.__scene__.sceneRect().width()
-                
-            if cType.height is None:
-                cType.height = self.__scene__.sceneRect().height()
-            
-            if cType.radius is None:
-                cType.radius = self.__cursorRadius__
-                
-            if isinstance(label, str) and len(label) > 0:
-                crsId = label
-                
-            else:
-                tryName = cType.name
-                if tryName in cDict.keys():
-                    tryName = utilities.counterSuffix(tryName, [s for s in cDict.keys()])
-                    
-                crsId = tryName
-                
-            if crsId in self.__cursors__.keys():
-                crsId +="%d" % len(cDict)
-                
-            if frameVisibility is None:
-                if len(cType.frameIndices) == 0:
-                    frameVisibility = [f for f in range(nFrames)]
-                    
-                else:
-                    frameVisibility = cType.frameIndices
-                
-            else:
-                if isinstance(frameVisibility, (tuple, list)):
-                    if len(frameVisibility):
-                        if len(frameVisibility) == 1 and frameVisibility[0] is None:
-                            frameVisibility.clear()
-                            
-                        else:
-                            if not all([isinstance(f, int) for f in frameVisibility]):
-                                raise TypeError("frameVisibility expected to be a sequence of int, an empty sequence, the sequence [None], or just None; got %s instead" % frameVisibility)
-                            
-                    else:
-                        frameVisibility = [0]
-                            
-                else:
-                    raise TypeError("frame visibility must be specified as a list of ints or an empty list, or None; got %s instead" % frameVisibility)
-                
-            cursor = pgui.GraphicsObject(parameters             = cType,
-                                            currentFrame        = frame,
-                                            visibleFrames       = frameVisibility,
-                                            label               = crsId,
-                                            showLabel           = showLabel,
-                                            labelShowsPosition  = labelShowsPosition,
-                                            parentWidget        = parentWidget)
-            
-            #print("ImageViewer.createNewCursor cursor.backend", cursor.__backend__)
-            
-        else:              # parametric c'tor :
-            # NOTE: 2018-09-28 10:20:29
-            # cType is a GraphicsObjecType enum value
-            cTypeStr = ""
-            
-            if cType & pgui.GraphicsObjectType.vertical_cursor:
-                cTypeStr = "v"
-
-            elif cType & pgui.GraphicsObjectType.horizontal_cursor:
-                cTypeStr = "h"
-
-            elif cType & pgui.GraphicsObjectType.point_cursor:
-                cTypeStr = "p"
-
-            elif cType & pgui.GraphicsObjectType.crosshair_cursor:
-                cTypeStr = "c"
-
-            else:
-                return
-            
-            # NOTE: 2018-09-28 10:21:32
-            # because it can be an enum value or an int resulted from
-            # logical OR between several enum values, 
-            # see NOTE: 2018-09-28 10:20:29
-            if isinstance(cType, int):
-                cDict = self.__graphicsObjects__[cType]
-                
-            else:
-                cDict = self.__graphicsObjects__[cType.value]
-            
-            if label is None or (isinstance(label, str) and len(label) == 0):
-                crsId = "%s%d" % (cTypeStr, len(cDict))
-                
-            elif instance(label, str) and len(label):
-                crsId = "%s%d" % (label, len(cDict))
-                
-            else:
-                raise TypeError("label expected to be a non-empty str or None; got %s instead" % type(name).__name__)
-                
-            #print(pos)
-                
-            if isinstance(pos, (tuple, list)) and \
-                len(pos) == 2 and all([isinstance(a, (numbers.Real, pq.Quantity)) for a in pos]):
-                point = QtCore.QPointF(pos[0], pos[1])
-                    
-            elif isinstance(pos, (QtCore.QPoint, QtCore.QPointF)):
-                point = QtCore.QPointF(pos)
-            
-            else:
-                # no pos specified
-                
-                # NOTE: 2018-09-28 11:20:32
-                # cursor() is reimplemented as access method for a pictgui.Cursor!
-                # must use the superclass instance method
                 currentTopLabelText = self._topLabel.text()
                 
                 self._topLabel.setText(currentTopLabelText + " Double-click left mouse button for cursor position")
                 
-                #currentCursor = super(GraphicsImageViewerWidget, self).cursor()
-                currentCursor = self._imageGraphicsView.viewport().cursor()
-                
-                #print("currentCursor shape:", currentCursor.shape())
+                currentGUICursor = self._imageGraphicsView.viewport().cursor()
                 
                 self._imageGraphicsView.viewport().setCursor(QtCore.Qt.CrossCursor)
-                #self.setCursor(QtCore.Qt.CrossCursor)
                 
-                mouseEventFilters = [pgui.MouseEventSink(c) for c in cDict.values()]
+                eventSinks = [pgui.MouseEventSink() for o in self.graphicsObjects]
                 
-                if len(cDict) > 0:
-                    # install mouse event filter for all other cursors
-                    for ck, c in enumerate(cDict.values()):
-                        c.installEventFilter(mouseEventFilters[ck])
-                    
+                [_ for _ in itertools.starmap(lambda x,y: x.installEventFilter(y),
+                                              zip(self.graphicsObjects, eventSinks))]
+                
+                # NOTE: 2021-05-10 10:41:19 
+                # wait for mouse press or Esc key press
                 while not self.__escape_pressed___ and not self.__mouse_pressed___:
-                    QtCore.QCoreApplication.processEvents()
+                    # NOTE: 2021-05-10 10:39:47
+                    # see self.mousePressEvent(), self.mouseReleaseEvent() and
+                    # self.keyPressEvent()
+                    # the self.mouse...Event() set up __last_mouse_click_lmb__
+                    # the self.keyPressEvent() captures Esc key press
+                    QtCore.QCoreApplication.processEvents() 
                     
                 self.__escape_pressed___ = False
                 self.__mouse_pressed___  = False
                 
-                if len(cDict) > 0:
-                    for ck, c in enumerate(cDict.values()):
-                        c.removeEventFilter(mouseEventFilters[ck])
+                [_ for _ in itertools.starmap(lambda x,y: x.removeEventFilter(y),
+                                              zip(self.graphicsObjects, eventSinks))]
                 
-                self._imageGraphicsView.viewport().setCursor(currentCursor)
+                self._imageGraphicsView.viewport().setCursor(currentGUICursor)
                 
                 self._topLabel.setText(currentTopLabelText)
                 
+                # NOTE: 2021-05-10 10:38:15 
+                # self.__last_mouse_click_lmb__ is set by self.mousePressEvent
+                
                 if isinstance(self.__last_mouse_click_lmb__, (QtCore.QPoint, QtCore.QPointF)):
+                    # the loop at NOTE: 2021-05-10 10:41:19 was interrupted by
+                    # mouse press, therefore we land here
                     point = QtCore.QPointF(self.__last_mouse_click_lmb__)
                     
-                else:
-                
-                    valx = np.floor(self.__scene__.rootImage.boundingRect().center().x())
-                    valy = np.floor(self.__scene__.rootImage.boundingRect().center().y())
+                    if self.scene.sceneRect().contains(point):
+                        # NOTE: 2021-05-10 10:49:38
+                        # item is one of the concrete pgui cursor classes, so it
+                        # works as a factory here:
+                        pobj = item(point.x(), point.y(), 
+                                    self.scene.sceneRect().width(),
+                                    self.scene.sceneRect().height(),
+                                    self.__cursorWindow__, 
+                                    self.__cursorWindow__,
+                                    self.__cursorRadius__,
+                                    name=name,
+                                    frameindex=[],
+                                    currentFrame=frame)
+                        
+                        qobj = pgui.GraphicsObject(obj=pobj, showLabel=showLabel, 
+                                       labelShowsPosition = labelShowsPosition,
+                                       parentWidget = parentWidget)
+                        
+                    self.__last_mouse_click_lmb__ = None
                     
-                    if len(cDict) > 0:
-                        # find a suitable position so we don't land on previous objects
-                        if cType & pgui.GraphicsObjectType.vertical_cursor or \
-                            cType & pgui.GraphicsObjectType.crosshair_cursor or \
-                                cType & pgui.GraphicsObjectType.point_cursor:
-                            
-                            max_x = max([o.x for o in cDict.values()])
-                            valx = (self.__scene__.rootImage.boundingRect().width() + max_x) / 2
-                            
-                        if cType & pgui.GraphicsObjectType.horizontal_cursor or \
-                            cType & pgui.GraphicsObjectType.crosshair_cursor or \
-                                cType & pgui.GraphicsObjectType.point_cursor:
-                        
-                            max_y = max([o.y for o in cDict.values()])
-                            valy = (self.__scene__.rootImage.boundingRect().height() + max_y) / 2
-                            
-                    point = QtCore.QPointF(valx, valy)
+            else:
+                pass # TODO start shape building process
+        
+        qobj.canMove = movable
+        qobj.canEdit = editable
             
-            if not self.__scene__.sceneRect().contains(point) or point == QtCore.QPointF(0,0):
-                point.setX(np.floor(self.__scene__.rootImage.boundingRect().center().x()))
-                point.setY(np.floor(self.__scene__.rootImage.boundingRect().center().y()))
-                
-            width = self.__scene__.sceneRect().width()
-            height = self.__scene__.sceneRect().height()
+        # NOTE: 2021-04-18 12:13:21 FIXME
+        # do I reallly need guiClient, here? rois and cursors should always be 
+        # notified of frame change, right?
+        if isinstance(parentWidget, ImageViewer):# and not parentWidget.guiClient:
+            parentWidget.frameChanged[int].connect(qobj.slotFrameChanged)
             
-            if frameVisibility is None:
-                frameVisibility = []
-                
-            elif isinstance(frameVisibility, (tuple, list)):
-                if len(frameVisibility):
-                    if len(frameVisibility) == 1 and frameVisibility[0] is None:
-                        frameVisibility.clear()
-                        
-                    else:
-                        if not all([isinstance(f, int) for f in frameVisibility]):
-                            raise TypeError("frameVisibility expected a sequence of int, [], or [None], or just None; got %s instead" % frameVisibility)
-                        
-                
-            cursor = pgui.GraphicsObject(parameters = (width, height, window, window, radius),
-                                            pos                 = point, 
-                                            objectType          = cType,
-                                            currentFrame        = frame,
-                                            visibleFrames       = frameVisibility, 
-                                            label               = crsId,
-                                            showLabel           = showLabel,
-                                            labelShowsPosition  = labelShowsPosition,
-                                            parentWidget        = parentWidget)
-            
-        cursor.canMove = movable
-            
-        if isinstance(parentWidget, ImageViewer) and not parentWidget.guiClient:
-            parentWidget.frameChanged[int].connect(cursor.slotFrameChanged)
-            
-        self.__scene__.addItem(cursor)
-
+        self.scene.addItem(qobj)
+        
         if autoSelect:
-            for c in self.__cursors__.values():
+            for c in self.graphicsObjects:
                 c.setSelected(False)
                 
-            cursor.setSelected(True)
+            qobj.setSelected(True)
             
-        cursor.signalPosition.connect(self.slot_reportCursorPos)
-        cursor.selectMe[str, bool].connect(self.slot_setSelectedCursor)
-        cursor.requestContextMenu.connect(self.slot_graphicsObjectMenuRequested)
-        cursor.signalBackendChanged.connect(self.slot_cursorChanged)
-        
-        cDict[crsId] = cursor
-        
-        self.scene.update(self.scene.sceneRect().x(), \
-                          self.scene.sceneRect().y(), \
-                          self.scene.sceneRect().width(), \
-                          self.scene.sceneRect().height())
-        
-        #if len(cursor.frameVisibility)==0 or cursor.currentFrame in cursor.frameVisibility:
-            #cursor.show()
+        if isinstance(qobj.backend, pgui.Cursor):
+            qobj.signalPosition.connect(self.slot_reportCursorPos)
             
-        if cursor.__backend__.hasStateForFrame(cursor.currentFrame):
-            cursor.show()
-            
-        self.signalCursorAdded.emit(cursor.backend)
+        qobj.selectMe[str, bool].connect(self.slot_setSelectedCursor)
+        qobj.requestContextMenu.connect(self.slot_graphicsObjectMenuRequested)
         
-        return cursor
-    
+        if qobj.backend.hasStateForFrame():
+            qobj.show()
+            
+        return qobj
+        
     def clear(self):
         """Clears the contents of the viewer.
         
@@ -1577,7 +1501,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         underlying scene.
         
         """
-        for d in self.__graphicsObjects__.values():
+        for d in self._graphicsObjects_.values():
             d.clear()
             
         for d in self.__cursors__.values():
@@ -1601,22 +1525,22 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         # see NOTE: 2018-09-25 23:06:55
         #sigBlock = QtCore.QSignalBlocker(sender)
         
-        if roiType & pgui.GraphicsObjectType.point:
+        if roiType & pgui.PlanarGraphicsType.point:
             rTypeStr = "p"
             
-        elif roiType & pgui.GraphicsObjectType.line:
+        elif roiType & pgui.PlanarGraphicsType.line:
             rTypeStr = "l"
             
-        elif roiType & pgui.GraphicsObjectType.rectangle:
+        elif roiType & pgui.PlanarGraphicsType.rectangle:
             rTypeStr = "r"
             
-        elif roiType & pgui.GraphicsObjectType.ellipse:
+        elif roiType & pgui.PlanarGraphicsType.ellipse:
             rTypeStr = "e"
             
-        elif roiType & pgui.GraphicsObjectType.polygon:
+        elif roiType & pgui.PlanarGraphicsType.polygon:
             rTypeStr = "pg"
             
-        elif roiType & pgui.GraphicsObjectType.path:
+        elif roiType & pgui.PlanarGraphicsType.path:
             rTypeStr = "pt"
             
         elif roiType == 0:
@@ -1630,7 +1554,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         sender.selectMe.connect(self.slot_setSelectedRoi)
         sender.requestContextMenu.connect(self.slot_graphicsObjectMenuRequested)
         
-        rDict = self.__graphicsObjects__[roiType]
+        rDict = self._graphicsObjects_[roiType]
         
         roiId = "%s%d" % (rTypeStr, len(rDict))
         sender.name=roiId
@@ -1639,6 +1563,8 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
         self.selectedRoi = sender
         
+        self.signalRoiAdded.emit(sender.backend)
+            
     @pyqtSlot(object)
     @safeWrapper
     def slot_cursorChanged(self, obj):
@@ -1670,34 +1596,30 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @safeWrapper
     def slot_editAnyCursor(self):
         self._cursorEditor()
-        
-        return
-    
+
     @pyqtSlot()
     @safeWrapper
     def slot_editSelectedCursor(self):
         if self.selectedCursor is not None:
             self._cursorEditor(self.selectedCursor.ID)
             
-        return
-                    
     @pyqtSlot()
     @safeWrapper
     def slot_editCursor(self):
-        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in self.__cursors__.keys():
+        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.dataCursors, "name"):
             self._cursorEditor(self._cursorContextMenuSourceId)
             
-        return
-    
     def propagateCursorState(self):
-        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in self.__cursors__.keys():
-            cursor = self.__cursors__[self._cursorContextMenuSourceId]
+        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.dataCursors, "name"):
+            cursor = [o for o in filter(lambda x: isinstance(x.backend, pgui.Cursor) and x.backend.name == self._cursorContextMenuSourceId, self.graphicsObjects)]
+            if len(cursor) == 0:
+                return
             
-            if cursor.__backend__.hasHardFrameAssociations and cursor.__backend__.hasStateForCurrentFrame:
-                cursor.__backend__.propagateFrameState(cursor.__backend__.currentFrame, cursor.__backend__.frameIndices)
-                cursor.__backend__.updateFrontends()
-                
-        
+            cursor = cursor[0]
+
+            if cursor.backend.hasHardFrameAssociations and cursor.backend.hasStateForCurrentFrame:
+                cursor.backend.propagateFrameState(cursor.backend.currentFrame, cursor.backend.frameIndices)
+                cursor.backend.updateFrontends()
     
     @pyqtSlot()
     @safeWrapper
@@ -1722,12 +1644,12 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
 
     @pyqtSlot(str, QtCore.QPoint)
     @safeWrapper
-    def slot_graphicsObjectMenuRequested(self, crsId, pos):
-        if crsId in self.__cursors__.keys() and self.__cursors__[crsId].objectType & pgui.GraphicsObjectType.allCursorTypes:
-            self._cursorContextMenuSourceId = crsId 
+    def slot_graphicsObjectMenuRequested(self, objId, pos):
+        if objId in iter_attribute(self.dataCursors,"name"):
+            self._cursorContextMenuSourceId = objId
             
             cm = QtWidgets.QMenu("Cursor Menu", self)
-            crsEditAction = cm.addAction("Edit properties for %s cursor" % crsId)
+            crsEditAction = cm.addAction("Edit properties for %s cursor" % objId)
             crsEditAction.triggered.connect(self.slot_editCursor)
             
             crsPropagateStateToAllFrames = cm.addAction("Propagate current state to all frames")
@@ -1735,89 +1657,123 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
             crsLinkCursorAction = cm.addAction("Link...")
             crsUnlinkCursorAction = cm.addAction("Unlink...")
-            crsRemoveAction = cm.addAction("Remove %s cursor" % crsId)
+            crsRemoveAction = cm.addAction("Remove %s cursor" % objId)
             crsRemoveAction.triggered.connect(self.slot_removeCursor)
             cm.exec(pos)
             
-        elif crsId in self.__rois__.keys() and self.__rois__[crsId].objectType & pgui.GraphicsObjectType.allObjectTypes:
-            self._roiContextMenuSourceId = crsId
+        elif objId in [o.name for o in self.rois]:
+            self._roiContextMenuSourceId = objId
             
             cm = QtWidgets.QMenu("ROI Menu", self)
-            crsEditAction = cm.addAction("Edit properties for %s ROI" % crsId)
+            crsEditAction = cm.addAction("Edit properties for %s ROI" % objId)
             crsEditAction.triggered.connect(self.slot_editRoi)
             
-            pathEditAction = cm.addAction("Edit path for %s" % crsId)
+            pathEditAction = cm.addAction("Edit path for %s" % objId)
             pathEditAction.triggered.connect(self.slot_editRoiShape)
             
             crsLinkCursorAction = cm.addAction("Link...")
             crsUnlinkCursorAction = cm.addAction("Unlink...")
-            crsRemoveAction = cm.addAction("Remove %s ROI" % crsId)
+            crsRemoveAction = cm.addAction("Remove %s ROI" % objId)
             crsRemoveAction.triggered.connect(self.slot_removeRoi)
             cm.exec(pos)
-
-    
             
     @pyqtSlot(str, bool)
     @safeWrapper
-    def slot_setSelectedCursor(self, cId, sel):
+    def slot_setSelectedGraphicsObject(self, objId:str, sel:bool):
+        # TODO 2021-05-10 13:31:27
+        # do we want to have an unique selection among ALL the graphics items, 
+        # or a unique selection PER GROUP of graphics object type (i.e. cursors
+        # vs rois)?
+        # I'm partial to the second option...'
+        if objId in iter_attribute(self.dataCursors, "name"):
+            obj = [o for o in self.graphicsObjects if isinstance(o.backend, pgui.Cursor) and o.backend.name == objId]
+            if len(obj):
+                self.selectedCursor = obj[0]
+                self.signalGraphicsObjectSelected.emit(self.selectedCursor.backend)
+            else:
+                self.selectedCursor = None
+                self.signalGraphicsDeselected.emit()
+                
+        elif objId in iter_attribute(self.rois, "name"):
+            obj = [o for o in self.graphicsObjects if not isinstance(o.backend, pgui.Cursor) and o.backend.name == objId]
+            if len(obj):
+                self.selectedRoi = obj[0]
+                self.signalGraphicsObjectSelected.emit(self.selectedRoi.backend)
+            else:
+                self.selectedRoi = None
+                self.signalGraphicsDeselected.emit()
+            
+        #else:
+
+    @pyqtSlot(str, bool)
+    @safeWrapper
+    def slot_setSelectedCursor(self, cId:str, sel:bool):
         """To keep track of what cursor is selected, 
         independently of the underlying graphics view fw.
         """
-        if len(self.__cursors__) == 0 or cId not in self.__cursors__.keys():
-            self.selectedCursor = None
-            self.signalGraphicsDeselected.emit()
-            return
-        
-        if sel:
-            self.selectedCursor = self.__cursors__[cId]
-            
-            self.signalCursorSelected.emit(self.selectedCursor.backend)
-            
-        else:
-            self.selectedCursor = None
-            self.signalGraphicsDeselected.emit()
+        if cId in iter_attribute(self.dataCursors, "name"):
+            if sel:
+                c = [o for o in self.graphicsObjects if o.backend.name == cId]
+                if len(c):
+                    self.selectedCursor = c[0]
+                    self.signalGraphicsObjectSelected.emit(self.selectedCursor.backend)
+                    return
+                
+        self.selectedCursor = None
+        self.signalGraphicsDeselected.emit()
             
     @pyqtSlot(str, bool)
     @safeWrapper
-    def slot_setSelectedRoi(self, rId, sel):
-        if len(self.__rois__) == 0 or rId not in self.__rois__.keys():
-            self.selectedRoi = None
-            self.signalGraphicsDeselected.emit()
-            return
-        
-        if sel:
-            self.selectedRoi = self.__rois__[rId]
-            self.signalCursorSelected.emit(self.selectedRoi.backend)
+    def slot_setSelectedRoi(self, rId:str, sel:bool):
+        if rId in iter_attribute(self.rois, "name"):
+            if sel:
+                r = [o for o in self.graphicsObjects if o.backend.name == rId]
+                if len(r):
+                    self.selectedRoi = r[0]
+                    self.signalGraphicsObjectSelected.emit(self.selectedRoi.backend)
+                    return
             
-        else:
-            self.selectedRoi = None
-            self.signalGraphicsDeselected.emit()
+        self.selectedRoi = None
+        self.signalGraphicsDeselected.emit()
             
     @pyqtSlot()
     @safeWrapper
     def slot_newHorizontalCursor(self):
-        self.createNewCursor(pgui.GraphicsObjectType.horizontal_cursor)
-        
+        obj = self.newGraphicsObject(pgui.HorizontalCursor)
+        if obj is not None:
+            self.signalCursorAdded.emit(obj.backend)
+
     @pyqtSlot()
     @safeWrapper
     def slot_newPointCursor(self):
-        self.createNewCursor(pgui.GraphicsObjectType.point_cursor)
+        obj = self.newGraphicsObject(pgui.PointCursor)
+        if obj is not None:
+            self.signalCursorAdded.emit(obj.backend)
     
     @pyqtSlot()
     @safeWrapper
     def slot_newVerticalCursor(self):
-        self.createNewCursor(pgui.GraphicsObjectType.vertical_cursor)
+        obj = self.newGraphicsObject(pgui.VerticalCursor)
+        if obj is not None:
+            self.signalCursorAdded.emit(obj.backend)
     
     @pyqtSlot()
     @safeWrapper
     def slot_newCrosshairCursor(self):
-        self.createNewCursor(pgui.GraphicsObjectType.crosshair_cursor)
+        obj = self.newGraphicsObject(pgui.CrosshairCursor)
+        if obj is not None:
+            self.signalCursorAdded.emit(obj.backend)
     
     @pyqtSlot(str)
     @safeWrapper
     def slot_selectCursor(self, crsId):
-        if crsId in self.__cursors__.keys():
+        if crsId in iter_attribute(self.dataCursors, "name"):
             self.slot_setSelectedCursor(crsId, True)
+      
+    @pyqtSlot(str)
+    @safeWrapper
+    def slot_selectGraphicsObject(self, objId):
+        self.slot_setSelectedGraphicsObject(objId)
       
     @pyqtSlot()
     @safeWrapper
@@ -1829,189 +1785,87 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def slot_receiveCursorLinkRequest(self):
         pass
     
-    @pyqtSlot(int, str, "QPointF")
+    @pyqtSlot(str, "QPointF")
     @safeWrapper
-    def slot_reportCursorPos(self, cType, crsId, pos):
-        obj = self.__cursors__.get(crsId, None)
-        if obj is not None:
-            if cType & pgui.GraphicsObjectType.vertical_cursor:
-                self.signalCursorAt[str, list].emit(crsId, \
-                    [np.floor(pos.x()), None, obj.xwindow])
+    def slot_reportCursorPos(self, crsId, pos):
+        if crsId in iter_attribute(self.dataCursors, "name"):
+            obj = [o for o in self.dataCursor(crsId)]
+            
+            if len(obj) == 0:
+                return
+            
+            obj = obj[0]
+            
+            if isinstance(obj, pgui.VerticalCursor):
+                self.signalCursorAt[str, list].emit(crsId, 
+                                                    [np.floor(pos.x()), None, obj.xwindow])
                 
-            elif cType & pgui.GraphicsObjectType.horizontal_cursor:
-                self.signalCursorAt[str, list].emit(crsId, \
-                    [None, np.floor(pos.y()), self.__cursors__[crsId].ywindow])
+            elif isinstance(obj, pgui.HorizontalCursor):
+                self.signalCursorAt[str, list].emit(crsId, 
+                                                    [None, np.floor(pos.y()), obj.ywindow])
                 
-            elif cType & (pgui.GraphicsObjectType.crosshair_cursor | pgui.GraphicsObjectType.point_cursor):
-                self.signalCursorAt[str, list].emit(crsId, \
-                    [np.floor(pos.x()), np.floor(pos.y()), self.__cursors__[crsId].xwindow, self.__cursors__[crsId].ywindow])
-                        
+            else:
+                self.signalCursorAt[str, list].emit(crsId,
+                                                    [np.floor(pos.x()), np.floor(pos.y()), obj.xwindow, obj.ywindow])
+                
     @pyqtSlot()
     @safeWrapper
     def slot_removeCursors(self):
-        if len(self.__cursors__) == 0:
-            return
+        self._removePlanarGraphics(cursors=True)
         
-        cursors = [c for c in self.__cursors__.values()]
-                
-        for crs in cursors:
+    @pyqtSlot()
+    @safeWrapper
+    def slot_removeAllCursors(self):
+        self._removeAllPlanarGraphics(cursors=True)
+        for crs in filter(lambda x: isinstance(x.backend, pgui.Cursor), self.graphicsObjects):
+            crs.backend.frontends.clear()
             self.scene.removeItem(crs)
             
-            if crs in crs.backend.frontends:
-                crs.backend.frontends.remove(crs)
-            
-        cursorTypeInts = [t.value for t in pgui.GraphicsObjectType if \
-            t.value < pgui.GraphicsObjectType.allCursorTypes]
-        
-        for k in cursorTypeInts:
-            self.__graphicsObjects__[k].clear()
-            
         self.selectedCursor = None
-        
-        self.__cursors__.clear()
-        
-        self.update(self._imageGraphicsView.childrenRegion())
-        self.scene.update(self.scene.sceneRect().x(), \
-                          self.scene.sceneRect().y(), \
-                          self.scene.sceneRect().width(), \
-                          self.scene.sceneRect().height())
         
     @pyqtSlot()
     @safeWrapper
     def slot_removeSelectedCursor(self):
-        if self.selectedCursor is None:
-            return
-        
-        self.slot_removeCursorByName(self.selectedCursor.name)
+        self._removeSelectedPlanarGraphics(cursors=True)
         
     @pyqtSlot()
     @safeWrapper
     def slot_removeCursor(self):
-        if len(self.__cursors__) == 0:
+        if len([o for o in self.dataCursors]) == 0:
             return
         
-        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in self.__cursors__.keys():
+        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.dataCursors, "name"):
             self.slot_removeCursorByName(self._cursorContextMenuSourceId)
         
     @pyqtSlot(str)
     @safeWrapper
     def slot_removeCursorByName(self, crsId):
-        #if isinstance(self.__image_viewer__, ImageViewer):
-            #print("GraphicsImageViewerWidget of %s slot_removeCursorByName %s" % (self.__image_viewer__.windowTitle(), crsId))
-        #else:
-            #print("GraphicsImageViewerWidget slot_removeCursorByName %s" % crsId)
+        self._removePlanarGraphics(name=crsId, cursors=True)
             
-        if len(self.__cursors__) == 0:
-            return
-        
-        if crsId in self.__cursors__.keys():
-            cursor = self.__cursors__[crsId]
-            
-            self.scene.removeItem(cursor)
-            
-            if self.selectedCursor == cursor:
-                self.selectedCursor = None
-            
-            if isinstance(cursor.objectType, pgui.GraphicsObjectType):
-                cType = cursor.objectType.value
-                
-            else:
-                cType = cursor.objectType
-
-            #removed_cursor = self.__graphicsObjects__[cType].pop(crsId, None)
-            self.__graphicsObjects__[cType].pop(crsId, None)
-            
-            if cursor in cursor.backend.frontends:
-                cursor.backend.frontends.remove(cursor)
-
-            self.signalCursorRemoved.emit(cursor.backend)
-            
-            #del cursor
-            #del removed_cursor
-            
-        self.update(self._imageGraphicsView.childrenRegion())
-        
-        self.scene.update(self.scene.sceneRect().x(), \
-                          self.scene.sceneRect().y(), \
-                          self.scene.sceneRect().width(), \
-                          self.scene.sceneRect().height())
-        
     @pyqtSlot()
     @safeWrapper
     def slot_removeRois(self):
-        if len(self.__rois__) == 0 :
-            return
+        self._removePlanarGraphics(cursors=False)
         
-        rois = [r for r in self.__rois__.values()]
+    @pyqtSlot()
+    @safeWrapper
+    def slot_removeAllRois(self):
+        self._removeAllPlanarGraphics(cursors=False)
         
-        for roi in rois:
-            self.scene.removeItem(roi)
-            
-            if roi in roi.backend.frontends:
-                roi.backend.frontends.remove(roi)
-            
-        roiTypeInts = [t.value for t in pgui.GraphicsObjectType if \
-            t.value > pgui.GraphicsObjectType.allCursorTypes]
-        
-        for k in roiTypeInts:
-            self.__graphicsObjects__[k].clear()
-            
-        self.__rois__.clear()
-        
-        self.selectedRoi = None
-        
-        self.update(self._imageGraphicsView.childrenRegion())
-        self.scene.update(self.scene.sceneRect().x(), \
-                          self.scene.sceneRect().y(), \
-                          self.scene.sceneRect().width(), \
-                          self.scene.sceneRect().height())
+    @pyqtSlot()
+    @safeWrapper
+    def slot_removeAllGraphics(self):
+        self._removeAllPlanarGraphics()
         
     @pyqtSlot()
     @safeWrapper
     def slot_removeSelectedRoi(self):
-        if self.selectedRoi is None:
-            return
-        
-        self.slot_removeRoiByName(self.selectedRoi.name)
+        self._removeSelectedPlanarGraphics(cursors=False)
         
     @pyqtSlot(str)
     @safeWrapper
     def slot_removeRoiByName(self, roiId):
-        #print("GraphicsImageViewerWidget slot_removeRoiByName %s" % roiId)
-        if len(self.__rois__) == 0:
-            return
-        
-        if roiId in self.__rois__.keys():
-            roi = self.__rois__[roiId]
-            
-            self.scene.removeItem(roi)
-            
-            if self.selectedRoi == roi:
-                self.selectedRoi = None
-            
-            if isinstance(roi.objectType, pgui.GraphicsObjectType):
-                rType = roi.objectType.value
-                
-            else:
-                rType = roi.objectType
-
-            #removed_roi = self.__graphicsObjects__[rType].pop(roiId, None)
-            self.__graphicsObjects__[rType].pop(roiId, None)
-            
-            if roi in roi.backend.frontends:
-                roi.backend.frontends.remove(roi)
-            
-            self.signalRoiRemoved.emit(roi.backend)
-            
-            #del roi
-            #del removed_roi
-            
-        self.update(self._imageGraphicsView.childrenRegion())
-        
-        self.scene.update(self.scene.sceneRect().x(), \
-                          self.scene.sceneRect().y(), \
-                          self.scene.sceneRect().width(), \
-                          self.scene.sceneRect().height())
+        self._removePlanarGraphicsByName(self, roiId, cursors=False)
 
     @pyqtSlot()
     @safeWrapper
@@ -2022,31 +1876,8 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         if self._roiContextMenuSourceId is not None and self._roiContextMenuSourceId in self.__rois__.keys():
             self.slot_removeRoiByName(self._roiContextMenuSourceId)
         
-    @safeWrapper
-    def hasRoi(self, roiId):
-        """Tests for existence of a GraphicsObject roi with given id or name (label).
-        
-        Parameters:
-        ===========
-        roiId: str: the roi Id or roi Name (label)
-        """
-        if not isinstance(roiId, str):
-            raise TypeError("Expecting a str; got %s instead" % type(roiId).__name__)
-        
-        if len(self.__rois__) == 0:
-            return False
-        
-        if not roiId in self.__rois__.keys():
-            roi_id_Label = [(rid, r.name) for (rid, r) in self.__rois__.items() if r.name == roiId]
-            
-            return len(roi_id_Label) > 0
-            
-        else:
-            return True
-        
-   ####
-    # properties
-    ####
+
+   #### BEGIN properties
     
     @property
     def minZoom(self):
@@ -2065,7 +1896,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def maxZoom(self, val):
         self.__maxZoom__ = val
         
-
     @property
     def scene(self):
         return self.__scene__
@@ -2075,75 +1905,211 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         return self._imageGraphicsView
     
     @property
-    def cursors(self):
-        return self.__cursors__
-    
-    @property
     def imageViewer(self):
         return self.__image_viewer__
     
     @property
-    def rois(self):
-        return self.__rois__
+    def graphicsObjects(self) -> typing.Iterator:
+        """Iterator for existing pictgui.GraphicsObjects.
+        """
+
+        #NOTE ATTENTION: 2021-05-08 21:27:31 New API:
+        
+        #To simplify the code, GraphicsImageViewerWidget does not store references
+        #to either the scene's GraphicsObject objects, or to their PlanarGraphics
+        #backends.
+        
+        #The GraphicsObject instances are already owned by the viewer widget's 
+        #scene, and their PlanarGraphics backends can be accessed through the
+        #'backend' attribute of the GraphicsObject instance.
+        
+        #This property allows access to the GraphicsObject instances that are
+        #owned by the scene, and thus indirectly to their PlanarGraphics 'backend'.
+
+        return filter_type(self.scene.items(), pgui.GraphicsObject)
+        
+    @property
+    def planarGraphics(self) -> typing.Iterator:
+        """Iterator for the backends of all the GraphicsObjects in the scene.
+        """
+        return iter_attribute(self.graphicsObjects, "backend")
     
     @property
-    def graphicsObjects(self):
-        return self.__graphicsObjects__
+    def rois(self) -> typing.Iterator:
+        """All ROIs (PlanarGraphics) with frontends in the scene.
+        """
+        return filterfalse_type(self.planarGraphics, pgui.Cursor)
+    
+    @property
+    def dataCursors(self) -> typing.Iterator:
+        """All PlanarGraphics Cursors with frontends in the scene.
+        """
+        return filter_type(self.planarGraphics, pgui.Cursor)
+        
+    #### END properties
+
+    #### BEGIN public methods
     
     @safeWrapper
-    def roi(self, value):
-        """Returns the GraphicsObject with specified ID or name (label) or None if this does not exist.
+    def roi(self, value:typing.Optional[typing.Any]=None, 
+            attribute:str="name", 
+            predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y,
+            **kwargs) -> typing.Iterator:
+        """Iterates through ROIs with specific attributes.
+        
+        ROIs are selected by comparing the value of a specific ROI attribute
+        (named in 'attribute') against the value specified in 'value'.
+        
+        The two values are compared using the predicate specified in 'predicate'.
+        By default, the predicate tests for equality.
         
         Parameters:
-        ===========
-        roiId: str: the roi Id or Name (label)
-        """
-        if not isinstance(value, str):
-            raise TypeError("Expecting a str; got %s instead" % type(value).__name__)
-        
-        #print("current rois: ", self.__rois__)
-        
-        if len(self.__rois__):
-            if value in self.__rois__.keys():
-                return self.__rois__[value]
+        ==========
+        value: any type; optional, default is None
+            The value against which the value of the named attribute is compared.
             
-            else:
-                roi_id_Label = [(r, rid, r.label) for (rid, r) in self.__rois__.items() if r.label == value]
-                #print("roi",  roi_id_Label[0])
-                #print("roi id %s" % rid)
-                #print("roi label " , roi_id_Label[0].label)
-                if len(roi_id_Label):
-                    return [self.__rois__[i[0]] for i in roi_id_Label]
-    
-    ####
-    # public methods
-    ####
-    
-    #def showImageLabel(self, val):
-        #self._imageNameLabel.setVisible(val)
+            When None, returns self.rois property directly
+            
+        Named Parameters:
+        =================
+        attribute: str, default is "name" - the name of the attribute for which
+            the value will be compared against 'value'
+        
+        predicate: a callable that takes two parameters and returns a bool.
+            Performs the actual comparison between 'value' and the named attribute
+            value.
+            
+            The first parameter of the predicate is a place holder for the value
+            of the attribute given in 'attribute'
+            
+            The second parameter is the placeholder for 'value'
+            
+            In short, the predicate compares the vlue of the named attribute to
+            that given in 'value'
+            
+            Optional: default is the identity (lambda x,y: x==y)
+            
+        Var-keyword parameters:
+        =======================
+        Mapping of attribute name to function
+        attribute_name:str -> function object (unary predicate)
+            This is an alternative syntax that supplements the 'value' and
+            'attribute' parameters described above.
+            
+            e.g.:
+            roi(name=lambda x: x=="some_name")
+            
+        Returns:
+        ========
+        An iterator for non-Cursor PlanarGraphics objects, optionally having the 
+        named attribute with values that satisfy the predicate, and possibly
+        further attributes with values as specified in kwargs.
+        
+        By default, the function returns an iterator of ROIs selected by their 
+        name.
+        
+        """
+        
+        if len(**kwargs):
+            ret = list()
+            for n,f in kwargs.items():
+                if isinstance(f, function):
+                    ret.append(filter_attribute(self.rois, n, f))
+                    
+        else:
+            ret = self.rois
+            
+        
+        return filter_attribute(ret, attribute, value, predicate)
         
     @safeWrapper
-    def cursor(self, value):
-        """Returns the GraphicsObject cursor with specified ID or name (label) or None if this does not exist.
+    def dataCursor(self, value:typing.Optional[typing.Any] = None,
+                   attribute:str="name", 
+                   predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y,
+                   **kwargs) -> typing.Iterator:
+        """Iterates through Cursors with specific attributes.
+        
+        Data cursors are selected by comparing the value of a specific cursor 
+        attribute (named in 'attribute') against the value specified in 'value'.
+        
+        The two values are compared using the predicate specified in 'predicate'.
+        By default, the predicate tests for equality.
         
         Parameters:
-        ===========
-        value: str: the cursor Id or Name (label)
-        """
+        ==========
+        value: any type; optional, default is None
+            The value against which the value of the named attribute is compared.
+            
+            When None, returns self.dataCursors property directly.
+            
+        Named Parameters:
+        =================
+        attribute: str, default is "name" - the name of the attribute for which
+            the value will be compared against 'value'
         
-        if len(self.__cursors__):
-            if not isinstance(value, str):
-                raise TypeError("Expecting a str; gt %s instead" % type(value).__name__)
+        predicate: a callable that takes two parameters and returns a bool.
+            Performs the actual comparison between 'value' and the named attribute
+            value.
             
-            if value in self.__cursors__.keys():
-                return self.__cursors__[value]
+            The first parameter of the predicate is a place holder for the value
+            of the attribute given in 'attribute'
             
-            #else:
-                #crsId_Label = [(c, cid, c.name) for (cid, c) in self.__cursors__.items() if c.label == value]
-                
-                #if len(crsId_Label):
-                    #return [c[0] for c in crsId_Label]
+            The second parameter is the placeholder for 'value'
             
+            In short, the predicate compares the vlue of the named attribute to
+            that given in 'value'
+            
+            Optional: default is the identity (lambda x,y: x==y)
+            
+        Var-keyword parameters:
+        =======================
+        Mapping of attribute name to function
+        attribute_name:str -> function object (unary predicate)
+            This is an alternative syntax that supplements the 'value' and
+            'attribute' parameters described above.
+            
+            e.g.:
+            dataCursor(name=lambda x: x=="some_name")
+            
+        Returns:
+        ========
+        An iterator for Cursor PlanarGraphics objects, optionally having the 
+        named attribute with values that satisfy the predicate, and possibly
+        further attributes with values as specified in kwargs.
+        
+        By default, the function returns an iterator of Cursor selected by their
+        name.
+        
+        """
+        if len(kwargs):
+            ret = list()
+            for n, f in kwargs.items():
+                ret.append(filter_attribute(self.dataCursors, n, f))
+        else:
+            ret = self.dataCursors
+            
+        return filter_attribute(ret, attribute, value, predicate)
+    
+    def verticalCursor(self, value:typing.Any=None, attribute:str="name", 
+               predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y) -> typing.Iterator:
+        return filter_attribute(filter_type(self.planarGraphics, pgui.VerticalCursor), 
+                                attribute, value, predicate)
+        
+    def horizontalCursor(self, value:typing.Any=None, attribute:str="name", 
+               predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y) -> typing.Iterator:
+        return filter_attribute(filter_type(self.planarGraphics, pgui.HorizontalCursor), 
+                                attribute, value, predicate)
+        
+    def crosshairCursor(self, value:typing.Any=None, attribute:str="name", 
+               predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y) -> typing.Iterator:
+        return filter_attribute(filter_type(self.planarGraphics, pgui.CrosshairCursor), 
+                                attribute, value, predicate)
+        
+    def pointCursor(self, value:typing.Any=None, attribute:str="name", 
+               predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y) -> typing.Iterator:
+        return filter_attribute(filter_type(self.planarGraphics, pgui.PointCursor), 
+                                attribute, value, predicate)
+        
     @safeWrapper
     def hasCursor(self, crsid):
         """Tests for existence of a GraphicsObject cursor with given id or label.
@@ -2173,10 +2139,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def wheelEvent(self, evt):
         if evt.modifiers() and QtCore.Qt.ShiftModifier:
             step = 1
-            #if evt.modifiers() and QtCore.Qt.ControlModifier and QtCore.Qt.ShiftModifier:
-                #step = 10
-                
-            #print("wheel event angle delta x: ", evt.angleDelta().x(), " y: ", evt.angleDelta().y())
                 
             nDegrees = evt.angleDelta().y()*step/8
             
@@ -2185,50 +2147,38 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             zoomChange = nSteps * 0.1
             
             self.slot_relativeZoom(zoomChange)
-        #else:
         evt.accept()
 
     def timerEvent(self, evt):
         evt.ignore()
         
     def keyPressEvent(self, evt):
-        #print("keyPresEvent in GraphicsImageViewerWidget: ", evt)
         if evt.key() == QtCore.Qt.Key_Escape:
             self.__escape_pressed___ = True
             
-        #else:
-            #self.__escape_pressed___ = False
-            
         evt.accept()
-        #evt.ignore()
         
     @safeWrapper
     def mousePressEvent(self, evt):
-        #print("mousePressEvent in GraphicsImageViewerWidget: ", evt)
         self.__mouse_pressed___ = True
         
         if evt.button() == QtCore.Qt.LeftButton:
             self.__last_mouse_click_lmb__ = evt.pos()
-            #self.__escape_pressed___ = True
             
         elif evt.button() == QtCore.Qt.RightButton:
             self.__last_mouse_click_lmb__ = None
-            #self.__escape_pressed___ = True
         
         evt.accept()
     
     @safeWrapper
     def mouseReleaseEvent(self, evt):
-        #print("mouseReleaseEvent in GraphicsImageViewerWidget: ", evt)
         self.__mouse_pressed___ = True
         
         if evt.button() == QtCore.Qt.LeftButton:
             self.__last_mouse_click_lmb__ = evt.pos()
-            #self.__escape_pressed___ = True
             
         elif evt.button() == QtCore.Qt.RightButton:
             self.__last_mouse_click_lmb__ = None
-            #self.__escape_pressed___ = True
         
         evt.accept()
     
@@ -2238,33 +2188,10 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def view(self, a):
         if isinstance(a, QtGui.QPixmap):
             self.__scene__.rootImage = QtWidgets.QGraphicsPixmapItem(a)
-            #self.__scene__.setRootImage(QtWidgets.QGraphicsPixmapItem(a))
             
         elif isinstance(a, QtGui.QImage):
             self.__scene__.rootImage = QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap.fromImage(a))
-            #self.__scene__.setRootImage(QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap.fromImage(a)))
-            
-        else:
-            return
         
-        #print(a)
-        
-        #self._imageGraphicsView.ensureVisible(self.__scene__.getRootImage().boundingRect(),0,0)
-        
-        #print("scene Rect: ", self.__scene__.sceneRect())
-        #print("image bounding rect: ", self.__scene__.getRootImage().boundingRect())
-        
-        #if self.parentWidget() is None:
-            ##self.adjustSize()
-            #self.resize(self.__scene__.sceneRect().width(), self.__scene__.sceneRect().height())
-            ##self.setVisible(True)
-        ##else:
-            ##self.parentWidget().resize(self.__scene__.sceneRect().width(), self.__scene__.sceneRect().height())
-            
-        #self._imageGraphicsView.setGeometry(self.__scene__.sceneRect().toAlignedRect())
-        #self._imageGraphicsView.centerOn(QtCore.QPointF(self.__scene__.rootImage.boundingRect().left() ,self.__scene__.rootImage.boundingRect().top()))
-
-
     def interactiveZoom(self):
         self.__interactiveZoom__ = not self.__interactiveZoom__
     
@@ -2274,18 +2201,13 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def setTopLabelText(self, value):
         self._topLabel.setText(value)
         
-    #def setBottomLabelText(self, value):
-        #self._bottomLabel.setText(value)
-        
     def clearTopLabel(self):
         self._topLabel.clear()
         
-    #def clearBottomLabel(self):
-        #self._bottomLabel.clear()
-        
     def clearLabels(self):
         self.clearTopLabel()
-        #self.clearBottomLabel()
+        
+    #### END public methods
         
 class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     closeMe                 = pyqtSignal(int)
@@ -2312,40 +2234,93 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     #
     # gamma = None (for now)
     #
-    # "colortable" = singleton or list of colortables or None
+    # "colormap" = singleton or list of colortables or None
     #
-  
+    
+    # NOTE: 2021-09-15 10:40:44 KISS!
+    # for cursor & roi label backgrounds we should limit ourselved to one of:
+    # a) transparent
+    # b) any color (although preferable either black or white)
+    # and this is applied across the board (i.e. all cursors & rois)
+    #
+    # Regarding hover color, the same one-for-all rule should apply: use the same
+    # hover color for any graphics item we hover (if we decide to use hover color, 
+    # which might be nice!)
+    #
+    # Also, NOTE that these are defaults for top level imageviewer windows only.
+    # Client windows will have to set their own cursor/roi colors by supplying
+    # the appropriate parameter to the cursor/roi creation method in this :class:
+    #
+    #
+    # To get/set the color for a SPECIFIC graphics item (cursor or ROI) use the
+    # getter / setter methods
+    #
+    # getPlanarGraphicsColor / setPlanarGraphicsColor; NOTE these are NOT defined
+    # as configurables for this :class:. Instead they should be linked into (i.e.,
+    # called, perhaps, indirectly, by) a configurable getter/setter of the 
+    # viewer's owner :class: such as LSCaTWindow. In this way the appearance of
+    # a subset of planargraphics of a certain type (which share a common meaning)
+    # appear similarly
+    #
+    
+    
+    defaultRoisColor = "#aaff00"
+    
+    defaultCursorColors = Bunch({"crosshair_cursor":"#C173B088", 
+                                 "horizontal_cursor":"#B1D28F88", 
+                                 "vertical_cursor":"#ff007f88",
+                                 "point_cursor":"#aaaa00"})
+    
+    defaultLinkedCursorColors = Bunch({"crosshair_cursor":QtGui.QColor(defaultCursorColors["crosshair_cursor"]).darker().name(QtGui.QColor.HexArgb),
+                                       "horizontal_cursor":QtGui.QColor(defaultCursorColors["horizontal_cursor"]).darker().name(QtGui.QColor.HexArgb),
+                                       "vertical_cursor":QtGui.QColor(defaultCursorColors["vertical_cursor"]).darker().name(QtGui.QColor.HexArgb),
+                                       "point_cursor":QtGui.QColor(defaultCursorColors["point_cursor"]).darker().name(QtGui.QColor.HexArgb)})
+    
+    defaultGraphicsLabelBackgroundColor = QtCore.Qt.transparent
+    
+    defaultGraphicsHoverColor = "red"
+
     def __init__(self, data: (vigra.VigraArray, vigra.filters.Kernel2D, np.ndarray, QtGui.QImage, QtGui.QPixmap, tuple, list) = None,
                  parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
+                 ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
                  frame:(int, type(None)) = None, 
-                 displayChannel = None, normalize: (bool, ) = False, gamma: (float, ) = 1.0, 
+                 displayChannel = None, 
+                 normalize: (bool, ) = False, 
+                 gamma: (float, ) = 1.0, 
                  *args, **kwargs):
-        super().__init__(data=data, parent=parent, pWin=pWin, ID=ID, win_title=win_title, doc_title=doc_title, frame=frame, *args, *kwargs)
 
-        #self._configureGUI_()
-        
-        self.imageNormalize             = None
-        self.imageGamma                 = None
-        self.colorMap                   = None
-        self.prevColorMap               = None
-        self.colorTable                 = None
-        self.colorbar                   = None
-        self._colorbar_width_           = 20
+        self._image_width_ = 0
+        self._image_height_ = 0
+        self._imageNormalize             = None
+        self._imageGamma                 = None
+        self._colorMap                   = None
+        self._tempColorMap               = None
+        self._prevColorMap               = None
+        self._colorBar                   = None
+        self._colorbar_width_            = 20
         
         #self._separateChannels           = False
         
-        self.cursorsColor               = None
-        self.roisColor                  = None
+        self.cursorsColor               = None # to remove
+        self.linkedCursorsColor         = None # to remove
+        self.cursorLabelTextColor       = None # to remove
+        self.linkedCursorLabelTextColor = None # to remove
+        self.cursorLabelBackgroundColor = None # to property
+        self.roisColor                  = None # to property
+        self.linkedROIsColor            = None # to property
+        self.roiLabelTextColor          = None # to remove
+        self.linkedROILabelTextColor    = None # to remove
+        self.roiLabelBackgroundColor    = None # to remove
+        self.opaqueCursorLabel          = True # replace with self._graphicsBackgroundColor_
+        self.opaqueROILabel             = True # replace with self._graphicsBackgroundColor_
         
-        self.sharedCursorsColor         = None
-        self.sharedRoisColor            = None
+        self._cursorColors_             = self.defaultCursorColors
+        self._graphicsBackgroundColor_  = self.defaultGraphicsLabelBackgroundColor
+        self._linkedCursorColors_       = self.defaultLinkedCursorColors
+        self._roisColor_                = self.defaultRoisColor
+        self._graphicsHoverColor_       = self.defaultGraphicsHoverColor
         
-        #self._defaultCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
-        
-        #self.fallbackCursorsColor       = pgui.GraphicsObject.defaultColor
-        #self.fallbackRoisColor          = pgui.GraphicsObject.defaultColor
         
         if displayChannel is None:
             self._displayedChannel_      = "all"
@@ -2368,14 +2343,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         #self._number_of_frames_         = 1
         self.tStride                    = 0
         self.zStride                    = 0
-        self.frameAxisInfo              = None
         self.userFrameAxisInfo          = None
-        self.widthAxisInfo              = None # this is "visual" width which may not be on a spatial axis "x"
-        self.heightAxisInfo             = None # this is "visual" height which may not be on a spatial axis "y"
+        # NOTE: 2021-12-02 10:50:17
+        # the 3 beow are int see NOTE: 2021-12-02 10:39:54
+        self.frameAxis                  = None
+        self.widthAxis                  = None # this is "visual" width which may not be on a spatial axis "x"
+        self.heightAxis                 = None # this is "visual" height which may not be on a spatial axis "y"
         #self.frameIterator              = None # ??? FIXME what's this for ???
-        self._currentZoom_            = 0
+        self._currentZoom_              = 0
         #self.complexDisplay            = ComplexDisplay.real # one of "real", "imag", "dual" "abs", "phase" (cmath.phase), "arg"
-        self._currentFrameData_       = None
+        self._currentFrameData_         = None
         
         # QGraphicsLineItems -- outside the roi/cursor GraphicsObject framework!
         self._scaleBarColor_             = QtGui.QColor(255, 255, 255)
@@ -2390,10 +2367,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                                      cap = QtCore.Qt.RoundCap,
                                                      join = QtCore.Qt.RoundJoin)
         
-        self.settings                   = QtCore.QSettings()
+        #self.qsettings                   = QtCore.QSettings()
         
         self._display_horizontal_scalebar_ = True
         self._display_vertical_scalebar_   = True
+        
+        self._display_time_vertical_           = True
         
         self._showsScaleBars_            = True
         
@@ -2402,13 +2381,25 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._scaleBarOrigin_            = (0, 0)
         self._scaleBarLength_            = (10,10)
         
-        # NOTE 2019-03-18 12:54:14
-        # TODO
-        #self._cursors_color_
-        #self._rois_color_
-
-        #self._load_settings_()
+        # NOTE: 2021-08-25 09:42:54
+        # ScipyenFrameViewer initialization - also does the following:
+        # 1) calls self._configureUI_() overridden here:
+        #   1.1) sets up the UI defined in the .ui file (setupUi)
+        #
+        # 2) calls self.loadSettings() inherited from 
+        # ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
+        #
+        # NOTE: 2022-01-17 16:27:30
+        # pass None for data to prevent super().__init__ from calling setData
+        # next call our own setData
+        super().__init__(data=None, parent=parent, ID=ID, win_title=win_title, 
+                         doc_title=doc_title, frameIndex=frame, **kwargs)
         
+        # NOTE: 2022-01-17 16:29:57
+        # call super.setData() directly, as we don't need to treat 'data' 
+        # speacially (unlike in SignalViewer's case)
+        #
+        # in turn, super.setData() calls self._set_data_(...)
         if isinstance(data, ImageViewer.supported_types) or any([t in type(data).mro() for t in ImageViewer.supported_types]):
             self.setData(data, doc_title=self._docTitle_)
         
@@ -2417,16 +2408,152 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     ####
     
     @property
+    def colorMapObj(self) -> colormaps.mpl.colors.Colormap:
+        """The colormap used as default for displaying gray-scale images
+        This is not a configurable property; however, changing it will result in
+        a new value of the colorMap property
+        """
+        if not isinstance(self._colorMap, colormaps.mpl.colors.Colormap):
+            if isinstance(self._prevColorMap, colormaps.mpl.colors.Colormap):
+                self._colorMap = self._prevColorMap
+            else:
+                self._colorMap = colormaps.get("grey")
+        
+        return self._colorMap
+    
+    @colorMapObj.setter
+    def colorMapObj(self, val:colormaps.mpl.colors.Colormap) -> None:
+        if isinstance(val, colormaps.mpl.colors.Colormap):
+            self._colorMap = val
+        
+    @property
+    def colorMap(self) -> str:
+        """Name of the colormap used as default for displaying gray-scale images.
+        This is the 'name' attribute (str) of a matplotlib.colors.Colormap object.
+        This is so that the name can be safely stored in QSettings.
+        
+        The colorMap property setter accepts a matplotlib.colors.Colormap object
+        or a str (valid colormap name, see gui.sciyen_colormaps module).
+        If str is not a valid colormap name the default color map will not be changed.
+        """
+        if not isinstance(self._colorMap, colormaps.mpl.colors.Colormap):
+            if isinstance(self._prevColorMap, colormaps.mpl.colors.Colormap):
+                self._colorMap = self._prevColorMap
+            else:
+                self._colorMap = colormaps.get("grey")
+            #self.displayFrame()
+            
+        return self._colorMap.name
+    
+    @markConfigurable("ColorMap")
+    @colorMap.setter
+    def colorMap(self, val:typing.Union[str, colormaps.mpl.colors.Colormap]):
+        """Setter for colorMap
+        """
+        if isinstance(val, colormaps.mpl.colors.Colormap):
+            cmap_name = val.name
+            cmap = val
+            
+        elif isinstance(val, str):
+            cmap = colormaps.get(val, None)
+            if not isinstance(cmap, colormaps.mpl.colors.Colormap):
+                return
+            cmap_name = val
+                
+        else:
+            raise TypeError(f"Expecting a str or a maptplotlib.cm.Colormap; got {type(val).__name__} instead")
+        
+        if isinstance(self._colorMap, colormaps.mpl.colors.Colormap):
+            self._prevColorMap = self._colorMap
+        
+        self._colorMap = cmap
+        #self._colorMap = val
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["ColorMap"] = cmap_name
+        
+        self.displayFrame()
+        
+    @property
+    def frameIndexBinding(self):
+        if not isinstance(self._data_, vigra.VigraArray):
+            return (None, 0)
+        
+        # NOTE when a frame axis index equals data.ndim this means there is no
+        # frame axis there!
+        
+        #print("in frameIndexBinding: self.frameAxis", self.frameAxis)
+        #print("in frameIndexBinding: self._number_of_frames_", self._number_of_frames_)
+        if isinstance(self._number_of_frames_, int):
+            return tuple((self.frameAxis if self.frameAxis < self._data_.ndim else None, k) for k in range(self._number_of_frames_))
+        
+        else:
+            traversal = tuple(tuple((ax,i) for i in range(axSize)) for ax, axSize in zip(reversed(self.frameAxis), reversed(self._number_of_frames_)))
+            #traversal = tuple(tuple((ax,i) for i in range(axSize)) for ax, axSize in zip(self.frameAxis, self._number_of_frames_))
+            return tuple(itertools.product(*traversal))
+            
+        
+    @property
+    def temporaryColorMap(self)->str:
+        """Name of a temporary colormap or None.
+        A temporary colormap is to be used for displaying 'channel' images (e.g.,
+        2D Vigra arrays representing an image 'channel').
+        In order to be used, the temporary colormap needs to be passed as the
+        'colorMap' parameter to self.displayFrame().
+        By default, the temporary colormap is None.
+        The setter of this property acceps either a str (colormap name) or a 
+        mpl.colors.Colormap object. 
+        When a str, if this is not a valid colormap name, the temporary colormap
+        is set to None.
+        This is not a configurable property.
+        """
+        if isinstance(self._tempColorMap, colormaps.mpl.colors.Colormap):
+            return self._tempColorMap.name
+            
+    @temporaryColorMap.setter
+    def temporaryColorMap(self, val:typing.Union[colormaps.mpl.colors.Colormap,str]):
+        if val is None:
+            self._tempColorMap = None
+        elif isinstance(val, str):
+            self._tempColorMap = colormaps.get(val, None)
+        elif isinstance(val, colormaps.mpl.colors.Colormap):
+            self._tempColorMap = val
+        else:
+            raise TypeError(f"Expecting a str, matplotlib colormap or None; got {type(val).__name__} instead")
+        
+        if isinstance(self._tempColorMap, colormaps.colors.Colormap):
+            self.displayFrame(colorMap = self._tempColorMap)
+        
+        
+    def getPlanarGraphicsColor(self, ID):
+        
+        pass
+    
+    def setPlanarGraphicsColor(self, ID, val):
+        pass
+        
+    def setDataDisplayEnabled(self, value):
+        self.viewerWidget.setEnabled(value is True)
+        self.viewerWidget.setVisible(value is True)
+            
+    @property
     def currentFrame(self):
         return self._current_frame_index_
     
     @currentFrame.setter
     def currentFrame(self, val):
         """
-        Emits self.frameChanged signal when not a guiClient
+        Emits self.frameChanged signal
         """
-        if not isinstance(val, int) or val >= self._number_of_frames_ or val < 0: 
+        missing = (isinstance(self._missing_frame_value_, (int, float)) and val == self._missing_frame_value_) or \
+            self._missing_frame_value_ in (MISSING, NA) and val is self._missing_frame_value_
+        
+        if missing or val not in self.frameIndex:
+            self.setDataDisplayEnabled(False)
             return
+        else:
+            self.setDataDisplayEnabled(True)
+            
+        self._current_frame_index_ = int(val)
         
         # NOTE: 2018-09-25 23:06:55
         # recipe to block re-entrant signals in the code below
@@ -2436,14 +2563,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in \
             (self.framesQSpinBox, self.framesQSlider)]
         
-        #self.framesQSpinBox.valueChanged[int].disconnect()
-        #self.framesQSlider.valueChanged[int].disconnect()
-
         self.framesQSpinBox.setValue(val)
         self.framesQSlider.setValue(val)
-
-        self._current_frame_index_ = val
-        #print("ImageViewer %s currentFrame: " % self.windowTitle(), self._current_frame_index_)
 
         self.displayFrame()
 
@@ -2457,73 +2578,160 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             # frame) followed by the backends' responsibility to update
             # their frontends
             #
-            for obj_dict in self.graphicsObjects().values():
-                for obj in obj_dict.values():
-                    if obj.backend.currentFrame != self._current_frame_index_: # check to avoid race conditions and recurrence
-                        obj.backend.currentFrame = self._current_frame_index_
+            for o in self.graphicsObjects:
+                if o.backend.currentFrame != self._current_frame_index_: # check to avoid race conditions and recurrence
+                    o.backend.currentFrame = self._current_frame_index_
+                    
+            # NOTE: 2021-07-08 10:53:01
+            # Alternatively:
+            for o in self.planarGraphics:
+                if o.currentFrame != self._current_frame_index_: # check to avoid race conditions and recurrence
+                    o.currentFrame = self._current_frame_index_
                     
             self.frameChanged.emit(self.currentFrame)
         
-        #self.framesQSpinBox.valueChanged.connect(self.slot_setFrameNumber)
-        #self.framesQSlider.valueChanged.connect(self.slot_setFrameNumber)
-        
         # NOTE: 2018-05-21 20:59:18
-            
+        # managed to do away with guiClient here
     
     @property
-    def cursors(self):
-        return self.viewerWidget.cursors
+    def graphicsObjects(self):
+        return list(self.viewerWidget.graphicsObjects)
+    
+    @property
+    def planarGraphics(self):
+        return list(set(self.viewerWidget.planarGraphics))
+    
+    @property
+    def dataCursors(self):
+        """List of Cursor planar graphics.
+        This is the list of unique planar graphics cursor backends for the 
+        displayed cursors
+        """
+        return list(self.viewerWidget.dataCursors)
+    
+    def getDataCursors(self, **kwargs):
+        """List with a specific subset of Cursor planar graphics objects.
+        
+        Var-keyword parameters
+        ======================
+        kwargs: key/value pairs for cursor properties for selecting the cursors
+            subset.
+            
+            When no var-keyword parameters are passed, the function returns 
+            self.dataCursors property directly.
+        
+        (see core.prog.filter_attr)
+        """
+        if len(kwargs):
+            return list(filter_attr(self.viewerWidget.dataCursors, **kwargs))
+        
+        return self.dataCursors
     
     @safeWrapper
-    def cursor(self, value):
-        """Returns a GraphicsObject cursor with specified ID or name (label).
+    def dataCursor(self, value:typing.Optional[typing.Any]=None, *args, **kwargs):
+        """Returns a list of pictgui.Cursor selected by one or more attributes.
         
-        Parameters:
-        ===========
-        value: str: the cursor Id or roi Name (label)
+        By default, compares the value of the 'name' attribute of the 
+        PlanarGraphics Cursor object to the 'value' parameter.
+        
+        Delegates to GraphicsImageViewerWidget.dataCursor, documented below
+        
+        Parameters: (from GraphicsImageViewerWidget.cursor(...) docstring)
+        ==========
+        value: any type
+            The value against which the value of the named attribute is compared.
+               
+        Named Parameters:
+        =================
+        attribute: str, default is "name" - the name of the attribute for which
+            the value will be compared against 'value'
+        
+        predicate: a callable that takes two parameters and returnss a bool.
+            Performs the actual comparison between 'value' and the named attribute
+            value.
+            
+            The first parameter of the predicate is a place holder for the value
+            of the attribute given in 'attribute'
+            
+            The second parameter is the placeholder for 'value'
+            
+            In short, the predicate compares the vlue of the named attribute to
+            that given in 'value'
+            
+            Optional: default is the identity (lambda x,y: x==y)
         """
-        return self.viewerWidget.cursor(value)
+        return list(self.viewerWidget.dataCursor(value, *args, **kwargs))
 
     @safeWrapper
-    def hasCursor(self, value):
+    def hasCursor(self, *args, **kwargs):
         """Tests for existence of a GraphicsObject cursor with specified ID or name (label).
         
-        Parameters:
-        ===========
-        value: str: the cursor Id or roi Name (label)
+        Delegates to self.dataCursor(...)
         """
-        return self.viewerWidget.hasCursor(value)
+        return len(set(self.dataCursor(*args, **kwargs))) > 0
     
     @property
     def rois(self):
-        return self.viewerWidget.rois
+        """List of non-Cursor planargraphics
+        This is the list of unique planar graphics cursor backends for the 
+        displayed cursors
+        """
+        return list(set(self.viewerWidget.rois))
     
     @safeWrapper
-    def roi(self, roiId):
-        """Returns a GraphicsObject roi with specified ID or name (label).
+    def roi(self, value:typing.Optional[typing.Any]=None, *args, **kwargs):
+        """Returns a list of PlanarGraphics ROI roi with a specific attribute value.
         
-        Parameters:
-        ===========
-        roiId: str: the roi Id or roi Name (label)
+        Delegates to GraphicsImageViewerWidget.roi(...); by default, compares
+        the value of the 'name' attribute of the PlanarGraphics to the 'value'
+        parameter.
+        
+        Parameters: (from GraphicsImageViewerWidget.roi(...) docstring)
+        ==========
+        value: any type
+            The value against which the value of the named attribute is compared.
+               
+        Named Parameters:
+        =================
+        attribute: str, default is "name" - the name of the attribute for which
+            the value will be compared against 'value'
+        
+        predicate: a callable that takes two parameters and returnss a bool.
+            Performs the actual comparison between 'value' and the named attribute
+            value.
+            
+            The first parameter of the predicate is a place holder for the value
+            of the attribute given in 'attribute'
+            
+            The second parameter is the placeholder for 'value'
+            
+            In short, the predicate compares the vlue of the named attribute to
+            that given in 'value'
+            
+            Optional: default is the identity (lambda x,y: x==y)
+            
         """
-        return self.viewerWidget.roi(roiId)
+        return list(set(self.viewerWidget.roi(value, *args, **kwargs)))
         
     @safeWrapper
-    def hasRoi(self, roiId):
-        """Tests for existence of a GraphicsObject roi with specified ID or name (label).
+    def hasRoi(self, *args, **kwargs):
+        """Tests for existence of a PlanarGraphics ROI roi with a given attribute.
         
-        Parameters:
-        ===========
-        roiId: str: the roi Id or roi Name (label)
+        Delegates to self.roi(...)
+        
         """
-        return self.viewerWidget.hasRoi(roiId)
+        return len(set(self.roi(*args, **kwargs))) > 0
     
     @property
     def colorBarWidth(self):
         return self._colorbar_width_
     
+    @markConfigurable("ColorBarWidth", "qt")
     @colorBarWidth.setter
     def colorBarWidth(self, value):
+        if isinstance(value, str):
+            value = int(value)
+                
         if not isinstance(value, int):
             raise TypeError("Expecting an int; got %s instead" % type(value).__name__)
         
@@ -2554,6 +2762,20 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         """A reference to the selected cursor
         """
         return self.viewer.selectedCursor
+    
+    @property
+    def imageWidth(self):
+        """Width of the displayed image (in pixels); read-only; 0 if no image
+        """
+        return self._image_width_
+    
+    @property
+    def imageHeight(self):
+        """Height of the displayed image (in pixels); read-only; 0 if no image
+        """
+        return self._image_height_
+    
+    
     
     ####
     # slots
@@ -2693,8 +2915,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @pyqtSlot()
     @safeWrapper
-    def slot_removeCursors(self):
-        self.viewerWidget.slot_removeCursors()
+    def slot_removeAllCursors(self):
+        self.viewerWidget.slot_removeAllCursors()
 
     @pyqtSlot()
     @safeWrapper
@@ -2703,8 +2925,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @pyqtSlot()
     @safeWrapper
-    def slot_removeRois(self):
-        self.viewerWidget.slot_removeRois()
+    def slot_removeAllRois(self):
+        self.viewerWidget.slot_removeAllRois()
         
     @pyqtSlot(str)
     @safeWrapper
@@ -2745,7 +2967,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._currentZoom_ -=1
         self.viewerWidget.slot_zoom(2**self._currentZoom_)
         
-    @pyqtSlot(bool)
+    @pyqtSlot()
     @safeWrapper
     def slot_selectZoom(self):
         self.viewerWidget.interactiveZoom()
@@ -2757,8 +2979,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self._setup_color_bar_()
             
         else:
-            if self.colorbar is not None:
-                self.viewerWidget.scene.removeItem(self.colorbar)
+            if self._colorBar is not None:
+                self.viewerWidget.scene.removeItem(self._colorBar)
                 
     def _setup_color_bar_(self):
         #try:
@@ -2769,7 +2991,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         
         if isinstance(self._data_, vigra.VigraArray):
-            self._currentFrameData_, _ = self._generate_frame_view_(self._displayedChannel_)
+            self._currentFrameData_, _ = self._frameView_(self._displayedChannel_)
             
             imax = self._currentFrameData_.max()
             imin = self._currentFrameData_.min()
@@ -2795,24 +3017,24 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                                         axis=1).T,
                                         axistags = vigra.VigraArray.defaultAxistags("xy"))
             
-            if self.colorMap is None or self._currentFrameData_.channels > 1:
-                bar_qimage = bar_image.qimage(normalize = self.imageNormalize)
+            if self._colorMap is None or self._currentFrameData_.channels > 1:
+                bar_qimage = bar_image.qimage(normalize = self._imageNormalize)
                 
             else:
-                bar_qimage = self._applyColorTable_(bar_image).qimage(normalize = self.imageNormalize)
+                bar_qimage = self._applyColorTable_(bar_image).qimage(normalize = self._imageNormalize)
                     
                     
-            if self.colorbar is None:
-                self.colorbar =  QtWidgets.QGraphicsItemGroup()
+            if self._colorBar is None:
+                self._colorBar =  QtWidgets.QGraphicsItemGroup()
                 
-                self.viewerWidget.scene.addItem(self.colorbar)
-                #self.colorbar.setPos(bar_x, 0)
+                self.viewerWidget.scene.addItem(self._colorBar)
+                #self._colorBar.setPos(bar_x, 0)
                     
             else:
-                for item in self.colorbar.childItems():
-                    self.colorbar.removeFromGroup(item)
+                for item in self._colorBar.childItems():
+                    self._colorBar.removeFromGroup(item)
                     
-                #self.colorbar.setPos(bar_x, 0)
+                #self._colorBar.setPos(bar_x, 0)
                     
                 
             cbar_pixmap_item = QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap.fromImage(bar_qimage))
@@ -2931,13 +3153,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             back_rect.setBrush(pgraph.mkBrush("w"))
             #back_rect.setZValue(-1)
             
-            self.colorbar.addToGroup(back_rect)
-            self.colorbar.addToGroup(cbar_pixmap_item)
-            self.colorbar.addToGroup(cbar_rect)
+            self._colorBar.addToGroup(back_rect)
+            self._colorBar.addToGroup(cbar_pixmap_item)
+            self._colorBar.addToGroup(cbar_rect)
             
             for k,l in enumerate(tick_lines):
-                self.colorbar.addToGroup(l)
-                self.colorbar.addToGroup(tick_labels[k])
+                self._colorBar.addToGroup(l)
+                self._colorBar.addToGroup(tick_labels[k])
                 
             
             
@@ -2977,21 +3199,21 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 w = self._data_.shape[0]
                 h = self._data_.shape[1]
                 
-                if self.frameAxisInfo is not None:
-                    if isinstance(self.frameAxisInfo, tuple) and len(self.frameAxisInfo) == 2:
-                        ndx1 = self._current_frame_index_ // self._data_.shape[self._data_.axistags.index(self.frameAxisInfo[0].key)]
-                        ndx0 = self._current_frame_index_ - ndx1 * self._data_.shape[self._data_.axistags.index(self.frameAxisInfo[0].key)]
+                if self.frameAxis is not None:
+                    if isinstance(self.frameAxis, tuple):# and len(self.frameAxis) == 2:
+                        ndx1 = self._current_frame_index_ // self._data_.shape[self._data_.axistags.index(self.frameAxis[0].key)]
+                        ndx0 = self._current_frame_index_ - ndx1 * self._data_.shape[self._data_.axistags.index(self.frameAxis[0].key)]
                         
-                        img = self._data_.bindAxis(self.frameAxisInfo[0].key,ndx0).bindAxis(self.frameAxisInfo[1].key,ndx1)
+                        img = self._data_.bindAxis(self.frameAxis[0].key,ndx0).bindAxis(self.frameAxis[1].key,ndx1)
                         
                     else:
-                        img = self._data_.bindAxis(self.frameAxisInfo.key, self._current_frame_index_)
+                        img = self._data_.bindAxis(self.frameAxis.key, self._current_frame_index_)
                         
                 else:
                     img = self._data_
                     
-                xcal = dt.AxisCalibration(img.axistags[0])
-                ycal = dt.AxisCalibration(img.axistags[1])
+                xcal = axiscalibration.AxesCalibration(img.axistags[0])
+                ycal = axiscalibration.AxesCalibration(img.axistags[1])
                 
                 x_units = xcal.getUnits(img.axistags[0])
                 y_units = ycal.getUnits(img.axistags[1])
@@ -3024,44 +3246,36 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             #print("def_y_len", def_y_len)
             
             dlg = quickdialog.QuickDialog(self, "Display scale bars")
-            #dlg = vigra.pyqt.quickdialog.QuickDialog(self, "Display scale bars")
             
             display_group = quickdialog.HDialogGroup(dlg)
-            #display_group = vigra.pyqt.quickdialog.HDialogGroup(dlg)
             
             show_x = quickdialog.CheckBox(display_group, "Horizontal")
-            #show_x = vigra.pyqt.quickdialog.CheckBox(display_group, "Horizontal")
             show_x.setToolTip("Show horizontal scalebar")
             show_x.setChecked(self._display_horizontal_scalebar_)
             
             show_y = quickdialog.CheckBox(display_group, "Vertical")
-            #show_y = vigra.pyqt.quickdialog.CheckBox(display_group, "Vertical")
             show_y.setToolTip("Show vertical scalebar")
             show_y.setChecked(self._display_vertical_scalebar_)
             
             x_prompt = quickdialog.FloatInput(dlg, "X coordinate (in %s)" % x_units)
-            #x_prompt = vigra.pyqt.quickdialog.FloatInput(dlg, "X coordinate (in %s)" % x_units)
             x_prompt.variable.setClearButtonEnabled(True)
             x_prompt.variable.redoAvailable = True
             x_prompt.variable.undoAvailable = True
             x_prompt.setValue(def_x)
             
             y_prompt = quickdialog.FloatInput(dlg, "Y coordinate (in %s)" % y_units)
-            #y_prompt = vigra.pyqt.quickdialog.FloatInput(dlg, "Y coordinate (in %s)" % y_units)
             y_prompt.variable.setClearButtonEnabled(True)
             y_prompt.variable.redoAvailable = True
             y_prompt.variable.undoAvailable = True
             y_prompt.setValue(def_y)
             
             x_len_prompt = quickdialog.FloatInput(dlg, "Length on X axis (in %s)" % x_units)
-            #x_len_prompt = vigra.pyqt.quickdialog.FloatInput(dlg, "Length on X axis (in %s)" % x_units)
             x_len_prompt.variable.setClearButtonEnabled(True)
             x_len_prompt.variable.redoAvailable = True
             x_len_prompt.variable.undoAvailable = True
             x_len_prompt.setValue(def_x_len)
             
             y_len_prompt = quickdialog.FloatInput(dlg, "Length on Y axis (in %s)" % y_units)
-            #y_len_prompt = vigra.pyqt.quickdialog.FloatInput(dlg, "Length on Y axis (in %s)" % y_units)
             y_len_prompt.variable.setClearButtonEnabled(True)
             y_len_prompt.variable.redoAvailable = True
             y_len_prompt.variable.undoAvailable = True
@@ -3085,9 +3299,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     cal_x       = x
                     cal_x_len   = y_len
                     
-                #print("x", x)
-                #print("x_len", x_len)
-                    
                 if ycal is not None:
                     cal_y       = y_prompt.value() * ycal.getUnits(img.axistags[1].key)
                     cal_y_len   = y_len_prompt.value() * ycal.getUnits(img.axistags[1].key)
@@ -3101,9 +3312,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     
                     cal_y       = y
                     cal_y_len   = y_len
-                    
-                #print("y", y)
-                #print("y_len", y_len)
                     
                 self._scaleBarOrigin_ = (x, y)
                 self._scaleBarLength_ = (x_len, y_len)
@@ -3151,36 +3359,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             except:
                 return
             
-    #@pyqtSlot()
-    #def slot_refreshDisplayedWorkspaceImage(self):
-        #"""Refreshes the data display.
-        #Requires that self._scipyenWindow_ is of the appropriate type
-        #and that self._data_var_name_ is a valid identifier for the data
-        #in self._scipyenWindow_.workspace namespace
-        #"""
-        #from workspacefunctions import getvarsbytype
-        
-        #if self._scipyenWindow_ is None:
-            #return
-        
-        #if isinstance(self._data_var_name_, str):
-            #img_vars = dict(getvarsbytype(vigra.VigraArray, ws = self._scipyenWindow_.workspace))
-            
-            #if self._data_var_name_ not in img_vars.keys():
-                #return
-            
-            #image = img_vars[self._data_var_name_]
-            
-            #if isinstance(self._displayedChannel_, int):
-                #if self._displayedChannel_ >= image.channels:
-                    #self._displayedChannel_ = "all"
-            
-            #self.view(image, title = self._data_var_name_, displayChannel = self._displayedChannel_)
-            
-        
     @pyqtSlot()
     def slot_loadImageFromWorkspace(self):
-        from workspacefunctions import getvarsbytype
+        from core.workspacefunctions import getvarsbytype
         
         if self._scipyenWindow_ is None:
             return
@@ -3196,16 +3377,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         ans = choiceDialog.exec()
         
-        if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
-            image = img_vars[choiceDialog.selectedItem]
-            image_title = choiceDialog.selectedItem
-            self._data_var_name_ = choiceDialog.selectedItem
+        if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
+            image = img_vars[choiceDialog.selectedItemsText[0]]
+            image_title = choiceDialog.selectedItemsText[0]
+            self._data_var_name_ = choiceDialog.selectedItemsText[0]
             
             if isinstance(self._displayedChannel_, int):
                 if self._displayedChannel_ >= image.channels:
                     self._displayedChannel_ = "all"
             
-            self.view(image, title = image_title, displayChannel = self._displayedChannel_)
+            self.view(image, doc_title = image_title, displayChannel = self._displayedChannel_)
         
     @pyqtSlot(bool)
     def slot_displayAllChannels(self, value):
@@ -3259,91 +3440,86 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     # private methods
     ####
     
-    def _parseVigraArrayData_(self, img):
+    def _parseVigraArrayData_(self, img:vigra.VigraArray):
         """ Extract information about image axes to figure out how to display it.
         
         For now ImageViewer only accepts images with up to three dimensions.
         
         NOTE:
-        1) a 3D image MAY be represented as a 4D vigra array with a channel axis
+        1) a 3D 'image' (or 'volume') MAY be represented as a 4D vigra array 
+            with a channel axis
         
-        2) a 2D image MAY be prepresented as a 3D vigra array with a channel axis
+        2) a 2D image MAY be represented as a 3D vigra array with a channel axis
         
         img is a vigra.VigraArray object
         
         """
+        # NOTE: 2021-12-02 10:39:54
+        # use axis indices instead of AxisInfo, in proposeLayout
         import io
         
         if img is None:
             return False
         
+        if np.any(np.iscomplex(img)):
+            self.criticalMessage("Error", "ImageViewer cannot yet display complex-valued data")
+            return False
+            
         try:
-            (nFrames, frameAxisInfo, widthAxisInfo, heightAxisInfo) = dt.getFrameLayout(img, userFrameAxis = self.userFrameAxisInfo)
+            layout = vu.proposeLayout(img, userFrameAxis = self.userFrameAxisInfo,
+                                      timeVertical = self._display_time_vertical_,
+                                      indices=True)
             
         except Exception as e:
             s = io.StringIO()
             sei = sys.exc_info()
             traceback.print_exception(file=s, *sei)
-            msgbox = QtWidgets.QMessageBox()
-            msgbox.setSizeGripEnabled(True)
-            msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-            #msgbox.setWindowTitle(sei[0].__class__.__name__)
-            msgbox.setWindowTitle(type(e).__name__)
-            msgbox.setText(sei[0].__class__.__name__)
-            msgbox.setDetailedText(s.getvalue())
-            msgbox.exec()
+            self.errorMessage(type(e).__name__, "\n".join([sei[0].__class__.__name__, s.getvalue()]))
             return False
-            #QtWidgets.QMessageBox.critical(self, "Error", "Data must have at least two non-channel axes; instead it has %d" % (img.axistags.axisTypeCount(vigra.AxisType.NonChannel)))
-            
-        if np.any(np.iscomplex(img)):
-            QtWidgets.QMessageBox.critical(self, "Error", "ImageViewer cannot display complex-valued data")
-            return False
-            #raise ValueError("Cannot display complex-valued data")
             
         try:
             # there may be a previous image stored here
-            if self._data_ is not None and len(self.viewerWidget.cursors) > 0: # parse width/height of previos image if any, to check against existing cursors
-                #if self._data_.width != img.width or self._data_.height != img.height:
-                if self._data_.shape[self._data_.axistags.index(self.widthAxisInfo.key)] != img.shape[img.axistags.index(widthAxisInfo.key)] or \
-                    self._data_.shape[self._data_.axistags.index(self.heightAxisInfo.key)] != img.shape[img.axistags.index(heightAxisInfo.key)]:
-                    msgBox = QtWidgets.QMessageBox()
-                    msgBox.setText("New image frame geometry will invalidate existing cursors.")
-                    msgBox.setInformativeText("Load image and bring all cursors to center?")
-                    msgBox.setStandardButtons(QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel)
-                    msgBox.setDefaultButton(QtWidgets.QMessageBox.Cancel)
-                    msgBox.setIcon(QtWidgets.QMessageBox.Warning)
+            if self._data_ is not None and len(self.dataCursors) > 0: # parse width/height of previos image if any, to check against existing cursors
+                if self._data_.shape[layout.horizontalAxis] != img.shape[layout.horizontalAxis] or \
+                    self._data_.shape[layout.verticalAxis] != img.shape[layout.verticalAxis]:
+                    self.questionMessage("Imageviewer:", "New image geometry will invalidate existing cursors.\nLoad image and bring all cursors to center?")
                     
                     ret = msgBox.exec()
                     
                     if ret == QtWidgets.QMessageBox.Cancel:
                         return False
                     
-                    for c in self.viewerWidget.cursors.values():
-                        widthAxisNdx = img.axistags.index(widthAxisInfo.key)
-                        heightAxisNdx = img.axistags.index(heightAxisInfo.key)
-                        c.rangeX = img.shape[widthAxisNdx]
-                        c.rangeY = img.shape[heightAxisNdx]
-                        c.setPos(img.shape[widthAxisNdx]/2, img.shape[heightAxisNdx]/2)
+                    for c in self.dataCursors:
+                        c.rangeX = img.shape[layout.horizontalAxis]
+                        c.rangeY = img.shape[layout.verticalAxis]
+                        c.setPos(img.shape[layout.horizontalAxis]/2, img.shape[layout.verticalAxis]/2)
             
-            self._number_of_frames_        = nFrames
-            self.frameAxisInfo  = frameAxisInfo
-            self.widthAxisInfo  = widthAxisInfo
-            self.heightAxisInfo = heightAxisInfo
+            #self._number_of_frames_ = layout.nFrames if isinstance(layout.nFrames, (int, type(None))) else np.prod(layout.nFrames)
+            self._data_frames_ = 0 if layout.nFrames is None else layout.nFrames if isinstance(layout.nFrames, int) else np.prod(layout.nFrames)
+
+            if self._data_frames_ is None:
+                self.criticalMessage("Error", "Cannot determine the number of frames in the data")
+                return False
+            
+            #self.frameIndex = range(self._data_frames_)
         
-            self.framesQSlider.setMaximum(self._number_of_frames_-1)
-            self.framesQSlider.setToolTip("Select frame.")
+            self.frameAxis  = layout.framesAxis
             
-            self.framesQSpinBox.setMaximum(self._number_of_frames_-1)
-            self.framesQSpinBox.setToolTip("Select frame .")
-            self.nFramesLabel.setText("of %d" % self._number_of_frames_)
+            self.widthAxis  = layout.horizontalAxis
+            self.heightAxis = layout.verticalAxis
             
             return True
                 
         except Exception as e:
-            traceback.print_exc()
+            s = io.StringIO()
+            sei = sys.exc_info()
+            traceback.print_exception(file=s, *sei)
+            self.errorMessage(type(e).__name__, "\n".join([sei[0].__class__.__name__, s.getvalue()]))
+            #traceback.print_exc()
             return False
         
-    def _applyColorTable_(self, image: vigra.VigraArray):
+    def _applyColorTable_(self, image: vigra.VigraArray, 
+                          colorMap:typing.Optional[colormaps.colors.Colormap]=None):
         """Applies the internal color table to the 2D array.
         
         Parameters:
@@ -3363,12 +3539,14 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         vigra.VigraArray: uint8 image with 4 channels. This is a copy of image, 
         with applied color table (see vigra.colors.applyColortable)
         """
+        if not isinstance(colorMap, colormaps.colors.Colormap):
+            colorMap  = self._colorMap
+            
         if isinstance(image, vigra.VigraArray):
             if np.isnan(image).any():
                 return image
             
-            if not isinstance(self.colorMap, colors.Colormap):
-                #print("self.colorMap is a ", type(self.colorMap))
+            if not isinstance(colorMap, colormaps.colors.Colormap):
                 return image
             
             if image.min() == image.max():
@@ -3376,11 +3554,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             lrMapImage = vigra.colors.linearRangeMapping(image)
             
-            nMap = colors.Normalize(vmin=0, vmax=255)
+            nMap = colormaps.colors.Normalize(vmin=0, vmax=255)
             
-            sMap = cm.ScalarMappable(norm = nMap, cmap = self.colorMap)
-            
-            #print(type(sMap))
+            sMap = colormaps.cm.ScalarMappable(norm = nMap, cmap = colorMap)
             
             sMap.set_array(range(256))
             cTable = sMap.to_rgba(range(256), bytes=True)
@@ -3412,7 +3588,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             #if qimg.isGrayScale():
                 #q
     
-    def _generate_frame_view_(self, channel):
+    def _frameView_(self, channel):
         """Returns a slice (frame) of self._data_ along the self.frameAxis
         
         If the slice contains np.nan returns a copy of the image slice.
@@ -3423,44 +3599,32 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if not isinstance(self._data_, vigra.VigraArray):
             raise RuntimeError("Wrong function call for a non-vigra array image")
         
-        if self.frameAxisInfo is not None:
+        img_view = self._data_
+        dimindices = []
+        
+        if self.frameAxis is not None:
             # NOTE: 2019-11-13 13:52:46
-            # frameAxisInfo is None only for 2D data arrays
-            if isinstance(self.frameAxisInfo, (tuple, list)):
-                dimindices = list()
-                
-                frameAxisDims = [self._data_.shape[self._data_.axistags.index[ax.key]] for ax in self.frameAxisInfo]
-                
-                premultipliers = [1]
-                
-                premultipliers += list(np.cumprod([self._data_.shape[self._data_.axistags.index[ax.key]] for ax in self.frameAxisInfo])[:-1])
-                
-                frame = self._current_frame_index_
-                
-                for k in range(len(premultipliers)-1, -1, -1):
-                    ndx = frame // premultipliers[k]
-                    
-                    frame = frame % premultipliers[k]
-                    
-                    dimindices.append(ndx)
-                
-                dimindices.reverse()
-                
-                # get a 2D slice view of the data
-                img_view = self._data_.bindAxis(self.frameAxisInfo[0].key, dimindices[0])
-                
-                for k in range(1, len(dimindices)):
-                    img_view = img_view.bindAxis(self.frameAxisInfo[k].key, dimindices[k])
+            # frameAxis is None only for 2D data arrays or 3D arrays with channel axis
+            index = self.frameIndexBinding[self._current_frame_index_]
+            dimindices = [index]
+        
+            if all(isinstance(ndx, tuple) for ndx in index):
+                for ndx in index:
+                    # NOTE: 2021-12-02 10:40:17
+                    # axis infos are now axis indices (ints)
+                    # see  NOTE: 2021-12-02 10:39:54
+                    img_view = img_view.bindAxis(ndx[0], ndx[1])
+                    #img_view = img_view.bindAxis(img_view.axistags.index(ndx[0].key), ndx[1])
                     
             else:
-                img_view = self._data_.bindAxis(self.frameAxisInfo.key, self._current_frame_index_)
-                dimindices = [self._current_frame_index_]
-                
-        else:
-            img_view = self._data_
-            dimindices = []
+                #print("in self._frameView_: index", index)
+                img_view = img_view.bindAxis(index[0], index[1])
+                #img_view = img_view.bindAxis(img_view.axistags.index(index[0].key), index[1])
             
-        # up to now, img_view is a 2D slice view of self._data_, will _ALL_ avaiable channels
+        #else:
+            #img_view = self._data_
+            
+        # up to now, img_view is a 2D slice view of self._data_, will _ALL_ available channels
             
         # get a channel view on the 2D slice view of self._data_
         if isinstance(channel, int) and "c" in self._currentFrameData_.axistags and channel_index in range(self._currentFrameData_.channels):
@@ -3475,15 +3639,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         return img_view, dimindices
         
     @safeWrapper
-    def displayFrame(self, channel_index = None):
-        #print("ImageViewer %s displayFrame()" % self.windowTitle())
-        #print("viewing frame along the %s axis " % self.frameAxisInfo)
-        #x = None
-        #y = None
-        
+    def displayFrame(self, channel_index = None, 
+                     colorMap:typing.Optional[colormaps.colors.Colormap] = None,
+                     asAlphaChannel:bool=False):
         if channel_index is None:
             channel_index = self._displayedChannel_
-        
+            
+        if not isinstance(colorMap, colormaps.colors.Colormap):
+            colorMap = self._colorMap
+                
         if isinstance(channel_index, str):
             if channel_index.lower().strip() != "all":
                 raise ValueError("When a string, channel_index must be 'all' -- case-insensitive; got %s instead" % channel_index)
@@ -3500,41 +3664,82 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self._displayedChannel_ = channel_index
         
         if isinstance(self._data_, vigra.VigraArray):
-            self._currentFrameData_, _ = self._generate_frame_view_(channel_index) # this is an array view !
+            self._currentFrameData_, _ = self._frameView_(channel_index) # this is an array view !
             
-            if self.colorMap is None:
-                self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self.imageNormalize))
-                
-            else:
+            if asAlphaChannel:
                 if self._currentFrameData_.channels == 1:
                     if self._currentFrameData_.channelIndex < self._currentFrameData_.ndim:
                         self._currentFrameData_ = self._currentFrameData_.squeeze()
                         
-                    cFrame = self._applyColorTable_(self._currentFrameData_)
+                    red = vigra.VigraArray(np.full(self._currentFrameData_.shape, fill_value=0.),
+                                             axistags=vigra.VigraArray.defaultAxistags('xy'))
                     
-                    self.viewerWidget.view(cFrame.qimage(normalize = self.imageNormalize))
+                    green = vigra.VigraArray(np.full(self._currentFrameData_.shape, fill_value=0.),
+                                             axistags=vigra.VigraArray.defaultAxistags('xy'))
                     
-                else: # don't apply color map to a multi-band frame data
-                    #warnings.warn("Cannot apply color map to a multi-band image")
-                    self._currentFrameData_ = self._currentFrameData_.squeeze().copy()
-                    self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self.imageNormalize))
-        
+                    blue = vigra.VigraArray(np.full(self._currentFrameData_.shape, fill_value=0.),
+                                             axistags=vigra.VigraArray.defaultAxistags('xy'))
+                    
+                    frame = vigra.VigraArray(np.concatenate((red[Ellipsis, np.newaxis],
+                                                             green[Ellipsis, np.newaxis],
+                                                             blue[Ellipsis,np.newaxis],
+                                                             self._currentFrameData_[Ellipsis,np.newaxis]),
+                                                            axis=2),
+                                            axistags = vigra.VigraArray.defaultAxistags('xyc'))
+                    
+                    self.viewerWidget.view(frame.qimage(normalize=False))
+                    #if frame.min() == frame.max():
+                        #self.viewerWidget.view(frame.qimage(normalize=False))
+                    #else:
+                        #self.viewerWidget.view(frame.qimage(normalize=self._imageNormalize))
+                    
+            else:
+                if isinstance(colorMap, colormaps.colors.Colormap):
+                    if self._currentFrameData_.channels == 1:
+                        if self._currentFrameData_.channelIndex < self._currentFrameData_.ndim:
+                            self._currentFrameData_ = self._currentFrameData_.squeeze()
+                            
+                        cFrame = self._applyColorTable_(self._currentFrameData_, colorMap)
+                        
+                        if cFrame.min() == cFrame.max():
+                            self.viewerWidget.view(cFrame.qimage(normalize = False))
+                        else:
+                            self.viewerWidget.view(cFrame.qimage(normalize = self._imageNormalize))
+                        
+                    else: # don't apply color map to a multi-band frame data
+                        #warnings.warn("Cannot apply color map to a multi-band image")
+                        self._currentFrameData_ = self._currentFrameData_.squeeze().copy()
+                        self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self._imageNormalize))
+                
+                else:
+                    if self._currentFrameData_.min() == cFrame.max():
+                        self.viewerWidget.view(self._currentFrameData_.qimage(normalize = False))
+                    else:
+                        self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self._imageNormalize))
+                
             # TODO FIXME: what if we view a transposed array ???? (e.g. viewing it on
             # Y or X axis instead of the Z or T axis?)
-            w = self._data_.shape[self._data_.axistags.index(self.widthAxisInfo.key)] # this is not neccessarily space!
-            h = self._data_.shape[self._data_.axistags.index(self.heightAxisInfo.key)] # this is not neccessarily space!
-            # NOTE: 2017-07-24 09:03:38
-            # w and h are a convention here
+            #width_axis_ndx = self._data_.axistags.index(self.widthAxis.key)
+            #height_axis_ndx = self._data_.axistags.index(self.heightAxis.key)
+            w = self._data_.shape[self.widthAxis] # this is not neccessarily space!
+            h = self._data_.shape[self.heightAxis] # this is not neccessarily space!
+            
+            self._image_width_ = w
+            self._image_height_= h
             
             # NOTE: 2017-07-26 22:18:14
             # get calibrates axes sizes
-            cals = "(%s x %s)" % \
-                (strutils.print_scalar_quantity(dt.getCalibratedAxisSize(self._data_, self.widthAxisInfo.key)), \
-                    strutils.print_scalar_quantity(dt.getCalibratedAxisSize(self._data_, self.heightAxisInfo.key)))
+            if self._axes_calibration_ is not None:
+                cals = "(%s x %s)" % (self._axes_calibration_.calibrations[self.widthAxis].calibratedDistance(w),
+                                      self._axes_calibration_.calibrations[self.heightAxis].calibratedDistance(h))
+            else:
+                cals = "(%s x %s)" % \
+                    (quantity2str(vu.getCalibratedAxisSize(self._data_, self.widthAxis)), \
+                        quantity2str(vu.getCalibratedAxisSize(self._data_, self.heightAxis)))
     
             shapeTxt = "%s x %s: %d x %d %s" % \
-                (dt.defaultAxisTypeName(self.widthAxisInfo), \
-                    dt.defaultAxisTypeName(self.heightAxisInfo), \
+                (axisTypeName(self._data_.axistags[self.widthAxis]), \
+                    axisTypeName(self._data_.axistags[self.heightAxis]), \
                     w, h, cals)
             
             self.slot_displayColorBar(self.displayColorBarAction.isChecked())
@@ -3553,72 +3758,18 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 pass
             
         else:
-            #print("nothing to do ?")
             return # shouldn't really get here
         
         self.viewerWidget.setTopLabelText(shapeTxt)
         
-        #try:
-            #if isinstance(self._data_, vigra.VigraArray):
-                #self._currentFrameData_, _ = self._generate_frame_view_(channel_index) # this is an array view !
-                
-                #if self.colorMap is None:
-                    #self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self.imageNormalize))
-                    
-                #else:
-                    #if self._currentFrameData_.channels == 1:
-                        #if self._currentFrameData_.channelIndex < self._currentFrameData_.ndim:
-                            #self._currentFrameData_ = self._currentFrameData_.squeeze()
-                            
-                        #cFrame = self._applyColorTable_(self._currentFrameData_)
-                        
-                        #self.viewerWidget.view(cFrame.qimage(normalize = self.imageNormalize))
-                        
-                    #else: # don't apply color map to a multi-band frame data
-                        ##warnings.warn("Cannot apply color map to a multi-band image")
-                        #self._currentFrameData_ = self._currentFrameData_.squeeze().copy()
-                        #self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self.imageNormalize))
+        z_coord_str = self._display_Z_coordinate()
+        if len(z_coord_str.strip()):
+            self.statusBar().showMessage(z_coord_str)
             
-                ## TODO FIXME: what if we view a transposed array ???? (e.g. viewing it on
-                ## Y or X axis instead of the Z or T axis?)
-                #w = self._data_.shape[self._data_.axistags.index(self.widthAxisInfo.key)] # this is not neccessarily space!
-                #h = self._data_.shape[self._data_.axistags.index(self.heightAxisInfo.key)] # this is not neccessarily space!
-                ## NOTE: 2017-07-24 09:03:38
-                ## w and h are a convention here
-                
-                ## NOTE: 2017-07-26 22:18:14
-                ## get calibrates axes sizes
-                #cals = "(%s x %s)" % \
-                    #(strutils.print_scalar_quantity(dt.getCalibratedAxisSize(self._data_, self.widthAxisInfo.key)), \
-                        #strutils.print_scalar_quantity(dt.getCalibratedAxisSize(self._data_, self.heightAxisInfo.key)))
+    def setDataDisplayEnabled(self, value):
+        self.viewerWidgetContainer.setEnabled(value is True)
         
-                #shapeTxt = "%s x %s: %d x %d %s" % \
-                    #(dt.defaultAxisTypeName(self.widthAxisInfo), \
-                        #dt.defaultAxisTypeName(self.heightAxisInfo), \
-                        #w, h, cals)
-                
-                #self.slot_displayColorBar(self.displayColorBarAction.isChecked())
-
-            #elif isinstance(self._data_, (QtGui.QImage, QtGui.QPixmap)):
-                ## NOTE 2018-09-14 11:45:13
-                ## TODO/FIXME adapt code to select channels from a Qimage is not allGray() or not isGrayscale()
-                #self.viewerWidget.view(self._data_)
-                
-                #w = self._data_.width()
-                #h = self._data_.height()
-                #shapeTxt = "W x H: %d x %d " % (w, h)
-                
-            #else:
-                ##print("nothing to do ?")
-                #return # shouldn't really get here
-            
-            #self.viewerWidget.setTopLabelText(shapeTxt)
-            
-        #except Exception as e:
-            #traceback.print_exc()
-            #self._currentFrameData_ = None
-            
-    def _configureGUI_(self):
+    def _configureUI_(self):
         self.setupUi(self)
         
         #self.setWindowTitle("Image Viewer")
@@ -3644,24 +3795,20 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.viewerWidget.signalCursorAt[str, list].connect(self.slot_displayCursorPos)
         
         self.viewerWidget.scene.signalMouseAt[int, int].connect(self.slot_displayMousePos)
-        #self.viewerWidget.scene.signalMouseLeave.connect(self._sceneMouseLeave)
         
         self.viewerWidget.signalCursorAdded[object].connect(self.slot_graphicsObjectAdded)
-        self.viewerWidget.signalCursorChanged[object].connect(self.slot_graphicsObjectChanged)
+        #self.viewerWidget.signalCursorChanged[object].connect(self.slot_graphicsObjectChanged)
         self.viewerWidget.signalCursorRemoved[object].connect(self.slot_graphicsObjectRemoved)
-        self.viewerWidget.signalCursorSelected[object].connect(self.slot_graphicsObjectSelected)
-        #self.viewerWidget.signalCursorDeselected[object].connect(self.slot_graphicsObjectDeselected)
+        self.viewerWidget.signalGraphicsObjectSelected[object].connect(self.slot_graphicsObjectSelected)
         
         self.viewerWidget.signalRoiAdded[object].connect(self.slot_graphicsObjectAdded)
-        self.viewerWidget.signalRoiChanged[object].connect(self.slot_graphicsObjectChanged)
+        #self.viewerWidget.signalRoiChanged[object].connect(self.slot_graphicsObjectChanged)
         self.viewerWidget.signalRoiRemoved[object].connect(self.slot_graphicsObjectRemoved)
         self.viewerWidget.signalRoiSelected[object].connect(self.slot_graphicsObjectSelected)
-        #self.viewerWidget.signalRoiDeselected[object].connect(self.slot_graphicsObjectDeselected)
         
         self.viewerWidget.signalGraphicsDeselected.connect(self.slot_graphicsObjectDeselected)
         
         self.actionView.triggered.connect(self.slot_loadImageFromWorkspace)
-        #self.actionRefresh.triggered.connect(self.slot_refreshDisplayedWorkspaceImage)
         self.actionRefresh.triggered.connect(self.slot_refreshDataDisplay)
         
         self.actionExportAsPNG.triggered.connect(self.slot_exportSceneAsPNG)
@@ -3682,30 +3829,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.displayIndividualChannelActions = list()
         
-        self.colorMapMenu = QtWidgets.QMenu("Color Map", self)
-        self.displayMenu.addMenu(self.colorMapMenu)
-        
-        self.cursorsRoisColorMenu = QtWidgets.QMenu("Colors for Cursor and Rois", self)
-        self.displayMenu.addMenu(self.cursorsRoisColorMenu)
-        
-        self.colorMapAction = self.colorMapMenu.addAction("Choose Color Map")
-        self.editColorMapAction = self.colorMapMenu.addAction("Edit Color Map")
-        
-        self.chooseCursorColorAction = self.cursorsRoisColorMenu.addAction("Set cursors color")
-        self.chooseCursorColorAction.triggered.connect(self.slot_chooseCursorsColor)
-        
-        self.chooseCBCursorColorAction = self.cursorsRoisColorMenu.addAction("Set color for shared cursors")
-        self.chooseCBCursorColorAction.triggered.connect(self.slot_chooseCBCursorsColor)
-        
-        self.chooseRoiColorAction = self.cursorsRoisColorMenu.addAction("Set rois color")
-        self.chooseRoiColorAction.triggered.connect(self.slot_chooseRoisColor)
-    
-        self.chooseCBRoiColorAction = self.cursorsRoisColorMenu.addAction("Set color for shared rois")
-        self.chooseCBRoiColorAction.triggered.connect(self.slot_chooseCBRoisColor)
-    
-        self.brightContrastGammaMenu = QtWidgets.QMenu("Brightness Contrast Gamma", self)
-        self.displayMenu.addMenu(self.brightContrastGammaMenu)
-        
         self.displayScaleBarAction = self.displayMenu.addAction("Scale bar")
         self.displayScaleBarAction.setCheckable(True)
         self.displayScaleBarAction.setChecked(False)
@@ -3716,8 +3839,69 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.displayColorBarAction.setChecked(False)
         self.displayColorBarAction.toggled[bool].connect(self.slot_displayColorBar)
         
+        self.brightContrastGammaMenu = QtWidgets.QMenu("Brightness Contrast Gamma", self)
+        self.displayMenu.addMenu(self.brightContrastGammaMenu)
+        
         self.imageBrightnessAction = self.brightContrastGammaMenu.addAction("Brightness")
         self.imageGammaAction = self.brightContrastGammaMenu.addAction("Gamma")
+        
+        self.cursorsAppearanceMenu = QtWidgets.QMenu("Cursor appearance", self)
+        self.displayMenu.addMenu(self.cursorsAppearanceMenu)
+        
+        self.chooseCursorColorAction = self.cursorsAppearanceMenu.addAction("Line")
+        self.chooseCursorColorAction.triggered.connect(self.slot_chooseCursorsColor)
+        
+        self.chooseCursorLabelTextColorAction = self.cursorsAppearanceMenu.addAction("Label text")
+        self.chooseCursorLabelTextColorAction.triggered.connect(self.slot_chooseCursorLabelTextColor)
+        
+        self.chooseCursorLabelBGColorAction = self.cursorsAppearanceMenu.addAction("Label background")
+        self.chooseCursorLabelBGColorAction.triggered.connect(self.slot_chooseCursorLabelBGColor)
+        
+        self.linkedCursorColorsMenu = QtWidgets.QMenu("Linked cursors", self)
+        self.cursorsAppearanceMenu.addMenu(self.linkedCursorColorsMenu)
+        
+        self.chooseLinkedCursorColorAction = self.linkedCursorColorsMenu.addAction("Line")
+        self.chooseLinkedCursorColorAction.triggered.connect(self.slot_chooseLinkedCursorsColor)
+        
+        self.chooseLinkedCursorLabelTextColorAction = self.linkedCursorColorsMenu.addAction("Label text")
+        self.chooseLinkedCursorLabelTextColorAction.triggered.connect(self.slot_chooseLinkedCursorLabelTextColor)
+        
+        self.chooseLinkedCursorLabelBGColorAction = self.linkedCursorColorsMenu.addAction("Label background")
+        self.chooseLinkedCursorLabelBGColorAction.triggered.connect(self.slot_chooseLinkedCursorBGColor)
+        
+        self.opaqueCursorLabelAction = self.cursorsAppearanceMenu.addAction("Opaque cursor labels")
+        self.opaqueCursorLabelAction.setCheckable(True)
+        self.opaqueCursorLabelAction.setChecked(self.opaqueCursorLabel)
+        self.opaqueCursorLabelAction.toggled[bool].connect(self.slot_setOpaqueCursorLabels)
+    
+        self.roisAppearanceMenu = QtWidgets.QMenu("ROI appearance", self)
+        self.displayMenu.addMenu(self.roisAppearanceMenu)
+        
+        self.chooseRoiColorAction = self.roisAppearanceMenu.addAction("Set rois color")
+        self.chooseRoiColorAction.triggered.connect(self.slot_chooseRoisColor)
+    
+        self.chooseROILabelTextColorAction = self.roisAppearanceMenu.addAction("Set text color for ROI labels")
+        self.chooseROILabelTextColorAction.triggered.connect(self.slot_chooseRoisLabelTextColor)
+    
+        self.linkedROIColorsMenu = QtWidgets.QMenu("Linked ROIs", self)
+        self.cursorsAppearanceMenu.addMenu(self.linkedROIColorsMenu)
+        
+        self.chooseLinkedRoiColorAction = self.linkedROIColorsMenu.addAction("Set color for linked rois")
+        self.chooseLinkedRoiColorAction.triggered.connect(self.slot_chooseLinkedRoisColor)
+        
+        self.chooseLinkedROILabelTextColorAction = self.linkedROIColorsMenu.addAction("Set text color for linked ROI labels")
+        self.chooseLinkedROILabelTextColorAction.triggered.connect(self.slot_chooseLinkedRoisLabelTextColor)
+    
+        self.opaqueROILabelAction = self.cursorsAppearanceMenu.addAction("Opaque ROI labels")
+        self.opaqueROILabelAction.setCheckable(True)
+        self.opaqueROILabelAction.setChecked(self.opaqueCursorLabel)
+        self.opaqueROILabelAction.toggled[bool].connect(self.slot_setOpaqueROILabels)
+    
+        self.colorMapMenu = QtWidgets.QMenu("Color Map", self)
+        self.displayMenu.addMenu(self.colorMapMenu)
+        
+        self.colorMapAction = self.colorMapMenu.addAction("Choose Color Map")
+        self.editColorMapAction = self.colorMapMenu.addAction("Edit Color Map")
         
         self.framesQSlider.setMinimum(0)
         self.framesQSlider.setMaximum(0)
@@ -3732,7 +3916,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self._frames_spinner_ = self.framesQSpinBox
 
-        #self.actionOpen.triggered.connect(self._openImageFile)
         self.editColorMapAction.triggered.connect(self._editColorMap)
 
         self.colorMapAction.triggered.connect(self.slot_chooseColorMap)
@@ -3772,8 +3955,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.removeCursorAction = self.removeCursorsMenu.addAction("Remove Selected Cursor")
         self.removeCursorAction.triggered.connect(self.viewerWidget.slot_removeSelectedCursor)
         
+        self.removeCursorsAction = self.removeCursorsMenu.addAction("Remove cursors ...")
+        self.removeCursorsAction.triggered.connect(self.viewerWidget.slot_removeCursors)
+        
         self.removeAllCursorsAction = self.removeCursorsMenu.addAction("Remove All Cursors")
-        self.removeAllCursorsAction.triggered.connect(self.viewerWidget.slot_removeCursors)
+        self.removeAllCursorsAction.triggered.connect(self.viewerWidget.slot_removeAllCursors)
         
         self.cursorsMenu.addMenu(self.removeCursorsMenu)
         
@@ -3809,7 +3995,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.editRoiAction = self.editRoisMenu.addAction("Edit ROI...")
         self.editRoiAction.triggered.connect(self.viewerWidget.slot_editRoi)
         
-        
         self.removeRoisMenu = QtWidgets.QMenu("Remove ROIs")
         self.roisMenu.addMenu(self.removeRoisMenu)
         
@@ -3817,12 +4002,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.removeSelectedRoiAction.triggered.connect(self.viewerWidget.slot_removeSelectedRoi)
         
         self.removeAllRoisAction = self.removeRoisMenu.addAction("Remove All ROIS")
-        self.removeAllRoisAction.triggered.connect(self.viewerWidget.slot_removeRois)
+        self.removeAllRoisAction.triggered.connect(self.viewerWidget.slot_removeAllRois)
         
         self.toolBar = QtWidgets.QToolBar("Main", self)
-        self.toolBar.setObjectName("DataViewer_Main_Toolbar")
+        self.toolBar.setObjectName("%s_Main_Toolbar" % self.__class__.__name__)
         
-        refreshAction = self.toolBar.addAction(QtGui.QIcon(":/images/view-refresh.svg"), "Refresh")
+        refreshAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh")
         refreshAction.triggered.connect(self.slot_refreshDataDisplay)
         
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
@@ -3835,8 +4020,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.zoomInAction = self.zoomToolBar.addAction(QtGui.QIcon.fromTheme("zoom-in"), "Zoom In")
         self.zoomAction = self.zoomToolBar.addAction(QtGui.QIcon.fromTheme("zoom"), "Zoom")
         
-        #self.zoomToolBar.widgetForAction(self.zoomAction).setCheckable(True)
-        
         self.zoomOutAction.triggered.connect(self.slot_zoomOut)
         self.zoomOriginalAction.triggered.connect(self.slot_zoomOriginal)
         self.zoomInAction.triggered.connect(self.slot_zoomIn)
@@ -3845,13 +4028,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.zoomToolBar)
     
     def _editColorMap(self):
-        pass;
-  
+        pass
+    
     @pyqtSlot(str)
     @safeWrapper
-    def slot_testColorMap(self, item):
-        self.colorMap = colormaps.get(item, None)
-        self.displayFrame()
+    def slot_testColorMap(self, item:str):
+        # NOTE 2020-11-28 10:19:07
+        # upgrade to matplotlib 3.x
+        colorMap = colormaps.get(item)
+        self.displayFrame(colorMap=colorMap)
           
     @pyqtSlot()
     @safeWrapper
@@ -3859,25 +4044,38 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if self._data_ is None:
             return
         
-        self.prevColorMap = self.colorMap # cache the current colorMap
+        if not isinstance(self._data_, vigra.VigraArray) or self._currentFrameData_.channels > 1:
+            QtWidgets.QMessageBox.information(self,"Choose Color Map","Cannot apply color maps to multi-channel images")
+            return
         
-        colormapnames = sorted([n for n in colormaps.keys()])
+        self._prevColorMap = self._colorMap # cache the current colorMap
         
-        if isinstance(self.colorMap, colors.Colormap):
-            d = pgui.ItemsListDialog(self, itemsList=colormapnames, title="Select color map", preSelected=self.colorMap.name)
+        # NOTE 2020-11-28 10:19:07
+        # upgrade to matplotlib 3.x
+        colormapnames = sorted([n for n in colormaps.cm._cmap_registry.keys()])
+        
+        if isinstance(self._colorMap, colormaps.colors.Colormap):
+            d = pgui.ItemsListDialog(self, itemsList=colormapnames,
+                                     title="Select color map",
+                                     preSelected=self._colorMap.name)
             
         else:
-            d = pgui.ItemsListDialog(self, itemsList=colormapnames, title="Select color map", preSelected="None")
+            d = pgui.ItemsListDialog(self, itemsList=colormapnames, 
+                                     title="Select color map", 
+                                     preSelected="None")
             
-        d.itemSelected.connect(self.slot_testColorMap) # this will SET self.colorMap to the selected one
+        d.itemSelected.connect(self.slot_testColorMap) # this will SET self._colorMap to the selected one
     
         a = d.exec_()
 
         if a == QtWidgets.QDialog.Accepted:
+            selItems = d.selectedItemsText
+            if len(selItems):
+                self.colorMap = selItems[0]
             self.displayFrame()
             
         else:
-            self.colorMap = self.prevColorMap
+            self.colorMap = self._prevColorMap
             self.displayFrame()
 
     def _editImageBrightness(self):
@@ -3886,6 +4084,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
     def _editImageGamma(self):
         pass;
+    
 
     def _displayValueAtCoordinates(self, coords, crsId=None):
         """
@@ -3902,6 +4101,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         #if self._currentFrameData_ is None:
             #return
+            
+        # NOTE: 2021-12-03 09:40:11 because self.frameAxis is now an int or a 
+        # tuple of ints we need tpo convert these back to axisinfo
         
         if coords[0] is not None:
             x = int(coords[0])
@@ -3924,40 +4126,53 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             wy = None
             
         if isinstance(self._data_, vigra.VigraArray):
-            # this can also be a PictArray!
+            # this can also be a PictArray! 
+            # NOTE: 2020-09-04 08:51:38 PictArray is defunct and removed from the API
             # NOTE: 2017-07-24 09:03:38
             # w and h are a convention here
             #w = self._data_.shape[0]
             #h = self._data_.shape[1]
             
-            widthAxisIndex = self._data_.axistags.index(self.widthAxisInfo.key)
-            heightAxisIndex = self._data_.axistags.index(self.heightAxisInfo.key)
+            #widthAxisIndex = self._data_.axistags.index(self.widthAxis.key)
+            #heightAxisIndex = self._data_.axistags.index(self.heightAxis.key)
             
-            w = self._data_.shape[widthAxisIndex]
-            h = self._data_.shape[heightAxisIndex]
+            w = self._data_.shape[self.widthAxis]
+            h = self._data_.shape[self.heightAxis]
+            
+            # NOTE: 2021-12-02 10:57:24
+            # this is now requires because of NOTE: 2021-12-02 10:39:54
+            wAxInfo = self._data_.axistags[self.widthAxis]
+            hAxInfo = self._data_.axistags[self.heightAxis]
             
             #
             # below, img is a view NOT a copy !
             #
             
-            img, dimindices = self._generate_frame_view_(self._displayedChannel_)
+            img, _ = self._frameView_(self._displayedChannel_)
             
-            viewWidthAxisIndex = img.axistags.index(self.widthAxisInfo.key)
-            viewHeightAxisIndex = img.axistags.index(self.heightAxisInfo.key)
+            viewWidthAxisIndex = img.axistags.index(wAxInfo.key)
+            viewHeightAxisIndex = img.axistags.index(hAxInfo.key)
+            
+            viewW = img.shape[viewWidthAxisIndex]
+            viewH = img.shape[viewHeightAxisIndex]
+            
+            # NOTE: 2021-10-25 22:26:53
+            # when given, wx and wy below are, horizontal & vertical cursor
+            # windows, respectively
             
             if wx is not None:
-                cwx = dt.AxisCalibration(img.axistags[viewWidthAxisIndex]).getCalibratedAxialDistance(wx, img.axistags[viewWidthAxisIndex])
+                if self._axes_calibration_:
+                    cwx = self._axes_calibration_[viewWidthAxisIndex].calibratedDistance(wx)
+                    swx = " +/- %d (%s) " % (wx//2, quantity2str(cwx/2))
                     
-                swx = " +/- %d (%.2f) " % (wx//2, cwx/2)
-                
             else:
                 swx = ""
                 
             if wy is not None:
-                cwy = dt.AxisCalibration(img.axistags[viewHeightAxisIndex]).getCalibratedAxialDistance(wy, img.axistags[viewHeightAxisIndex])
+                if self._axes_calibration_:
+                    cwy = self._axes_calibration_[viewHeightAxisIndex].calibratedDistance(wy)
+                    swy = " +/- %d (%s) " % (wy//2, quantity2str(cwy/2))
                     
-                swy = " +/- %d (%.2f) " % (wy//2, cwy/2)
-                
             else:
                 swy = ""
             
@@ -3981,78 +4196,86 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
 
             #print("w: %f, x: %f, h: %f, y: %f" % (w, x, h, y))
             
-            if all([val is not None for val in (x,y)]):
+            if all([v_ is not None for v_ in (x,y)]):
                 if img.ndim >= 2: # there may be a channel axis
-                    cx = dt.AxisCalibration(img.axistags[viewWidthAxisIndex]).getCalibratedAxisCoordinate(x, img.axistags[viewWidthAxisIndex].key)
-                    cy = dt.AxisCalibration(img.axistags[viewHeightAxisIndex]).getCalibratedAxisCoordinate(y, img.axistags[viewHeightAxisIndex].key)
-                
-                    scx = "%.2f %s" % (cx.magnitude, cx.units.dimensionality.string)
-                    scy = "%.2f %s" % (cy.magnitude, cy.units.dimensionality.string)
-                    
-                    sx = img.axistags[viewWidthAxisIndex].key #dt.defaultAxisTypeSymbol(self._currentFrameData_.axistags[0])
-                    sy = img.axistags[viewHeightAxisIndex].key #dt.defaultAxisTypeSymbol(self._currentFrameData_.axistags[1])
+                    if self._axes_calibration_:
+                        cx = self._axes_calibration_[viewWidthAxisIndex].calibratedMeasure(x)
+                        cy = self._axes_calibration_[viewHeightAxisIndex].calibratedMeasure(y)
+                        scx = quantity2str(cx)
+                        scy = quantity2str(cy)
+                    else:
+                        scx = ""
+                        scy = ""
+                        
+                    widthAxisKey = img.axistags[viewWidthAxisIndex].key 
+                    heightAxisKey = img.axistags[viewHeightAxisIndex].key
                     
                     if img.ndim > 2: # this is possible only when there is a channel axis!
                         if img.channels > 1:
                             val = [float(img.bindAxis("c", k)[x,y,...]) for k in range(img.channels)]
+                            
+                            if self._axes_calibration_:
+                                channelNdx = self._axes_calibration_["c"].channelIndices
+                                cval = [self._axes_calibration_["c"].getChannelCalibration(channelNdx[k]).calibratedMeasure(val[k]) for k in range(img.channels)]
+                                sval = "(%s)" % "; ".join(["%s" % quantity2str(v) for v in cval])
+                                
+                            else:
+                                sval = "(%s)" % "; ".join(["%.2f" % v for v in val])
                         
                         else:
                             val = float(img[x,y])
+                            if self._axes_calibration_:
+                                cval = self._axes_calibration_["c"].getChannelCalibration().calibratedMeasure(val)
+                                sval = "(%s)" % quantity2str(cval)
+                            else:
+                                sval = "(%.2f)" % val
                             
-                        if self.frameAxisInfo is not None:
-                            if isinstance(self.frameAxisInfo, vigra.AxisInfo):
-                                if self.frameAxisInfo not in self._data_.axistags:
-                                    raise RuntimeError("frame axis %s not found in the image" % self.frameAxisInfo.key)
+                        if self.frameAxis is not None:
+                            #if isinstance(self.frameAxis, vigra.AxisInfo):
+                            if isinstance(self.frameAxis, int):
+                                if self.frameAxis >= self._data_.ndim:
+                                    raise RuntimeError(f"frame axis {self.frameAxis} not found in the image")
+                                frameAxis = self._data_.axistags[self.frameAxis]
+                                zAxisKey = frameAxis.key
                                 
-                                cz = dt.AxisCalibration(self.frameAxisInfo).getCalibratedAxisCoordinate(self._current_frame_index_, self.frameAxisInfo.key)
-
-                                sz = self.frameAxisInfo.key
-
-                                if isinstance(val, float):
-                                    coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s: %.2f %s)> %.2f" % \
-                                        (crstxt, \
-                                        x, sx, scx, swx, \
-                                        y, sy, scy, swy, \
-                                        self._current_frame_index_, sz, cz.magnitude, cz.units.dimensionality.string, \
-                                        val)
+                                if self._axes_calibration_:
+                                    cz = self._axes_calibration_[frameAxis.key].calibratedMeasure(self._current_frame_index_)
+                                    scz = quantity2str(cz)
+                                else:
+                                    scz = ""
                                 
-                                elif isinstance(val, (tuple, list)):
-                                    valstr = "(" + " ".join(["%.2f" % v for v in val]) + ")"
-                                    
-                                    coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s: %.2f %s)> %s" % \
-                                        (crstxt, \
-                                        x, sx, scx, swx, \
-                                        y, sy, scy, swy, \
-                                        self._current_frame_index_, sz, cz.magnitude, cz.units.dimensionality.string, \
-                                        valstr)
-                                    
-                            else: # self.frameAxisInfo is a tuple
-                                sz_cz = ", ".join(["%s: %s" % (ax.key, strutils.print_scalar_quantity(dt.AxisCalibration(ax).getCalibratedAxisCoordinate(self._current_frame_index_, ax.key))) for ax in self.frameAxisInfo])
+                                coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s: %s)> %s" % \
+                                    (crstxt, 
+                                    x, widthAxisKey, scx, swx, 
+                                    y, heightAxisKey, scy, swy,
+                                    self._current_frame_index_, zAxisKey, scz,
+                                    sval)
+                            
+                            else: # self.frameAxis is a tuple
+                                #frameAxis = tuple(self._data_.axistags.index(ax) for ax in self.frameAxis)
+                                if self._axes_calibration_:
+                                    sz_cz = ", ".join([f"{ndx[0]}: {ndx[1]} ({quantity2str(self._axes_calibration_[self._data_.axistags[ndx[0]]].calibratedDistance(ndx[1]))})" for ndx in reversed(self.frameIndexBinding[self._current_frame_index_])])
+                                else:
+                                    sz_cz = ", ".join([f"{ndx[0]}: {ndx[1]}" for ndx in reversed(self.frameIndexBinding[self._current_frame_index_])])
                                 
-                                if isinstance(val, float):
-                                    coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s)> %s" % \
-                                        (crstxt, \
-                                        x, sx, scx, swx, \
-                                        y, sy, scy, swy, \
-                                        self._current_frame_index_, sz_cz, \
-                                        val)
+                                #if self._axes_calibration_:
+                                    #sz_cz = ", ".join([f"{ndx[0].key}: {ndx[1]} ({quantity2str(self._axes_calibration_[ndx[0].key].calibratedDistance(ndx[1]))})" for ndx in reversed(self.frameIndexBinding[self._current_frame_index_])])
+                                #else:
+                                    #sz_cz = ", ".join([f"{ndx[0].key}: {ndx[1]}" for ndx in reversed(self.frameIndexBinding[self._current_frame_index_])])
                                 
-                                elif isinstance(val, (tuple, list)):
-                                    valstr = "(" + " ".join(["%.2f" % v for v in val]) + ")"
-                                    
-                                    coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s)> %s" % \
-                                        (crstxt, \
-                                        x, sx, scx, swx, \
-                                        y, sy, scy, swy, \
-                                        self._current_frame_index_, sz_cz, \
-                                        valstr)
+                                coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s)> %s" % \
+                                    (crstxt, \
+                                    x, widthAxisKey, scx, swx, \
+                                    y, heightAxisKey, scy, swy, \
+                                    self._current_frame_index_, sz_cz, \
+                                    val)
                                     
                         else:
                             if isinstance(val, float):
                                 coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s> %s" % \
                                     (crstxt, \
-                                    x, sx, scx, swx, \
-                                    y, sy, scy, swy, \
+                                    x, widthAxisKey, scx, swx, \
+                                    y, heightAxisKey, scy, swy, \
                                     val)
                                 
                             elif isinstance(val, (tuple, list)):
@@ -4060,67 +4283,81 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                     
                                 coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s> %s" % \
                                     (crstxt, \
-                                    x, sx, scx, swx, \
-                                    y, sy, scy, swy, \
+                                    x, widthAxisKey, scx, swx, \
+                                    y, heightAxisKey, scy, swy, \
                                     valstr)
                                 
                                 
-                    else:
+                    else: # ndim == 2
                         val = float(np.squeeze(img[x,y]))
                         
                         coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s> %.2f" % \
                             (crstxt, \
-                            x, sx, scx, swx, \
-                            y, sy, scy, swy, \
+                            x, widthAxisKey, scx, swx, \
+                            y, heightAxisKey, scy, swy, \
                             val)
                     
-                else: # shouldn't realy get here, should we ?!?
+                else: # ndim < 2 shouldn't realy get here, should we ?!?
                     val = float(img[x])
-
-                    cx = dt.AxisCalibration(img.axistags[viewWidthAxisIndex]).getCalibratedAxisCoordinate(x, img.axistags[viewWidthAxisIndex].key)
-                        
-                    sx = img.axistags[viewWidthAxisIndex].key
                     
-                    scx = "%.2f %s" % (cx.magnitude, cx.units.dimensionality.string)
+                    if self._axes_calibration_:
+                        cx = self._axes_calibration_[viewWidthAxisIndex].calibratedMeasure(x)
+                        scx = quantity2str(cx)
+                    else:
+                        scx = ""
+
+                    widthAxisKey = img.axistags[viewWidthAxisIndex].key
                     
                     coordTxt = "%s<X: %d (%s: %s)%s> %.2f" % \
-                        (crstxt, x, sx, scx, swx, val)
+                        (crstxt, x, widthAxisKey, scx, swx, val)
                     
             else:
                 c_list = list()
                 
                 if y is None:
-                    cx = dt.AxisCalibration(img.axistags[viewWidthAxisIndex]).getCalibratedAxisCoordinate(x, img.axistags[viewWidthAxisIndex])
-                        
-                    sx = img.axistags[viewWidthAxisIndex].key
+                    if self._axes_calibration_:
+                        cx = self._axes_calibration_[viewWidthAxisIndex].calibratedMeasure(x)
+                        scx = quantity2str(cx)
+                    else:
+                        scx = ""
+
+                    widthAxisKey = img.axistags[viewWidthAxisIndex].key
                     
-                    scx = "%.2f %s" % (cx.magnitude, cx.units.dimensionality.string)
-                    
-                    c_list.append("%s<X: %d (%s: %s)%s" % ((crstxt, x, sx, scx, swx)))
+                    c_list.append("%s<X: %d (%s: %s)%s" % ((crstxt, x, widthAxisKey, scx, swx)))
                     
                 elif x is None:
-                    cy = dt.AxisCalibration(img.axistags[viewHeightAxisIndex]).getCalibratedAxisCoordinate(y, img.axistags[viewHeightAxisIndex])
-                        
-                    sy = img.axistags[viewHeightAxisIndex].key
+                    if self._axes_calibration_:
+                        cy = self._axes_calibration_[viewHeightAxisIndex].calibratedMeasure(y)
+                        scy = quantity2str(cy)
+                    else:
+                        scy = ""
+
+                    heightAxisKey = img.axistags[viewHeightAxisIndex].key
                     
-                    scy = "%.2f %s" % (cy.magnitude, cy.units.dimensionality.string)
-                    
-                    c_list.append("%s<Y: %d (%s: %s)%s" % ((crstxt, y, sy, scy, swy)))
+                    c_list.append("%s<Y: %d (%s: %s)%s" % ((crstxt, y, heightAxisKey, scy, swy)))
                 
                 if img.ndim > 2:
-                    if self.frameAxisInfo is not None:
-                        if isinstance(self.frameAxisInfo, vigra.AxisInfo):
-                            if self.frameAxisInfo not in self._data_.axistags:
-                                raise RuntimeError("frame axis intfo %s not found in the image" % self.frameAxisInfo.key)
+                    if self.frameAxis is not None:
+                        if isinstance(self.frameAxis, (vigra.AxisInfo, int)):
+                            #if self.frameAxis not in self._data_.axistags:
+                            if self.frameAxis >= img.ndim:
+                                raise RuntimeError(f"frame axis {self.frameAxis} %s not found in the image")
                         
-                            cz = dt.AxisCalibration(self.frameAxisInfo).getCalibratedAxisCoordinate(self._current_frame_index_, self.frameAxisInfo)
+                            if self._axes_calibration_:
+                                cz = quantity2str(self._axes_calibration_[self._data_.axistags[self.frameAxis].key].calibratedMeasure(self._current_frame_index_))
+                            else:
+                                cz = ""
                         
-                            sz = self.frameAxisInfo.key #dt.defaultAxisTypeSymbol(self.frameAxisInfo)
+                            sz = self.frameAxis.key if isinstance(self.frameAxis, vigra.AxisInfo) else self._data_.axistags[self.frameAxis].key
                         
                             c_list.append(", Z: %d (%s: %s)>" % (self._current_frame_index_, sz, cz))
                             
                         else:
-                            sz_cz = ", ".join(["%s: %s" % (ax.key, dt.AxisCalibration(ax).getCalibratedAxisCoordinate(self._current_frame_index_, ax.key)) for ax in self.frameAxisInfo])
+                            if self._axes_calibration_:
+                                sz_cz = ", ".join(["%s: %s" % (self._data_.axistags[ax].key, quantity2str(self._axes_calibration_[self._data_.axistags[ax].key].calibratedMeasure(self._current_frame_index_))) for ax in self.frameAxis])
+                                
+                            else:
+                                sz_cz = ", ".join(["%s: %s" % (sedlf._data_.axistags[ax].key, self._current_frame_index_) for ax in self.frameAxis])
                                 
                             c_list.append("(%s)" % sz_cz)
     
@@ -4187,54 +4424,30 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         else:
             return # shouldn't really get here
         
+    def _display_Z_coordinate(self) -> str:
+        ret = f"Z: {self._current_frame_index_}"
+        if self.frameAxis is not None:
+            index = self.frameIndexBinding[self._current_frame_index_]
+            if all(isinstance(ndx, tuple) for ndx in index):
+                if self._axes_calibration_:
+                    z = ", ".join([f"{self._data_.axistags[ndx[0]].key}: {ndx[1]} ({quantity2str(self._axes_calibration_[self._data_.axistags[ndx[0]].key].calibratedDistance(ndx[1]))})" for ndx in reversed(index)])
+                else:
+                    z = ", ".join([f"{self._data_.axistags[ndx[0]].key}: {ndx[1]}" for ndx in reversed(index)])
+                    
+            else:
+                if self._axes_calibration_:
+                    z = f"{self._data_.axistags[index[0]].key}: {index[1]} ({quantity2str(self._axes_calibration_[self._data_.axistags[index[0]].key].calibratedDistance(index[1]))})"
+                else:
+                    z = f"{self._data_.axistags[index[0]].key}: {index[1]}"
+                
+            ret += f": {z}"
+            
+        return ret
+        
     ####
     # public methods
     ####
     
-    def graphicsObjects(self, rois=None):
-        """Delegation in order to keep code using ImageViewer small.
-        
-        rois: boolean or None (default)
-        
-            When None: returns a dict where keys are all registered graphics objects
-                        and values are dicts
-                        
-            NOTE:  this is NOT a ChainMap
-            
-            When True: returns the dictionary of rois (a ChainMap)
-            
-            When False: returns the dictionary of cursors (a ChainMap)
-            
-        
-        """
-        if rois is None:
-            return self.viewer.__graphicsObjects__
-        
-        elif rois is True:
-            return self.viewer.rois
-        
-        else:
-            return self.viewer.cursors
-        
-    def graphicsObject(self, name):
-        """Delegation in order to keep code using ImageViewer small.
-        
-        Delegates to self.roi(value) if roi, or self.cursor(value) otherwise
-        """
-        if name in self.graphicsObjects(rois=True):
-            return self.roi(name)
-        
-        if name in self.graphicsObjects(rois=False):
-            return self.cursor(name)
-        
-    def hasGraphicsObject(self, name):
-        """Delegation in order to keep code using ImageViewer small.
-        
-        Delegates to self.hasRoi(value) if roi, or self.hasCursor(value) otherwise
-        """
-        
-        return name in self.rois or name in self.cursors
-        
     @safeWrapper
     def slot_removeCursorByName(self, crsId):
         if crsId in self.graphicsObjects(rois=False):
@@ -4253,58 +4466,107 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         elif name in self.graphicsObjects(rois=False):
             self.viewerWidget.slot_removeCursorByName(name)
+            
+    #def loadSettings(self):
+        ## NOTE: 2021-07-08 09:52:11
+        ## loadWindowSettings is inheritd from ScipyenViewer and does nothing if
+        ## self.parent() is not Scipyen's main window
+        #self.loadWindowSettings() # inherited from ScipyenViewer
+        #self.loadViewerSettings()
+            
+    def loadViewerSettings(self):
+        pass
+        # FIXME TODO 2021-08-22 22:08:19
+        # transfer this to confuse settings
+        #colorMapName = self.qsettings.value("ImageViewer/ColorMap", None)
+        #colorMapName = self.qsettings.value("/".join([self.__class__.__name__, "ColorMap"]), None)
         
-    def _load_viewer_settings_(self):
-        #colorMapName = self.settings.value("ImageViewer/ColorMap", None)
-        colorMapName = self.settings.value("/".join([self.__class__.__name__, "ColorMap"]), None)
+        ##print("ImageViewer %s loadViewerSettings colorMapName" % self, colorMapName)
         
-        if isinstance(colorMapName, str):
-            self.colorMap = colormaps.get(colorMapName, None)
+        #if isinstance(colorMapName, str):
+            #self._colorMap = colormaps.get(colorMapName, None)
                 
-        elif isinstance(colorMapName, mpl.colors.Colormap):
-            self.colorMap = colorMapName
+        #elif isinstance(colorMapName, colormaps.colors.Colormap):
+            #self._colorMap = colorMapName
             
-        else:
-            self.colorMap = None
+        #else:
+            #self._colorMap = None
         
-        #color = self.settings.value("ImageViewer/CursorsColor", None)
-        color = self.settings.value("/".join([self.__class__.__name__, "CursorColor"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.cursorsColor = color
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "CursorColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.cursorsColor = color
             
-        #color = self.settings.value("ImageViewer/RoisColor", None)
-        color = self.settings.value("/".join([self.__class__.__name__, "RoisColor"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.roisColor = color
-        
-        #color = self.settings.value("ImageViewer/SharedCursorsColor", None)
-        color = self.settings.value("/".join([self.__class__.__name__, "SharedCursorsColor"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.sharedCursorsColor = color
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "CursorLabelTextColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.cursorLabelTextColor = color
             
-        #color = self.settings.value("ImageViewer/SharedRoisColor", None)
-        color = self.settings.value("/".join([self.__class__.__name__, "SharedRoisColor"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.sharedRoisColor = roiscolor
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "LinkedCursorColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.linkedCursorsColor = color
             
-    def _save_viewer_settings_(self):
-        if isinstance(self.colorMap, mpl.colors.Colormap):
-            self.settings.setValue("/".join([self.__class__.__name__, "ColorMap"]), self.colorMap.name)
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "LinkedCursorLabelTextColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.linkedCursorLabelTextColor = color
             
-        else:
-            self.settings.setValue("/".join([self.__class__.__name__, "ColorMap"]), None)
-        
-        self.settings.setValue("/".join([self.__class__.__name__, "CursorColor"]), self.cursorsColor)
-        
-        self.settings.setValue("/".join([self.__class__.__name__, "RoisColor"]), self.roisColor)
-        
-        self.settings.setValue("/".join([self.__class__.__name__, "SharedCursorsColor"]), self.sharedCursorsColor)
-        
-        self.settings.setValue("/".join([self.__class__.__name__, "SharedRoisColor"]), self.sharedRoisColor)
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "CursorLabelBackgroundColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.linkedCursorLabelTextColor = color
             
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "OpaqueCursorLabel"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.opaqueCursorLabel = color
+            
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "RoiColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.roisColor = color
+        
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "ROILabelTextColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.roiLabelTextColor = color
+            
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "LinkedROIColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.linkedROIsColor = color
+        
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "LinkedROILabelTextColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.linkedROILabelTextColor = color
+            
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "ROILabelBackgroundColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.roiLabelBackgroundColor = color
+            
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "OpaqueROILabel"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.opaqueROILabel = color
+            
+    def saveViewerSettings(self):
+        pass
+        #if isinstance(self._colorMap, colormaps.colors.Colormap):
+            #self.qsettings.setValue("/".join([self.__class__.__name__, "ColorMap"]), self._colorMap.name)
+            
+        #else:
+            #self.qsettings.setValue("/".join([self.__class__.__name__, "ColorMap"]), None)
+        
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "CursorColor"]), self.cursorsColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "CursorLabelTextColor"]), self.cursorLabelTextColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "LinkedCursorColor"]), self.linkedCursorsColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "LinkedCursorLabelTextColor"]), self.linkedCursorLabelTextColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "CursorLabelBackgroundColor"]), self.cursorLabelBackgroundColor)
+        ##self.qsettings.setValue("/".join([self.__class__.__name__, "LinkedCursorLabelBackgroundColor"]), self.LinkedCursorLabelBackgroundColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "OpaqueCursorLabel"]), self.opaqueCursorLabel)
+        
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "RoiColor"]), self.roisColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "ROILabelTextColor"]), self.roiLabelTextColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "LinkedROIColor"]), self.linkedROIsColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "LinkedROILabelTextColor"]), self.linkedROILabelTextColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "ROILabelBackgroundColor"]), self.roiLabelBackgroundColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "OpaqueROILabel"]), self.opaqueROILabel)
+        
+        
     def setImage(self, image, doc_title=None, normalize=True, colormap=None, gamma=None,
                  frameAxis=None, displayChannel=None):
-        self.setData(image, doc_title=doc_title, normalize=normalize, colortable=colortable, gamma=gamma,
+        self.setData(image, doc_title=doc_title, normalize=normalize, colormap=colormap, gamma=gamma,
                      frameAxis=frameAxis, displayChannel=displayChannel)
         
     def displayChannel(self, channel_index):
@@ -4333,19 +4595,25 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.displayFrame("all")
         self._displayedChannel_ = "all"
         
-    def view(self, image, doc_title=None, normalize=True, colortable=None, gamma=None,
-             frameAxis=None, displayChannel=None, frameIndex=None):
-        self.setData(image, doc_title=doc_title, normalize=normalize, colortable=colortable, gamma=gamma,
-                     frameAxis=frameAxis, frameIndex=None, displayChannel=displayChannel)
+    def view(self, image, doc_title=None, normalize=True, colormap=None, gamma=None,
+             frameAxis=None, displayChannel=None, asAlphaChannel=False, frameIndex=None, get_focus=True):
+        # NOTE: 2020-09-24 14:19:57
+        # this calls ancestor's instance method ScipyenFrameViewer.setData(...)
+        # which then delegates back to _set_data() here.
+        self.setData(image, doc_title=doc_title, normalize=normalize, colormap=colormap, gamma=gamma,
+                     frameAxis=frameAxis, frameIndex=None, displayChannel=displayChannel, 
+                     asAlphaChannel=asAlphaChannel, get_focus=get_focus)
         
-    def _set_data_(self, data, normalize=True, colortable = None, gamma = None, 
-            frameAxis=None, frameIndex=None, 
-            arrayAxes:(type(None), vigra.AxisTags) = None, 
-            displayChannel = None, 
-            doc_title:(str, type(None)) = None,
-            *args, **kwargs):
+    def _set_data_(self, data, normalize=True, colormap = None, gamma = None, 
+                   tempColorMap = None,
+                   frameAxis=None, frameIndex=None, 
+                   arrayAxes:(type(None), vigra.AxisTags) = None, 
+                   displayChannel = None, 
+                   doc_title:(str, type(None)) = None,
+                   asAlphaChannel:bool=False,
+                   *args, **kwargs):
         '''
-        SYNTAX: self.view(image, title = None, normalize = True, colortable = None, gamma = None, separateChannels = False, frameAxis = None)
+        SYNTAX: self.view(image, title = None, normalize = True, colormap = None, gamma = None, separateChannels = False, frameAxis = None)
     
         Parameters:
         ============
@@ -4355,7 +4623,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             normalize: bool, default True
             
-            colortable: default None
+            colormap: default None; when given, overrides the colormap configuration
+                set up in preferences ONLY for this image
+                
             
             gamma: float scalar or None (default)
             
@@ -4364,14 +4634,34 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             displaychannel: int, "all", or None (default)
         '''
         
-        self.colorTable         = colortable
-        self.imageNormalize     = normalize
-        self.imageGamma         = gamma
-
-        if self.colorbar is not None:
-            self.viewerWidget.scene.removeItem(self.colorbar)
+        self._imageNormalize     = normalize
+        self._imageGamma         = gamma
+        
+        if isinstance(colormap, colormaps.colors.Colormap):
+            self._colorMap = colormap
             
-        self.colorbar = None
+        elif isinstance(colormap, str):
+            cmap = colormaps.get(colormap, None)
+            if isinstance(cmap, colormaps.colors.Colormap):
+                self._colorMap = cmap
+
+        if self._colorBar is not None:
+            self.viewerWidget.scene.removeItem(self._colorBar)
+            
+        if isinstance(tempColorMap, colormaps.colors.Colormap):
+            self._tempColorMap = tempColorMap
+            
+        elif isinstance(tempColorMap, str):
+            cmap = colormaps.get(tempColorMap, None)
+            if isinstance(cmap, colormaps.colors.Colormap):
+                self._tempColorMap = cmap
+                
+        else:
+            self._tempColorMap = None
+            
+        self._colorBar = None
+        
+        self._axes_calibration_ = None
                 
         if displayChannel is None:
             self._displayedChannel_      = "all"
@@ -4392,13 +4682,31 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 self.userFrameAxisInfo  = frameAxis
                 
             if self._parseVigraArrayData_(data):
+                # NOTE: 2022-01-17 16:32:15
+                # self._parseVigraArrayData_ sets up _number_of_frames_ and 
+                # _data_frames_
                 self._data_  = data
+                self.frameIndex = frameIndex or range(self._data_frames_) # set by _parseVigraArrayData_
+                self._number_of_frames_ = len(self.frameIndex)
+                self._axes_calibration_ = AxesCalibration(data)
                 self._setup_channels_display_actions_()
-                self.displayFrame()
-            
+                self.displayFrame(asAlphaChannel=asAlphaChannel)
+                
+                #totalFrames = self._number_of_frames_ if isinstance(self._number_of_frames_, int) else np.prod(self._number_of_frames_)
+        
+                self.framesQSlider.setMaximum(self._number_of_frames_ - 1)
+                self.framesQSlider.setToolTip("Select frame.")
+                
+                self.framesQSpinBox.setMaximum(self._number_of_frames_ - 1)
+                self.framesQSpinBox.setToolTip("Select frame.")
+                self.nFramesLabel.setText("of %d" % self._number_of_frames_)
+                
+  
         elif isinstance(data, (QtGui.QImage, QtGui.QPixmap)):
             self._number_of_frames_ = 1
+            self.frameIndex = range(self._number_of_frames_)
             self._data_  = data
+            self.frameAxis = None
             self.displayFrame()
             
         elif isinstance(data, np.ndarray):
@@ -4407,7 +4715,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     arrayAxes = vigra.VigraArray.defaultAxistags("x")
                     
                 elif data.ndim == 2:
-                    if utilities.isVector(data):
+                    if dt.is_vector(data):
                         arrayAxes = vigra.VigraArray.defaultAxistags("y")
                     else:
                         arrayAxes = vigra.VigraArray.defaultAxistags("xy")
@@ -4415,13 +4723,20 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 else:
                     arrayAxes = vigra.VigraArray.defaultAxistags(data.ndim, noChannels=True)
                     
-            self._data_ = vigra.VigraArray(data, axistags=arrayAxes)
+            # NOTE: 2021-10-25 16:29:38
+            # For display purposes only, we construct a VigraArray on the numpy
+            # ndarray passed as 'image'
+            
+            array_data = vigra.VigraArray(data, axistags=arrayAxes)
+            if self._parseVigraArrayData_(array_data):
+                self._data_  = array_data
+                self.frameIndex = frameIndex or range(self._number_of_frames_) # set by _parseVigraArrayData_
+                self._axes_calibration_ = AxesCalibration(array_data)
+                self._setup_channels_display_actions_()
+                self.displayFrame(asAlphaChannel=asAlphaChannel)
             
         else:
-            raise TypeError("First argument must be a VigraArray or a numpy.ndarray")
-        
-        if kwargs.get("show", True):
-            self.activateWindow()
+            raise TypeError("First argument must be a VigraArray, a numpy.ndarray, a QtGui.QImage or a QtGui.QPixmap")
         
     def clear(self):
         """Clears all image data cursors and rois from this window
@@ -4431,19 +4746,14 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.framesQSlider.setMaximum(0)
         self.framesQSpinBox.setMaximum(0)
         self._data_ = None
-        #self.imageNormalize             = None
-        #self.imageGamma                 = None
-        #self.colorMap                   = None
-        #self.prevColorMap               = None
-        #self.colorTable                 = None
         self._separateChannels           = False
-        #self.setWindowTitle("Image Viewer")
         self.tStride                    = 0
         self.zStride                    = 0
-        self.frameAxisInfo              = None
+        self.frameAxis              = None
         self.userFrameAxisInfo          = None
-        self.widthAxisInfo              = None # this is "visual" width which may not be on a spatial axis "x"
-        self.heightAxisInfo             = None # this is "visual" height which may not be on a spatial axis "y"
+        self._display_time_vertical_        = True
+        self.widthAxis              = None # this is "visual" width which may not be on a spatial axis "x"
+        self.heightAxis             = None # this is "visual" height which may not be on a spatial axis "y"
         self._currentZoom_               = 0
         self._currentFrameData_          = None
         self._xScaleBar_                 = None
@@ -4457,25 +4767,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.displayScaleBarAction.setChecked(False)
         #self.displayScaleBarAction.toggled[bool].connect(self.slot_displayScaleBar)
         
-        if self.colorbar is not None:
-            self.viewerWidget.scene.removeItem(self.colorbar)
+        if self._colorBar is not None:
+            self.viewerWidget.scene.removeItem(self._colorBar)
             
-            self.colorbar = None
+            self._colorBar = None
         
         self.viewerWidget.clear()
-        
-    def setColorMap(self, value):
-        if isinstance(value, str):
-            self.colorMap = colormaps.get(value, None)
-            
-        elif isinstance(value, colors.Colormap):
-                self.colorMap = value
-                
-        else:
-            return
-        
-        self.displayFrame()
-        
         
     def showScaleBars(self, origin=None, length=None, calibrated_length=None, pen=None, units=None):
         """Shows a scale bar for both axes in the display
@@ -4598,8 +4895,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 else:
                     self._yScaleBarTextItem_.setPlainText("%d" % length[1])
                 
-            self._yScaleBarTextItem_.setPos(3 * self._yScaleBar_.pen().width(),
-                                           0)
+            self._yScaleBarTextItem_.setPos(3 * self._yScaleBar_.pen().width(), 0)
             
             self._yScaleBarTextItem_.setRotation(-90)
                 
@@ -4608,93 +4904,162 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._scaleBarLength_ = length
         self._scaleBarOrigin_ = origin
         
+    def addCursors(self, **kwargs) -> tuple:
+        """Programmatically creates a set of cursors from cursor parameters.
         
+        Creates gui.planargraphics.Cursor objects and their 
+        gui.planargraphics.GraphicsObject frontends.
         
+        The method provides a quick shorthand for creating new cursors in the 
+        ImageViewer's scene.
         
+        Var-keyword parameters:
+        =======================
+        Mapping of cursor name (str) to a dict with fields:
+            "type": str (valid PlanarGraphicsType name)
+            "pos": tuple (x,y) of coordinates
+            
+        Returns:
+        ========
+        A (possibly empty) tuple of gui.planargraphics.Cursor objects.
         
-    def addGraphicsObject(self, item, pos=None, movable=True, editable=True, 
-                          label=None, window=None, radius=None, 
-                          frame=None, framesVisible=None,
-                          showLabel=True, labelShowsPosition=True):
-        """Manually add a roi or a cursor to the underlying scene.
+        Example:
+        
+        c = addCursors(**dict(map(lambda k: ("Cursor%i"%k, {"type":"vertical", "pos": (50 + 50 * k, 0)}), range(2))))
+        
+        """
+        objects = list()
+        
+        if self.viewerWidget.scene.rootImage is not None:
+            #k = 0
+            
+            for name, type_pos in kwargs.items():
+                ctype = type_pos.get("type", None)
+                cpos = type_pos.get("pos", None)
+                
+                if isinstance(ctype, str):
+                    cursor_type_names = filter(lambda x: x.endswith("_cursor"), pgui.PlanarGraphicsType.names())
+                    sub_match = list(filter(lambda x: ctype in x, cursor_type_names))
+                    if ctype in cursor_type_names:
+                        ctype = pgui.PlanarGraphicsType["ctype"]
+                        
+                    elif len(sub_match):
+                        ctype = pgui.PlanarGraphicsType[sub_match[0]]
+                        
+                    else:
+                        continue # no known cursor type
+                    
+                elif isinstance(ctype, pgui.PlanarGraphicsType):
+                    if not ctype.is_primitive() or not ctype.name.endswith("_cursor"):
+                        continue
+                    
+                else:
+                    continue
+                        
+                if not isinstance(cpos, (tuple, list)) or len(cpos) != 2 or not all((isinstance(v, numbers.Number) for v in cpos)):
+                    continue
+                
+                if ctype == pgui.PlanarGraphicsType.vertical_cursor:
+                    factory = pgui.VerticalCursor
+                    
+                elif ctype == pgui.PlanarGraphicsType.horizontal_cursor:
+                    factory = pgui.HorizontalCursor
+                    
+                elif ctype == pgui.PlanarGraphicsType.crosshair_cursor:
+                    factory = pgui.CrosshairCursor
+                    
+                elif ctype == pgui.PlanarGraphicsType.point_cursor:
+                    factory = pgui.PointCursor
+                    
+                else:
+                    continue
+                
+                obj = factory(cpos[0], cpos[1],
+                            self.viewerWidget.scene.sceneRect().width(),
+                            self.viewerWidget.scene.sceneRect().height(),
+                            self.viewerWidget.__cursorWindow__, 
+                            self.viewerWidget.__cursorWindow__,
+                            self.viewerWidget.__cursorRadius__,
+                            name=name,
+                            frameindex=[],
+                            currentFrame = self.currentFrame,
+                            )
+                
+                obj=self.addPlanarGraphics(obj, showLabel=True, labelShowsPosition=True)
+                # NOTE: 2021-09-16 12:11:54
+                # these two are needed to that we can move the thing with the mouse
+                # FIXME this should not happen
+                obj.x = cpos[0]
+                obj.y = cpos[1]
+                
+                objects.append(obj)
+            
+        return objects
+        
+    def addPlanarGraphics(self, item:pgui.PlanarGraphics, 
+                          movable:bool = True, 
+                          editable:bool = True, 
+                          showLabel:bool = True, 
+                          labelShowsPosition:bool = True, 
+                          autoSelect:bool = True,
+                          transparentLabel:bool = False,
+                          returnGraphics:bool=False,
+                          ) -> typing.Union[pgui.PlanarGraphics, pgui.GraphicsObject]:
+        """Add a roi or a cursor to the underlying scene.
+        
+        The function generates a gui.planargraphics.GraphicsObject as a frontend
+        to a gui.plarangraphics.PlanarGraphics object.
+        
+        The ImageViewer does not own the PlanarGraphics object, but a reference
+        to the PlanarGraphics object is accessible to the GraphicsObject 
+        instance as the 'backend'. attribute.
+        
+        In turn, a PlanarGraphics object can hold references to potentially more
+        than one GraphicsObject 'frontends' (e.g. one for a distinct instance
+        of ImageViewer) such that changes in the PlanarGraphics object shape
+        descriptors are visible in all frontends.
+        
         
         Parameters:
         ===========
         
-        item: either:
+        item: gui.PlanarGraphics object
         
-            a) pictgui.Cursor, a cursor GraphicsObjectType enum value (or int, 
-                    resolving to a cursor GraphicsObjectType enum), 
-                    
-            or:
-                    
-            b) pictgui.Path, pctgui.Rect, pictgui.Ellipse, or a non-cursor 
-               GraphicsObjectType enum (or int resolving to a non-cursor
-               GraphicsObjectType enum) 
-               
         Keyword parameters:
         ==================
-        Passed to GraphicsObject constructor via GraphicsImageViewerWidget 
-        createNewRoi() or createnewCursor() methods.
+        returnGraphics:bool, optional, default is False
+            When True, returns the newly-created gui.planargraphics.GraphicsObject
+            ( a PyQt5.QtWidgets.QGraphicsItem); otherwise, returns the 
+            PlanarGraphics objects passed as 'item'
+        
+        The following are optional (default values shownn in parantheses) and
+        are passed directly to the GraphicsObject constructor via the method
+        GraphicsImageViewerWidget.newGraphicsObject(...):
+        
+        movable:bool (True)
+        editable:bool (True)
+        showLabel:bool (True)
+        labelShowsPosition:bool (True); for gui.planargraphics.Cursor objects
+        autoSelect:bool (True)
+        transparentLabel:bool (False)
+        
+        
+        
+        NOTE: To manually add a roi or cursor in the window, use the window menu
+        
+        Returns:
+        ========
+        The PlanarGraphics object passed in the 'item' argument.
         
         """
+        obj = self.viewerWidget.newGraphicsObject(item, 
+                                                  movable             = movable,
+                                                  editable            = editable, 
+                                                  showLabel           = showLabel,
+                                                  labelShowsPosition  = labelShowsPosition,
+                                                  autoSelect          = autoSelect)
         
-        if isinstance(item, pgui.Cursor):
-            #print("window %s adds cursor %s in frame %s\n" % (self.__repr__(), item.type, framesVisible))
-            
-            if framesVisible is None:
-                framesVisible = item.frameIndices
-                
-            
-            obj = self.viewerWidget.createNewCursor(item, 
-                                                    pos                 = pos,
-                                                    movable             = movable,
-                                                    editable            = editable, 
-                                                    frame               = frame,
-                                                    label               = label,
-                                                    frameVisibility     = framesVisible,
-                                                    showLabel           = showLabel,
-                                                    labelShowsPosition  = labelShowsPosition,
-                                                    parentWidget        = self)
-            
-        elif isinstance(item, (int, pgui.GraphicsObjectType)) and \
-            item & pgui.GraphicsObjectType.allCursorTypes:
-            
-            obj = self.viewerWidget.createNewCursor(item, 
-                                                    window              = window, 
-                                                    radius              = radius, 
-                                                    pos                 = pos, 
-                                                    movable             = movable, 
-                                                    editable            = editable, 
-                                                    frame               = frame, 
-                                                    label               = label, 
-                                                    frameVisibility     = framesVisible, 
-                                                    showLabel           =  showLabel,
-                                                    labelShowsPosition  = labelShowsPosition,
-                                                    parentWidget        = self)
-        
-        elif isinstance(item, pgui.PlanarGraphics):
-            roiType = item.type
-
-            if framesVisible is None:
-                framesVisible = item.frameIndices
-                
-            obj = self.viewerWidget.createNewRoi(params                 = item, 
-                                                 roiType                =  roiType, 
-                                                 label                  = label, 
-                                                 frame                  = frame, 
-                                                 pos                    = pos,
-                                                 movable                =  movable, 
-                                                 editable               = editable, 
-                                                 frameVisibility        = framesVisible,
-                                                 showLabel              = showLabel,
-                                                 labelShowsPosition     = labelShowsPosition,
-                                                 parentWidget           = self)
-            
-        else:
-            raise TypeError("Unexpected item parameter: %s" % type(item).__name__)
-
-        if isinstance(obj, pgui.PlanarGraphics) and obj.objectType & pgui.GraphicsObjectType.allCursorTypes:
+        if isinstance(obj.backend, pgui.Cursor):
             if isinstance(self.cursorsColor, QtGui.QColor) and self.cursorsColor.isValid():
                 obj.color = self.cursorsColor
                 
@@ -4702,8 +5067,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             if isinstance(self.roisColor, QtGui.QColor) and self.roisColor.isValid():
                 obj.color = self.roisColor
                 
-        return obj
-    
+        obj.setTransparentLabel(transparentLabel)
+
+        return obj if returnGraphics else obj.backend
+        
     @pyqtSlot()
     @safeWrapper
     def slot_chooseCursorsColor(self):
@@ -4717,8 +5084,75 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                                 title="Choose cursors color",
                                                 options=QtWidgets.QColorDialog.ShowAlphaChannel)
             
-        self.setCursorsColor(color)
+        self.setGraphicsObjectColor(color, "cursor")
+
+    @pyqtSlot()
+    @safeWrapper
+    def slot_chooseLinkedCursorsColor(self):
+        if isinstance(self.cursorsColor, QtGui.QColor):
+            initial = self.cursorsColor
+            
+        else:
+            initial = QtCore.Qt.white
+
+        color = self._showColorChooser(initial, "Choose color for linked Cursors")
         
+        self.setGraphicsObjectColor(color, "linkedcursor")
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_chooseCursorLabelTextColor(self):
+        if isinstance(self.cursorLabelTextColor, QtGui.QColor):
+            initial = self.cursorLabelTextColor
+            
+        else:
+            initial = QtCore.Qt.white
+
+        color = self._showColorChooser(initial, "Choose color cursor labels text")
+        self.setGraphicsObjectColor(color, "cursorLabelText")
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_chooseLinkedCursorLabelTextColor(self):
+        if isinstance(self.linkedCursorLabelTextColor, QtGui.QColor):
+            initial = self.linkedCursorLabelTextColor
+            
+        else:
+            initial = QtCore.Qt.white
+
+        color = self._showColorChooser(initial, "Choose color cursor labels text")
+        self.setGraphicsObjectColor(color, "linkedcursorlabeltext")
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_chooseCursorLabelBGColor(self):
+        # TODO/FIXME: 2021-05-12 09:33:30
+        # not used yet
+        if isinstance(self.cursorLabelBackgroundColor, QtGui.QColor):
+            initial = self.cursorLabelBackgroundColor
+            
+        else:
+            initial = QtCore.Qt.white
+
+        color = self._showColorChooser(initial, "Choose color cursor labels background")
+        
+        self.setGraphicsObjectColor(color, "cursorLabelBackground")
+            
+    @pyqtSlot()
+    @safeWrapper
+    def slot_chooseLinkedCursorBGColor(self):
+        # TODO/FIXME: 2021-05-12 09:33:30
+        # not used yet
+        if isinstance(self.cursorLabelBackgroundColor, QtGui.QColor):
+            initial = self.cursorLabelBackgroundColor
+            
+        else:
+            initial = QtCore.Qt.white
+
+        color = self._showColorChooser(initial, "Choose color cursor labels background")
+        
+        self.setGraphicsObjectColor(color, "cursorLabelBackground")
+            
     @pyqtSlot()
     @safeWrapper
     def slot_chooseRoisColor(self):
@@ -4728,68 +5162,151 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         else:
             initial = QtCore.Qt.white
 
-        color = QtWidgets.QColorDialog.getColor(initial=initial, 
-                                                title="Choose cursors color",
-                                                options=QtWidgets.QColorDialog.ShowAlphaChannel)
+        color = self._showColorChooser(initial, "Choose color for ROIs")
         
-        self.setRoisColor(color)
+        self.setGraphicsObjectColor(color, "rois")
             
+        
     @pyqtSlot()
     @safeWrapper
-    def slot_chooseCBCursorsColor(self):
-        if isinstance(self.cursorsColor, QtGui.QColor):
-            initial = self.cursorsColor
+    def slot_chooseLinkedRoisColor(self):
+        if isinstance(self.linkedROIsColor, QtGui.QColor):
+            initial = self.linkedROIsColor
             
         else:
             initial = QtCore.Qt.white
 
-        color = QtWidgets.QColorDialog.getColor(initial=initial, 
-                                                title="Choose cursors color",
-                                                options=QtWidgets.QColorDialog.ShowAlphaChannel)
-            
-        self.setSharedCursorsColor(color)
+        color = self._showColorChooser(initial, "Choose color for linked ROIs")
+        
+        self.setGraphicsObjectColor(color, "linkedroi")
         
     @pyqtSlot()
     @safeWrapper
-    def slot_chooseCBRoisColor(self):
-        if isinstance(self.sharedRoisColor, QtGui.QColor):
-            initial = self.sharedRoisColor
+    def slot_chooseRoisLabelTextColor(self):
+        if isinstance(self.roiLabelTextColor, QtGui.QColor):
+            initial = self.roiLabelTextColor
             
         else:
             initial = QtCore.Qt.white
 
-        color = QtWidgets.QColorDialog.getColor(initial=initial, 
-                                                title="Choose cursors color",
-                                                options=QtWidgets.QColorDialog.ShowAlphaChannel)
+        color = self._showColorChooser(initial, "Choose color for linked ROIs")
         
-        self.setSharedRoisColor(color)
+        self.setGraphicsObjectColor(color, "roilabeltext")
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_chooseLinkedRoisLabelTextColor(self):
+        if isinstance(self.linkedROILabelTextColor, QtGui.QColor):
+            initial = self.linkedROILabelTextColor
             
-    def setCursorsColor(self, color):
-        #print("ImageViewer.setCursorsColor", color)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.cursorsColor = color
-            for obj in self.graphicsObjects(rois=False).values():
-                obj.color = self.cursorsColor
+        else:
+            initial = QtCore.Qt.white
+
+        color = self._showColorChooser(initial, "Choose color for linked ROIs")
         
-    def setRoisColor(self, color):
-        #print("ImageViewer.setRoisColor", color)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.roisColor = color
-            for obj in self.graphicsObjects(rois=True).values():
-                obj.color = self.roisColor
-    
-    def setSharedCursorsColor(self, color):
-        #print("ImageViewer.setSharedCursorsColor", color.name())
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.sharedCursorsColor = color
-            for obj in self.graphicsObjects(rois=False).values():
-                obj.colorForSharedBackend = self.sharedCursorsColor
+        self.setGraphicsObjectColor(color, "linkedroilabeltext")
         
-    def setSharedRoisColor(self, color):
-        #print("ImageViewer.setRoisColor", color)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.sharedRoisColor = color
-            for obj in self.graphicsObjects(rois=True).values():
-                obj.colorForSharedBackend = self.sharedRoisColor
+    @pyqtSlot()
+    @safeWrapper
+    def slot_chooseROILabelBGColor(self):
+        # TODO/FIXME: 2021-05-12 09:33:30
+        # not used yet
+        if isinstance(self.roiLabelBackgroundColor, QtGui.QColor):
+            initial = self.roiLabelBackgroundColor
+            
+        else:
+            initial = QtCore.Qt.white
+
+        color = self._showColorChooser(initial, "Choose color cursor labels background")
         
-    
+        self.setGraphicsObjectColor(color, "roilabelbackground")
+        
+    @pyqtSlot(bool)
+    @safeWrapper
+    def slot_setOpaqueCursorLabels(self, value):
+        self.setOpaqueGraphicsLabel(cursors=True, opaque=value)
+            
+    @pyqtSlot(bool)
+    @safeWrapper
+    def slot_setOpaqueROILabels(self, value):
+        self.setOpaqueGraphicsLabel(cursors=False, opaque=value)
+            
+    def _showColorChooser(self, initial:QtGui.QColor, title:str="Choose color") -> typing.Optional[QtGui.QColor]:
+        return QtWidgets.QColorDialog.getColor(initial=initial, 
+                                                title=title,
+                                                options=QtWidgets.QColorDialog.ShowAlphaChannel,
+                                                parent=self)
+        
+    def setGraphicsObjectColor(self, color:QtGui.QColor, what:str):
+        cursor = what.lower() in ("cursor", "linkedcursor",
+                                  "cursorlabeltext", "linkedcursorlabeltext",
+                                  "cursorlabelbackground")
+        
+        if cursor:
+            filtfn = partial(filter, lambda x: isinstance(x.backend, pgui.Cursor))
+        else:
+            filtfn = partial(itertools.filterfalse, lambda x: isinstance(x.backend, pgui.Cursor))
+            
+        if isinstance(color, QtGui.QColor) and color.isValid():
+            if what.lower() == "cursor":
+                self.cursorsColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.penColor = self.cursorsColor
+                    
+            elif what.lower() == "linkedcursor":
+                self.linkedCursorsColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.linkedPenColor = self.linkedCursorsColor
+                    
+            elif what.lower() == "cursorlabeltext":
+                self.cursorLabelTextColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.textColor = self.cursorLabelTextColor
+                    
+            elif what.lower() == "linkedcursorlabeltext":
+                self.linkedCursorLabelTextColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.linkedTextColor = self.linkedCursorLabelTextColor
+                    
+            elif what.lower() == "cursorlabelbackground":
+                self.cursorLabelBackgroundColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.textBackgroundColor = self.cursorLabelBackgroundColor
+                    
+            elif what.lower() == "roi":
+                self.roisColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.penColor = self.roisColor
+                    
+            elif what.lower() == "linkedroi":
+                self.linkedROIsColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.linkedPenColor = self.linkedROIsColor
+                    
+            elif what.lower() == "roilabeltext":
+                self.roiLabelTextColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.textColor = self.roiLabelTextColor
+                    
+            elif what.lower() == "linkedroilabeltext":
+                self.linkedROILabelTextColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.linkedTextColor = self.linkedROILabelTextColor
+                    
+            elif what.lower() == "roilabelbackground":
+                self.roiLabelBackgroundColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.textBackgroundColor = self.roiLabelBackgroundColor
+        
+    def setOpaqueGraphicsLabel(self, cursors:bool=False, opaque:bool=True):
+        if cursors:
+            self.opaqueCursorLabel = opaque
+            objs = [o for o in filter(lambda x: isinstance(x.backend, pgui.Cursor), 
+                                        self.viewerWidget.graphicsObjects)]
+        else:
+            self.opaqueROILabel = opaque
+            objs = [o for o in itertools.filterfalse(lambda x: isinstance(x.backend, pgui.Cursor), 
+                                                    self.viewerWidget.graphicsObjects)]
+        for obj in objs:
+            obj.opaqueLabel = opaque
+            

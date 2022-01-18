@@ -1,49 +1,83 @@
+from copy import deepcopy
+import numbers, warnings
 import numpy as np
 
 import quantities as pq
 
 import neo
 from neo.core import baseneo
+from neo.core.baseneo import BaseNeo
 from neo.core import basesignal
+from neo.core.basesignal import BaseSignal
 from neo.core import container
 from neo.core.dataobject import DataObject, ArrayDict
 
+from core.quantities import (units_convertible, name_from_unit)
+from core.strutils import is_path #, is_pathname_valid
 
-def _new_DataSignal(cls, signal, units=None, dtype=None, copy=True,
-                    origin=0*pq.dimensionless, sampling_period=None,
+
+def _new_DataSignal(cls, signal, units=None, domain_units=None, dtype=None, copy=True,
+                    t_start=0*pq.dimensionless, sampling_period=None,
                     sampling_rate=None, name=None, file_origin=None,
-                    description=None, annotations=None,
-                    channel_index=None, segment=None):
-    obj = cls(signal=signal, units=units, dtype=dtype, copy=copy,
-              origin=origin, sampling_period=sampling_period, sampling_rate=sampling_rate,
+                    description=None, array_annotations=None, annotations=None,
+                    #channel_index=None, 
+                    segment=None):
+    if not isinstance(array_annotations, ArrayDict):
+        array_annotations = ArrayDict(signal.shape[-1])
+        
+    if not isinstance(annotations, dict):
+        if annotations is None:
+            annotations = dict()
+        else:
+            try:
+                annotations = dict(annotations)
+            except:
+                annotations = dict() # just so that we aren't left hanging out
+                
+    obj = cls(signal=signal, units=units, time_units=domain_units, dtype=dtype, copy=copy,
+              t_start=t_start, sampling_period=sampling_period, sampling_rate=sampling_rate,
               name=name, file_origin=file_origin, description=description,
+              array_annotations=array_annotations,
               **annotations)
     
-    obj.channel_index = channel_index
+    #obj.channel_index = channel_index
     obj.segment = segment
     
     return obj
 
-def _new_IrregularlySampledDataSignal(cls, domain, signal, units=None, domain_units=None,
-                                      dtype=None, copy=True, name=None,file_origin=None,
-                                      description=None,annotations=None,segment=None,
-                                      channel_index=None):
+def _new_IrregularlySampledDataSignal(cls, domain, signal, units=None, 
+                                      domain_units=None, dtype=None, 
+                                      domain_dtype=None, copy=True, 
+                                      name=None,file_origin=None,
+                                      description=None,annotations=None,
+                                      array_annotations=None,
+                                      #channel_index=None,
+                                      segment=None,
+                                      ):
+    if not isinstance(array_annotations, ArrayDict):
+        array_annotations = ArrayDict(signal.shape[-1])
+        
+    if not isinstance(annotations, dict):
+        if annotations is None:
+            annotations = dict()
+        else:
+            try:
+                annotations = dict(annotations)
+            except:
+                annotations = dict() # just so that we aren't left hanging out
+                
     obj = cls(domain=domain,signal=signal,units=units,domain_units=domain_units,
               dtype=dtype,copy=copy,name=name,file_origin=file_origin,
-              description=description, **annotations)
+              description=description, array_annotations=array_annotations,**annotations)
     
     obj.segment=segment
-    obj.channel_index = channel_index
+    #obj.channel_index = channel_index
     
     return obj
 
 
-class DataSignal(neo.basesignal.BaseSignal):
-    """Emulates a "generic" neo.AnalogSignal.
-    
-    Does not enforce a time domain (domain units need not be time units).
-       
-    TODO implement parent container object + channel index functionality as well
+class DataSignal(BaseSignal):
+    """A "generic" neo.AnalogSignal with domain not restricted to time.
     
     Very much modeled after neo.AnalogSignal
     """
@@ -73,117 +107,208 @@ class DataSignal(neo.basesignal.BaseSignal):
     # by analogy, we need to define the following grouping objects:
     #
     #
-    _single_parent_objects = ("Segment", "ChannelIndex") 
+    #_single_parent_objects = ("Segment", "ChannelIndex") 
     
+    _parent_objects = ('Segment',)
+    _parent_attrs = ('segment',)
     _quantity_attr = 'signal'
-    
+
     _necessary_attrs = (('signal', pq.Quantity, 2),
                         ('sampling_period', pq.Quantity, 0),
                         ('origin', pq.Quantity, 0))
     
     _recommended_attrs = neo.baseneo.BaseNeo._recommended_attrs
 
-    def __new__(cls, signal, units=None, dtype=None, copy=True, 
-                origin=0*pq.dimensionless, sampling_period=None, sampling_rate=None, 
+    def __new__(cls, signal, units=None,  time_units=None,
+                dtype=np.dtype("float64"), copy=True, 
+                t_start=0*pq.dimensionless, 
+                sampling_period=None, sampling_rate=None, 
                 name=None, file_origin=None, description=None, 
-                **annotations):
+                array_annotations=None, **annotations):
         
-        if units is None:
-            if not hasattr(signal, "units"):
-                units = pq.dimensionless
+        # NOTE: try & sort out the mess from pickles saved with prev APIs
+        # WARNING: 2021-12-09 21:45:08 This is NOT guaranteed to succeed
+        # if trying to load an old pickle fails, you're better off going to the
+        # original data !
+        
+        #strings  = {"name":None,"file_origin":None, "description": None}
+        
+        quants = {"units": None, "time_units": None}
+        
+        #domainargs = {"t_start": None, "sampling_period":None, "sampling_rate":None}
+        
+        #annots    = {"array_annotations":None, "annotations": None}
+        
+        dtypes   = {"dtype":None}
+        
+        bools = {"copy": None}
+        
+        
+        call_args = {"units": units,
+                    "time_units": time_units,
+                    "dtype": dtype,
+                    "copy": copy,
+                    "t_start": t_start,
+                    "sampling_period": sampling_period,
+                    "sampling_rate": sampling_rate,
+                    "name": name,
+                    "file_origin": file_origin,
+                    "description": description,
+                    "array_annotations": array_annotations,
+                    "annotations": annotations,
+            }
+        
+        for k,v in call_args.items():
+            if isinstance(v, bool): # there is onyl one bool arg expected
+                bools["copy"] = v
                 
-        elif isinstance(signal, pq.Quantity):
-            if units != signal.units:
-                signal = signal.rescale(units)
-                
-        obj = pq.Quantity(signal, units=units, dtype=dtype, copy=copy).view(cls)
+            elif isinstance(v, np.dtype): # there is only one dtype arg expected
+                dtypes["dtype"] = v
 
+            elif isinstance(v, pq.Quantity):
+                if v.size == 1: # a scalar ; note signal is treated from the outset
+                    # precedence: units, time_units, t_start, sampling_period, sampling_rate
+                    if quants["units"] is None:
+                        if isinstance(signal, pq.Quantity):
+                            quants["units"] = signal.units
+                            
+                        else:
+                            quants["units"] = v.units
+                            
+        obj = pq.Quantity(signal, units=quants["units"], dtype=dtypes["dtype"], copy=bools["copy"]).view(cls)
+        
         if obj.ndim == 1:
             obj.shape = (-1,1)
-            
-        if origin is None:
-            obj._origin = 0 * pq.dimensionless
-            
-        else:
-            if not isinstance(origin, pq.Quantity):
-                raise TypeError("Expecting a Quantity for origin; got %s instead" % (type(origin).__name__))
-            
-            elif origin.size > 1:
-                raise TypeError("origin must be a scalar quantity; got %s instead" % origin)
-            
-            obj._origin = origin
-        
-        if sampling_period is None:
-            # sampling period not given
-            if sampling_rate is None:
-                # sampling period not given and sampling rate not given =>
-                # set default sampling_period
-                obj._sampling_period = 1 * obj._origin.units # default sampling period
-                
-            elif isinstance(sampling_rate, pq.Quantity): # calculate from sampling rate if given
-                # sampling period not given, sampling rate given as Quantity =>
-                # calculate sampling_period from given sampling_rate
-                if origin.units == pq.dimensionless and sampling_rate.units != pq.dimensionless:
-                    obj._origin = origin.magnitude * (1/sampling_rate).units
-                    
-                if sampling_rate.units != 1/obj._origin.units:
-                    raise TypeError("Mismatch between sampling rate units and object units: %s and %s" % (sampling_rate.units, obj._origin.units))
-                
-                elif sampling_rate.size > 1:
-                    raise TypeError("Sampling rate is expected to be a scalar quantity; got %s instead" % sampling_rate)
-                
-                else:
-                    obj._sampling_period = 1/sampling_rate
-                    
-            elif isinstance(sampling_rate, numbers.Real):
-                # sampling period not given; sampling rate given as a unitless scalar
-                # => caluclate sampling period
-                if sampling_rate <= 0:
-                    raise ValueError("Sampling rate must have a strictly positive value; got %g instead" % sampling_rate)
-                
-                obj._sampling_period = 1/(sampling_rate * obj._origin.units)
-                
-            else:
-                raise TypeError("Sampling rate expected to be a scalar python quantity; got %s instead" % (type(sampling_rate).__name__))
-            
-        elif isinstance(sampling_period, pq.Quantity):
-            # sampling period given; disregard sampling rate if given at all
-            if origin.units == pq.dimensionless and sampling_period.units != pq.dimensionless:
-                obj._origin = origin.magnitude * sampling_period.units
-                
-            if sampling_period.units != obj._origin.units:
-                raise TypeError("Sampling period and signal domain have incompatible units: %s and %s" % (sampling_period.units, obj._origin.units))
-            
-            elif sampling_period.size > 1:
-                raise TypeError("Sampling period is expected to be a scalar quantity; got %s instead" % sampling_period)
-            
-            else:
-                obj._sampling_period = sampling_period
-                
-        elif isinstance(sampling_period, numbers.Real):
-            if sampling_period <= 0:
-                raise ValueError("Sampling period must be strictly positive; got %g instead" % sampling_period)
-            
-            obj._sampling_period = sampling_period * obj._origin.units
-        
         obj.segment=None
-        obj.channelIndex=None
+        obj.channel_index=None
 
         return obj
-    
-    def __init__(self, signal, units=None, dtype=None, copy=True, 
-                 origin=0*pq.dimensionless, sampling_rate=None, sampling_period=None,
+    def __init__(self, signal, units=None, time_units = None, dtype=None, copy=True, 
+                 t_start=0*pq.dimensionless, sampling_rate=None, sampling_period=None,
                  name=None, file_origin=None, description=None, 
-                 **annotations):
+                 array_annotations=None, **annotations):
         
         """DataSignal constructor.
-        units: the signal's units (NOT the units of the domain)
-        origin: python Quantity in the units of the domain, NOT of the signal
-        
         """
         
-        baseneo.BaseNeo.__init__(self, name=name, file_origin = file_origin, 
-                         description=description, **annotations)
+        strings  = {"name":None,"file_origin":None, "description": None}
+        
+        quants = {"units": None, "time_units": None}
+        
+        domainargs = {"t_start": None, "sampling_period":None, "sampling_rate":None}
+        
+        annots    = {"array_annotations":None, "annotations": None}
+        
+        dtypes   = {"dtype":None}
+        
+        bools = {"copy": None}
+        
+        
+        call_args = {"units": units,
+                    "time_units": time_units,
+                    "dtype": dtype,
+                    "copy": copy,
+                    "t_start": t_start,
+                    "sampling_period": sampling_period,
+                    "sampling_rate": sampling_rate,
+                    "name": name,
+                    "file_origin": file_origin,
+                    "description": description,
+                    "array_annotations": array_annotations,
+                    "annotations": annotations,
+            }
+        
+        for k,v in call_args.items():
+            #print(f"before: {k}, {v}, {type(v).__name__}")
+            if isinstance(v, bool): # there is onyl one bool arg expected
+                bools["copy"] = v
+                
+            elif isinstance(v, np.dtype): # there is only one dtype arg expected
+                dtypes["dtype"] = v
+
+            elif isinstance(v, str):
+                # there are 3 str args expected: name, file_origin and description; brrrr...
+                if is_path(v):
+                    # likely a file path name
+                    strings["file_origin"] = v
+                elif strings["name"] is None: # give precedence to name
+                    strings["name"] = v
+                else:
+                    strings["description"] = v
+                    
+            elif isinstance(v, dict):
+                if isinstance(v, ArrayDict): # only array_annotations are ArrayDict
+                    annots["array_annotations"] = v
+                    
+                elif isinstance(v, dict): # can be array_annotations or anotations; brrr...
+                    if len(v) == signal.shape[1]: # likely array annotations, too
+                        if annots["array_annotations"] is None:
+                            arr_ann = ArrayDict(signal.shape[1])
+                            for ka,va in v.items():
+                                arr_ann[ka] = va
+                            annots["array_annotations"] = arr_ann
+                        else:
+                            annots["annotations"] = v
+                            
+                    else:
+                        annots["annotations"] = v
+                        
+            elif isinstance(v, pq.Quantity):
+                if v.size == 1: # a scalar ; note signal is treated from the outset
+                    # precedence: units, time_units, t_start, sampling_period, sampling_rate
+                    if quants["time_units"] is None:
+                        quants["time_units"] = v.units
+                        
+                    elif domainargs["t_start"] is None:
+                        domainargs["t_start"] = v
+                        
+                    elif domainargs["sampling_period"] is None:
+                        domainargs["sampling_period"] = v
+                        
+                    elif domainargs["sampling_rate"] is None:
+                        domainargs["sampling_rate"] = v
+                        
+        #print("strings", strings)
+        #print("quants", quants)
+        #print("domainargs", domainargs)
+        #print("annots", annots)
+        #print("call_args", call_args)
+        
+        # let's checkout domainargs and units
+        # get sampling period & rate out of the way first
+        #s_rate = None
+        #s_per = None
+        #t_units = None
+        
+        
+        if isinstance(domainargs["sampling_period"], pq.Quantity):
+            #print("sampling_period", domainargs["sampling_period"])
+            if units_convertible(1/domainargs["sampling_period"], quants["time_units"]):
+                domainargs["sampling_rate"] = domainargs["sampling_period"]
+                domainargs["sampling_period"] = 1/domainargs["sampling_period"]
+                
+        if isinstance(domainargs["sampling_rate"], pq.Quantity):
+            if units_convertible(domainargs["sampling_rate"], quants["time_units"]):
+                domainargs["sampling_period"] = 1/domainargs["sampling_rate"]
+                
+        if all(isinstance(d, pq.Quantity) for d in (domainargs["t_start"], domainargs["sampling_period"])) :
+            if domainargs["t_start"] == 1/domainargs["sampling_period"]:
+                sr = domainargs["sampling_period"]
+                domainargs["sampling_period"] = domainargs["t_start"]
+                domainargs["sampling_rate"] = sr
+                domainargs["t_start"] = 0 * quants["time_units"]
+            
+        elif all(isinstance(d, pq.Quantity) for d in (domainargs["t_start"], domainargs["sampling_rate"])) :
+            if domainargs["t_start"] == 1/domainargs["sampling_rate"]:
+                domainargs["sampling_period"] = domainargs["t_start"]
+                domainargs["t_start"] = 0 * quants["time_units"]
+
+        DataObject.__init__(self, name=strings["name"], file_origin=strings["file_origin"], 
+                         description=strings["description"], 
+                         array_annotations=annots["array_annotations"], **annots["annotations"])
+        
+        self._origin = domainargs["t_start"]
+        self._sampling_period = domainargs["sampling_period"]
         
         self.__domain_name__ = name_from_unit(self.domain)
         
@@ -204,13 +329,16 @@ class DataSignal(neo.basesignal.BaseSignal):
         self.name               = getattr(obj, "name",          None)
         self.file_origin        = getattr(obj, "file_origin",   None)
         self.description        = getattr(obj, "description",   None)
+        #self.channel_index      = getattr(obj, "channel_index", None)
         self.segment            = getattr(obj, "segment",       None)
-        self.channel_index      = getattr(obj, "channel_index", None)
+        self.array_annotations  = getattr(obj, "array_annotations", None)
+        self.__domain_name__    = name_from_unit(self._origin)
     
     def __reduce__(self):
         return _new_DataSignal, (self.__class__, 
                                  np.array(self),
                                  self.units, 
+                                 self.domain.units,
                                  self.dtype, 
                                  True,
                                  self.origin, 
@@ -220,7 +348,8 @@ class DataSignal(neo.basesignal.BaseSignal):
                                  self.file_origin, 
                                  self.description,
                                  self.annotations,
-                                 self.channel_index,
+                                 self.array_annotations,
+                                 #self.channel_index,
                                  self.segment)
     
     def __deepcopy__(self, memo):
@@ -228,6 +357,7 @@ class DataSignal(neo.basesignal.BaseSignal):
         
         new_DS = cls(np.array(self), 
                      units=self.units, 
+                     domain_units = self.domain.units,
                      dtype=self.dtype,
                      origin=self._origin, 
                      sampling_period=self._sampling_period,
@@ -367,21 +497,6 @@ class DataSignal(neo.basesignal.BaseSignal):
     def nanrange(self, **kwargs):
         return self.nanmax(**kwargs) - self.nanmin(**kwargs)
     
-    #@property
-    #def index(self):
-        #return self._index
-    
-    #@index.setter
-    #def index(self, value):
-        #if value is None:
-            #self._index = 0
-            #return
-        
-        #if not isinstance(value, int):
-            #raise TypeError("Expecting an int; got %s instead" % type(value).__name__)
-        
-        #self._index = value
-        
     @property
     def origin(self):
         """The domain coordinate of the first data sample in the signal.
@@ -405,30 +520,32 @@ class DataSignal(neo.basesignal.BaseSignal):
             raise TypeError("Expecting a scalar quantity; got %s instead" % (type(value).__name__))
     
     @property
-    def domain_start(self):
-        return self.t_start
+    def domain_begin(self):
+        """Alias to self.origin
+        """
+        return self.origin
     
     @property
-    def domain_stop(self):
-        return self.t_stop
+    def domain_end(self):
+        """Alias to self.t_stop, which is an alias to self.domain[-1]
+        """
+        return self.origin + self.extent
     
     @property
     def t_start(self):
         """The domain coordinate of the first data sample in the signal.
-        A convenience equivalent of neo.AnalogSignal.t_start
+        Alias to self.origin; convenience equivalent of neo.AnalogSignal.t_start
         
-        Read-only; t_stop can ny be changed by altering sampling_rate or sampling_period
         """
-        return self._origin
+        return self.origin
     
     @property
     def t_stop(self):
         """The domain coordinate of the last data sample in the signal.
-        
+        Read-only; alias to self.domain_end
         A convenience equivalent of neo.AnalogSignal.t_stop
         """
-        
-        return self.domain[-1]
+        return self.domain_end
     
     @t_start.setter
     def t_start(self, value):
@@ -518,10 +635,22 @@ class DataSignal(neo.basesignal.BaseSignal):
     def domain_name(self, value):
         if isinstance(value, str) and len(value.strip()):
             self.__domain_name__ = value
+            
+    @property
+    def extent(self):
+        """The extent of this signal in its domain
+        """
+        return self.shape[0] / self.sampling_rate
+    
+    @property
+    def duration(self):
+        """Alias to self extent
+        """
+        return self.extent
     
     @property
     def domain(self):
-        """The domain coordinate for the data samples in the signal.
+        """The domain for the data samples in the signal.
         
         Equivalent to neo.AnalogSignal.times. Read-only.
         
@@ -537,11 +666,10 @@ class DataSignal(neo.basesignal.BaseSignal):
     
     @property
     def times(self):
-        """The domain coordinate for the data samples in the signal.
+        """The domain for the data samples in the signal.
+        Alias to self.domain
         
         Provided for api compatibility with neo.AnalogSignal
-        
-        Return self.domain
         
         """
         return self.domain
@@ -601,7 +729,7 @@ class DataSignal(neo.basesignal.BaseSignal):
                              sampling_rate=self.sampling_rate)
         
         obj._copy_data_complement(self)
-        #obj.channel_index = self.channel_index # FIXME TODO channel index functionality
+        #obj.channel_index = self.channel_index #
         #obj.segment = self.segment             # FIXME TODO parent container functionality
         obj.annotations.update(self.annotations)
 
@@ -770,26 +898,270 @@ class DataSignal(neo.basesignal.BaseSignal):
             
         return signal
 
-class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
+    def downsample(self, downsampling_factor, **kwargs):
+        """
+        Downsample the data of a signal.
+        This method reduces the number of samples of the AnalogSignal to a fraction of the
+        original number of samples, defined by `downsampling_factor`.
+        This method is a wrapper of scipy.signal.decimate and accepts the same set of keyword
+        arguments, except for specifying the axis of resampling, which is fixed to the first axis
+        here.
+
+        Parameters:
+        -----------
+        downsampling_factor: integer
+            Factor used for decimation of samples. Scipy recommends to call decimate multiple times
+            for downsampling factors higher than 13 when using IIR downsampling (default).
+
+        Returns:
+        --------
+        downsampled_signal: :class:`AnalogSignal`
+            New instance of a :class:`AnalogSignal` object containing the resampled data points.
+            The original :class:`AnalogSignal` is not modified.
+
+        Note:
+        -----
+        For resampling the signal with a fixed number of samples, see `resample` method.
+        """
+
+        if not HAVE_SCIPY:
+            raise ImportError('Decimating requires availability of scipy.signal')
+
+        # Resampling is only permitted along the time axis (axis=0)
+        if 'axis' in kwargs:
+            kwargs.pop('axis')
+
+        downsampled_data = scipy.signal.decimate(self.magnitude, downsampling_factor, axis=0,
+                                                 **kwargs)
+        downsampled_signal = self.duplicate_with_new_data(downsampled_data)
+
+        # since the number of channels stays the same, we can also copy array annotations here
+        downsampled_signal.array_annotations = self.array_annotations.copy()
+        downsampled_signal.sampling_rate = self.sampling_rate / downsampling_factor
+
+        return downsampled_signal
+
+    def resample(self, sample_count, **kwargs):
+        """
+        Resample the data points of the signal.
+        This method interpolates the signal and returns a new signal with a fixed number of
+        samples defined by `sample_count`.
+        This method is a wrapper of scipy.signal.resample and accepts the same set of keyword
+        arguments, except for specifying the axis of resampling which is fixed to the first axis
+        here, and the sample positions. .
+
+        Parameters:
+        -----------
+        sample_count: integer
+            Number of desired samples. The resulting signal starts at the same sample as the
+            original and is sampled regularly.
+
+        Returns:
+        --------
+        resampled_signal: :class:`DataSignal`
+            New instance of a :class:`DataSignal` object containing the resampled data points.
+            The original :class:`DataSignal` is not modified.
+
+        Note:
+        -----
+        For reducing the number of samples to a fraction of the original, see `downsample` method
+        """
+
+        if not HAVE_SCIPY:
+            raise ImportError('Resampling requires availability of scipy.signal')
+
+        # Resampling is only permitted along the time axis (axis=0)
+        if 'axis' in kwargs:
+            kwargs.pop('axis')
+        if 't' in kwargs:
+            kwargs.pop('t')
+
+        resampled_data, resampled_times = scipy.signal.resample(self.magnitude, sample_count,
+                                                                t=self.times, axis=0, **kwargs)
+
+        resampled_signal = self.duplicate_with_new_data(resampled_data)
+        resampled_signal.sampling_rate = (sample_count / self.shape[0]) * self.sampling_rate
+
+        # since the number of channels stays the same, we can also copy array annotations here
+        resampled_signal.array_annotations = self.array_annotations.copy()
+
+        return resampled_signal
+
+    def rectify(self, **kwargs):
+        """
+        Rectify the signal.
+        This method rectifies the signal by taking the absolute value.
+        This method is a wrapper of numpy.absolute() and accepts the same set of keyword
+        arguments.
+
+        Returns:
+        --------
+        resampled_signal: :class:`DataSignal`
+            New instance of a :class:`DataSignal` object containing the rectified data points.
+            The original :class:`DataSignal` is not modified.
+
+        """
+
+        # Use numpy to get the absolute value of the signal
+        rectified_data = np.absolute(self.magnitude, **kwargs)
+
+        rectified_signal = self.duplicate_with_new_data(rectified_data)
+
+        # the sampling rate stays constant
+        rectified_signal.sampling_rate = self.sampling_rate
+
+        # since the number of channels stays the same, we can also copy array annotations here
+        rectified_signal.array_annotations = self.array_annotations.copy()
+
+        return rectified_signal
+
+    def concatenate(self, *signals, overwrite:bool=False, padding:bool=False):
+        """
+        Concatenate multiple DataSignal objects across the domain axis.
+
+        Units, sampling_rate and number of signal traces must be the same
+        for all signals. Otherwise a ValueError is raised.
+        Note that timestamps of concatenated signals might shift in oder to
+        align the sampling times of all signals.
+
+        Parameters
+        ----------
+        signals: DataSignal objects
+            DataSignals that will be concatenated
+        overwrite : bool
+            If True, samples of the earlier (lower index in `signals`)
+            signals are overwritten by that of later (higher index in `signals`)
+            signals.
+            If False, samples of the later are overwritten by earlier signal.
+            Default: False
+        padding : bool, scalar quantity
+            Sampling values to use as padding in case signals do not overlap.
+            If False, do not apply padding. Signals have to align or
+            overlap. If True, signals will be padded using
+            np.NaN as pad values. If a scalar quantity is provided, this
+            will be used for padding. The other signal is moved
+            forward in time by maximum one sampling period to
+            align the sampling times of both signals.
+            Default: False
+
+        Returns
+        -------
+        signal: DataSignal
+            concatenated output signal
+        """
+
+        # Sanity of inputs
+        if not hasattr(signals, '__iter__'):
+            raise TypeError('signals must be iterable')
+        if not all([isinstance(a, DataSignal) for a in signals]):
+            raise TypeError('Entries of anasiglist have to be of type neo.DataSignal')
+        if len(signals) == 0:
+            return self
+
+        signals = [self] + list(signals)
+
+        # Check required common attributes: units, sampling_rate and shape[-1]
+        shared_attributes = ['units', 'sampling_rate']
+        attribute_values = [tuple((getattr(anasig, attr) for attr in shared_attributes))
+                            for anasig in signals]
+        # add shape dimensions that do not relate to time
+        attribute_values = [(attribute_values[i] + (signals[i].shape[1:],))
+                            for i in range(len(signals))]
+        if not all([attrs == attribute_values[0] for attrs in attribute_values]):
+            raise MergeError(
+                f'AnalogSignals have to share {shared_attributes} attributes to be concatenated.')
+        units, sr, shape = attribute_values[0]
+
+        # find gaps between Analogsignals
+        combined_time_ranges = self._concatenate_time_ranges(
+            [(s.t_start, s.t_stop) for s in signals])
+        missing_time_ranges = self._invert_time_ranges(combined_time_ranges)
+        if len(missing_time_ranges):
+            diffs = np.diff(np.asarray(missing_time_ranges), axis=1)
+        else:
+            diffs = []
+
+        if padding is False and any(diffs > signals[0].sampling_period):
+            raise MergeError(f'Signals are not continuous. Can not concatenate signals with gaps. '
+                             f'Please provide a padding value.')
+        if padding is not False:
+            logger.warning('Signals will be padded using {}.'.format(padding))
+            if padding is True:
+                padding = np.NaN * units
+            if isinstance(padding, pq.Quantity):
+                padding = padding.rescale(units).magnitude
+            else:
+                raise MergeError('Invalid type of padding value. Please provide a bool value '
+                                 'or a quantities object.')
+
+        t_start = min([a.t_start for a in signals])
+        t_stop = max([a.t_stop for a in signals])
+        n_samples = int(np.rint(((t_stop - t_start) * sr).rescale('dimensionless').magnitude))
+        shape = (n_samples,) + shape
+
+        # Collect attributes and annotations across all concatenated signals
+        kwargs = {}
+        common_annotations = signals[0].annotations
+        common_array_annotations = signals[0].array_annotations
+        for anasig in signals[1:]:
+            common_annotations = intersect_annotations(common_annotations, anasig.annotations)
+            common_array_annotations = intersect_annotations(common_array_annotations,
+                                                             anasig.array_annotations)
+
+        kwargs['annotations'] = common_annotations
+        kwargs['array_annotations'] = common_array_annotations
+
+        for name in ("name", "description", "file_origin"):
+            attr = [getattr(s, name) for s in signals]
+            if all([a == attr[0] for a in attr]):
+                kwargs[name] = attr[0]
+            else:
+                kwargs[name] = f'concatenation ({attr})'
+
+        conc_signal = DataSignal(np.full(shape=shape, fill_value=padding, dtype=signals[0].dtype),
+                                   sampling_rate=sr, t_start=t_start, units=units, **kwargs)
+
+        if not overwrite:
+            signals = signals[::-1]
+        while len(signals) > 0:
+            conc_signal.splice(signals.pop(0), copy=False)
+
+        return conc_signal
+
+    def _concatenate_time_ranges(self, time_ranges):
+        time_ranges = sorted(time_ranges)
+        new_ranges = time_ranges[:1]
+        for t_start, t_stop in time_ranges[1:]:
+            # time range are non continuous -> define new range
+            if t_start > new_ranges[-1][1]:
+                new_ranges.append((t_start, t_stop))
+            # time range is continuous -> extend time range
+            elif t_stop > new_ranges[-1][1]:
+                new_ranges[-1] = (new_ranges[-1][0], t_stop)
+        return new_ranges
+
+    def _invert_time_ranges(self, time_ranges):
+        i = 0
+        new_ranges = []
+        while i < len(time_ranges) - 1:
+            new_ranges.append((time_ranges[i][1], time_ranges[i + 1][0]))
+            i += 1
+        return new_ranges
+
+class IrregularlySampledDataSignal(BaseSignal):
     """Almost literal copy of the neo.IrregularlySampledSignal, accepting a domain other than time
     """
-    _single_parent_objects = ("Segment", "ChannelIndex") 
-    
+    _parent_objects = ('Segment',)
+    _parent_attrs = ('segment',)
     _quantity_attr = 'signal'
-    
-    _necessary_attrs = (('signal', pq.Quantity, 2),
-                        ('sampling_period', pq.Quantity, 0),
-                        ('origin', pq.Quantity, 0))
-    
+    _necessary_attrs = (('domain', pq.Quantity, 1), ('signal', pq.Quantity, 2))
+
     _recommended_attrs = neo.baseneo.BaseNeo._recommended_attrs
 
-    #"def" __new__(cls, domain, signal, units=None, domain_units=None, dtype=None, 
-                #copy=True, name=None, file_origin=None, description=None, 
-                #**annotations):
-        
-    def __new__(cls, domain, signal, units=None, domain_units=None, dtype=np.dtype("float64"), 
-                copy=True, name=None, file_origin=None, description=None, 
-                **annotations):
+    def __new__(cls, domain, signal, units=None, domain_units=None, time_units=None,
+                dtype=np.dtype("float64"), domain_dtype = np.dtype("float64"),
+                copy=True, name=None, file_origin=None, 
+                description=None, array_annotations=None, **annotations):
         
         if units is None:
             if not hasattr(signal, "units"):
@@ -804,9 +1176,11 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         if obj.ndim == 1:
             obj.shape = (-1,1)
 
-            
         if domain_units is None:
-            if hasattr(domain, "units"):
+            if isinstance(time_units, pq.Quantity):
+                domain_units = time_units
+
+            elif hasattr(domain, "units"):
                 domain_units = domain.units
                 
             else:
@@ -816,19 +1190,21 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
             if domain_units != domain.units:
                 domain = domain.rescale(domain_units)
                 
-        obj._domain = pq.Quantity(domain, units = domain_units,dtype=float, copy=copy)
+        obj._domain = pq.Quantity(domain, units = domain_units,
+                                  dtype=float, copy=copy)
                 
         obj.segment=None
-        obj.channelIndex=None
 
         return obj
                 
-    def __init__(self, domain, signal, units=None, domain_units=None, dtype=None,
-                 copy=True, name=None, file_origin=None, description=None,
-                 **annotations):
-        baseneo.BaseNeo.__init__(self, name=name, file_origin=file_origin,
-                                 description=description, **annotations)
-        
+    def __init__(self, domain, signal, units=None, domain_units=None, time_units=None,
+                 dtype=None, copy=True, name=None, file_origin=None, description=None,
+                 array_annotations=None, **annotations):
+        DataObject.__init__(self, name=name, file_origin=file_origin,
+                            description=description, 
+                            array_annotations=array_annotations,
+                            **annotations)
+
         self.__domain_name__ = name_from_unit(self._domain)
         
         if isinstance(name, str):
@@ -843,31 +1219,41 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
                                                    self.units,
                                                    self.domain.units,
                                                    self.dtype,
+                                                   self.domain.dtype,
                                                    True,
                                                    self.name,
                                                    self.file_origin,
                                                    self.description,
                                                    self.annotations,
+                                                   self.array_annotations,
+                                                   #self.channel_index,
                                                    self.segment,
-                                                   self.channel_index)
+                                                   )
     
     def __array_finalize__(self, obj):
         super(IrregularlySampledDataSignal, self).__array_finalize__(obj)
-        self._domain = getattr(obj, "_domain", None)
+        self._domain            = getattr(obj, "_domain", getattr(obj, "times", None))
         self.annotations        = getattr(obj, "annotations",   {})
         self.name               = getattr(obj, "name",          None)
         self.file_origin        = getattr(obj, "file_origin",   None)
         self.description        = getattr(obj, "description",   None)
         self.segment            = getattr(obj, "segment",       None)
-        self.channel_index      = getattr(obj, "channel_index", None)
-        self.__domain_name__    = name_from_unit(self._domain)
+        #self.channel_index      = getattr(obj, "channel_index", None)
+        self.array_annotations  = getattr(obj, "array_annotations", None)
+        if isinstance(self._domain, pq.Quantity):
+            self.__domain_name__    = name_from_unit(self._domain)
+        else:
+            self.__domain_name__    = "Dimensionless"
         
     def __deepcopy__(self, memo):
         cls = self.__class__
         new_signal = cls(self.domain, np.array(self), units=self.units,
                          domain_units=self.domain.units, dtype=self.dtype,
-                         t_start=self.t_start, name=self.name,
-                         file_origin=self.file_origin, description=self.description)
+                         domain_dtype=self.domain.dtype,
+                         name=self.name, file_origin=self.file_origin, 
+                         description=self.description,
+                         array_annotations=self.array_annotations,
+                         annotations = self.annotations)
         new_signal.__dict__.update(self.__dict__)
         memo[id(self)] = new_signal
         for k, v in self.__dict__.items():
@@ -1026,15 +1412,71 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         TODO interpolation
         """
         if interpolation is None:
-            return (self[:-1] * self.sampling_intervals.reshape(-1, 1)).sum() / self.duration
+            return np.sum(self[:-1] * self.sampling_intervals.reshape(-1, 1), axis=1) / self.duration
+        else:
+            raise NotImplementedError
+        
+    def nanmean(self, interpolation=None):
+        """
+        TODO: Interpolation
+        """
+        if interpolation is None:
+            return np.nansum(self[:-1] * self.sampling_intervals.reshape(-1, 1), axis=1) / self.duration
+            
         else:
             raise NotImplementedError
 
-    def resample(self, at=None, interpolation=None):
+    def resample(self, sample_count, **kwargs):
+        """
+        Resample the data points of the signal.
+        This method interpolates the signal and returns a new signal with a fixed number of
+        samples defined by `sample_count`.
+        This function is a wrapper of scipy.signal.resample and accepts the same set of keyword
+        arguments, except for specifying the axis of resampling which is fixed to the first axis
+        here, and the sample positions. .
+
+        Parameters:
+        -----------
+        sample_count: integer
+            Number of desired samples. The resulting signal starts at the same sample as the
+            original and is sampled regularly.
+
+        Returns:
+        --------
+        resampled_signal: :class:`DataSignal`
+            New instance of a :class:`DataSignal` object containing the resampled data points.
+            The original :class:`IrregularlySampledDataSignal` is not modified.
+        """
+
+        if not HAVE_SCIPY:
+            raise ImportError('Resampling requires availability of scipy.signal')
+
+        # Resampling is only permitted along the time axis (axis=0)
+        if 'axis' in kwargs:
+            kwargs.pop('axis')
+        if 't' in kwargs:
+            kwargs.pop('t')
+
+        resampled_data, resampled_times = scipy.signal.resample(self.magnitude, sample_count,
+                                                                t=self.times.magnitude,
+                                                                axis=0, **kwargs)
+
+        new_sampling_rate = (sample_count - 1) / self.duration
+        resampled_signal = DataSignal(resampled_data, units=self.units, dtype=self.dtype,
+                                        t_start=self.t_start,
+                                        sampling_rate=new_sampling_rate,
+                                        array_annotations=self.array_annotations.copy(),
+                                        **self.annotations.copy())
+
+        # since the number of channels stays the same, we can also copy array annotations here
+        resampled_signal.array_annotations = self.array_annotations.copy()
+        return resampled_signal
+
+    def resample_interp(self, at=None, interpolation=None):
         '''
         TODO
-        Resample the signal, returning either an :class:`AnalogSignal` object
-        or another :class:`IrregularlySampledSignal` object.
+        Resample the signal, returning either an :class:`DataSignal` object
+        or another :class:`IrregularlySampledDataSignal` object.
 
         Arguments:
             :at: either a :class:`Quantity` array containing the times at
@@ -1047,6 +1489,28 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         # further interpolation methods could be added
         raise NotImplementedError
     
+    def time_shift(self, t_shift):
+        """
+        Shifts a :class:`IrregularlySampledSignal` to start at a new time.
+
+        Parameters:
+        -----------
+        t_shift: Quantity (time)
+            Amount of time by which to shift the :class:`IrregularlySampledSignal`.
+
+        Returns:
+        --------
+        new_sig: :class:`SpikeTrain`
+            New instance of a :class:`IrregularlySampledSignal` object
+            starting at t_shift later than the original :class:`IrregularlySampledSignal`
+            (the original :class:`IrregularlySampledSignal` is not modified).
+        """
+        new_sig = deepcopy(self)
+
+        new_sig.times += t_shift
+
+        return new_sig
+
     @property
     def sampling_intervals(self):
         '''
@@ -1054,15 +1518,15 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
 
         (:attr:`times[1:]` - :attr:`times`[:-1])
         '''
-        return self.times[1:] - self.times[:-1]
+        return self.domain[1:] - self.domain[:-1]
 
     @property
-    def domain_start(self):
-        return self.t_start
+    def domain_begin(self):
+        return self.domain[0]
     
     @property
-    def domain_stop(self):
-        return self.t_stop
+    def domain_end(self):
+        return self.domain[-1]
     
     @property
     def t_start(self):
@@ -1072,7 +1536,7 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         Read-only
         
         """
-        return self._origin
+        return self.domain_begin
     
     @property
     def t_stop(self):
@@ -1084,8 +1548,7 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         
         """
         
-        return self.domain[-1]
-    
+        return self.domain_end
     
     def range(self, **kwargs):
         return self.max(**kwargs) - self.min(**kwargs)
@@ -1093,21 +1556,6 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
     def nanrange(self, **kwargs):
         return self.nanmax(**kwargs) - self.nanmin(**kwargs)
     
-    #@property
-    #def index(self):
-        #return self._index
-    
-    #@index.setter
-    #def index(self, value):
-        #if value is None:
-            #self._index = 0
-            #return
-        
-        #if not isinstance(value, int):
-            #raise TypeError("Expecting an int; got %s instead" % type(value).__name__)
-        
-        #self._index = value
-        
     @property
     def extent(self):
         """The extent of the data domain of the signal, as a quantity.
@@ -1118,13 +1566,17 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         period or sampling rate.
         
         """
-        return self.shape[0] * self.sampling_period
+        return self.domain[-1] - self.domain[0]
+    
+    @property
+    def duration(self):
+        return self.extent
     
     @property
     def end(self):
         """The equivalent of neo.AnalogSignal.t_stop
         """
-        return self.origin + self.extent
+        return self.domain[0] + self.extent
     
     @property
     def name(self):
@@ -1140,7 +1592,7 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         """A brief description of the domain name
         """
         if self.__domain_name__ is None:
-            self.__domain_name__ = name_from_unit(self.domain)
+            self.__domain_name__ = name_from_unit(self.domain) if isinstance(self.domain, pq.Quantity) else "Dimensionless"
             
         return self.__domain_name__
     
@@ -1256,7 +1708,7 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         obj = self.__class__(domain=self.domain, signal=signal, units=to_u)
         
         obj._copy_data_complement(self)
-        #obj.channel_index = self.channel_index # FIXME TODO channel index functionality
+        #obj.channel_index = self.channel_index 
         #obj.segment = self.segment             # FIXME TODO parent container functionality
         obj.annotations.update(self.annotations)
 
@@ -1264,12 +1716,11 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
 
     def duplicate_with_new_array(self, signal):
         '''
-        Create a new :class:`AnalogSignal` with the same metadata
+        Create a new :class:`IrregularlySampledDataSignal` with the same metadata
         but different data
         '''
         #signal is the new signal
-        obj = self.__class__(signal=signal, units=self.units,
-                             sampling_rate=self.sampling_rate)
+        obj = self.__class__(domain=signal.domain, signal=signal, units=self.units)
         
         obj._copy_data_complement(self)
         obj.annotations.update(self.annotations)
@@ -1278,26 +1729,31 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
 
     def _check_consistency(self, other):
         '''
-        Check if the attributes of another :class:`AnalogSignal`
+        Check if the attributes of another :class:`IrregularlySampledDataSignal`
         are compatible with this one.
         '''
         if isinstance(other, IrregularlySampledDataSignal):
-            for attr in "origin", "sampling_rate", "sampling_period":
+            for attr in ("domain", "units", "domain_units"):
                 if getattr(self, attr) != getattr(other, attr):
                     raise ValueError("Inconsistent values of %s" % attr)
             # how to handle name and annotations?
 
     def _copy_data_complement(self, other):
         '''
-        Copy the metadata from another :class:`AnalogSignal`.
+        Copy the metadata from another :class:`IrregularlySampledDataSignal`.
         '''
-        for attr in ("origin", "sampling_rate", "sampling_period", "name", "file_origin",
-                     "description", "annotations"):
-            setattr(self, attr, getattr(other, attr, None))
-            
-        #for attr in ("origin", "sampling_rate", "sampling_period", "name", "file_origin",
-                     #"description", "annotations", "_domain"):
-            #setattr(self, attr, getattr(other, attr, None))
+        #for attr in ("origin", "name", "file_origin", "domain", "units", "domain_units",
+                     #"description", "annotations", "array_annotations"):
+        for attr in ("origin", "name", "file_origin", "description", 
+                     "annotations", "array_annotations"):
+            setattr(self, attr, deepcopy(getattr(other, attr, None)))
+            #print("attr", attr)
+            #if attr == "units":
+                
+            #elif attr == "domain_units":
+                
+                #setattr(self, attr, deepcopy(getattr(other, attr, pq.dimensionless)))
+            #else:
             
     def interval(self, start, stop):
         '''The equivalent of neo.AnalogSignal.time_slice.
@@ -1348,64 +1804,143 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         
         return self.interval(start, stop)
 
-    #"def" merge(self, other):
-        #'''
-        #Merge another :class:`DataSignal` into this one.
+    def concatenate(self, other, allow_overlap=False):
+        '''
+        Combine this and another signal along the time axis.
 
-        #The :class:`DataSignal` objects are concatenated horizontally
-        #(column-wise, :func:`np.hstack`).
+        The signal objects are concatenated vertically
+        (row-wise, :func:`np.vstack`). Patching can be
+        used to combine signals across segments.
+        Note: Only array annotations common to
+        both signals are attached to the concatenated signal.
 
-        #If the attributes of the two :class:`DataSignal` are not
-        #compatible, an Exception is raised.
-        #'''
-        #if self.sampling_rate != other.sampling_rate:
-            #raise MergeError("Cannot merge, different sampling rates")
-        
-        #if self.origin != other.origin:
-            #raise MergeError("Cannot merge, different origins")
-        
-        ## NOTE: FIXME TODO implement parent container functionality
-        ##
+        If the attributes of the two signal are not
+        compatible, an Exception is raised.
 
-        #if hasattr(self, "lazy_shape"):
-            #if hasattr(other, "lazy_shape"):
-                #if self.lazy_shape[0] != other.lazy_shape[0]:
-                    #raise MergeError("Cannot merge signals of different length.")
-                
-                #merged_lazy_shape = (self.lazy_shape[0], self.lazy_shape[1] + other.lazy_shape[1])
-                
-            #else:
-                #raise MergeError("Cannot merge a lazy object with a real object.")
-            
-        #if other.units != self.units:
-            #other = other.rescale(self.units)
-            
-        #stack = np.hstack(map(np.array, (self, other)))
-        
-        #kwargs = {}
-        
-        #for name in ("name", "description", "file_origin"):
-            #attr_self = getattr(self, name)
-            #attr_other = getattr(other, name)
-            #if attr_self == attr_other:
-                #kwargs[name] = attr_self
-            #else:
-                #kwargs[name] = "merge(%s, %s)" % (attr_self, attr_other)
-                
-        #merged_annotations = neo.core.baseneo.merge_annotations(self.annotations,
-                                               #other.annotations)
-        #kwargs.update(merged_annotations)
-        
-        #signal = DataSignal(stack, units=self.units, dtype=self.dtype,
-                              #copy=False, origin=self.origint,
-                              #sampling_rate=self.sampling_rate,
-                              #**kwargs)
-        
-        ## NOTE: 2017-11-15 23:34:23 FIXME TODO
-        ## implement channel index functionality
-        ##
+        Required attributes of the signal are used.
 
-        #if hasattr(self, "lazy_shape"):
-            #signal.lazy_shape = merged_lazy_shape
-            
-        #return signal
+        Parameters
+        ----------
+        other : neo.BaseSignal
+            The object that is merged into this one.
+        allow_overlap : bool
+            If false, overlapping samples between the two
+            signals are not permitted and an ValueError is raised.
+            If true, no check for overlapping samples is
+            performed and all samples are combined.
+
+        Returns
+        -------
+        signal : neo.IrregularlySampledDataSignal
+            Signal containing all non-overlapping samples of
+            both source signals.
+
+        Raises
+        ------
+        MergeError
+            If `other` object has incompatible attributes.
+        '''
+
+        for attr in self._necessary_attrs:
+            if not (attr[0] in ['signal', 'times', 't_start', 't_stop', 'times']):
+                if getattr(self, attr[0], None) != getattr(other, attr[0], None):
+                    raise MergeError(
+                        "Cannot concatenate these two signals as the %s differ." % attr[0])
+
+        if hasattr(self, "lazy_shape"):
+            if hasattr(other, "lazy_shape"):
+                if self.lazy_shape[-1] != other.lazy_shape[-1]:
+                    raise MergeError("Cannot concatenate signals as they contain"
+                                     " different numbers of traces.")
+                merged_lazy_shape = (self.lazy_shape[0] + other.lazy_shape[0], self.lazy_shape[-1])
+            else:
+                raise MergeError("Cannot concatenate a lazy object with a real object.")
+        if other.units != self.units:
+            other = other.rescale(self.units)
+
+        new_times = np.hstack((self.times, other.times))
+        sorting = np.argsort(new_times)
+        new_samples = np.vstack((self.magnitude, other.magnitude))
+
+        kwargs = {}
+        for name in ("name", "description", "file_origin"):
+            attr_self = getattr(self, name)
+            attr_other = getattr(other, name)
+            if attr_self == attr_other:
+                kwargs[name] = attr_self
+            else:
+                kwargs[name] = "merge({}, {})".format(attr_self, attr_other)
+        merged_annotations = merge_annotations(self.annotations, other.annotations)
+        kwargs.update(merged_annotations)
+
+        kwargs['array_annotations'] = intersect_annotations(self.array_annotations,
+                                                            other.array_annotations)
+
+        if not allow_overlap:
+            if max(self.t_start, other.t_start) <= min(self.t_stop, other.t_stop):
+                raise ValueError('Can not combine signals that overlap in time. Allow for '
+                                 'overlapping samples using the "no_overlap" parameter.')
+
+        t_start = min(self.t_start, other.t_start)
+        t_stop = max(self.t_start, other.t_start)
+
+        signal = IrregularlySampledDataSignal(signal=new_samples[sorting], times=new_times[sorting],
+                                          units=self.units, dtype=self.dtype, copy=False,
+                                          t_start=t_start, t_stop=t_stop, **kwargs)
+        signal.segment = None
+
+        if hasattr(self, "lazy_shape"):
+            signal.lazy_shape = merged_lazy_shape
+
+        return signal
+    
+    def merge(self, other):
+        '''
+        Merge another signal into this one.
+
+        The signal objects are concatenated horizontally
+        (column-wise, :func:`np.hstack`).
+
+        If the attributes of the two signals are not
+        compatible, an Exception is raised.
+
+        Required attributes of the signal are used.
+        '''
+
+        if not np.array_equal(self.times, other.times):
+            raise MergeError("Cannot merge these two signals as the sample times differ.")
+
+        if self.segment != other.segment:
+            raise MergeError(
+                "Cannot merge these two signals as they belong to different segments.")
+        if hasattr(self, "lazy_shape"):
+            if hasattr(other, "lazy_shape"):
+                if self.lazy_shape[0] != other.lazy_shape[0]:
+                    raise MergeError("Cannot merge signals of different length.")
+                merged_lazy_shape = (self.lazy_shape[0], self.lazy_shape[1] + other.lazy_shape[1])
+            else:
+                raise MergeError("Cannot merge a lazy object with a real object.")
+        if other.units != self.units:
+            other = other.rescale(self.units)
+        stack = np.hstack((self.magnitude, other.magnitude))
+        kwargs = {}
+        for name in ("name", "description", "file_origin"):
+            attr_self = getattr(self, name)
+            attr_other = getattr(other, name)
+            if attr_self == attr_other:
+                kwargs[name] = attr_self
+            else:
+                kwargs[name] = "merge({}, {})".format(attr_self, attr_other)
+        merged_annotations = merge_annotations(self.annotations, other.annotations)
+        kwargs.update(merged_annotations)
+
+        signal = self.__class__(self.times, stack, units=self.units, dtype=self.dtype,
+                                copy=False, **kwargs)
+        signal.segment = self.segment
+        signal.array_annotate(**self._merge_array_annotations(other))
+
+        if hasattr(self, "lazy_shape"):
+            signal.lazy_shape = merged_lazy_shape
+
+        return signal
+

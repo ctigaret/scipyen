@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Module with utilities for an external IPython kernel.
-To be used on the client side (i.e. Scipyen app side)
+To be used on the client side (i.e. Scipyen app side).
+Contains functions and types used ot communicate with the remote kernel via its
+messaging API.
 """
 # on the client side, in a received execute_reply message the keys of
 # msg["content"]["user_expressions"] are identical to those in the
@@ -70,23 +72,94 @@ from core.traitcontainers import DataBag
 #from contextlib import contextmanager
 #print(sys.path)
 
-__module_path__ = os.path.abspath(os.path.dirname(__file__))
+__module_path__ = os.path.abspath(os.path.dirname(__file__)) # this should be ending in "/core"
+
+__scipyen_path__ =  os.path.dirname(__module_path__)
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-nrn_ipython_initialization_file = os.path.join(os.path.dirname(__module_path__),"neuron_python", "nrn_ipython.py")
-nrn_ipython_initialization_cmd = "".join(["run -i -n ", nrn_ipython_initialization_file, " 'gui'"])
+__virtual_env_dir__ = os.environ.get("VIRTUAL_ENV", None)
 
-init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, importlib",
-                 "import traceback, keyword, inspect, itertools, functools, collections",
-                 "import signal, pickle, json, csv",
-                 "from importlib import reload",
-                 "".join(["sys.path.insert(2, '", os.path.dirname(__module_path__), "')"]),
-                 "from core import extipyutils_host as hostutils",
+if isinstance(__virtual_env_dir__, str) and len(__virtual_env_dir__.strip()):
+    __virtual_site_packages__ = os.path.join(__virtual_env_dir__, "lib", "python%i.%i" % sys.version_info[0:2], "site-packages")
+    
+else:
+    __virtual_site_packages__ = None
+    
+# initialization script for ALL external IPython consoles
+# private: call indirectly via init_commands!
+_ext_ipython_initialization_file = os.path.join(__module_path__, "extipy_init.py")
+_ext_ipython_initialization_cmd = " ".join(["get_ipython().run_cell(", "'run -i -n", _ext_ipython_initialization_file, "')"])
+
+#print("_ext_ipython_initialization_cmd", _ext_ipython_initialization_cmd)
+
+# initialization script for NEURON in external ipython process
+# only called when launching a NEURON external console
+# expected to be passed as 'code' parameter to tab with frontend factories in 
+# ExternalIPython / ExternalConsolewindow!
+nrn_ipython_initialization_file = os.path.join(os.path.dirname(__module_path__),"neuron_python", "nrn_ipython.py")
+nrn_ipython_initialization_cmd = " ".join(["run -i -n", nrn_ipython_initialization_file, " 'gui'"])
+
+# NOTE: 2021-01-14 12:12:11
+# the last two lines in the init_commands make these two modules available for 
+# importing in the "remote" kernel
+# TODO: 2021-01-14 12:18:45
+# figure out how to use Qt5 Agg in the external ipython (mpl.use("Qt5Agg") crashes
+# the kernel when a mpl figure is shown)
+# for now stick with inline figures
+init_commands = [
+    "import sys, os, io, warnings, numbers, types, typing, re, importlib",
+    "import traceback, keyword, inspect, itertools, functools, collections",
+    ]
+if __virtual_site_packages__:
+    init_commands.append("".join(["sys.path.insert(2, '", __virtual_site_packages__, "')"]))
+
+if os.path.isfile(_ext_ipython_initialization_file):
+    init_commands.append(_ext_ipython_initialization_cmd)
+    
+init_commands.extend(
+    [
+    "import signal, pickle, json, csv",
+    "import numpy as np",
+    "import scipy",
+    "import pandas as pd",
+    "import seaborn as sb",
+    "from importlib import reload",
+    "from pprint import pprint",
+    "import matplotlib as mpl",
+    "mpl.rcParams['savefig.format'] = 'svg'",
+    "mpl.rcParams['xtick.direction'] = 'in'",
+    "mpl.rcParams['ytick.direction'] = 'in'",
+    "from matplotlib import pyplot as plt",
+    "from matplotlib import cm",
+    "import matplotlib.mlab as mlb",
+    "mpl.use('Qt5Agg')",
+    "".join(["sys.path.insert(2, '", __scipyen_path__, "')"]),
+    "from core import extipyutils_host as hostutils",
+    ])
+    
+#init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, importlib",
+                 #"import traceback, keyword, inspect, itertools, functools, collections",
+                 #"import signal, pickle, json, csv",
+                 #"import numpy as np",
+                 #"import scipy",
+                 #"import pandas as pd",
+                 #"import seaborn as sb",
+                 #"from importlib import reload",
+                 #"from pprint import pprint",
+                 #"import matplotlib as mpl",
+                 #"mpl.rcParams['savefig.format'] = 'svg'",
+                 #"mpl.rcParams['xtick.direction'] = 'in'",
+                 #"mpl.rcParams['ytick.direction'] = 'in'",
+                 #"from matplotlib import pyplot as plt",
+                 #"from matplotlib import cm",
+                 #"import matplotlib.mlab as mlb",
+                 #"".join(["sys.path.insert(2, '", os.path.dirname(__module_path__), "')"]),
+                 #"from core import extipyutils_host as hostutils",
                  
-                 #"from IPython.lib.deepreload import reload as dreload",
-                 #"sys.path=['" + sys.path[0] +"'] + sys.path",
-                 ]
+                 ##"from IPython.lib.deepreload import reload as dreload",
+                 ##"sys.path=['" + sys.path[0] +"'] + sys.path",
+                 #]
 
 
 
@@ -97,6 +170,34 @@ class ForeignCall(DataBag):
     kernel_client.execute(*call())
     
     kernel_client.execute(**call.dict())
+    
+    NOTE: 2021-01-14 16:55:36
+    The user_expression dict is a str:str mapping used to serialize data 
+    generated in the remote kernel so that it is captured in the Scipyen workspace.
+    
+    The serialization occurs via JSON (as ascii data), optionally pickled.
+    
+    CAUTION: Not all Python objects can be pickled - in particular some Qt objects
+    (e.g., widgets, or from the QGraphics framework) cannot be pickled.
+    
+    Also, pickling/unpickling of user-defined data types depends on the modules
+    defining the data type being imported in both the remote and local (Scipyen's)
+    IPython kernels.
+    
+    The keys in user_expressions are name of the variables as they are to appear
+    in Scipyen's user workspace. 
+    
+    The values are str which are going to be evaluated in the calling namespace, 
+    or treated as a byte stream of pickled data, when the key is prefixed with 
+    "pickled_"; in the latter case, the data will be "unpickled" at the receiving
+    end (see unpack_shell_channel_data() in this module).
+    
+    TODO: not used: The user_expressions may contain the special keyword __REDIRECT__ which must
+    be mapped to either "True" or "False"
+    
+    When present and mapped to "True", then the variables returned by the 
+    user_expressions mechanism will be returned to the caller's namespace instead
+    of being exported to Scipyen's user workspace.
     
     """
     def __init__(self, code="", silent=True, store_history=False, user_expressions=None,
@@ -262,11 +363,11 @@ def define_foreign_data_props_getter_fun_str(dataname:str, namespace:str="Intern
     """Defines a function to retieve object properties in the foreign namespace.
     
     The function is wrapped by a context manager so that any module imports are
-    are not reflected in the foreign namespace.
+    are not reflected in the foreign namespace. - is this true !?
     
     The function should be removed from the foreign ns after use.
     """
-    return "\n".join(["@hostutils.contextExecutor()", # core.extipyutils_host is imported remotely as hostutils
+    return "\n".join(["@hostutils.ContextExecutor()", # core.extipyutils_host is imported remotely as hostutils
     "def f(objname, obj):",                           # use regular function wrapped in a context manager
     "    from core.utilities import summarize_object_properties",
     "    return summarize_object_properties(objname, obj, namespace='%s')" % namespace,
@@ -327,7 +428,7 @@ def cmds_get_foreign_data_props(dataname:str, namespace:str="Internal") -> list:
     
     ##### BEGIN variant 3 - no joy - remote kernel reports attribute error __enter__
     # when using a generator instead of a function -- why ??!
-    #cmd1 = "\n".join(["@hostutils.contextExecutor()", # core.extipyutils_host is imported remotely as hostutils
+    #cmd1 = "\n".join(["@hostutils.ContextExecutor()", # core.extipyutils_host is imported remotely as hostutils
     #"def f_gen(objname, obj):",             # use a generator func
     #"    from core.utilities import summarize_object_properties",
     #"    yield summarize_object_properties(objname, obj)",
@@ -353,7 +454,7 @@ def cmds_get_foreign_data_props2(dataname:str, namespace:str="Internal") -> list
     # passed as code , not as part of user_expressions)
     # a bit more convoluted, as it creates sub_special_%(dataname) in the foreign namespace
     special = "properties_of"
-    sub_special = "obj_props_"
+    sub_special = "obj_props"
     
      # defines a generator fcn decorated with contextmanager
     cmd1 = define_foreign_data_props_getter_gen_str(dataname, namespace)
@@ -423,7 +524,7 @@ def cmd_copy_from_foreign(varname:str, as_call=True) -> typing.Union[ForeignCall
     
     Once captured in the "execute_reply" message, the variable can be deserialized
     in Scipyen's workspace, by passing the received "execute_reply" message to the 
-    using unpack_data_recvd_on_shell_chnl() function.
+    using unpack_shell_channel_data() function.
     
     If as_call is True:
         A ForeignCall object with user_expression set to the dict as explained above.
@@ -434,7 +535,7 @@ def cmd_copy_from_foreign(varname:str, as_call=True) -> typing.Union[ForeignCall
     
     To fetch several variables use cmd_copies_from_foreign().
     
-    See also unpack_data_recvd_on_shell_chnl.
+    See also unpack_shell_channel_data.
     
     For details about messaging in Jupyter see:
     
@@ -487,14 +588,14 @@ def cmd_copies_from_foreign(*args, as_call=True) -> typing.Union[ForeignCall, di
     The fetched variables are shuttled back into client code in serialized form 
     (pickled str bytes) via the "execute_reply" shell channel message. From there
     variables are recovered by passing the "execute_reply" message to the 
-    unpack_data_recvd_on_shell_chnl() function.
+    unpack_shell_channel_data() function.
     
     When as_call is true (default):
         A ForeignCall with the user_expressions set to the dict with structure
         as explained above.
     
     
-    See also unpack_data_recvd_on_shell_chnl.
+    See also unpack_shell_channel_data.
     
     For details about messaging in Jupyter see:
     
@@ -536,7 +637,7 @@ def cmd_copy_to_foreign(dataname, data:typing.Any) -> str:
     pickle_str = str(pickle.dumps({dataname:data}))
     #print("cmd_copy_to_foreign: pickle_str = %s" % pickle_str)
     
-    prepper_cmd="\n".join(["@hostutils.contextExecutor()",
+    prepper_cmd="\n".join(["@hostutils.ContextExecutor()",
     "def f(picklebytes):",
     "   data = pickle.loads(eval(str(picklebytes)))",
     "   get_ipython().user_ns.update(data)"])
@@ -550,20 +651,13 @@ def cmd_copy_to_foreign(dataname, data:typing.Any) -> str:
     exec_calls.append(ForeignCall(code = "del f"))
     
     return exec_calls
-    #unpickler_cmd = "".join([__unpickled_data__, "=", "pickle.loads(eval(str(", pickle_str, ")))"])
-    #assigner_cmd = "".join
-    
-    #if as_call:
-        #return {"code":cmd, "silent":True, "store_history":False, "user_expressions":None}
-    
-    #return cmd
-    
     
 def cmd_foreign_namespace_listing(namespace:str="Internal", as_call=True) -> dict:
     """Creates a user_expression containing the variable names in a foreign namespace.
     """
     
     expr = {"ns_listing_of_%s" % namespace : "dir()"}
+    #expr = {"ns_listing_of_%s" % namespace.replace(" ", "_") : "dir()"}
     
     if as_call:
         return ForeignCall(user_expressions = expr)
@@ -578,22 +672,13 @@ def cmd_foreign_shell_ns_listing(namespace:str="Internal", as_call=True) -> dict
     
     # NOTE 2020-07-29 22:51:02: WRONG: the value of "ns_listing_of_%s" % namespace
     # must be a str
-    #expr = {"ns_listing_of_%s" % namespace : {"user_ns":"[k for k in get_ipython().user_ns.keys()",
-                                              #"user_ns_hidden": "[k for k in get_ipython().user_ns_hidden.keys()]"}}
+    #ue1 = "{'user_ns':set([k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys() and not inspect.ismodule(get_ipython().user_ns[k]) and not k.startswith('_') ])}"
     
-    ue1 = "{'user_ns':set([k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys() and not inspect.ismodule(get_ipython().user_ns[k]) and not k.startswith('_') ])}"
-    #ue1 = ["{'user_ns':'[k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys() and not k.startswith(",
-           #'"_"',
-           #")]'}"]
-    #ue1 = "{'user_ns':'[k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys()]'}"
-    #ue2 = "'user_ns_hidden': '[k for k in get_ipython().user_ns_hidden.keys()]'}"
+    # NOTE: allow listing of imported modules!
+    ue1 = "{'user_ns':set([k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys() and not k.startswith('_') ])}"
     
-    
-    #expr = {"ns_listing_of_%s" % namespace : "".join([ue1, ue2])}
-    #expr = {"ns_listing_of_%s" % namespace : "".join(ue1)}
     expr = {"ns_listing_of_%s" % namespace : ue1}
-    
-    #expr = {"ns_listing_of_%s" % namespace : "get_ipython().user_ns"}
+    #expr = {"ns_listing_of_%s" % namespace.replace(" ", "_") : ue1}
     
     if as_call:
         return ForeignCall(user_expressions = expr)
@@ -603,7 +688,7 @@ def cmd_foreign_shell_ns_listing(namespace:str="Internal", as_call=True) -> dict
 #### END call generators
 
 
-def unpack_data_recvd_on_shell_chnl(msg:dict) -> dict:
+def unpack_shell_channel_data(msg:dict) -> dict:
     """Extracts data shuttled from the remote kernel via " execute_reply" message.
     
     The data are present as text/plain mime type data in the received execute_reply
@@ -644,11 +729,10 @@ def unpack_data_recvd_on_shell_chnl(msg:dict) -> dict:
     #
     # "properties_of_%s"    (varname)
     #
-    # "ns_listing_of_%s"    (kernel_tab_name)
+    # "ns_listing_of_%s"    (workspace_name)
     #
     # ATTENTION The specials are set by the functions than generate the commands
     # generating the user_expressions dictionaries.
-    
     
     ret = dict()
     # peel-off layers one by one so we can always be clear of what this does
@@ -668,21 +752,21 @@ def unpack_data_recvd_on_shell_chnl(msg:dict) -> dict:
                 ret.update(data_dict)
                 
             
-            elif value_status == "error":
-                ret.update({"error_%s_%s" % (key, msg["tab"].replace(" ", "_")): {"ename":value["ename"],
-                                               "evalue": value["evalue"],
-                                               "traceback": value["traceback"]}})
+            #elif value_status == "error":
+                #ret.update({"error_%s_%s" % (key, msg["workspace_name"]): {"ename":value["ename"],
+                                               #"evalue": value["evalue"],
+                                               #"traceback": value["traceback"]}})
                 
-            else:
-                ret.update({"%s_%s_%s" % (value_status, key, msg["tab".replace(" ", "_")]): value_status})
+            #else:
+                #ret.update({"%s_%s_%s" % (value_status, key, msg["workspace_name"]): value_status})
                     
-    elif msg_status == "error":
-        ret.update({"error_%s_%s" % (msg["msg_type"], msg["tab"].replace(" ","_")): {"ename": msg["content"]["ename"],
-                                                   "evalue": msg["content"]["evalue"],
-                                                   "traceback": msg["content"]["traceback"]}})
+    #elif msg_status == "error":
+        #ret.update({"error_%s_%s" % (msg["msg_type"], msg["workspace_name"]): {"ename": msg["content"]["ename"],
+                                                   #"evalue": msg["content"]["evalue"],
+                                                   #"traceback": msg["content"]["traceback"]}})
         
-    else:
-        ret.update({"%s_%s_%s" % (msg_status, msg["msg_type"], msg["tab"].replace(" ", "_")): msg_status})
+    #else:
+        #ret.update({"%s_%s_%s" % (msg_status, msg["msg_type"], msg["workspace_name"]): msg_status})
     
     return ret
 

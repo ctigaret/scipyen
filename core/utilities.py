@@ -2,27 +2,68 @@
 '''
 Various utilities
 '''
-import traceback, re, itertools, time, typing, warnings, numbers
-from sys import getsizeof
-from numpy import ndarray
+import traceback, re, itertools, functools, time, typing, warnings, operator, inspect
+import random, math
+from numbers import Number
+from sys import getsizeof, stderr
+from copy import (copy, deepcopy,)
+from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
+                     isgeneratorfunction, iscoroutinefunction,
+                     iscoroutine, isawaitable, isasyncgenfunction,
+                     isasyncgen, istraceback, isframe, 
+                     isabstract, ismethoddescriptor, isdatadescriptor,
+                     isgetsetdescriptor, ismemberdescriptor,
+                     signature,
+                     )
+from functools import (partial, partialmethod, reduce, singledispatch)
+from itertools import chain
+import collections
+import collections.abc
+from collections import deque, OrderedDict
+import numpy as np
+from neo.core.dataobject import DataObject as NeoDataObject
+from neo.core.container import Container as NeoContainer
+import pandas as pd
+import quantities as pq
+import vigra
 
-from .prog import safeWrapper
+#import language_tool_python
 
-abbreviated_type_names = {'IPython.core.macro.Macro' : 'Macro'}
-sequence_types = ['list', 'tuple', "deque"]
-set_types = ["set", "frozenset"]
-dict_types = ["dict"]
-neo_containers =["Block", "Segment"]
-# NOTE: 2020-07-10 12:52:57
-# PictArray is defunct
-#vigra_array_types = ["VigraArray", "PictArray"] 
-vigra_array_types = ["VigraArray"]
-signal_types = ['Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 
-                'SpikeTrain', "DataSignal", "IrregularlySampledDataSignal",
-                "TriggerEvent",
-                ]
-ndarray_type = ndarray.__name__
+try:
+    from pyqtgraph import eq # not sure is needed
+except:
+    from operator import eq
 
+from core import prog
+from .prog import safeWrapper, deprecation
+
+from .strutils import get_int_sfx
+from .quantities import units_convertible
+
+# NOTE: 2021-07-24 15:03:53
+# moved TO core.datatypes
+#abbreviated_type_names = {'IPython.core.macro.Macro' : 'Macro'}
+#sequence_types = (list, tuple, deque)
+#sequence_typenames = ('list', 'tuple', "deque")
+#set_types = (set, frozenset)
+#set_typenames = ("set", "frozenset")
+#dict_types = (dict,)
+#dict_typenames = ("dict",)
+## NOTE: neo.Segment class name clashes with nrn.Segment
+#neo_containernames = ("Block", "Segment",)
+## NOTE: 2020-07-10 12:52:57
+## PictArray is defunct
+#signal_types = ('Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 
+                #'SpikeTrain', "DataSignal", "IrregularlySampledDataSignal",
+                #"TriggerEvent",)
+                
+#ndarray_type = ndarray.__name__
+random.seed()
+HASHRANDSEED = random.randrange(4294967295)
+
+# NOTE: 2021-08-19 09:47:18
+# moved FROM copre.workspacefunctions:
+# total_size
 
 standard_obj_summary_headers = ["Name","Workspace",
                                 "Type","Data Type", 
@@ -30,7 +71,2510 @@ standard_obj_summary_headers = ["Name","Workspace",
                                 "Shape", "Axes", "Array Order", "Memory Size",
                                 ]
 
+class SafeComparator(object):
+    # NOTE: 2021-07-28 13:42:07
+    # pg.eq does NOT work with numpy arrays and pandas objects!
+    # operator.eq DOES work with numpy array and pandas objects!
+    # and accepts non-numeric values
+    # operator.le ge lt gt accept ONLY numeric values hence MAY not work with
+    # either numpy array or pandas objects
+    
+    def __init__(comp=eq):
+        self.comp = comp
+        
+    def __call__(self, x, y):
+        try:
+            ret = True
+            
+            ret &= type(x) == type(y)
+            
+            if not ret:
+                return ret
+            
+            if isfunction(x):
+                return x == y
+            
+            if isinstance(x, partial):
+                return x.func == y.func and x.args == y.args and x.keywords == y.keywords
+                
+            if isinstance(x, (np.ndarray, str, Number)):
+                #return operator.eq(x,y)
+                return self.comp(x,y)
+            
+            if hasattr(x, "size"):
+                ret &= x.size == y.size
 
+            if not ret:
+                return ret
+            
+            if hasattr(x, "shape"):
+                ret &= x.shape == y.shape
+                
+            if not ret:
+                return ret
+            
+            # NOTE: 2018-11-09 21:46:52
+            # isn't this redundant after checking for shape?
+            # unless an object could have shape attribte but not ndim
+            if hasattr(x, "ndim"):
+                ret &= x.ndim == y.ndim
+            
+            if not ret:
+                return ret
+            
+            if hasattr(x, "__len__") or hasattr(x, "__iter__"):
+                ret &= len(x) == len(y)
+
+                if not ret:
+                    return ret
+                
+                # NOTE: 2021-08-21 09:43:33 FIXME
+                # ATTENTION Line below produces infinite recursion
+                # when x contains a reference to itself
+                #ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
+                
+                # NOTE: 2021-08-21 09:45:48 FIXED
+                ret &= all(map(lambda x_: hash_identity_test(x_[0],x_[1]),zip(x,y)))
+                
+                if not ret:
+                    return ret
+                
+            ret &= self.comp(x,y)
+            
+            return ret ## good fallback, though potentially expensive
+        
+        except Exception as e:
+            #traceback.print_exc()
+            #print("x:", x)
+            #print("y:", y)
+            return False
+        
+def __check_isclose_args__(rtol:typing.Optional[Number]=None, 
+      atol:typing.Optional[Number]=None, 
+      use_math:bool=True,
+      equal_nan:bool=True) -> tuple: # (func, rtol, atol)
+    
+    if not isinstance(rtol, Number):
+        rtol = inspect.signature(math.isclose).parameters["rel_tol"].default if use_math else inspect.signature(np.isclose).parameters["rtol"].default
+        
+    if not isinstance(atol, Number):
+        atol = inspect.signature(math.isclose).parameters["abs_tol"].default if use_math else inspect.signature(np.isclose).parameters["atol"].default
+        
+    f_isclose = partial(math.isclose, rel_tol=rtol, abs_tol=atol) if use_math else partial(np.isclose, rtol=rtol, atol=atol, equal_nan=equal_nan)
+    
+    return f_isclose, rtol, atol
+        
+@singledispatch
+def is_same_as(x, y, 
+               rtol:typing.Optional[Number]=None, 
+               atol:typing.Optional[Number]=None, 
+               use_math:bool=True, 
+               equal_nan:bool=False,
+               comparator = operator.eq):
+    """Compares two objects.
+    
+    Parameters:
+    ----------
+    x,y: comparands; supported types are str, numeric scalar, complex, and
+        numpy arrays (including python Quantity).
+        
+        NOTE: when numpy arrays, they MUST have the same dtypeand identical
+        shapes, unless one of them has size 1 (one)
+        
+    comparator: either operator.eq (the default) or isclose (defined in this module)
+        
+    use_math:bool - used only when comparator is utilities.isclose, and passed on
+        to that function.
+        
+        When True, utilities.isclose uses use math.isclose; else, use numpy.isclose
+    
+        NOTE: when x,y are numpy arrays, thre function uses numpy.isclose automatically.
+        
+    equal_nan: used only when comparator is utilities.isclose, and is passed on
+    to that function
+        
+    rtol, atol: used when comparator is isclose and are passed on to that function
+    
+    """
+    return operator.eq(x,y)
+
+@is_same_as.register(str)
+def _(x, y, rtol:typing.Optional[Number]=None, 
+            atol:typing.Optional[Number]=None, 
+            use_math:bool=True, 
+            equal_nan:bool=False,
+            comparator = operator.eq):
+    return comparator(x,y)
+
+@is_same_as.register(np.ndarray)
+def _(x,y,  rtol:typing.Optional[Number]=None, 
+            atol:typing.Optional[Number]=None, 
+            use_math:bool=True, 
+            equal_nan:bool=False,
+            comparator = operator.eq):
+    
+    if comparator not in (operator.eq, isclose):
+        raise TypeError(f"'comparator' expected one of operator.eq or isclose;; got {comparator} instead")
+    
+    use_math = False
+    
+    _array_attrs_ = ("dtype", "size", "shape", "ndim")
+    
+    if comparator is isclose:
+        comparator = partial(comparator, 
+                             rtol=rtol, atol=atol, 
+                             use_math=use_math, equal_nan=equal_nan)
+    
+    if isinstance(y, pq.Quantity):
+        y = y.magnitude
+        
+    ret = reduce(operator.and_, (operator.eq(x_,y_) for x_, y_ in ((getattr(x, name, None), getattr(y, name, None)) for name in _array_attrs_)))
+    
+    if ret:
+        ret &= np.all(comparator(x,y))
+    
+    return ret
+
+@is_same_as.register(pq.Quantity)
+def _(x,y,  rtol:typing.Optional[Number]=None, 
+            atol:typing.Optional[Number]=None, 
+            use_math:bool=True, 
+            equal_nan:bool=False,
+            comparator = operator.eq):
+    
+    if comparator not in (operator.eq, isclose):
+        raise TypeError(f"'comparator' expected one of operator.eq or isclose; got {comparator} instead")
+    
+    use_math = False
+    
+    _array_attrs_ = ("dtype", "size", "shape", "ndim")
+    
+    if comparator is isclose:
+        comparator = partial(comparator, 
+                             rtol=rtol, atol=atol, 
+                             use_math=use_math, equal_nan=equal_nan)
+    
+    if not isinstance(y, pq.Quantity):
+        x = x.magnitude
+        
+    else:
+        if not units_convertible(x,y):
+            return False
+        
+        elif x.units != y.units:
+            y = y.rescale(x.units)
+            
+        x=x.magnitude
+        y=y.magnitude
+        
+    ret = reduce(operator.and_, (operator.eq(x_,y_) for x_, y_ in ((getattr(x, name, None), getattr(x, name, None)) for name in _array_attrs_)))
+    
+    if ret:
+        ret &= np.all(comparator(x,y))
+    
+    return ret
+
+@is_same_as.register(collections.abc.Sequence)
+def _(x,y,
+            rtol:typing.Optional[Number]=None, 
+            atol:typing.Optional[Number]=None, 
+            use_math:bool=True, 
+            equal_nan:bool=False,
+            comparator = operator.eq):
+    
+    if comparator is isclose:
+        comparator = partial(comparator, 
+                             rtol=rtol, atol=atol, 
+                             use_math=use_math, equal_nan=equal_nan)
+    
+    ret = len(x) == len(y)
+    
+    if ret:
+        ret &= reduce(operator.and_, (comparator(x_, y_) for (x,y) in zip(x,y)))
+        
+    return ret
+
+@is_same_as.register(collections.abc.Mapping)
+def _(x,y,
+            rtol:typing.Optional[Number]=None, 
+            atol:typing.Optional[Number]=None, 
+            use_math:bool=True, 
+            equal_nan:bool=False,
+            comparator = operator.eq):
+    
+    # use for comparisons between mapping values
+    simp_fun = partial(is_same_as, rtol=rtol, atol=atol, 
+                       use_math=use_math, equal_nan=eual_nan,
+                       comparator = comparator)
+        
+    if comparator is isclose:
+        comparator = partial(comparator, 
+                             rtol=rtol, atol=atol, 
+                             use_math=use_math, equal_nan=equal_nan)
+    ret = len(x) == len(y)
+    if ret: # check for equality of mapping keys
+        ret &= reduce(operator.and_, (operator.eq(k1, k2) for (k1, k2) in zip(x.keys(), y.keys())))
+        
+    if ret: # not compare the values
+        ret &= reduce(operator.and_, (simp_fun(a,b) for (a,b) in zip(x.values(), y.values())))
+        
+    return ret
+
+def ideq(x,y):
+    return id(x) == id(y)
+
+@singledispatch
+def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarray, pq.Quantity], 
+            rtol:typing.Optional[Number]=None, 
+            atol:typing.Optional[Number]=None, 
+            use_math:bool=True, 
+            equal_nan:bool=False) -> typing.Union[bool, np.ndarray]:
+    """Generalized isclose.
+    
+    Parameters:
+    ==========
+    x, y: numeric scalars or numpy arrays with identical shapes or where one of
+        them has size 1; 
+    
+    use_math:bool, default is True
+        When True, use math.isclose
+        When False, use numpy.isclose
+        
+        When either 'x' or 'y' are numpy arrays with size > 1 the function will
+        automatically switch to using numpy.isclose
+        
+        For differences between the math.isclose and numpy.isclose, see NOTE.
+        
+    rtol, atol:floats Optional, default values are as for 
+        math.isclose (1e-09 and 0.0) or numpy.isclose (1e-05 and 1e-08)
+        
+    equal_nan:bool, optional, default is False
+        Whether np.nan or math.nan are considered equal to each other
+        
+    Returns:
+    ========
+    bool scalar when math is True, else a numpy array with dtype('bool')
+    
+    NOTE:
+    numpy.isclose:
+    --------------
+    Signature: np.isclose(a, b, rtol=1e-05, atol=1e-08, equal_nan=False)
+    
+    For finite values, isclose uses the following equation to test whether
+    two floating point values are equivalent.
+
+        absolute(`a` - `b`) <= (`atol` + `rtol` * absolute(`b`))
+
+    Unlike the built-in `math.isclose`, the above equation is not symmetric
+    in `a` and `b` -- it assumes `b` is the reference value -- so that
+    `isclose(a, b)` might be different from `isclose(b, a)`. Furthermore,
+    the default value of atol is not zero, and is used to determine what
+    small values should be considered close to zero. the default value is
+    appropriate for expected values of order unity: if the expected values
+    are significantly smaller than one, it can result in false positives.
+    `atol` should be carefully selected for the use case at hand. a zero value
+    for `atol` will result in `False` if either `a` or `b` is zero.
+
+    math.isclose:
+    -------------
+    Signature: math.isclose(a, b, *, rel_tol=1e-09, abs_tol=0.0)
+    
+    If no errors occur, the result will be: 
+    
+        abs(`a`-`b`) <= max(`rel_tol` * max(abs(`a`), abs(`b`)), `abs_tol`).
+
+    For the values to be considered close, the difference between them
+    must be smaller than at least one of the tolerances.
+
+    -inf, inf and NaN behave similarly to the IEEE 754 Standard.  That
+    is, NaN is not close to anything, even itself.  inf and -inf are
+    only close to themselves.
+    
+    """
+    raise NotImplementedError(f"{type(x).__name__} objects are not supported")
+
+@isclose.register(str)
+def _(x,y,
+      rtol:typing.Optional[Number]=None, 
+      atol:typing.Optional[Number]=None, 
+      use_math:bool=True, 
+      equal_nan:bool=False):
+    return x.lower() == y.lower()
+
+@isclose.register(np.ndarray)
+def _(x,y,
+      rtol:typing.Optional[Number]=None, 
+      atol:typing.Optional[Number]=None, 
+      use_math:bool=True, 
+      equal_nan:bool=False):
+    
+    if any(v.size > 1 for v in (x,y)):
+        use_math = False
+    
+    f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
+    
+    if isinstance(y, pq.Quantity):
+        y = y.magnitude
+    
+    # emulate equal_nan for math.isclose
+    if use_math:
+        if all(v is math.nan or v is np.nan for v in (x,y)):
+            return True
+        
+        return False
+    
+    return f_isclose(x,y)
+
+@isclose.register(pq.Quantity)
+def _(x,y,
+      rtol:typing.Optional[Number]=None, 
+      atol:typing.Optional[Number]=None, 
+      use_math:bool=True, 
+      equal_nan:bool=False):
+    
+    if any(v.size > 1 for v in (x,y)):
+        # use math only on scalars
+        use_math = False
+    
+    f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math, equal_nan)
+    
+    if not isinstance(y, pq.Quantity):
+        x = x.magnitude
+        
+    else:
+        if not units_convertible(x,y):
+            return False
+        
+        elif x.units != y.units:
+            y = y.rescale(x.units)
+            
+        x = x.magnitude
+        y = y.magnitude
+    
+    if use_math:
+        # emulate equal_nan for math.isclose
+        # NOTE: math.isclose operates only on scalars x and y
+        if all(v in (math.nan, np.nan) for v in (x,y)):
+            if equal_nan:
+                return True
+            return False
+    
+    return f_isclose(x,y)
+
+@isclose.register(Number)
+def _(x,y,
+      rtol:typing.Optional[Number]=None, 
+      atol:typing.Optional[Number]=None, 
+      use_math:bool=True, 
+      equal_nan:bool=False):
+    
+    f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
+    
+    return f_isclose(x,y)
+
+@isclose.register(complex)
+def _(x,y, rtol:typing.Optional[Number]=None, 
+            atol:typing.Optional[Number]=None, 
+            use_math:bool=True, 
+            equal_nan:bool=False):
+    
+    f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
+    
+    return reduce(operator.and_, (f_isclose(x_, y_) for x_, y_ in ((getattr(x, name), getattr(y, name)) for name in ("real", "imag"))))
+
+def all_or_not_all(*args):
+    """Returns True when elements in args are either all True or all False.
+    """
+    return all(args) or all(not(arg) for arg in args)
+
+def hashiterable(x:typing.Iterable[typing.Any]) -> Number:
+    """Takes into account the order of the elements.
+    
+    NOTE: This works when the type of the elements contained in the iterable are
+    basic Python type elements. 
+    
+    When the elements are iterables their type, and not their content, is 'hashed'
+    in order to prevent infinite recursion when these elements contain reference(s)
+    to the iterable being 'hashed'.
+    
+    Example 1:
+    
+    import random # to generate random sequences
+    random.seed()
+    
+    # generate 10 random sequences
+    k = 11
+    seqs = [random.sample(range(k), k) for i in range(k)]
+
+    seqs
+    
+        [[7, 5, 10, 1, 4, 2, 6, 3, 9, 8, 0],
+         [9, 0, 7, 1, 5, 8, 3, 10, 6, 4, 2],
+         [7, 10, 9, 3, 6, 4, 8, 1, 5, 0, 2],
+         [1, 6, 8, 2, 5, 10, 9, 4, 0, 7, 3],
+         [5, 7, 2, 0, 9, 6, 8, 4, 3, 10, 1],
+         [6, 0, 2, 9, 7, 1, 8, 3, 4, 10, 5],
+         [10, 2, 6, 7, 4, 1, 5, 9, 0, 8, 3],
+         [3, 7, 5, 1, 10, 0, 9, 6, 8, 4, 2],
+         [0, 5, 3, 8, 2, 9, 1, 6, 4, 7, 10],
+         [9, 10, 2, 3, 5, 8, 0, 1, 4, 7, 6],
+         [8, 9, 0, 3, 5, 7, 1, 4, 2, 6, 10]]    
+        
+    sums = [sum(hashiterable(x)) for x in seqs]
+
+    sums
+
+        [103034808763.81586,
+         103034808806.43579,
+         103034808697.90562,
+         103034808809.05049,
+         103034808811.85916,
+         103034808796.93391,
+         103034808824.6124,
+         103034808735.8485,
+         103034808837.7218,
+         103034808790.48198,
+         103034808795.09956]
+        
+    Example 2:
+    
+    k = 10
+    
+    eye = [[0]*k for i in range(k)]
+    
+    for i, s in enumerate(eye):
+        s[i]=1
+        
+    eye
+    
+        [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+         [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+         [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+         [0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+         [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+         [0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]
+
+    sums = [sum(hashiterable(x)) for s in eye]
+    
+    sums
+    
+        [102740977801.8254,
+         102740977802.8254,
+         102740977801.15872,
+         102740977804.8254,
+         102740977801.02539,
+         102740977806.8254,
+         102740977800.96825,
+         102740977808.8254,
+         102740977800.93651,
+         102740977810.8254]
+        
+    """
+    if not hasattr(x, "__iter__"):
+        raise TypeError("Expecting an iterable; got %s instead" % type(x).__name__)
+    
+    # NOTE: 2021-08-21 10:02:46 FIXME
+    # ATTENTION:
+    # The line below generate infinite recursion when v contains references to x
+    #return (gethash(v) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
+    # NOTE: 2021-08-21 10:08:01 FIXED
+    return ( (hash(type(v)) if (hasattr(v, "__iter__") or v is x) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
+    #return ( (hash(type(v)) if isinstance(v, (list, deque, dict)) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
+
+@safeWrapper
+def gethash(x:typing.Any) -> Number:
+    """Calculates a hash-like figure for objects (including of non-hashable types)
+    To be used for object comparisons.
+    
+    Not suitable for secure code.
+    
+    CAUTION: some types may return same hash even if they have different content:
+    These are np.ndarray and subclasses
+    
+    WARNING: This is NOT NECESSARILY a hash
+    In particular for mutable sequences, or objects containing immutable sequences
+    is very likely to return floats
+    """
+    from core.datatypes import is_hashable
+    
+    # FIXME 2021-08-20 14:23:26
+    # for large data array, calculating the hash after converting to tuple may:
+    # 
+    # 1. incur significant overheads (for very large data)
+    #
+    # 2. may raise exception when the element type in the tuple is not hashable
+    #   checking this may also increase overhead
+    
+    # Arguably, we don't need to monitor elemental vale changes in these large
+    # data sets, just their ndim/shape/size/axistags, etc
+    def _sumarr(_x):
+        return sum((hash(_x.ndim), hash(_x.size), hash(_x.shape),))
+        
+    def _sumarrdtype(_x):
+        return _sumarr(_x) + hash(_x.dtype)
+
+    try:
+        if is_hashable(x):
+            return hash(x)
+        
+        elif isinstance(x, pq.Quantity):
+            return hash(type(x)) + _sumarrdtype(x) + hash(x.dimensionality)
+        
+        elif isinstance(x, vigra.VigraArray):
+            return hash(type(x)) + _sumarrdtype(x) + hash(x.axistags)
+            #return hash(type(x)) + gethash(np.array(x)) + hash(x.axistags)
+        
+        elif isinstance(x, vigra.vigranumpycore.ChunkedArrayBase):
+            return hash(type(x)) + _sumarrdtype(x) + sum((hash(x.chunk_array_shape), hash(x.chunk_shape), ))
+        
+        elif isinstance(x, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
+            return hash(type(x)) + hash(x)
+            #return HASHRANDSEED + hash(x)
+        
+        elif isinstance(x, np.ndarray):
+            return hash(type(x)) + _sumarrdtype(x)
+            #return HASHRANDSEED + sum([hash(x.shape), hash(x.size), hash(x.ndim) , hash(x.dtype)])
+        
+        elif isinstance(x, pd.DataFrame):
+            return hash(type(x)) + _sumarr(x) + gethash(x.index) + gethash(x.columns) + sum((gethash(x[c]) for c in x.columns))
+        
+        elif isinstance(x, pd.Series):
+            return hash(type(x)) + _sumarrdtype(x) + hash(tuple(x.index)) + hash(tuple(x.name))
+            #return HASHRANDSEED + hash(tuple(x.index)) + hash(tuple(x.name)) + hash(tuple(x)) + hash(x.dtype)
+        
+        elif isinstance(x, pd.Index):
+            return hash(type(x)) + _sumarrdtype(x)
+            #return HASHRANDSEED + hash(tuple(x)) 
+            
+        elif hasattr(x, "__iter__"):
+            return hash(type(x)) + sum(hashiterable(x))
+        
+        elif not is_hashable(x):
+            if hasattr(x, "__dict__"):
+                return hash(type(x)) + gethash(x.__dict__)
+            
+            else:
+                return hash(type(x)) # FIXME 2021-08-20 14:22:13
+                #return HASHRANDSEED + hash(type(x)) # FIXME 2021-08-20 14:22:13
+        
+        else:
+            # NOTE: 2021-08-19 16:18:20
+            # tuples, like all immutable basic python datatypes are hashable and their
+            # hash values reflect the order of the elements
+            # All user-defined classes and objects of user-defined types are also
+            # hashable
+            return hash(type(x)) + hash(x)
+            #return HASHRANDSEED + hash(x)
+    except:
+        return hash(type(x))
+        #return HASHRANDSEED + hash(type(x))
+        
+def get_index_for_seq(index:int, 
+                      test:typing.Sequence[typing.Any], 
+                      target:typing.Sequence[typing.Any], 
+                      mapping:typing.Optional[dict]=None) -> int:
+    """Heuristic for computing an index into the target sequence.
+    
+    Returns an index into the `target` sequence given `index`:int index into
+    the `test` sequence and an optional index mapping.
+    
+    Parameters:
+    ===========
+    index: int; If negative it will be treated as a negative sequence index
+                (i.e., reversed indexing)
+                
+    test: Sequence or instance of a type implementing the methods 
+        `__len__` and `__getitem__`, and for which `index` int is a valid 
+        index.
+    
+    target: Sequence or instance of a type implementing the methods 
+        `__len__` and `__getitem__`, and for which a corresponding int index
+        is returned.
+    
+    mapping:dict; optional, default is None.
+        When present, it is expected to contain key/value mappings such that:
+        
+        key: int, range, tuple : indices valid for the `test` sequence
+        
+        value: int: index valid for the `target` sequence
+        
+    Returns:
+    =======
+    int: index into the target sequence
+    
+    When both test and target have the same length, this is the same value 
+        as `index`.
+        
+    When target has length 1, it always returns the value 0 (zero).
+    
+    Otherwise:
+    
+    When `mapping` is a dict with key/value pairs as above, 
+        returns the value mapped to the key that:
+        a) equals `index`, when key is a str
+        b) contains `index`, when key is a tuple or range
+        
+    When `mapping` is None (the default):
+    
+    a) if `target` is shorter than `test`:
+    a.1) for a positive `index`, the function returns:
+        a.1.1) the value of `index` if index is in the semi-open interval 
+            [0, len(target))
+            
+        a.1.2) -1 if index is >= len(target) (i.e., returns the index of
+            the last element in `target`)
+            
+    a.2) for a negative `index` (reverse indexing) the function returns
+        max(min(ndx, -1), -len(target)) where
+        
+        ndx = `index` + let(test) - len(target)
+        
+    b) if `target` is longer than `test`:
+    b.1) for a positive `index` returns:
+        
+        min(index, len(test)-1)
+        
+    b.2) for a negative `index` returns:
+    
+        max(ndx, -len(target)) where
+        
+        ndx = index + len(test) - len(target)
+    
+    Examples:
+    ========
+    
+    In [1]: from core.utilities import get_index_for_seq
+
+    In [2]: a = [1,2,3,4,5,6]
+
+    In [3]: b = [2,4,6]
+
+    In [4]: b[get_index_for_seq(5,a,b)]
+    Out[4]: 6
+
+    In [5]: b[get_index_for_seq(2,a,b)]
+    Out[5]: 6
+
+    In [6]: b[get_index_for_seq(-1,a,b)]
+    Out[6]: 6
+
+    In [7]: b[get_index_for_seq(-5,a,b)]
+    Out[7]: 4
+
+    In [8]: b[get_index_for_seq(-6,a,b)]
+    Out[8]: 2
+
+    In [9]: a[get_index_for_seq(1, b, a)]
+    Out[9]: 2
+
+    In [10]: a[get_index_for_seq(-1, b, a)]
+    Out[10]: 3
+
+    In [11]: a[get_index_for_seq(-2, b, a)]
+    Out[11]: 2
+
+    In [12]: a[get_index_for_seq(-4, b, a)]
+    
+    IndexError: Index -4 out of range for test sequence
+
+    In [13]: a[get_index_for_seq(-4, a, b)]
+    Out[13]: 6
+    
+    
+    
+    """
+    if not isinstance(index, int):
+        raise TypeError(f"`index` expected to be an int; got {type(index).__name__} instead")
+    
+    if not isinstance(test, collections.abc.Sequence) or not all(hasattr(test, a) for a in ("__len__", "__getitem__")):
+        raise TypeError(f"`test` expected to be a Sequence-like object; got {type(test).__name__} instead")
+    
+    if not isinstance(target, collections.abc.Sequence) or not all(hasattr(target, a) for a in ("__len__", "__getitem__")):
+        raise TypeError(f"`target` expected to be a Sequence-like; got {type(target).__name__} instead")
+    
+    if index not in range(-len(test),(len(test))):
+        raise IndexError(f"Index {index} out of range for test sequence")
+    
+    if len(target) == len(test):
+        return index
+    
+    elif len(target) == 1:
+        return 0
+    
+    elif isinstance(mapping, dict):
+        for key in mapping:
+            if (isinstance(key, int) and key == index) or (isinstance(key, range, tuple) and index in key):
+                if mapping[key] in range(-len(target),(len(target))):
+                    return mapping[key]
+                else:
+                    return IndexError(f"Index {mapping[key]} out of range for target sequence")
+            
+    else:
+        if len(target) < len(test):
+            # test posindex:    0,  1,  2,  3,  4,  5
+            # test negindex:   -6, -5, -4, -3, -2, -1
+            # trgt posindex:    0,  1,  2,  3
+            # trgt negindex:   -4, -3, -2, -1
+            # dlen = 2
+            if index >= len(target):
+                return - 1 # index of last element in target
+                
+            elif index < 0:
+                dlen = len(test) - len(target)
+                ndx = index + dlen
+                return max(min(ndx, -1), -len(target))
+                #if ndx >= 0:
+                    #return -1
+                #else:
+                    #return ndx
+                    
+            else:
+                return index
+                
+        else: # case len(target) == len(test) dealt with above
+            # here len(target) > len(test)
+            # test posindex:    0,  1,  2,  3
+            # test negindex:   -4, -3, -2, -1
+            # trgt posindex:    0,  1,  2,  3,  4,  5
+            # trgt negindex:   -6, -5, -4, -3, -2, -1
+            # dlen = -2
+            # apply index to target[0:len(test)]
+            if index < 0:
+                dlen = len(test) - len(target)
+                ndx = index + dlen
+                return max(ndx, -len(target))
+                #return min(max(ndx, -len(target)), -len(target))
+                #if ndx < -len(target):
+                    #return -len(target)
+                #else:
+                    #return ndx
+            else:
+                return min(index, len(test)-1)
+            
+def total_size(o, handlers={}, verbose=False):
+    """ Returns the approximate memory footprint an object and all of its contents.
+
+    Automatically finds the contents of the following builtin containers and
+    their subclasses:  tuple, list, deque, dict, set and frozenset.
+    To search other containers, add handlers to iterate over their contents:
+
+        handlers = {SomeContainerClass: iter,
+                    OtherContainerClass: OtherContainerClass.get_elements}
+
+    Author:
+    Raymond Hettinger
+    
+    Reference:
+    Compute memory footprint of an object and its contents (python recipe)
+    
+    Raymond Hettinger python recipe 577504-1
+    https://code.activestate.com/recipes/577504/
+    
+    """
+    dict_handler = lambda d: chain.from_iterable(d.items())
+    all_handlers = {tuple: iter,
+                    list: iter,
+                    deque: iter,
+                    dict: dict_handler,
+                    set: iter,
+                    frozenset: iter,
+                   }
+    all_handlers.update(handlers)     # user handlers, if given, take precedence
+    seen = set()                      # track which object id's have already been seen
+    default_size = getsizeof(0)       # estimate sizeof object without __sizeof__
+
+    def sizeof(o_):
+        if id(o_) in seen:       # do not double count the same object
+            return 0
+        seen.add(id(o_))
+        
+        s = getsizeof(o_, default_size)
+
+        if verbose:
+            print(s, type(o_), repr(o_), file=stderr)
+            
+        handler = all_handlers[type(o_)]
+        
+        s += sum(map(sizeof, handler(o_)))
+
+        #for typ, handler in all_handlers.items():
+            #if isinstance(o_, typ):
+                #s += sum(map(sizeof, handler(o_)))
+                #break
+        return s
+
+    return sizeof(o)
+
+# NOTE: 2021-07-27 23:09:02
+# define this here BEFORE NestedFinder so that we can use it as default value for
+# comparator
+
+@safeWrapper
+def hash_identity_test(x,y):
+    return gethash(x) == gethash(y)
+
+@safeWrapper
+def safe_identity_test2(x, y):
+    return SafeComparator(comp=eq)(x, y)
+
+@safeWrapper
+def safe_identity_test(x, y, idcheck=False):
+    ret = True
+    
+    if idcheck:
+        ret &= id(x) == id(y)
+        
+        if not ret:
+            return ret
+    
+    ret &= type(x) == type(y)
+    
+    if not ret:
+        return ret
+    
+    if isfunction(x):
+        return x == y
+    
+    if isinstance(x, partial):
+        return x.func == y.func and x.args == y.args and x.keywords == y.keywords
+        
+    if hasattr(x, "size"):
+        ret &= x.size == y.size
+
+        if not ret:
+            return ret
+    
+    elif hasattr(x, "__len__") or hasattr(x, "__iter__"):
+        ret &= len(x) == len(y)
+
+        if not ret:
+            return ret
+        
+        ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
+        
+        if not ret:
+            return ret
+        
+    if hasattr(x, "shape"):
+        ret &= x.shape == y.shape
+            
+        if not ret:
+            return ret
+    
+    # NOTE: 2018-11-09 21:46:52
+    # isn't this redundant after checking for shape?
+    # unless an object could have shape attribte but not ndim
+    if hasattr(x, "ndim"):
+        ret &= x.ndim == y.ndim
+    
+        if not ret:
+            return ret
+    
+    if hasattr(x, "dtype"):
+        ret &= x.dtype == y.dtype
+    
+        if not ret:
+            return ret
+    
+    if isinstance(x, (np.ndarray, str, Number, pd.DataFrame, pd.Series, pd.Index)):
+        ret &= np.all(x==y)
+    
+        if not ret:
+            return ret
+    
+    ret &= eq(x,y)
+    
+    return ret ## good fallback, though potentially expensive
+
+class NestedFinder(object):
+    """Provides searching in nesting (hierarchical) data structures.
+    
+    A nesting, or hierarchical, data structure is a mapping (dict) or sequence 
+    (tuple, list, deque) where at least one elements (or value) is another 
+    hierarchical data structure (dict, tuple, list, collections.deque). 
+    
+    These types include collections.namedtuple objects.
+    
+    For practical purposes, numpy arrays and pandas data types (DataFrame,
+    Index and Series) are considered "leaf" objects - i.e., no further search is
+    performed INSIDE their elements when these elements are of a nesting type as
+    described above.
+    
+    """
+    supported_collection_types = (np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame, pd.Index) # this implicitly includes namedtuple
+    supported_hierarchical_types = (dict, list, tuple, deque)
+    nesting_types = supported_hierarchical_types
+    
+    def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None,
+                 comparator:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=safe_identity_test):
+        """NestedFinder initializer.
+        
+        Parameters:
+        -----------
+        data: a possibily nesting data structure. 
+        
+            Supported types are:
+        
+            np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame
+            
+        comparator: function or functools.partial (optional)
+            A callable taking at least two arguments, and returns a bool.
+            
+            Typical binary comparators are:
+                operators.eq
+                pyqtgraph.eq
+                Scipyen's utilities.safe_identity_test. This is the default.
+            
+            When None, the finder's comparator reverts to operators.eq which
+            when used with numpy array will very likely raise exceptions
+            
+            Comparator functions can be made from functions taking additional
+            parameters or keyword parameters. 
+            
+            For example, to use numpy' isclose:
+            
+            from functools import partial
+            import numpy as np
+            fn = partial(np, atol=1e-2, rtol=1e-2)
+            
+            Then pass fn as comparator parameter to the NestedFinder initializer
+        """
+        self._paths_ = deque()
+        self._found_ = deque() # indexing objects visited
+        self._result_ = deque()
+        self._values_ = deque()
+        self._visited_ = deque() # visited nesting types - to avoid infinite recursion
+        self._data_ = src
+        self._item_as_index_ = None
+        self._item_as_value_ = None
+        
+        self._comparator_ = operator.eq # see 'operator' module for other examples
+        
+        isbinfun = isfunction(comparator) and len(signature(comparator).parameters) == 2
+        isparfun = isinstance(comparator, partial) and len(signature(comparator.func).parameters) >= 2
+        
+        if isbinfun or isparfun:
+            # NOTE: this can be a functools.partial
+            # Foe example, np.isclose can be fed into the finder and have its keyword
+            # parameters such as 'atol' and 'rtol' fixed; e.g., 
+            # fn = functools.partial(np.isclose, atol=2e-2, atol-2e-2)
+            # pass fn as comparator parameter here (or to self.comparator setter)
+            self._comparator_ = comparator
+        
+    def reset(self):
+        """Clears book-keeping queues, results and removes data reference
+        The comparator function is left the same.
+        """
+        self.initialize()
+        self._data_ = None
+        
+    def initialize(self):
+        """Clears the result and book-keeping queues.
+        The comparator function is left unchanged.
+        """
+        self._visited_.clear()
+        self._paths_.clear()
+        self._found_.clear()
+        self._result_.clear()
+        self._values_.clear()
+        self._item_as_index_ = None
+        self._item_as_value_ = None
+        
+    @property
+    def comparator(self):
+        """Returns the comparator function used in searching of the str '=='
+        """
+        return self._comparator_
+    
+    @comparator.setter
+    def comparator(self, fn:typing.Callable[..., typing.Any]):
+        """Sets the comparator function to a custom binary comparator.
+        A binary comparator compares two arguments e.g., func(x, y) -> bool
+        
+        A comparator that also accept further optional parameters (i.e.
+        named or keyword parameters) can be used by 'wrapping' in a partial where
+        the ohter parameters are 'fixed' to some values:
+        
+        For example, the comparator:
+        
+        func(x, y, option=default) -> True
+        
+        can be passed as a partial:
+        
+        functools.partial(func, option=val)
+        
+        """
+        if fn is None:
+            self._comparator_ = operator.eq
+            return
+        
+        isbinfun = isfunction(fn) and len(signature(fn).parameters) == 2
+        isparfun = isinstance(fn, partial) and len(signature(fn.func).parameters) >= 2
+        
+        if isbinfun or isparfun:
+            # NOTE: this can be a functools.partial
+            self._comparator_ = fn
+        
+    @property
+    def lastSearchIndex(self):
+        """Read-only acces to the last search item
+        """
+        return self._item_as_index_
+    
+    @property
+    def lastSearchValue(self):
+        """Read-only acces to the last search item
+        """
+        return self._item_as_value_
+    
+    @property
+    def paths(self):
+        """Rad-only access to the collection of indexing paths.
+        Since this may be consumed in other code (e.g. self.get or 
+        NestedFinder.getvalue) this property returns a deep copy of the results.
+        """
+        return deepcopy(self._paths_)
+        
+        
+    @property
+    def result(self):
+        """Read-only, deep copy of the search result.
+        Since this may be consumed in other code (e.g. self.get or 
+        NestedFinder.getvalue) this property returns a deep copy of the results.
+        """
+        return deepcopy(self._result_)
+    
+    @property
+    def values(self):
+        """Read-only, of the collection of values found with search by index.
+        
+        This is a deep copy so that modifications by other code does not alter
+        the collection stored in the NestedFinder.
+        """
+        return deepcopy(self._values_)
+    
+    @property
+    def data(self):
+        """Read/write access to the nesting data structure"""
+        return self._data_
+    
+    @data.setter
+    def data(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None):
+        self.reset()
+        self._data_ = src
+        
+    @staticmethod
+    def is_namedtuple(x):
+        """ core.datatype.is_namedtuple imported here.
+        """
+        from core.datatypes import is_namedtuple
+        return is_namedtuple(x)
+    
+    def _ndx_expr(self, src, ndx):
+        if isinstance(src, dict):
+            if ndx in src.keys():
+                if isinstance(ndx, str):
+                    return "['%s']" % ndx
+                else:
+                    return "[%s]" % ndx
+            else:
+                return ""
+            
+        elif NestedFinder.is_namedtuple(src):
+            if ndx in src._fields:
+                return ".%s" % ndx
+            else:
+                return ""
+            
+        elif isinstance(src, (tuple, list, deque)):
+            #print("_ndx_expr ndx", ndx, "src", src)
+            if isinstance(ndx, int):
+                return "[%d]" % ndx
+            
+            else:
+                return ""
+    
+        elif isinstance(src, pd.DataFrame): 
+            if isinstance(ndx, list) and all([isinstance(i, tuple) and len(i)==2 for i in ndx]):
+                warnings.warn("Cannot generate indexing expression from multiple DataFrame indexing tuples")
+                return ""
+            
+            elif isinstance(ndx, tuple) and len(ndx) == 2: # (row index, col index)
+                if all([isinstance(i, int) for i in ndx]):
+                    return ".iloc[%d, %d]" % tuple(ndx)
+                else:
+                    # FIXME 2021-08-16 11:28:49
+                    # assumes row & column indices (labels) given as str
+                    # (which is probably the most common case for DataFrame
+                    # objects, but check)
+                    sndx = ", ".join(["'%s'" % n if isinstance(n, str) else "%s" % n for n in ndx])
+                    return ".loc[%s]" % sndx
+                
+        elif isinstance(src, pd.Series):
+            if isinstance(ndx, list):
+                warnings.warn("Cannnot generate indexing expression from multiple Series indices")
+                return ""
+            
+            elif isinstance(ndx, int):
+                return ".iloc[%d]" % ndx
+                
+            else:
+                # FIXME see FIXME 2021-08-16 11:28:49
+                return ".loc['%s']" % ndx if isinstance(ndx, str) else ".loc[%s]" % ndx
+            
+        elif isinstance(src, np.ndarray):
+            if isinstance(ndx, np.ndarray): # length should be equal to src.ndim but this is not checked here
+                aexpr = ("%s" % ndx).replace(" ", ", ")
+            elif isinstance(ndx, tuple): # again, length shoudl be equal to src.ndim but this is not checked here
+                aexpr = "(%s)" % ", ".join(["%s" % n for n in ndx])
+                
+            elif isinstance(ndx, int):
+                aexpr = "%d" % ndx
+                
+            else:
+                return ""
+                
+            return "[%s]" % aexpr
+            
+        else:
+            if isinstance(ndx, int):
+                return "[%d]" % ndx
+            
+            elif isinstance(ndx, str):
+                return "['%s']" % ndx
+            
+            else:
+                return "[%s]" % ndx
+
+        return ""
+            
+    def _gen_elem(self, 
+                  src:typing.Any, ndx:typing.Any, 
+                  report:bool=False) -> typing.Generator[typing.Any, None, None]:
+        """Element retrieval from collection given key or index
+        Parameters:
+        -----------
+        src: python object
+        ndx: key or index
+        
+        Yields:
+        ------
+        A value - when src is a collection and ndx is a valid indexing object 
+            appropriate for src, src if src is an elemental object (NOT a
+            collection) or nothing
+        
+        """
+        try:
+            #if ndx: # NOTE: 2021-08-17 09:07:37 when ndx == 0 (perfectly valid) this is False!
+            if ndx is not None: # better be explicit
+                if isinstance(src, dict):
+                    if ndx in src.keys():
+                        yield src[ndx]
+                        
+                elif NestedFinder.is_namedtuple(src):
+                    if ndx in src._fields:
+                        yield getattr(src, ndx)
+                        
+                elif isinstance(src, (tuple, list, deque)):
+                    if isinstance(ndx, int) and ndx in range(len(src)): # also check validity
+                        yield src[ndx]
+                        
+                elif isinstance(src, pd.DataFrame): 
+                    # can't just  check everything, just only the basics: 
+                    # for DF ndx is a (row idx, col idx) tuple or list of such
+                    # if ndx not appropriate raises exceptions
+                    if isinstance(ndx, list) and all([isinstance(i, tuple) and len(i)==2 for i in ndx]):
+                        yield [src.iloc[ix[0], ix[1]] if all([isinstance(i, int) for i in ix]) else src.loc[ix[0], ix[1]] for ix in ndx]
+                        
+                    elif isinstance(ndx, tuple) and len(ndx) == 2: # (row index, col index)
+                        if all([isinstance(i, int) for i in ndx]):
+                            yield src.iloc[ndx[0], ndx[1]] 
+                        else:
+                            yield src.loc[ndx[0], ndx[1]] 
+                        
+                elif isinstance(src, pd.Series):
+                    # can't just  check everything, just only the basics: 
+                    # for Series ndx can be an int, (row) index, or a list of such
+                    if isinstance(ndx, list):
+                        yield [src.iloc[i] if isinstance(i, int) else src.loc[i] for i in ndx]
+                        
+                    elif isinstance(ndx, int):
+                        yield src.iloc[ndx]
+                        
+                    else:
+                        yield src.loc[ndx] # will raise exc if ndx not appropriate
+                        
+                elif isinstance(src, (np.ndarray, pd.Index)):
+                    yield src[ndx]
+                    
+                else:
+                    yield src
+            
+        except:
+            # optionally, give some feedfback on failure
+            if report:
+                traceback.print_exc()
+            
+    def _gen_nested_value(self, src:typing.Any, 
+                          path:typing.Optional[typing.List[typing.Any]]=None) -> typing.Generator[typing.Any, None, None]:
+        #print("_gen_nested_value, path", path)
+        if path is None or (isinstance(path , list) and len(path) == 0):
+            #print("\tnot path")
+            yield src
+            
+        if isinstance(path, deque): # begins here
+            #print("start from deque")
+            #while path: # NOTE: 2021-08-17 09:03:28 DON'T: [0] resolves as False!!!
+            while len(path):
+                pth = path.popleft()
+                #print("\tpth", pth, "path", path)
+                yield from self._gen_nested_value(src, pth)
+                
+        if isinstance(path, list): # first element is top index, then next nesting level etc
+            while len(path):
+                #print("src", src)
+                ndx = path.pop(0)
+                #print("ndx", ndx)
+                g = self._gen_elem(src, ndx)
+                try:
+                    yield from self._gen_nested_value(next(g), path)
+                    #ng = next(g)
+                    #print("next_g", ng)
+                    #yield from self._gen_nested_value(ng, path)
+                except StopIteration:
+                    pass
+                
+        else:# elementary indexing with POD scalars, ndarray or tuple of ndarray
+            yield from self._gen_elem(src, path)
+            
+    def _get_path_expression(self, src, path=None):
+        if not path:
+            return ""
+        
+        expr = list()
+            
+        if isinstance(path, deque): # begins here
+            while path:
+                pth = path.popleft()
+                expr.append(self._get_path_expression(src, pth))
+            
+            return expr
+                
+        if isinstance(path, list): # first element is top index, then next nesting level etc
+            while len(path):
+                #print("_get_path_expression path", path)
+                ndx = path.pop(0)
+                #print("_get_path_expression ndx", ndx, "src", src)
+                expr.append(self._ndx_expr(src, ndx))
+                #print("_get_path_expression expr", expr)
+                g = self._gen_elem(src, ndx)
+                try:
+                    expr.append(self._get_path_expression(next(g), path))
+                except StopIteration:
+                    continue
+            #print("_get_path_expression expr", expr)
+            return "".join(["%s" % s for s in expr])
+                
+        else:# elementary indexing with POD scalars, ndarray or tuple of ndarray
+            return self._ndx_expr(src, path)
+            
+    def _gen_search(self, var, item, parent=None, as_index=False):#, ntabs=0): # ntabs - for debugging only!
+        """Generator to search item in a nesting data structure.
+        
+        Item can be an indexing object, or a value.
+        
+        Parameters:
+        ----------
+        var: nested data structure (dict, tuple, list, deque)
+        item: object to be found; see below for details
+        parent: parent indexing object (optional, default None)
+        as_index:bool (default True)
+        
+        A nested data structure is one of:
+        1. a nested mapping (dict): 
+            Some of the keys may be mapped to dict or sequences, which may be 
+            themselves nested data structures
+        2. a nested (or ragged) sequence (deque, list, tuple):
+            Some of the elements may themselves by dict, be nested data structures
+        
+        When 'as_index' is True (default) uses `item' as an indexing object
+        inside the nested data structure: as a mapping key for dict, or integer
+        index for sequences as follows.
+        
+        1. when item is an int if will be used as index in a sequence
+        2. when item is a str it will be used ad a mapping key and as a
+            namedtuple field name
+        3. when item is a hashable object it will be used as dict key.
+        
+        NOTE: inspired from code by 
+        
+        hexerei software
+        https://stackoverflow.com/questions/9807634/find-all-occurrences-of-a-key-in-nested-dictionaries-and-lists
+        
+        for the original get_dict_extract function on which this is based
+        
+        
+        Generates:
+        ---------
+        a) an indexing object when item is a value (as_index is False, default)
+        b) a value, when item is an indexing object (as_index = True)
+        
+        """
+        # NOTE: 2021-07-25 00:18:52
+        # For all intents and purposes ndarray are considered leaf data here.
+        # We rely on numpy search routines to retrieve the index of an item
+        # (as long as it is a scalar type appropriate for the nested ndarray)
+        
+        # NOTE: 2021-07-27 10:39:33
+        # New parameter optional 'parent' represents the indexing object of the 
+        # item's container - necessary to avoid unnecessary trimming of 
+        # self._found_
+        
+        if var is None:
+            var = self.data
+            
+            
+        if isinstance(var, NestedFinder.nesting_types) and id(var) not in self._visited_:
+            self._visited_.append(id(var))
+            
+        #print("\n%s_gen_search in %s (parent: %s)" % ("".join(["\t"] * ntabs), type(var).__name__, parent), "visited:", self._found_)
+                
+        if isinstance(var, dict): # search inside a dict
+            # print("%s loop through %s members -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
+            for k, v in var.items():
+                if isinstance(v, NestedFinder.nesting_types):
+                    if id(v) in self._visited_:
+                        continue
+                    self._visited_.append(id(v))
+                
+                if as_index:
+                    if item == k:    # item should be hashable 
+                        self._found_.append(k)
+                        self._paths_.append(list(self._found_))
+                        # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
+                        yield v
+                        
+                else:
+                    if self._comparator_(item, v):
+                        self._found_.append(k)
+                        self._paths_.append(list(self._found_))
+                        # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
+                        yield k
+                        
+                if isinstance(v, self.supported_collection_types):
+                    self._found_.append(k)
+                    # print("%ssearch inside %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
+                    yield from self._gen_search(v, item, k, as_index)#, ntabs+1) # ntabs for debugging
+                    self._found_.pop()
+                    
+                # print("%sNOT FOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
+                #if len(self._found_):
+                    #self._found_.pop()
+                
+            # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._found_)
+                    
+            if len(self._found_):
+                #if not parent or parent != self._found_[-1]:
+                if not parent or not safe_identity_test(parent, self._found_[-1]):
+                    self._found_.pop()
+                    # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._found_)
+            
+        elif NestedFinder.is_namedtuple(var): # search inside a namedtuple
+            # print("%s loop through %s fields -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._found_)
+            for k in var._fields:
+                v = getattr(var, k)
+                if isinstance(v, NestedFinder.nesting_types):
+                    if id(v) in self._visited_:
+                        continue
+                    self._visited_.append(id(v))
+                
+                self._found_.append(k)
+                # print("%scheck %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__), "visited:", self._found_)
+                if as_index:
+                    if k == item:
+                        #self._found_.append(k)
+                        self._paths_.append(list(self._found_))
+                        # print("%sFOUND in %s field %s: %s -" % "".join(["\t"] * (ntabs+1)), (type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
+                        yield v
+                        
+                else:
+                    if self._comparator_(v, item):
+                        #self._found_.append(k)
+                        self._paths_.append(list(self._found_))
+                        # print("%sFOUND in %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
+                        yield k
+                        
+                if isinstance(v, self.supported_collection_types):
+                    #self._found_.append(k)
+                    # print("%ssearch inside %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
+                    yield from self._gen_search(v, item, k, as_index)#, ntabs+1) # ntabs for debugging
+                    #self._found_.pop()
+                        
+                # print("%sNOT FOUND in %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
+                if len(self._found_):
+                    self._found_.pop()
+                
+            # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
+
+            if len(self._found_):
+                if not parent or not safe_identity_test(parent, self._found_[-1]):
+                    self._found_.pop()
+                    # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
+            
+        elif isinstance(var, (list, tuple, deque)): # search inside a sequence other that any of the above
+            # print("%sloop through %s elements -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
+            for k, v in enumerate(var):
+                if isinstance(v, NestedFinder.nesting_types):
+                    if id(v) in self._visited_:
+                        continue
+                    self._visited_.append(id(v))
+                
+                # print("%scheck %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__), "visited:", self._found_)
+                self._found_.append(k)
+                
+                if as_index:
+                    #if self._comparator_(k, item):
+                    if k == item:
+                        #self._found_.append(k)
+                        self._paths_.append(list(self._found_))
+                        # print("%sFOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
+                        yield v
+                        
+                else:
+                    if self._comparator_(v, item):
+                        #self._found_.append(k)
+                        self._paths_.append(list(self._found_))
+                        # print("%sFOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
+                        yield k
+                        
+                if isinstance(v, self.supported_collection_types):
+                    #self._found_.append(k)
+                    # print("%ssearch inside %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
+                    yield from self._gen_search(v, item, k, as_index)#, ntabs+1) # ntabs for debugging
+                    #self._found_.pop()
+                    
+                # print("%sNOT FOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
+                if len(self._found_):
+                    self._found_.pop()
+                
+            # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
+
+            if len(self._found_):
+                if not parent or not safe_identity_test(parent, self._found_[-1]):
+                    self._found_.pop()
+                    # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
+
+        elif isinstance(var, pd.Index):#  pd.Index is a leaf collection
+            #print("in index")
+            if as_index: # expects a tuple of 1D int arrays!
+                if isinstance(item, np.ndarray) and item.ndims == 1:
+                    try:
+                        self._found_.append((item,))
+                        self._paths_.append(list(self._found_))
+                        yield var[item]
+                        
+                    except:
+                        # NOTE: 2021-07-28 16:42:06
+                        # uncomment for debugging
+                        #traceback.print_exc()
+                        pass
+                        
+                if isinstance(item, (tuple, list)) and len(item) == 1 and isinstance(item[0], np.ndarray) and item[0].ndim==1:
+                    try:
+                        self._found_.append(item)
+                        self._paths_.append(list(self._found_))
+                        yield var[item]
+                        
+                    except:
+                        # NOTE: 2021-07-28 16:42:06
+                        # uncomment for debugging
+                        #traceback.print_exc()
+                        pass
+                        
+            else: # => if found yields a tuple with one numpy array of int indices where found!
+                try:
+                    ndx = var == item # should be a boolean ndarray
+                    if np.any(ndx):
+                        nx = np.nonzero(np.atleast_1d(ndx))
+                        self._found_.append(nx)
+                        self._paths_.append(list(self._found_))
+                        yield nx # tuple(ndarray(), )
+                except:
+                    # NOTE: 2021-07-28 16:32:28
+                    # uncomment for debugging
+                    #traceback.print_exc()
+                    pass
+                
+            if len(self._found_):
+                #if not parent or parent != self._found_[-1]:
+                if not parent or not safe_identity_test(parent, self._found_[-1]):
+                    self._found_.pop()
+                    # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._found_)
+            
+        elif isinstance(var, (pd.DataFrame, pd.Series)): # leaf collections
+            # TODO: 2021-07-28 14:07:12 TODO
+            # searching for values in pandas objects is only trivial with 
+            # trivial comparators (such as operator.eq)
+            # TODO: for more complicated comparators e.g. numpy.isclose this needs more work
+            if as_index:
+                # the index appended to paths must be something to tell us that
+                # it aplies to pandas DataFrame or Series objects; 
+                if isinstance(var, pd.Series):
+                    if isinstance(item, (tuple, list)):
+                        try:
+                            v = [var.iloc[ix] if isinstance(ix, (int, slice, range)) else var.loc[ix] for ix in item]
+                            self._found_.append(item)
+                            self._paths_.append(list(self._found_))
+                            yield v
+                        except:
+                            # NOTE: 2021-07-28 16:32:28
+                            # uncomment for debugging
+                            #traceback.print_exc()
+                            pass
+                        
+                        
+                    if isinstance(item, (int, slice, range)):
+                        try:
+                            v = var.iloc[item]
+                            self._found_.append(item)
+                            self._paths_.append(list(self._found_))
+                            yield v
+                        except:
+                            # NOTE: 2021-07-28 16:32:28
+                            # uncomment for debugging
+                            #traceback.print_exc()
+                            pass
+                        
+                    else:
+                        try:
+                            v = var.loc[item]
+                            self._found_.append(item)
+                            self._paths_.append(list(self._found_))
+                            yield v
+                        except:
+                            # NOTE: 2021-07-28 16:32:28
+                            # uncomment for debugging
+                            #traceback.print_exc()
+                            pass
+                        
+                elif isinstance(var, pd.DataFrame):
+                    if isinstance(item, list): # list of row, col index pairs - either as int or as row & col index objects
+                        try:
+                            v = [var.iloc[ix[0], ix[1]] if all ([isinstance(i, (int, slice, range)) for i in ix]) else var.loc[ix[0],ix[1]] for ix in item]
+                            self._found_.append(item)
+                            self._paths_.append(list(self._found_))
+                            yield v
+                        except:
+                            # NOTE: 2021-07-28 16:32:28
+                            # uncomment for debugging
+                            #traceback.print_exc()
+                            pass
+                            
+                    elif isinstance(item, tuple): # tuple of row, col indexes - either as int or as row & col index objects
+                        try: # will raise exception if neither elements in item are valid
+                            v = var.iloc[item[0], item[1]] if all([isinstance(i, (int, slice, range)) for i in item]) else var.loc[item[0], item[1]]
+                            self._found_.append(item)
+                            self._paths_.append(list(self._found_))
+                            yield v # a pd.DataFrame or a pd.Series!
+                        except:
+                            # NOTE: 2021-07-28 16:32:28
+                            # uncomment for debugging
+                            #traceback.print_exc()
+                            pass
+                            
+                    elif isinstance(item, (int, range,slice)): # int index: for dataframe retrun the item_th row as a pd.Series
+                        try:
+                            v = var.iloc[item,:] # this is a series
+                            self._found_.append([item, slice(var.shape[1])]) # => explicit (normalized) indexing: row, col
+                            self._paths_.append(list(self._found_))
+                            yield v # a pd.Series
+                        except:
+                            try:
+                                v = var.iloc[:,item] # try columns
+                                self._found_.append([slice(var.shape[0]), item]) # => explicit (normalized) indexing: row, col
+                                self._paths_.append(list(self._found_))
+                            except:
+                                # NOTE: 2021-07-28 16:32:28
+                                # uncomment for debugging
+                                #traceback.print_exc()
+                                pass
+                            
+                    elif isinstance(item, pd.Index): # try to see if the index applies to the dataframe rows; _IF_ it fails, then check columns
+                        try:
+                            v = var.loc[item,:] # this is now a DataFrame
+                            self._found_.append([item, var.columns]) # => explicit (normalized) row/col indexing; item is a row ndex
+                            self._paths_.append(list(self._found_))
+                            yield v # a pd.DataFrame
+                            
+                        except:
+                            try:
+                                v = var.loc[:,item] # check columns
+                                self._found_.append([var.index, item]) # => explicit (normalized) row/col indexing; item is a col index
+                                self._paths_.append(list(self._found_))
+                                yield v
+                            except:
+                                # NOTE: 2021-07-28 16:32:28
+                                # uncomment for debugging
+                                #traceback.print_exc()
+                                pass
+            else:
+                # FIXME: 2021-07-28 15:18:51
+                # only supports scalar numbers and str for now
+                # and only support identity comparison (i.e. ignores self.comparator)
+                # TODO: 2021-07-28 15:20:38
+                # customized support for qualified comparators e.g., np.isclose
+                # and string comparisons (using pandas parser. etc) according to
+                # the column's dtype
+                if isinstance(item, (Number, str)):
+                    try:
+                        ndx = var == item
+                        if np.any(ndx): # check in values
+                            # creates a sequence of (row indexer, column indexer) tuples
+                            # where item was found
+                            # each tuple element ix in nx can then be used as
+                            # df.loc[ix[0], ix[1]] to retrieve the data value in
+                            # the data frame
+                            if isinstance(var, pd.DataFrame):
+                                nx = [(ndx.index[ndx.loc[:,c]], c) for c in var.columns[ndx.any()]]
+                                
+                            else:
+                                nx = ndx.index[ndx]
+                                
+                            # NOTE: 2021-07-28 15:32:26
+                            # this will append a tuple of pandas indices (row ix, col ix)!
+                            # treat carefully!
+                            self._found_.append(nx)
+                            self._paths_.append(list(self._found_))
+                            yield nx
+                            
+                        else: #check in indices
+                            #print("check in indices in %s" % type(var).__name__)
+                            if isinstance(var, pd.Series): # only row indices for Series
+                                ndx = var.index == item
+                                if np.any(ndx):
+                                    nx = ndx.index[ndx]
+                                    self._found_.append(nx)
+                                    self._paths_.append(list(self._found_))
+                                    yield nx
+                                    
+                            if isinstance(var, pd.DataFrame):
+                                rowndx = var.index == item
+                                #print("rowndx", np.any(rowndx))
+                                if np.any(rowndx):# -> row index + all columns
+                                    nx = [(ndx.index[ndx.loc[:,c]], var.columns)]
+                                    self._found_.append(nx)
+                                    self._paths_.append(list(self._found_))
+                                    yield nx
+                                    
+                                colndx = var.columns == item
+                                found = np.any(colndx)
+                                #print("colndx", found)
+                                if found: # -> all rows, given cols
+                                    nx = [(var.index, var.columns[colndx])]
+                                    #print("col nx", nx)
+                                    self._found_.append(nx)
+                                    self._paths_.append(list(self._found_))
+                                    #print(self._found_)
+                                    #print(self._paths_)
+                                    yield nx
+                            
+                    except:
+                        # NOTE: 2021-07-28 16:32:51
+                        # uncomment for debugging
+                        #traceback.print_exc()
+                        pass
+                            
+            #print(parent)
+            #print(self._found_)
+            if len(self._found_):
+                #if not parent or parent != self._found_[-1]:
+                if not parent or not safe_identity_test(parent, self._found_[-1]):
+                    self._found_.pop()
+        
+        elif isinstance(var, np.ndarray): # leaf collection
+            # print("%slookup in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
+            if as_index: # search for value at index
+                # NOTE 1: 2021-07-25 00:02:37
+                #
+                # We DO NOT support slice indexing, indexing arrays, or other
+                # fancy ndarray indexing here.
+                #
+                # We ONLY support the following (simple) ndarray indexing:
+                # (a) indexing by an int (flat index)
+                # (b) indexing by a tuple of int (one element per ndarray axis)
+                # (c) indexing by a tuple of "scalar" ndarrays (with size 1)
+                #     (as if output by np.nonzero)
+                #
+                # NOTE 2:
+                # We only support ndarrays with primitive data types (for now)
+                #
+                # NOTE 3: When 'item' is a suitable indexing object (see NOTE 1) 
+                # the function yields an indexing ndarray of size 1 as in NOTE 1
+                # case (c)
+                #
+                # NOTE 4: When 'item' is a value to be searched for, it must be
+                # cast-able to the ndarray's dtype, or an ndarray of size one &
+                # same dtype as the ndarray where the search is performed
+                
+                if isinstance(item, int): 
+                    # case (a)
+                    if len(var.shape)==0 or var.ndim==0:
+                        if item == 0:
+                            self._found_.append(np.array([item]))
+                            self._paths_.append(list(self._found_))
+                            # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
+                            yield var[0]
+                            
+                    elif item < var.shape[0]:
+                        self._found_.append(np.array([item]))
+                        self._paths_.append(list(self._found_))
+                        # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
+                        yield var[item] # may yield a subdimensional array
+                        
+                elif isinstance(item, (tuple, list)) and all(filter(lambda x: isinstance(x, int) or (isinstance(x, np.ndarray) and x.size==1), item)):
+                    # cases (b) and (c)
+                    if len(item) == var.ndim:
+                        self._found_.append(np.array([item]))
+                        self._paths_.append(list(self._found_))
+                        # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
+                        yield var[tuple(item)]
+
+            else: # search for index of value
+                # FIXME 2021-07-28 15:19:40
+                # only supports identity; this will almost surely fail for floats
+                # TODO: 2021-07-28 15:21:54
+                # customized application of qualified comparators e..g, 
+                # np.isclose for numeric arrays and other comparisons for non-numeric
+                # dtypes
+                if isinstance(item, (Number, str)) or (isinstance(item, np.ndarray) and item.size == 1):
+                    try:
+                        ndx = np.array([False])
+                        if isinstance(item, (Number,str)):
+                            ai = np.array([item])
+                            if ai.dtype == var.dtype:
+                                ndx = var == item
+                        
+                        else:
+                            if item.dtype == var.dtype:
+                                ndx = var == item
+                                
+                        if np.any(ndx):
+                            nx = np.nonzero(np.atleast_1d(ndx))
+                            self._found_.append(nx)
+                            self._paths_.append(list(self._found_))
+                            # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
+                            yield nx
+                    except:
+                        # NOTE: 2021-07-28 16:32:51
+                        # uncomment for debugging
+                        #traceback.print_exc()
+                        pass
+                    
+            # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
+            
+            if len(self._found_):
+                if not parent or not safe_identity_test(parent, self._found_[-1]):
+                    self._found_.pop()
+                    # print("%sback up one in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
+                
+            
+    def find(self, item:typing.Optional[typing.Any]=None, find_value:typing.Optional[bool]=None):
+        """Search for 'item' in a nesting data structure.
+        
+        A nesting data structure if a collection (sequence or mapping - a dict)
+        that contains other sequnences or dicts nested inside (with arbitrary
+        nesting levels).
+        
+        Parameters (for Usage, see below):
+        ----------------------------------
+        
+        item: object of the search (optional, default is None)
+            When None, the function re-runs the last search. 
+            
+            The search mode (by value or by index) is determined by 'find_value'
+            parameter (see below).
+            
+        find_value: bool (optional, default is None) 
+            Determines up the search mode: by value or by index.
+            
+            When True: 'search by value' mode
+            
+                * 'item' is cosidered a value possibly contained deep inside the
+                    nesting data structure
+                
+                * the function returns a collection of paths leading to the 
+                    values identical to that of 'item' (for primitive data types),
+                    or that are references to the 'item' (for other objects)
+                
+                * if 'item' is None, the function re-runs the last search in 
+                    'search by value' mode regardless of the mode of the previous 
+                    search
+                
+            When False: 'search by index' mode (a.k.a index lookup)
+            
+                * 'item' is considered an atomic indexing object (e.g. str, int, 
+                    ndarray or tuple of ndarrays) possibly valid for any of the
+                    containers nested in data 
+                
+                * the function returns a collection of found values and their
+                    paths inside the nesting data structure (see below)
+                
+                * If 'item' is None, the function re-runs the last search in 
+                    'search by index' mode regardless of the mode of the previous 
+                    search
+                
+            When anything else (i.e. NOT a bool):
+                If 'item' is None, the function re-runs the last search with the
+                same mode as the previous search.
+                
+                Otherwise, the function runs a search for 'item', using 
+                'search by value' mode (i.e., as if find_value was passed as 
+                True)
+                
+        Returns:
+        -------
+        A deque.
+        
+        In 'search by value' mode the returned value contains paths, where each 
+        path consists of the indices into nested containers with increasing 
+        nesting depth (think "tree branch") leading to where the 'item' was found.
+        
+        These paths (either individually, or their deque container returned here)
+        can be used to retrieve these values later on (see, e.g., self.get() and
+        NestedFinder.getvalue()). 
+        
+        CAUTION: When the nesting data structure has been modified externally, 
+        these paths may not be valid anymore.
+        
+        In 'search by index' mode, the returned value contains ('path', 'value')
+        tuples, where:
+        
+        * 'path' is the "tree branches" leading to (and ending with) the found 
+            'item' (remember, 'item' is an atomic index)
+            
+        * 'value' is the object found at the index that was looked up ('item')
+        
+        Usage:
+        ------
+        
+        Searching can be perfomred in two modes:
+        
+        1) 'search-by-value'
+        
+        To find the index branch path of a value inside the nesting data:
+        
+        * pass the value as 'item', and optionally specify 'find_value' as True
+        
+        * the method returns a collection (deque) of indexing paths from the 
+        top level to the 'leaf' index where 'item' was found
+        
+        2) 'search-by-index-or-key'
+        
+        To find values at a given index (or indexing object) inside ALL the 
+            collections contained in the nesting data structure:
+        
+        * pass the index as 'item' and specify 'find_value' as False. 
+        
+        * the method returns a collection (deque) of ('path', 'value') pairs,
+            where:
+            * 'path' is the indexing path from the top level to the index
+            specfied by 'item' (if found, and if appropriate)
+        
+            * 'value' is the object found at 'item' index in each of the 
+            collections contained inside the nesting data structure.
+            
+        To split out the index branch path the correspondng vales in two 
+        sequences (tuples), use the idiom:
+        
+            paths, values = zip(*ret) 
+        
+        where 'ret' is the return value of this method.
+        
+        The indexing object:
+        -------------------------------
+        An indexing object is any python object that can be used for subscript-
+        or key-based access, as follows:
+        
+        a) a hashable object usable as dict key
+        
+        b) int, range, slice - for indexing into sequences and pandas.Index objects
+        
+        c) a str - used as dict key, or as field name in a named tuple
+        
+        d) pandas Index object - for use with pandas Series and DataFrame objects
+        
+        e) numpy ndarray with integer elements - for indexing in numpy ndarrays
+        
+        f) a tuple of the above as appropriate
+        
+        The nesting data structure
+        --------------------------
+        This is a collection containing other collections as elements. These 
+        'nested' collections can themselves contain other nested collections, 
+        and so on to an arbitrary level.
+        
+        The tables below describe what python types are considered nesting data
+        structures, leaf, and nested data types, and the type of indexing objects
+        by convention accepted here, with brief notes about their use internally.
+        
+        Nesting data types are collections where the search is performed recursively;
+        they can be nested inside a parent nesting data.
+        
+        Nesting data type           Indexing object type
+        -------------------------------------------------
+        dict (and subclasses)       Hashable object that can be used as a key
+                                    (including but not limited to int, str)
+                                     
+        list, tuple, deque          int, range, slice
+        
+        namedtuple                  int, range, slice - as for tuple
+                                    str - for named field attribute-like access
+        
+        The following data types, although they are specialized collection types, 
+        are considered as 'leaf' objects: no recursive search is performed inside
+        their elements.
+        
+        'Leaf' data type            Indexing object type
+        ------------------------------------------------
+        numpy ndarray               indexing array (numpy ndarray with int or bool 
+                                    elements)
+                                    tuple of indexing arrays (with length matching
+                                    that of the array's shape)
+                                    
+        pandas.Index                int, range, slice, 
+                                    indexing array (as for 1D numpy ndarray)
+        
+        pandas.Series               pandas.Index (via Series.loc)     
+                                    int, range, slice (via Series.iloc property)
+                                    
+        pandas.DataFrame            (rows, cols) pair of pandas.Index objects 
+                                        (via DataFrame.loc)
+                                    tuple of int, range, slice (row, cols)
+                                        (via DataFrame.iloc)
+                                        
+        NOTE: Numpy ndarray objects also accept imple indexing via int, range, 
+            slice; however, for numpy arrays, the finder returns "canonical" 
+            indexing arrays as described above.
+        
+        
+        ATTENTION: When the nesting (or hierarchical) data contains circular 
+        references to a hierarchical data (i.e., the same python object of a
+        hierachical data type is stored as a value at distinct indexing paths)
+        only the first of these references is traversed (as encountered in 
+        depth-first order). This is to avoid runaway recursion into otherwise
+        the same hierarchical collection type.
+        
+        Indexing path:
+        --------------
+        This is a sequence (deque) of indexing objects as above, representing 
+        the 'tree' path from the top level nesting data (root) to the "leaf"; 
+        the root is excluded from the path.
+        
+        To illustrate, given a dict dd as below:
+        
+        dd = {"a":1, "b":{"c":2}, "c":[1,2,3]}
+        
+        1) Finding items with a given value:
+        
+        Elements with value 1 are found at the following paths:
+        
+        ["a"] and ["c", 0]
+        
+            NestedFinder(dd).find(1) --> deque([['a'], ['c', 0]])
+        
+        Elements with value 2 are found at the following paths:
+        ["b", "c"] and ["c", 1]
+        
+            NestedFinder(dd).find(2) --> deque([['b', 'c'], ['c', 1]])
+            
+        An element with value 3 is found at ["c",2]:
+        
+            NestedFinder(dd).find(3) --> deque([['c', 2]])
+        
+        
+        Furthermore: 
+        
+            NestedFinder(dd).find([1,2,3]) --> deque([['c']])
+            
+            NestedFinder(dd).find({"c":2}) --> deque([['b']])
+        
+        However:
+        
+            NestedFinder(dd).find({"c":1}) --> deque([]) # i.e., not found!
+            
+            NestedFinder(dd).find(4) --> deque([]) # i.e., not found!
+        
+        
+            NestedFinder(dd).find("c") --> deque([]) # i.e., not found!
+            
+        
+        2) Finding values given an index:
+            
+            NestedFinder(dd).find("c", False) 
+            
+            --> deque([(['b', 'c'], 2), (['c'], [1, 2, 3])])
+            
+            (compare with the previous example)
+            
+            Capture paths and values separately:
+            
+            paths, values  = zip(*NestedFinder(dd).find("c", False))
+            
+            paths 
+            --> (['b', 'c'], ['c'])
+            
+            values 
+            --> (2, [1, 2, 3])
+            
+        Finally, the last search (with its search mode) can be re-run by 
+        calling 'find' without parameters.
+            
+        
+        In either search mode (1) or (2) a deep copy of the collection of indexing
+        paths can be obtained as the NestedFinder object's property "paths".
+        
+        This can be used as the 'paths' parameter for the static method
+        NestedFinder.getvalue and the instance method NestedFinder.get.
+        
+        WARNING: Both of these methods will 'consume' the 'paths' parameter 
+        and therefore this collection should be treated as volatile.
+        
+        See also more contrived example below.
+        
+        Preamble:
+        ---------
+        
+        from collections import namedtuple
+        from core.utilities import NestedFinder
+        Point = namedtuple("Point", ("x", "y"))
+        p = Point(11,22)
+        ar = np.arange(5)
+           
+        d = {'b': {
+                    7: 8,
+                    9: [10, 11, ar],
+                    '9': ar,
+                    'd': p
+                    },
+            'd': p,
+            'e': (1, p)
+            }
+            
+        finder = NestedFinder(d)
+        
+        Example 1: 'search by value' mode = searching for a value retrieves the
+        paths leading to it.
+        -----------------------------------
+        
+        # ALso shows how these paths can be used to retrieve the value that was 
+        # searched for (for illustration purposes, as we already have the value 
+        # because we used it in the search)
+        
+        finder.find(p)
+        --> deque([['b', 'd'], ['d'], ['e', 1]]) #  a collection of indexing paths
+        
+        # use the internally stored collection of indexing paths to get the leaf 
+        # objects
+        finder.get()
+        --> Point(x=11, y=22), Point(x=11, y=22), Point(x=11, y=22)]
+        
+        # find another value
+        finder.find(11)
+        --> deque([['b', 9, 1],
+                    ['b', 9, 2, (array([11]),)],
+                    ['b', '9', (array([11]),)],
+                    ['b', 'd', 'x'],
+                    ['d', 'x'],
+                    ['e', 1, 'x']])
+        
+        # last search parameters are stored
+        finder.lastSearchIndex --> None
+        finder.lastSearchValue --> 11
+        
+        # repeat last search
+        finder.find() 
+        --> deque([['b', 9, 1],
+                    ['b', 9, 2, (array([11]),)],
+                    ['b', '9', (array([11]),)],
+                    ['b', 'd', 'x'],
+                    ['d', 'x'],
+                    ['e', 1, 'x']])
+                    
+        # retrieve the leaves using the found indexing paths 
+        #
+        # we searched to objects with the value 11 (an int); these are either the
+        # int objects stored at (IN 'PSEUDO-CODE'):
+        #
+        #   d['b'][9][1]    because d['b'] is a dict, and d['b'][9] is a list 
+        #                   where element at index 1 equals 11
+        #
+        #   d['b']['d'].x   because d['b']['d'] is a Point (namedtuple) where 
+        #                   the field 'x' equals 11
+        #
+        #   d['e'][1].x     because d['e'] is a tuple where element at index 1 
+        #                   is a Point (namedtuple) with field 'x' equal to 11
+        #
+        # or the ndarray elements at:
+        #
+        # d['b'][9][2][(array([11]),)]
+        #                   because element with index 2 in the d['b'][9] list
+        #                   is a numpy array where the element at [11,] equals 11
+        #
+        # d['b']['9'][(array([11]),)]
+        #                   because d['b']['9'] is a numpy array with the element
+        #                   at [11,] equal to 11
+        
+        finder.get()
+        --> [11, array([11]), array([11]), 11, 11, 11]
+        
+        finder.find("x")
+        --> deque([])
+        
+        Example 2: 'search by index' mode
+        ----------------------------------
+        
+        finder.find("x", False)
+        --> deque([(['b', 'd', 'x'], 11), (['d', 'x'], 11), (['e', 1, 'x'], 11)])
+        
+        ret = finder.find()
+        
+        ret
+        --> deque([(['b', 'd', 'x'], 11), (['d', 'x'], 11), (['e', 1, 'x'], 11)])
+        
+        finder.lastSearchIndex --> 'x'
+        finder.lastSearchValue --> None
+        
+        # the found values can be retrieved directly from the result:
+        vals = [v[1] for v in ret]
+        vals
+        --> [11, 11, 11]
+        
+        # but if the opportunity is lost, one can access the values using the 
+        # paths found in 'search by index' mode
+        
+        finder.get() # uses internally stored paths from last find
+        --> [11, 11, 11]
+        
+        # or even later, by passing an externally-generated paths collection
+        pth = [v[0] for v in ret]
+        pth
+        --> [['b', 'd', 'x'], ['d', 'x'], ['e', 1, 'x']]
+        
+        finder.get(pth) --> [11,11,11] # WARNING "consumes" pth (and indirectly, ret)
+        pth --> [[], [], []]
+        ret --> deque([([], 11), ([], 11), ([], 11)])
+        
+        # ret can be retrieved back
+        
+        ret = finder.find()
+        ret
+        --> deque([(['b', 'd', 'x'], 11), (['d', 'x'], 11), (['e', 1, 'x'], 11)])
+        
+        pth = [v[0] for v in ret]
+        pth
+        --> [['b', 'd', 'x'], ['d', 'x'], ['e', 1, 'x']]
+        
+        finder.get(deque(pth)) # WARNING "consumes" pth (and indirectly, ret)
+        --> [11, 11, 11]
+        
+        # restore paths collection (see above)
+        ret = finder.find()
+        pth = [v[0] for v in ret]
+        
+        finder.get(pth[0], True)
+        --> [11]
+        pth
+        --> [[], ['d', 'x'], ['e', 1, 'x']] # WARNING consumes partially
+        
+        To avoid the paths arguement from being consumed, pass a deep copy:
+        
+        from copy import deepcopy
+        finder.get(deepcopy(pth[0]), True)
+        
+        
+        When feeding a list to finder.get one must specify 'single' True/False
+        depending whether the list is ONE path or a collection of paths
+        finder.get(pth, True) --> TypeError: unhashable type: 'list'
+        
+        Example 3: One can work "outside" of a NestedFinder object.
+        ------------------------------------------------------------
+        
+        finder = NestedFinder(d)
+        del finder # goodbye 
+        
+        ret = finder.find("x", False)
+        pth = [v[0] for v in ret]
+        
+        NestedFinder.getvalue(d, deepcopy(pth))
+        --> [11, 11, 11]
+
+        """
+        if item is None:
+            if self.lastSearchIndex:
+                item = self.lastSearchIndex
+                if not isinstance(find_value, bool):
+                    find_value = False
+                
+            elif self.lastSearchValue:
+                item = self.lastSearchValue
+                if not isinstance(find_value, bool):
+                    find_value = True
+                
+            else:
+                return deque()
+            
+        if not isinstance(find_value, bool): # force the default here
+            find_value = True
+            
+        self.initialize()
+        
+        self._values_ = deque(self._gen_search(self.data, item, None, not find_value))
+        
+        if find_value:
+            self._result_ = self._paths_
+            self._item_as_value_ = item
+        else:
+            assert len(self._values_) == len(self._paths_)
+            self._result_ = deque(zip(self._paths_, self._values_))
+            self._item_as_index_ = item
+            
+        return deepcopy(self._result_)
+    
+    def findkey(self, obj):
+        """Search for value given an atomic key or indexing object
+        Returns a sequence of (path, value) tuples, where path is a list of
+        indexing objects (or keys) from the top to the item's nesting level,
+        and value is the nested value.
+        
+        Calls self.find(key_or_indexing_obj, False)
+        """
+        return self.find(obj, False)
+    
+    def findindex(self, obj):
+        """Calls self.findkey(key_or_indexing_obj).
+        """
+        return self.findkey(key_or_indexing_obj)
+    
+    def findvalue(self, value):
+        """Search for the key or indexing object nested in self.data.
+        
+        Calls self.find(value, True)
+        """
+        return self.find(value, True)
+    
+    def path_expression(self, paths:typing.Optional[typing.Union[tuple, list,deque]]=None, single:bool=True):
+        """Generates a str expression to be valuated on the hierarchical data
+        """
+        if not isinstance(paths, (deque, list, tuple)):
+            if not self._paths_:
+                #warnings.warn("Must run self.findvalue(val) or self.find(val, True) first")
+                return []
+            paths = self.paths
+            
+        if not isinstance(paths, deque):
+            if isinstance(paths, tuple):
+                paths = [paths]
+                
+            if not single:
+                paths = deque(paths)
+            
+        return self._get_path_expression(self.data, paths)
+    
+    @staticmethod
+    def paths2expression(data, paths:typing.Optional[typing.Union[tuple, list,deque]]=None, single:bool=True):
+        if not isinstance(paths, (deque, list, tuple)):
+            return ""
+        
+        if not isinstance(paths, deque):
+            if not single:
+                paths = deque(paths)
+                
+        return NestedFinder()._get_path_expression(data, paths)
+            
+    def get(self, paths:typing.Optional[typing.Union[tuple, list,deque]]=None, single:bool=True):
+        """Retrieves nested value(s) from the internal data using indexing paths.
+        
+        The internal data is the nesting (hierarchical) data type established at
+        initialization or later by setting the 'data' property.
+        
+        An indexing path is a list of atomic indexing objects, given in an 
+        increasing order of nesting depth (think tree branches from the stem to
+        a leaf).
+        
+        Several paths collected in a deque may be passed, in which case the 
+        function returns a collection (sequence) of values.
+        
+        For other (external) nesting data use NestedFinder.getvalue() static
+        method with an appropriate collection of paths (e.g. found by another 
+        instance of NestedFinder).
+        
+        Parameters:
+        ----------
+        paths: tuple, list, deque; optional, default is None
+        
+            When None, use the indexing paths generated by the last search, see:
+            self.find(), self.findindex(), self.findkey(), and self.findvalue().
+            
+            Type    Interpretation
+            ------------------------------------------
+            
+            tuple:  a tuple of cordinates in a 2D+ array or a pandas DataFrame
+                         ('paths' must be a pair in this case)
+                                       
+            list:   when 'single' is True (default): an indexing path;
+                        each element is an indexing object for each nesting level
+                        in increasing order (excluding the top level)
+                        
+                    when 'single' is False: a collection of indexing paths
+                                    
+            deque:  collection of indexing paths ('single' is ignored)
+            
+            NOTE: When 'paths' is a list or tuple, the parameter 'single' 
+                specifies if 'paths' is ONE indexing path or a collection of 
+                indexing  paths.
+            
+            WARNING The elements in 'paths' will be "consumed" (i.e., removed 
+            from the collection) during the process.
+            
+            To avoid this side-effect, pass a deep copy here.
+        
+        single: bool, default is True
+        
+            Specifies if 'paths' is a collection of path sequences (False) or
+            just a single path (True).
+            
+            Ignored when 'paths' is a deque.
+            
+            See the table above for how this modifies the function's behaviour.
+        
+        Returns:
+        -------
+        
+        A (possibly empty) list of values, one for each path in the 'paths' 
+        collection.
+        
+        Examples:
+        --------
+        
+        See examples in NestedFinder.find
+        
+        See also NestedFinder.getvalue
+        
+        """
+        if not isinstance(paths, (deque, list, tuple)):
+            if not self._paths_:
+                #warnings.warn("Must run self.findvalue(val) or self.find(val, True) first")
+                return []
+            paths = self.paths
+            
+        if not isinstance(paths, deque):
+            if isinstance(paths, tuple):
+                paths = [paths]
+                
+            if not single:
+                paths = deque(paths)
+            
+        return list(self._gen_nested_value(self.data, paths))
+            
+    @staticmethod
+    def getvalue(data, paths:typing.Optional[typing.Union[tuple, list, deque]]=None, single:bool = True):
+        """Static version of NestedFinder.get.
+        
+        Parameters:
+        -----------
+        
+        data: a nesting data structure
+        
+        paths: sequence (deque, list, tuple) of indexing paths or an indexing path.
+        
+            Optional, default is None, in which case returns an empty list.
+            
+            When a deque, this is interpreted as a collection of indexing paths.
+            
+        single: bool, optional (default is True)
+            Ignored if 'paths' is a deque.
+            
+            When True, 'paths' is a single indexing path.
+            
+        See NestedFinder.get for details
+        
+        WARNING: paths must reflect the nesting structure in 'data'
+        
+        """
+        if not isinstance(paths, (deque, list, tuple)):
+            return list()
+        
+        if not isinstance(paths, deque):
+            if not single:
+                paths = deque(paths)
+                
+        return list(NestedFinder()._gen_nested_value(data, paths))
+    
+        #finder = NestedFinder()
+        
+        #return list(finder._gen_nested_value(data, paths))
+        
+    
+def reverse_dict(x:dict)->dict:
+    """Returns a reverse mapping (values->keys) from x
+    
+    Parameters:
+    ==========
+    x:dict
+        CAUTION: the keys in 'x' must be mapped to unique values, and 
+                 the values in 'x' must be of hashable types
+    
+    Returns:
+    =======
+    
+    A dict mapping values to keys ('inverse' projection of 'x')
+    
+    """
+    from .traitcontainers import (DataBag, Bunch, )
+    from collections import OrderedDict
+    if isinstance(x, DataBag):
+        ret = DataBag((v,i) for i,v in x.items())
+    elif isinstance(x, Bunch):
+        ret = Bunch((v,i) for i,v in x.items())
+    elif isinstance(x, OrderedDict):
+        ret = OrderedDict((v,i) for i,v in x.items())
+    else:
+        ret = dict((v,i) for i,v in x.items())
+        
+    return ret
+
+def reverse_mapping_lookup(x:dict, y:typing.Any)->typing.Optional[typing.Any]:
+    """Looks up the key mapped to value y in the x mapping (dict)
+    Parameters:
+    ===========
+    x:dict
+    
+    y: any type
+    
+    Returns:
+    ========
+    The key mapped to 'y', if the mapping is unique, else a tuple of keys that
+    map to the same value in 'y'.
+    
+    Returns None if 'y' is not found among x.values()
+    
+    """
+    #from .traitcontainers import (DataBag, Bunch, )
+    #from collections import OrderedDict
+    
+    if y in x.values():
+        ret = [name for name, val in x.items() if y == val]
+        
+        if len(ret) == 1:
+            return ret[0]
+        
+        elif len(ret) > 1:
+            return tuple(ret)
+    
 def summarize_object_properties(objname, obj, namespace="Internal"):
     """Returns a dict with object properties for display in Scipyen workspace.
     The dict keys represent the column names in the WorkspaceViewer table, and 
@@ -47,6 +2591,15 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     the Scipyen main window.
     
     """
+    from core.datatypes import (abbreviated_type_names, dict_types, dict_typenames,
+                                ndarray_type, neo_containernames, 
+                                sequence_types, sequence_typenames, 
+                                set_types, set_typenames, signal_types, is_namedtuple, 
+                                UnitTypes, )
+    # NOTE: 2021-07-19 10:41:55
+    # FIXME for the above 2021-07-19 10:01:35:
+    # eliding is now created in gui.WorkspaceModel._get_item_for_object
+    
     #NOTE: memory size is reported as follows:
         #result of obj.nbytes, for object types derived from numpy ndarray
         #result of total_size(obj) for python containers
@@ -58,24 +2611,90 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         #TODO construct handlers for other object types as well including 
         #PyQt5 objects (maybe)
             
-    from numbers import Number
     
     result = dict(map(lambda x: (x, {"display":"", "tooltip":""}), standard_obj_summary_headers))
     
     objtype = type(obj)
     typename = objtype.__name__
+    ttip = typename
     
-    objcls = obj.__class__
-    clsname = objcls.__name__
+    wspace_name = "Namespace: %s" % namespace
     
-    result["Name"] = {"display": objname, "tooltip":objname}
+    # NOTE: 2021-10-03 21:07:45
+    # this consumes too much of resources (time & memory) and is unnecessary
+    # use the short version above
+    #if isinstance(obj, str):
+        #ttip = obj
+    #elif isinstance(obj, (tuple, list)):
+        #ttip = "%s" % (obj,)
+    #else:
+        #try:
+            #ttip = "%s" % obj
+        #except:
+            #ttip = typename
+    
+    result["Name"] = {"display": "%s" % objname, "tooltip":"\n".join([ttip, wspace_name])}
     
     tt = abbreviated_type_names.get(typename, typename)
     
+    if tt in signal_types and hasattr(obj, "dimensionality"):
+        tt += " (%s)" % obj.dimensionality
+    
     if tt == "instance":
-        tt = abbreviated_type_names.get(clsname, clsname)
+        objcls = obj.__class__
+        clsname = objcls.__name__
         
-    result["Type"] = {"display": tt, "tooltip": "type: %s" % tt}
+        tt = abbreviated_type_names.get(clsname, clsname)
+
+    if objtype is type:
+        tt += f" <{obj.__name__}>"
+        
+    ttip = tt
+        
+    if is_namedtuple(obj):
+        ttip += " (namedtuple)"
+        
+    if isabstract(obj):
+        ttip += " (abstract base class)"
+        
+    if isframe(obj):
+        ttip += " (execution stack frame)"
+        
+    if istraceback(obj):
+        ttip += " (execution stack traceback)"
+        
+    if isbuiltin(obj):
+        ttip = " (builtin)"
+    
+    if isgeneratorfunction(obj):
+        ttip += " (generator function)"
+        
+    if iscoroutinefunction(obj):
+        ttip += " (coroutine)"
+        
+    if isasyncgenfunction(obj):
+        ttip += " (asynchronous generator function)"
+        
+    # Not sure if these below are needed
+    if isasyncgen(obj):
+        ttip += " (asynchronous generator)"
+        
+    if isawaitable(obj): 
+        ttip += " (awaitable)"
+        
+    if isdatadescriptor(obj):
+        ttip += " (data descriptor)"
+        
+    if isgetsetdescriptor(obj):
+        ttip += " (getset descriptor)"
+        
+    if ismethoddescriptor(obj):
+        ttip += " (method descriptor)"
+        
+    if ismemberdescriptor(obj):
+        ttip += " (member descriptor)"
+            
+    result["Type"] = {"display": tt, "tooltip": "type: %s" % ttip}
     
     # these get assigned values below
     dtypestr = ""
@@ -96,11 +2715,10 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     ordertip= ""
     memsz = ""
     memsztip = ""
-    
 
     try:
-        if tt in sequence_types:
-            if len(obj) and all([isinstance(v, numbers.Number) for v in obj]):
+        if isinstance(obj, sequence_types):
+            if len(obj) and all([isinstance(v, Number) for v in obj]):
                 datamin = str(min(obj))
                 mintip = "min: "
                 datamax = str(max(obj))
@@ -113,8 +2731,8 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz    = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        elif tt in set_types:
-            if len(obj) and all([isinstance(v, numbers.Number) for v in obj]):
+        elif isinstance(obj, set_types):
+            if len(obj) and all([isinstance(v, Number) for v in obj]):
                 datamin = str(min([v for v in obj]))
                 mintip = "min: "
                 datamax = str(max([v for v in obj]))
@@ -127,7 +2745,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             #memsz    = str(total_size(obj)) # too slow for large collections
             memsztip = "memory size: "
             
-        elif tt in dict_types:
+        elif isinstance(obj, dict_types):
             sz = str(len(obj))
             sizetip = "length: "
             
@@ -135,107 +2753,13 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz    = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        #elif tt in ('VigraArray', "PictArray"):
-        elif tt in vigra_array_types:
-            dtypestr = str(obj.dtype)
-            dtypetip = "dtype: "
-            
-            if obj.size > 0:
-                try:
-                    if np.all(np.isnan(obj[:])):
-                        datamin = str(np.nan)
-                        
-                    else:
-                        datamin = str(np.nanmin(obj))
-                        
-                except:
-                    pass
-                
-                mintip = "min: "
-                
-                try:
-                    if np.all(np.isnan(obj[:])):
-                        datamax = str(np.nan)
-                    
-                    else:
-                        datamax  = str(np.nanmax(obj))
-                        
-                except:
-                    pass
-                
-                maxtip = "max: "
-                
-            sz    = str(obj.size)
-            sizetip = "size: "
-            
-            ndims   = str(obj.ndim)
-            dimtip = "dimensions: "
-            
-            shp = str(obj.shape)
-            shapetip = "shape: "
-            
-            axes    = repr(obj.axistags)
-            axestip = "axes: "
-            
-            arrayorder    = str(obj.order)
-            ordertip = "array order: "
-            
-            memsz    = str(obj.nbytes)
-            #memsz    = "".join([str(getsizeof(obj)), str(obj.nbytes), "bytes"])
-            memsztip = "memory size (array nbytes): "
-            
-        #elif tt in ('Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 'SpikeTrain', "DataSignal", "IrregularlySampledDataSignal"):
-        elif tt in signal_types:
-            dtypestr = str(obj.dtype)
-            dtypetip = "dtype: "
-            
-            if obj.size > 0:
-                try:
-                    if np.all(np.isnan(obj[:])):
-                        datamin = str(np.nan)
-                        
-                    else:
-                        datamin = str(np.nanmin(obj))
-                        
-                except:
-                    pass
-                    
-                mintip = "min: "
-                    
-                try:
-                    if np.all(np.isnan(obj[:])):
-                        datamax = str(np.nan)
-                        
-                    else:
-                        datamax  = str(np.nanmax(obj))
-                        
-                except:
-                    pass
-                
-                maxtip = "max: "
-                
-            sz    = str(obj.size)
-            sizetip = "size: "
-            
-            ndims   = str(obj.ndim)
-            dimtip = "dimensions: "
-            
-            shp = str(obj.shape)
-            shapetip = "shape: "
-            
-            memsz    = str(obj.nbytes)
-            #memsz    = "".join([str(getsizeof(obj)), str(obj.nbytes), "bytes"])
-            memsztip = "memory size (array nbytes): "
-            
-        #elif tt in ('Block', 'Segment'):
-        elif tt in neo_containers:
+        elif isinstance(obj, NeoContainer):
             sz = str(obj.size)
             sizetip = "size: "
                 
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        #elif tt == 'str':
         elif isinstance(obj, str):
             sz = str(len(obj))
             sizetip = "size: "
@@ -267,8 +2791,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        #elif isinstance(obj, pd.Series):
-        elif  tt == "Series":
+        elif isinstance(obj, pd.Series):
             dtypestr = "%s" % obj.dtype
             dtypetip = "dtype: "
 
@@ -284,8 +2807,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        #elif isinstance(obj, pd.DataFrame):
-        elif tt == "DataFrame":
+        elif isinstance(obj, pd.DataFrame):
             sz = "%s" % obj.size
             sizetip = "size: "
 
@@ -298,7 +2820,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        elif tt == ndarray_type:
+        elif isinstance(obj, np.ndarray):
             dtypestr = str(obj.dtype)
             dtypetip = "dtype: "
             
@@ -336,15 +2858,20 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             shapetip = "shape: "
             
             memsz    = str(obj.nbytes)
-            memsztip = "memory size: "
+            memsztip = "memory size (bytes): "
+            
+            if isinstance(obj, vigra.VigraArray) and hasattr(obj, "axistags"):
+                axes    = repr(obj.axistags)
+                axestip = "axes: "
+                
+                arrayorder    = str(obj.order)
+                ordertip = "array order: "
+            
             
         else:
             #vmemsize = QtGui.QStandardItem(str(getsizeof(obj)))
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
-            
-            
-        #print("namespace", namespace)
             
         result["Data Type"]     = {"display": dtypestr,     "tooltip" : "%s%s" % (dtypetip, dtypestr)}
         result["Workspace"]     = {"display": namespace,    "tooltip" : "Location: %s kernel namespace" % namespace}
@@ -357,8 +2884,11 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         result["Array Order"]   = {"display": arrayorder,   "tooltip" : "%s%s" % (ordertip, arrayorder)}
         result["Memory Size"]   = {"display": memsz,        "tooltip" : "%s%s" % (memsztip, memsz)}
         
+        # NOTE: 2021-06-12 12:22:38
+        # append namespace name to the tooltip at the entries other than Name, as well
         for key, value in result.items():
-            value["tooltip"] = "\n".join([value["tooltip"], "Namespace: %s" % result["Workspace"]["display"]])
+            if key != "Name":
+                value["tooltip"] = "\n".join([value["tooltip"], wspace_name])
         
     except Exception as e:
         traceback.print_exc()
@@ -367,7 +2897,9 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
 def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True) -> typing.Union[tuple, int]:
     """Alternative to list.index(), such that a missing value returns None
-    of raising an Exception
+    of raising an Exception.
+    DEPRECATED
+    Use prog.filter_attr
     """
     if b in a:
         if multiple:
@@ -377,6 +2909,101 @@ def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True) -> typi
     
     else:
         return None
+    
+def index_of(seq, obj, key=None, multiple=False, comparator=None):
+    """Find the index of obj in the object sequence seq.
+    
+    Object finding can be based on the object's identity (by default) or by the 
+    value of a specific object attribute. 
+    
+    In the former case, the object 'obj' must exist in 'seq'.
+    
+    In the latter case, 'key' must be a unary function - typically, a lambda
+    function with access to a property of the object (i.e. calls a 'getter'
+    method); the value of the property must support comparison operations
+    (i.e., have at least the '__eq__' member function).
+    
+    This allows retrieving the index of an object with the same property value
+    as 'obj', even if 'obj' is not in the sequence (when 'obj' is in the sequence,
+    this MAY return the index of 'obj', when 'obj' is the first element 
+    satisfying the condition in 'key')
+    
+    Functions with more than one parameter must accept an element of 'seq' as 
+    first parameter, and can be converted to unary function using 
+    functools.partial()
+    
+    e.g. 
+    
+    index = index_of(seq, obj, key = lambda x: x.attribute)
+    
+    OR:
+    
+    index = index_of(seq, obj, key = lambda x: getattr(x, "something", None) etc
+        
+        This represents the index of the first object with property 'something'
+        having the same value as 'obj.something'
+    
+    Parameters:
+    ----------
+    seq: iterable
+    
+    obj: any pyton object
+    
+    key: function that accesses one of obj attributes; optional (default is None)
+    
+    multiple:bool, optional (default is False)
+        When False (the default) returns a list with the index of the first 
+            occurrence of 'obj' in 'seq' (that optionally satisfies 'key') - this
+            behaviour is similar to that of the list.index method.
+            
+        When True, returns a (possibly empty) list of indices for the occurrences
+            of obj in seq (that optionally also satisfy key).
+            
+    comparator: binary predicate function: a function taking two parameters
+        and returning a bool value; optional,  default is None
+        
+        When None, comparison is made using the 'is' builtin.
+        
+        For comparing data, one may use functions in the 'operator' module
+        e.g., 'operator.eq'
+        
+        Used when 'multiple' is True.
+        
+        NOTE: the 'is' builtin returns True when the two compared operands are
+            symbols of the same python object (they have the same 'id').
+            
+            When a comparison of the contents contents of otherwise DISTINCT 
+            objects is intended, then a 'comparator' binary predicate should be 
+            used.
+    
+    Returns:
+    -------
+    
+    A list of indices (possibly empty)
+    
+    """
+    if key is None:
+        if obj in seq:# returns None if object not in seq
+            if multiple:
+                if comparator is None:
+                    return [k for k, o in enumerate(seq) if o is obj]
+                else:
+                    return [k for k, o in enumerate(seq) if comparator(o, obj)]
+            return [seq.index(obj)]
+        else:
+            return []
+    
+    elif inspect.isfunction(key):
+        lst = [key(o) for o in seq]
+        if multiple:
+            if comparator is None:
+                return [k for k, v in enumerate(lst) if v is key(obj)]
+            else:
+                return [k for k, v in enumerate(lst) if comparator(v, key(obj))]
+        else:
+            if key(obj) in lst:
+                return [lst.index(key(obj))]
+            return list()
     
 def yyMdd(now=None):
     import string, time
@@ -391,7 +3018,7 @@ def yyMdd(now=None):
 
 
 
-def makeFileFilterString(extList, genericName):
+def make_file_filter_string(extList, genericName):
     extensionList = [''.join(i) for i in zip('*' * len(extList), '.' * len(extList), extList)]
 
     fileFilterString = genericName + ' (' + ' '.join(extensionList) +')'
@@ -404,8 +3031,14 @@ def makeFileFilterString(extList, genericName):
     
     return (fileFilterString, individualFilterStrings)
 
-def counterSuffix(x, strings):
-    """Appends a counter suffix to x is x is found in the list of strings
+def elements_types(s):
+    """Returns the unique types in a sequence
+    """
+    return gen_unique(map(lambda x: type(x).__name__, s))
+
+
+def counter_suffix(x, strings, sep="_"):
+    """Appends a counter suffix to x if x is found in the list of strings
     
     Parameters:
     ==========
@@ -414,87 +3047,141 @@ def counterSuffix(x, strings):
     
     strings = sequence of str to check for existence of x
     
+    underscore_sfx: bool default is True: and underscore separated the numeric
+     suffi from the root of the string
+     When False, the separator is space
+    
     """
+    # TODO:
     
-    if not isinstance(strings, (tuple, list)) or not all ([isinstance(s, str) for s in strings]):
-        raise TypeError("Second positional parameter was expected to be a sequence of str")
-    
-    count = len(strings)
-    
-    ret = x
-    
-    if count > 0:
-        if x in strings:
-            first   = strings[0]
-            last    = strings[-1]
-            
-            m = re.match(r"([a-zA-Z_]+)(\d+)\Z", first)
-            
-            if m:
-                suffix = int(m.group(2))
+    #base = "AboveTheSky"
+    #p = re.compile("^%s_{0,1}\d*$" % base)
+    #p = re.compile("^%s_{0,1}\d*$" % base)
+    #items = list(filter(lambda x: p.match(x), standardQtGradientPresets.keys()))
+    #items
+    #names = list(standardQtGradientPresets.keys())
+    #names.append("AboveTheSky_1")
+    #items = list(filter(lambda x: p.match(x), names))
+    #items
 
-                if suffix > 0:
-                    ret = "%s_%d" % (x, suffix-1)
-                    
-            else:
-                m = re.match(r"([a-zA-Z_]+)(\d+)\Z", last)
-                
-                if m:
-                    suffix = int(m.group(2))
-                    
-                    ret = "%s_%d" % (x, suffix+1)
+    if not isinstance(strings, (tuple, list)) and not hasattr(strings, "__iter__"):
+        raise TypeError("Second positional parameter was expected to be an iterable; got %s instead" % type(strings).__name__)
+    
+    if not all ([isinstance(s, str) for s in strings]):
+        raise TypeError("Second positional parameter was expected to contain str elements only")
+    
+    if not isinstance(sep, str):
+        raise TypeError("Separator must be a str; got %s instead" % type(sep).__name__)
+    
+    if len(sep) == 0:
+        raise ValueError("Separator cannot be an empty string")
+    
+    
+    if len(strings):
+        base, cc = get_int_sfx(x, sep=sep)
+        
+        #p = re.compile(base)
+        p = re.compile("^%s%s{0,1}\d*$" % (base, sep))
+        
+        items = list(filter(lambda x: p.match(x), strings))
+        
+        if len(items):
+            fullndx = range(1, len(items))
+            full = set(fullndx)
+            currentsfx = sorted(list(filter(lambda x: x, map(lambda x: get_int_sfx(x, sep=sep)[1], items))))
+            current = set(currentsfx)
+            if len(currentsfx):
+                if min(currentsfx) > 1:
+                    # first slot (base_1) is missing - fill it 
+                    newsfx = 1
                     
                 else:
-                    
-                    ret = "%s_%d" % (x, count)
-                    
-    return ret
+                    if current == full:
+                        # full range if indices is taken;
+                        # but the 0th slot may be missing (base)
+                        if base not in items:
+                            # 0th slot (base) is missing:
+                            return base
+                        # => get the next one up (base_x, x = len(items)
+                        newsfx = len(items)
+                        
+                    else: # set cardinality may be different, or just their elements are different
+                        if len(current) == len(full):
+                            # same cardinality => different elements =>
+                            # neither is a subset of the other
+                            # check what elements from full are NOT in currentsfx
+                            # while SOME currentsfx are in full
+                            missing = full - current
+                            if len (missing):
+                                # get the minimal slot from missing
+                                newsfx = min(missing)
+                            else:
+                                # full and currentsfx are disjoint
+                                newsfx = min(full)
+                        else:
+                            return base # FIXME/TODO good default ?!?
+            else:
+                # base not found: return the next available slot (base_1)
+                newsfx = 1
                 
-    
+            return sep.join([base, "%d" % newsfx])
+            
+        else:
+            return x
+                
+    return x
+                
 def get_nested_value(src, path):
-    """Returns a value contained in the nested dictionary structure src.
+    """Returns a value contained in a hierarchical data structure.
     
     Returns None if path is not found in dict.
     
     Parameters:
     ===========
     
-    src: a dictionary, possibily containing other nested dictionaries; 
+    src: a dictionary, or a sequence (tuple, list), possibily containing other 
+        nested dict/tuple/list; 
         NOTE: all keys in the dictionary must be hashable objects
     
-    path: a hashable object that points to a valid key in "src", or a list of
-            hashable objects describing the path from the top-level dictionary src
+    path: an indexing object that points to a valid key nested in "src", or a list of
+            indexing objects describing the path from the top-level dictionary src
             down to the individual "branch".
             
             Hashable objects are python object that define __hash__() and __eq__()
             functions, and have a hash value that never changes during the object's
             lifetime. Typical hashable objects are scalars and strings.
+            
+            When src is a tuple or list, path is expected to be a sequence of int
+            (or values that can be casted to int).
+            
+            When src is a collections.namedtuple or a dict, path may contain a mixture of str 
+            and int.
+            
+            NOTE: the path represents depth-first traversal of src.
     
     """
-    if not isinstance(src, (dict, tuple, list)):
-        raise TypeError("First parameter (%s) expected to be a dict, tuple, or list; got %s instead" % (src, type(src).__name__))
+    if not isinstance(src, NestedFinder.supported_collection_types):
+        raise TypeError("First parameter (%s) expected to be a %s; got %s instead" % (src, NestedFinder.supported_collection_types, type(src).__name__))
     
-    #if hasattr(path, "__hash__") and getattr(path, "__hash__") is not None: 
-        ## list has a __hash__ attribute which is None
-        #if path in src:
-            #return src[path]
-        
-        #else:
-            #return None
-        
-    elif isinstance(path, (tuple, list)):
+    if isinstance(path, (tuple, list, deque)):
         try:
             if isinstance(src, (tuple, list)):
-                ndx = int(path[0])
+                # here path is expected to be a sequence of int unless src is a
+                # named tuple
+                if isinstance(src, tuple) and isinstance(path[0], str):
+                        # will raise exception if src is not a named tuple or
+                        # path[0] is not a field name of src
+                        value = getattr(src, path[0]) 
+                else:
+                    # will raise exception if casting cannot be done
+                    ndx = int(path[0]) 
+                                   
                 
             else:
                 ndx = path[0]
             
+            # will raise exception if ndx is not hashable
             value = src[ndx]
-            
-            #print("path", path)
-            #print("path[0]", path[0])
-            #print("value type", type(value).__name__)
             
             if len(path) == 1:
                 return value
@@ -509,9 +3196,11 @@ def get_nested_value(src, path):
             traceback.print_exc
             return None
         
+    elif isinstance(path, (str, int)):
+        return get_nested_value(src, [path])
+        
     else:
         raise TypeError("Expecting a hashable object or a sequence of hashable objects, for path %s; got %s instead" % (path, type(path).__name__))
-        
         
 def set_nested_value(src, path, value):
     """Adds (or sets) a nested value in a mapping (dict) src.
@@ -561,34 +3250,122 @@ def pairwise(iterable):
     next(b, None)
     return zip(a, b)
 
-def unique(seq):
+def sort_with_none(iterable, none_last = True):
+    import math
+    
+    noneph = math.inf if none_last else -math.info
+    
+    return sorted(iterable, key=lambda x: x if x is not None else noneph)
+
+def unique(seq, key=None):
     """Returns a sequence of unique elements in sequence 'seq'.
+    Function vrsion of gen_unique
+    Parameters:
+    -----------
+    seq: an iterable sequence (tuple, list, range)
+    
+    key: predicate for uniqueness (optional, default is None)
+        Typically, this is an object returned by a lambda function
+        
+        e.g.
+        
+        unique(seq, lambda x: x._some_member_property_or_getter_function_)
+    
+    Returns:
+    =======
+    A sequence containing unique elements in 'seq'.
+    
+    NOTE: Does not guarantee the order of the unique elements is the same as 
+            their order in 'seq'
+            
+    WARNING: Only works with sequences of hashable types.
+    
+    See also gen_unique for a generator version.
+    
+    """
+    if not isinstance(seq, collections.abc.Sequence):
+        raise TypeError(f"Expecting a Sequence; got {type(seq).__name__} instead")
+
+    if isinstance(seq, tuple):
+        return tuple((item for item in gen_unique(seq, key=key)))
+    
+    else:
+        return [item for item in gen_unique(seq, key=key)]
+            
+    #if not isinstance(seq, (tuple, list, range)):
+        #raise TypeError("expecting an iterable sequence (i.e., a tuple, a list, or a range); got %sinstead" % type(seq).__name__)
+    
+    #seen = set()
+    
+    #if key is None:
+        #return [x for x in seq if x not in seen and not seen.add(x)]
+    
+    #else:
+        #return [x for x in seq if key not in seen and not seen.add(key)]
+
+def gen_unique(seq, key=None):
+    """Iterates through unique elements in seq
     
     Parameters:
     -----------
     seq: an iterable sequence (tuple, list, range)
     
-    Returns:
-    A sequence containing unique elements in 'seq'.
+    key: predicate for uniqueness (optional, default is None)
+        When present, it is usually a unary predicate function taking an 
+        element of the sequence as first parameter, and returning a bool.
+        
+        Predicates with more than one parameters (e.g., a comparator such as 
+        operator.ge_, etc) can be converted to unary predicates by "fixing" the 
+        second operand through functools.partial.
+        
+        
+        Typically, this is an object returned by a lambda function
+        
+        e.g.
+        
+        unique(seq, lambda x: x._some_member_property_or_getter_function_)
+    
+    Yields:
+    =======
+    Unique elements in 'seq'.
     
     NOTE: Does not guarantee the order of the unique elements is the same as 
             their order in 'seq'
+            
+    WARNING: Only works with sequences of hashable types.
+    
+    See also:
+    ========
+    
+    unique for a function version
     
     """
-    if not isinstance(seq, (tuple, list, range)):
-        raise TypeError("expecting an iterable sequence (i.e., a tuple, a list, or a range); got %sinstead" % type(seq).__name__)
+    if not isinstance(seq, (tuple, list, range, deque, str)):
+        raise TypeError("expecting an iterable sequence (i.e., a tuple, a list, or a range); got %s instead" % type(seq).__name__)
     
     seen = set()
     
-    return [x for x in seq if x not in seen and not seen.add(x) ]
+    if key is None:
+        yield from (x for x in seq if x not in seen and not seen.add(x))
+    
+    else:
+        if inspect.isfunction(key):
+            yield from (x for x in seq if key(x) not in seen and not seen.add(key(x)))
+        else:
+            yield from (x for x in seq if key not in seen and not seen.add(key))
+            
+            
 
 
-def __name_lookup__(container: typing.Sequence, name:str, 
-                    multiple: bool = True) -> typing.Union[tuple, int]:
+def name_lookup(container: typing.Sequence, name:str, 
+                multiple: bool = True) -> typing.Union[tuple, int]:
+    """Get indices of container elements with attribute 'name' of given value(s).
+    """
+    
     names = [getattr(x, "name") for x in container if (hasattr(x, "name") and isinstance(x.name, str) and len(x.name.strip())>0)]
     
     if len(names) == 0 or name not in names:
-        warnings.warn("No element with 'name' == '%s' was found in the sequence" % name)
+        warnings.warn(f"No element with 'name' {name} was found in the sequence")
         return None
     
     if multiple:
@@ -601,43 +3378,454 @@ def __name_lookup__(container: typing.Sequence, name:str,
         
     return names.index(name)
 
+def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series]],
+                     index: typing.Optional[typing.Union[str, int, collections.abc.Sequence, np.ndarray, range, slice]] = None,
+                     silent:bool=False) -> typing.Union[range, tuple]:
+    """Transform various indexing objects to a range or iterable of int indices.
+    
+    Also checks the validity of the index for an iterable of data_len samples.
+    
+    Parameters:
+    -----------
+    data: Sequence or int; 
+        When a Sequence, the index will be verified against len(data).
         
-@safeWrapper
-def safe_identity_test(x, y):
-    from pyqtgraph import eq
+        When one of the pandas data types:
+            DataFrame, Series: the index will be checked against the object's 
+            'index' attribute
+            
+            pandas.core.indexes.base.Index: the index will be cheched against it
+            (useful when passing the columns attribute of a DataFrame)
+            
+        When an int, 'data' is the length of a putative Sequence (hence 
+        data >= 0)
+    
+    index: int, iterable, np.ndarray, range, slice, str, or None (default).
+    
+        When 'index' is None, the function returns range(0, len(data)) with 
+            'data' is a Sequence, else range(, data) when 'data' is an int.
+            
+        Otherwise, the function behaves as below:
+        
+        Index type 
+        -----------
+        range                       It is returned, provided max(index) < len(data)
+                                    (or max(index) < data when 'data' is an int)
+        
+        slice                       Returns slice.indices(len(data))
+                                    (or slice.indices(data) when 'data' is an int)
+        
+        collections.abc.Sequence    Each element must be in range(-len(data), len(data))
+        with int elements           (or range(-data, data) when 'data' is an int)
+        
+                                    Returns 'index'
+                                    
+        str                         'data' must be a Sequence containing elements 
+                                    that MAY have an attribute named 'name' (those
+                                    without a 'name' attribute are ignored and 
+                                    their indices in the Sequence will be skipped).
+                                    
+        collections.abc.Sequence    'data' must be a Sequence, as above;
+        with str elements           
+                                    Returns the indices of those elements in 'data'
+                                    having 'name' attribute with value in index.
+                                    
+        1D np.ndarray with
+        integer dtype               Returns a list of array's values (after validation)
+        (e.g. np.dtype(int))
+        
+        logical dtype               Used as a 'mask': returns the indices of the 
+        (e.g., np.dtype(bool))      True values; 'index' must satisfy:
+                                    len(index) == len(data) (with 'data' a Sequence)
+                                    len(index) == data (whith 'data' an int)
+        
+        CAUTION: negative integral indices are valid and perform the reverse 
+            indexing (going "backwards" in the iterable).
+            
+    Returns:
+    --------
+    ret - an iterable object (range, or tuple of integer indices) that can be 
+        used in list comprehensions using 'data' (when 'data' is a Sequence) or
+        any sequence with same length as 'data' (when 'data' is an int).
+        
+    See also:
+    
+    prog.filter_attr
+    
+    """
+    from core.datatypes import is_vector
+    
+    if data is None:
+        return tuple()
+    
+    elif isinstance(data, int):
+        data_len = data
+        data = None
+        
+    elif isinstance(data, collections.abc.Sequence):
+        data_len = len(data)
+        
+    elif isinstance(data, (pd.Series, pd.DataFrame)):
+        data_len = len(data)
+        data = data.index
+        
+    elif isinstance(data, pd.core.indexes.base.Index):
+        data_len = len(data)
+        
+    else:
+        raise TypeError("Expecting an int or a sequence (tuple, list, deque) or None; got %s instead" % type(data).__name__)
+    
+    if index is None:
+        return range(data_len)
+    
+    if isinstance(index, int):
+        # NOTE: 2020-03-12 22:40:31
+        # negative values ARE supported: they simply go backwards from the end of
+        # the sequence
+        if index not in range(-data_len,data_len):
+            if silent:
+                return None
+            raise ValueError("Index %s is invalid for %d elements" % (index, len(data)))
+        
+        if isinstance(data, pd.core.indexes.base.Index):
+            return (data[index], )
+        
+        return (index,)
+    
+    if isinstance(index, str):
+        if isinstance(data, (tuple, list)):
+            return tuple(prog.filter_attr(data, name=lambda x: x==index, indices_only=True))
+    
+        if isinstance(data, (pd.core.indexes.base.Index)):
+            if index in data:
+                return index
+                #return (list(data).index(index), )
+            
+            if not silent:
+                raise IndexError(f"Invalid 'index' specification {index}")
+                
+        raise TypeError("Name index requires 'data' to be a sequence of objects, or a pandas Index")
+        
+    elif isinstance(index, collections.abc.Iterable):
+        if all(isinstance(v, int) and v in range(-data_len, data_len) for v in index):
+            if isinstance(data, pd.core.indexes.base.Index):
+                return (data[v] for v in index )
+            
+            return index
+        
+        elif all(isinstance(v, str) for v in index):
+            if not isinstance(data, collections.abc.Iterable):
+                raise TypeError("When indexing by name attribute (str), data must be an iterable")
+            
+            if isinstance(data, collections.abc.Sequence):
+                return tuple(prog.filter_attr(data, name=lambda x: x in index, indices_only=True))
+            
+            if isinstance(data, pd.core.indexes.base.Index):
+                return tuple(v for v in index if v in data)
+        
+                if not silent:
+                    raise IndexError(f"Invalid 'index' specification {index}")
+        else:
+            if silent:
+                return None
+            
+            raise IndexError(f"Invalid 'index' specification {index}")
+        
+    elif isinstance(index, range):
+        if max(index) >= data_len:
+            if silent:
+                return None
+            raise IndexError("Index %s out of range for %d elements" % (index, data_len))
+        
+        return index # -> index IS a range
+    
+    elif isinstance(index, slice):
+        ndx = index.indices(data_len)
+            
+        if len(ndx) == 0:
+            if silent:
+                return None
+            raise IndexError("Indexing %s results in an empty indexing list" % index)
+        
+        if max(ndx) >= data_len:
+            if silent:
+                return None
+            raise IndexError("Index %s out of range for %d elements" % (index, data_len))
+        
+        if min(ndx) < -data_len:
+            if silent:
+                return None
+            raise IndexError("Index %s out of range for %d elements" % (index, data_len))
+        
+        return ndx # -> ndx IS a tuple
+    
+    elif isinstance(index, np.ndarray):
+        if not is_vector(index):
+            raise TypeError("Indexing array must be a vector; instead its shape is %s" % index.shape)
+            
+        if index.dtype.kind == "i": # index is an array of int
+            return tuple(index)
+        
+        elif index.dtype.kind == "b": # index is an array of bool
+            if len(index) != data_len:
+                raise TypeError("Boolean indexing vector must have the same length as the iterable against it will be normalized (%d); got %d instead" % (data_len, len(index)))
+            
+            return tuple(np.arange(data_len)[index])
+            #return tuple([k for k in range(data_len) if index[k]])
+            
+    else:
+        raise TypeError("Unsupported data type for index: %s" % type(index).__name__)
+    
+def normalized_sample_index(data:np.ndarray, 
+                            axis: typing.Union[int, str, vigra.AxisInfo], 
+                            index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None) -> typing.Union[range, list]:
+    """Calls normalized_index on a specific array axis.
+    Also checks index validity along a numpy array axis.
+    
+    Parameters:
+    ----------
+    data: numpy.ndarray or a derivative (e.g. neo.AnalogSgnal, vigra.VigraArray)
+    
+    axis: int, str, vigra.AxisInfo. The array axis along which the index is normalized.
+    
+    index: int, tuple, list, np.ndarray, range, slice, None (default).
+        When not None, it is the index to be normalized.
+        
+        CAUTION: negative integral indices are valid and perform the indexing 
+        "backwards" in an array.
+    
+    Returns:
+    --------
+    ret - an iterable (range or list) of integer indices
+    
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Expecting a numpy array or a derivative; got %s instead" % type(data).__name__)
+    
+    if not isinstance(axis, (int, str, vigra.AxisInfo)):
+        raise TypeError("Axis expected to be an int, a str or a vigra.AxisInfo; got %s instead" % type(axis).__name__)
+    
+    axis = normalized_axis_index(data, axis)
+    
+    data_len = data.shape[axis]
     
     try:
-        ret = True
-        
-        ret &= type(x) == type(y)
-        
-        if not ret:
-            return ret
-        
-        if hasattr(x, "size"):
-            ret &= x.size == y.size
-
-        if not ret:
-            return ret
-        
-        if hasattr(x, "shape"):
-            ret &= x.shape == y.shape
-            
-        if not ret:
-            return ret
-        
-        # NOTE: 2018-11-09 21:46:52
-        # isn't this redundant after checking for shape?
-        # unless an object could have shape attribte but not ndim
-        if hasattr(x, "ndim"):
-            ret &= x.ndim == y.ndim
-        
-        ret &= eq(x,y)
-        
-        return ret ## good fallback, though potentially expensive
+        return normalized_index(data_len, index)
     
-    except Exception as e:
-        #traceback.print_exc()
-        #print("x:", x)
-        #print("y:", y)
-        return False
+    except Exception as exc:
+        raise RuntimeError("For data axis %d with size %d:" % (axis, data_len)) from exc
+
+def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)) -> int:
+    """Returns an integer index for a specific array axis
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Expecting a numpy array or a derivative; got %s instead" % type(data).__name__)
+    
+    if not isinstance(axis, (int, str, vigra.AxisInfo)):
+        raise TypeError("Axis expected to be an int, a str or a vigra.AxisInfo; got %s instead" % type(axis).__name__)
+    
+    if isinstance(axis, (str, vigra.AxisInfo)):
+        # NOTE: 2019-11-22 12:39:30
+        # for VigraArray only, normalize axis index from str or AxisInfo to int
+        if not isinstance(data, vigra.VigraArray):
+            raise TypeError("Generic numpy arrays do not support axis index as strings or AxisInfo objects")
+        
+        if isinstance(axis, str):
+            axis = data.axitags.index(axis)
+            
+        elif isinstance(axis, vigra.AxisInfo):
+            axis = data.axistags.index(axis.key)
+            
+    # NOTE: 2019-11-22 12:39:17
+    # by now, axis is an int
+    if axis < 0 or axis > data.shape[axis]:
+        raise ValueError
+    
+    return axis
+
+def sp_set_loc(x, index, columns, val):
+    """Assign values to pandas.SparseArray
+    Work around .loc idiom when fill value is pd.NA
+    
+    Parameters:
+    -----------
+    x : DataFrame with series formatted with Pandas SparseDtype
+        Series formatted with Pandas SparseDtype
+    
+    index: str, or list, or slice object
+        Same as one would use as first argument of .loc[]
+        
+    columns: str, list, or slice
+        Same one would normally use as second argument of .loc[]
+        Ignored when x is a Pandas Series (just pass None to ensure the parameter 
+        is set)
+        
+    val: insert values
+
+    Returns
+    -------
+    x: Modified DataFrame or Series
+
+    NOTE:
+    -------
+    Modified from Answer 1 at
+    https://stackoverflow.com/questions/49032856/assign-values-to-sparsearray-in-pandas
+    
+    'Insert data in a DataFrame with SparseDtype format'
+
+    Only applicable for pandas version > 0.25
+    
+    """
+    if isinstance(x, pd.Series):
+        spdtypes = x.dtype
+        #if np.any(x.isna):
+        if np.any(x.isna()):
+            x = np.asarray(x, dtype=np.dtype(object), order="k")
+        else:
+            x.sparse.to_dense()
+        # NOTE: 2021-12-05 22:09:29 ignore columns for a pd.Series
+        
+        x.loc[index] = val
+        x = x.astype(spdtyes)
+        return x
+    
+    # NOTE: 2021-12-05 22:02:06
+    # handle the case where columns is a slice, a list, or a pandas Index
+    # Save the original sparse format for reuse later
+    # trimmed-down version of full code for data frames, further below 
+    spdtypes = x.dtypes[columns]
+
+    if isinstance(columns, slice):
+        columns = x.columns[columns] # => pd.Index !
+    
+    if isinstance(columns, (list, pd.Index)): # tuples (not lists) are used for multi-index
+        for c in columns:
+            #if np.any(x[c].isna):
+            if np.any(x[c].isna()):
+                # NOTE: see NOTE: 2021-12-04 20:06:50
+                x[c] = np.asarray(x[c], dtype = np.dtype(object), order = "K")
+            else:
+                # NOTE: 2021-12-04 20:06:50
+                # this fails when the sparse array has pd.NA as fill_value
+                x[c] = x[c].sparse.to_dense() # original code
+
+    else: 
+        # Convert concerned Series to dense format
+        #if np.any(x[columns].isna):
+        if np.any(x[columns].isna()):
+            # NOTE: see NOTE: 2021-12-04 20:06:50
+            x[columns] = np.asarray(x[columns], dtype = np.dtype(object), order = "K")
+        else:
+            # NOTE: 2021-12-04 20:06:50
+            # this fails when the sparse array has pd.NA as fill_value
+            x[columns] = x[columns].sparse.to_dense() # original code
+
+    # Do a normal insertion with .loc[]
+    x.loc[index, columns] = val
+
+    # Back to the original sparse format
+    if isinstance(columns, (slice, list, pd.Index)): # tuples (not lists) are used for multi-index
+        for c in columns:
+            x[c] = x[c].astype(spdtypes[c])
+    else:
+        x[columns] = x[columns].astype(spdtypes)
+    
+    return x    
+
+def sp_get_loc(x, index, columns):
+    """Retrieve values to pandas.SparseArray
+    Work around .loc idiom when fill value is pd.NA
+    
+    See also sp_set_loc
+
+    Only applicable for pandas version > 0.25
+
+    Parameters:
+    -----------
+    x : DataFrame with series formatted with pd.SparseDtype, OR
+        Series formatted with pd.SparseDtype
+    
+    index: str, or list, or slice object
+        Same as one would use as first argument of .loc[]
+        
+    columns: str, list, or slice
+        Same one would normally use as second argument of .loc[]
+        Ignored when 'x' is a Pandas Series  (just pass None to ensure the 
+        parameter is set)
+        
+    Returns
+    -------
+    x: DataFrame, Series, or scalar
+        
+    """
+    # trimmed-down version of full code for data frames, further below 
+    if isinstance(x, pd.Series):
+        spdtypes = x.dtype
+        #if np.any(x.isna):
+        if np.any(x.isna()):
+            x = np.asarray(x, dtype=np.dtype(object), order="k")
+        else:
+            x.sparse.to_dense()
+        # NOTE: 2021-12-05 22:09:29 ignore columns for a pd.Series
+        
+        ret = x.loc[index]
+        x = x.astype(spdtyes)
+        if isinstance(ret, pd.Series):
+            ret = ret.astype(spdtypes)
+        return ret
+    
+    # Save the original sparse format for reuse later
+    
+    # NOTE: dt.dtypes returns a Series!!! 
+    # NOTE: it is 'dtypes' not 'dtype'!
+    spdtypes = x.dtypes[columns] # this is a pd.Series with column names as row index
+    
+    if isinstance(columns, slice):
+        columns = x.columns[columns] # => pd.Index
+        #columns = [c for c in x.columns[columns]]
+    
+    if isinstance(columns, (list, pd.Index)): # tuples (not lists) are used for multi-index
+        for c in columns:
+            #if np.any(x[c].isna):
+            if np.any(x[c].isna()):
+                # NOTE: see NOTE: 2021-12-04 20:06:50
+                x[c] = np.asarray(x[c], dtype = np.dtype(object), order = "K")
+            else:
+                # NOTE: 2021-12-04 20:06:50
+                # this fails when the sparse array has pd.NA as fill_value
+                x[c] = x[c].sparse.to_dense() # original code
+
+    else: 
+        # NOTE: should also cover tuples of columns (multiindex) but haven't checked yet        
+        # Convert concerned Series to dense format
+        #if np.any(x[columns].isna):
+        if np.any(x[columns].isna()):
+            # NOTE: see NOTE: 2021-12-04 20:06:50
+            x[columns] = np.asarray(x[columns], dtype = np.dtype(object), order = "K")
+        else:
+            # NOTE: 2021-12-04 20:06:50
+            # this fails when the sparse array has pd.NA as fill_value
+            x[columns] = x[columns].sparse.to_dense() # original code
+
+    # Access using .loc[]
+    ret = x.loc[index, columns]
+
+    # Back to the original sparse format
+    if isinstance(columns, (slice, list, pd.Index)): # tuples (not lists) are used for multi-index
+        for c in columns:
+            x[c] = x[c].astype(spdtypes[c])
+    else:
+        x[columns] = x[columns].astype(spdtypes)
+    
+    # also apply original sparse dtype to the result
+    if isinstance(ret, pd.Series):
+        if isinstance(spdtypes, pd.Series):
+            ret = ret.astype(spdtypes[ret.name])
+            
+        ret = ret.astype(spdtypes)
+        
+    elif isinstance(ret, pd.DataFrame):
+        for c in ret.columns:
+            ret[c] = ret[c].astype(spdtypes[c])
+    
+    return ret

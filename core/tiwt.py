@@ -1,8 +1,8 @@
 from __future__ import print_function
 
 import sys
+# vigra: http://ukoethe.github.io/vigra/doc-release/vigranumpy/index.html
 import vigra
-import pywt
 import numpy as np
 import numpy.matlib as mlib
 
@@ -10,7 +10,7 @@ import numpy.matlib as mlib
 # Lee G, Gommers R, Wasilewski F, Wohlfahrt K, O’Leary A, Nahrstaedt H, and Contributors, 
 # “PyWavelets - Wavelet Transforms in Python”, 2006-,
 # https://github.com/PyWavelets/pywt [Online; accessed 2018].
-
+import pywt
 
 def test_analysis_synthesis(img, wavename, levels, reclevel=None, rtol=1e-5, atol=1e-5):
     print("\nReconstruction using natural domain convolution with FIRs, in a pyramid algorithm")
@@ -34,7 +34,7 @@ def test_analysis_synthesis(img, wavename, levels, reclevel=None, rtol=1e-5, ato
     
 
 def test_fft_analysis_synthesis(img, wavename, levels, reclevel=None, rtol=1e-5, atol=1e-5):
-    ###### ACHIEVES PERFECT RECONSTRUCTION WITH HAAR WAVELETS, a-trous 
+    ###### ACHIEVES PERFECT RECONSTRUCTION WITH HAAR WAVELETS, ("a-trous ")
     ###### also for fft_dec/fft_rec
     print("\nReconstruction using fft convolution and pyramid algorithm")
     fftdec             = fft_dec(img, levels, wavelet=wavename)

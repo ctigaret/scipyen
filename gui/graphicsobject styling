@@ -1,0 +1,58 @@
+ NOTE: 2021-07-03 12:43:10 APPEARANCE
+     Overhaul of styling - we define five possible states:
+     1. unlinked unselected
+     2. unlinked selected
+     3. linked unselected
+     4. linked selected
+     5. control - for drawing "control path" line and points of ROIs in edit mode
+     
+     Each state has the following drawn parts:
+     line_pen (color, style, cap, join, width)  -  pen for the line art
+     label_pen (color, style, cap, join, width) -  pen for the label text
+     point_pen (color, style, cap, join, width) -  pen for the control points
+     label_brush (style: pattern/color/gradient/texture) - brush for the label text background
+     point_brush (style: pattern/color/gradient/texture) - brush for the control points
+     
+    
+     Any Cursor or ROI is drawn in one of the styles 1-4 above;
+     The decision of painting the item as "selected" or "unselected" is taken 
+     inside self.paint by interrogating the selected status with 
+     self.isSelected() method inherited from QGraphicsItem.
+    
+     The decision of painting the item as "linked" or "unlinked" is taken outside
+     paint at the time when the PlanarGraphics backend is linked/unlinked from
+     other PlanarGraphics.
+    
+     The same backend can be displayed by more than one frontend (GraphicsObject)
+     which are (should be) shown in different scenes with the same geometry.
+     The frontends that all display the same backend are NOT considered "linked".
+    
+    What changes:
+        selection changes the style of the drawn elements
+        linking changes the color of the drawn lines, the color(s) or gradients
+        of brushes that have color/pattern/gradient style
+        
+    GraphicsObjectLnF class has four static members
+    
+Implementation:
+    atomic template:
+        pen:
+            line
+            label
+            point
+        brush:
+            label
+            point
+        pointsize
+    
+    base(dict) with two bool keys: True/False for selection
+        False = atomic template for unselected
+        True  = atomic template for selected
+        
+    linked(dict) as base, but for linked objects
+
+    control = atomic template for control path
+    
+    self.lnf: a reference to either basic or linked
+    
+paint() uses self.lnf

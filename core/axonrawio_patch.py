@@ -34,7 +34,7 @@ Note: j.s.nowacki@gmail.com has a C++ library with SWIG bindings which also
 reads abf files - would be good to cross-check
 
 """
-from __future__ import print_function, division, absolute_import
+#from __future__ import print_function, division, absolute_import
 # from __future__ import unicode_literals is not compatible with numpy.dtype both py2 py3
 
 from neo.rawio.baserawio import (BaseRawIO, _signal_channel_dtype, _unit_channel_dtype,
@@ -50,7 +50,7 @@ from io import open, BufferedReader
 import numpy as np
 
 
-class AxonRawIO(BaseRawIO):
+class AxonRawIO_v1(BaseRawIO):
     extensions = ['abf']
     rawmode = 'one-file'
 
@@ -383,7 +383,7 @@ def parse_axon_soup(filename):
     that contains more information.
     """
     with open(filename, 'rb') as fid:
-        f = StructFile(fid)
+        f = StructFile_v1(fid)
 
         # version
         f_file_signature = f.read(4)
@@ -581,7 +581,7 @@ def parse_axon_soup(filename):
     return header
 
 
-class StructFile(BufferedReader):
+class StructFile_v1(BufferedReader):
     def read_f(self, fmt, offset=None):
         if offset is not None:
             self.seek(offset)

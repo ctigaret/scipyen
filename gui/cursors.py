@@ -1,5 +1,7 @@
-
-import collections, enum, numbers
+# -*- coding: utf-8 -*-
+"""Pyqtgraph-based cursors for signal viewers
+"""
+import collections, enum, numbers, typing
 
 from PyQt5 import (QtCore, QtGui, QtWidgets,) 
 from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
@@ -8,8 +10,41 @@ import pyqtgraph as pg
 pg.Qt.lib = "PyQt5"
 
 import numpy as np
+import quantities as pq
 
 from core.prog import safeWrapper
+
+class ClickableInfiniteLine(pg.InfiniteLine):
+    sig_double_clicked = pyqtSignal()
+    
+    def _init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
+    def mouseDoubleClickEvent(self, ev):
+        if ev.button() == QtCore.Qt.LeftButton:
+            ev.accept()
+            self.sig_double_clicked.emit()
+            
+    def setHoverPen(self, *args, **kwargs):
+        if self.mouseHovering:
+            if isinstance(getattr(self, "label", None), pg.InfLineLabel):
+                self.label.setColor(self.hoverPen.color())
+            
+        super().setHoverPen(*args, **kwargs)
+        
+    def setMouseHover(self, hover):
+        if self.mouseHovering == hover:
+            return
+        self.mouseHovering = hover
+        if hover:
+            self.currentPen = self.hoverPen
+        else:
+            self.currentPen = self.pen
+            
+        if isinstance(getattr(self, "label", None), pg.InfLineLabel):
+            self.label.setColor(self.currentPen.color())
+        
+        self.update()
 
 class SignalCursor(QtCore.QObject):
     """SignalCursor object.
@@ -29,12 +64,15 @@ class SignalCursor(QtCore.QObject):
     
     sig_axisPositionChanged = pyqtSignal(tuple, name="sig_axisPositionChanged")
 
+    default_precision = 3
+    
     class SignalCursorTypes(enum.Enum):
         """Enumeration of signal cursor types.
         """
         vertical    = (False, True)
         horizontal  = (True, False)
         crosshair   = (True, True)
+        
         
         @classmethod
         def names(cls):
@@ -85,10 +123,22 @@ class SignalCursor(QtCore.QObject):
                 if len(types):
                     return types[0].name
                 
-    def __init__(self, plot_item, x=None, y=None, xwindow=0.0, ywindow=0.0,
-                 cursor_type = None, cursorID="c", follower=False, parent=None, 
-                 xBounds=None, yBounds=None, 
-                 pen=None, hoverPen=None, linkedPen=None,
+    def __init__(self, plot_item:pg.PlotItem, 
+                 x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, 
+                 y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, 
+                 xwindow:float=0.0, ywindow:float=0.0,
+                 cursor_type:typing.Optional[typing.Union[str,SignalCursorTypes, tuple, list]] = None, 
+                 cursorID:str="c", 
+                 follower:bool=False, 
+                 parent:typing.Optional[pg.GraphicsItem]=None, 
+                 xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
+                 yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
+                 pen:typing.Optional[QtGui.QPen]=None, 
+                 hoverPen:typing.Optional[QtGui.QPen]=None, 
+                 linkedPen:typing.Optional[QtGui.QPen]=None,
+                 movable_label:bool=True, 
+                 show_value:bool=False, 
+                 precision:int=3,
                  **kwargs):
         
         super(SignalCursor, self).__init__(parent=parent)
@@ -180,6 +230,9 @@ class SignalCursor(QtCore.QObject):
         self._dragging_ = False
         
         self._current_plot_item_ = None # for multi-axes cursors
+        self._movable_label_ = movable_label
+        self._show_value_ = show_value
+        self._value_precision_ = precision if isinstance(precision, int) and precision > 0 else self.default_precision
         
         self._setup_(plot_item, x=x, y=y, xwindow=xwindow, ywindow=ywindow, 
                          cursor_type=cursor_type, cursorID=cursorID,
@@ -204,14 +257,21 @@ class SignalCursor(QtCore.QObject):
         if h:
             # set up the horizontal InfiniteLine
             if not isinstance(self._hl_, pg.InfiniteLine):
-                label = self._cursorId_ if self._cursor_type_ == SignalCursor.SignalCursorTypes.horizontal else None
-                self._hl_ = pg.InfiniteLine(pos=pos, 
+                if self._cursor_type_ == SignalCursor.SignalCursorTypes.horizontal:
+                    label = "%s {value:.%d}" % (self._cursorId_, self._value_precision_) if self._show_value_ else self._cursorId_
+                else:
+                    label = None
+                
+                self._hl_ = ClickableInfiniteLine(pos=pos, 
                                             angle=0, 
                                             movable=not self._follows_mouse_, 
                                             name="%s_h" % name, 
                                             label=label,
+                                            labelOpts = {"movable": self._movable_label_},
                                             pen=self._pen_, 
                                             hoverPen = self._hoverPen_)
+                
+                self._hl_.sig_double_clicked.connect(self.slot_line_doubleClicked)
             
                 if not self._follows_mouse_:
                     if self._cursor_type_ == SignalCursor.SignalCursorTypes.horizontal:
@@ -241,21 +301,27 @@ class SignalCursor(QtCore.QObject):
             self._hl_.addMarker("<|>", 0)
             self._hl_.addMarker("<|>", 1)
             
+            if isinstance(getattr(self._hl_, "label", None), pg.InfLineLabel):
+                self._hl_.label.setColor(self._pen_.color())
+            
         else:
             self._hl_ = None
-            
-        #print("_setup_lines_ after hl xy", (self.x, self.y))
             
         if v:
             # set up the vertical InfiniteLine
             if not isinstance(self._vl_, pg.InfiniteLine):
-                self._vl_ = pg.InfiniteLine(pos=pos, 
+                label = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_) if self._show_value_ else self._cursorId_
+                #print(self._value_precision_)
+                self._vl_ = ClickableInfiniteLine(pos=pos, 
                                             angle=90, 
                                             movable=not self._follows_mouse_,
                                             name="%s_v" % name, 
-                                            label=self._cursorId_,
+                                            label=label,
+                                            labelOpts={"movable": self._movable_label_},
                                             pen=self._pen_, 
                                             hoverPen = self._hoverPen_)
+                
+                self._vl_.sig_double_clicked.connect(self.slot_line_doubleClicked)
             
                 if not self._follows_mouse_: 
                     if self._cursor_type_ == SignalCursor.SignalCursorTypes.vertical:
@@ -285,6 +351,9 @@ class SignalCursor(QtCore.QObject):
             self._vl_.addMarker("^", 0)
             self._vl_.addMarker("v", 1)
             
+            if isinstance(getattr(self._vl_, "label", None), pg.InfLineLabel):
+                self._vl_.label.setColor(self._pen_.color())
+            
         else:
             self._vl_ = None
             
@@ -293,6 +362,19 @@ class SignalCursor(QtCore.QObject):
             
         if not self._follows_mouse_:
             scene.sigMouseMoved.connect(self._slot_mouse_event_)
+            
+    def _set_cursor_pen_(self, pen):
+        if self._hl_ is not None:
+            self._hl_.setPen(pen)
+            if isinstance(self._hl_.label, pg.InfLineLabel):
+                self._hl_.label.setColor(pen.color())
+        
+        if self._vl_ is not None:
+            self._vl_.setPen(pen)
+            if isinstance(self._vl_.label, pg.InfLineLabel):
+                self._vl_.label.setColor(pen.color())
+        
+        self.update()
             
     def _get_plotitem_data_bounds_(self, item):
         plotDataItems = [i for i in item.listDataItems() if isinstance(i, pg.PlotDataItem)]
@@ -438,6 +520,74 @@ class SignalCursor(QtCore.QObject):
                     
             if self._vl_ is not None:
                 self._vl_.setPos(pos.x())
+                
+    def _update_labels_(self):
+        if isinstance(self._vl_, pg.InfiniteLine):
+            if isinstance(self._vl_.label, pg.InfLineLabel):
+                if self._show_value_:
+                    format_str = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_)
+                    #print(format_str)
+                    self._vl_.label.setFormat(format_str)
+                else:
+                    self._vl_.label.setFormat(self._cursorId_)
+                    
+        if isinstance(self._hl_, pg.InfiniteLine):
+            if isinstance(self._hl_.label, pg.InfLineLabel):
+                if self._show_value_:
+                    format_str = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_)
+                    self._hl_.label.setFormat(format_str)
+                else:
+                    self._hl_.label.setFormat(self._cursorId_)
+                    
+    def update(self):
+        if isinstance(self._vl_, pg.InfiniteLine):
+            self._vl_.update()
+            if isinstance(self._vl_.label, pg.InfLineLabel):
+                self._vl_.label.update()
+        if isinstance(self._hl_, pg.InfiniteLine):
+            self._hl_.update()
+            if isinstance(self._hl_.label, pg.InfLineLabel):
+                self._hl_.label.update()
+
+    def setMovableLabels(self, value):
+        if isinstance(self._vl_, pg.InfiniteLine):
+            if isinstance(self._vl_.label, pg.InfLineLabel):
+                self._vl_.label.setMovable(value==True)
+                
+        if isinstance(self._hl_, pg.InfiniteLine):
+            if isinstance(self._hl_.label, pg.InfLineLabel):
+                self._hl_.label.setMovable(value==True)
+                
+                
+    def setShowValue(self, val:bool, precision:typing.Optional[int]=None):
+        if isinstance(precision, int):
+            if precision < 0:
+                raise ValueError("Precision must be >= 0; got %d instead" % precision)
+        
+            self._value_precision_ = precision
+            
+        elif precision is not None:
+            raise TypeError("Precision must be an int >= 0 or None; got %s instead" % precision)
+        
+        self._show_value_ = val==True
+        self._update_labels_()
+        
+    def setPrecision(self, val):
+        if not isinstance(val, int) or val < 0:
+            raise TypeError("Precision must be an int > = 0; got %s instead" % val)
+        
+        self._value_precision_ = val
+        
+    @property
+    def precision(self):
+        return self._value_precision_
+    
+    @precision.setter
+    def precision(self, val):
+        if not isinstance(val, int) or val < 0:
+            raise TypeError("Precision must be an int > = 0; got %s instead" % val)
+        self._value_precision_ = val
+        self._update_labels_()
                     
     @pyqtSlot()
     @pyqtSlot(object)
@@ -479,7 +629,9 @@ class SignalCursor(QtCore.QObject):
             else:
                 self._is_selected_ = val
             
-    def setBounds(self, host=None, xBounds=None, yBounds=None):
+    def setBounds(self, host:typing.Optional[pg.GraphicsItem]=None, 
+                  xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
+                  yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None) -> None:
         if host is None:
             host = self._host_graphics_item_
             
@@ -664,9 +816,17 @@ class SignalCursor(QtCore.QObject):
             
         self._add_lines_to_host_()
         
-    def _setup_(self, host, cursor_type="crosshair", x=None, y=None, 
-                  xwindow=None, ywindow=None, follower=False, cursorID=None, 
-                  xBounds=None, yBounds=None, **kwargs):
+    def _setup_(self, host:pg.GraphicsItem, 
+                cursor_type:typing.Union[str,SignalCursorTypes, tuple, list]="crosshair", 
+                x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, 
+                y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, 
+                xwindow:typing.Optional[float]=None, 
+                ywindow:typing.Optional[float]=None, 
+                follower:bool=False, 
+                cursorID:typing.Optional[str]=None, 
+                xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None,
+                yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None,
+                **kwargs) -> None:
         
         #print("SignalCursor._setup_ cursor_type %s" % cursor_type)
         
@@ -783,10 +943,7 @@ class SignalCursor(QtCore.QObject):
 
         self._setup_lines_(*show_lines, **kwargs)
         
-        #print("_setup_ after _setup_lines_ xy", (self.x, self.y))
-        
         self._add_lines_to_host_()
-        #print("_setup_ after __add_lines_to_host__ xy", (self.x, self.y))
         
     def _interpret_scene_mouse_events_(self, scene=None):
         """for crosshair only
@@ -808,7 +965,7 @@ class SignalCursor(QtCore.QObject):
     @safeWrapper
     def _slot_selected_in_scene_(self, evt):
         # NOTE: 2019-02-09 23:29:22
-        # here, evt is a mouse event
+        # here, evt is a mouse event, NOT a QPointF!
         scene = self.hostScene
         
         items = scene.items(evt.pos())
@@ -816,6 +973,10 @@ class SignalCursor(QtCore.QObject):
         if (self.vline is not None and self.vline in items) or \
             (self.hline is not None and self.hline in items):
             self.sig_cursorSelected.emit(self.ID)
+            
+    @pyqtSlot()
+    def slot_line_doubleClicked(self):
+        self.sig_doubleClicked.emit(self.ID)
             
     @pyqtSlot(object)
     @safeWrapper
@@ -848,28 +1009,17 @@ class SignalCursor(QtCore.QObject):
                 pos = evt
                 
             if isinstance(pos, (QtCore.QPointF, QtCore.QPoint)):
-                #print("_slot_mouse_event_ pos:", pos)
                 self._update_lines_from_pos_(pos)
             
         else:
             if scene is not None and len(scene.clickEvents):
-                #print("SignalCursor._slot_mouse_event_ scene.clickEvents", scene.clickEvents)
                 mouseClickEvents = [e for e in scene.clickEvents if type(e).__name__ == "MouseClickEvent"]
-                #print("SignalCursor._slot_mouse_event_ mouseClickEvents", mouseClickEvents)
-                # NOTE: 2019-11-28 15:15:37
-                # double-click events do not seem to be captured ?
-                #print("SignalCursor._slot_mouse_event_ is double click", [e.double() for e in mouseClickEvents])
                 
                 if len(mouseClickEvents):
-                    #print("SignalCursor._slot_mouse_event_ modifiers", mouseClickEvents[0].modifiers())
-                    #print("SignalCursor._slot_mouse_event_ double", mouseClickEvents[0].double())
-                    #print("SignalCursor._slot_mouse_event_ double", mouseClickEvents[0].button())
                     items = scene.items(evt)
                     
                     if any([i is not None and i in items for i in (self.vline, self.hline)]):
                         self.sig_cursorSelected.emit(self.ID)
-                        
-                        #print("SignalCursor._slot_mouse_event_", QtWidgets.QApplication.keyboardModifiers())
                         
                         if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
                             self.sig_editMe.emit(self.ID)
@@ -1277,11 +1427,16 @@ class SignalCursor(QtCore.QObject):
             warnings.Warning("New ID is empty")
             
         self._cursorId_ = val
+        self._update_labels_()
         
     @property
     def defaultPen(self):
         return self._default_pen_
     
+    @property
+    def isLinked(self):
+        return self._linked_
+        
     @property
     def pen(self):
         """A QtGui.QPen
@@ -1295,12 +1450,12 @@ class SignalCursor(QtCore.QObject):
         
         self._pen_ = val
         
-        if self._hl_ is not None:
-            self._hl_.setPen(self._pen_)
-            
-        if self._vl_ is not None:
-            self._vl_.setPen(self.__pen)
-            
+        if self._linked_:
+            self._set_cursor_pen_(self._linkedPen_)
+
+        else:
+            self._set_cursor_pen_(self._pen_)
+    
     @property
     def linkedPen(self):
         return self._linkedPen_
@@ -1311,12 +1466,12 @@ class SignalCursor(QtCore.QObject):
             raise TypeError("expecting a QtGui.QPen; got a %s instead" % type(val).__name__)
         
         self._linkedPen_ = val
-            
-        if self._hl_ is not None:
-            self._hl_.setPen(self._linkedPen_)
-            
-        if self._vl_ is not None:
-            self._vl_.setPen(self._linkedPen_)
+        
+        if self._linked_:
+            self._set_cursor_pen_(self._linkedPen_)
+
+        else:
+            self._set_cursor_pen_(self._pen_)
     
     @property
     def hoverPen(self):
@@ -1334,6 +1489,8 @@ class SignalCursor(QtCore.QObject):
             
         if self._vl_ is not None:
             self._vl_.setHoverPen(self._hoverPen_)
+            
+        self.update()
     
     @property
     def cursorTypeName(self):

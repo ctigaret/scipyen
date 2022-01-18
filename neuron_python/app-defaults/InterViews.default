@@ -1,0 +1,11 @@
+InterViews*PopupWindow*overlay: true
+InterViews*PopupWindow*saveUnder: on
+InterViews*TransientWindow*saveUnder: on
+InterViews*background: #ffffff
+InterViews*brush_width: 0
+InterViews*double_buffered: on
+InterViews*flat: #aaaaaa
+InterViews*font: fixed
+InterViews*foreground: #000000
+InterViews*synchronous: off
+InterViews*malloc_debug: off

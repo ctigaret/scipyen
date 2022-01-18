@@ -1,0 +1,544 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>TriggerDetectWidget</class>
+ <widget class="QWidget" name="TriggerDetectWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>550</width>
+    <height>219</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>TriggerDetectWidget</string>
+  </property>
+  <property name="toolTip">
+   <string>Trigger Detection Widget</string>
+  </property>
+  <property name="statusTip">
+   <string>Trigger Detection Widget</string>
+  </property>
+  <property name="whatsThis">
+   <string>Trigger Detection Widget</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
+      <widget class="QGroupBox" name="presynGroupBox">
+       <property name="toolTip">
+        <string>Triggers for presynaptic simulation</string>
+       </property>
+       <property name="statusTip">
+        <string>Triggers for presynaptic simulation</string>
+       </property>
+       <property name="whatsThis">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Triggers for presynaptic simulation via simulation (extracellular) electrodes.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="title">
+        <string>Pres&amp;ynaptic</string>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+       <property name="checked">
+        <bool>false</bool>
+       </property>
+       <layout class="QVBoxLayout" name="verticalLayout_2">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_4">
+          <item>
+           <widget class="QLabel" name="label_4">
+            <property name="text">
+             <string>Channel:</string>
+            </property>
+            <property name="buddy">
+             <cstring>presynChannelSpinBox</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="presynChannelSpinBox"/>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_6">
+          <item>
+           <widget class="QLabel" name="label_12">
+            <property name="text">
+             <string>Start:</string>
+            </property>
+            <property name="buddy">
+             <cstring>presynStartDoubleSpinBox</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="presynStartDoubleSpinBox">
+            <property name="suffix">
+             <string> s</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_7">
+          <item>
+           <widget class="QLabel" name="label_13">
+            <property name="text">
+             <string>Stop:</string>
+            </property>
+            <property name="buddy">
+             <cstring>presynStopDoubleSpinBox</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="presynStopDoubleSpinBox">
+            <property name="suffix">
+             <string> s</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_5">
+          <item>
+           <widget class="QLabel" name="label_8">
+            <property name="text">
+             <string>Name:</string>
+            </property>
+            <property name="buddy">
+             <cstring>presynNameLineEdit</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="presynNameLineEdit">
+            <property name="text">
+             <string>pre</string>
+            </property>
+            <property name="clearButtonEnabled">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="postsynGroupBox">
+       <property name="toolTip">
+        <string>Triggers for postsynaptic stimulation</string>
+       </property>
+       <property name="statusTip">
+        <string>Triggers for postsynaptic stimulation</string>
+       </property>
+       <property name="whatsThis">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Triggers for postsynaptic stimulation (e.g. current injection via patch electrode, or antidromic stimulation with extracellular electrodes).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="title">
+        <string>Pos&amp;tynaptic</string>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+       <property name="checked">
+        <bool>false</bool>
+       </property>
+       <layout class="QVBoxLayout" name="verticalLayout_3">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_8">
+          <item>
+           <widget class="QLabel" name="label_5">
+            <property name="text">
+             <string>Channel:</string>
+            </property>
+            <property name="buddy">
+             <cstring>postsynChannelSpinBox</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="postsynChannelSpinBox"/>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_10">
+          <item>
+           <widget class="QLabel" name="label_14">
+            <property name="text">
+             <string>Start:</string>
+            </property>
+            <property name="buddy">
+             <cstring>postsynStartDoubleSpinBox</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="postsynStartDoubleSpinBox">
+            <property name="suffix">
+             <string> s</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_11">
+          <item>
+           <widget class="QLabel" name="label_15">
+            <property name="text">
+             <string>Stop:</string>
+            </property>
+            <property name="buddy">
+             <cstring>postsynStopDoubleSpinBox</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="postsynStopDoubleSpinBox">
+            <property name="suffix">
+             <string> s</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_9">
+          <item>
+           <widget class="QLabel" name="label_9">
+            <property name="text">
+             <string>Name:</string>
+            </property>
+            <property name="buddy">
+             <cstring>postsynNameLineEdit</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="postsynNameLineEdit">
+            <property name="text">
+             <string>post</string>
+            </property>
+            <property name="clearButtonEnabled">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="photoGroupBox">
+       <property name="toolTip">
+        <string>Trigger for light pulses</string>
+       </property>
+       <property name="statusTip">
+        <string>Trigger for light pulses</string>
+       </property>
+       <property name="whatsThis">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Trigger for light pulses (e.g. uncaging pulses, light-sensitive in channels, pohotoconversion of fluorescent proteins, etc.).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="title">
+        <string>Photostim&amp;ulation</string>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+       <property name="checked">
+        <bool>false</bool>
+       </property>
+       <layout class="QVBoxLayout" name="verticalLayout_4">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_12">
+          <item>
+           <widget class="QLabel" name="label_6">
+            <property name="text">
+             <string>Channel:</string>
+            </property>
+            <property name="buddy">
+             <cstring>photoChannelSpinBox</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="photoChannelSpinBox"/>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_14">
+          <item>
+           <widget class="QLabel" name="label_16">
+            <property name="text">
+             <string>Start:</string>
+            </property>
+            <property name="buddy">
+             <cstring>photoStartDoubleSpinBox</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="photoStartDoubleSpinBox">
+            <property name="suffix">
+             <string> s</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_15">
+          <item>
+           <widget class="QLabel" name="label_17">
+            <property name="text">
+             <string>Stop:</string>
+            </property>
+            <property name="buddy">
+             <cstring>photoStopDoubleSpinBox</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="photoStopDoubleSpinBox">
+            <property name="suffix">
+             <string> s</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_13">
+          <item>
+           <widget class="QLabel" name="label_10">
+            <property name="text">
+             <string>Name:</string>
+            </property>
+            <property name="buddy">
+             <cstring>photoNameLineEdit</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="photoNameLineEdit">
+            <property name="text">
+             <string>photo</string>
+            </property>
+            <property name="clearButtonEnabled">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="imagingGroupBox">
+       <property name="toolTip">
+        <string>Imaging frame trigger</string>
+       </property>
+       <property name="statusTip">
+        <string>Imaging frame trigger</string>
+       </property>
+       <property name="whatsThis">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Trigger that initiates one frame of laser scan imaging (not to be confused with a line imaging trigger, which synchronizes the initiation of a single scanning line).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="title">
+        <string>Ima&amp;ging frame</string>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+       <property name="checked">
+        <bool>false</bool>
+       </property>
+       <layout class="QVBoxLayout" name="verticalLayout_5">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_16">
+          <item>
+           <widget class="QLabel" name="label_7">
+            <property name="text">
+             <string>Channel:</string>
+            </property>
+            <property name="buddy">
+             <cstring>imagingChannelSpinBox</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="imagingChannelSpinBox"/>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_18">
+          <item>
+           <widget class="QLabel" name="label_18">
+            <property name="text">
+             <string>Start:</string>
+            </property>
+            <property name="buddy">
+             <cstring>imagingStartDoubleSpinBox</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="imagingStartDoubleSpinBox">
+            <property name="suffix">
+             <string> s</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_19">
+          <item>
+           <widget class="QLabel" name="label_19">
+            <property name="text">
+             <string>Stop:</string>
+            </property>
+            <property name="buddy">
+             <cstring>imagingStopDoubleSpinBox</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="imagingStopDoubleSpinBox">
+            <property name="suffix">
+             <string> s</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_17">
+          <item>
+           <widget class="QLabel" name="label_11">
+            <property name="text">
+             <string>Name:</string>
+            </property>
+            <property name="buddy">
+             <cstring>imagingNameLineEdit</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="imagingNameLineEdit">
+            <property name="text">
+             <string>frame</string>
+            </property>
+            <property name="clearButtonEnabled">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <tabstops>
+  <tabstop>presynGroupBox</tabstop>
+  <tabstop>presynChannelSpinBox</tabstop>
+  <tabstop>presynStartDoubleSpinBox</tabstop>
+  <tabstop>presynStopDoubleSpinBox</tabstop>
+  <tabstop>presynNameLineEdit</tabstop>
+  <tabstop>postsynGroupBox</tabstop>
+  <tabstop>postsynChannelSpinBox</tabstop>
+  <tabstop>postsynStartDoubleSpinBox</tabstop>
+  <tabstop>postsynStopDoubleSpinBox</tabstop>
+  <tabstop>postsynNameLineEdit</tabstop>
+  <tabstop>photoGroupBox</tabstop>
+  <tabstop>photoChannelSpinBox</tabstop>
+  <tabstop>photoStartDoubleSpinBox</tabstop>
+  <tabstop>photoStopDoubleSpinBox</tabstop>
+  <tabstop>photoNameLineEdit</tabstop>
+  <tabstop>imagingGroupBox</tabstop>
+  <tabstop>imagingChannelSpinBox</tabstop>
+  <tabstop>imagingStartDoubleSpinBox</tabstop>
+  <tabstop>imagingStopDoubleSpinBox</tabstop>
+  <tabstop>imagingNameLineEdit</tabstop>
+ </tabstops>
+ <resources/>
+ <connections/>
+</ui>

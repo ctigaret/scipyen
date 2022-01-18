@@ -2,11 +2,12 @@
 """Import routines for PrairieView data
 """
 #### BEGIN core python modules
-import os, sys, traceback, warnings, datetime, time, mimetypes, io
+import os, sys, traceback, warnings, datetime, time, mimetypes, io, typing
 from enum import Enum, IntEnum #, unique
 from collections import OrderedDict
 import concurrent.futures
 import threading
+#import xml
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -14,39 +15,62 @@ import numpy as np
 import quantities as pq
 import neo
 import vigra
-#import vigra.pyqt.quickdialog as quickdialog
-#### END 3rd party modules
-
-#### BEGIN pict.core modules
-import core.xmlutils as xmlutils
-import core.datatypes as dt
-import core.imageprocessing as imgp
-import core.neoutils as neoutils
-#from core import *
-#### END pict.core modules
-
-#### BEGIN pict.iolib modules
-import iolib.pictio as pio
-#### END pict.iolib modules
-
-#### BEGIN pict.gui modules
 #from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
+from PyQt5 import (QtCore, QtWidgets, QtGui,)
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 from PyQt5.uic import loadUiType as __loadUiType__ 
-#from gui import *
-#from gui import __loadUiType__ as __loadUiType__
+#### END 3rd party modules
+
+#### BEGIN scipyen modules
+from core.utilities import safeWrapper
+from core.traitcontainers import DataBag
+from core.triggerevent import (TriggerEvent, TriggerEventType, )
+from core.triggerprotocols import (TriggerProtocol,
+                                   auto_detect_trigger_protocols,
+                                   embed_trigger_protocol, 
+                                   embed_trigger_event,
+                                   parse_trigger_protocols,
+                                   remove_trigger_protocol,
+                                   parse_trigger_protocols)
+
+from core.neoutils import (concatenate_blocks, concatenate_signals,)
+
+import core.xmlutils as xmlutils
+import core.strutils as strutils
+import core.datatypes as dt
+
+import iolib.pictio as pio
+
 from gui import resources_rc as resources_rc
-#from gui import pyqtSignal as pyqtSignal
-#from gui import pyqtSlot as pyqtSlot
-from gui import quickdialog as quickdialog
-#### END pict.gui modules
+from gui import quickdialog as qd
+from gui.triggerdetectgui import TriggerDetectDialog, TriggerDetectWidget
+from gui.protocoleditordialog import ProtocolEditorDialog
+from gui import pictgui as pgui
+from gui.workspacegui import WorkspaceGuiMixin
+import gui.signalviewer as sv
 
+from imaging import (imageprocessing as imgp, axisutils, axiscalibration,)
+from imaging.scandata import (ScanData, ScanDataOptions, scanDataOptions,)
 
-_module_path_ = os.path.abspath(os.path.dirname(__file__))
+from imaging.vigrautils import (concatenateImages, insertAxis)
 
-__UI_PVImporterDialog__, __QDialog__ = __loadUiType__(os.path.join(_module_path_,"PVImporterDialog.ui"), from_imports=True, import_from="gui")
-# TODO:
-# factor out common functions in a superclass
+from imaging.axisutils import (axisTypeFromString, axisTypeName, 
+                               axisTypeSymbol, axisTypeUnits,)
+
+from imaging.axiscalibration import (AxesCalibration, 
+                                     CalibrationData, 
+                                     ChannelCalibrationData, 
+                                     AxisCalibrationData)
+
+import ephys.ephys as ephys
+
+#### END scipyen modules
+
+__module_path__ = os.path.abspath(os.path.dirname(__file__))
+
+#__UI_PVImporterDialog__, __QDialog__ = __loadUiType__(os.path.join(__module_path__,"PVImporterDialog.ui"), from_imports=True, import_from="gui")
+__UI_PrairieImporter, __QDialog__ = __loadUiType__(os.path.join(__module_path__, "PrairieImporter.ui"), from_imports=True, import_from="gui")
+
 
 """ NOTE: 2017-09-22 09:28:23
 Image file organization with respect to (hyper-)volume data (hereafter I describe 
@@ -177,17 +201,11 @@ class PVLinescanDefinition(object):
                 except:
                     val = k.value
                     
-                #if k.name == "mode":
-                    #self.__dict__[k.name] = PVLinescanMode[val].value
-                ##else:
-                    ##self.__attributes__[k.name] = val
-                
                 if k.name == "mode":
                     self.__attributes__[k.name] = PVLinescanMode[val].value
                 else:
                     self.__attributes__[k.name] = val
                 
-        #if self.__dict__["mode"] == PVLinescanMode.freeHand.value:
         if self.__attributes__["mode"] == PVLinescanMode.freeHand:
             freehandnodes = node.getElementsByTagName("Freehand")
             
@@ -275,6 +293,14 @@ class PVLinescanDefinition(object):
         ret.append(" length = %g\n" % (self.line_length))
         
         return "".join(ret)
+    
+    def metadata(self):
+        metadata = dict()
+        metadata["attributes"] = self.__attributes__
+        metadata["coordinates"] = self.__coordinates__
+        metadata["line_length"] = self.line_length
+        
+        return DataBag(metadata)
         
 
 class PVLaser(object):
@@ -298,9 +324,9 @@ class PVLaser(object):
             ##self.__dict__.update(dict([(k.name, k.value) for k in node.attributes.values()]))
             
         if node.attributes is not None:
-            self.__attributes__ = dt.DataBag(xmlutils.attributesToDict(node))
+            self.__attributes__ = DataBag(xmlutils.attributesToDict(node))
         else:
-            self.__attributes__ = dt.DataBag(dict())
+            self.__attributes__ = DataBag(dict())
             #self.__dict__.update(dict([(k.name, k.value) for k in node.attributes.values()]))
             
     @property
@@ -327,8 +353,6 @@ class PVLaser(object):
     def __str__(self):
         ret = ["Laser:\n"]
         ret += [" %s = %s\n" % (i[0], i[1]) for i in self.__attributes__.items()]
-        #ret += [" %s = %s\n" % (i[0], i[1]) for i in self.__dict__.items()]
-        #ret.append("\n")
         
         return "".join(ret)
 
@@ -347,10 +371,10 @@ class PVSystemConfiguration(object):
                 raise TypeError("Parent of a PVSystemConfiguration can only be one or a PVScan object")
 
         if node.attributes is not None:
-            self.__attributes__ = dt.DataBag(xmlutils.attributesToDict(node))
+            self.__attributes__ = DataBag(xmlutils.attributesToDict(node))
             
         else:
-            self.__attributes__ = dt.DataBag(dict())
+            self.__attributes__ = DataBag()
         
         lasers = node.getElementsByTagName("Laser")
         
@@ -384,19 +408,20 @@ class PVSystemConfiguration(object):
     def attributes(self):
         return self.__attributes__
     
-    #def laser(self, index):
-        #return self.lasers[index]
-
-    #@property
-    #def numLasers(self):
-        #return len(self.lasers)
+    def as_dict(self):
+        ret = dict()
+        ret.update(self.attributes)
+        ret["lasers"] = [laser.attributes for laser in self.lasers]
         
+        return DataBag(ret)
+    
     def __repr__(self):
         return self.__str__()
     
     def __str__(self):
         ret = ["System Configuration:"]
-        ret += ["%s = %s" % (i[0], i[1]) for i in self.__attributes__.items()]
+        if self.__attributes__.items() is not None:
+            ret += ["%s = %s" % (i[0], i[1]) for i in self.__attributes__.items() if i is not None]
         #ret += ["%s = %s" % (i[0], i[1]) for i in self.__dict__.items()]
         for l in self.lasers:
             ret.append(l.__str__())
@@ -419,7 +444,7 @@ class PVStateShard(object):
             else:
                 raise TypeError("Parent of a PVStateShard can only be None or a PVFrame object")
         
-        self.__attributes__ = dt.DataBag(dict())
+        self.__attributes__ = DataBag(dict())
 
         for n in keyNodes:
             try:
@@ -551,26 +576,17 @@ class PVFrame(object):
             else:
                 raise TypeError("Parent of a PVFrame can only be None or a PVSequence")
         
-        #if node.attributes is not None:
-            #self.__dict__.update(xmlutils.attributesToDict(node))
-        ##else:
-            ##self.__attributes__ = dict()
-            
         if node.attributes is not None:
-            self.__attributes__ = dt.DataBag(xmlutils.attributesToDict(node))
+            self.__attributes__ = DataBag(xmlutils.attributesToDict(node))
         else:
-            self.__attributes__ = dt.DataBag(dict())
+            self.__attributes__ = DataBag(dict())
             
-        self.__files__ = [dt.DataBag(xmlutils.attributesToDict(n)) for n in node.getElementsByTagName("File")]
-        
-        #for f in self.__files__:
-            #if not "source" in f.keys():
-                #f["source"] = ""
+        self.__files__ = [DataBag(xmlutils.attributesToDict(n)) for n in node.getElementsByTagName("File")]
         
         ep = node.getElementsByTagName("ExtraParameters")
         
         if len(ep) > 0:
-            self.ExtraParameters = [dt.DataBag(xmlutils.attributesToDict(n)) for n in ep]
+            self.ExtraParameters = [DataBag(xmlutils.attributesToDict(n)) for n in ep]
         else:
             self.ExtraParameters = None
         
@@ -686,7 +702,7 @@ class PVFrame(object):
         
         #metadata to be retrieved from the associated PVStateShard
         #=================================
-        #Some of these parameters whe present, are passed to PictArray constructor
+        #Some of these parameters when present, are passed to PictArray constructor
         #(see datatypes.PictArray) and this function will return a PictArray instead
         #of a plain VigraArray.
         
@@ -766,21 +782,25 @@ class PVFrame(object):
         # whole data (hyper-)volume, but just the files pertaining to this frame
         # (hence we do not pass asVolume=True to loadImageFile function)
         
-        # NOTE: 2017-10-18 22:37:05
-        # make sure the channel numbers are in increasing order
-        channelIndex = [f["channel"] for f in self.files]
-        
+        # STEP 1: read metadata
         mdata = self.metadata()
         
+        # STEP 2: set up file names
         if filepath is None:
             if self.parent is not None:
                 filepath = self.parent.filepath
         
-        frameData = list()
+        # STEP 3: set up vigra arrays and their axes
+        frameData = list() # will contain vigra arrays for each scans frame, to be concatenated
         
-        sourceData = list()
+        sourceData = list() # will contnain vigra arrays for each source frame, to be concatenated
+        
+        #channelNames = (f["channelName"] for f in self.files)
         
         for k in range(len(mdata["files"])):
+            # NOTE: 2022-01-06 00:10:42
+            # fdata: frame data
+            # sdata: source data
             if filepath is not None:
                 fdata = pio.loadImageFile(os.path.join(filepath, self.files[k]["filename"]))
             
@@ -790,85 +810,106 @@ class PVFrame(object):
             if fdata.ndim == 2 and fdata.channelIndex == fdata.ndim:
                 fdata.insertChannelAxis() # make sure there is a channel axis
                 
+            # NOTE: 2021-10-27 22:06:14
+            # Now `fdata` has default axistags ('x', 'y', 'c') as per vigra's
+            # default behaviour
+
+            # NOTE: 2021-10-26 10:34:59 NEW AXIS CALIBRATION FRAMEWORK
+            # AxisCalibrationData pertains to a single axis
+            # AxesCalibration collects several AxisCalibrationData objects (one 
+            # for each axis in the vigra array)
+            #
+            # AxesCalibration c'tor with AxisInfo as parameter assigns default 
+            # values to the array's axistags
+            #
+            
+            # NOTE: 2021-10-27 21:59:09
+            # Below, we calibrate axes individually using an AxisCalibrationData
+            # object for each axis
+            # 
+            # AxisCalibrationData objects here are just used to embed calibration
+            # strings in the `description` attribute for the corresponding
+            # AxisInfo
+                
             # NOTE: 2018-06-03 22:15:10
             # axis_0_info is the AxisInfo object for the 1st (spatial) dimension (axis)
-            axis_0_info = fdata.axistags[0]
-            axis_0_cal  = dt.AxisCalibration(axis_0_info,
-                                                    units=pq.um,
-                                                    origin=0.0,
-                                                    resolution=self.state.attributes["micronsPerPixel_XAxis"],
-                                                    axisname=dt.defaultAxisTypeName(axis_0_info))
+            fdata_axis_0_info = fdata.axistags[0]
             
-            #print("PVFrame.__call__() axis_0_cal", axis_0_cal)
+            # NOTE: 2021-10-26 15:48:42
             
-            axis_0_info = axis_0_cal.calibrateAxis(axis_0_info)
+            fdata_axis_0_cal  = AxisCalibrationData(fdata_axis_0_info)
+            fdata_axis_0_cal.resolution = self.state.attributes["micronsPerPixel_XAxis"]
+            fdata_axis_0_cal.units = pq.um
+            
+            # embed calibration string into axis_0_info's description
+            fdata_axis_0_info = fdata_axis_0_cal.calibrateAxis(fdata_axis_0_info)
             
             
             # NOTE: 2018-06-03 22:15:54
-            # axis_1_info is the AxisInfo objects for the 2nd (spatial or temporal) dimension (axis)
+            # axis_1_info is the AxisInfo objects for the 2nd dimension (axis);
+            # the type of this axis (spatial or temporal) depends on the type of 
+            # PVSequence: for a Linescan, the this axis is a temporal one
             #
-            # what type of PVSequence does this frame belong to?
-            # we need to know this in order to set appropriate axis information
+            # By default, vigra impex sets this axis to be a Space type ('y')
+            # so we only modify this default behaviour when PVSequence is of 
+            # Linescan type
             if self.parent is not None and self.parent.type == PVSequenceType.Linescan:
-                axis_1_info = vigra.AxisInfo(key="t", 
+                fdata_axis_1_info = vigra.AxisInfo(key="t", 
                                              typeFlags=vigra.AxisType.Time, 
                                              resolution = self.state.attributes["scanlinePeriod"])
                 
-                axis_1_cal  = dt.AxisCalibration(axis_1_info,
-                                                        units=pq.s,
-                                                        origin=0.0,
-                                                        resolution=self.state.attributes["scanlinePeriod"],
-                                                        axisname=dt.defaultAxisTypeName(axis_1_info))
-                
-                axis_1_info = axis_1_cal.calibrateAxis(axis_1_info)
+                fdata_axis_1_cal  = AxisCalibrationData(fdata_axis_1_info)
+                fdata_axis_1_cal.units = pq.s
                 
             else:
-                axis_1_info = fdata.axistags[1]
+                fdata_axis_1_info = fdata.axistags[1] # by default vigra behaviour is Space 
                 
-                axis_1_cal = dt.AxisCalibration(axis_1_info,
-                                                       units = pq.um,
-                                                       origin=0.0,
-                                                       resolution = self.state.attributes["micronsPerPixel_YAxis"],
-                                                       axisname=dt.defaultAxisTypeName(axis_1_info))
+                fdata_axis_1_cal = AxisCalibrationData(fdata_axis_1_info)
+                fdata_axis_1_cal.resolution = self.state.attributes["micronsPerPixel_YAxis"]
+                fdata_axis_1_cal.units = pq.um
                 
-                axis_1_info = axis_1_cal.calibrateAxis(axis_1_info)
+            # embed calibration string into axis_1_info's description
+            fdata_axis_1_info = fdata_axis_1_cal.calibrateAxis(fdata_axis_1_info)
             
             # NOTE: 2018-06-03 22:16:26
-            # axis_2_info is the AxisInfo object for 3rd dimension (channel axis !!!)
+            # axis_2_info is the AxisInfo object for 3rd dimension
+            # Since all individual images saved by PrairieView are 2D, 
+            # then the third axis is a Channels axis (by default vigra impex
+            # assigns this as 'c' even if is singleton)
             #
             
-            if fdata.channelIndex == fdata.ndim:
+            if fdata.channelIndex == fdata.ndim: # channel axis is virtual
                 # NOTE: 2018-08-01 16:43:58
                 # make sure there IS a channel axis
-                axis_2_info = vigra.AxisInfo.c(description=self.files[k]["channelName"])
+                fdata_axis_2_info = vigra.AxisInfo.c 
                 
             else:
-                axis_2_info = fdata.axistags["c"]
+                fdata_axis_2_info = fdata.axistags["c"]
+                
+            fdata_axis_2_info.description = self.files[k]["channelName"]
             
-            axis_2_cal = dt.AxisCalibration(axis_2_info, 
-                                                   units = dt.defaultAxisTypeUnits(axis_2_info),
-                                                   origin=0.0,
-                                                   resolution = 1.0,
-                                                   axisname=self.files[k]["channelName"])
+            fdata_axis_2_cal = AxisCalibrationData(fdata_axis_2_info)
+            fdata_axis_2_cal.addChannelCalibration(ChannelCalibrationData(index = self.files[k]["channel"],
+                                                                          name=self.files[k]["channelName"]),
+                                                   name=self.files[k]["channelName"],
+                                                   index = self.files[k]["channel"])
             
-            axis_2_cal.setChannelCalibration(0, name=self.files[k]["channelName"],
-                                             origin=0.0,
-                                             resolution = 1.0)
-                                                   
+            #fdata_axis_2_cal.setChannelName(0, self.files[k]["channelName"]) # also adds channel calibration to the channel axis calibration
+                                        
+            # embed calibration string into axis_2_info's description
+            fdata_axis_2_info = fdata_axis_2_cal.calibrateAxis(fdata_axis_2_info)
             
-            axis_2_info = axis_2_cal.calibrateAxis(axis_2_info)
-            
-            newaxistags = vigra.AxisTags(axis_0_info, axis_1_info, axis_2_info)
-            
+            # construct a new VigraArray using fdata and new axistags initialized
+            # from the calibrated AxisInfo objects
+            newaxistags = vigra.AxisTags(fdata_axis_0_info, fdata_axis_1_info, fdata_axis_2_info)
             frame = vigra.VigraArray(fdata, axistags=newaxistags)
-            
-            channel_axis_info = frame.axistags["c"]
             
             frameData.append(frame)
         
+            # NOTE: 2021-10-27 22:18:41
+            # the source data is set up using the same blueprint as for frame data
+            # ideally we should end up with one source data frame for each scans data frame
             if "source" in self.files[k] and all(self.files[k]["source"]):
-                # NOTE: 2018-06-03 22:18:03
-                # axis_x_info are AxisInfo objects as mentioned in above NOTE comments
                 if filepath is not None:
                     sdata = pio.loadImageFile(os.path.join(filepath, self.files[k]["source"]))
                     
@@ -878,44 +919,43 @@ class PVFrame(object):
                 if sdata.ndim == 2 and sdata.channelIndex == sdata.ndim:
                     sdata.insertChannelAxis() # make sure there is a channel axis
                     
-                axis_0_info = sdata.axistags[0]
-                axis_0_cal = dt.AxisCalibration(axis_0_info,
-                                                       units=pq.um, 
-                                                       origin=0.0, 
-                                                       resolution=self.state.attributes["micronsPerPixel_XAxis"],
-                                                       axisname=dt.defaultAxisTypeName(axis_0_info))
+                sdata_axis_0_info = sdata.axistags[0]
+                sdata_axis_0_cal = AxisCalibrationData(sdata_axis_0_info)
+                sdata_axis_0_cal.resolution = self.state.attributes["micronsPerPixel_XAxis"]
+                sdata_axis_0_cal.units = pq.um
                 
-                axis_0_info = axis_0_cal.calibrateAxis(axis_0_info)
+                sdata_axis_0_info = sdata_axis_0_cal.calibrateAxis(sdata_axis_0_info)
                 
-                axis_1_info = sdata.axistags[1]
-                axis_1_cal = dt.AxisCalibration(axis_1_info,
-                                                       units=pq.um, 
-                                                       origin=0.0, 
-                                                       resolution=self.state.attributes["micronsPerPixel_YAxis"],
-                                                       axisname=dt.defaultAxisTypeName(axis_1_info))
+                sdata_axis_1_info = sdata.axistags[1]
+                sdata_axis_1_cal = AxisCalibrationData(sdata_axis_1_info)
+                sdata_axis_1_cal.resolution=self.state.attributes["micronsPerPixel_YAxis"]
+                sdata_axis_1_cal.units = pq.um
                 
-                axis_1_info = axis_1_cal.calibrateAxis(axis_1_info)
+                sdata_axis_1_info = sdata_axis_1_cal.calibrateAxis(sdata_axis_1_info)
                 
-                axis_2_info = sdata.axistags["c"]
+                if sdata.channelIndex == sdata.ndim:
+                    sdata_axis_2_info = vigra.AxisInfo.c
+                else:
+                    sdata_axis_2_info = sdata.axistags["c"]
                 
-                axis_2_cal = dt.AxisCalibration(axis_2_info,
-                                                       units=dt.defaultAxisTypeUnits(axis_2_info), 
-                                                       origin=0.0, 
-                                                       resolution=1.0)
-                axis_2_cal.setChannelCalibration(0, name = self.files[k]["channelName"],
-                                                 origin=0.0, 
-                                                 resolution=1.0)
+                sdata_axis_2_cal = AxisCalibrationData(sdata_axis_2_info)
+                sdata_axis_2_cal.addChannelCalibration(ChannelCalibrationData(index = self.files[k]["channel"],
+                                                                          name=self.files[k]["channelName"]),
+                                                        name = self.files[k]["channelName"],
+                                                        index = self.files[k]["channel"])
+
+                sdata_axis_2_cal = sdata_axis_2_cal.calibrateAxis(sdata_axis_2_info)
                 
-                axis_2_cal = axis_2_cal.calibrateAxis(axis_2_info)
-                
-                newaxistags = vigra.AxisTags(axis_0_info, axis_1_info, axis_2_info)
-                
+                newaxistags = vigra.AxisTags(sdata_axis_0_info, sdata_axis_1_info, sdata_axis_2_info)
                 source = vigra.VigraArray(sdata, axistags=newaxistags)
                 
                 sourceData.append(source)
                 
         if len(sourceData) == 0:
             sourceData = None
+            
+        # STEP 4: optionally merge into multi-band arrays if __mergeChannelsOnOutput__
+        # then return frameData and sourceData
             
         if len(self.files) > 1 and len(self.files) <= 4:
             # this could be returned as a multiband (multichannel) array 
@@ -928,31 +968,34 @@ class PVFrame(object):
                 channels = [int(self.files[k]["channel"]) for k in range(len(self.files))]
                 channel_names = [self.files[k]["channelName"] for k in range(len(self.files))]
                 
-                mergedFrameData = imgp.concatenateImages(*frameData, axis="c", allowConcatenationFor=("origin", "resolution"))
+                mergedFrameData = concatenateImages(*frameData, axis="c", allowConcatenationFor=("origin", "resolution"))
                 
-                merged_channel_axis_info = mergedFrameData.axistags["c"]
+                merged_channels_axinfo = mergedFrameData.axistags["c"]
                 
-                merged_channel_axis_cal = dt.AxisCalibration(merged_channel_axis_info,
-                                                                    axisname = dt.defaultAxisTypeName(merged_channel_axis_info))
+                merged_channels_axcal = AxesCalibration(merged_channels_axinfo,
+                                                        axisname = axisTypeName(merged_channels_axinfo))
                 
-                for channel in channels:
-                    if channel not in merged_channel_axis_cal.channelIndices:
-                        merged_channel_axis_cal.addChannel(channel)
+                for kch, channel in enumerate(channels):
+                    merged_channels_axcal.addChannelCalibration(ChannelCalibrationData(name=channel_names[kch],
+                                                                                         index=channel),
+                                                                  name=channel_names[kch])
+                    
+                merged_channels_axinfo = merged_channels_axcal.calibrateAxis(merged_channels_axinfo)
                         
-                    merged_channel_axis_cal.setChannelName(channel, channel_names[channels.index(channel)])
-                
                 if sourceData is not None:
-                    mergedSourceData = imgp.concatenateImages(*sourceData, axis="c")
+                    mergedSourceData = concatenateImages(*sourceData, axis="c")
                     
-                    merged_source_channel_axis_info = mergedSourceData.axistags["c"]
+                    merged_source_channel_axinfo = mergedSourceData.axistags["c"]
                     
-                    merged_source_channel_axis_cal = dt.AxisCalibration(merged_source_channel_axis_info,
-                                                                               axisname = dt.defaultAxisTypeName(merged_source_channel_axis_info))
+                    merged_source_channel_axcal = AxesCalibration(merged_source_channel_axinfo,
+                                                                    axisname = axisTypeName(merged_source_channel_axinfo))
                     
-                    for channel in channels:
-                        if channel not in merged_source_channel_axis_cal.channeIndices:
-                            merged_source_channel_axis_cal.addChannel(channel)
-                        merged_source_channel_axis_cal.setChannelName(channel, channel_names[channels.index(channel)])
+                    for kch, channel in enumerate(channels):
+                        merged_source_channel_axcal.addChannelCalibration(ChannelCalibrationData(name=channel_names[kch],
+                                                                                                    index = channel),
+                                                                            name = channel_names[kch])
+                        
+                    merged_source_channel_axis_ino = merged_source_channel_axcal.calibrateAxis(merged_channels_axinfo)
                         
                 else:
                     mergedSourceData = None
@@ -966,27 +1009,16 @@ class PVFrame(object):
         """
         
         channelIndex = [f["channel"] for f in self.files]
-        
-        #print(channelIndex)
-        
         orderedIndex = np.argsort(channelIndex)
-        
-        #print(orderedIndex)
         metadata = dict()
-        
         metadata["frame"] = self.attributes
-        
         metadata["acq"] = self.state.attributes
-        
         metadata["channels"] = self.channels
-        
         metadata["channel_names"] = {int(self.files[k]["channel"]): self.files[k]["channelName"] for k in orderedIndex}
-        
         metadata["files"] = [self.files[k] for k in orderedIndex]
-        
         metadata["type"] = self.__class__.__name__
         
-        return dt.DataBag(metadata)
+        return DataBag(metadata)
         
         
     def __repr__(self):
@@ -1034,7 +1066,7 @@ class PVSequence (object):
             else:
                 raise TypeError("Parent of a PVSequence can only be None or a PVScan object")
         
-        self.__attributes__ = dt.DataBag(dict())
+        self.__attributes__ = DataBag(dict())
         
         if node.attributes is not None:
             for k in node.attributes.values():
@@ -1054,7 +1086,7 @@ class PVSequence (object):
             self.__definition__ = PVLinescanDefinition(node.getElementsByTagName("PVLinescanDefinition")[0], \
                                                         parent=self)
             
-            self.__syncZAxis__ = dt.DataBag(xmlutils.attributesToDict(node.getElementsByTagName("PVLinescanSynchZ")[0]))
+            self.__syncZAxis__ = DataBag(xmlutils.attributesToDict(node.getElementsByTagName("PVLinescanSynchZ")[0]))
             
         else: # TODO / FIXME code for other sequence tyes
             self.__definition__ = None
@@ -1146,7 +1178,7 @@ class PVSequence (object):
         # Point: not implemented
         
         # NOTE: 2017-10-23 10:46:11
-        # axistags management taken care of by imgp.concatenateImages
+        # axistags management taken care of by concatenateImages
         
         if self.sequencetype == PVSequenceType.Linescan:
             if self.definition.mode in (PVLinescanMode.straightLine, \
@@ -1192,10 +1224,10 @@ class PVSequence (object):
                 # NOTE: 2017-10-27 21:47:29
                 # for linescans, the Y axis should be Time !!!
                 if self.__mergeChannelsOnOutput__:
-                    data = self.frames[0].mergeChannels(filepath=filepath) # a tuple of frameData, sourceData
+                    data = self.frames[0].mergeChannels(filepath=filepath) # a tuple of frameData, sourceData, both multiband vigra arrays
                     
                 else:
-                    data = self.frames[0](filepath=filepath)# a tuple of frameData, sourceData
+                    data = self.frames[0](filepath=filepath)# a tuple of frameData, sourceData, both lists
                     
                 return data
                     
@@ -1214,8 +1246,6 @@ class PVSequence (object):
             if self.__mergeChannelsOnOutput__:
                 data = [f.mergeChannels(filepath=filepath) for f in self.frames]# a tuple of frameData, sourceData
                 
-            #else:
-                #data = [f() for f in self.frames]
                 # NOTE: 2017-10-25 00:34:44
                 # be mindful that frames __call__() return a TUPLE of
                 # frame data and source data; except for Linescan frames, source data
@@ -1241,20 +1271,19 @@ class PVSequence (object):
 
                     framePeriod = float(diffTimes.mean())# * pq.s
                 
-                    newAxisInfo = vigra.AxisInfo(key="t", typeFlags=vigra.AxisType.Time, \
-                                                resolution=framePeriod, \
-                                                description=dt.defaultAxisTypeName(dt.axisTypeFlags["t"]))
+                    newAxisInfo = vigra.AxisInfo(key="t", 
+                                                 typeFlags=vigra.AxisType.Time, 
+                                                 resolution=framePeriod, 
+                                                 description=axisTypeName(axisTypeFromString["t"]))
                     
-                    newAxisCal = dt.AxisCalibration(newAxisInfo,
-                                                           units=pq.s, 
-                                                           origin=float(self.frames[0].attributes["absoluteTime"]), 
-                                                           resolution = framePeriod,
-                                                           axisname=dt.defaultAxisTypeName(newAxisInfo))
+                    newAxisCal = AxisCalibrationData(newAxisInfo)
+                    newAxisCal.units = pq.s,
+                    newAxisCal.origin = float(self.frames[0].attributes["absoluteTime"])
+                    newAxisCal.resolution = framePeriod
                     
                     newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
                     
                 else: # Z series
-                    #print("PVSequence() ZSeries")
                     # get the Z axis resolution from the frames state
                     z_pos = [float(f.state.attributes["positionCurrent_ZAxis"]) for f in self.frames]
                     z_steps = np.diff(z_pos)
@@ -1265,15 +1294,15 @@ class PVSequence (object):
                         
                     zres = z_steps[0]
                     
-                    newAxisInfo = vigra.AxisInfo(key="z", typeFlags=vigra.AxisType.Space,\
-                                                resolution=zres, \
-                                                description=dt.defaultAxisTypeName(dt.axisTypeFlags["z"]))
+                    newAxisInfo = vigra.AxisInfo(key="z", 
+                                                 typeFlags=vigra.AxisType.Space,
+                                                 resolution=zres,
+                                                 description=axisTypeName(axisTypeFromString["z"]))
                     
-                    newAxisCal = dt.AxisCalibration(newAxisInfo,
-                                                           units=pq.um, 
-                                                           origin=float(self.frames[0].state.attributes["positionCurrent_ZAxis"]), 
-                                                           resolution=zres,
-                                                           axisname=dt.defaultAxisTypeName(newAxisInfo))
+                    newAxisCal = AxisCalibrationData(newAxisInfo)
+                    newAxisCal.units = pq.um
+                    newAxisCal.origin = float(self.frames[0].state.attributes["positionCurrent_ZAxis"])
+                    newAxisCal.resolution = zres
                     
                     newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
                 
@@ -1287,13 +1316,11 @@ class PVSequence (object):
                 else:
                     newAxisDim = data[0].ndim
                     
-                #print("insert axis")
                 images = [imgp.insertAxis(img, newAxisInfo, newAxisDim) for img in data]
             
                 # NOTE: 2017-10-25 00:51:06 source data is None here
                 # so we just return None for it
-                #print("return, concatenate")
-                return imgp.concatenateImages(images, axis=newAxisInfo), None
+                return concatenateImages(images, axis=newAxisInfo), None
             
             else: # separate channels
                 data = [f(filepath=filepath) for f in self.frames] # for each frame: a tuple of frame data & src data if linescan
@@ -1343,14 +1370,15 @@ class PVSequence (object):
 
                     framePeriod = float(diffTimes.mean())#framePeriods[0]
                 
-                    newAxisInfo = vigra.AxisInfo(key="t", typeFlags = vigra.AxisType.Time, \
-                                                resolution=framePeriod, \
-                                                description=dt.defaultAxisTypeName(dt.axisTypeFlags["t"]))
+                    newAxisInfo = vigra.AxisInfo(key="t", 
+                                                 typeFlags = vigra.AxisType.Time,
+                                                 resolution=framePeriod,
+                                                 description=axisTypeName(axisTypeFromString["t"]))
                     
-                    newAxisCal = dt.AxisCcalibration(units=pq.s, 
-                                                            origin=float(self.frames[0].attributes["absoluteTime"]), 
-                                                            resolution=framePeriod,
-                                                            axisname=dt.defaultAxisTypeName(newAxisInfo))
+                    newAxisCal = AxisCalibrationData(units = pq.s, 
+                                                     origin = float(self.frames[0].attributes["absoluteTime"]), 
+                                                     resolution = framePeriod,
+                                                     name = axisTypeName(newAxisInfo))
                     
                     newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
                     
@@ -1361,15 +1389,15 @@ class PVSequence (object):
 
                     zres = abs(z_steps[0])
                     
-                    newAxisInfo = vigra.AxisInfo(key="z", typeFlags=vigra.AxisType.Space, \
-                                                resolution=zres, \
-                                                description=dt.defaultAxisTypeName(dt.axisTypeFlags["z"]))
+                    newAxisInfo = vigra.AxisInfo(key="z", 
+                                                 typeFlags=vigra.AxisType.Space,
+                                                 resolution=zres,
+                                                 description=axisTypeName(axisTypeFromString["z"]))
                     
-                    newAxisCal = dt.AxisCalibration(newAxisInfo,
-                                                           units=pq.um, 
-                                                           origin=float(self.frames[0].state.attributes["positionCurrent_ZAxis"]), 
-                                                           resolution=zres,
-                                                           axisname=dt.defaultAxisTypeName(newAxisInfo))
+                    newAxisCal = AxisCalibrationData(newAxisInfo)
+                    newAxisCal.units=pq.um
+                    newAxisCal.origin=float(self.frames[0].state.attributes["positionCurrent_ZAxis"])
+                    newAxisCal.resolution=zres
                     
                     newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
                     
@@ -1383,9 +1411,9 @@ class PVSequence (object):
                 else:
                     newAxisDim = data[0][0].ndim
                     
-                return [imgp.concatenateImages([imgp.insertAxis(data[frame][channel], newAxisInfo, newAxisDim) \
-                                                        for frame in range(len(self.frames))], \
-                                                        axis=newAxisInfo) \
+                return [concatenateImages([insertAxis(data[frame][channel], newAxisInfo, newAxisDim) 
+                                                        for frame in range(len(self.frames))], 
+                                                        axis=newAxisInfo) 
                                                     for channel in range(len(data[0]))], None
                 
         elif self.sequencetype == PVSequenceType.Single:
@@ -1437,20 +1465,26 @@ class PVSequence (object):
         """Returns metadata for this sequence.
         
         This is an ordered dictionary with the following fields:
-        sequence    = dictionary with the sequence attributes
+        attributes    = dictionary with the sequence attributes
         length      = number of frames in the sequence
         definition  = for Linescan sequences this is the actual linescan definition; this is None for other sequence types
         zsync       = Z axis synchronization parameters
         filepath    = path to the data files 
         frames      = a list with metadata for each frame in the sequence
         """
-        metadata = dict()
+        #metadata = dict()
+        metadata = DataBag(mutable_types=True, allow_none=True)
         
-        metadata["sequence"]    = self.attributes
+        metadata["attributes"]  = self.attributes
         metadata["length"]      = self.length
-        metadata["definition"]  = self.definition
+        
+        if isinstance(self.definition, PVLinescanDefinition):
+            metadata["definition"]  = self.definition.metadata()
+        else:
+            metadata["definition"] = None
+            
         metadata["zsync"]       = self.zAxisSynchronization
-        metadata["file_path"]    = self.filepath
+        metadata["file_path"]   = self.filepath
         
         if self.type == PVSequenceType.Linescan:
             if self.definition.mode in (PVLinescanMode.straightLine, \
@@ -1508,7 +1542,7 @@ class PVSequence (object):
         
         metadata["type"] = self.__class__.__name__
         
-        return dt.DataBag(metadata)
+        return DataBag(metadata)
         
     @property
     def parent(self):
@@ -1667,9 +1701,9 @@ class PVScan(object):
         # at various places in the code, unless you write code to manage it.
         # -- too work for little benefit
         if doc.documentElement.attributes is not None:
-            self.__attributes__ = dt.DataBag(xmlutils.attributesToDict(doc.documentElement))
+            self.__attributes__ = DataBag(xmlutils.attributesToDict(doc.documentElement))
         else:
-            self.__attributes__ = dt.DataBag(dict())
+            self.__attributes__ = DataBag(dict())
             
         # query its children
         if not doc.documentElement.hasChildNodes():
@@ -1698,8 +1732,6 @@ class PVScan(object):
             
         except Exception as e:
             traceback.print_exc()
-            #(tp, val, tb) = sys.exc_info()
-            #print(traceback.print_tb(tb))
             warnings.warn("PVScan object path will be set to None")
             self.__path__ = None
             
@@ -1708,8 +1740,6 @@ class PVScan(object):
         
         except Exception as e:
             traceback.print_exc()
-            #(tp, val, tb) = sys.exc_info()
-            #print(traceback.print_tb(tb))
             warnings.warn("PVScan object filename will be set to None")
             self.__filename__ = None
             
@@ -1733,9 +1763,6 @@ class PVScan(object):
         if not all([sequence.sequencetype == self.sequences[0].sequencetype for sequence in self.sequences]):
             raise ValueError("Mixed types of PVSequence are not supported")
         
-        # NOTE: 2017-11-08 00:42:30 
-        # DEPRECATION: PictArray dropped from the API
-        
         # NOTE: 2017-10-24 23:23:50  TODO / FIXME
         # the PVSequence object should also parse metdata, and return parts of it
         # as metadata attached to the image (e.g., generate axis calibrations and
@@ -1756,11 +1783,6 @@ class PVScan(object):
         if filepath is None:
             filepath = self.filepath
             
-            
-        #print("PVSCan(): filepath", filepath)
-            
-        #max_workers = len(self.sequences)
-        
         if self.sequences[0].sequencetype == PVSequenceType.Linescan:
             if self.sequences[0].definition.mode in (PVLinescanMode.straightLine, \
                                         PVLinescanMode.freeHand, \
@@ -1805,31 +1827,17 @@ class PVScan(object):
                 else:
                     framePeriod = 1.0
                     
-                #print("PVScan.__call__() framePeriod", framePeriod)
-                    
-                newAxisInfo = vigra.AxisInfo(key="t1", typeFlags=vigra.AxisType.Time, \
-                                                       resolution=framePeriod, \
-                                                       description=dt.defaultAxisTypeName(dt.axisTypeFlags["t"]))
+                newAxisInfo = vigra.AxisInfo(key="t1", 
+                                             typeFlags=vigra.AxisType.Time, 
+                                             resolution=framePeriod)
                 
-                newAxisCal = dt.AxisCalibration(newAxisInfo,
-                                                       units=pq.s,
-                                                       origin=float(self.sequences[0].frames[0].attributes["absoluteTime"]),
-                                                       resolution=framePeriod,
-                                                       axisname=dt.defaultAxisTypeName(newAxisInfo))
-
+                newAxisCal = AxisCalibrationData(newAxisInfo)
+                newAxisCal.units = pq.s
+                newAxisCal.origin = float(self.sequences[0].frames[0].attributes["absoluteTime"])
+                newAxisCal.resolution = framePeriod
+                
                 newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
                 
-                #print("PVScan.__call__() newAxisInfo", newAxisInfo)
-                
-                # NOTE: 2017-10-29 15:36:00 
-                # incorporate the absolute source path to the XML document on the
-                # file system is read from (so that we can load image data from
-                # anywhere in the filesystem)
-                
-                # NOTE: 2017-10-25 00:34:44
-                # be mindful that frames __call__() return a TUPLE of
-                # frame data and source data; 
-                # except for Linescan frames, source data is None
                 if self.__mergeChannelsOnOutput__:
                     data = [s.mergeChannels(filepath=filepath) for s in self.sequences]
                     
@@ -1855,7 +1863,7 @@ class PVScan(object):
                     
                     # NOTE: 2017-10-25 00:46:27
                     # returns tuple of multi-band frame & source data
-                    fdata = imgp.concatenateImages([imgp.insertAxis(img, newAxisInfo, newAxisDim) \
+                    fdata = concatenateImages([insertAxis(img, newAxisInfo, newAxisDim) \
                                                         for img in frmdata], axis=newAxisInfo)
                     
                     channelAxisDim = srcdata[0].axistags.channelIndex
@@ -1866,7 +1874,7 @@ class PVScan(object):
                     else:
                         newAxisDim = srcdata[0].ndim
                     
-                    sdata = imgp.concatenateImages([imgp.insertAxis(img, newAxisInfo, newAxisDim) \
+                    sdata = concatenateImages([insertAxis(img, newAxisInfo, newAxisDim) \
                                                         for img in srcdata], axis=newAxisInfo)
                     
                     
@@ -1908,17 +1916,15 @@ class PVScan(object):
                         
                     # NOTE: 2017-10-25 00:46:39
                     # returns a tuple of single-band frame data channels & single-band source data channels 
-                    #print("fdata")
-                    fdata = [imgp.concatenateImages([imgp.insertAxis(frmdata[sequence][channel], newAxisInfo, newAxisDim) \
-                                                        for sequence in range(len(self.sequences))], \
-                                                        axis=newAxisInfo) \
-                            for channel in range(len(frmdata[0]))]
+                    fdata = [concatenateImages(*[insertAxis(frmdata[sequence][channel], 
+                                                                      newAxisInfo, 
+                                                                      newAxisDim) for sequence in range(len(self.sequences))],
+                                                        axis=newAxisInfo) for channel in range(len(frmdata[0]))]
                     
-                    #print("sdata")
-                    sdata = [imgp.concatenateImages([imgp.insertAxis(srcdata[sequence][channel], newAxisInfo, newAxisDim) \
-                                                        for sequence in range(len(self.sequences))], \
-                                                        axis=newAxisInfo) \
-                            for channel in range(len(srcdata[0]))]
+                    sdata = [concatenateImages(*[insertAxis(srcdata[sequence][channel],
+                                                                      newAxisInfo, 
+                                                                      newAxisDim) for sequence in range(len(self.sequences))],
+                                                        axis=newAxisInfo) for channel in range(len(srcdata[0]))]
                 
             
             elif self.sequences[0].definition.mode == PVLinescanMode.lissajous:
@@ -1944,10 +1950,10 @@ class PVScan(object):
             # frame data (because TSeries and ZSeries frames have no "source"
             # attribute)
             if self.__mergeChannelsOnOutput__:
-                return self.sequences[0].mergeChannels() # (frameData, None)
+                return (self.sequences[0].mergeChannels(), None) # (frameData, None)
                 
             else:
-                return self.sequences[0]() # (frameData, None)
+                return (self.sequences[0](), None )# (frameData, None)
             
         elif self.sequences[0].sequencetype == PVSequenceType.Single.value:
             # again, nothing to do here -- this pertains to SingleImage 
@@ -1956,21 +1962,21 @@ class PVScan(object):
             # of these sequences ever have more than one frame?
             
             if self.__mergeChannelsOnOutput__:
-                return self.sequences[0].mergeChannels() # (frameData, None)
+                return (self.sequences[0].mergeChannels(), None )# (frameData, None)
                 
             else:
-                return self.sequences[0]() # (frameData, None)
+                return (self.sequences[0](), None )# (frameData, None)
             
         
         elif self.sequences[0].sequencetype == PVSequenceType.Point.value:
             raise NotImplementedError("Point scan sequence parsing not implemented yet")
             # TODO - FIXME figure out what this does and how to parse it sensibly
             
-        else:                           # do nothing here
+        else:  # do nothing here
             raise ValueError("Unknown sequence type %d" % self.sequencetype)
             
 
-    def scanData(self, mergeChannels=False, analysisoptions=None, electrophysiology=None, name=None):
+    def scanData(self, mergeChannels=False, analysisOptions=None, electrophysiology=None, name=None):
         """Returns a datatypes.ScanData object
         """
         
@@ -1986,20 +1992,30 @@ class PVScan(object):
         for future in concurrent.futures.as_completed(futures):
             (scans, scene) = future.result()
         
-        meta = self.metadata()
-        #print("PVScan.scanData  c'tuct ScanData")
-        ret = dt.ScanData(scene=scene, scans=scans, metadata=meta, name=self.name)
+        #meta = self.metadata()
         
-        if analysisoptions is not None:
-            ret.analysisoptions = analysisoptions
-            
+        kw = dict()
+        kw["name"] = self.name
+        kw["metadata"] = self.metadata()
+        
         if isinstance(electrophysiology, neo.Block):
-            ret.electrophysiology = electrophysiology
+            kw["electrophysiology"] = electrophysiology
             
-        if isinstance(name, str) and len(name) > 0:
-            ret.name = name
+        if analysisOptions is not None:
+            kw["analysisOptions"] = analysisOptions
             
-        return ret
+        return ScanData(scene=scene, scans=scans, **kw)
+            
+
+        #ret = ScanData(scene=scene, scans=scans, metadata=meta, name=self.name)
+        
+        #if isinstance(electrophysiology, neo.Block):
+            #ret.electrophysiology = electrophysiology
+            
+        #if isinstance(name, str) and len(name) > 0:
+            #ret.name = name
+            
+        #return ret
     
     def scandata(self, *args, **kwargs):
         return self.scanData(*args, **kwargs)
@@ -2008,9 +2024,8 @@ class PVScan(object):
     def metadata(self):
         """Returns metadata associated with this PVSCan
         """
-        
-        metadata = dict()
-        metadata["configuration"] = self.configuration
+        metadata = DataBag(mutable_types=True, allow_none=True)
+        metadata["configuration"] = self.configuration.as_dict()
         metadata["file_path"] = self.filepath
         
         if self.sequences[0].type == PVSequenceType.Linescan:
@@ -2037,7 +2052,7 @@ class PVScan(object):
             
         metadata["type"] = self.__class__.__name__
         
-        return dt.DataBag(metadata)
+        return metadata
     
     def mergeChannels(self, filepath=None):
         """Coerce reading the files as a multiband image.
@@ -2154,197 +2169,810 @@ class PVScan(object):
             
         return "\n".join(ret)
     
+# NOTE: 2020-11-30 23:45:00
+# place the mixin before other base classes so that it is initialized
+# then super(...).__init__ it
+class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, ):
+    sig_protocolRemoved = pyqtSignal(int, name="sig_protocolRemoved")
     
-class PVImporterDialog(__UI_PVImporterDialog__, __QDialog__):
-    def __init__(self, parent, currentdir, presyn_trigger_detect, postsyn_trigger_detect, photo_trigger_detect, imaging_trigger_detect, data_name=None, ephys_name=None):
-        super().__init__(self, parent)
+    def __init__(self, parent=None,
+                 name: typing.Optional[str] = None,
+                 pvScanFileName: typing.Optional[str]=None, 
+                 optionsFileName: typing.Optional[str]=None, 
+                 ephysFileNames: typing.Optional[typing.Union[str, tuple, list]]=None,
+                 protocolFileName: typing.Optional[str]=None,
+                 clearTriggerEvents: typing.Optional[bool]=False,
+                 auto_export:bool = False,
+                 **kwargs): # parent, flags - see documentation for QDialog constructor in Qt Assistant
+        """
+        Parameters:
+        -----------
+        name:str (optional, default is None) - name of generated ScanData
+        pvScanFileName:str (optional, default is None) - name of PrairieView scan experiment (XML) file
+        optionsFileName:str (optional, default is None) - name of a pickle (*pkl) file containing ScanData options
+        ephysFileNames:str or sequence of str - name(s) of Axon file(s) , or
+                    pickle (*.pkl) files, containing associated electrophysiology
+                            data.
+                    
+                    The Axon files can be text (*.atf) or binary (*.abf) files.
+                    
+                    Optional; default is None
+                            
+        protocolFileName:str (optional, default is None) - name of pickle (*.pkl) 
+                    file with TriggerProtocols 
+
+        clearTriggerEvents:bool (optional, default is False)
+                            When True (default), remove all neo.Event objects
+                            embedded in the electrophysiology data, before
+                            detecting trigger events.
+                            
+        auto_export: bool (optional, default is False)
+            When True, pressing "OK" button will export the generated ScanData
+            to the workspace.
+            
+            This is a convenience to place data directly in Scipyen's workspace.
+            
+            When False (the default) the dialog simply generates the Scandata 
+            object and stores it in the "scanData" attribute. TODO: Because this
+            can be time consuming best is to call this asynchronously, when 
+            auto_export is False.
         
-        if not isinstance(parent, QtWidgets, QWidget):
-            raise TypeError("parent expected to be a QWidget; got %s instead" % type(parent).__name__)
+        """
+        # NOTE: 2021-04-18 11:49:52
+        # 'parent' parameter is required; when called from a PyQt5 slot, 'parent'
+        # should be set to the object which own the slot, so that it will take
+        # owership fo the dialog; otherwise, the dialog will go out of scope when
+        # the slot returns - this means its window will close and the C/C++
+        # objects that compose it will be garbage collected (also meaning that 
+        # later delete actions on these objects will throw exceptions)
+        #
+        # see also scipyen gui.mainwindow.ScipyenWindow.slot_importPrairieView()
+        super(__QDialog__, self).__init__(parent)
+        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
+        #super(WorkspaceGuiMixin, self).__init__(parent, **kwargs)
         
-        if not isinstance(currentdir, str):
-            raise TypeError("currentdir expected to be a string; got %s instead" % type(currentdir).__name__)
+        self._scandata_ = None # the outcome: a ScanData object
         
-        if not os.path.exists(currentdir) or not os.path.isdir(currentdir) or not os.access(currentdir, os.R_OK):
-            raise ValueError("%s is not a readable directory" % currentdir)
+        self._pvscan_ = None # the xml.dom.minidom.Document that specifies the
+                            # the PVScan experiment
         
-        for n, t in zip(("presyn_trigger_detect", "postsyn_trigger_detect", "photo_trigger_detect", "imaging_trigger_detect"),
-                        (presyn_trigger_detect, postsyn_trigger_detect, photo_trigger_detect, imaging_trigger_detect)):
+        self.dataName = "" # the value of lsdata "name" attribute
         
-            if not isinstance(t, (tuple, list)):
-                raise TypeError("%s expected to be a tuple or list; got %s instead" % (n, type(t).__name__))
+        self.pvScanFileName = "" # the PV Scan XML document file - contains
+                                 # scan experiment information & location of
+                                 # the files with the numerical data of lsdata
+                                 
+        self.scanDataVarName = "" # the name that will be assigned to lsdata in the
+                                # user's workspace
+                                
+        self.protocolFileName = "" # pickle file containing the trigger protocols
+        
+        self.optionsFileName = "" # pickle file containing saved ESPCaT options
+        
+        self.ephysFileNames = list() 
+        
+        self.scanDataOptions = None # ScanDataOptions object - to be assigned to lsdata
+        
+        self._ephys_ = None # a neo.Block with electrophysiology recordings associated
+                            # with lsdata
+                            
+        
+        self.clearEvents = clearTriggerEvents if isinstance(clearTriggerEvents, bool) else False
+                            
+        self.triggerProtocols = list()  # list of TriggerProtocol objects associated
+                                        # with lsdata
+                                        
+        self.cachedEvents = list()
+        self.cachedProtocols = list()
+        self.cachedProtocolFileName = ""
+                                        
+        if isinstance(name, str) and len(name.strip()):
+            self.dataName = name
+            self.scanDataVarName = strutils.str2symbol(self.dataName)
+        
+        if isinstance(pvScanFileName, str) and len(pvScanFileName.strip()):
+            if os.path.isfile(pvScanFileName) and any([mime in pio.mimetypes.guess_type(pvScanFileName)[0] for mime in ("xml", "pickle")]):
+                self.pvScanFileName = pvScanFileName
+        
+        if isinstance(optionsFileName, str) and len(optionsFileName.strip()):
+            if os.path.isfile(optionsFileName) and "pickle" in pio.mimetypes.guess_type(optionsFileName)[0]:
+                self.optionsFileName = optionsFileName
+        
+        if isinstance(ephysFileNames, str) and len(ephysFileNames.strip()):
+            if os.path.isfile(ephysFileNames) and any([mime in pio.mimetypes.guess_type(ephysFileNames)[0] for mime in ("pickle", "axon")]):
+                self.ephysFileNames = [ephysFileNames]
             
-            if len(t) not in (3, 4):
-                raise TypeError("%s expected to have three or four elements; got %d instead" % (n, len(t)))
-            
-            if not isinstance(t[0], bool):
-                raise TypeError("first element of %s expected to be a bool; got %s instead" % (n, type(t[0]).__name__))
-            
-            if not isinstance(t[1], int):
-                raise TypeError("second element of %s expected to be an int; got %s instead" % (n, type(t[1]).__name__))
-            
-            if t[1] < 0:
-                raise ValueError("second element of %s must be >= 0; got %d instead" % (n, t[1]))
-            
-            if not isinstance(t[2], str):
-                raise TypeError("third element of %s expected to be a str; got %s instead" % (n, type(t[2]).__name__))
-            
-            if len(t[2]) == 0:
-                raise ValueError("third element of %s must not be an epmty string" % n)
-            
-            if len(t) == 4:
-                if not insinstance(t[3], tuple):
-                    raise TypeError("fourth element of %s must be a tuple; got %s instead" % (n, type(t[3]).__name__))
+        elif isinstance(ephysFileNames, (tuple, list)) and all([isinstance(v, str) for v in ephysFileNames]):
+            self.ephysFileNames = [s for s in ephysFileNames if (len(s.strip()) and any([mime in pio.mimetypes.guess_type(s)[0]]))]
+        
+        if isinstance(protocolFileName, str) and len(protocolFileName.strip()):
+            if os.path.isfile(self.protocolFileName) and "pickle" in pio.mimetypes.guess_type(self.protocolFileName)[0]:
+                self.protocolFileName = protocolFileName
                 
-                if len(t[3]) != 2:
-                    raise TypeError("fourth element of %s must have two elements; got %d instead" % (n, len(presyn_trigger_detect[3])))
-                
-                if not all([isinstance(p, float) for p in t[3]]):
-                    raise TypeError("fourth element of %s must contain float values" % n)
+        self.auto_export = auto_export
         
-        if not isinstance(data_name, (str, type(None))):
-            raise TypeError("data_name extected to be a string, or None; got %s instead" % type(data_name).__name__)
+        self._configureUI_()
+        self.setSizeGripEnabled(True)
         
-        if isinstance(data_name, str) and len(data_name.strip()) == 0:
-            raise ValueError("data_name cannopt be an empty string")
+    def _configureUI_(self):
+        self.setupUi(self)
         
-        if not isinstance(ephys_name, (str, type(None))):
-            raise TypeError("ephys_name expected to be astring; got %s instead" % type(ephys_name).__name__)
+        self.dataNameLineEdit.undoAvailable=True
+        self.dataNameLineEdit.redoAvailable=True
+        self.dataNameLineEdit.setClearButtonEnabled(True)
+        if len(self.dataName):
+            self.dataNameLineEdit.setText(self.dataName)
+        self.dataNameLineEdit.editingFinished.connect(self._slot_setDataName)
+        self.dataNameLineEdit.textChanged.connect(self._slot_setDataName)
         
-        if isinstance(ephys_name, str) and len(ephys_name.strip()) == 0:
-            raise ValueError("ephys_name cannot be an empty string")
+        self.pvScanFileNameLineEdit.undoAvailable=True
+        self.pvScanFileNameLineEdit.redoAvailable=True
+        self.pvScanFileNameLineEdit.setClearButtonEnabled(True)
+        if len(self.pvScanFileName):
+            self.pvScanFileNameLineEdit.setText(self.pvScanFileName)
+        self.pvScanFileNameLineEdit.editingFinished.connect(self._slot_setPVScanFileName)
+        self.pvScanFileNameLineEdit.textChanged.connect(self._slot_setPVScanFileName)
         
-        self.targetdir              = currentdir
-        self.presyn_trigger_detect  = presyn_trigger_detect
-        self.postsyn_trigger_detect = postsyn_trigger_detect
-        self.photo_trigger_detect   = photo_trigger_detect
-        self.imaging_trigger_detect = imaging_trigger_detect
+        self.pvScanFileChooserToolButton.clicked.connect(self._slot_choosePVScanFile)
+        self.pvScanImportFromWorkspaceToolButton.clicked.connect(self._slot_importPVScanFromWorkspace)
         
-        self.xmlFileFilter          = "XML Files (*.xml)"
-        self.pickleFileFilter       = "Pickle Files (*.pkl)"
-        self.ephysFilesFilter       = ";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)"])
+        self.optionsFileNameLineEdit.undoAvailable=True
+        self.optionsFileNameLineEdit.redoAvailable=True
+        self.optionsFileNameLineEdit.setClearButtonEnabled(True)
         
-        self.data_name              = data_name
-        self._ephys_name            = ephys_name
+        if len(self.optionsFileName):
+            self.optionsFileNameLineEdit.setText(self.optionsFileName)
+        self.optionsFileNameLineEdit.editingFinished.connect(self._slot_setOptionsFileName)
+        self.optionsFileNameLineEdit.textChanged.connect(self._slot_setOptionsFileName)
         
-        self.pvXMLfileName          = None
-        self.pvscan                 = None
-        self.epscatoptions          = None
+        self.optionsFileChooserToolButton.clicked.connect(self._slot_chooseOptionFile)
+        self.optionsImportToolButton.clicked.connect(self._slot_importOptionsFromWorkspace)
         
-        self.ephysdata              = None
+        self.ephysFileNameLineEdit.undoAvailable=True
+        self.ephysFileNameLineEdit.redoAvailable=True
+        self.ephysFileNameLineEdit.setClearButtonEnabled(True)
+        self.ephysFileNameLineEdit.setText(os.pathsep.join(self.ephysFileNames))
+        self.ephysFileNameLineEdit.editingFinished.connect(self._slot_setEphysFileNames)
         
-        self.scandata               = None
+        self.ephysFileChooserToolButton.clicked.connect(self._slot_chooseEphysFiles)
+        self.ephysImportFromWorkspaceToolButon.clicked.connect(self._slot_importEphysFromWorkspace)
         
-    def __configure_UI__(self):
+        self.triggerProtocolFileNameLineEdit.undoAvailable=True
+        self.triggerProtocolFileNameLineEdit.redoAvailable=True
+        self.triggerProtocolFileNameLineEdit.setClearButtonEnabled(True)
+        
+        if len(self.protocolFileName):
+            self.triggerProtocolFileNameLineEdit.setText(protocolFile)
+        self.triggerProtocolFileNameLineEdit.editingFinished.connect(self._slot_setProtocolFileName)
+        self.triggerProtocolFileNameLineEdit.textChanged.connect(self._slot_setProtocolFileName)
+            
+        
+        self.triggerProtocolFileChooserToolButton.clicked.connect(self._slot_chooseProtocolFile)
+        
+        self.protocolsImportToolButton.clicked.connect(self._slot_importProtocolFromWorkspace)
+        
+        self.detectTriggersToolButton.clicked.connect(self._slot_startTriggerEventDetectionGui)
+        self.editTriggerProtocolsToolButton.clicked.connect(self._slot_editTriggerProtocols)
+        self.buildScandataToolButton.clicked.connect(self.slot_generateScanData)
+        
+        # NOTE: 2021-10-09 23:55:03
+        # belowl self._scipyenWindow_ is inherited from WorkspaceGuiMixin (initialized)
+        self.ephysPreview = sv.SignalViewer(win_title = "Trigger Events Detection")
+        
+        #self.ephysPreview = sv.SignalViewer(parent = self._scipyenWindow_, 
+                                            #win_title = "Trigger Events Detection")
+        
+        #self.ephysPreview = sv.SignalViewer(parent = self, 
+                                            #win_title = "Trigger Events Detection")
+        
+        # NOTE: 2021-03-21 11:35:59 just a "place holder" here; the actual dialog 
+        # created in _slot_startTriggerEventDetectionGui()
+        self.eventDetectionDialog = None # when a TriggerDetectDialog, this caches the detection options & events
+        
+        #self.protocolEditorDialog = ProtocolEditorDialog(parent=self, title = "Edit Trigger Protocols")
+        #self.protocolEditorDialog = ProtocolEditorDialog(parent=self._scipyenWindow_, title = "Edit Trigger Protocols")
+        self.protocolEditorDialog = ProtocolEditorDialog(title = "Edit Trigger Protocols")
+        
+        # the ProtocolEditorDialog works on a reference to the list of 
+        # TriggerProtocols stored in here.
+        self.protocolEditorDialog.triggerProtocols = self.triggerProtocols
+        self.protocolEditorDialog.sig_detectTriggers.connect(self._slot_startTriggerEventDetectionGui)
+        self.protocolEditorDialog.sig_removeProtocol.connect(self._slot_removeProtocol)
+        self.protocolEditorDialog.sig_requestProtocolAdd.connect(self._slot_protocolAddRequest)
+        self.protocolEditorDialog.finished.connect(self._slot_protocolEditorFinished)
+        
+        self.buttonBox.accepted.connect(self.slot_generateScanData)
+        
+    @pyqtSlot(int)
+    def _slot_removeProtocol(self, index):
+        """Removes a trigger protocol.
+        """
+        # TODO: contemplate the use of the traitlets' observer paradigm with
+        # TriggerProtocol objects.
+        
+        if index < len(self.triggerProtocols):
+            tp = self.triggerProtocols[index]
+        
+            if isinstance(self._scandata_, ScanData):
+                self._scandata_.removeTriggerProtocol(index)
+        
+            if isinstance(self._ephys_, neo.Block):
+                remove_trigger_protocol(tp, self._ephys_)
+            
+            self.sig_protocolRemoved.emit(index)
+            
+    @pyqtSlot()
+    def _slot_protocolAddRequest(self):
+        pass
+    
+    @pyqtSlot()
+    def _slot_editTriggerProtocols(self):
+        self.protocolEditorDialog.triggerProtocols = self.triggerProtocols
+        self.protocolEditorDialog.open()
+        
+    @pyqtSlot()
+    def _slot_protocolEditorFinished(self):
         pass
         
-        
     @pyqtSlot()
-    def slot_choosePVFile(self):
-        self.pvXMLfileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
-                                                                 caption="Open PrairieView file", 
-                                                                 filter=self.xmlFileFilter,
-                                                                 directory=self.targetdir)
-        
-        if len(self.pvXMLfileName) == 0:
+    @safeWrapper
+    def _slot_startTriggerEventDetectionGui(self):
+        """Opens the trigger event detection dialog.
+        The following signals are connected to this slot:
+            detectTriggersToolButton.clicked()
+            protocolEditorDialog.sig_detectTrigger()
+        """
+        if self._ephys_ is None:
             return
         
-        try:
-            self.pvScan = PrairieView.PVScan(pio.loadXMLFile(pvXMLfileName))
+        if isinstance(self._ephys_, neo.Block) and len(self._ephys_.segments):
+            if self.eventDetectionDialog is None:
+                self.eventDetectionDialog = TriggerDetectDialog(ephysdata=self._ephys_,
+                                                                clearEvents=True,
+                                                                ephysViewer = self.ephysPreview)
+                                                                #parent=self._scipyenWindow_)
+                self.eventDetectionDialog.finished.connect(self._slot_stopTriggerEventDetectionGui)
             
-        except Exception as e:
-            s = io.StringIO()
-            sei = sys.exc_info()
-            traceback.print_exception(file=s, *sei)
-            msgbox = QtWidgets.QMessageBox()
-            msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-            msgbox.setWindowTitle(sei[0].__class__.__name__)
-            msgbox.setText(sei[0].__class__.__name__)
-            msgbox.setDetailedText(s.getvalue())
-            msgbox.exec()
-            return
+            #self.ephysPreview.plot(self._ephys_) # done in TriggerDetectDialog c'tor
             
+            # NOTE: 2021-04-11 14:06:55
+            # call open() instead of anything else to keep the GUI loop running
+            # and NOT block interaction with other windows, especially with the
+            # SignalViewer that plots the ephys data
+            self.eventDetectionDialog.open() 
             
     @pyqtSlot()
-    def slot_chooseOptionsFile(self):
-        epscatOptionsFileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
-                                                                         caption="Open EPSCaT Options file", 
-                                                                         filter=self.pickleFileFilter,
-                                                                         directory=self.targetdir)
+    def _slot_stopTriggerEventDetectionGui(self):
+        """Closes trigger event detection dialog and interprets the result.
+        If dialog.result() is "accepted" (or yes/ok) then a new set collection
+        of trigger protocols is generated.
+    
+        The following signals are connected to this slot:
+            eventDetectionDialog.finished()
+        """
+        self.ephysPreview.close()
+        if self.eventDetectionDialog.result():
+            if not self.eventDetectionDialog.detected:
+                self.eventDetectionDialog.detect_triggers()
+                
+            if len(self.eventDetectionDialog.triggerProtocols[:]):
+                self.cachedProtocols[:] = self.triggerProtocols[:]
+                self.cachedProtocolFileName = self.triggerProtocolFileNameLineEdit.text()
+                self.triggerProtocols[:] = self.eventDetectionDialog.triggerProtocols[:]
+            
+                self.triggerProtocolFileNameLineEdit.setText("<detected>")
+                
+            else:
+                self.triggerProtocolFileNameLineEdit.setText("")
+            
+    @pyqtSlot()
+    def _slot_undoTriggers(self):
+        if self._ephys_ is None:
+            return
         
-        if len(epscatOptionsFileName) == 0:
-            self.epscatoptions = epscatOptions()
+        signalblockers = [QtCore.QSignalBlocker(self.triggerProtocolFileNameLineEdit)]
+        
+        for k,s in enumerate(self._ephys_.segments):
+            s.events.clear()
+            if k < len(self.cachedEvents):
+                s.events = self.cachedEvents[k]
+                
+        self.triggerProtocols[:] = self.cachedProtocols[:]
+        self.ephysPreview.plot(self._ephys_)
+        self.updateProtocolEditor()
+        
+        if len(self.protocolFileName):
+            self.triggerProtocolFileNameLineEdit.setText(self.protocolFileName)
+            
+    @pyqtSlot(int)
+    def _slot_clearEventsChanged(self, value):
+        self.clearEvents = self.clearEventsCheckBox.isChecked()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_setPVScanFileName(self):
+        # connected to editing the PVScan field
+        if "imported" in self.pvScanFileNameLineEdit.text():
+            return
+        
+        self.pvScanFileName = self.pvScanFileNameLineEdit.text().strip()
+        
+        if len(self.pvScanFileName.strip()):
+            ret = self.loadPVScan(self.pvScanFileName)
+            if not ret:
+                self.pvScanFileName = ""
+                self._pvscan_ = None
+                self._scandata_ = None
+        
+        else:
+            self.pvScanFileName = ""
+            self._pvscan_ = None
+            self._scandata_ = None
+                
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_choosePVScanFile(self):
+        signalblockers = [QtCore.QSignalBlocker(w) for w in (self.pvScanFileNameLineEdit, self.dataNameLineEdit)]
+        fileFilter = ";;".join(["XML Files (*.xml)", "Pickle files (*.pkl)", "All files (*.*)"])
+        
+        self.pvScanFileName, _ = self.chooseFile(caption="Open PrairieView file",
+                                   fileFilter=fileFilter)
+        
+        if len(self.pvScanFileName.strip()):
+            self._scandata_ = None # because we need to rebuild the scanData
+            if self.loadPVScan(self.pvScanFileName):
+                self.pvScanFileNameLineEdit.setText(self.pvScanFileName)
+            else:
+                self.pvScanFileNameLineEdit.clear()
+                self.pvScanFileName = ""
+                self._pvscan_ = None
+                
+        else:
+            self.pvScanFileNameLineEdit.clear()
+            self.pvScanFileName = ""
+            self._pvscan_ = None
+
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_setOptionsFileName(self):
+        # connected to editing Options field
+        if "imported" in self.optionsFileNameLineEdit.text():
+            return
+        self.optionsFileName = self.optionsFileNameLineEdit.text()
+        if len(self.optionsFileName.strip()):
+            ret = self.loadOptions(self.optionsFileName) 
+            if not ret:
+                self.optionsFileName = ""
+                self.scanDataOptions = None
+                
+        else:
+            self.optionsFileName = ""
+            self.scanDataOptions = None
+
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_chooseOptionFile(self):
+        signalblockers = [QtCore.QSignalBlocker(w) for w in (self.optionsFileNameLineEdit,)]
+        caption = "Open ScanData Options file for %s" % self.scanDataVarName if (isinstance(self.scanDataVarName, str) and len(self.scanDataVarName.strip())) else "Open EPSCaT Options file"
+        
+        self.optionsFileName, _ = self.chooseFile(caption=caption, fileFilter="Pickle Files (*.pkl)")
+        
+        if len(self.optionsFileName.strip()):
+            if self.loadOptions(self.optionsFileName):
+                self.optionsFileNameLineEdit.setText(self.optionsFileName)
+                
+            else:
+                self.optionsFileName = ""
+                self.optionsFileNameLineEdit.clear()
+                self.scanDataOptions = None
+                
+        else:
+            self.optionsFileName = ""
+            self.optionsFileNameLineEdit.clear()
+            self.scanDataOptions = None
+            
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_setEphysFileNames(self):
+        # NOTE: 2020-12-26 12:17:01 This always generates a list of str even if
+        # the split results in only one element.
+        if any([v in self.ephysFileNameLineEdit.text() for v in ("mutliple files", "imported")]):
+            return
+        
+        self.ephysFileNames = self.ephysFileNameLineEdit.text().split(os.pathsep)
+        
+        if len(self.ephysFileNames):
+            ret = self.loadEphys(self.ephysFileNames)
+            if not ret:
+                self._ephys_ = None
+                
+        else:
+            self._ephys_ = None
+                
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_chooseEphysFiles(self):
+        signalblockers =[QtCore.QSignalBlocker(w) for w in (self.ephysFileNameLineEdit,)]
+
+        #targetDir = os.getcwd()
+        caption = "Open Electrophysiology Data file(s) for %s" % self.scanDataVarName if (isinstance(self.scanDataVarName, str) and len(self.scanDataVarName.strip())) else "Open Electrophysiology Data file(s)"
+        
+        fileFilter = ";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)"])
+        
+        self.ephysFileNames, _ = self.chooseFile(caption=caption, fileFilter=fileFilter, single=False)
+        
+        if len(self.ephysFileNames) == 1:
+            self.ephysFileNameLineEdit.setText(self.ephysFileNames[0])
+            
+        elif len(self.ephysFileNames) > 1:
+            self.ephysFileNameLineEdit.setText("<multiple files>")
             
         else:
-            try:
-                self.epscatoptions = pio.loadPickleFile(epscatOptionsFileName)
-                
-            except Exception as e:
-                s = io.StringIO()
-                sei = sys.exc_info()
-                traceback.print_exception(file=s, *sei)
-                msgbox = QtWidgets.QMessageBox()
-                msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-                msgbox.setWindowTitle(sei[0].__class__.__name__)
-                msgbox.setText(sei[0].__class__.__name__)
-                msgbox.setDetailedText(s.getvalue())
-                msgbox.exec()
-                return
-                
+            self.ephysFileNameLineEdit.clear()
+            
+        if len(self.ephysFileNames):
+            ret = self.loadEphys(self.ephysFileNames)
+            if not ret:
+                self.ephysFileNameLineEdit.clear()
+                self._ephys_ = None
+    
     @pyqtSlot()
-    def slot_chooseEphysFiles(self):
-        ephysFileNames, _ = QtWidgets.QFileDialog.getOpenFileNames(self, 
-                                                               caption="Open electrophysiology files",
-                                                               filter=self.ephysFilesFilter,
-                                                               directory=self.targetdir)
-        blocks = list()
+    @safeWrapper
+    def _slot_setDataName(self):
+        self.dataName = self.dataNameLineEdit.text()
+        if len(self.dataName.strip()):
+            self.scanDataVarName = strutils.str2symbol(self.dataName)
+            
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_setProtocolFileName(self):
+        if any([v in self.triggerProtocolFileNameLineEdit.text() for v in ("imported", "detected")]):
+            return
+        self.protocolFileName = self.triggerProtocolFileNameLineEdit.text()
+        if len(self.protocolFileName.strip()):
+            if self.loadProtocols(self.protocolFileName):
+                self.cachedProtocolFileName = self.protocolFileName
         
-        self.ephysData = None
+        else:
+            self.triggerProtocols.clear()
         
-        try:
-            if len(ephysFileNames) > 0:
-                if all([mimetypes.guess_type(f)[0] == "application/axon-data" for f in ephysFileNames]):
-                    blocks = [pio.loadAxonFile(f) for f in ephysFileNames]
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_chooseProtocolFile(self):
+        signalblockers = [QtCore.QSignalBlocker(w) for w in (self.triggerProtocolFileNameLineEdit,)]
+        targetdir = os.getcwd()
+        caption = "Open Trigger Protocol file for %s" % self.scanDataVarName if (isinstance(self.scanDataVarName, str) and len(self.scanDataVarName.strip())) else "Open Trigger Protocol file"
+            
+        self.protocolFileName, _ = self.chooseFile(caption=caption, fileFilter="Pickle Files (*.pkl)")
+        
+        if len(self.protocolFileName.strip()):
+            if self.loadProtocols(self.protocolFileName):
+                self.triggerProtocolFileNameLineEdit.setText(self.protocolFileName)
+                self.cachedProtocolFileName = self.protocolFileName
+            
+        else:
+            self.triggerProtocolFileNameLineEdit.setText(self.cachedProtocolFileName)
+            self.triggerProtocols.clear()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_importPVScanFromWorkspace(self):
+        vars_ = self.importWorkspaceData([xmlutils.xml.dom.minidom.Document, PVScan],
+                                         title="Import PVSCan",
+                                         single=True)
+        
+        if len(vars_):
+            if isinstance(vars_[0], xmlutils.xml.dom.minidom.Document):
+                self._pvscan_ = PVScan(vars_[0])
+            elif isinstance(vars_[0], PVScan):
+                self._pvscan_ = vars_[0]
+            else:
+                self.errorMessage("Import PrairieView", "Expecting a PVSCan or an XML document; got %s instead." % type(vars_[0]).__name__)
+
+            signalblockers = [QtCore.QSignalBlocker(w) for w in (self.pvScanFileNameLineEdit, self.dataNameLineEdit)]
+            self.pvScanFileNameLineEdit.setText("<imported>")
+            
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_importOptionsFromWorkspace(self):
+        vars_ = self.importWorkspaceData([ScanData, dict],
+                                        title="Import Options",
+                                        single=True)
+        
+        if len(vars_):
+            options = vars_[0]
+            
+            if isinstance(options, ScanData):
+                options = options.analysisOptions
+                
+            self.scanDataOptions = options
+            signalblockers = [QtCore.QSignalBlocker(w) for w in (self.optionsFileNameLineEdit,)]
+            self.optionsFileNameLineEdit.setText("<imported>")
+            
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_importEphysFromWorkspace(self):
+        vars_ = self.importWorkspaceData([ScanData, neo.Block, neo.Segment, 
+                                          neo.AnalogSignal, tuple, list],
+                                        title="Import electrophysiology",
+                                        single=False)
+        if len(vars_):
+            if len(vars_) == 1:
+                if isinstance(vars_[0], ScanData):
+                    self._ephys_ = vars_[0].electrophysiology
+                    
+                elif isinstance(vars_[0], neo.Block):
+                    self._ephys_ = vars_[0]
+                    
+                elif isinstance(vars_[0], neo.Segment):
+                    self._ephys_ = neo.Block()
+                    self._ephys_.segments[:] = vars_[0]
+                    
+                elif isinstance(vars_[0], (tuple, list)) and len(vars_[0]):
+                    if all([isinstance(v, neo.Segment) for v in vars_[0]]):
+                        self._ephys_ = neo.Block()
+                        self._ephys_.segments[:] = vars_[0][:]
+                        
+                    elif all([isinstance(v, neo.Block) for v in vars_[0]]):
+                        self._ephys_ = concatenate_blocks(*vars_[0])
+                        
+                    else:
+                        self.errorMessage("PrairieView Importer", "Import electrophysiology: \nCannot import from data %s which is %s" % (vars_[0], type(vars_[0].__name__)))
+                        return
                     
                 else:
-                    blocks = [pio.loadPickleFile(f) for f in ephysFileNames]
+                    self.errorMessage("PrairieView Importer", "Import electrophysiology: \nCannot import from data %s which is %s" % (vars_[0], type(vars_[0].__name__)))
+                    return
                     
-            if len(blocks) > 0:
+            elif len(vars_) > 1:
+                if all([isinstance(v, neo.Segment) for v in vars_]):
+                    self._ephys_ = neo.Block()
+                    self._ephys_.segments[:] = vars_[:]
+                    
+                elif all([isinstance(v, neo.Block) for v in vars_]):
+                    self._ephys_ = concatenate_blocks(*vars_)
+                    
+                else:
+                    self.errorMessage("PrairieView Importer", "Import electrophysiology: \nExpecting a sequnce of neo.Segment or neo.Block objects")
+                    return
+            
+            signalblockers =[QtCore.QSignalBlocker(w) for w in (self.ephysFileNameLineEdit,)]
+            self.ephysFileNameLineEdit.setText("<imported>")
+            
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_importProtocolFromWorkspace(self):
+        vars_ = self.importWorkspaceData([ScanData, TriggerProtocol, tuple, list],
+                                         title="Import Protocol",
+                                         single=False)
+        
+        if len(vars_):
+            if len(vars_) == 1:
+                if isinstance(vars_[0], ScanData):
+                    self.triggerProtocols[:] = vars_[0].triggerProtocols[:]
+                    
+                elif isinstance(vars_[0], (tuple, list)) and all([isinstance(v, TriggerProtocol) for v in vars_[0]]):
+                    self.triggerProtocols[:] = vars_[0][:]
+                    
+                elif isinstance(vars_[0], TriggerProtocol):
+                    self.triggerProtocols = [vars_[0]]
+                    
+                else:
+                    self.errorMessage("PrairieView Importer", "Expecting a ScanData, a TriggerProtocol or a sequence of TriggerProtocol objects; got %s instead" % vars_[0])
+                    return
+                    
+            else:
+                if all([isinstance(v, TriggerProtocol) for v in vars_]):
+                    self.triggerProtocols[:] = vars_[:]
+                    
+                else:
+                    self.errorMessage("PrairieView Importer", "Expecting a multiple selection of TriggerProtocol objects; got %s instead" % vars_)
+                    return
+        
+            signalblockers = [QtCore.QSignalBlocker(w) for w in (self.triggerProtocolFileNameLineEdit,)]
+            self.cachedProtocolFileName = self.triggerProtocolFileNameLineEdit.text()
+            self.triggerProtocolFileNameLineEdit.setText("<imported>")
+            
+    @pyqtSlot()
+    def _slot_addProtocol(self):
+        newProtocol = TriggerProtocol()
+        if self._scandata_ is not None:
+            segments_with_protocol = [p.segmentIndices() for p in self._scandata_.triggerProtocols]
+            
+            data_segments = [k for k in range(self._scandata_.scansFrames)]
+                
+    @safeWrapper
+    def loadPVScan(self, fileName):
+        if len(fileName) and os.path.isfile(fileName):
+            mime_type, file_type, encoding = pio.getMimeAndFileType(fileName)
+            
+            if "xml" in mime_type:
+                self._pvscan_ = PVScan(pio.loadXMLFile(fileName))
+                
+            elif "pickle" in mime_type:
+                self._pvscan_ = pio.loadPickleFile(fileName)
+                
+            else:
+                self.errorMessage("PrairieView Import - Prairiew View Scan file", "%s is not an XML or Pickle file" % self.pvScanFileName)
+                return False
+            
+            tempDataVarName = os.path.splitext(os.path.basename(fileName))[0]
+            if len(self.scanDataVarName.strip()) == 0:
+                self.scanDataVarName = strutils.str2symbol(tempDataVarName)
+            
+            if len(self.dataName.strip()) == 0:
+                #self.dataName = self.scanDataVarName
+                self.dataNameLineEdit.setText(self.scanDataVarName)
+                
+            if fileName != self.pvScanFileName:
+                signalblockers = [QtCore.QSignalBlocker(w) for w in (self.pvScanFileNameLineEdit, self.dataNameLineEdit)]
+                self.pvScanFileName = fileName
+                self.pvScanFileNameLineEdit.setText(self.pvScanFileName)
+                
+            return True
+        
+        else:
+            self.errorMessage("PrairieView Import", "File %s not found" % fileName)
+        
+        return False
+    
+    @safeWrapper
+    def loadEphys(self, fileNamesList):
+        if len(fileNamesList):
+            fileNamesList = [f for f in fileNamesList if len(f.strip())]
+            if len(fileNamesList) == 0:
+                return
+            
+            bad_files = [f for f in fileNamesList if not os.path.isfile(f)]
+            if len(bad_files):
+                self.errorMessage("PrairieView Importer", "The following files: %s could not be found" % os.pathsep.join(fileNamesList))
+                return False
+            
+            blocks = list()
+            
+            if all([any([s in pio.getMimeAndFileType(f)[0] for s in ("axon", "abf", "atf")]) for f in fileNamesList]):
+                # NOTE 2020-10-06 16:24:08
+                # this is simple: each axon file generates one block
+                blocks[:] = [pio.loadAxonFile(f) for f in fileNamesList]
+                
+            elif all(["pickle" in pio.getMimeAndFileType(f)[0] for f in fileNamesList]):
+                # CAUTION 2020-10-06 16:22:25
+                # when loading pickle files, they can contain either:
+                # a) one block with one segment for each sweep => concatenate them
+                # b) a single block with as many segments as sweeps => use ths first 
+                # block and discard the others
+                blocks[:] = [pio.loadPickleFile(f) for f in fileNamesList]
+                
+            else:
+                self.errorMessage("PrairieView Importer", "Electrophysiology files\nExpecting Axon or Pickle files for electrophysiology")
+                return False
+                    
+            if len(blocks):
                 if all([isinstance(b, neo.Block) for b in blocks]):
-                    self.ephysData = neoutils.concatenate_blocks(*blocks)
+                    self._ephys_ = concatenate_blocks(*blocks)
+                    self.cachedEvents = [s.events for s in self._ephys_.segments]
+                    return True
                     
                 elif all([isinstance(b, neo.Segment) for b in blocks]):
-                    self.ephysData = neo.Block()
-                    self.ephysData.segments[:] = blocks[:]
+                    self._ephys_ = neo.Block()
+                    self._ephys_.segments[:] = blocks[:]
+                    self.cachedEvents = [s.events for s in self._ephys_.segments]
+                    
+                    return True
                     
                 else:
-                    QtWidgets.QMessageBox.critical("Electrophysiology files must contain neo.Blocks or individual neo.Segments")
-                    return
-                        
-        except Exception as e:
-            s = io.StringIO()
-            sei = sys.exc_info()
-            traceback.print_exception(file=s, *sei)
-            msgbox = QtWidgets.QMessageBox()
-            msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-            msgbox.setWindowTitle(sei[0].__class__.__name__)
-            msgbox.setText(sei[0].__class__.__name__)
-            msgbox.setDetailedText(s.getvalue())
-            msgbox.exec()
-            return
-        
-        
-        
-    def importData(self):
-        dlg = quickdialog.QuickDialog(self, "Import PrairieView Data")
-        
-        namePrompt = quickdialog.StringInput(dlg, "Data name:")
-        
-        namePrompt.variable.setClearButtonEnabled(True)
-        namePrompt.variable.redoAvailable=True
-        namePrompt.variable.undoAvailable=True
-        
-        
-        
+                    self.errorMessage("PrairieView Importer", "Electrophysiology files must contain neo.Blocks or individual neo.Segments")
+                    return False
+                
+        else:
+            return False
     
+    @safeWrapper
+    def loadOptions(self, fileName):
+        if len(fileName) and os.path.isfile(fileName) and "pickle" in pio.getMimeAndFileType(fileName)[0]:
+            self.scanDataOptions = pio.loadPickleFile(fileName)
+            
+            if fileName != self.optionsFileName:
+                signalblockers = [QtCore.QSignalBlocker(w) for w in (self.optionsFileNameLineEdit,)]
+                self.optionsFileName = fileName
+                self.optionsFileNameLineEdit.setText(self.optionsFileName)
+                
+            return True
+        
+        else:
+            self.errorMessage("PrairieView Importer", "Load options from file:\n%s is not an XML or Pickle file" % self.pvScanFileName)
+            return False
+        
+    @safeWrapper
+    def loadProtocols(self, fileName):
+        mime_type = pio.getMimeAndFileType(fileName)[0]
+        
+        if len(fileName) and os.path.isfile(fileName) and "pickle" in mime_type:
+            tp = pio.loadPickleFile(fileName)
+            
+            if isinstance(tp, (tuple, list)) and all([isinstance(v, TriggerProtocol) for v in tp]):
+                self.triggerProtocols = tp
+                
+                if fileName != self.protocolFileName:
+                    signalblockers = [QtCore.QSignalBlocker(w) for w in (self.triggerProtocolFileNameLineEdit,)]
+                    self.protocolFileName = fileName
+                    self.triggerProtocolFileNameLineEdit.setText(self.protocolFileName)
+                
+                return True        
+            
+            else:
+                self.errorMessage("PrairieView Importer", "Load protocols from file:\nNo trigger protocols found in pickle file %s " % fileName)
+                return False
+        
+        else:
+            self.errorMessage("PrairieView Importer", "Load protocols from file:\nExpecting a Pickle file; got %s which is a %s instead" % (fileName, mime_type))
+            return False
+        
+    @pyqtSlot()
+    def done(self, value):
+        """Generates ScanData object (if accepted) and closes the dialog.
+        value: a QtWidgets.QDialog.DialogCode (Accepted = 1, Rejected = 2)
+        NOTE: Clients need to connect custom slots to this dialog's accepted(),
+        rejected(), or finished(int) signals
+        """
+        if value == QtWidgets.QDialog.Accepted:
+            self.slot_generateScanData()
+            
+        super().done(value)        
+        
+    @pyqtSlot()
+    def accept(self):
+        # NOTE: 2021-04-16 11:24:35 this calls done(QDialog.Accepted)
+        super().accept()
+        
+    @pyqtSlot()
+    def reject(self):
+        # NOTE: 2021-04-16 11:24:48 this calls done(QDialog.Rejected)
+        super().reject()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_generateScanData(self):
+        """If sel.auto_export is True, it also export the result to workspace.
+        """
+        if isinstance(self._pvscan_, PVScan):
+            self._scandata_ = self._pvscan_.scandata()
+            
+        if isinstance(self._scandata_, ScanData):
+            if len(self.dataName):
+                self._scandata_.name = self.dataName
+                
+            #print("ephys", type(self._ephys_))
+            if isinstance(self._ephys_, neo.Block):
+                self._scandata_.electrophysiology = self._ephys_
+                
+            if isinstance(self.scanDataOptions, (ScanDataOptions, dict)):
+                self._scandata_.analysisOptions = self.scanDataOptions
+                
+            if isinstance(self.triggerProtocols, (tuple, list)) and all([isinstance(v, TriggerProtocol) for v in self.triggerProtocols]):
+                self._scandata_.triggers = self.triggerProtocols
+                
+            if self.auto_export:
+                self._scipyenWindow_.assignToWorkspace(self.scanDataVarName, self.scanData, from_console=False)
+            
+    def updateProtocolEditor(self):
+        self.protocolEditorDialog.triggerProtocols = self.triggerProtocols
+        
+        
+    @property
+    def ephysdata(self):
+        return self._ephys_
     
+    @property
+    def pvscan(self):
+        return self._pvscan_
+    
+    @property
+    def scanData(self):
+        return self._scandata_
+    
+    @property
+    def scandata(self):
+        """Alias to self.scanData
+        """
+        return self.scanData

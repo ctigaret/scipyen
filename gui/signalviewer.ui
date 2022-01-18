@@ -54,9 +54,6 @@
     </item>
     <item row="1" column="0">
      <layout class="QHBoxLayout" name="horizontalLayout">
-      <property name="sizeConstraint">
-       <enum>QLayout::SetFixedSize</enum>
-      </property>
       <item>
        <widget class="QCheckBox" name="plotAnalogSignalsCheckBox">
         <property name="text">
@@ -102,10 +99,16 @@
       <item>
        <widget class="QSpinBox" name="framesQSpinBox">
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+         <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>48</width>
+          <height>0</height>
+         </size>
         </property>
         <property name="mouseTracking">
          <bool>true</bool>
@@ -115,6 +118,9 @@
         </property>
         <property name="whatsThis">
          <string>Current frame number</string>
+        </property>
+        <property name="buttonSymbols">
+         <enum>QAbstractSpinBox::UpDownArrows</enum>
         </property>
         <property name="keyboardTracking">
          <bool>false</bool>
@@ -182,7 +188,14 @@
     <addaction name="actionClose"/>
     <addaction name="menuExport"/>
    </widget>
+   <widget class="QMenu" name="menuTools">
+    <property name="title">
+     <string>Tools</string>
+    </property>
+    <addaction name="actionDetect_Triggers"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuTools"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QDockWidget" name="coordinatesDockWidget">
@@ -277,6 +290,11 @@
   <action name="actionPNG">
    <property name="text">
     <string>&amp;PNG</string>
+   </property>
+  </action>
+  <action name="actionDetect_Triggers">
+   <property name="text">
+    <string>Detect Triggers</string>
    </property>
   </action>
  </widget>

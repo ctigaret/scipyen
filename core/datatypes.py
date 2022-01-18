@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 ''' Utilities for generic and numpy array-based data types such as quantities
-
+Changelog:
+2021-01-06 14:35:30 gained module-level constants:
+RELATIVE_TOLERANCE
+ABSOLUTE_TOLERANCE
+EQUALS_NAN
 
 '''
 
@@ -8,56 +12,43 @@ from __future__ import print_function
 
 #### BEGIN core python modules
 import collections 
+from collections import deque
 import datetime
-from enum import Enum, IntEnum
+from enum import (Enum, IntEnum,)
 import inspect
 import numbers
+import math
+import dataclasses
 import sys
 import time
 import traceback
 import typing
 import warnings
 import weakref
-from copy import deepcopy, copy
+from copy import (deepcopy, copy,)
 
 #### END core python modules
 
 #### BEGIN 3rd party modules
-from PyQt5 import QtGui, QtCore, QtWidgets
+from PyQt5 import (QtGui, QtCore, QtWidgets,)
 import numpy as np
+from numpy import ndarray
 import numpy.matlib as mlib
 import pandas as pd
 import quantities as pq
-import xarray as xa
 import vigra
 import neo
-from neo.core import baseneo
-from neo.core import basesignal
-from neo.core import container
-from neo.core.dataobject import DataObject, ArrayDict
+from neo.core import (baseneo, basesignal, container,)
+from neo.core.dataobject import (DataObject, ArrayDict,)
 #### END 3rd party modules
 
 #### BEGIN pict.core.modules
-
+from core import quantities as cq
 from . import xmlutils
 from . import strutils
-
-#import utilities
-from .utilities import counterSuffix, unique
-from .prog import safeWrapper
-
-from .imageprocessing import *
-
-#import patchneo
-#from .patchneo import neo
-
-#from . import neoutils
+from .prog import safeWrapper, is_hashable, is_type_or_subclass
 
 #### END pict.core.modules
-
-#### BEGIN pict.systems modules
-#from systems import * # PrairieView, soon ScanImage also
-#### END pict.systems modules
 
 # CHANGELOG (most recent first)
 #
@@ -113,64 +104,48 @@ from .imageprocessing import *
 # the case when a new axis is added (vigra.newaxis), which I must then immediately 
 # follow by calibrate(...) or something
 #   
-
-UnitTypes = collections.defaultdict(lambda: "NA", 
-                                    {"a":"axon", "b":"bouton", "c":"cell", 
-                                    "d":"dendrite", "e":"excitatory", 
-                                    "g":"granule",  "i":"inhibitory", 
-                                    "l":"stellate", "p":"pyramidal",  
-                                    "m":"microglia", "n":"interneuron", 
-                                    "s":"spine", "t":"terminal",
-                                    "y":"astrocyte"})
-                                    
-Genotypes = ["NA", "wt", "het", "hom"]
-
+abbreviated_type_names = {'IPython.core.macro.Macro' : 'Macro'}
+sequence_types = (list, tuple, deque)
+sequence_typenames = (t.__name__ for t in sequence_types)
+#sequence_typenames = ('list', 'tuple', "deque")
+set_types = (set, frozenset)
+set_typenames = (t.__name__ for t in set_types)
+#set_typenames = ("set", "frozenset")
+dict_types = (dict,)
+dict_typenames = (t.__name__ for t in dict_types)
+#dict_typenames = ("dict",)
+# NOTE: neo.Segment class name clashes with nrn.Segment
+neo_containernames = ("Block", "Segment",)
+# NOTE: 2020-07-10 12:52:57
+# PictArray is defunct
+signal_types = ('Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 
+                'SpikeTrain', "DataSignal", "IrregularlySampledDataSignal",
+                "TriggerEvent",)
+                
+ndarray_type = ndarray.__name__
 
 NUMPY_NUMERIC_KINDS = set("buifc")
 NUMPY_STRING_KINDS = set("SU")
 
-#NOTE: do not confuse with pq.au which is one astronomical unit !!!
-arbitrary_unit = arbitraryUnit = ArbitraryUnit = pq.UnitQuantity('arbitrary unit', 1. * pq.dimensionless, symbol='a.u.')
-pixel_unit  = pixelUnit = PixelUnit = pq.UnitQuantity('pixel', 1. * pq.dimensionless, symbol='pixel')
-
-day_in_vitro = div = pq.UnitQuantity("day in vitro", 1 *pq.day, symbol = "div")
-week_in_vitro = wiv = pq.UnitQuantity("week in vitro", 1 * pq.week, symbol = "wiv")
-
-postnatal_day = pnd = pq.UnitQuantity("postnatal day", 1 * pq.day, symbol = "pnd")
-postnatal_week = pnw = pq.UnitQuantity("postnatal week", 1 * pq.week, symbol = "pnw")
-postnatal_month = pnm = pq.UnitQuantity("postnatal month", 1 * pq.month, symbol = "pnm")
-
-embryonic_day = emd = pq.UnitQuantity("embryonic day", 1 * pq.day, symbol = "emd")
-embryonic_week = emw = pq.UnitQuantity("embryonic week", 1 * pq.week, symbol = "emw")
-embryonic_month = emm = pq.UnitQuantity("embryonic month", 1 * pq.month, symbol = "emm")
+UnitTypes = collections.defaultdict(lambda: "NA", 
+                                    {"a":"axon", "b":"bouton", "c":"cell", 
+                                     "d":"dendrite", "e":"excitatory", 
+                                     "g":"granule",  "i":"inhibitory", 
+                                     "l":"stellate", "p":"pyramidal",  
+                                     "m":"microglia", "n":"interneuron", 
+                                     "s":"spine", "t":"terminal",
+                                     "y":"astrocyte"})
+                                    
+GENOTYPES = ["NA", "wt", "het", "hom"]
 
 
-# NOTE: 2017-07-21 16:05:38
-# a dimensionless unit for channel axis (when there are more than one channel in the data)
-# NOTE: NOT TO BE CONFUSED WITH THE UNITS OF THE DATA ITSELF!
-channel_unit = channelUnit = ChannelUnit = pq.UnitQuantity("channel", 1. * pq.dimensionless, symbol="channel")
+RELATIVE_TOLERANCE = 1e-4
+ABSOLUTE_TOLERANCE = 1e-4
+EQUAL_NAN = True
 
-space_frequency_unit = spaceFrequencyUnit = sfu = pq.UnitQuantity('space frequency unit', 1/pq.m, symbol='1/m')
 
-# not to be confused with angular frequency which is radian/s (or Hz, if you consider radian to be dimensionless)
-# thus 1 angle frequency equal one cycle per radian -- another form of space frequency
-# where space is expressed in "angle" (e.g. visual angle)
-angle_frequency_unit = angleFrequencyUnit = afu = pq.UnitQuantity('angle frequency unit', 1/pq.rad, symbol='1/rad')
 
-custom_unit_symbols = dict()
-custom_unit_symbols[arbitrary_unit.symbol] = arbitrary_unit
-custom_unit_symbols[pixel_unit.symbol] = pixel_unit
-custom_unit_symbols[channel_unit.symbol] = channel_unit
-custom_unit_symbols[space_frequency_unit.symbol] = space_frequency_unit
-custom_unit_symbols[angle_frequency_unit.symbol] = angle_frequency_unit
-
-# some other useful units TODO
-
-#relative_tolerance = 1e-4
-#absolute_tolerance = 1e-4
-#equal_nan = True
-    
-def isVector(x):
+def is_vector(x):
     """Returns True if x is a numpy array encapsulating a vector.
     
     A vector is taken to be a numpy array with one dimension, or a numpy
@@ -190,7 +165,7 @@ def isVector(x):
     else:
         return False
         
-def isColumnVector(x):
+def is_column_vector(x):
     """Returns True if x is a numpy arrtay encapsulating a column vector.
     
     A column vector is taken to be a numpy array with one dimension or a numpy
@@ -230,11 +205,52 @@ def isRowVector(x):
     else:
         return False
     
-def arraySlice(data:np.ndarray, slicing:(dict, type(None))):
+def is_uniform_sequence(s):
+    """Returns True when all elements in the sequence have the same type
+    Can also be used with sets after conversion to list.
+    """
+    ret = isinstance(s, collections.abc.Sequence) 
+
+    if ret:
+        ret &= all(isinstance(v, type(s[0])) for v in s[1:])
+
+    return ret
+
+def is_convertible_to_numpy_array(s):
+    ret = is_uniform_sequence(s)
+    if ret:
+        try:
+            a = np.array(s)
+        except:
+            traceback_print_exc()
+            ret = False
+            
+    return ret
+
+def is_uniform_collection(obj):
+    """Shorthand to apply is_uniform_sequence() to what can be converted to list.
+    For dict collections, it applied to obj.values()
+    """
+    try:
+        if isinstance(obj, dict):
+            s = list(obj.values())
+        else:
+            s = list(obj)
+            
+        return is_uniform_sequence(s)
+    except:
+        return False
+    
+def sequence_element_type(s):
+    from utilities import unique
+    return unique((type(e) for e in s))
+    
+    
+def array_slice(data:np.ndarray, slicing:(dict, type(None))):
     """Dynamic slicing of nD arrays and introducing new axis in the array.
     """
     if not isinstance(data, np.ndarray):
-        raise TypeError("data expected to be a numpy ndarray or vigra array; got %s instead" % type(data).__name__)
+        raise TypeError("data expected to be a numpy ndarray or a type derived from numpy ndarray; got %s instead" % type(data).__name__)
     
     indexobj = [slice(0,k) for k in data.shape]
     
@@ -339,6 +355,40 @@ def arraySlice(data:np.ndarray, slicing:(dict, type(None))):
         raise TypeError("Slicing expected to be a dict or None; got %s instead" % type(slicing).__name__)
     
     return tuple(indexobj)
+
+#def is_hashable(x):
+    #ret = bool(getattr(x, "__hash__", None) is not None)
+    #if ret:
+        #try:
+            ## because some 3rd party packages 'get smart' and override __hash__()
+            ## to raise Exception 
+            #hash(x) 
+            #return True
+        #except:
+            #return False
+        
+#def is_type_or_subclass(x, y):
+    #if isinstance(x, type):
+        #return issubclass(x, y)
+    
+    #return isinstance(x, y)
+    
+def is_unavailable(x):
+    return x is pd.NA or x is np.nan or x is math.nan or x is dataclasses.MISSING
+    
+def is_dotted_name(s):
+    return isinstance(s, str) and '.' in s
+
+def is_namedtuple(x):
+    if isinstance(x, type):
+        ret = issubclass(x, tuple)
+    else:
+        ret = issubclass(type(x), tuple)
+        
+    if ret: 
+        ret &= all([hasattr(x, a) for a in ("_asdict", "_fields", "_make", "_replace")])
+        
+    return ret
     
 def is_string(array):
     """Determine whether the argument has a string or character datatype, when
@@ -350,8 +400,12 @@ def is_string(array):
     return np.asarray(array).dtype.kind in NUMPY_STRING_KINDS
 
 def is_numeric_string(array):
-    
-    return is_string(array) and not np.isnan(np.genfromtxt(value)).any()
+    """Determines if the argument is a string array that can be parsed as numeric.
+    """
+    if isinstance(array, str):
+        array = [array]
+        
+    return is_string(array) and not np.isnan(np.genfromtxt(array)).any()
         
 
 def is_numeric(array):
@@ -378,200 +432,6 @@ def is_numeric(array):
     return np.asarray(array).dtype.kind in NUMPY_NUMERIC_KINDS
 
 
-def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)) -> int:
-    """Returns an integer index for a specific array axis
-    """
-    if not isinstance(data, np.ndarray):
-        raise TypeError("Expecting a numpy array or a derivative; got %s instead" % type(data).__name__)
-    
-    if not isinstance(axis, (int, str, vigra.AxisInfo)):
-        raise TypeError("Axis expected to be an int, a str or a vigra.AxisInfo; got %s instead" % type(axis).__name__)
-    
-    if isinstance(axis, (str, vigra.AxisInfo)):
-        # NOTE: 2019-11-22 12:39:30
-        # for VigraArray only, normalize axis index from str or AxisInfo to int
-        if not isinstance(data, vigra.VigraArray):
-            raise TypeError("Generic numpy arrays do not support axis index as strings or AxisInfo objects")
-        
-        if isinstance(axis, str):
-            axis = data.axitags.index(axis)
-            
-        elif isinstance(axis, vigra.AxisInfo):
-            axis = data.axistags.index(axis.key)
-            
-    # NOTE: 2019-11-22 12:39:17
-    # by now, axis is an int
-    if axis < 0 or axis > data.shape[axis]:
-        raise ValueError
-    
-    return axis
-
-def normalized_index(data: typing.Optional[typing.Union[typing.Sequence, int]],
-                     index: typing.Optional[typing.Union[str, int, tuple, list, np.ndarray, range, slice]] = None,
-                     multiple:bool = True) -> typing.Union[range, tuple]:
-    """Returns a generic indexing in the form of an iterable of indices.
-    
-    Also checks the validity of the index for an iterable of data_len samples.
-    
-    Parameters:
-    -----------
-    data: a sequence, or an int; the index will be normalized against its length
-        When an int, data is the length of a putative sequence
-    
-    index: int, tuple, list, np.ndarray, range, slice, None (default).
-        When not None, it is the index to be normalized
-    
-        CAUTION: negative integral indices are valid and perform the reverse 
-            indexing (going "backwards" in the iterable).
-    
-    Returns:
-    --------
-    ret - an iterable index (range or list of integer indices) that can be
-        used with list comprehension
-    
-    """
-    if data is None:
-        return tuple()
-    
-    if not isinstance(data, (int, tuple, list)):
-        raise TypeError("Expecting an int or a sequence (tuple, or list) or None; got %s instead" % type(data).__name__)
-    
-    data_len = data if isinstance(data, int) else len(data)
-    
-    if index is None:
-        return range(data_len)
-    
-    elif isinstance(index, int):
-        # NOTE: 2020-03-12 22:40:31
-        # negative values ARE supported: they simply go backwards from the end of
-        # the sequence
-        if index >= len(data):
-            raise ValueError("Index %s is invalid for %d elements" % (index, len(data)))
-        
-        if flat:
-            return index
-        
-        return tuple([index]) # -> (index,)
-    
-    elif isinstance(index, str):
-        if not isinstance(data, (tuple, list)):
-            raise TypeError("Name lookup requires a sequence")
-        
-        ret = __name_lookup__(data, index, multiple=multiple)
-        #ret = __name_lookup__(data, index, silent=silent, multiple=multiple)
-        
-        if isinstance(ret, numbers.Number):
-            return tuple([ret])
-        
-        elif isinstance(ret, (tuple, list)):
-            if len(ret) > 1:
-                return tuple(ret)
-            
-            else:
-                return tuple([ret[0]])
-            
-        else:
-            return tuple()
-            
-    elif isinstance(index, (tuple,  list)):
-        if not all([isinstance(v, (int, str)) for v in index]):
-            raise TypeError("Index sequence %s is expected to contain int only" % index)
-        
-        if any([isinstance(v, str) for v in index]):
-            if not isinstance(data, (tuple, list)):
-                raise TypeError("Name lookup requires a sequence")
-            
-            return tuple([v if isinstance(v, int) and v < data_len else __name_lookup__(data, v, multiple=multiple) for v in index])
-            
-        else:
-            if not all([v < data_len for v in index]):
-                raise ValueError("Index sequence %s contains invalid values for %d elements" % (index, data_len))
-            
-            return tuple(index) # -> index as a tuple
-    
-    elif isinstance(index, range):
-        if index.start < 0 or index.stop < 0:
-            warnings.warn("Range %s will produce reverse indexing" % index)
-            
-        if max(index) >= data_len:
-            raise ValueError("Index %s out of range for %d elements" % (index, data_len))
-        
-        return index # -> index IS a range
-    
-    elif isinstance(index, slice):
-        if index.start < 0 or index.stop < 0:
-            warnings.warn("Index %s will produce reverse indexing or an empty indexing list" % index)
-            
-        if max(index) >= data_len:
-            raise ValueError("Index %s out of range for %d elements" % (index, data_len))
-        
-        ndx = index.indices(data_len)
-        
-        if len(ndx) == 0:
-            raise ValueError("Indexing %s results in an empty indexing list" % index)
-        
-        if any(ndx) >= data_len:
-            raise ValueError("Slice %s generates out of range indices (%s) for %d elements" % (index, ndx, data_len))
-        
-        if any(ndx) < 0:
-            warnings.warn("Index %s will produce reverse indexing" % index)
-            
-        return ndx # -> ndx IS a tuple
-    
-    elif isinstance(index, np.ndarray):
-        if not isVector(index):
-            raise TypeError("Indexing array must be a vector; instead its shape is %s" % index.shape)
-            
-        if index.dtype.kind == "i": # index is an array of int
-            return tuple([k for k in index])
-        
-        elif index.dtype.kind == "b": # index is an array of bool
-            if len(index) != data_len:
-                raise TypeError("Boolean indexing vector must have the same length as the iterable against it will be normalized (%d); got %d instead" % (data_len, len(index)))
-            
-            return tuple([k for k in range(data_len) if index[k]])
-            
-    else:
-        raise TypeError("Unsupported data type for index: %s" % type(index).__name__)
-    
-def normalized_sample_index(data:np.ndarray, 
-                            axis: typing.Union[int, str, vigra.AxisInfo], 
-                            index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None) -> typing.Union[range, list]:
-    """Calls normalized_index on a specific array axis.
-    Also checks index validity along a numpy array axis.
-    
-    Parameters:
-    ----------
-    data: numpy.ndarray or a derivative (e.g. neo.AnalogSgnal, vigra.VigraArray)
-    
-    axis: int, str, vigra.AxisInfo. The array axis along which the index is normalized.
-    
-    index: int, tuple, list, np.ndarray, range, slice, None (default).
-        When not None, it is the index to be normalized.
-        
-        CAUTION: negative integral indices are valid and perform the indexing 
-        "backwards" in an array.
-    
-    Returns:
-    --------
-    ret - an iterable (range or list) of integer indices
-    
-    """
-    if not isinstance(data, np.ndarray):
-        raise TypeError("Expecting a numpy array or a derivative; got %s instead" % type(data).__name__)
-    
-    if not isinstance(axis, (int, str, vigra.AxisInfo)):
-        raise TypeError("Axis expected to be an int, a str or a vigra.AxisInfo; got %s instead" % type(axis).__name__)
-    
-    axis = normalized_axis_index(data, axis)
-    
-    data_len = data.shape[axis]
-    
-    try:
-        return normalized_index(data_len, index)
-    
-    except Exception as exc:
-        raise RuntimeError("For data axis %d with size %d:" % (axis, data_len)) from exc
 
 def __default_none__():
     return None
@@ -582,343 +442,309 @@ def __default_units__():
 def __default_undimensioned__():
     return pq.dimensionless
 
-def unit_quantity_from_name_or_symbol(s):
-    if not isinstance(s, str):
-        raise TypeError("Expecting a string; got %s instead" % type(s).__name__)
+
+
+def categorize_data_frame_columns(data, *column_names, inplace=True):
+    """"""
+    if not isinstance(data, pd.DataFrame):
+        raise TypeError("Expecting a pandas.DataFrame; got %s instead" % type(data).__name__)
     
-    if s in pq.__dict__:
-        ret = eval(s, pq.__dict__)
-        #try:
-            #ret = eval(s, pq.__dict__)
+    if len(column_names) == 0:
+        raise TypeError("Expectign at least one column")
+    
+    if any([not isinstance(c, str) for c in column_names]):
+        raise TypeError("All column names expected to be strings")
+    
+    if any([c not in data.columns for c in column_names]):
+        raise ValueError("At least one of the specified columns does not exist in data")
+    
+    if inplace:
+        for c in column_names:
+            data[c] = pd.Categorical(data[c].astype("category"))
             
-        #except Exception as err:
-            #warnings.warn("String %s could not be evaluated to a Python Quantity" % s, RuntimeWarning)
-            #ret = pq.dimensionless
+        return data
             
-    elif s in custom_unit_symbols.keys():
-        ret = custom_unit_symbols[s]
-        
-    elif s in [u.name for u in custom_unit_symbols.values()]:
-        ret = [u for u in custom_unit_symbols.values() if u.name == s]
-        
     else:
-        warnings.warn("Unknown unit quantity %s" % s, RuntimeWarning)
-        
-        ret = pq.dimensionless
-        
-    return ret
-        
-def name_from_unit(u):
+        ret = data.copy()
+        for c in column_names:
+            ret[c] = pd.Categorical(data[c].astype("category"))
+            
+        return ret
+    
+class TypeEnum(IntEnum):
+    """Common ancestor for enum types used in Scipyen
     """
-    FIXME make it more intelligent!
-    """
-    d_name = ""
+    @classmethod
+    def names(cls):
+        """Iterate through the names in TypeEnum enumeration.
+        """
+        for t in cls:
+            yield t.name
     
-    if not isinstance(u, (pq.UnitQuantity, pq.Quantity)):
-        return d_name
-        #raise TypeError("Expecting a Quanity or UnitQuanity; got %s instead" % type(u).__name__)
-    
-    unitQuantity = [k for k in u.dimensionality.keys()]
-    
-    
-    if len(unitQuantity):
-        unitQuantity = unitQuantity[0] 
-    
-        d_name = unitQuantity.name
+    @classmethod
+    def values(cls):
+        """Iterate through the int values of TypeEnum enumeration.
+        """
+        for t in cls:
+            yield t.value
         
-        if d_name in ("Celsius", "Kelvin", "Fahrenheit"):
-            d_name = "Temperature"
+    @classmethod
+    def types(cls):
+        """Iterate through the elements of TypeEnum enumeration.
+        Useful to quickly remember what the members of this enum are (with their
+        names and values).
+        
+        A TypeEnum enum member is by definition a member 
+        of TypeEnum enum and an instance of TypeEnum.
+        
+        """
+        for t in cls:
+            yield t
             
-        elif d_name in ("arcdegree"):
-            d_name = "Angle"
+    @classmethod
+    def namevalue(cls, name:str):
+        """Return the value (int) for given name;
+        If name is not a valid TypeEnum name returns -1
+        """
+        if name in cls.names():
+            return getattr(cls, name).value
+        
+        return -1
+    
+    @classmethod
+    def type(cls, t):
+        if isinstance(t, str):
+            if t in cls.names():
+                return [_t for _t in cls if _t.name == t][0]
+            else:
+                # check for user-defined composite type - break it down to a list
+                # of existing types, if possible
+                if "|" in t:
+                    t_hat = [cls.type(_t.strip()) for _t in t.split("|")]
+                    if len(t_hat):
+                        return t_hat
+                    else:
+                        raise ValueError("Unknown %s type name %s" % (cls.__name__, t))
+                else:
+                    raise ValueError("Unknown %s type name %s" % (cls.__name__, t))
             
-        elif "volt" in d_name:
-            d_name = "Potential"
+        elif isinstance(t, int):
+            if t in cls.values():
+                return [_t for _t in cls if _t.value == t][0]
+            else:
+                # check for implicit composite type (i.e. NOT listed in the definition)
+                ret = [_t for _t in cls if _t.value & t]
+                if len(ret):
+                    return ret
+                else:
+                    raise ValueError("Unknown %s type value %d" % (cls.__name__, t))
             
-        elif "ampere" in d_name:
-            d_name = "Current"
+        elif isinstance(t, cls):
+            return t
+        
+        else:
+            raise TypeError("Expecting a %s, int or str; got %s instead" % (cls.__name__, type(t).__name__))
             
-        elif "siemens" in d_name:
-            d_name = "Conductance"
-            
-        elif "ohm" in d_name:
-            d_name = "Resistance"
-            
-        elif "coulomb" in d_name:
-            d_name = "Capacitance"
-            
-        elif "hertz" in d_name:
-            d_name = "Frequency"
+    @classmethod
+    def strand(cls, name1:str, name2:str):
+        """ Emulates '&' operator for type names 'name1' and 'name2'.
+        If neither arguments are valid names returns 0
+        """
+        if any([n not in cls.names() for n in [name1, name2]]):
+            return 0
         
-        elif any([v in d_name for v in ("meter", "foot", "mile","yard")]):
-            d_name = "Length"
-            
-        elif any([v in d_name for v in ("second", "minute", "day","week", "month", "year")]):
-            d_name = "Time"
-            
-    return d_name
-            
+        val1 = cls.namevalue(name1)
+        val2 = cls.namevalue(name2)
+        
+        return val1 & val2
     
-
-def check_time_units(value):
-    if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
-        raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)
+    @classmethod
+    def is_primitive_type(cls, t):
+        """Checks if 't' is a primitive type in this types enumeration.
+        
+        Parameters:
+        -----------
+        t: int, str, TypeEnum (or subclass)
+        
+            When an int or a str, the value must be a valid one (i.e., found in
+            TypeEnum.values() or TypeEnum.names(), respectively)
+        
+        """
+        return len(cls.primitive_component_types(t)) == 0
     
-    ref = pq.s
+    @classmethod
+    def is_derived_type(cls, t):
+        """Checks if 't' is a compound type (i.e. derived from other type enums)
+        
+        Parameters:
+        -----------
+        t: int, str, TypeEnum (or subclass)
+        
+            When an int or a str, the value must be a valid one (i.e., found in
+            TypeEnum.values() or TypeEnum.names(), respectively)
+        
+        """
+        return len(cls.component_types(t)) > 0
+        #return len(cls.primitive_component_types(t)) > 0
+        
+    @classmethod
+    def is_composite_type(cls, t):
+        """Alias of TypeEnum.is_derived_type()
+        
+        Parameters:
+        -----------
+        t: int, str, TypeEnum (or subclass)
+        
+            When an int or a str, the value must be a valid one (i.e., found in
+            TypeEnum.values() or TypeEnum.names(), respectively)
+        
+        """
+        return cls.is_derived_type(t)
     
-    return value._reference.dimensionality == ref.dimensionality
-    
-def conversion_factor(x, y):
-    """Calculates the conversion factor from y units to x units.
-    """
-    if not isinstance(x, (pq.Quantity, pq.UnitQuantity)):
-        raise TypeError("x expected to be a python Quantity; got %s instead" % type(x).__name__)
-    
-    if not isinstance(y, (pq.UnitQuantity, pq.Quantity)):
-        raise TypeError("y expected to be a python UnitQuantity or Quantity; got %s instead" % type(y).__name__)
-    
-    if x._reference.dimensionality != y._reference.dimensionality:
-        raise TypeError("x and y have incompatible units (%s and %s respectively)" % (x.units, y.units))
-
-    x_dim = pq.quantity.validate_dimensionality(x)
-    y_dim = pq.quantity.validate_dimensionality(y)
-    
-    if x_dim != y_dim:
-        try:
-            cf = pq.quantity.get_conversion_factor(x_dim, y_dim)
-            
-        except AssertionError:
-            raise ValueError("Cannot convert from %s to %s" % (origin_dim.dimensionality, self_dim.dimensionality))
+    @classmethod
+    def primitive_component_types(cls, t):
+        """ Returns a list of primitive TypeEnum objects that compose 't'.
+        If 't' is already a primitive type, returns an empty list.
         
-        return cf
-    
-    else:
-        return 1.0
-
-def units_convertible(x, y):
-    """Checks that the units of python Quantities x and y are identical or convertible to each other.
-    NOTE: To check that x and y have IDENTICAL units simply call 'x.units == y.units'
-    """
-    if not isinstance(x, (pq.Quantity, pq.UnitQuantity)):
-        raise TypeError("x expected to be a python Quantity; got %s instead" % type(x).__name__)
-    
-    if not isinstance(y, (pq.UnitQuantity, pq.Quantity)):
-        raise TypeError("y expected to be a python UnitQuantity or Quantity; got %s instead" % type(y).__name__)
-    
-    return x._reference.dimensionality == y._reference.dimensionality
-
-    
-       
-
-class UnitsStringValidator(QtGui.QValidator):
-    def __init__(self, parent=None):
-        super(UnitsStringValidator, self).__init__(parent)
+        Parameters:
+        -----------
+        t: int, str, TypeEnum (or subclass)
         
-    def validate(self, s, pos):
-        try:
-            u = eval("1*%s" % (s[0:pos]), pq.__dict__)
-            return QtGui.QValidator.Acceptable
+            When an int or a str, the value must be a valid one (i.e., found in
+            TypeEnum.values() or TypeEnum.names(), respectively)
         
-        except:
-            return QtGui.QValidator.Invalid
-        
-    
-#__AnalysisUnit__ = AnalysisUnit
-
-class IndicatorCalibration(object):
-    def __init__(self, name=None, Kd = None, Fmin = None, Fmax = None):
-        super().__init__(self)
-        
-        self.name=name
-        self.Kd = Kd
-        self.Fmin = Fmin
-        self.Fmax = Fmax
-        
-        
-#class PictArray(vigra.VigraArray):
-    #"""DO NOT USE -- inheritance from VigraArray is broken
-    #Extends vigra.VigraArray with axes calibration concept.
-    #Does NOT replicate VigraArray static methods!!!
-    
-    #To calibrate an axis (or an individual channel in a Channels axis)
-    #call one of the setXXX() methods of its "axiscalibration" property.
-    
-    #FIXME: after calling VigraArray methods such as bindAxis, the PictArray
-    #will lose its __axiscalibration__ attribute
-    
-    #"""
-    
-    #def __new__(cls, obj, dtype=np.float32, order=None, init=True, value=None, axistags=None):
-        ##print("__new__ Cls:", cls)
-        ##print("__new__ type(args[0]):", type(obj))
-        
-        ##ret = vigra.VigraArray(obj, dtype=dtype, order=order, init=init, value=value, axistags=axistags)
-        
-        ##ret.__class__.__name__ = "PictArray"
-        
-        ## NOTE: 2018-09-11 15:48:12
-        ## this doesn't work because internally (at C++ level)0 this expects cls to be VigraArray
-        ## 
-        #ret = super(PictArray, cls).__new__(cls, obj, dtype=dtype, order=order, init=init, value=value, axistags=axistags)
-        
-        ##print("__new__ type(ret)", type(ret))
-        
-        #return ret
-
-    #def __init__(self, *args, **kwargs):
-        ##print("__init__ type(self)", type(self))
-        ##print("__init__ args", args)
-        #if not hasattr(self, "__axiscalibration__"):
-            #self.__axiscalibration__ = AxisCalibration(self)
-            #for ax in self.axistags:
-                #self.__axiscalibration__.calibrateAxis(ax)
-            
-
-    #def __array_finalize__(self, obj):
-        #super(PictArray, self).__array_finalize__(obj)
-        
-        ##print("__array_finalize__", type(obj))
-        
-        #if not hasattr(self, "__axiscalibration__"):
-            #self.__axiscalibration__ = AxisCalibration(obj)
-        #else:
-            #self.__axiscalibration__.synchronize()
-        ##if isinstance(obj, vigra.VigraArray):
-        
-    #@property
-    #def axiscalibration(self):
-        #if not hasattr(self, "__axiscalibration__"):
-            #self.__axiscalibration__ = AxisCalibration(self)
-
-        #return self.__axiscalibration__
-    
-    #@axiscalibration.setter
-    #def axiscalibration(self, value):
-        #if not isinstance(value, AxisCalibration):
-            #raise TypeError("Expectign an AxisCalibration object; got %s instead" % type(value).__name__)
-        
-        #if any([key not in self.axistags for key in value.keys()]):
-            #raise ValueError("AxisCalibration axis %s does not exist in this PictArray object" % key)
-        
-        #self.__axiscalibration__ = value
-        
-        #for ax in self.axistags:
-            #self.__axiscalibration__.calibrateAxis(ax)
-            
-def __set_valid_key_names__(obj):
-    if isinstance(obj, ScanData):
-        __set_valid_key_names__(obj._analysis_unit_)
-        
-        for au in obj._analysis_units_:
-            __set_valid_key_names__(au)
-            
-        if len(obj.analysisoptions) and isinstance(obj.analysisoptions, dict):
-            __set_valid_key_names__(obj.analysisoptions)
+        """
+        from .utilities import unique
+        if isinstance(t, (int, str)):
+            t_hat = cls.type(t)
+            if isinstance(t_hat, list):
+                return unique([__t for __t in chain.from_iterable([[_t for _t in cls if _t.is_primitive() and _t.value <= t_.value] for t_ in t_hat])])
+            else:
+                t = t_hat
                 
-            if "Discrimination" in obj.analysisoptions and isinstance(obj.analysisoptions["Discrimination"], dict):
-                if "data_2D" in obj.analysisoptions["Discrimination"]:
-                    d2d = obj.analysisoptions["Discrimination"]["data_2D"]
-                    obj.analysisoptions["Discrimination"].pop("data_2D", None)
-                    obj.analysisoptions["Discrimination"]["Discr_2D"] = d2d
-                    
-            if "Fitting" in obj.analysisoptions and isinstance(obj.analysisoptions["Fitting"], dict):
-                if "CoefficientNames" in obj.analysisoptions["Fitting"] and \
-                    isinstance(obj.analysisoptions["Fitting"]["CoefficientNames"], (tuple, list)) and \
-                        len(obj.analysisoptions["Fitting"]["CoefficientNames"]):
-                            __set_valid_key_names__(obj.analysisoptions["Fitting"]["CoefficientNames"])
-            
-    elif isinstance(obj, AnalysisUnit):
-        __set_valid_key_names__(obj.descriptors)
-        if "Dd_Length" in obj.descriptors:
-            value = obj.descriptors["Dd_Length"]
-            obj.descriptors["Dendrite_Length"] = value
-            obj.descriptors.pop("Dd_Length", None)
-            
-                
-    elif isinstance(obj, (DataBag, dict)):
-        items = list(obj.items())#[item for item in obj.items()]
+        elif not isinstance(t, cls):
+            raise TypeError("Expecting a TypeEnum, int or str; got %s instead" % type(t).__name__)
         
-        for item in items:
-            if isinstance(item[0], str):
-                try:
-                    item_type = type(eval(item[0])).__name__
-                    if item_type == "function":
-                        continue
-                    
-                except:
-                    pass
-                    
-                value = item[1]
-                
-                if isinstance(value, (dict, list)):
-                    __set_valid_key_names__(value)
-                
-                obj.pop(item[0], None)
-                obj[strutils.string_to_valid_identifier(item[0])] = value
-            
+        return [_t for _t in filter(lambda x: x & t, cls) if _t.value < t.value and _t.is_primitive()]
+        
+    @classmethod
+    def component_types(cls, t):
+        """ Returns a list of TypeEnum objects that compose 't'.
+        If 't' is already a primitive type, returns an empty list.
     
-    elif hasattr(obj, "annotations"):
-        if type(obj) in neo.__dict__.values() or isinstance(obj, DataSignal):
-            __set_valid_key_names__(obj.annotations)
+        The TypeEnum objects can also be composite types.
+        
+        Parameters:
+        -----------
+        t: int, str, TypeEnum (or subclass)
+        
+            When an int or a str, the value must be a valid one (i.e., found in
+            TypeEnum.values() or TypeEnum.names(), respectively)
+        
+        """
+        from .utilities import unique
+        if isinstance(t, (int, str)):
+            t_hat = cls.type(t)
+            if isinstance(t_hat, list):
+                # NOTE: 2021-04-14 23:33:22
+                # by definition this only occurs with a composite type
+                return unique([__t for __t in chain.from_iterable([[_t for _t in cls if _t.value <= t_.value] for t_ in t_hat])])
+            else:
+                t = t_hat
+                
+        elif not isinstance(t, cls):
+            raise TypeError("Expecting a %s, int or str; got %s instead" % (cls.__name__, type(t).__name__))
+        
+        return [_t for _t in filter(lambda x: x & t, cls) if _t.value < t.value]
     
-    elif isinstance(obj, (tuple, list)):
-        for k, o in enumerate(obj):
-            if isinstance(o, str):
-                obj[k] = strutils.string_to_valid_identifier(o)
-        #if isinstance(obj, list):
-            ##for k, o in enumerate(obj):
-                ##if not isinstance(o, str): # don't touch string values!
-                    ##obj[k] = __set_valid_key_names__(o)
-            
-        #else:
-            #oo = list(obj)
-            #for o in oo
-            #for k, o in enumerate(oo):
-                #if not isinstance(o, str): # don't touch string values!
-                    #oo[k] = __set_valid_key_names__(o)
+    @classmethod
+    def derived_types(cls, t):
+        """ Returns the composite TypeEnum objects where 't' participates.
+        Parameters:
+        -----------
+        t: int, str, TypeEnum (or subclass)
+        
+            When an int or a str, the value must be a valid one (i.e., found in
+            TypeEnum.values() or TypeEnum.names(), respectively)
+        
+        """
+        if isinstance(t, (int, str)):
+            t_hat = cls.type(t)
+            if isinstance(t_hat, list):
+                return unique([__t for __t in chain.from_iterable([[_t for _t in cls if _t is not t_ and _t.value > t_.value] for t_ in t_hat])])
+            else:
+                t = t_hat
                 
-            #obj = tuple(oo)
-            
-    #return obj
-
-#@safeWrapper
-#def _upgrade_attribute_(obj, old_name, new_name, attr_type, default_value):
-    #needs_must = False
-    #if not hasattr(obj, new_name):
-        #needs_must = True
+        elif not isinstance(t, cls):
+            raise TypeError("Expecting a %s, int or str; got %s instead" % (cls.__name__, type(t).__name__))
         
-    #else:
-        #attribute = getattr(obj, new_name)
+        return [_t for _t in filter(lambda x: x & t, cls) if not _t.is_primitive() and _t is not t and _t.value > t.value]# _t.value > t.value]
         
-        #if not isinstance(attribute, attr_type):
-            #needs_must = True
-            
-    #if needs_must:
-        #if hasattr(obj, old_name):
-            #old_attribute = getattr(obj, old_name)
-            
-            #if isinstance(old_attribute, attr_type):
-                #setattr(obj, new_name, old_attribute)
-                #delattr(obj, old_name)
-                
-            #else:
-                #setattr(obj, new_name, default)
-                #delattr(obj, old_name)
-                
-        #else:
-            #setattr(obj, new_name, default)
-            
-    #return obj
-
-
-def check_apiversion(data):
-    if isinstance(data, (AxisCalibration, AnalysisUnit, ScanData)):
-        if not hasattr(data, "apiversion"):
-            return False
+    
+    def is_derived(self):
+        """Return True if this TypeEnum object is a composite (i.e., derived) type.
+        """
+        return self.is_derived_type(self)
+    
+    def is_composite(self):
+        """Return True if this TypeEnum object is a composite (i.e., derived) type.
+        """
+        return self.is_derived()
+    
+    def is_primitive(self):
+        return self.is_primitive_type(self)
+    
+    def primitives(self):
+        """Returns a list of primitive types used to generate this type.
         
-        if not isinstance(data.apiversion, tuple) or len(data.apiversion) !=2:
-            return False
+        Compound types are generated from primitive types through the logical
+        OR operator (bitwise OR).
         
-        return data.apiversion[0] + data.apiversion[1]/10 >= 0.2
+        Returns an empty list of this is a primitive type.
+        """
+        return self.primitive_component_types(self)
+    
+    def components(self):
+        """Returns a list of components for this TypeEnum object.
+        
+        Compound types are generated from primitive types through the logical
+        OR operator (bitwise OR).
+        
+        If this TypeEnum object is a primitive returns an empty list
+        """
+        return self.component_types(self)
+    
+    def includes(self, t):
+        """Returns True if 't' is a component of this TypeEnum object.
+        
+        't' may be a primitive or a composite type.
+        
+        Always returns False when this is a primitive.
+        """
+        t = self.type(t)
             
-    return True
+        return t in self.components()
+    
+    def is_primitive_of(self, t):
+        """Returns True if this TypeEnum object is a primitive of 't'.
+        
+        Always returns False when this TypeEnum object is a composite (i.e., 
+        even if it is a component of 't').
+        """
+        t = self.type(t)
+            
+        return self in t.primitives()
+    
+    def is_component_of(self, t):
+        """Returns True if this TypeEnum object is a component of 't'.
+        """
+        t = self.type(t)
+        
+        return self in t.components()
+    
+    def nameand(self, name:str):
+        """ Applies strand() to the name of this object and the argument.
+        """
+        return self.strand(self.name, name)
+        
+    

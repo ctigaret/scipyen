@@ -1,4 +1,4 @@
-"""quickdialog module from vigranumpy/pyqt
+"""quickdialog module adaptedfrom vigranumpy.pyqt.quickdialog
 """
 #######################################################################
 #                                                                      
@@ -34,18 +34,15 @@
 #    OTHER DEALINGS IN THE SOFTWARE.                                   
 #                                                                      
 #######################################################################
-
 # NOTE: 2019-10-06 00:43:44
-# modified by Cezar M. Tigaret (cezar.tigaret@gmail.com, TigaretC@cardiff.ac.uk)
-# for use with PyQt5
-#import PyQt4.QtGui  as qt
-#import PyQt4.QtCore as QtCore
-#from PyQt4.QtCore import SIGNAL
+# Adaptation for use with PyQt5
+# Copyright 209-2021 by Cezar M. Tigaret (cezar.tigaret@gmail.com, TigaretC@cardiff.ac.uk)
+#########################################################################
+import os, typing
 import PyQt5.QtCore as QtCore
 import PyQt5.QtGui as QtGui
 import PyQt5.QtWidgets as QtWidgets
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
-import os
 
 def alignLabels(*args):
     m = 0
@@ -248,7 +245,6 @@ class CheckBox(QtWidgets.QCheckBox):
     def selection(self):
         return self.isChecked()
 
-
 class Choice(QtWidgets.QFrame):
     def __init__(self, parent, label, vertical = 0):
         QtWidgets.QFrame.__init__(self, parent)
@@ -339,6 +335,70 @@ class VDialogGroup(DialogGroup):
     def __init__(self, parent):
         DialogGroup.__init__(self, parent, 1)
        
+class QuickDialogComboBox(QtWidgets.QFrame):
+    """A combobox to use with a QuickDialog.
+    
+    The combobox is nothing fancy -- only accepts a list of text items
+    """
+    def __init__(self, parent, label):
+        QtWidgets.QFrame.__init__(self, parent)
+        parent.addWidget(self)
+        
+        self.label = QtWidgets.QLabel(label)
+        self.variable = QtWidgets.QComboBox()
+        
+        self._layout = QtWidgets.QHBoxLayout()
+        self._layout.setSpacing(5)
+        self._layout.addWidget(self.label)
+        self._layout.addWidget(self.variable, 1)
+        
+        self.setLayout(self._layout)
+        
+    def setFocus(self):
+        self.variable.setFocus()
+        
+    def setItems(self, textList):
+        if not isinstance(textList, (tuple, list)):
+            raise TypeError("Expecting a sequence; got %s instead" % type(textList).__name__ )
+        
+        if not all([isinstance(v, str) for v in textList]):
+            raise TypeError("Expecting a sequence of strings")
+        
+        self.variable.clear()
+        
+        for text in textList:
+            self.variable.addItem(text)
+            
+    def setValue(self, index):
+        if isinstance(index, int) and index >= -1 and index < self.variable.model().rowCount():
+            self.variable.setCurrentIndex(index)
+            
+    def setText(self, text):
+        if isinstance(text, str):
+            self.variable.setCurrentText(text)
+            
+    def value(self):
+        return self.variable.currentIndex()
+    
+    def text(self):
+        return self.variable.currentText()
+    
+    def connectTextChanged(self, slot):
+        self.currentTextChanged[str].connect(slot)
+        
+    def connectIndexChanged(self, slot):
+        """Connects the combobox currentIndexChanged signal.
+        NOTE: this is an overlaoded signal, with to versions 
+        (respectively, with a str and int argument).
+        
+        Therefore it is expected that the connected slot is also overloaded
+        to accept a str or an int
+        """
+        self.variable.currentIndexChanged[str].connect(slot)
+        
+    def disconnect(self):
+        self.variable.currentIndexChanged[str].disconnect()
+        
 #class DialogStack(qt.QWidgetStack):
 #    def __init__(self, parent, widgetMapping = None):
 #        qt.QWidgetStack.__init__(self, parent)
@@ -382,12 +442,12 @@ class VariableNameStringInput(StringInput):
             else:
                 ret = QtGui.QValidator.Acceptable
                 
-            print("validate returns: ", ret)
+            #print("validate returns: ", ret)
             return ret
         
         
         def fixup(self, s):
-            return validateVarName(s)
+            return validate_varname(s)
             
             
     def __init__(self, parent, label, ws):
@@ -402,11 +462,11 @@ class VariableNameStringInput(StringInput):
             QtWidgets.QMessageBox.critical(None, "Error","Field '%s' empty" % (self.label.text()))
             return False
         else:
-            self.variable.setText(validateVarName(self.text()))
+            self.variable.setText(validate_varname(self.text()))
         return True
     
 class QuickDialog(QtWidgets.QDialog):
-    def __init__(self, parent, title):
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, title:typing.Optional[str]=None):
         QtWidgets.QDialog.__init__(self, parent)
 
         self.layout = QtWidgets.QVBoxLayout(self)
@@ -416,6 +476,8 @@ class QuickDialog(QtWidgets.QDialog):
         self.insertButtons()
         
         self.widgets = []
+        if not isinstance(title, str) or len(title.strip()) == 0:
+            title = "QuickDialog"
         self.setWindowTitle(title)
         #self.setOrientation(QtCore.Qt.Vertical)
         self.resize(500,-1)
@@ -500,7 +562,7 @@ class QuickDialog(QtWidgets.QDialog):
     def tryAccept(self):
         for i in self.widgets:
             try:
-                if i.validate() == 0:
+                if not isinstance(i, QtWidgets.QAbstractSpinBox) and i.validate() == 0:
                     return
             except AttributeError:
                 continue

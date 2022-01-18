@@ -35,12 +35,12 @@ class TextViewer(ScipyenViewer):
     highlighter_types = ("plain", "xml", "html")
     
     def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
+                 ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
                  *args, **kwargs) -> None:
-        super().__init__(data=data, parent=parent, pWin=pWin, ID = ID, win_title=win_title, doc_title=doc_title, *args, **kwargs)
+        super().__init__(data=data, parent=parent, ID = ID, win_title=win_title, doc_title=doc_title, *args, **kwargs)
             
-    def _configureGUI_(self):
+    def _configureUI_(self):
         self.fileMenu = self.menuBar().addMenu("&File")
         self.fileMenu.addAction("&Save As...", self.saveAsFile, "Ctrl+Shift+S")
         

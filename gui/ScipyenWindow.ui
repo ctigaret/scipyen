@@ -303,14 +303,14 @@ NOTE: you can click anywhere in the row to select</string>
        <attribute name="headerCascadingSectionResizes">
         <bool>true</bool>
        </attribute>
+       <attribute name="headerMinimumSectionSize">
+        <number>100</number>
+       </attribute>
        <attribute name="headerDefaultSectionSize">
         <number>100</number>
        </attribute>
        <attribute name="headerHighlightSections">
         <bool>true</bool>
-       </attribute>
-       <attribute name="headerMinimumSectionSize">
-        <number>100</number>
        </attribute>
        <attribute name="headerShowSortIndicator" stdset="0">
         <bool>false</bool>
@@ -393,26 +393,6 @@ NOTE: you can click anywhere in the row to select</string>
         </widget>
        </item>
        <item>
-        <widget class="QToolButton" name="dirUpBtn">
-         <property name="toolTip">
-          <string>Go to parent directory</string>
-         </property>
-         <property name="text">
-          <string>Parent directory</string>
-         </property>
-         <property name="icon">
-          <iconset theme="go-up">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-         <property name="autoRaise">
-          <bool>true</bool>
-         </property>
-         <property name="arrowType">
-          <enum>Qt::UpArrow</enum>
-         </property>
-        </widget>
-       </item>
-       <item>
         <widget class="QToolButton" name="dirBackBtn">
          <property name="toolTip">
           <string>Go back</string>
@@ -453,14 +433,33 @@ NOTE: you can click anywhere in the row to select</string>
         </widget>
        </item>
        <item>
+        <widget class="QToolButton" name="dirUpBtn">
+         <property name="toolTip">
+          <string>Go to parent directory</string>
+         </property>
+         <property name="text">
+          <string>Parent directory</string>
+         </property>
+         <property name="icon">
+          <iconset theme="go-up">
+           <normaloff>.</normaloff>.</iconset>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+         <property name="arrowType">
+          <enum>Qt::UpArrow</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QToolButton" name="viewFilesFilterToolBtn">
          <property name="text">
           <string/>
          </property>
          <property name="icon">
-          <iconset resource="resources/resources.qrc">
-           <normaloff>:/images/view-filter.svg</normaloff>
-           <normalon>:/images/view-filter.svg</normalon>:/images/view-filter.svg</iconset>
+          <iconset theme="view-filter">
+           <normaloff>.</normaloff>.</iconset>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -579,14 +578,14 @@ NOTE: you can click anywhere in the row to select</string>
          <attribute name="headerCascadingSectionResizes">
           <bool>true</bool>
          </attribute>
+         <attribute name="headerMinimumSectionSize">
+          <number>100</number>
+         </attribute>
          <attribute name="headerDefaultSectionSize">
           <number>100</number>
          </attribute>
          <attribute name="headerHighlightSections">
           <bool>true</bool>
-         </attribute>
-         <attribute name="headerMinimumSectionSize">
-          <number>100</number>
          </attribute>
          <attribute name="headerShowSortIndicator" stdset="0">
           <bool>true</bool>
@@ -638,8 +637,8 @@ NOTE: you can click anywhere in the row to select</string>
              <string/>
             </property>
             <property name="icon">
-             <iconset resource="resources/resources.qrc">
-              <normaloff>:/images/window-close.svg</normaloff>:/images/window-close.svg</iconset>
+             <iconset theme="window-close">
+              <normaloff>.</normaloff>.</iconset>
             </property>
             <property name="autoRaise">
              <bool>true</bool>

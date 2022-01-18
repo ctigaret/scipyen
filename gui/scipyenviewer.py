@@ -1,22 +1,28 @@
 # -*- coding: utf-8 -*-
 """Superclass for Scipyen viewer windows
 """
-from abc import ABC, ABCMeta, abstractmethod
+import typing, warnings
+from dataclasses import MISSING
+from abc import (ABC, ABCMeta, abstractmethod,)
+from traitlets import Bunch
+#from abc import (abstractmethod,)
 
-from PyQt5 import QtCore, QtWidgets, QtGui
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
+from PyQt5 import (QtCore, QtWidgets, QtGui,)
+from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 
 from core.utilities import safeWrapper
+from .workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
+from pandas import NA
 
-#print(__path__)
 
-#from .. import mainwindow.ScipyenWindow as ScipyenWindow
-#from  mainwindow import ScipyenWindow
-
-class ScipyenViewer(QtWidgets.QMainWindow):
+class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     """Base type for all Scipyen viewers.
     
     Includes common functionality for all viewer classes defined in Scypien.
+    
+    Inherits from WorkspaceGuiMixin which provides accesss to the Scipyen's 
+    workspace and, indirectly, to the management of Qt and non-Qt settings 
+    (through inheritance from ScipyenConfigurable)
     
     Derived classes:
     -----------------
@@ -47,7 +53,7 @@ class ScipyenViewer(QtWidgets.QMainWindow):
         attribute "_data_", but this mechanism can be superceded in the derived
         type.
     
-    _configureGUI_() -- configures specific GUI widgets and menus
+    _configureUI_() -- configures specific GUI widgets and menus
         
          ATTENTION: If the viewer inherits Qt widgets and actions defined in a
         QtDesigner *.ui file (loaded with PyQt5.uic.loadUiType()) then this function
@@ -56,9 +62,9 @@ class ScipyenViewer(QtWidgets.QMainWindow):
     If there are viewer type-specific settigns that need to be made persistent
     across sessions then the following abstract mthods also need to be implemented:
     
-        _save_viewer_settings_() -- saves viewer class-specific settings
+        saveViewerSettings() -- saves viewer class-specific settings
     
-        _load_viewer_settings_() -- loads viewer class-specific settings
+        loadViewerSettings() -- loads viewer class-specific settings
         
     The other methods may be overridden in the derived classes.
     
@@ -110,10 +116,12 @@ class ScipyenViewer(QtWidgets.QMainWindow):
     supported_types = (object, )
     view_action_name = None
     
-    def __init__(self, data: (object, type(None))=None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
-                 win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
-                 *args, **kwargs) -> None:
+    def __init__(self, data: object = None, 
+                 parent: (QtWidgets.QMainWindow, type(None)) = None, 
+                 ID:(int, type(None)) = None,
+                 win_title: (str, type(None)) = None, 
+                 doc_title: (str, type(None)) = None,
+                 **kwargs) -> None:
         """Constructor.
         
         Sets up attributes common to all Scipyen's viewers.
@@ -124,14 +132,19 @@ class ScipyenViewer(QtWidgets.QMainWindow):
         data: object or None (default) - the data displayed in the viewer
         
         parent: QMainWindow or None (default) - the parent window 
+        
+            When parent is scipyen's MainWindow (type name ScipyenWindow) then 
+            this also gets assigned to the '_scipyenWindow_' attribute, which:
+            
+            * gives access to the user (shell) workspace
+            
+            * indicates that this QMainWindow instance is a direct "client" of 
+            scipyen app
+            
+            When a QMainWindow that is NOT scipyen's main window, this indicates
+            it being a client of that window (typically, a scipyen sub-app, e.g.
+            LSCaT)
 
-        pWin: QMainWindow, or None (default) - the instance of the Scipyen main
-            window.
-            
-            If present, the viewer will have access to the user's workspace, and
-            will manage its own settings (save/load to/from the Scipyen 
-            configuration file).
-            
         win_title: str or None (default). The display name of the viewer, to be 
             used as part of the window title according to the pattern
             "document - window". 
@@ -149,12 +162,9 @@ class ScipyenViewer(QtWidgets.QMainWindow):
         *args, **kwargs: variadic argument and keywords specific to the constructor of the
             derived subclass.
         """
-        # should be set to True when the viewer is managed by another GUI inside Scipyen
+        #print(f"ScipyenViewer<{self.__class__.__name__}>.__init__ data: {type(data).__name__}")
         super().__init__(parent)
-        
-        self.settings = QtCore.QSettings()
-
-        self._scipyenWindow_ = None
+        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         
         self._docTitle_ = None
         self._winTitle_ = None # force auto-set in update_title()
@@ -174,22 +184,44 @@ class ScipyenViewer(QtWidgets.QMainWindow):
         else:
             self._ID_  = self.winId()
 
-        if isinstance(pWin, QtWidgets.QMainWindow) and type(pWin).__name__ == "ScipyenWindow":
-            self._scipyenWindow_  = pWin
+        # NOTE: 2021-09-16 12:26:09
+        # This MUST be implemented in the derived :class:
+        self._configureUI_()
         
-        else:
-            if type(parent).__name__ == "ScipyenWindow":
-                self._scipyenWindow_   = parent
+        # GUI (Qt) settings saved in $HOME/.config/Scipyen/Scipyen.conf
+        #self.qsettings = QtCore.QSettings() 
+        # NOTE: 2021-05-04 21:42:12 About settings
+        # handling settings in the superclass only works for window geometry
+        # and related stuff on the Qt side.
         
-        #if isinstance(varname, str) and len(varname.strip()):
-            #self._data_var_name_ = varname
+        # Purely "pythonic" settings requires the subclass to be initialized in
+        # order for these to work.
+        # The prime example is the colorMap settings in ImageViewer:
+        # if the settings are loaded during the superclass _init__() (i.e., here),
+        # the attributes referenced there (e.g. colorMap) are not yet available ,
+        # hence the assignment of a color map fails silently
+        # 
+        # The solution is to manage these non-Qt settings in the subclass code
+        # by using overloaded loadViewerSettings(); in contrast, loadWindowSettings
+        # defined here and inherited by the subclass works fine.
+        
+        # NOTE: 2021-08-17 12:59:47
+        # it maybe tempting to call this from inside self._configureUI_()
+        # HOWEVER: self.loadSettings() calls self.loadWindowSettings() then 
+        # self.loadViewerSettings(), which MAY depend on some data being loaded
+        # already in the viewer window.
+        # Therefore, it is best to call self.loadSettings() now i.e., it at the 
+        # very end of the __init__(), after all essential stuff is done.
+        self.loadSettings() # called from ScipyenConfigurable (via WorkspaceGuiMixin)
             
-        self._configureGUI_()
         
-        self.loadSettings()
-            
+        # NOTE: 2021-08-17 12:59:02
+        # setData ALMOST SURELY needs the ui elements to be initialized - hence 
+        # it is called here, AFTER self._configureUI_()
         if data is not None:
-            self.setData(data = data, doc_title = doc_title) # , varname = varname)
+            # NOTE: 2022-01-17 12:39:49 this will call setData in the derived
+            # _class_, if defined
+            self.setData(data = data, doc_title = doc_title)
             
         else:
             self.update_title(win_title = win_title, doc_title = doc_title)
@@ -206,7 +238,7 @@ class ScipyenViewer(QtWidgets.QMainWindow):
             of the data. Otherwise, the display name of the data is left unchanged
             (even if it is None or an empty string).
             
-            When None, it will remove the data isplay name from the window title.
+            When None, it will remove the data display name from the window title.
         
         win_title: str or None (default): display name of the viewer.
             When not None, or non-empty, will replace the current display name
@@ -247,9 +279,18 @@ class ScipyenViewer(QtWidgets.QMainWindow):
             if enforce or self._winTitle_ is None or (isinstance(self._winTitle_, str) and len(self._winTitle_.strip()) == 0): 
                 # auto-set viewer title ONLY if not already set, or enforce is True
                 if self._scipyenWindow_ is not None:
-                    viewerVarName = [k for k in self._scipyenWindow_.workspace.keys() if \
-                                    type(self._scipyenWindow_.workspace[k]).__name__ == type(self).__name__ and \
-                                    self._scipyenWindow_.workspace[k].ID == self._scipyenWindow_.currentImageViewerWindowID]
+                    if self.__class__ in self._scipyenWindow_.currentViewers:
+                        currentViewer = self._scipyenWindow_.currentViewers[self.__class__]
+                        
+                    else:
+                        currentViewer = None
+                        
+                    if currentViewer is None:
+                        viewerVarName = []
+                    else:
+                        viewerVarName = [k for k in self._scipyenWindow_.workspace.keys() if \
+                                        type(self._scipyenWindow_.workspace[k]).__name__ == type(self).__name__ and \
+                                        self._scipyenWindow_.workspace[k].ID == currentViewer.ID]
                     
                     # NOTE: 2019-11-09 13:40:54
                     # when called from __init__, self is not bound to any
@@ -275,9 +316,20 @@ class ScipyenViewer(QtWidgets.QMainWindow):
             
         else:
             self.setWindowTitle(self._winTitle_)
-
+            
     @abstractmethod
-    def _configureGUI_(self):
+    def setDataDisplayEnabled(self, value):
+        """Enable/disable the central data display widget.
+        Abstract method; it must be implemented in subclasses, which have full
+        control if and how a central data duisplay widget is implemented.
+        """
+        w = getattr(self, "viewerWidget", None)
+        if w:
+            w.setEnabled(value is True)
+            w.setVisible(value is True)
+            
+    @abstractmethod
+    def _configureUI_(self):
         """Custom GUI initialization.
         Abstract method, it must be implemented in the derived :class:.
         
@@ -290,71 +342,6 @@ class ScipyenViewer(QtWidgets.QMainWindow):
         """
         pass
     
-    @abstractmethod
-    def _save_viewer_settings_(self):
-        pass
-    
-    @abstractmethod
-    def _load_viewer_settings_(self):
-        """Restore viewer's settings from the Qt configuration file.
-        NOTE: Must be defined (overridden) in the derived :class:.
-        The configuration file is determined at application (Scipyen) level.
-        See also QtCore.QSettings()
-        """
-        pass
-    
-    def saveSettings(self):
-        """Save viewer's settings in Scipyen's configuration file.
-        
-        The function saves a set of settings common to all derived viewer 
-        classes:
-        
-        window size, window position, and window state
-        
-        Subclass-specific settings are handled by _save_viewer_settings_ which
-        MUST be implemented in the derived subclass.
-        
-        The configuration file is determined at application (Scipyen) level.
-        See also QtCore.QSettings()
-        """
-        if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-            self.settings.setValue("/".join([self.__class__.__name__, "WindowSize"]), self.size())
-                
-            self.settings.setValue("/".join([self.__class__.__name__, "WindowPos"]), self.pos())
-                
-            self.settings.setValue("/".join([self.__class__.__name__, "WindowState"]), self.saveState())
-            
-        self._save_viewer_settings_()
-            
-    def loadSettings(self):
-        """Restores viewer's settings from Scipyen's configuration file.
-
-        The function loads a set of settings common to all derived viewer 
-        classes:
-        
-        window size, window position, and window state
-        
-        Subclass-specific settings are handled by _save_viewer_settings_ which
-        MUST be implemented in the derived subclass.
-        
-        The configuration file is determined at application (Scipyen) level.
-        See also QtCore.QSettings()
-        """
-        if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-            windowSize = self.settings.value("/".join([self.__class__.__name__, "WindowSize"]), None)
-            if windowSize is not None:
-                self.resize(windowSize)
-                
-            windowPos = self.settings.value("/".join([self.__class__.__name__, "WindowPos"]), None)
-            if windowPos is not None:
-                self.move(windowPos)
-                
-            windowState = self.settings.value("/".join([self.__class__.__name__, "WindowState"]), None)
-            if windowState is not None:
-                self.restoreState(windowState)
-                
-            self._load_viewer_settings_()
-                
     def view(self, data: (object, type(None)), 
                 doc_title: (str, type(None)) = None, 
                 *args, **kwargs):
@@ -366,6 +353,10 @@ class ScipyenViewer(QtWidgets.QMainWindow):
         properties of the viewer based on the data passed to this function.
         """
         self.setData(data, doc_title=doc_title, *args, **kwargs)
+        
+    def _check_supports_parameter_type_(self, value):
+        return isinstance(value, self.supported_types) or any([t in type(value).mro() for t in self.supported_types])
+        
     
     def setData(self, *args, **kwargs):
         """Generic function to set the data to be displayed by this viewer.
@@ -382,55 +373,72 @@ class ScipyenViewer(QtWidgets.QMainWindow):
         data: a python object; its type depends of the types supported by
             the drived viewer class
             
-        doc_title: data name to be shown as part of the window title
-            
-            
+        doc_title: str = data name to be shown as part of the window title
+        
         Variadic named parameters (kwargs):
         ----------------------------------
-        show: bool (default: True); when True, make the window visible
+        get_focus: bool Optional default False; 
+            When True, the window will be given focus.
+            When False (the default) an already visible viewer window is kept as
+            is (e.g. behind other windows) - useful when the windowing system of 
+            the operating system does not implement a focus stealing mechanism.
+            
+            Subclasses can enforce their own behaviour by overriding this.
             
         """
-        if len(args):
-            data = args[0]
-            
-        else:
-            data  = None
         
-        show = kwargs.get("show", True)
+        # NOTE: 2020-09-25 10:35:34
+        # 
+        # This function does thw following:
+        #
+        # 1. delegates to _set_data_(...) -- which does nothing here and MUST be
+        #   overridden (see below).
+        #
+        # 2. sets up the window title
+        #
+        # 3. makes the window visible and optionally brings it into focus
+        #
+        # For a consistent behaviour, subclasses MUST define _set_data_() in order 
+        # to set up their own instance variables and data model according to 
+        # their deisgned functionality.
+        #
+        # Subclasses may also override this method if necessary, but then call
+        # super().setData(...) from within theis own setData()
+        #
+        
+        if not any([self._check_supports_parameter_type_(a) for a in args]):
+            raise TypeError("Expecting one of the supported types: %s" % " ".join([s.__name__ for s in self.supported_types]))
+            
+            
+        get_focus = kwargs.get("get_focus", False)
         
         doc_title = kwargs.get("doc_title", None)
         
-        data_mro = type(data).mro()
-        
-        if not isinstance(data, self.supported_types) or not any([t in type(data).mro() for t in self.supported_types]):
-            raise TypeError("Expecting a %s; got %s instead" % (" ".join([s.__name__ for s in self.supported_types]), type(data).__name__))
-        
+        # NOTE: 2020-09-25 10:28:59 make sure that the derived type handles
+        # doc_title appropriately - see e.g. SignalViewer
         if isinstance(doc_title, str) and len(doc_title.strip()):
-            self._docTitle_ = doc_title
-            
-        elif hasattr(data, "name") and isinstance(data.name, str) and len(data.name.strip()):
-            self._docTitle_ = data.name
+            self._docTitle_ = doc_title 
             
         else:
             self._docTitle_ = None
-            
-        #print("ScipyenViewer setData args", args)
-        #print("ScipyenViewer setData kwargs", kwargs)
-        
-        if len(args)>1:
-            self._set_data_(data, *args[1:], **kwargs)
-            
-        else:
-            self._set_data_(data, **kwargs)
         
         self.update_title(doc_title = doc_title, win_title=self._winTitle_)
         
-        if show:
+        self._set_data_(*args, **kwargs)
+        
+        #print(f"In ScipyenViewer<{self.__class__.__name__}>.setData(): is visible: {self.isVisible()}")
+        
+        if not self.isVisible():
             self.setVisible(True)
+        
+        if get_focus:
+            self.activateWindow()
             #self.show()
         
     @abstractmethod
     def _set_data_(self, data: object, *args, **kwargs):
+        """Must override in the subclass
+        """
         pass
     
     @property
@@ -458,59 +466,6 @@ class ScipyenViewer(QtWidgets.QMainWindow):
             self.update_title()
             
     @property
-    def appWindow(self):
-        """The application main window.
-        This is a reference to the  Scipyen main window, unless explicitly given
-        as something else at the viewer's initiation.
-        
-        appWindow gives access to Scipyen main window API (e.g. the workspace)
-        and is used regardless of the value of guiClient property.
-        """
-        return self._scipyenWindow_;
-    
-    @appWindow.setter
-    def appWindow(self, val: QtWidgets.QMainWindow):
-        if type(val).__name__ == "ScipyenWindow":
-            self._scipyenWindow_ =val
-        else:
-            raise TypeError("Unexpected type for appWindow setter argument; a ScipyenWindow is required with attribute 'workspace'; instead we've got %s" % type(val).__name__)
-    
-    @property
-    def guiClient(self):
-        """Boolean (default False) indicating whether this window manages its own settings.
-        
-        When the viewer subclass instance is used as a standalone window, this 
-        property should be set to False (its default value).
-        
-        When the viewer subclass instance is subordinated to another GUI main window
-        which has control over, and manages the settings of this instance,
-        then guiClient property should be set to True, to avoid race conditions
-        and recurrences (infinite loops).
-        
-        guiClient is also useful for a managing Main Window instance to 
-        control other aspects of the viewer's functionality, e.g. management of
-        PlanarGraphics objects in an ImageViewer.
-        
-        This property also has a setter.
-        
-        ATTENTION: When guiClient is True, appWindow must be a reference to the
-        Scipyen's MainWindow instance.
-        """
-        return type(self._scipyenWindow_).__name__ != "ScipyenViewer"
-    
-    #@guiClient.setter
-    #def guiClient(self, value: bool):
-        #"""Sets up this viewer as a GUI client.
-        
-        #When a GUI client, the viewer has a slightly restricted fucntionality.
-        
-        #"""
-        #if not isinstance(value, bool):
-            #raise TypeError("Expecting a bool; got %s instead" % type(value).__name__)
-        
-        #self._gui_client_ = value
-        
-    @property
     def winTitle(self):
         """The prefix of the window title.
         
@@ -537,6 +492,7 @@ class ScipyenViewer(QtWidgets.QMainWindow):
             raise TypeError("Expecting a str, or None; got %s instead" % type(value.__name__))
         
         self.update_title(win_title = value, enforce=True)
+        
             
     @property
     def docTitle(self):
@@ -583,10 +539,29 @@ class ScipyenViewer(QtWidgets.QMainWindow):
         
     def closeEvent(self, evt:QtCore.QEvent):
         """All viewers in Scipyen should behave consistently.
-        May by overridden in derived classes.
+        However, this may by overridden in derived classes.
         """
+        #print("ScipyenViewer<%s>.closeEvent %s: isTopLevel %s" % (self.__class__.__name__, self.winTitle, self.isTopLevel))
+        # NOTE: 2021-07-08 12:07:35
+        # also de-register the viewer with Scipyen's main window, if this viewer
+        # is NOT a client (child) of another Scypen app (e.g. LSCaTWindow)
         self.saveSettings()
-        evt.accept()
+        
+        if self.isTopLevel:
+            # NOTE: 2021-07-11 09:48:50
+            # Save window settings only for top level viewer windows
+            # NOTE: 2021-05-04 21:53:04
+            # Here saveSettings will have access to all the subclass attributes (it
+            # is fully initialized, etc)
+            # see NOTE: 2019-11-09 09:30:38 for details
+            #self.saveSettings()
+        
+            if any([v is self for v in self.appWindow.workspace.values()]):
+                self.appWindow.deRegisterViewer(self) # this will also save settings and close the viewer window
+                self.appWindow.removeFromWorkspace(self, by_name=False)
+
+            evt.accept()
+            
         self.close()
     
     def event(self, evt:QtCore.QEvent):
@@ -670,7 +645,7 @@ class ScipyenFrameViewer(ScipyenViewer):
     1) Subclasses of ScipyenFrameViewer should define at least one of two QWidgets 
     (a QSlider and a QSpinBox) used for frame navigation.
     
-    In the implementation of _configureGUI_() these widgets should then be 
+    In the implementation of _configureUI_() these widgets should then be 
     aliased to self._frames_slider_ and self._frames_spinner_, respectively, to 
     allow for synchronization of frame navigation, e.g.:
     
@@ -689,21 +664,19 @@ class ScipyenFrameViewer(ScipyenViewer):
     ImageViewer, SignalViewer, LSCaTWindow.
     """
     
-    # signal emitted when the viewer displays 
+    # signal emitted when the viewer displays a data frame; value:int = the
+    # index of the frame in the data
     frameChanged            = pyqtSignal(int, name="frameChanged")
     
-    def __init__(self, data: (object, type(None)) = None, 
-                 parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 pWin: (QtWidgets.QMainWindow, type(None))= None, 
-                 ID:(int, type(None)) = None,
-                 win_title: (str, type(None)) = None, 
-                 doc_title: (str, type(None)) = None,
-                 frameIndex:(int, tuple, list, range, slice, type(None)) = None,
-                 currentFrame:(int, type(None)) = None,
+    def __init__(self, data: typing.Optional[object] = None, 
+                 parent: typing.Optional[QtWidgets.QMainWindow] = None, 
+                 ID: typing.Optional[int] = None,
+                 win_title: typing.Optional[str] = None, 
+                 doc_title: typing.Optional[str] = None,
+                 frameIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None,
+                 currentFrame: typing.Optional[int] = None,
+                 missingFrameValue:typing.Optional[object]=None,
                  *args, **kwargs):
-        super().__init__(data=data, parent=parent, pWin=pWin, ID=ID,
-                         win_title=win_title, doc_title=doc_title,
-                         *args, **kwargs)
         """Constructor for ScipyenFrameViewer.
         
         Parameters:
@@ -714,7 +687,13 @@ class ScipyenFrameViewer(ScipyenViewer):
 
         pWin: QMainWindow, or None (default) - the instance of the Scipyen main
             window.
-            If present, the viewer will have access to the user's workspace.
+            When pWin is the Scipyen's main window, the viewer will have access to
+            the user's workspace and will manage the viewer settings as part of
+            the Scipyen's global Scipyen Qt configuration (i.e. save/load using
+            the Scipyen configuration file).
+            
+            When pWin is any other QMainWindow, the viewer settings will be
+            managed by pWin, if it has the capabilities to do so.
             
         win_title: str or None (default). The display name of the viewer, to be 
             used as part of the window title according to the pattern
@@ -728,22 +707,44 @@ class ScipyenFrameViewer(ScipyenViewer):
             
             When None (the default) the window title will contain only the
             viewer name suffixed with the window ID.
-        
+            
         frameIndex: int or None (default). The index of the data frameIndex to be displayed.
+        
+        currentFrame: int or None (default). The index of the currentFrame.
+        
+        missingFrameValue: any object or None;
+            When not None, this is the value that, when passed to the setter of
+            the currentFrame property will disable the current display, to 
+            visually indicate a missing data frame
         
         *args, **kwargs: variadic argument and keywords specific to the constructor of the
             derived subclass.
         """
         
+        #print(f"ScipyenFrameViewer<{self.__class__.__name__}>.__init__ data: {type(data).__name__}")
+ 
         self._current_frame_index_      = 0 
-        self._number_of_frames_         = 1 # determined from the data
-        self.rameIndex                  = range(self._number_of_frames_)
-        #self._linkedViewers_            = list()
         
         # These two should hold a reference to the actual QSlider and QSpinBox
         # defined in the subclass, or in *.ui file used by the subclass
         self._frames_spinner_           = None
         self._frames_slider_            = None
+        
+        self._missing_frame_value_ = missingFrameValue or NA
+        
+        # NOTE: 2022-01-17 13:02:27
+        # the attributes below (and their properties with unmangled names)
+        # MUST have their final values assigned by setData(...)
+        self._data_frames_              = 0
+        self._number_of_frames_         = 1 # determined from the data
+        self._frameIndex_               = range(self._number_of_frames_)
+        
+        # NOTE: 2022-01-16 13:09:44
+        # This also calls self._configureUI_() and self.setData(...)
+        super().__init__(data=data, parent=parent, ID=ID,
+                         win_title=win_title, doc_title=doc_title,
+                         *args, **kwargs)
+        
         
     @abstractmethod
     def displayFrame(self, *args, **kwargs):
@@ -757,24 +758,68 @@ class ScipyenFrameViewer(ScipyenViewer):
     @property
     def dataFrames(self):
         """The number of "frames" (segments, sweeps) in which data is organized.
+        This may be larger than nFrames which is the number of frames the viewer
+        can actually display.
         """
         return self._data_frames_
     
     @property
     def nFrames(self):
-        """The number of display "frames" this viewer knows of.
+        """The number of data "frames" this viewer knows of; read-only.
+        
         The displayed frames may be a subset of the frames that the data is 
         logically organized in, consisting of the frames selected for viewing.
         
         In the general case,
             self.nFrames <= self.dataFrames
             
-        An exception from this rule is case multi-channel signal plotted in
-        SignalViewer, with one channel being plotted per frame - hence, there
+        This can happen when only a subset of the data frames are to be shown.
+            
+        An exception from this rule is the case case of multi-channel signals 
+        plotted in SignalViewer, with one channel per frame - hence, there
         are several frames displayed one at a time, even if data is logically
         organized in just one frame.
         """
         return self._number_of_frames_
+    
+    @property
+    def frameIndex(self):
+        """Indices of frames.
+        By default, this is range(self.nFrames). In turn, by default:
+        self.nFrames == self.dataFrames.
+        
+        However, assigning a sequence of int (tuple, list, range) here or in the 
+        initializer effectively limits the display to a subset of the available 
+        data frames (and thus self.nFrames becomes less than self.dataFrames)
+        
+        """
+        return self._frameIndex_
+    
+    @frameIndex.setter
+    def frameIndex(self, value:typing.Optional[typing.Union[tuple, list, range]]=None):
+        if value is None:
+            self._frameIndex_ = range(self.nFrames)
+            return 
+        
+        elif isinstance(value, (tuple, list)):
+            if not all(isinstance(v, int) for v in value):
+                raise TypeError("'frameIndex' can only accept a sequence of int")
+            
+            if not all(v in range(self.dataFrames) for v in value):
+                raise ValueError(f"'frameIndex' cannot contain values outside {range(self.dataFrames)}")
+            
+            if len(set(value)) != len(value):
+                raise ValueError("'frameIndex' does not accept duplicate values")
+            
+        #elif isinstance(value, range):
+            #if len(value) > self.dataFrames:
+                #raise ValueError(f"'frameIndex {value} goes beyound the total number of data frames {self.dataFrames}")
+            
+        elif not isinstance(value, range):
+            raise TypeError(f"New frameIndex must be a range, or sequence (tuple, list) of int with unique values in {range(self.dataFrames)}; got {type(value).__name__} instead")
+        #else:
+            #raise TypeError(f"New frameIndex must be a range, or sequence (tuple, list) of int with unique values in {range(self.dataFrames)}; got {type(value).__name__} instead")
+        self._frameIndex_ = value
         
     @property
     def currentFrame(self):
@@ -810,13 +855,14 @@ class ScipyenFrameViewer(ScipyenViewer):
         However derived subclasses may override this function to implement more
         specific functionality.
         """
+        print(f"{self.__class__.__name__}.currentFrame.setter({val}) ")
         if not isinstance(value, int) or value >= self._number_of_frames_ or value < 0:
             return
         
         self._current_frame_index_ = value
         
         # widgets which we want to prevent from emitting signals, temporarily
-        # signals from wudgets in this list will be blocked for the lifetime of
+        # signals from widgets in this list will be blocked for the lifetime of
         # this list (i.e. until and just before the function returns)
         blocked_signal_emitters = list()
         
@@ -864,13 +910,16 @@ class ScipyenFrameViewer(ScipyenViewer):
         return self._frames_spinner_
     
     @safeWrapper
-    def linkToViewers(self, broadcast: bool = True, *viewers):
+    def linkToViewers(self, *viewers, broadcast: bool = True):
         """Synchronizes frame navigation with the specified viewer(s).
+        
+        CAUTION: Assumes each viewer in viewers manages data with the same 
+        number of data frames.
         
         Named parameters:
         ----------------
         broadcast: bool (default True). If True, also synchronizes frame
-            navigation among the viewers.
+            navigation among the additional viewers directly.
         
         Var-positional parameters:
         -------------------------
@@ -936,20 +985,29 @@ class ScipyenFrameViewer(ScipyenViewer):
         
     @pyqtSlot(int)
     @safeWrapper
-    def slot_setFrameNumber(self, value:int):
+    def slot_setFrameNumber(self, value:typing.Union[int, type(MISSING), type(NA), type(None), float]):
         """Drives frame navigation from the GUI.
         
         The valueChanged signal of the widget used to select the index of the 
-        displayed data frame should be connected to this slot in _configureGUI_()
+        displayed data frame should be connected to this slot in _configureUI_()
         
-        NOTE: the subclass can override this function.
+        NOTE: Subclasses can override this function.
         """
-        #print("ScipyenFrameViewer %s slot_setFrameNumber %d" % (type(self).__name__, value))
-        if value >= self._number_of_frames_ or value < 0:
-            return
+        #print(f"ScipyenFrameViewer<{self.__class__.__name__}> slot_setFrameNumber {value}")
         
-        self.currentFrame = value
-        
-        for viewer in self.linkedViewers:
-            viewer.currentFrame = value
+        if isinstance(value, int):
+            if value not in range(self._number_of_frames_):
+            #if value >= self._number_of_frames_ or value < 0:
+            #if value not in self.frameIndex:
+                return
+            
+            # NOTE: 2021-01-07 14:36:54
+            # subclasses should override this setter to emit frameChanged(int) signal
+            self.currentFrame = value
+            
+            self.frameChanged.emit(value)
+            
+            for viewer in self.linkedViewers:
+                viewer.currentFrame = value
+            
         

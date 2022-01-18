@@ -31,7 +31,8 @@ def fitGauss1DSum(x, y, locations, **kwargs):
     calibrated axis units. Use with parameters given in data samples.
    
     """
-    from . import datatypes as dt
+    from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+    #from . import datatypes as dt
     
     if not isinstance(locations, (tuple, list, np.ndarray, numbers.Real)):
         raise TypeError("Locations expected to be a sequence of floats or a scalar")
@@ -39,7 +40,7 @@ def fitGauss1DSum(x, y, locations, **kwargs):
     if isinstance(locations, numbers.Real):
         locations = [locations]
         
-    if isinstance(x, (neo.AnalogSignal, dt.DataSignal, pq.Quantity)):
+    if isinstance(x, (neo.AnalogSignal, DataSignal, pq.Quantity)):
         xx = x.magnitude.squeeze()
         
     elif isinstance(x, np.ndarray):
@@ -53,7 +54,7 @@ def fitGauss1DSum(x, y, locations, **kwargs):
     
     #print("xx.shape: ", xx.shape)
     
-    if isinstance(y, (neo.AnalogSignal, dt.DataSignal, pq.Quantity)):
+    if isinstance(y, (neo.AnalogSignal, DataSignal, pq.Quantity)):
         yy = y.magnitude.squeeze()
         
     elif isinstance(y, np.ndarray):
@@ -208,9 +209,10 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf),
     result["Rsq"]: the R2 of the entire EPSCaT fit
     
     """
-    from . import datatypes as dt
+    #from . import datatypes as dt
+    from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
     
-    if not isinstance(data, (neo.AnalogSignal, dt.DataSignal)):
+    if not isinstance(data, (neo.AnalogSignal, DataSignal)):
         raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datatypes.DataSignal; got %s instead" % type(data).__name__)
     
     if data.ndim == 2 and data.shape[1] > 1:

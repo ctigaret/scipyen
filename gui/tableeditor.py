@@ -8,12 +8,13 @@
 #### BEGIN core python modules
 from __future__ import print_function
 
-import os, inspect, warnings, traceback, datetime
+import os, inspect, warnings, traceback, datetime, typing
 #### END core python modules
 
 #### BEGIN 3rd party modules
 import pandas as pd
-import xarray as xa
+import quantities as pq
+#import xarray as xa
 import numpy as np
 import neo
 import vigra
@@ -22,6 +23,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from PyQt5.uic import loadUiType as __loadUiType__
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.pylab as plb
 import matplotlib.mlab as mlb
@@ -32,15 +34,16 @@ import matplotlib.mlab as mlb
 import core.datatypes as dt
 
 import core.strutils as strutils
-from core.strutils import string_to_float
+from core.strutils import str2float
 
-from core.utilities import safeWrapper, unique
+from core.prog import (safeWrapper, )
 
-import core.triggerprotocols
-from core.triggerprotocols import TriggerEvent, TriggerProtocol
+from core.triggerprotocols import TriggerProtocol
+from core.triggerprotocols import (TriggerEvent, TriggerEventType,)
 
 import core.datasignal
-from core.datasignal import DataSignal, IrregularlySampledDataSignal
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
+from core.datatypes import array_slice
 
 #### END pict.core modules
 
@@ -60,6 +63,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 Ui_TableEditor, QMainWindow = __loadUiType__(os.path.join(__module_path__, "tableeditor.ui"))
+Ui_TableEditorWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "tableeditorwidget.ui"))
 
 class MetaHeaderView(QtWidgets.QHeaderView):
     #Re: How to edit Horizontal Header Item in QTableWidget, on QtCentre
@@ -136,15 +140,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelData_ = None
         self._modelRows_ = 0
         self._modelColumns_ = 0
-        #self._modelDataRowHeaders = None
-        #self._modelDataColumnHeaders = None
         
         # NOTE: 2018-11-10 10:58:09
         # how many columns & rows are actually displayed
         #self._displayedColumns = 0
         self._displayedRows_ = 0
         
-        self._viewers_ = list()
+        #self._viewers_ = list()
         
         self.setModelData(data)
         
@@ -184,7 +186,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     #### BEGIN item data handling
     #### BEGIN read-only access
     def data(self, modelIndex, role=QtCore.Qt.DisplayRole):
-        #print("TabularDataModel data, index row: %d; col %d; role %s" % (modelIndex.row(), modelIndex.column(), role))
         try:
             if self._modelData_ is None:
                 return QtCore.QVariant()
@@ -216,19 +217,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     def rowCount(self, parentIndex=QtCore.QModelIndex()):
         #print("TabularDataModel rowCount")
         return self._modelRows_
-        #return self._displayedRows_
-    
-        #if parentIndex.isValid():
-            #return 0
-            
-        #if self._modelData_ is None:
-            #return 0
-        
-        #if isinstance(self._modelData_, (pd.DataFrame, pd.Series, np.ndarray)):
-            #return self._modelData_.shape[0]
-        
-        #else:
-            #return 0 #  NOTE: 2018-11-10 11:26:48 TODO nested lists ?!?
         
     def columnCount(self, parentIndex=QtCore.QModelIndex()):
         #print("TabularDataModel columnCount")
@@ -281,8 +269,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             if not isinstance(data, (pd.Series, pd.DataFrame, np.ndarray, type(None))):
                 raise TypeError("%s data is not yet supported" % type(data).__name__)
             
-            if isinstance(data, np.ndarray) and data.ndim > 2:
-                raise TypeError("cannot support numpy array data with more than two dimensions")
+            #if isinstance(data, np.ndarray) and data.ndim > 2:
+                #raise TypeError("cannot support numpy array data with more than two dimensions")
             
             self.beginResetModel()
             
@@ -304,6 +292,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 #self._modelDataRowHeaders = data.index
                 #self._modelDataColumnHeaders = data.name
                 
+            elif isinstance(data, pd.Index):
+                self._modelData_ = data
+                self._modelRows_ = data.shape[0]
+                self._modelColumns_ = 1
+                
             elif isinstance(data, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
                 if data.ndim:
                     self._modelRows_ = data.shape[0]
@@ -320,12 +313,20 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelData_ = data
                 
             elif isinstance(data, np.ndarray):
-                self._modelData_ = data
-                if data.ndim:
-                    self._modelRows_ = data.shape[0]
+                if data.ndim > 2:
+                    self._modelData_ = np.squeeze(data).reshape((data.shape[0], np.prod(data.shape[1:])))
+                else:
+                    self._modelData_ = data
                     
-                    if data.ndim > 1:
-                        self._modelColumns_ = data.shape[1]
+                if self._modelData_.ndim:
+                        
+                    self._modelRows_ = self._modelData_.shape[0]
+                    
+                    if self._modelData_.ndim > 1:
+                        self._modelColumns_ = self._modelData_.shape[1]
+                        
+                    else:
+                        self._modelColumns_ = 1
                     
                 else:
                     self._modelRows_ = 1
@@ -352,9 +353,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         except Exception as e:
             traceback.print_exc()
         
-    @property
-    def views(self):
-        return self._viewers_
+    #@property
+    #def views(self):
+        #return self._viewers_
             
     #def appendView()
     
@@ -564,12 +565,20 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     else:
                         return QtCore.QVariant()
                     
-            elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
+            #elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
+            elif isinstance(self._modelData_, neo.core.basesignal.BaseSignal):
                 if orientation == QtCore.Qt.Horizontal: # horizontal (columns) header
                     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
                         if section == 0:
                             if isinstance(self._modelData_, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
-                                return QtCore.QVariant("%s (%s)" % (self._modelData_.domain_name, self._modelData_.domain.dimensionality))
+                                domain_name = getattr(self._modelData_,"domain_name", None)
+                                domain = getattr(self._modelData_, "domain", None)
+                                if isinstance(domain_name, str) and isinstance(domain, pq.Quantity):
+                                    dname = f"{domain_name} ({domain.dimensionality})" if len(domain_name.strip()) else "Sample index"
+                                    return QtCore.QVariant(dname)
+                                    #return QtCore.QVariant("%s (%s)" % (self._modelData_.domain_name, self._modelData_.domain.dimensionality))
+                                else:
+                                    return QtCore.QVariant("Sample")
                                                        
                             else:
                                 return QtCore.QVariant("Time (%s)" % self._modelData_.times.dimensionality)
@@ -636,7 +645,15 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 
                 if isinstance(ret, datetime.datetime):
                     ret = ret.isoformat(" ")
+                    
+            elif isinstance(self._modelData_, pd.Index):
+                ret = self._modelData_[row]
+                
+                ret_type = type(ret).__name__
 
+                if isinstance(ret, datetime.datetime):
+                    ret = ret.isoformat(" ")
+                    
             elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
                 if col == 0:
                     ret = self._modelData_.times[row]
@@ -646,8 +663,18 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     ret = self._modelData_[row, col-1]
                     ret_type = type(ret).__name__
                     
+                if isinstance(ret, pq.Quantity):
+                    ret = ret.magnitude
+                    
             elif isinstance(self._modelData_, np.ndarray):
-                ret = self._modelData_[row, col]
+                if self._modelData_.ndim  == 0: # e.g. pq object
+                    ret = np.atleast_1d(self._modelData_)[row]
+                    
+                elif self._modelData_.ndim > 1:
+                    ret = self._modelData_[row, col]
+                    
+                else:
+                    ret = self._modelData_[row]
                 
                 ret_type = type(ret).__name__
 
@@ -657,15 +684,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             else:
                 return QtCore.QVariant()
                 
-            #if role == QtCore.Qt.DisplayRole:
             if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole):
                 return QtCore.QVariant("%s" % ret)
-            
-            #if role == QtCore.Qt.EditRole:
-                #return QtCore.QVariant("%s" % ret)
-            
-            #elif role == QtCore.Qt.AccessibleTextRole:
-                #return QtCore.QVariant("%s" % ret)
             
             elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                 return QtCore.QVariant(ret_type)
@@ -807,7 +827,403 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             
         return False
             
-class TableEditor(ScipyenViewer, Ui_TableEditor):
+class TableEditorWidget(QWidget, Ui_TableEditorWidget):
+    # TODO 2019-11-01 22:57:01
+    # finish implementing all these
+    supported_types = (pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
+                       neo.AnalogSignal, neo.IrregularlySampledSignal,
+                       neo.Epoch, neo.Event, neo.SpikeTrain,
+                       DataSignal, IrregularlySampledDataSignal,
+                       TriggerEvent, TriggerProtocol,
+                       np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D)
+    
+    view_action_name = "Table"
+    
+    #def __init__(self, model:typing.Optional[QtCore.QAbstractTableModel]=None, 
+                 #parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
+    def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
+        super().__init__(parent=parent)
+        
+        self._dataModel_ = TabularDataModel(parent=self)
+        
+        # NOTE: 2021-10-18 09:32:45
+        # ### BEGIN keep this  - you may re-enable the possibility to use custom tabular
+        # data models
+        
+        #if model is None:
+            #self._dataModel_ = TabularDataModel(parent=self)
+            
+        #else:
+            #self._dataModel_ = model
+        # ### END keep this ...
+        
+        self._configureUI_()
+        
+        # NOTE: 2021-08-16 17:22:20
+        # By default, this is defined in the .ui file as:
+        # QtWidgets.QAbstractItemView.DoubleClicked |
+        # QtWidgets.QAbstractItemView.EditKeyPressed |
+        # QtWidgets.QAbstractItemView.AnyKeyPressed
+        self._defaultEditTriggers_ = self.tableView.editTriggers()
+        
+        self._data_ = None
+        
+        self._slicingAxis_ = None
+        
+        self._currentSlice_ = 0
+        
+    def setData(self, data:(pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
+                       neo.AnalogSignal, neo.IrregularlySampledSignal,
+                       neo.Epoch, neo.Event, neo.SpikeTrain,
+                       DataSignal, IrregularlySampledDataSignal,
+                       TriggerEvent, TriggerProtocol,
+                       np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D), *args, **kwargs):
+        
+        self._data_ = data
+        
+        if isinstance(data, np.ndarray):
+            if data.ndim > 2:
+                self._slicingAxis_ = kwargs.get("sliceaxis", None)
+                if not isinstance(self._slicingAxis_, int) or self._slicingAxis_ < 0 or self._slicingAxis_ >= data.ndim:
+                    self._slicingAxis_ = 2
+                    
+                if data.ndim > 3:
+                    new_shape = list(data.shape[0:self._slicingAxis_]) + [np.prod(data.shape[self._slicingAxis_:])]
+                    self._data_ = np.squeeze(data).reshape(tuple(new_shape))
+                    
+                self._currentSlice_ = 0
+                self._dataModel_.setModelData(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
+                
+                self.prevSliceToolbutton.setEnabled(True)
+                self.nextSliceToolButton.setEnabled(True)
+                return
+        
+        self.prevSliceToolbutton.setEnabled(False)
+        self.nextSliceToolButton.setEnabled(False)
+        self._dataModel_.setModelData(self._data_)
+        
+    @pyqtSlot()
+    def _slot_prevSlice(self):
+        if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
+            if self.currentSlice > 0:
+                self.currentSlice = self.currentSlice - 1
+        
+    @pyqtSlot()
+    def _slot_nextSlice(self):
+        if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
+            if self.currentSlice <= self._data_.shape[self._slicingAxis_] -1 :
+                self.currentSlice = self.currentSlice + 1
+        
+    @property
+    def currentSlice(self):
+        return self._currentSlice_
+    
+    @currentSlice.setter
+    def currentSlice(self, val):
+        if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
+            if isinstance(val, int):
+                if val >=0 and val < self._data_.ndim:
+                    self._currentSlice_ = val
+                    if self._currentSlice_ == 0:
+                        self.prevSliceToolbutton.setEnabled(False)
+                        self.nextSliceToolButton.setEnabled(True)
+                        
+                    elif self._currentSlice_ >= self._data_.shape[self._slicingAxis_] - 1:
+                        self.prevSliceToolbutton.setEnabled(True)
+                        self.nextSliceToolButton.setEnabled(False)
+                        
+                    else:
+                        self.prevSliceToolbutton.setEnabled(True)
+                        self.nextSliceToolButton.setEnabled(True)
+                        
+                    self._dataModel_.setModelData(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
+                        
+                        
+    @property
+    def model(self):
+        return self.tableView.model()
+    
+    @model.setter
+    def model(self, md):
+        self._dataModel_ = md
+        self.tabelView.setModel(self._dataModel_)
+        
+    @property
+    def readOnly(self):
+        return self.tableView.editTriggers() == QtWidgets.QAbstractItemView.NoEditTriggers
+    
+    @readOnly.setter
+    def readOnly(self, val:bool):
+        if val:
+            self.tableView.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        else:
+            self.tableView.setEditTriggers(self._defaultEditTriggers_)
+            
+    def setEditTriggers(self, val):
+        """See documentation for QtWidgets.QAbstractItemView.setEditTriggers()
+        """
+        self.tableView.setEditTriggers(val)
+            
+    def _configureUI_(self):
+        self.setupUi(self)
+        self.tableView.setSortingEnabled(False)
+        self.tableView.setModel(self._dataModel_)
+        #self._dataModel_.signal_rowsPopulated[int].connect(self.slot_rowsReceived)
+        #self._dataModel_.signal_columnsPopulated[int].connect(self.slot_columnsReceived)
+        
+        self.tableView.horizontalHeader().setSectionsMovable(False)
+        # NOTE: 2018-11-28 21:46:18
+        # WARNING HUGE speed penalty when using ResizeToContents policy, for large
+        # data sets (~1k rows and tens of columns)
+        #self.tableView.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        #self.tableView.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        # NOTE: 2018-11-29 23:15:13
+        # you may play with this by also setting the precision to be based only
+        # on what is actually visible:
+        self.tableView.horizontalHeader().setResizeContentsPrecision(0) 
+        
+        self.tableView.horizontalHeader().setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.tableView.horizontalHeader().customContextMenuRequested[QtCore.QPoint].connect(self.slot_horizontal_header_context_menu_request)
+        
+        self.tableView.verticalHeader().setSectionsMovable(False)
+        
+        # see NOTE: 2018-11-28 21:46:18 and NOTE: 2018-11-29 23:15:13
+        #self.tableView.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        #self.tableView.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.tableView.verticalHeader().setResizeContentsPrecision(0) 
+        
+        self.tableView.verticalHeader().setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.tableView.verticalHeader().customContextMenuRequested[QtCore.QPoint].connect(self.slot_vertical_header_context_menu_request)
+        
+        
+        self.tableView.setAlternatingRowColors(True)
+        #self.tableView.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
+        self.tableView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.tableView.customContextMenuRequested[QtCore.QPoint].connect(self.slot_table_context_menu_requested)
+
+        self.resizeColumnsToolButton.clicked.connect(self.slot_resizeAllColumnsToContents)
+        self.resizeRowsToolButton.clicked.connect(self.slot_resizeAllRowsToContents)
+        
+        self.prevSliceToolbutton.setEnabled(False)
+        self.prevSliceToolbutton.clicked.connect(self._slot_prevSlice)
+        self.nextSliceToolButton.setEnabled(False)
+        self.nextSliceToolButton.clicked.connect(self._slot_nextSlice)
+        
+    @pyqtSlot()
+    def slot_resizeAllColumnsToContents(self):
+        #print("TableEditorWidget slot_resizeAllColumnsToContents")
+        signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
+        self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
+        
+    @pyqtSlot()
+    def slot_resizeAllRowsToContents(self):
+        signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
+        self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
+        
+    @pyqtSlot(QtCore.QPoint)
+    @safeWrapper
+    def slot_horizontal_header_context_menu_request(self, pos):
+        #print("horizontal header context menu at pos %s" % pos)
+        #print("clicked column %s" % self.tableView.columnAt(pos.x()))
+        
+        self.selectedColumnIndex = self.tableView.columnAt(pos.x())
+        
+        cm = QtWidgets.QMenu("Column Menu", self.tableView)
+        copyColumnTitleAction = cm.addAction("Copy column name")
+        copyColumnTitleAction.triggered.connect(self.slot_copyColumnName)
+        
+        resizeColumnToContentsAction = cm.addAction("Resize to contents")
+        resizeColumnToContentsAction.triggered.connect(self.slot_resizeSelectedColumnsToContents)
+        
+        resizeAllColumsToContextAction = cm.addAction("Resize All Columns To Contents")
+        
+        resizeAllColumsToContextAction.triggered.connect(self.slot_resizeAllColumnsToContents)
+        #copyColumnContents = cm.addAction("Copy column data")
+        
+        cm.exec(self.tableView.mapToGlobal(pos))
+        
+    @pyqtSlot(QtCore.QPoint)
+    @safeWrapper
+    def slot_vertical_header_context_menu_request(self, pos):
+        self.selectedRowIndex = self.tableView.rowAt(pos.x())
+        
+        cm = QtWidgets.QMenu("Row Menu", self.tableView)
+        copyColumnTitleAction = cm.addAction("Copy row name")
+        copyColumnTitleAction.triggered.connect(self.slot_copyRowName)
+        
+        resizeRowToContentsAction = cm.addAction("Resize to contents")
+        resizeRowToContentsAction.triggered.connect(self.slot_resizeSelectedRowsToContents)
+        
+        resizeAllRowsToContextAction = cm.addAction("Resize All Rows To Contents")
+        
+        resizeAllRowsToContextAction.triggered.connect(self.slot_resizeAllRowsToContents)
+        
+        cm.exec(self.tableView.mapToGlobal(pos))
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_copyColumnName(self):
+        if not isinstance(self.selectedColumnIndex, int):
+            return
+        
+        #columnName = self.tableView.horizontalHeaderItem(self.selectedColumnIndex).text()
+        
+        # NOTE: 2018-11-28 23:38:29
+        # this is a QtCore.QVariant that wraps a python str
+        columnName = self.tableView.model().headerData(self.selectedColumnIndex, QtCore.Qt.Horizontal).value()
+        
+        QtWidgets.QApplication.instance().clipboard().setText(columnName)
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_copyRowName(self):
+        if not isinstance(self.selectedRowIndex, int):
+            return
+        
+        rowName = self.tableView.verticalheaderItem(self.selectedRowIndex).text()
+        
+        QtWidgets.QApplication.instance().clipboard().setText(rowName)
+        
+    @pyqtSlot(QtWidgets.QTableWidgetItem)
+    @safeWrapper
+    def slot_tableEdited(self, item):
+        # TODO code for xarray.DataArray
+        # TODO code for multi-indexed pandas data frames
+        # TODO code for as_type(...) for pandas data -- e.g. categorical
+        col = item.column()
+        row = item.row()
+        value = item.text()
+        
+        if isinstance(self._data_, pd.DataFrame):
+            colHeaderText = self.tableView.horizontalHeaderItem(col).text()
+            
+            if colHeaderText not in self._data_.columns:
+                raise RuntimeError("%s not found in data columns!" % colHeaderText)
+            
+            columnDType = self._data_[colHeaderText].dtype
+            
+            if np.can_cast(eval(value), columnDType):
+                if columnDType == np.dtype("bool"):
+                    if value.lower().strip() in ("true, t, 1"):
+                        value = "True"
+                        
+                    elif value.lower().strip() in ("false, f, 0"):
+                        value = False
+                        
+                # CAUTION here
+                data_value = np.array(eval(value), dtype=columnDType)
+                
+                self._data_.loc[self._data_.index[row], colHeaderText] = data_value
+                
+            else:
+                raise RuntimeError("cannot cast %s to %s" % (value, columnDType))
+            
+            
+        elif isinstance(self._data_, pd.Series):
+            dataDType = self._data_.dtype
+            
+            if np.can_cast(eval(value), dataDType):
+                data_value = np.array(eval(value), dtype=dataDType)
+            
+                self._data_.loc[self._data_.index[row]] = data_value
+            
+        elif isinstance(self._data_, np.ndarray):
+            dataDType = self._data_.dtype
+            
+            if np.can_cast(eval(value), dataDType):
+                data_value = np.array(eval(value), dtype=dataDType)
+                
+                if self._data_.ndim == 3:
+                    self._data_[row,col,self.frameNo] = data_value
+                    
+                elif self._data_.ndim == 2:
+                    self._data_[row,col] = data_value
+                    
+                elif self._data_.ndim == 1:
+                    self._data_[row] = data_value
+           
+            else:
+                raise RuntimeError("cannot cast %s to %s" % (value, dataDType))
+            
+    @pyqtSlot()
+    @safeWrapper
+    def slot_resizeSelectedRowsToContents(self):
+        if not isinstance(self.selectedRowIndex, int):
+            return
+        
+        signalBlocker = QtCore.QSignalBlocker(self.tableView.verticalHeader())
+        
+        if len(self.tableView.selectionModel().selectedRows()) > 1:
+            row_indices = [ndx.row() for ndx in self.tableView.selectionModel().selectedColumns()]
+            
+            for ndx in row_indices:
+                sizeHint = max([self.tableView.sizeHintForRow(ndx), self.tableView.verticalHeader().sectionSizeHint(ndx)])
+                #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(ndx)
+                self.tableView.verticalHeader().resizeSection(ndx, sizeHint)
+                
+        else:
+            sizeHint = max([self.tableView.sizeHintForRow(self.selectedRowIndex), self.tableView.verticalHeader().sectionSizeHint(self.selectedRowIndex)])
+            #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)
+            self.tableView.verticalHeader().resizeSection(self.selectedRowIndex, sizeHint)
+
+    @pyqtSlot()
+    @safeWrapper
+    def slot_resizeSelectedColumnsToContents(self):
+        if not isinstance(self.selectedColumnIndex, int):
+            return
+        
+        signalBlocker = QtCore.QSignalBlocker(self.tableView.horizontalHeader())
+        
+        if len(self.tableView.selectionModel().selectedColumns()) > 1:
+            col_indices = [ndx.column() for ndx in self.tableView.selectionModel().selectedColumns()]
+            
+            for ndx in col_indices:
+                sizeHint = max([self.tableView.sizeHintForColumn(ndx), self.tableView.horizontalHeader().sectionSizeHint(ndx)])
+                #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(ndx)
+                self.tableView.horizontalHeader().resizeSection(ndx, sizeHint)
+                
+        else:
+            sizeHint = max([self.tableView.sizeHintForColumn(self.selectedColumnIndex), self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)])
+            #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)
+            self.tableView.horizontalHeader().resizeSection(self.selectedColumnIndex, sizeHint)
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_copySelection(self):
+        modelIndexes = self.tableView.selectedIndexes()
+        selected_text = list()
+        previous = modelIndexes[0]
+        #selected_text.append(self._dataModel_.data(previous).toString())
+        selected_text.append(str(self._dataModel_.data(previous).value()))
+        
+        for modelIndex in modelIndexes[1:]:
+            #data = self._dataModel_.data(modelIndex).toString()
+            data = str(self._dataModel_.data(modelIndex).value())
+            if modelIndex.row() != previous.row():
+                selected_text.append("\n")
+                
+            elif modelIndex.column() != previous.column():
+                selected_text.append("\t")
+            
+            selected_text.append(data)
+            
+            previous = modelIndex
+            
+        QtGui.QGuiApplication.clipboard().setText("".join(selected_text))
+    
+    @pyqtSlot(QtCore.QPoint)
+    @safeWrapper
+    def slot_table_context_menu_requested(self, pos):
+        #print("table_context_menu at pos %s" % pos)
+        
+        cm = QtWidgets.QMenu("Cell menu", self.tableView)
+        copySelectedAction = cm.addAction("Copy")
+        
+        copySelectedAction.triggered.connect(self.slot_copySelection)
+
+        cm.popup(self.tableView.mapToGlobal(pos), copySelectedAction)
+
+class TableEditor(ScipyenViewer):#, Ui_TableEditor):
     """Viewer/Editor for tabular data
     """
     # TODO: 2019-09-09 22:40:36
@@ -827,12 +1243,16 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
     
     view_action_name = "Table"
     
-    def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
+    def __init__(self, data: (object, type(None)) = None, 
+                 parent: (QtWidgets.QMainWindow, type(None)) = None, 
+                 ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
                  *args, **kwargs) -> None:
-        super().__init__(data=data, parent=parent, pWin=pWin, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs) # calls _configureGUI_ and loadSettings
+        super().__init__(data=data, parent=parent, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs) # calls _configureUI_ and loadSettings
 
+        #self.tableWidget = TableEditorWidget()
+        #self.setCentralWidget(self.tableWidget)
+        
         self.selectedColumnIndex      = None
         self.selectedRowIndex         = None
         
@@ -849,11 +1269,11 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
         
     def _save_viewer_settings_(self):
         if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-            self.settings.setValue("/".join([self.__class__.__name__, "UseMatplotlib"]), "%s" % self._use_matplotlib_)
+            self.qsettings.setValue("/".join([self.__class__.__name__, "UseMatplotlib"]), "%s" % self._use_matplotlib_)
             
     def _load_viewer_settings_(self):
         if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-            use_mpl = self.settings.value("/".join([self.__class__.__name__, "UseMatplotlib"]), True)
+            use_mpl = self.qsettings.value("/".join([self.__class__.__name__, "UseMatplotlib"]), True)
             
             if isinstance(use_mpl, bool):
                 self._use_matplotlib_ = use_mpl
@@ -872,7 +1292,7 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
     def _slot_use_mpl_toggled_(self, value):
         self._use_matplotlib_ = value
             
-    def _configureGUI_(self):
+    def _configureUI_(self):
         """Initializes and configures the GUI elements.
         """
         # NOTE: 2019-01-12 12:21:34
@@ -881,7 +1301,7 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
         # A better alternative I guess is to resize ot contents AFTER the table model
         # data has been (re)loaded, or just resize manually e.g. via a menu action.
         # CAUTION
-        self.setupUi(self) # initialize the GUI elements defined in the *.ui file
+        #self.setupUi(self) # initialize the GUI elements defined in the *.ui file
         #self.framesSlider.setMinimum(0)
         #self.framesSlider.setMaximum(0)
         #self.framesSlider.valueChanged.connect(self.slot_setFrameNumber)
@@ -923,50 +1343,68 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
         
         #self._dataModel_.setModelData(self._data_)
         
-        self.tableView.setSortingEnabled(False)
+        #self.tableView.setSortingEnabled(False)
 
-        self._dataModel_ = TabularDataModel(parent=self)
+        self.tableWidget = TableEditorWidget(parent=self)
+        self._dataModel_ = self.tableWidget._dataModel_
         
-        self.tableView.setModel(self._dataModel_)
-        #self._dataModel_.signal_rowsPopulated[int].connect(self.slot_rowsReceived)
-        #self._dataModel_.signal_columnsPopulated[int].connect(self.slot_columnsReceived)
+        # NOTE: see NOTE: 2021-10-18 09:32:45
+        #self._dataModel_ = TabularDataModel(parent=self)
         
-        self.tableView.horizontalHeader().setSectionsMovable(False)
-        # NOTE: 2018-11-28 21:46:18
-        # WARNING HUGE speed penalty when using ResizeToContents policy, for large
-        # data sets (~1k rows and tens of columns)
-        #self.tableView.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-        #self.tableView.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        # NOTE: 2018-11-29 23:15:13
-        # you may play with this by also setting the precision to be based only
-        # on what is actually visible:
-        self.tableView.horizontalHeader().setResizeContentsPrecision(0) 
+        #self.tableWidget = TableEditorWidget(model = self._dataModel_, parent=self)
         
-        self.tableView.horizontalHeader().setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self.tableView.horizontalHeader().customContextMenuRequested[QtCore.QPoint].connect(self.slot_horizontal_header_context_menu_request)
-        
-        self.tableView.verticalHeader().setSectionsMovable(False)
-        
-        # see NOTE: 2018-11-28 21:46:18 and NOTE: 2018-11-29 23:15:13
-        #self.tableView.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-        #self.tableView.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.tableView.verticalHeader().setResizeContentsPrecision(0) 
-        
-        self.tableView.verticalHeader().setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self.tableView.verticalHeader().customContextMenuRequested[QtCore.QPoint].connect(self.slot_vertical_header_context_menu_request)
+        self.setCentralWidget(self.tableWidget)
+        self.tableView = self.tableWidget.tableView
         
         
-        self.tableView.setAlternatingRowColors(True)
-        #self.tableView.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
-        self.tableView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self.tableView.customContextMenuRequested[QtCore.QPoint].connect(self.slot_table_context_menu_requested)
+        #self.tableView.setModel(self._dataModel_)
+        ##self._dataModel_.signal_rowsPopulated[int].connect(self.slot_rowsReceived)
+        ##self._dataModel_.signal_columnsPopulated[int].connect(self.slot_columnsReceived)
         
-        #self.tableView.itemChanged[QtWidgets.QTableWidgetItem].connect(self.slot_tableEdited, type=QtCore.Qt.QueuedConnection)
+        #self.tableView.horizontalHeader().setSectionsMovable(False)
+        ## NOTE: 2018-11-28 21:46:18
+        ## WARNING HUGE speed penalty when using ResizeToContents policy, for large
+        ## data sets (~1k rows and tens of columns)
+        ##self.tableView.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        ##self.tableView.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        ## NOTE: 2018-11-29 23:15:13
+        ## you may play with this by also setting the precision to be based only
+        ## on what is actually visible:
+        #self.tableView.horizontalHeader().setResizeContentsPrecision(0) 
+        
+        #self.tableView.horizontalHeader().setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        #self.tableView.horizontalHeader().customContextMenuRequested[QtCore.QPoint].connect(self.slot_horizontal_header_context_menu_request)
+        
+        #self.tableView.verticalHeader().setSectionsMovable(False)
+        
+        ## see NOTE: 2018-11-28 21:46:18 and NOTE: 2018-11-29 23:15:13
+        ##self.tableView.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        ##self.tableView.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        #self.tableView.verticalHeader().setResizeContentsPrecision(0) 
+        
+        #self.tableView.verticalHeader().setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        #self.tableView.verticalHeader().customContextMenuRequested[QtCore.QPoint].connect(self.slot_vertical_header_context_menu_request)
+        
+        
+        #self.tableView.setAlternatingRowColors(True)
+        ##self.tableView.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
+        #self.tableView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        #self.tableView.customContextMenuRequested[QtCore.QPoint].connect(self.slot_table_context_menu_requested)
+        
+        ##self.tableView.itemChanged[QtWidgets.QTableWidgetItem].connect(self.slot_tableEdited, type=QtCore.Qt.QueuedConnection)
+        
         self.toolBar = QtWidgets.QToolBar("Main", self)
         self.toolBar.setObjectName("TableEditor_Main_Toolbar")
         
-        refreshAction = self.toolBar.addAction(QtGui.QIcon(":/images/view-refresh.svg"), "Refresh")
+        refreshAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh")
+        #refreshAction = self.toolBar.addAction(QtGui.QIcon(":/images/view-refresh.svg"), "Refresh")
         refreshAction.triggered.connect(self.slot_refreshDataDisplay)
+        
+        #expandAllColumns = self.toolBar.addAction(QtGui.QIcon.fromTheme("resizecol"), "Resize columns to contents")
+        #expandAllColumns.triggered.connect(self.slot_resizeAllColumnsToContents)
+        
+        #expandAllRows = self.toolBar.addAction(QtGui.QIcon.fromTheme("resizerow"), "Resize rows to contents")
+        #expandAllColumns.triggered.connect(self.slot_resizeAllRowsToContents)
         
         self.addToolBar(self.toolBar)
         
@@ -983,9 +1421,9 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
         if type(data) not in self.supported_types or not any([t in type(data).mro() for t in self.supported_types]):
             raise TypeError("%s cannot handle data type %s" % (type(self).__name__, type(data).__name__))
         
-        if isinstance(data, np.ndarray):
-            if data.ndim > 2:
-                raise ValueError("Numpy arrays with more than two dimensions are not supported")
+        #if isinstance(data, np.ndarray):
+            #if data.ndim > 2:
+                #raise ValueError("Numpy arrays with more than two dimensions are not supported")
             
         self._data_ = data
         
@@ -1004,7 +1442,9 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
         
         signalBlocker = QtCore.QSignalBlocker(self.tableView)
         
-        self._dataModel_.setModelData(self._data_)
+        self.tableWidget.setData(self._data_)
+        
+        #self._dataModel_.setModelData(self._data_)
     
     @pyqtSlot()
     @safeWrapper
@@ -1080,6 +1520,7 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
         
     @safeWrapper
     def _plot_model_data_(self, modelIndexes, custom=False):
+        from core.utilities import unique
         if len(modelIndexes)==0: # bail out if there is no selection
             return
         
@@ -1121,7 +1562,7 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
         nan = np.nan
         
         for l in model_index_list:
-            column_data = np.array([string_to_float("%s" % self._dataModel_.__getModelData__(ndx.row(), ndx.column()).value()) for ndx in l], dtype="float64")
+            column_data = np.array([str2float("%s" % self._dataModel_.__getModelData__(ndx.row(), ndx.column()).value()) for ndx in l], dtype="float64")
             
             data.append(column_data)
             
@@ -1159,224 +1600,211 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
         
         self._use_matplotlib_ = value
     
-    @pyqtSlot(QtCore.QPoint)
-    @safeWrapper
-    def slot_table_context_menu_requested(self, pos):
-        #print("table_context_menu at pos %s" % pos)
+    #@pyqtSlot(QtCore.QPoint)
+    #@safeWrapper
+    #def slot_table_context_menu_requested(self, pos):
+        ##print("table_context_menu at pos %s" % pos)
         
-        cm = QtWidgets.QMenu("Cell menu", self.tableView)
-        copySelectedAction = cm.addAction("Copy")
+        #cm = QtWidgets.QMenu("Cell menu", self.tableView)
+        #copySelectedAction = cm.addAction("Copy")
         
-        copySelectedAction.triggered.connect(self.slot_copySelection)
+        #copySelectedAction.triggered.connect(self.slot_copySelection)
 
-        cm.popup(self.tableView.mapToGlobal(pos), copySelectedAction)
+        #cm.popup(self.tableView.mapToGlobal(pos), copySelectedAction)
 
-    @pyqtSlot()
-    @safeWrapper
-    def slot_copySelection(self):
-        modelIndexes = self.tableView.selectedIndexes()
-        selected_text = list()
-        previous = modelIndexes[0]
-        #selected_text.append(self._dataModel_.data(previous).toString())
-        selected_text.append(str(self._dataModel_.data(previous).value()))
+    #@pyqtSlot()
+    #@safeWrapper
+    #def slot_copySelection(self):
+        #modelIndexes = self.tableView.selectedIndexes()
+        #selected_text = list()
+        #previous = modelIndexes[0]
+        ##selected_text.append(self._dataModel_.data(previous).toString())
+        #selected_text.append(str(self._dataModel_.data(previous).value()))
         
-        for modelIndex in modelIndexes[1:]:
-            #data = self._dataModel_.data(modelIndex).toString()
-            data = str(self._dataModel_.data(modelIndex).value())
-            if modelIndex.row() != previous.row():
-                selected_text.append("\n")
+        #for modelIndex in modelIndexes[1:]:
+            ##data = self._dataModel_.data(modelIndex).toString()
+            #data = str(self._dataModel_.data(modelIndex).value())
+            #if modelIndex.row() != previous.row():
+                #selected_text.append("\n")
                 
-            elif modelIndex.column() != previous.column():
-                selected_text.append("\t")
+            #elif modelIndex.column() != previous.column():
+                #selected_text.append("\t")
             
-            selected_text.append(data)
+            #selected_text.append(data)
             
-            previous = modelIndex
+            #previous = modelIndex
             
-        QtGui.QGuiApplication.clipboard().setText("".join(selected_text))
+        #QtGui.QGuiApplication.clipboard().setText("".join(selected_text))
     
-    @pyqtSlot()
-    @safeWrapper
-    def slot_resizeSelectedColumnsToContents(self):
-        if not isinstance(self.selectedColumnIndex, int):
-            return
+    #@pyqtSlot()
+    #@safeWrapper
+    #def slot_resizeSelectedColumnsToContents(self):
+        #if not isinstance(self.selectedColumnIndex, int):
+            #return
         
-        signalBlocker = QtCore.QSignalBlocker(self.tableView.horizontalHeader())
+        #signalBlocker = QtCore.QSignalBlocker(self.tableView.horizontalHeader())
         
-        if len(self.tableView.selectionModel().selectedColumns()) > 1:
-            col_indices = [ndx.column() for ndx in self.tableView.selectionModel().selectedColumns()]
+        #if len(self.tableView.selectionModel().selectedColumns()) > 1:
+            #col_indices = [ndx.column() for ndx in self.tableView.selectionModel().selectedColumns()]
             
-            for ndx in col_indices:
-                sizeHint = max([self.tableView.sizeHintForColumn(ndx), self.tableView.horizontalHeader().sectionSizeHint(ndx)])
-                #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(ndx)
-                self.tableView.horizontalHeader().resizeSection(ndx, sizeHint)
+            #for ndx in col_indices:
+                #sizeHint = max([self.tableView.sizeHintForColumn(ndx), self.tableView.horizontalHeader().sectionSizeHint(ndx)])
+                ##sizeHint = self.tableView.horizontalHeader().sectionSizeHint(ndx)
+                #self.tableView.horizontalHeader().resizeSection(ndx, sizeHint)
                 
-        else:
-            sizeHint = max([self.tableView.sizeHintForColumn(self.selectedColumnIndex), self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)])
-            #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)
-            self.tableView.horizontalHeader().resizeSection(self.selectedColumnIndex, sizeHint)
+        #else:
+            #sizeHint = max([self.tableView.sizeHintForColumn(self.selectedColumnIndex), self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)])
+            ##sizeHint = self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)
+            #self.tableView.horizontalHeader().resizeSection(self.selectedColumnIndex, sizeHint)
         
-        
-    @pyqtSlot()
-    @safeWrapper
-    def slot_resizeSelectedRowsToContents(self):
-        if not isinstance(self.selectedRowIndex, int):
-            return
-        
-        signalBlocker = QtCore.QSignalBlocker(self.tableView.verticalHeader())
-        
-        if len(self.tableView.selectionModel().selectedRows()) > 1:
-            row_indices = [ndx.row() for ndx in self.tableView.selectionModel().selectedColumns()]
-            
-            for ndx in row_indices:
-                sizeHint = max([self.tableView.sizeHintForRow(ndx), self.tableView.verticalHeader().sectionSizeHint(ndx)])
-                #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(ndx)
-                self.tableView.verticalHeader().resizeSection(ndx, sizeHint)
-                
-        else:
-            sizeHint = max([self.tableView.sizeHintForRow(self.selectedRowIndex), self.tableView.verticalHeader().sectionSizeHint(self.selectedRowIndex)])
-            #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)
-            self.tableView.verticalHeader().resizeSection(self.selectedRowIndex, sizeHint)
-        
-        
-    @pyqtSlot(QtCore.QPoint)
-    @safeWrapper
-    def slot_horizontal_header_context_menu_request(self, pos):
-        #print("horizontal header context menu at pos %s" % pos)
-        #print("clicked column %s" % self.tableView.columnAt(pos.x()))
-        
-        self.selectedColumnIndex = self.tableView.columnAt(pos.x())
-        
-        cm = QtWidgets.QMenu("Column Menu", self.tableView)
-        copyColumnTitleAction = cm.addAction("Copy column name")
-        copyColumnTitleAction.triggered.connect(self.slot_copyColumnName)
-        
-        resizeColumnToContentsAction = cm.addAction("Resize to contents")
-        resizeColumnToContentsAction.triggered.connect(self.slot_resizeSelectedColumnsToContents)
-        
-        resizeAllColumsToContextAction = cm.addAction("Resize All Columns To Contents")
-        
-        resizeAllColumsToContextAction.triggered.connect(self.slot_resizeAllColumnsToContents)
-        #copyColumnContents = cm.addAction("Copy column data")
-        
-        cm.exec(self.tableView.mapToGlobal(pos))
-        
-    
-    @pyqtSlot(QtCore.QPoint)
-    @safeWrapper
-    def slot_vertical_header_context_menu_request(self, pos):
-        self.selectedRowIndex = self.tableView.rowAt(pos.x())
-        
-        cm = QtWidgets.QMenu("Row Menu", self.tableView)
-        copyColumnTitleAction = cm.addAction("Copy row name")
-        copyColumnTitleAction.triggered.connect(self.slot_copyRowName)
-        
-        resizeRowToContentsAction = cm.addAction("Resize to contents")
-        resizeRowToContentsAction.triggered.connect(self.slot_resizeSelectedRowsToContents)
-        
-        resizeAllRowsToContextAction = cm.addAction("Resize All Rows To Contents")
-        
-        resizeAllRowsToContextAction.triggered.connect(self.slot_resizeAllRowsToContents)
-        
-        cm.exec(self.tableView.mapToGlobal(pos))
         
     #@pyqtSlot()
     #@safeWrapper
-    #def slot_refreshDataDisplay(self):
-        #"""Overriden due to special identity tests for pandas objects and numpy arrays
-        #"""
-        #if isinstance(self._data_, (pd.DataFrame, pd.Series, np.ndarray)):
-            #workspace_data = [x for x in self._scipyenWindow_.workspace.values() if type(x) is type(self._data_)]
+    #def slot_resizeSelectedRowsToContents(self):
+        #if not isinstance(self.selectedRowIndex, int):
+            #return
+        
+        #signalBlocker = QtCore.QSignalBlocker(self.tableView.verticalHeader())
+        
+        #if len(self.tableView.selectionModel().selectedRows()) > 1:
+            #row_indices = [ndx.row() for ndx in self.tableView.selectionModel().selectedColumns()]
             
-            #if isinstance(self._data_, np.ndarray):
-                #if not any([np.array_equal(self._data_, x) for x in workspace_data]):
-                    
-            
+            #for ndx in row_indices:
+                #sizeHint = max([self.tableView.sizeHintForRow(ndx), self.tableView.verticalHeader().sectionSizeHint(ndx)])
+                ##sizeHint = self.tableView.horizontalHeader().sectionSizeHint(ndx)
+                #self.tableView.verticalHeader().resizeSection(ndx, sizeHint)
+                
+        #else:
+            #sizeHint = max([self.tableView.sizeHintForRow(self.selectedRowIndex), self.tableView.verticalHeader().sectionSizeHint(self.selectedRowIndex)])
+            ##sizeHint = self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)
+            #self.tableView.verticalHeader().resizeSection(self.selectedRowIndex, sizeHint)
+        
+        
+    #@pyqtSlot(QtCore.QPoint)
+    #@safeWrapper
+    #def slot_horizontal_header_context_menu_request(self, pos):
+        ##print("horizontal header context menu at pos %s" % pos)
+        ##print("clicked column %s" % self.tableView.columnAt(pos.x()))
+        
+        #self.selectedColumnIndex = self.tableView.columnAt(pos.x())
+        
+        #cm = QtWidgets.QMenu("Column Menu", self.tableView)
+        #copyColumnTitleAction = cm.addAction("Copy column name")
+        #copyColumnTitleAction.triggered.connect(self.slot_copyColumnName)
+        
+        #resizeColumnToContentsAction = cm.addAction("Resize to contents")
+        #resizeColumnToContentsAction.triggered.connect(self.slot_resizeSelectedColumnsToContents)
+        
+        #resizeAllColumsToContextAction = cm.addAction("Resize All Columns To Contents")
+        
+        #resizeAllColumsToContextAction.triggered.connect(self.slot_resizeAllColumnsToContents)
+        ##copyColumnContents = cm.addAction("Copy column data")
+        
+        #cm.exec(self.tableView.mapToGlobal(pos))
+        
     
-    @pyqtSlot()
-    @safeWrapper
-    def slot_copyColumnName(self):
-        if not isinstance(self.selectedColumnIndex, int):
-            return
+    #@pyqtSlot(QtCore.QPoint)
+    #@safeWrapper
+    #def slot_vertical_header_context_menu_request(self, pos):
+        #self.selectedRowIndex = self.tableView.rowAt(pos.x())
         
-        #columnName = self.tableView.horizontalHeaderItem(self.selectedColumnIndex).text()
+        #cm = QtWidgets.QMenu("Row Menu", self.tableView)
+        #copyColumnTitleAction = cm.addAction("Copy row name")
+        #copyColumnTitleAction.triggered.connect(self.slot_copyRowName)
         
-        # NOTE: 2018-11-28 23:38:29
-        # this is a QtCore.QVariant that wraps a python str
-        columnName = self.tableView.model().headerData(self.selectedColumnIndex, QtCore.Qt.Horizontal).value()
+        #resizeRowToContentsAction = cm.addAction("Resize to contents")
+        #resizeRowToContentsAction.triggered.connect(self.slot_resizeSelectedRowsToContents)
         
-        QtWidgets.QApplication.instance().clipboard().setText(columnName)
+        #resizeAllRowsToContextAction = cm.addAction("Resize All Rows To Contents")
         
-    @pyqtSlot()
-    @safeWrapper
-    def slot_copyRowName(self):
-        if not isinstance(self.selectedRowIndex, int):
-            return
+        #resizeAllRowsToContextAction.triggered.connect(self.slot_resizeAllRowsToContents)
         
-        rowName = self.tableView.verticalheaderItem(self.selectedRowIndex).text()
+        #cm.exec(self.tableView.mapToGlobal(pos))
         
-        QtWidgets.QApplication.instance().clipboard().setText(rowName)
+    #@pyqtSlot()
+    #@safeWrapper
+    #def slot_copyColumnName(self):
+        #if not isinstance(self.selectedColumnIndex, int):
+            #return
+        
+        ##columnName = self.tableView.horizontalHeaderItem(self.selectedColumnIndex).text()
+        
+        ## NOTE: 2018-11-28 23:38:29
+        ## this is a QtCore.QVariant that wraps a python str
+        #columnName = self.tableView.model().headerData(self.selectedColumnIndex, QtCore.Qt.Horizontal).value()
+        
+        #QtWidgets.QApplication.instance().clipboard().setText(columnName)
+        
+    #@pyqtSlot()
+    #@safeWrapper
+    #def slot_copyRowName(self):
+        #if not isinstance(self.selectedRowIndex, int):
+            #return
+        
+        #rowName = self.tableView.verticalheaderItem(self.selectedRowIndex).text()
+        
+        #QtWidgets.QApplication.instance().clipboard().setText(rowName)
         
 
-    @pyqtSlot(QtWidgets.QTableWidgetItem)
-    @safeWrapper
-    def slot_tableEdited(self, item):
-        # TODO code for xarray.DataArray
-        # TODO code for multi-indexed pandas data frames
-        # TODO code for as_type(...) for pandas data -- e.g. categorical
-        col = item.column()
-        row = item.row()
-        value = item.text()
+    #@pyqtSlot(QtWidgets.QTableWidgetItem)
+    #@safeWrapper
+    #def slot_tableEdited(self, item):
+        ## TODO code for xarray.DataArray
+        ## TODO code for multi-indexed pandas data frames
+        ## TODO code for as_type(...) for pandas data -- e.g. categorical
+        #col = item.column()
+        #row = item.row()
+        #value = item.text()
         
-        if isinstance(self._data_, pd.DataFrame):
-            colHeaderText = self.tableView.horizontalHeaderItem(col).text()
+        #if isinstance(self._data_, pd.DataFrame):
+            #colHeaderText = self.tableView.horizontalHeaderItem(col).text()
             
-            if colHeaderText not in self._data_.columns:
-                raise RuntimeError("%s not found in data columns!" % colHeaderText)
+            #if colHeaderText not in self._data_.columns:
+                #raise RuntimeError("%s not found in data columns!" % colHeaderText)
             
-            columnDType = self._data_[colHeaderText].dtype
+            #columnDType = self._data_[colHeaderText].dtype
             
-            if np.can_cast(eval(value), columnDType):
-                if columnDType == np.dtype("bool"):
-                    if value.lower().strip() in ("true, t, 1"):
-                        value = "True"
+            #if np.can_cast(eval(value), columnDType):
+                #if columnDType == np.dtype("bool"):
+                    #if value.lower().strip() in ("true, t, 1"):
+                        #value = "True"
                         
-                    elif value.lower().strip() in ("false, f, 0"):
-                        value = False
+                    #elif value.lower().strip() in ("false, f, 0"):
+                        #value = False
                         
-                # CAUTION here
-                data_value = np.array(eval(value), dtype=columnDType)
+                ## CAUTION here
+                #data_value = np.array(eval(value), dtype=columnDType)
                 
-                self._data_.loc[self._data_.index[row], colHeaderText] = data_value
+                #self._data_.loc[self._data_.index[row], colHeaderText] = data_value
                 
-            else:
-                raise RuntimeError("cannot cast %s to %s" % (value, columnDType))
+            #else:
+                #raise RuntimeError("cannot cast %s to %s" % (value, columnDType))
             
             
-        elif isinstance(self._data_, pd.Series):
-            dataDType = self._data_.dtype
+        #elif isinstance(self._data_, pd.Series):
+            #dataDType = self._data_.dtype
             
-            if np.can_cast(eval(value), dataDType):
-                data_value = np.array(eval(value), dtype=dataDType)
+            #if np.can_cast(eval(value), dataDType):
+                #data_value = np.array(eval(value), dtype=dataDType)
             
-                self._data_.loc[self._data_.index[row]] = data_value
+                #self._data_.loc[self._data_.index[row]] = data_value
             
-        elif isinstance(self._data_, np.ndarray):
-            dataDType = self._data_.dtype
+        #elif isinstance(self._data_, np.ndarray):
+            #dataDType = self._data_.dtype
             
-            if np.can_cast(eval(value), dataDType):
-                data_value = np.array(eval(value), dtype=dataDType)
+            #if np.can_cast(eval(value), dataDType):
+                #data_value = np.array(eval(value), dtype=dataDType)
                 
-                if self._data_.ndim == 3:
-                    self._data_[row,col,self.frameNo] = data_value
+                #if self._data_.ndim == 3:
+                    #self._data_[row,col,self.frameNo] = data_value
                     
-                elif self._data_.ndim == 2:
-                    self._data_[row,col] = data_value
+                #elif self._data_.ndim == 2:
+                    #self._data_[row,col] = data_value
                     
-                elif self._data_.ndim == 1:
-                    self._data_[row] = data_value
+                #elif self._data_.ndim == 1:
+                    #self._data_[row] = data_value
            
-            else:
-                raise RuntimeError("cannot cast %s to %s" % (value, dataDType))
+            #else:
+                #raise RuntimeError("cannot cast %s to %s" % (value, dataDType))
             
         

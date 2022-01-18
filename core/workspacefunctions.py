@@ -8,77 +8,69 @@ DOES NOT WORK (yet)
 #import pict
 
 from __future__ import print_function
-from sys import getsizeof, stderr
-from itertools import chain
+#from sys import getsizeof, stderr
 
 import re as _re # re is also imported directly from pict
 
-import inspect, keyword, warnings
+import inspect, keyword, warnings, typing
 
 from operator import attrgetter, itemgetter, methodcaller
 
 from collections import OrderedDict, deque
 
-from .utilities import safeWrapper
 
 try:
     from reprlib import repr
 except ImportError:
     pass
 
-def total_size(o, handlers={}, verbose=False):
-    """ Returns the approximate memory footprint an object and all of its contents.
-
-    Automatically finds the contents of the following builtin containers and
-    their subclasses:  tuple, list, deque, dict, set and frozenset.
-    To search other containers, add handlers to iterate over their contents:
-
-        handlers = {SomeContainerClass: iter,
-                    OtherContainerClass: OtherContainerClass.get_elements}
-
-    Author:
-    Raymond Hettinger
+def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None) -> bool:
+    """Sets or gets the state of scipyen debugging.
     
-    Reference:
-    Compute memory footprint of an object and its contents (python recipe)
+    The state is a boolean variable SCIPYEN_DEBUG in the user namespace.
     
-    Raymond Hettinger python recipe 577504-1
-    https://code.activestate.com/recipes/577504/
+    When True, then specific "print" messages in the scipyen modules get executed
+    
+    Parameters:
+    -----------
+    arg: str, bool, optional (default is None)
+        When str, "on" (case-insensitive) turns debugging ON ; anything else
+            turns debugging OFF
+            
+        When bool, True turns debugging ON, False turns it OFF
+        
+        When None, the function returns the current state of SCIPYEN_DEBUG.
+        
+        NOTE this is deliberately different from the behaviour of the
+        'scipyen_debug' line magic which, whehn called without argument, toggles
+        the debugging state ON or OFF
     
     """
-    dict_handler = lambda d: chain.from_iterable(d.items())
-    all_handlers = {tuple: iter,
-                    list: iter,
-                    deque: iter,
-                    dict: dict_handler,
-                    set: iter,
-                    frozenset: iter,
-                   }
-    all_handlers.update(handlers)     # user handlers take precedence
-    seen = set()                      # track which object id's have already been seen
-    default_size = getsizeof(0)       # estimate sizeof object without __sizeof__
-
-    def sizeof(o):
-        if id(o) in seen:       # do not double count the same object
-            return 0
-        seen.add(id(o))
-        s = getsizeof(o, default_size)
-
-        if verbose:
-            print(s, type(o), repr(o), file=stderr)
-
-        for typ, handler in all_handlers.items():
-            if isinstance(o, typ):
-                s += sum(map(sizeof, handler(o)))
-                break
-        return s
-
-    return sizeof(o)
-
-#"def" lsvars(ws = None, sel = None, sort=False, sortkey=None, reverse=None):
-#"def" lsvars(*args, ws = None, sort=False, sortkey=None, reverse=None):
-def lsvars(*args, glob:bool=True, ws:[dict, type(None)]=None, 
-           sort:bool=False, sortkey:object=None, reverse:bool=False):
+    ns = user_workspace()
+    if not isinstance(ns, dict):
+        return False
+    
+    if arg is None:
+        if "SCIPYEN_DEBUG" not in ns:
+            ns["SCIPYEN_DEBUG"] = False
+            
+        return ns["SCIPYEN_DEBUG"]
+    
+    if isinstance(arg, str):
+        val = arg.strip().lower() == "on"
+        ns["SCIPYEN_DEBUG"] = val
+        return ns["SCIPYEN_DEBUG"]
+    
+    elif isinstance(arg, bool):
+        ns["SCIPYEN_DEBUG"] = arg
+        return ns["SCIPYEN_DEBUG"]
+        
+    elif not isinstance(arg, bool):
+        raise TypeError("Expecting a str ('on' or 'off'), a bool, or None; got %s instead" % arg)
+        
+def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, 
+            var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None,
+            sort:bool=False, sortkey:object=None, reverse:bool=False):
     """List names of variables in a namespace, according to a selection criterion.
     
     Returns a (possibly sorted) list of variable names if found, or an empty list.
@@ -118,26 +110,16 @@ def lsvars(*args, glob:bool=True, ws:[dict, type(None)]=None,
         When None, the function tries ot find the user namespace (the "workspace")
         as set up by the Scipyen Main Window in Scipyen application.
     
-    
+    var_type: a type, a sequence of types, or None (default)
+        When a type, only select the variables of the indicated type
+        
     """
     from fnmatch import translate
     
     if ws is None:
-        frames_list = inspect.getouterframes(inspect.currentframe())
-        for (n,f) in enumerate(frames_list):
-            if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within the IPython console
-                ws = f[0].f_globals["mainWindow"].workspace
-                #ws = f[0].f_globals
-                break
-    
-    #if sortkey is not None:
-        #sort=True
-        
-    #if reverse is None:
-        #reverse = False
-        
-    #if sel is None:
-        #ret = ws.keys()
+        ws = user_workspace()
+    if ws is None:
+        raise ValueError("No valid workspace has been specified or found")
         
     if len(args) == 0: # no selector arguments: get all variables names in ws
         return ws.keys()
@@ -146,53 +128,65 @@ def lsvars(*args, glob:bool=True, ws:[dict, type(None)]=None,
         sel = args[0]
         
         if sel is None:
-            return ws.keys()
+            return ws.keys() # no selector: get all variables names in ws
             
-        elif isinstance(sel, str): #select by variable name
+        elif isinstance(sel, str): # select by variable name
             
-            if len(sel.strip()) == 0:
+            if len(sel.strip()) == 0:# empty selector string: get all variables names in ws
                 return ws.keys()
             
             p = _re.compile(translate(sel)) if glob else _re.compile(sel)
             
             var_names_filter = filter(p.match, ws.keys())
+            vlist =  [k for k in var_names_filter] # return a list of variable names
             
-            return [k for k in var_names_filter] # return a list of variable names
+            if isinstance(var_type, type) or (isinstance(var_type, (tuple, list)) and all([isinstance(v, type) for v in var_type])):
+                ret = [s for s in vlist if isinstance(ws[s], var_type)]
+                
+            else:
+                ret =  vlist # return a list of variable names
         
         elif isinstance(sel, type) or (isinstance(sel, (list, tuple)) and all([isinstance(k, type) for k in sel])):
             # select by variable type (or types)
-            return [k for (k,v) in ws.items() if sel is not type(None) and isinstance(v, sel)] # return a list of variable names
+            # ignore var_type parameter
+            ret = [k for (k,v) in ws.items() if sel is not type(None) and isinstance(v, sel)] # return a list of variable names
             
         else:
             raise TypeError("Unexpected type for the selector argument: got %s" % type(sel).__name__)
             
     else: # comma-separated list of selector arguments
+        ret = list()
         for (sk, sel) in enumerate(args):
-            ret = list()
-            
-            if isinstance(sel, str):
+            if isinstance(sel, str): # string selector
                 if len(sel.strip()):
                     
                     p = _re.compile(translate(sel)) if glob else _re.compile(sel)
                     
                     var_names_filter = filter(p.match, ws.keys())
                     
-                    ret += [k for k in var_names_filter] # return a list of variable names
+                    vlist = [k for k in var_names_filter] 
                     
-                if len(ret) == 0:
-                    return ws.keys()
+                    if isinstance(var_type, type) or (isinstance(var_type, (tuple, list)) and all([isinstance(v, type) for v in var_type])):
+                        ret.expand([s for s in vlist if isinstance(ws[s], var_type)])
+                        
+                    else:
+                        ret.expand(vlist) # return a list of variable names
+                    
+                #if len(ret) == 0:
+                    #return ws.keys()
             
             elif isinstance(sel, type) or (isinstance(sel, (list, tuple)) and all([isinstance(k, type) for k in sel])):
+                # ignore var_type
                 ret += [k for (k,v) in ws.items() if isinstance(v, sel)] # return a list of variable names
                 
             else:
                 raise TypeError("Unexpected type for the selector argument number %d: got %s" % (sk, type(sel).__name__))
                 
-        return ret
-    
     
     if sort:
         return sorted(ret, key=sortkey, reverse=reverse)
+    
+    return ret
     
     
 def getvarsbytype(vartype, ws=None):
@@ -208,24 +202,22 @@ def getvarsbytype(vartype, ws=None):
         if not all([isinstance(v, type) for v in vartype]):
             raise TypeError("Sequence in the first argument must contain only types")
         
-    else:
-        vartype = [vartype]
-    
+        if isinstance(vartype, list):
+            vatrtype = tuple(vartype)
+        
     if ws is None:
-        frames_list = inspect.getouterframes(inspect.currentframe())
+        ws = user_workspace()
+    if ws is None:
+        raise ValueError("No valid workspace has been specified or found")
         
-        for (n,f) in enumerate(frames_list):
-            if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within the IPython console
-                ws = f[0].f_globals["mainWindow"].workspace
-                #ws = f[0].f_globals
-                break
-        
-    lst=[(name, val) for (name, val) in ws.items() if (any([isinstance(val, v_type) for v_type in vartype]) and not name.startswith("_"))]
+    return dict((name, val) for (name, val) in ws.items() if isinstance(val, vartype) and not name.startswith("_"))
+    #lst=[(name, val) for (name, val) in ws.items() if (any([isinstance(val, v_type) for v_type in vartype]) and not name.startswith("_"))]
     
-    return dict(lst)
+    #return dict(lst)
         
-def getvars(*args, glob:bool=True, ws:[dict, type(None)]=None, as_dict:bool=False,
-            sort:bool= False, sortkey:object=None, reverse:bool = False) -> object:
+def getvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, 
+            var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None,
+            as_dict:bool=False, sort:bool= False, sortkey:object=None, reverse:bool = False) -> object:
     """Collects a subset of variabes from a workspace or a dictionary.
 
     Returns a (possibly sorted) list of the variables if found, or an empty list.
@@ -274,6 +266,9 @@ def getvars(*args, glob:bool=True, ws:[dict, type(None)]=None, as_dict:bool=Fals
         "workspace" attribute of Scipyen's main window. In turn, Scipyen
         main window is referenced as the "mainWindow" variable in the console 
         namespace.
+        
+    var_type: a type, a sequence of types, or None (default)
+        When a type, only select the variables of the indicated type
         
     as_dict: bool, default False.
     
@@ -342,18 +337,24 @@ def getvars(*args, glob:bool=True, ws:[dict, type(None)]=None, as_dict:bool=Fals
             
     """
     if ws is None:
-        frames_list = inspect.getouterframes(inspect.currentframe())
-        for (n,f) in enumerate(frames_list):
-            if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within the IPython console
-                ws = f[0].f_globals["mainWindow"].workspace
-                #ws = f[0].f_globals
-                break
+        ws = user_workspace()
         
-    var_names = lsvars(*args, glob=glob, ws=ws)
+    if ws is None:
+        raise ValueError("No valid workspace has been specified or found")
+        
+    var_names = lsvars(*args, glob=glob, var_type=var_type, ws=ws)
     
     
     if as_dict:
         lst = [(n, ws[n]) for n in var_names]
+        
+        # NOTE: 2020-10-12 14:18:14
+        # var_type already used in lsvars
+        #if isinstance(var_type, type) or (isinstance(var_type, (tuple, list)) and all([isinstance(v, type) for v in var_type])):
+            #lst = [(n, ws[n]) for n in var_names if isinstance(ws[n], var_type)]
+            
+        #else:
+            #lst = [(n, ws[n]) for n in var_names]
         
         if sort and sortkey is not None:
             lst.sort(key=sortkey)
@@ -362,6 +363,14 @@ def getvars(*args, glob:bool=True, ws:[dict, type(None)]=None, as_dict:bool=Fals
         
     else:
         ret = [ws[n] for n in var_names]
+        
+        # NOTE: 2020-10-12 14:18:14
+        # var_type already used in lsvars
+        #if isinstance(var_type, type) or (isinstance(var_type, (tuple, list)) and all([isinstance(v, type) for v in var_type])):
+            #ret = [ws[n] for n in var_names if isinstance(ws[n], var_type)]
+            
+        #else:
+            #ret = [ws[n] for n in var_names]
         
         if sort and sortkey is not None:
             ret.sort(key=sortkey)
@@ -373,39 +382,74 @@ def assignin(variable, varname, ws=None):
     """Assign variable as varname in workspace ws"""
     
     if ws is None:
-        frames_list = inspect.getouterframes(inspect.currentframe())
-        #print(frames_list)
-        for (n,f) in enumerate(frames_list):
-            if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within Scipyen's IPython console
-                ws = f[0].f_globals["mainWindow"].workspace
-                #ws = f[0].f_globals
-                break
+        ws = user_workspace()
+        
+    if ws is None:
+        raise ValueError("No valid workspace has been specified or found")
+        
+        #frame_records = inspect.getouterframes(inspect.currentframe())
+        ##print(frame_records)
+        #for (n,f) in enumerate(frame_records):
+            #if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within Scipyen's IPython console
+                #ws = f[0].f_globals["mainWindow"].workspace
+                ##ws = f[0].f_globals
+                #break
         
     ws[varname] = variable
     
 assign = assignin # syntactic sugar
 
-def userWorkspace():
-    """Returns a reference to the user workspace
+def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None) -> list:
+    """Returns a list of symbols to which 'x' is bound in the namespace 'ws'
+    
+    The  list is empty when the variable 'x' does not exist in ws (e.g when it is
+    dynamically created by an expression).
+    
+    WARNING The same variable may be bound to more than one symbol.
+    
+    Parameters:
+    ----------
+    x : a Python object of any type
+    ws: dict (optional default is None)
+        When None, the functions looks up the variable in the user's "lobal" namespace
     """
-    frames_list = inspect.getouterframes(inspect.currentframe())
-    for (n,f) in enumerate(frames_list):
+    if ws is None:
+        ws = user_workspace()
+        
+    elif not isinstance(ws, dict):
+        raise TypeError("'ws' expected ot be a dict; got %s instead" % type(ws).__name__)
+        
+    return [k for k in ws if ws[k] is x and not k.startswith("_")]
+
+def user_workspace() -> dict:
+    """Returns a reference to the user workspace (a.k.a user namespace)
+    """
+    frame_records = inspect.getouterframes(inspect.currentframe())
+    
+    for (n,f) in enumerate(frame_records):
         if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within Scipyen's IPython console
             return f[0].f_globals["mainWindow"].workspace
-            #return ws
+        
+def scipyentopdir() -> str:
+    user_ns = user_workspace()
+    return user_ns["mainWindow"]._scipyendir_
     
 
-#@safeWrapper
 def delvars(*args, glob=True, ws=None):
     """Delete variable named in *args from workspace ws
     CAUTION 
     """
     if ws is None:
-        frames_list = inspect.getouterframes(inspect.currentframe())
-        for (n,f) in enumerate(frames_list):
-            if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within the IPython console
-                ws = f[0].f_globals["mainWindow"].workspace
-                break
+        ws = user_workspace()
+        
+    if ws is None:
+        raise ValueError("No valid workspace has been specified or found")
+        
+        #frame_records = inspect.getouterframes(inspect.currentframe())
+        #for (n,f) in enumerate(frame_records):
+            #if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within the IPython console
+                #ws = f[0].f_globals["mainWindow"].workspace
+                #break
     
     #print(args)
     
@@ -519,7 +563,7 @@ def delvars(*args, glob=True, ws=None):
                     ws.pop(t[0], None)
                         
                     
-def validateVarName(arg, ws=None):
+def validate_varname(arg, ws=None):
     """Converts a putative variable name "arg" into a valid one.
     
     arg: a string
@@ -541,34 +585,38 @@ def validateVarName(arg, ws=None):
     a modified variable name
     
     """
+    from core.utilities import counter_suffix
     
     if ws is None:
-        frames_list = inspect.getouterframes(inspect.currentframe())
-        for (n,f) in enumerate(frames_list):
+        frame_records = inspect.getouterframes(inspect.currentframe())
+        for (n,f) in enumerate(frame_records):
             if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within the IPython console
                 ws = f[0].f_globals["mainWindow"].workspace
                 break
-    
+    if not isinstance(arg, str) or len(arg.strip()) == 0:
+        arg = "data"
     # check if arg is a valid python variable identifier; replace non-valid characters with 
-    # "_" (underscore) and prepend "variable_" if it starts with a digit
+    # "_" (underscore) and prepend "data_" if it starts with a digit
     if not arg.isidentifier():
-        arg = _re.sub("^(?=\d)","variable_", _re.sub("\W", "_", arg))
+        arg = _re.sub("^(?=\d)","data_", _re.sub("\W", "_", arg))
         
     # avoid arg being a valid python language keyword
     if keyword.iskeyword(arg):
-        arg = "variable_" + arg
+        arg = "data_" + arg
         
-    if arg in ws.keys():
-        while arg in ws.keys():
-            m = _re.search("_(\d+)$", arg)
-            if m:
-                count = int(m.group(0).split("_")[1]) + 1
-                arg = _re.sub("_(\d+)$", "_%d" % count, arg)
+    arg = counter_suffix(arg, ws.keys())
+        
+    #if arg in ws.keys():
+        #while arg in ws.keys():
+            #m = _re.search("_(\d+)$", arg)
+            #if m:
+                #count = int(m.group(0).split("_")[1]) + 1
+                #arg = _re.sub("_(\d+)$", "_%d" % count, arg)
                 
-            else:
-                arg += "_01"
+            #else:
+                #arg += "_01"
         
-            #print("validateVarName: new name: %s", arg)
+            ##print("validate_varname: new name: %s", arg)
                 
             
     return arg

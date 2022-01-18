@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>618</width>
-    <height>340</height>
+    <height>341</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -61,8 +61,7 @@
           <string>...</string>
          </property>
          <property name="icon">
-          <iconset resource="../gui/resources/resources.qrc">
-           <normaloff>:/images/document-open.svg</normaloff>:/images/document-open.svg</iconset>
+          <iconset theme="document-open"/>
          </property>
         </widget>
        </item>
@@ -90,8 +89,7 @@
           <string>...</string>
          </property>
          <property name="icon">
-          <iconset resource="../gui/resources/resources.qrc">
-           <normaloff>:/images/document-open.svg</normaloff>:/images/document-open.svg</iconset>
+          <iconset theme="document-open"/>
          </property>
         </widget>
        </item>
@@ -118,8 +116,7 @@
           <string>...</string>
          </property>
          <property name="icon">
-          <iconset resource="../gui/resources/resources.qrc">
-           <normaloff>:/images/document-open.svg</normaloff>:/images/document-open.svg</iconset>
+          <iconset theme="document-open"/>
          </property>
         </widget>
        </item>

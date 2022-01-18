@@ -1,0 +1,6 @@
+Fconf:
+    name: np.linalg.norm
+    args: []
+    kwargs:
+        axis: 0
+        ord: 2

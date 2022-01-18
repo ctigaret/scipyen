@@ -22,16 +22,37 @@ from . import resources_rc
 
 # TODO / FIXME: 2019-11-10 16:33:13 Merge with TableEditor
 class MatrixViewer(ScipyenViewer):
-    supported_types = (np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D)
+    """Simple table viewer for numpy arrays and vigra.filters.Kernel* objects.
+    
+    No context menu or editing capabilities are implemented.
+    
+    On its way to deprecation -- use TableEditor (see below)
+    
+    See also:
+    * gui.dictviewer.ScipyenTableWidget
+    * gui.tableeditor.TableEditorWidget for extended functionality
+    
+    """
+    supported_types = (
+                       np.ndarray, 
+                       vigra.VigraArray,
+                       vigra.filters.Kernel1D, 
+                       vigra.filters.Kernel2D,
+                       )
     view_action_name = "Matrix"
     
-    def __init__(self, data: (np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
-                 win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
-                 *args, **kwargs) -> None:
-        super().__init__(data=data, parent=parent, pWin=pWin, win_title=win_title, doc_title=doc_title, ID=ID, *args, **kwargs)
+    #def __init__(self, data: (np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
+                 #pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
+                 #win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
+                 #*args, **kwargs) -> None:
+        #super().__init__(data=data, parent=parent, pWin=pWin, win_title=win_title, doc_title=doc_title, ID=ID, *args, **kwargs)
         
-    def _configureGUI_(self):
+    def __init__(self, data: (np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
+                 ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
+                 *args, **kwargs) -> None:
+        super().__init__(data=data, parent=parent, win_title=win_title, doc_title=doc_title, ID=ID, *args, **kwargs)
+        
+    def _configureUI_(self):
         self.fileMenu = self.menuBar().addMenu("&File")
         self.fileMenu.addAction("&Save As...", self.saveAsFile, "Ctrl+Sift+S")
         

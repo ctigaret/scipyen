@@ -1,0 +1,26 @@
+!InterViews*PopupWindow*overlay: true
+!InterViews*PopupWindow*saveUnder: on
+!InterViews*TransientWindow*saveUnder: on
+!InterViews*background: #ffffff
+*InterViews*brush_width: 0
+*InterViews*double_buffered: on
+!InterViews*flat: #aaaaaa
+!InterViews*font: fixed
+!InterViews*foreground: #000000
+!InterViews*synchronous: off
+!InterViews*malloc_debug: off
+!InterViews*font: *helvetica-medium-r-normal*--12*
+!InterViews.MenuBar*font: *-helvetica-bold-o-normal--12*
+!InterViews*MenuItem*font: *-helvetica-bold-o-normal--12*
+!*InterViews*MenuBar*foreground: #000000
+!*InterViews*MenuItem*foreground: #000000
+!*IV*MenuBar*foreground: #000000
+!*IV*MenuItem*foreground: #000000
+! *nrn*MenuBar*foreground: #000000
+! *nrn*MenuItem*foreground: #000000
+*nrniv*MenuBar*foreground: #000000
+*nrniv*Button*foreground: #000000
+!*nrniv*FileChooser*foreground: #000000
+*nrniv*Dialog*foreground: #000000
+*nrniv*FieldEditor*foreground: #000000
+!*nrn*foreground: #000000

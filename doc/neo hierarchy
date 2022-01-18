@@ -1,0 +1,269 @@
+BaseNeo:
+    _necessary_attrs = ()
+    _recommended_attrs = (('name', str),
+                          ('description', str),
+                          ('file_origin', str))
+    
+    def __init__(self, name=None, description=None, file_origin=None,
+                 **annotations):
+        
+        --> self.annotations
+        --> self.name
+        --> self.description
+        --> self.file_origin
+    
+        --> self.<container> from self._parent_containers
+
+================================================================================
+DataObject: BaseSignal, Event, Epoch, SpikeTrain
+================================================================================    
+    
+DataObject <-- (BaseNeo, Quantity):
+    def __init__(self, name=None, description=None, file_origin=None, array_annotations=None,
+                 **annotations):
+    
+        --> self.array_annotations
+        
+        --> superclass BaseNeo object instance
+    
+BaseSignal <-> mixin between DataSignal and Analogsignal/IrregularlySampledSignal etc
+
+AnalogSignal <-- BaseSignal
+
+    _parent_objects = ('Segment',)
+    _parent_attrs = ('segment',)
+    _quantity_attr = 'signal'
+    _necessary_attrs = (('signal', pq.Quantity, 2),
+                        ('sampling_rate', pq.Quantity, 0),
+                        ('t_start', pq.Quantity, 0))
+    _recommended_attrs = BaseNeo._recommended_attrs
+
+    def __new__(cls, signal, units=None, dtype=None, copy=True, t_start=0 * pq.s,
+                    sampling_rate=None, sampling_period=None, name=None, file_origin=None,
+                    description=None, array_annotations=None, **annotations):
+    
+        --> obj Quantity(signal, units, dtype, copy).view(cls)
+        
+        --> obj._t_start: pq.Quantity; mandatory
+        --> obj.segment -> None (set later to reference to Segment object)
+
+    def __init__(self, signal, units=None, dtype=None, copy=True, t_start=0 * pq.s,
+                    sampling_rate=None, sampling_period=None, name=None, file_origin=None,
+                    description=None, array_annotations=None, **annotations):
+
+        --> superclass DataObject instance
+    
+IrregularlySampledSignal <-- BaseSignal
+    _parent_objects = ('Segment',)
+    _parent_attrs = ('segment',)
+    _quantity_attr = 'signal'
+    _necessary_attrs = (('times', pq.Quantity, 1), ('signal', pq.Quantity, 2))
+
+    def __new__(cls, times, signal, units=None, time_units=None, dtype=None, copy=True, name=None,
+                file_origin=None, description=None, array_annotations=None, **annotations):
+
+        --> obj Quantity.__new__(signal, units, dtype, copy)
+        --> obj.times Quantity(times, time_units, dtype=float)
+        --> obj.segment -> None (set later as for AnalogSignal)
+        
+    def __init__(self, times, signal, units=None, time_units=None, dtype=None, copy=True,
+                 name=None, file_origin=None, description=None, array_annotations=None,
+                 **annotations):
+    
+        --> superclass DataObject instance
+    
+ImageSequence <-- BaseSignal
+    _parent_objects = ("Segment",)
+    _parent_attrs = ("segment",)
+    _quantity_attr = "image_data"
+    _necessary_attrs = (
+        ("image_data", pq.Quantity, 3),
+        ("sampling_rate", pq.Quantity, 0),
+        ("spatial_scale", pq.Quantity, 0),
+        ("t_start", pq.Quantity, 0),
+    )
+    _recommended_attrs = BaseNeo._recommended_attrs
+
+    def __new__(cls, image_data, units=None, dtype=None, copy=True, t_start=0 * pq.s,
+                spatial_scale=None, frame_duration=None,
+                sampling_rate=None, name=None, description=None, file_origin=None,
+                **annotations):
+
+    --> obj Quantity(np.stack(image_data), unit, dtype, copy).view(cls)
+    --> obj.segment -> None (set later as for AnalogSignal)
+    --> obj.sampling_rate
+    --> obj.spatial_scale
+    --> obj._t_start
+    
+    def __init__(self, image_data, units=None, dtype=None, copy=True, t_start=0 * pq.s,
+                 spatial_scale=None, frame_duration=None,
+                 sampling_rate=None, name=None, description=None, file_origin=None,
+                 **annotations):
+        
+        --> superclass DataObject instance
+    
+Event <-- DataObject
+
+    _parent_objects = ('Segment',)
+    _parent_attrs = ('segment',)
+    _quantity_attr = 'times'
+    _necessary_attrs = (('times', pq.Quantity, 1), ('labels', np.ndarray, 1, np.dtype('U')))
+
+    def __new__(cls, times=None, labels=None, units=None, name=None, description=None,
+                file_origin=None, array_annotations=None, **annotations):
+        
+        --> obj Quantity(times, units).view(cls)
+        
+        --> obj.labels
+        
+        --> obj.segment -> None (set later)
+        
+    def __init__(self, times=None, labels=None, units=None, name=None, description=None,
+                 file_origin=None, array_annotations=None, **annotations):
+
+        --> superclass DataObject instance
+    
+Epoch <-- DataObject
+    _parent_objects = ('Segment',)
+    _parent_attrs = ('segment',)
+    _quantity_attr = 'times'
+    _necessary_attrs = (('times', pq.Quantity, 1), ('durations', pq.Quantity, 1),
+                        ('labels', np.ndarray, 1, np.dtype('U')))
+
+    def __new__(cls, times=None, durations=None, labels=None, units=None, name=None,
+                description=None, file_origin=None, array_annotations=None, **annotations):
+
+        --> obj Quantity(times, units).view(cls)
+        
+        --> obj.labels
+        
+        --> obj.durations
+        
+        --> obj.segment -> None (set later)
+        
+        
+    def __init__(self, times=None, durations=None, labels=None, units=None, name=None,
+                 description=None, file_origin=None, array_annotations=None, **annotations):
+        
+        --> superclass DataObject instance
+    
+SpikeTrain <-- DataObject
+    _parent_objects = ('Segment',)
+    _parent_attrs = ('segment',)
+    _quantity_attr = 'times'
+    _necessary_attrs = (('times', pq.Quantity, 1), ('t_start', pq.Quantity, 0),
+                        ('t_stop', pq.Quantity, 0))
+    _recommended_attrs = ((('waveforms', pq.Quantity, 3), ('left_sweep', pq.Quantity, 0),
+                           ('sampling_rate', pq.Quantity, 0)) + BaseNeo._recommended_attrs)
+
+    def __new__(cls, times, t_stop, units=None, dtype=None, copy=True, sampling_rate=1.0 * pq.Hz,
+                t_start=0.0 * pq.s, waveforms=None, left_sweep=None, name=None, file_origin=None,
+                description=None, array_annotations=None, **annotations):
+
+        --> obj times.view(cls); times <-- normalize_times_array(times, units, dtype, copy)
+                                    (effectively, pq.Quantity(times, units=units, dtype=dtype, copy=copy))
+                                    
+        --> obj.t_start
+        --> obj.t_stop
+        --> obj.waveforms
+        --> obj.left_sweep
+        --> obj.sampling_rate
+        --> obj.segment -> None (set later)
+        
+        --> obj/unit -> None (out of neo?)
+        
+    def __init__(self, times, t_stop, units=None, dtype=None, copy=True,
+                 sampling_rate=1.0 * pq.Hz, t_start=0.0 * pq.s, waveforms=None, left_sweep=None,
+                 name=None, file_origin=None, description=None, array_annotations=None,
+                 **annotations):
+        
+        --> superclass DataObject instance
+================================================================================    
+    Containers: Segment, Group, Block
+================================================================================    
+        
+Container <-- BaseNeo
+    def __init__(self, name=None, description=None, file_origin=None,
+    # Child objects that are a container and have a single parent
+    _container_child_objects = ()
+    # Child objects that have data and have a single parent
+    _data_child_objects = ()
+    # Child objects that can have multiple parents
+    _multi_child_objects = ()
+    # Properties returning children of children [of children...]
+    _child_properties = ()
+    # Containers that are listed when pretty-printing
+                 **annotations):
+        --> self.<container> from self._child_containers
+    
+Segment <-- Container
+
+    _data_child_objects = ('AnalogSignal',
+                           'Epoch', 'Event',
+                           'IrregularlySampledSignal', 'SpikeTrain', 'ImageSequence')
+    _parent_objects = ('Block',)
+    _recommended_attrs = ((('file_datetime', datetime),
+                           ('rec_datetime', datetime),
+                           ('index', int)) +
+                          Container._recommended_attrs)
+    def __init__(self, name=None, description=None, file_origin=None,
+                 file_datetime=None, rec_datetime=None, index=None,
+                 **annotations):
+
+        --> self.spiketrains <- SpikeTrainList(segment=self)
+        --> self.file_datetime
+        --> self.rec_datetime
+        --> self.index
+        
+Group <-- Container
+    _data_child_objects = (
+        'AnalogSignal', 'IrregularlySampledSignal', 'SpikeTrain',
+        'Event', 'Epoch', 'ChannelView', 'ImageSequence'
+    )
+    _container_child_objects = ('Segment', 'Group')
+    _parent_objects = ('Block',)
+
+    def __init__(self, objects=None, name=None, description=None, file_origin=None,
+                 allowed_types=None, **annotations):
+
+        --> self.allowed_types
+        --> self.add(*objects)
+        
+Block <-- Container
+    _container_child_objects = ('Segment', 'Group')
+    _child_properties = ()
+    _recommended_attrs = ((('file_datetime', datetime),
+                           ('rec_datetime', datetime),
+                           ('index', int)) +
+                          Container._recommended_attrs)
+
+    def __init__(self, name=None, description=None, file_origin=None,
+                 file_datetime=None, rec_datetime=None, index=None,
+                 **annotations):
+
+        --> self.file_datetime
+        --> self.rec_datetime
+        --> self.index
+        --> self.regionsofinterest = list()
+        
+        
+================================================================================    
+    ChannelView 
+================================================================================    
+
+ChanneView <-- BaseNeo
+    _parent_objects = ('Segment',)
+    _parent_attrs = ('segment',)
+    _necessary_attrs = (
+        ('index', np.ndarray, 1, np.dtype('i')),
+        ('obj', ('AnalogSignal', 'IrregularlySampledSignal'), 1)
+    )
+
+    def __init__(self, obj, index, name=None, description=None, file_origin=None,
+                 array_annotations=None, **annotations):
+        
+        --> superclass BaseNeo instance
+        
+        --> self.obj
+        --> self.index
+        --> self.array_annotations

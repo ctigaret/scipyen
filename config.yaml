@@ -1,0 +1,11 @@
+SignalViewer:
+    VerticalCursorColor: teal
+    CursorHoverColor: tomato
+    LinkedVerticalCursorColor: violet
+    CursorsShowValue: yes
+Fconf:
+    name: np.linalg.norm
+    args: []
+    kwargs:
+        axis: 0
+        ord: 2

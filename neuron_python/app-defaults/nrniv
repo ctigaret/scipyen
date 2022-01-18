@@ -1,0 +1,5 @@
+*nrniv*double_buffered: on
+*nrniv*MenuBar*foreground: #000000
+*nrniv*Button*foreground: #000000
+*nrniv*Dialog*foreground: #000000
+*nrniv*FieldEditor*foreground: #000000

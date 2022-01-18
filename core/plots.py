@@ -30,10 +30,13 @@ import quantities as pq
 import vigra
 import pandas as pd
 import seaborn as sb
+from seaborn.external.six import string_types
+#from seaborn._core import variable_type, infer_orient, categorical_order
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
 from . import datatypes as dt
+from imaging import vigrautils as vu
 #### END pict.core modules
 
 # TODO 2019-09-06 13:08:18
@@ -110,23 +113,70 @@ mpl_plot_functions["quiver"]                = Axes.quiver
 mpl_plot_functions["quiverkey"]             = Axes.quiverkey
 mpl_plot_functions["streamplot"]            = Axes.streamplot
 
-#def remove_na(arr):
-    #"""Helper method for removing NA values from array-like.
-    #NOTE: for ehatever reason, remove_na is not imported
-    #Parameters
-    #----------
-    #arr : array-like
-        #The array-like from which to remove NA values.
-
-    #Returns
-    #-------
-    #clean_arr : array-like
-        #The original array with NA values removed.
-
-    #"""
-    #return arr[pd.notnull(arr)]
-    
 class SB_CategoricalPlotter(sb.categorical._CategoricalPlotter):
+    def categorical_order(self, values, order=None, skip=None):
+        """Return a list of unique data values.
+
+        Determine an ordered list of levels in ``values``.
+
+        Parameters
+        ----------
+        values : list, array, Categorical, or Series
+            Vector of "categorical" values
+        
+        order : list-like, optional
+            Desired order of category levels to override the order determined
+            from the ``values`` object.
+            
+        skip : str or sequence of str, or None (default)
+            Name(s) of category(ies) to be skipped from plotting.
+            
+            NOTE: in Pandas DataFrame and Pandas Series, the category names are
+            strings
+            
+
+        Returns
+        -------
+        order : list
+            Ordered list of category levels not including null values.
+
+        """
+        if order is None:
+            if hasattr(values, "categories"):
+                if isinstance(skip, (tuple, list)):
+                    order = [c for c in values.categories if c not in skip]
+                    
+                elif skip is None:
+                    order = values.categories
+                    
+                else:
+                    order = [c for c in values.categories if c != skip]
+                    
+            else:
+                try:
+                    if isinstance(skip, (tuple, list)):
+                        order = [c for c in values.cat.categories if c not in skip]
+                            
+                    elif skip is None:
+                        order = values.cat.categories
+                        
+                    else:
+                        order = [c for c in values.cat.categories if c != skip]
+                        
+                except (TypeError, AttributeError):
+                    try:
+                        order = values.unique()
+                    except AttributeError:
+                        order = pd.unique(values)
+                    try:
+                        np.asarray(values).astype(np.float)
+                        order = np.sort(order)
+                    except (ValueError, TypeError):
+                        order = order
+            order = filter(pd.notnull, order)
+            
+        return list(order)
+
     def annotate_axes(self, ax, show_legend=True):
         """Add descriptive labels to an Axes object."""
         #print("SB_CategoricalPlotter.annotate_axes show_legend", show_legend)
@@ -180,9 +230,218 @@ class SB_CategoricalPlotter(sb.categorical._CategoricalPlotter):
                              label=label)
         ax.add_patch(rect)
 
+    def establish_variables(self, x=None, y=None, hue=None, data=None,
+                            orient=None, order=None, hue_order=None,
+                            skip = None, units=None):
+        """Convert input specification into a common representation."""
+        from seaborn._core import infer_orient
+        # Option 1:
+        # We are plotting a wide-form dataset
+        # -----------------------------------
+        if x is None and y is None:
+
+            # Do a sanity check on the inputs
+            if hue is not None:
+                error = "Cannot use `hue` without `x` or `y`"
+                raise ValueError(error)
+
+            # No hue grouping with wide inputs
+            plot_hues = None
+            hue_title = None
+            hue_names = None
+
+            # No statistical units with wide inputs
+            plot_units = None
+
+            # We also won't get a axes labels here
+            value_label = None
+            group_label = None
+
+            # Option 1a:
+            # The input data is a Pandas DataFrame
+            # ------------------------------------
+
+            if isinstance(data, pd.DataFrame):
+
+                # Order the data correctly
+                if order is None:
+                    order = []
+                    # Reduce to just numeric columns
+                    for col in data:
+                        try:
+                            data[col].astype(np.float)
+                            order.append(col)
+                        except ValueError:
+                            pass
+                plot_data = data[order]
+                group_names = order
+                group_label = data.columns.name
+
+                # Convert to a list of arrays, the common representation
+                iter_data = plot_data.iteritems()
+                plot_data = [np.asarray(s, np.float) for k, s in iter_data]
+
+            # Option 1b:
+            # The input data is an array or list
+            # ----------------------------------
+
+            else:
+
+                # We can't reorder the data
+                if order is not None:
+                    error = "Input data must be a pandas object to reorder"
+                    raise ValueError(error)
+
+                # The input data is an array
+                if hasattr(data, "shape"):
+                    if len(data.shape) == 1:
+                        if np.isscalar(data[0]):
+                            plot_data = [data]
+                        else:
+                            plot_data = list(data)
+                    elif len(data.shape) == 2:
+                        nr, nc = data.shape
+                        if nr == 1 or nc == 1:
+                            plot_data = [data.ravel()]
+                        else:
+                            plot_data = [data[:, i] for i in range(nc)]
+                    else:
+                        error = ("Input `data` can have no "
+                                 "more than 2 dimensions")
+                        raise ValueError(error)
+
+                # Check if `data` is None to let us bail out here (for testing)
+                elif data is None:
+                    plot_data = [[]]
+
+                # The input data is a flat list
+                elif np.isscalar(data[0]):
+                    plot_data = [data]
+
+                # The input data is a nested list
+                # This will catch some things that might fail later
+                # but exhaustive checks are hard
+                else:
+                    plot_data = data
+
+                # Convert to a list of arrays, the common representation
+                plot_data = [np.asarray(d, np.float) for d in plot_data]
+
+                # The group names will just be numeric indices
+                group_names = list(range((len(plot_data))))
+
+            # Figure out the plotting orientation
+            orient = "h" if str(orient).startswith("h") else "v"
+
+        # Option 2:
+        # We are plotting a long-form dataset
+        # -----------------------------------
+
+        else:
+
+            # See if we need to get variables from `data`
+            if data is not None:
+                x = data.get(x, x)
+                y = data.get(y, y)
+                hue = data.get(hue, hue)
+                units = data.get(units, units)
+
+            # Validate the inputs
+            for var in [x, y, hue, units]:
+                if isinstance(var, string_types):
+                    err = "Could not interpret input '{}'".format(var)
+                    raise ValueError(err)
+
+            # Figure out the plotting orientation
+            #orient = self.infer_orient(x, y, orient)
+            orient = infer_orient(x, y, orient)
+
+            # Option 2a:
+            # We are plotting a single set of data
+            # ------------------------------------
+            if x is None or y is None:
+
+                # Determine where the data are
+                vals = y if x is None else x
+
+                # Put them into the common representation
+                plot_data = [np.asarray(vals)]
+
+                # Get a label for the value axis
+                if hasattr(vals, "name"):
+                    value_label = vals.name
+                else:
+                    value_label = None
+
+                # This plot will not have group labels or hue nesting
+                groups = None
+                group_label = None
+                group_names = []
+                plot_hues = None
+                hue_names = None
+                hue_title = None
+                plot_units = None
+
+            # Option 2b:
+            # We are grouping the data values by another variable
+            # ---------------------------------------------------
+            else:
+
+                # Determine which role each variable will play
+                if orient == "v":
+                    vals, groups = y, x
+                else:
+                    vals, groups = x, y
+
+                # Get the categorical axis label
+                group_label = None
+                if hasattr(groups, "name"):
+                    group_label = groups.name
+
+                # Get the order on the categorical axis
+                group_names = self.categorical_order(groups, order, skip)
+
+                # Group the numeric data
+                plot_data, value_label = self._group_longform(vals, groups,
+                                                              group_names)
+
+                # Now handle the hue levels for nested ordering
+                if hue is None:
+                    plot_hues = None
+                    hue_title = None
+                    hue_names = None
+                else:
+
+                    # Get the order of the hue levels
+                    hue_names = self.categorical_order(hue, hue_order, skip)
+
+                    # Group the hue data
+                    plot_hues, hue_title = self._group_longform(hue, groups,
+                                                                group_names)
+
+                # Now handle the units for nested observations
+                if units is None:
+                    plot_units = None
+                else:
+                    plot_units, _ = self._group_longform(units, groups,
+                                                         group_names)
+
+        # Assign object attributes
+        # ------------------------
+        self.orient = orient
+        self.plot_data = plot_data
+        self.group_label = group_label
+        self.value_label = value_label
+        self.group_names = group_names
+        self.plot_hues = plot_hues
+        self.hue_title = hue_title
+        self.hue_names = hue_names
+        self.plot_units = plot_units
+
 class SB_CategoricalStatPlotter(SB_CategoricalPlotter):
-    """Seaborn's CategoricalPlotter vriant allowing custom statistics.
-    For now, accepts ci as "se" in adddition to Seaborn's options
+    """Seaborn's CategoricalPlotter variant allowing custom statistics.
+    For now, accepts ci as "se" in adddition to Seaborn's options, which are:
+    float, "sd" and None; float indicates the confidence interval, 95% by default
     """
     
     @property
@@ -346,21 +605,25 @@ class SB_CategoricalStatPlotter(SB_CategoricalPlotter):
         self.confint = np.array(confint)
             
 class SB_BarPlotter(SB_CategoricalStatPlotter):
-    def __init__(self, x, y, hue, data, order, hue_order,
+    def __init__(self, x, y, hue, data, order, hue_order, skip,
                  estimator, ci, n_boot, units,
                  orient, color, palette, saturation, errcolor,
-                 errwidth, capsize, dodge):
+                 errwidth, capsize, dodge, bar_width):
         """Initialize the plotter."""
+        self.dodge              = dodge
+
+        self.errcolor           = errcolor
+        self.errwidth           = errwidth
+        self.capsize            = capsize
+        
         self.establish_variables(x, y, hue, data, orient,
-                                 order, hue_order, units)
+                                 order, hue_order, skip, units)
         self.establish_colors(color, palette, saturation)
         self.estimate_statistic(estimator, ci, n_boot)
+        
+        if isinstance(bar_width, float):
+            self.width = bar_width # the seaborn default is 0.8
 
-        self.dodge = dodge
-
-        self.errcolor = errcolor
-        self.errwidth = errwidth
-        self.capsize = capsize
 
     def draw_bars(self, ax, kws):
         """Draw the bars onto `ax`."""
@@ -421,7 +684,6 @@ class SB_PointPlotter(SB_CategoricalStatPlotter):
                  estimator, ci, n_boot, units,
                  markers, linestyles, dodge, join, scale,
                  orient, color, palette, errwidth=None, capsize=None):
-        from seaborn.external.six import string_types
         """Initialize the plotter."""
         self.establish_variables(x, y, hue, data, orient,
                                  order, hue_order, units)
@@ -822,6 +1084,7 @@ def zeroCrossedAxes(fig, axisStyle, *args, **kwargs):
     #ax2 = ax.twin()
     
     for direction in ["xzero", "yzero"]:
+        ax.axis[direction].line.set_color("k")
         ax.axis[direction].set_axisline_style(axisStyle)
         ax.axis[direction].set_visible(True)
 
@@ -904,9 +1167,11 @@ def plotZeroCrossedAxes(x, y, fig=None, xlabel="Vm", ylabel="Im", axisStyle="-|>
     
     if xlabel is not None:
         ax.axis["xzero"].set_label(xlabel)
+        ax.axis["xzero"].line.set_color("k")
     
     if ylabel is not None:
         ax.axis["yzero"].set_label(ylabel)
+        ax.axis["yzero"].line.set_color("k")
         
     if isinstance(legend, (tuple, list)) and len(legend) > 0 and len(legend) == len(lines):
         lines[0].set_label(legend[0])
@@ -921,11 +1186,76 @@ def plotZeroCrossedAxes(x, y, fig=None, xlabel="Vm", ylabel="Im", axisStyle="-|>
     return lines, ax #, ax1
 
 
-def plotVigraKernel1D(val, fig=None, label=None, xlabel=None, ylabel=None, newPlot = False, plotStyle="stem", **kwargs):
+def plotNeoSignal(data, fig=None, label=None, newPlot=False, title = None,
+                  xlabel=None, ylabel=None,
+                  tick_direction="in", tick_length = 4.5, axes_offset=0,
+                  despine=True, panel_size=None, **kwargs):
+    """
+    TODO: plot multiple signals overlaid, with legend
+    """
+    import neo
+    if not isinstance(data, neo.core.basesignal.BaseSignal):
+        raise TypeError("Expecting a subclass of neo.core.basesignal.BaseSignal; got %s instead" % type(data))
+    
+    x = data.times
+    y = data.magnitude
+    
+    if fig is None:
+        fig = plt.figure()
+        
+    elif isinstance(fig, numbers.Integral):
+        fig = plt.figure(fig)
+        
+    elif isinstance(fig, mpl.figure.Figure):
+        fig = plt.figure(fig.number)
+        
+    if newPlot:
+        plt.clf()
+        
+    
+    if label is None or (isinstance(label, str) and len(label.strip()) == 0):
+        label = data.name
+        
+    if not isinstance(xlabel, str) or len(xlabel.strip()) == 0:
+        xlabel = "Time (%s)" % x.dimensionality
+    
+    if not isinstance(ylabel, str) or len(ylabel.strip()) == 0:
+        ylabel = "%s (%s)" % (data.name, data.dimensionality)
+    
+    
+    if isinstance(label, str) and len(label.strip()):
+        ret = plt.plot(x,y, label=label, **kwargs)
+        plt.legend(loc="best")
+    
+    else:
+        ret = plt.plot(x,y, **kwargs)
+        
+    
+    ax = plt.gca()
+    
+    if despine:
+        sb.despine(ax = ax, offset = axes_offset)
+    
+    ax.tick_params("y", direction=tick_direction, length=tick_length, color="black")
+        
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    
+    if isinstance(title, str) and len(title.strip()):
+        ax.set_title(title)
+        
+    fig.canvas.draw_idle()
+        
+    if isinstance(panel_size, (tuple, list)) and len(panel_size) ==2 and all([isinstance(v, numbers.Number) for v in panel_size]):
+        fig.set_size_inches(panel_size)
+    
+    
+def plotVigraKernel1D(val, fig=None, label=None, xlabel=None, ylabel=None, 
+                      newPlot = False, plotStyle="stem", tick_direction="in", **kwargs):
     if not isinstance(val, vigra.filters.Kernel1D):
         raise TypeError("A vigra Kernel1D was expected; got %s instead" % type(val).__name__)
     
-    [x,y] = dt.vigraKernel1D_to_ndarray(val)
+    [x,y] = vu.vK1D2array(val)
     
     if fig is None:
         fig = plt.figure()
@@ -943,16 +1273,8 @@ def plotVigraKernel1D(val, fig=None, label=None, xlabel=None, ylabel=None, newPl
     
     if isinstance(plotStyle, str):
         cmd = "ax." + plotStyle + "(x, y, **kwargs)"
-        #if isinstance(label, str):
-            #cmd = "ax." + plotStyle + "(x, y, legend=label, **kwargs)"
-        
-        #else:
-            
+
         ret = eval(cmd)
-        
-        #if isinstance(label, str):
-            #plt.legend([label])
-        
         
     else:
         ret = ax.stem(x,y, **kwargs)
@@ -965,24 +1287,188 @@ def plotVigraKernel1D(val, fig=None, label=None, xlabel=None, ylabel=None, newPl
     fig.canvas.draw_idle()
     
     return ret
+
+def plotVigraKernel(val, fig=None, label=None, xlabel=None, ylabel=None,
+                      newPlot=False, plotStyle=None, tick_direction="in",
+                      **kwargs):
+    """
+    Important kwargs:
+    ----------------
+    plotStyle: str: 
+        for 1D kernels: any valid 1D plot command (e.g., "stem", which is also the
+                    default for 1D kernels) 
+                    
+        for 2D kernels: "scatter", "image", or "matrix"
+        
+    interpolation None (default), or str as below; only for 2D kernels
+        'none', 'antialiased', 'nearest', 'bilinear', 'bicubic', 'spline16', 
+        'spline36', 'hanning', 'hamming', 'hermite', 'kaiser', 'quadric', 'catrom',
+        'gaussian', 'bessel', 'mitchell', 'sinc', 'lanczos', 'blackman'.
+    """
+    if not isinstance(val, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
+        raise TypeError(f"A vigra Kernel (1D or 2D) was expected; got {type(val).__name__} instead")
+    
+    [x,y] = vu.kernel2array(val)
+    
+    if fig is None:
+        fig = plt.figure()
+        
+    elif isinstance(fig, numbers.Integral):
+        fig = plt.figure(fig)
+        
+    elif isinstance(fig, mpl.figure.Figure):
+        fig = plt.figure(fig.number)
+        
+    if newPlot:
+        plt.clf()
+        
+    ax = plt.gca()
+    
+    kwargs.pop("c", None)
+    kwargs.pop("s", None)
+    
+    if isinstance(plotStyle, str):
+        if isinstance(val, vigra.filters.Kernel2D):
+            if not isinstance(x, list) or len(x) != 2:
+                raise TypeError("Incompatible 'x' parameter for plotting a 2D kernel; expecting a meshgrid ")
+            
+            if plotStyle == "scatter":
+                kwargs.pop("c", None)
+                kwargs.pop("s", None)
+                
+                c = mpl.colors.Normalize(y.min(), y.max())(y).ravel()
+                x_ = x[0].ravel()
+                y_ = x[1].ravel()
+                
+                ret = ax.scatter(x_, y_, c=c, **kwargs)
+                
+            elif plotStyle == "image":
+                #from matplotlib.image import NonUniformImage
+                x_ = x[0][0,:]
+                y_ = x[1][:,0]
+                z = mpl.colors.Normalize(y.min(), y.max())(y)
+                
+                ret = ax.imshow(z, extent =  (x_.min(), x_.max(), y_.min(), y_.max()), **kwargs)
+                
+            elif plotStyle == "matrix":
+                #from matplotlib.image import NonUniformImage
+                x_ = x[0][0,:]
+                y_ = x[1][:,0]
+                z = mpl.colors.Normalize(y.min(), y.max())(y)
+                
+                ret = ax.matshow(z, extent =  (x_.min(), x_.max(), y_.min(), y_.max()), **kwargs)
+                
+            else:
+                raise NotImplementedError(f"{plotStyle} not implemented for 2D kernels")
+                
+        else:
+            cmd = "ax." + plotStyle + "(x, y, **kwargs)"
+
+            ret = eval(cmd)
+        
+    else:
+        if isinstance(val, vigra.filters.Kernel2D):
+            if not isinstance(x, list) or len(x) != 2:
+                raise TypeError("Incompatible 'x' parameter for plotting a 2D kernel; expecting a meshgrid ")
+            
+            kwargs.pop("c", None)
+            kwargs.pop("s", None)
+            
+            c = mpl.colors.Normalize(y.min(), y.max())(y).ravel()
+            x_ = x[0].ravel()
+            y_ = x[1].ravel()
+            
+            ret = ax.scatter(x_, y_, c=c, **kwargs)
+            
+        else:
+            ret = ax.stem(x, y, **kwargs)
+            
+    if isinstance(label, str):
+        ret.set_label(label)
+        plt.legend(loc="best")
+        
+            
+    fig.canvas.draw_idle()
+    
+    return ret
+
+        
         
     
-def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
-            estimator=np.mean, ci=95, n_boot=1000, units=None,
-            orient=None, color=None, palette=None, saturation=.75,
-            errcolor="0", errwidth=None, capsize=None, dodge=True,
-            ax=None, overlay_stripplot=True, axes_offset=0, despine=True,
-            tick_direction="in", **kwargs):
+def barplot_sb(*args, x=None, y=None, hue=None, data=None, order=None, 
+               hue_order=None, skip=None, estimator=np.mean, ci=95, n_boot=1000,
+               units=None, orient=None, color=None, palette=None, saturation=.75,
+               errcolor="0", errwidth=None, capsize=None, dodge=True,
+               ax=None, overlay_stripplot=True, axes_offset=0, despine=True,
+               tick_direction="in", **kwargs):
     """
-    Keyword arguments :
-    ------------------
+    Show point estimates and confidence intervals as rectangular bars.
+    
+    Modified verison of Seaborn barplot, that allows to:
+    a) skip categories from the plot, when "order" is not specified
+    b) include the possibility to use the SEM in addition to the confidence
+        interval or SD, for errorbars.
+        
+    Keyword parameters:
+    ================== 
+    NOTE It is preferable that all parameters are passed as key=value pairs.
+    
+    x, y, hue: names of variables in "data", or vector data
+        In particular, when data is a Pandas DataFrame, x, "y" and "hue" are
+        column names such that:
+        
+        "x" is the name of the categorical, or categorical-like column, which 
+            holds the independent variable ("predictor", or "experimental" variable)
+            
+            This variables can be seen as categorical even if it is NOT of Pandas
+            Categorical type.
+            
+        "y" is the name of the column containing the dependent variable ("outcome"), 
+            which is usually continuous, i.e. it can take any value from an interval
+            
+        "hue" is the name of the column containing an independent categorical 
+            variable to be considered as a "factor" in the data (i.e. different 
+            from the predictor)
+            
+        Categorical data in 2x" and "hue" may be nominal, dichotomous, or ordinal.
+        
+        When "x" is ordinal, it is useful to specify the "order" parameter (see below)
+        so that a relation between "x" and "y" becomes clear.
+    
+    data: DataFrame, array, list of arrays
+    
+    order, hue_order: lists of strings
+        These are names of categories (a.k.a "levels" in R) found in data
+        (when data is a DataFrame):
+        
+        order: category names in the DataFrame column holding the independent 
+            variable "x"
+        
+        hue_order: category names in the DataFrame column holding the "hue"
+        
+        These parameters are useful when "x" and "hue" are ordinal variables.
+    
+    skip: a string or a sequence (tuple, list) of string. Optional (default is None).
+        These are the names of categories (or "levels") in "x" NOT to be plotted.
+        
+        "x" is assumed to be categorical.
+        
+        Only used when "order" is not specified. Otherwise, "order" will select
+        the categories to be plotted and "skip" is ignored.
+        
     ci: in addition to the accepted values for seaborn.barplot, it can also be 
         the string "se"; in this case the function plots mean +/- standard error 
         of the mean
         
-    Additional keyword arguments for barplot:
+    For the other parameters, please see the documentation for seaborn.barplot():
+    
+    https://seaborn.pydata.org/generated/seaborn.barplot.html#seaborn.barplot
+        
+    Additional keyword parameters for barplot:
     --------------
     show_legend (True)
+    bar_width (0.8) - NOTE: this is aliased to "width"; if both width and bar_width
+            are supplied, bar_width takes precedence
         
     Additional keyword arguments controlling the appearance of the 
     overlaid stripplot. These are embedded in kwargs (default values in parantheses):
@@ -1012,6 +1498,11 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
     ------------------------------------------------------------------
     color, orientation
     
+    Additonal keyword parameters for Y axis:
+    ----------------------------------------
+    tick_length : float (default is 4.5)
+    tick_direction : str (default is "in")
+    
     Returns:
     -------
     ax: plot axes -- see ax.bar? doe arguments controlling the appearance of the bars
@@ -1022,17 +1513,9 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
             or statistics +/- ci (ci is one of "sd" or "se")
     
     """
-    
-    plotter = SB_BarPlotter(x, y, hue, data, order, hue_order,
-                          estimator, ci, n_boot, units,
-                          orient, color, palette, saturation,
-                          errcolor, errwidth, capsize, dodge)
+    if not isinstance(data, (pd.DataFrame, dict)):
+        return
 
-    if ax is None:
-        ax = plt.gca()
-        
-        
-        
     strip_jitter = kwargs.pop("strip_jitter", True)
     strip_size = kwargs.pop("strip_size", 5)
     strip_dodge = kwargs.pop("strip_dodge", dodge)
@@ -1043,6 +1526,30 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
     strip_alpha = kwargs.pop("strip_alpha", 1)
     strip_legend = kwargs.pop("strip_legend", False)
     strip_order = kwargs.pop("strip_order", None)  # to allow only for the bar legend
+    tick_length = kwargs.pop("tick_length", 4.5)
+    tick_direction = kwargs.pop("tick_direction", "in")
+    bar_width = kwargs.pop("bar_width", None)
+    _width = kwargs.pop("width", None)
+    
+    if not isinstance(bar_width, float):
+        if isinstance(_width, float):
+            bar_width = _width
+        else:
+            bar_width = None
+            
+    else:
+        bar_width = None
+    
+    plotter = SB_BarPlotter(x, y, hue, data, order, hue_order, skip,
+                          estimator, ci, n_boot, units,
+                          orient, color, palette, saturation,
+                          errcolor, errwidth, capsize, dodge, bar_width)
+
+    if ax is None:
+        ax = plt.gca()
+        
+        
+        
 
     # NOTE: 2020-02-05 23:59:27
     # plots the bars
@@ -1071,7 +1578,7 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
     if despine:
         sb.despine(ax = ax, offset=axes_offset)
         
-    ax.tick_params("y", direction="in")
+    ax.tick_params("y", direction=tick_direction, length=tick_length, color="black")
         
     return ax, plotter
 
@@ -1090,9 +1597,9 @@ def catplot_sb(x=None, y=None, hue=None, data=None, row=None, col=None,
     
     Keyword arguments :
     ------------------
-    ci: in addition to the accepted values for seaborn.barplot, it can also be 
-        the string "se"; in this case the function plots mean +/- standard error 
-        of the mean
+    ci: in addition to the accepted values for seaborn.barplot (95, "sd", or None),
+        it can also be the string "se"; in this case the function plots mean 
+        +/- standard error of the mean
         
     Additional keyword arguments controlling the appearance of the 
     overlaid stripplot. These are embedded in kwargs (default values in parantheses):
@@ -1469,6 +1976,7 @@ def swarmplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None
 
     plotter.plot(ax, kwargs)
     return ax
+
 
 #def boxplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
             #orient=None, color=None, palette=None, saturation=.75,

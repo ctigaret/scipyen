@@ -8,6 +8,7 @@ import os, pickle
 import collections
 import itertools
 import math
+from copy import deepcopy
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -51,13 +52,14 @@ import core.curvefitting as crvf
 import core.models as models
 import core.datatypes as dt
 import core.plots as plots
-import core.neoutils as neoutils
 import core.datasignal as datasignal
-from core.datasignal import DataSignal, IrregularlySampledDataSignal
-import core.triggerprotocols
-from core.triggerprotocols import TriggerEvent, TriggerEventType, TriggerProtocol
-import core.scandata
-from core.scandata import ScanData
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+from core.quantities import units_convertible
+#import core.triggerprotocols
+from core.triggerevent import (TriggerEvent, TriggerEventType)
+from core.triggerprotocols import (TriggerProtocol)
+#import imaging.scandata
+from imaging.scandata import ScanData
 
 from core.prog import safeWrapper
 #from core.patchneo import *
@@ -76,8 +78,9 @@ import iolib.pictio as pio
 #### END pict.iolib modules
 
 #### BEGIN pict.ephys modules
-#from . import epsignal
+import ephys.ephys as ephys
 #### END pict.ephys modules
+
 
 @safeWrapper
 def segment_Rs_Rin(segment: neo.Segment,
@@ -227,7 +230,7 @@ def segment_Rs_Rin(segment: neo.Segment,
         raise RuntimeError("Cannot determine signal interval boundaries")
         
     if isinstance(Im, str):
-        Im = neoutils.get_index_of_named_signal(segment, Im)
+        Im = ephys.get_index_of_named_signal(segment, Im)
         
     elif not isinstance(Im, int):
         raise TypeError("Im expected to be a str or int; got %s instead" % type(Im).__name__)
@@ -235,7 +238,7 @@ def segment_Rs_Rin(segment: neo.Segment,
     Im_signal = segment.analogsignals[Im]
     
     if isinstance(Vm, pq.Quantity):
-        if not dt.units_convertible(Vm, pq.V):
+        if not units_convertible(Vm, pq.V):
             raise TypeError("Wrong units for Vm quantity: %s" % Vm.units)
         
         if Vm.size != 1:
@@ -253,7 +256,7 @@ def segment_Rs_Rin(segment: neo.Segment,
         # get the vm signal and measure vstep based on the specified regions:
         # use Irin region and Ibase region to determine the amplitude of vstep.
         if isinstance(Vm, str):
-            Vm = neoutils.get_index_of_named_signal(segment, Vm)
+            Vm = ephys.get_index_of_named_signal(segment, Vm)
         
         elif not isinstance(Vm, int):
             raise TypeError("Vm expected to be a str or int; got %s instead" % type(Vm).__name__)
@@ -338,9 +341,9 @@ def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     else:
         raise TypeError("vstep expected to be a float or a python Quantity; got %s instead" % type(vstep).__name__)
     
-    Ibase   = neoutils.cursor_average(signal, baseline, channel=channel)
-    IRs     = neoutils.cursor_max(signal, rs, channel=channel)
-    IRin    = neoutils.cursor_average(signal, rin, channel=channel)
+    Ibase   = ephys.cursor_average(signal, baseline, channel=channel)
+    IRs     = ephys.cursor_max(signal, rs, channel=channel)
+    IRin    = ephys.cursor_average(signal, rin, channel=channel)
     
     Rs  = vstep / (IRs  - Ibase)
     Rin = vstep / (IRin - Ibase)
@@ -931,7 +934,7 @@ def rheobase_latency(*args, **kwargs):
     xstart = kwargs.get("xstart", 0)
     
     if isinstance(xstart, pq.Quantity):
-        if not dt.units_convertible(xstart, latencies_mean.units):
+        if not units_convertible(xstart, latencies_mean.units):
             raise TypeError("'xstart' expected to have %s units; instead it has %s" % (latencies_mean.units, xstart.units))
         
         if xstart.units != pq.s:
@@ -946,7 +949,7 @@ def rheobase_latency(*args, **kwargs):
     xend = kwargs.get("xend", 0)
     
     if isinstance(xend, pq.Quantity):
-        if not dt.units_convertible(xstart, latencies_mean.units):
+        if not units_convertible(xstart, latencies_mean.units):
             raise TypeError("'xend' expected to have %s units; instead it has %s" % (latencies_mean.units, xend.units))
         
         if xend.units != pq.s:
@@ -1075,7 +1078,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
         t_stop = t_start = t0.durations[0]
         
     elif isinstance(t0, pq.Quantity):
-        if not dt.units_convertible(t0, pq.s):
+        if not units_convertible(t0, pq.s):
             raise TypeError("'t0' expected to have time units; got %s instead" % t0.units)
         
         if t0.size == 1:
@@ -1110,7 +1113,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
             t_stop = t1*pq.s
             
         elif isinstance(t1, pq.Quantity):
-            if not dt.units_convertible(t1, pq.s):
+            if not units_convertible(t1, pq.s):
                 raise TypeError("'t1' expected to have time units; got %s instead" % t1.units)
             
             if t1.size !=1:
@@ -1129,10 +1132,10 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
         raise TypeError("'ImSignal' expected to be an int or str; got %s instead" % type(ImSignal).__name__)
     
 
-    data = neoutils.set_relative_time_start(data)
+    data = ephys.set_relative_time_start(data)
     
     if t_start is not None and t_stop is not None:
-        data = neoutils.get_time_slice(data, t0=t_start, t1=t_stop)
+        data = ephys.get_time_slice(data, t0=t_start, t1=t_stop)
         
     if isinstance(data, neo.Block):
         segments = data.segments
@@ -1147,7 +1150,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
         raise TypeError("'data' expected to be a neo.Block, neo.Segment, or a sequence of neo.Segment; got %s instead" % type(data).__name__)
     
     if isinstance(VmSignal, str):
-        vmsignalindex = utilities.unique(neoutils.get_index_of_named_signal(data, VmSignal))[0]
+        vmsignalindex = utilities.unique(ephys.get_index_of_named_signal(data, VmSignal))[0]
         
     elif isinstance(VmSignal, int):
         vmsignalindex = VmSignal
@@ -1156,7 +1159,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
         raise TypeError("'VmSignal' expected to be a str or an int; got %s instead" % type(VmSignal).__name__)
     
     if isinstance(ImSignal, str):
-        imsignalindex = utilities.unique(neoutils.get_index_of_named_signal(data, ImSignal))[0]
+        imsignalindex = utilities.unique(ephys.get_index_of_named_signal(data, ImSignal))[0]
         
     elif isinstance(ImSignal, int):
         imsignalindex = ImSignal
@@ -1220,7 +1223,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None,
             baseEpoch = neo.Epoch(times = t_start * vm.times.units,
                                   durations = duration * vm.times.units)
             
-        elif all([(isinstance(v, pq.Quantity) and dt.units_convertible(v, vm.times)) for v in baseEpoch]):
+        elif all([(isinstance(v, pq.Quantity) and units_convertible(v, vm.times)) for v in baseEpoch]):
             times = baseEpoch[0]
             durations = baseEpoch[1]-baseEpoch[0]
             baseEpoch = neo.Epoch(times=times, durations=durations)
@@ -1236,7 +1239,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None,
             ssEpoch = neo.Epoch(times = t_start * vm.times.units,
                                   durations = duration * vm.times.units)
             
-        elif all([(isinstance(v, pq.Quantity) and dt.units_convertible(v, vm.times)) for v in ssEpoch]):
+        elif all([(isinstance(v, pq.Quantity) and units_convertible(v, vm.times)) for v in ssEpoch]):
             times = ssEpoch[0]
             durations = ssEpoch[1]-ssEpoch[0]
             ssEpoch = neo.Epoch(times=times, durations=durations)
@@ -1337,7 +1340,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None,
             Iinj = Iinj * pq.pA
             
         elif isinstance(Iinj, pq.Quantity):
-            if not dt.units_convertible(Iinj, pq.pA):
+            if not units_convertible(Iinj, pq.pA):
                 raise TypeError("Iinj is invalid: %s" % Iinj)
             
         else:
@@ -1530,7 +1533,7 @@ def PassiveMembranePropertiesAnalysis(block:neo.Block,
     else:
         if isinstance(Im_index, str):
             try:
-                Im_index = neoutils.get_index_of_named_signal(block.segments[0], Im_index)
+                Im_index = ephys.get_index_of_named_signal(block.segments[0], Im_index)
             except Exception as e:
                 raise RuntimeError("%s signal not found" % Im_index)
             
@@ -1539,7 +1542,7 @@ def PassiveMembranePropertiesAnalysis(block:neo.Block,
         
     if isinstance(Vm_index, str):
         try:
-            Vm_index = neoutils.get_index_of_named_signal(block.segments[0], Vm_index)
+            Vm_index = ephys.get_index_of_named_signal(block.segments[0], Vm_index)
         except Exception as e:
             raise RuntimeError("%s signal not found" % Vm_index)
         
@@ -1735,10 +1738,7 @@ def ap_waveform_roots(w, value, interpolate=False):
             decay_y = end_sample_ge_value
             decay_x = time_of_end_sample_ge_value
             
-    #else:
-        #warnings.warn("could not find the intercept of the decay with %s" % value, RuntimeWarning)
-            
-    return rise_x, rise_y, rise_cslope, decay_x, decay_y, decay_cslope
+    return float(rise_x), float(rise_y), float(rise_cslope), float(decay_x), float(decay_y), float(decay_cslope)
 
 def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,
                             triggers=None, tail=None,
@@ -1918,7 +1918,7 @@ def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,
     if len(segments_ap_reports):
         report = pd.concat(segments_ap_reports, ignore_index=True, sort=False)
         
-        if report.Record.dtype.name is not "category":
+        if report.Record.dtype.name != "category":
             report.Record = report.Record.astype("category")
             
         grouping = "AP"
@@ -2024,11 +2024,11 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,
                   
     triggers: None (default), or
     
-              datatypes.TriggerEvent where 'times' attribute indicate the time
+              TriggerEvent where 'times' attribute indicate the time
               of current pulses (in the time domain of Vm), or
               
-              datatypes.TriggerProtocol containing postsynaptic trigger events
-              (see datatypes.TriggerProtocol and datatypes.TriggerEvent for details)
+              TriggerProtocol containing postsynaptic trigger events
+              (see TriggerProtocol and TriggerEvent for details)
                 the times of the current injection pulses for eliciting APs are
                 taken as sthe postsynaptic trigger times
                 
@@ -2055,7 +2055,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,
             'events' attribute. 
             
             Raises ValueError if segment.events is empty or contains no 
-            dataypes.TriggerEvent objects.
+            TriggerEvent objects.
               
               
               
@@ -2088,7 +2088,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,
         if len(signal_index.strip()) == 0:
             raise ValueError("signal_index is an empty string!")
         
-        signal_index = neoutils.get_index_of_named_signal(segment, signal_index, silent=True)
+        signal_index = ephys.get_index_of_named_signal(segment, signal_index, silent=True)
         
         if isinstance(signal_index, (tuple, list)):
             if len(signal_index) and isinstance(signal_index[0], int):
@@ -2132,14 +2132,14 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,
     elif isinstance(triggers, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
         times = triggers.times
         
-        if not dt.units_convertible(times, signal.times.units):
+        if not units_convertible(times, signal.times.units):
             raise TypeError("triggers domain units (%s) are incompatible with this data" % triggers.times.dimensionality)
         
         elif times.units != signal.times.units:
             times = times.rescale(signal.times.units)
         
     elif isinstance(triggers, pq.Quantity):
-        if dt.units_convertible(triggers, signal.times):
+        if units_convertible(triggers, signal.times):
             times = triggers
             
             if triggers.units != signal.times.units:
@@ -2155,7 +2155,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,
         if all([isinstance(v, numbers.Real) for v in triggers]):
             times = np.array(triggers) * signal.times.units
             
-        elif all([isinstance(v, pq.Quantity) and dt.units_convertible(v, signal.times.units) for v in triggers]):
+        elif all([isinstance(v, pq.Quantity) and units_convertible(v, signal.times.units) for v in triggers]):
             times = triggers
             
         else:
@@ -2173,7 +2173,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,
     elif isinstance(signal.name, str) and len(signal.name.strip()):
         recordname = signal.name
         
-    elif (protocol_name is "NA" or protocol_name is None) and \
+    elif (protocol_name == "NA" or protocol_name is None) and \
         (isinstance(triggers, (TriggerProtocol, TriggerEvent)) and isinstance(triggers.name, str) and len(triggers.name.strip())):
         recordname.append(triggers.name)
         
@@ -2296,13 +2296,13 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
         raise TypeError("'signal' expected to be a neo.AnalogSignal; got %s instead" % type(signal).__name__)
         
     if resample_with_period is not None:
-        signal = neoutils.resample_pchip(signal, resample_with_period)
+        signal = ephys.resample_pchip(signal, resample_with_period)
             
     if isinstance(t0, numbers.Real):
         t0 *= signal.times.units
         
     elif isinstance(t0, pq.Quantity):
-        if not dt.units_convertible(t0, signal.times.units):
+        if not units_convertible(t0, signal.times.units):
             raise TypeError("t0 expected to be a float or quantity scalar with %s units" % signal.time.dimensionality)
         
         elif t0.units != signal.times.units:
@@ -2315,7 +2315,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
         t1 *= signal.times.units
         
     elif isinstance(t1, pq.Quantity):
-        if not dt.units_convertible(t1, signal.times.units):
+        if not units_convertible(t1, signal.times.units):
             raise TypeError("t1 expected to be a float or quantity scalar with %s units" % signal.time.dimensionality)
         
         elif t1.units != signal.times.units:
@@ -2334,24 +2334,24 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
     if t0 is not None and t1 is not None:
         signal = signal.time_slice(t0, t1)
             
-    dsdt = neoutils.ediff1d(signal).rescale(pq.V/pq.s)
+    dsdt = ephys.ediff1d(signal).rescale(pq.V/pq.s)
     
     if isinstance(thr, numbers.Real):
         thr *= pq.V/pq.s
         
     elif isinstance(thr, pq.Quantity):
-        if not dt.units_convertible(thr, dsdt.units):
+        if not units_convertible(thr, dsdt.units):
             raise TypeError("'thr' expected to have %s units; got %s instead" % (dsdt.units.dimensionality, thr.units.dimensionality))
         
         thr = thr.rescale(pq.V/pq.s)
 
     if smooth_window is not None:
-        dsdt = neoutils.convolve(dsdt, boxcar(smooth_window)/smooth_window)
+        dsdt = ephys.convolve(dsdt, boxcar(smooth_window)/smooth_window)
         
-    d2sdt2 = neoutils.ediff1d(dsdt).rescale(dsdt.units/dsdt.times.units)
+    d2sdt2 = ephys.ediff1d(dsdt).rescale(dsdt.units/dsdt.times.units)
     
     if smooth_window is not None:
-        d2sdt2 = neoutils.convolve(d2sdt2, boxcar(smooth_window)/smooth_window)
+        d2sdt2 = ephys.convolve(d2sdt2, boxcar(smooth_window)/smooth_window)
     
     ap_waves = extract_pulse_triggered_APs(signal, times, tail=tail)
     ap_dvdt = extract_pulse_triggered_APs(dsdt, times, tail=tail)
@@ -2538,8 +2538,10 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
     
     sig: neo.AnalogSignal with one channel
     
-    iinj:       neo.AnalogSignal with the actual current injection step 
+    iinj: neo.AnalogSignal with the actual current injection step 
                 (without any tail that might have been added to sig)
+            or a tuple (t_start, t_stop) in pq.s: the start/stop times of the 
+            injection step
     
     times: 
         numpy or Quantity array in units compatible with the time units of sig
@@ -2596,7 +2598,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
             times = times * sig.time.units
             
         else:
-            if not dt.units_convertible(times, sig.times):
+            if not units_convertible(times, sig.times):
                 raise TypeError("times units (%s) are incompatible with this signal (%s)" % (times.units.dimensionality, sig.times.units.dimensionality))
             
             times = times.rescale(sig.times.units)
@@ -2628,7 +2630,10 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
             after = intervals.min()
             
         else:
-            after = iinj.t_stop - starts[0]
+            if isinstance(iinj, tuple):
+                after = iinj[1] - starts[0]
+            else:
+                after = iinj.t_stop - starts[0]
             #raise ValueError("Cannot calculate minimum ISI for a single waveform")
         
     if after is None:
@@ -2651,7 +2656,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
             raise ValueError("when a vector, 'after' must have the same length as times")
         
         if isinstance(after, pq.Quantity):
-            if not dt.units_convertible(after, sig.times.units):
+            if not units_convertible(after, sig.times.units):
                 raise TypeError("units of after are incompatible with signal's times units")
             
         else:
@@ -2682,7 +2687,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
                 raise ValueError("'before' had incompatible size" )
             
             if isinstance(before, pq.Quantity):
-                if not dt.units_convertible(before, sig.times.units):
+                if not units_convertible(before, sig.times.units):
                     raise TypeError("'before' has incompatible units")
                 
                 before = before.rescale(sig.times.units)
@@ -2759,7 +2764,7 @@ def extract_pulse_triggered_APs(sig, times, tail = None):
             times = times.flatten() * sig.times.units
                 
         else:
-            if not dt.units_convertible(times, sig.times):
+            if not units_convertible(times, sig.times):
                 raise TypeError("times units (%s) are incompatible with this signal (%s)" % (times.units.dimensionality, sig.times.units.dimensionality))
             
             times = times.rescale(sig.times.units)
@@ -2785,7 +2790,7 @@ def extract_pulse_triggered_APs(sig, times, tail = None):
                 tail *= sig.times.units
                 
             else:
-                if not dt.units_convertible(tail, sig.time.units):
+                if not units_convertible(tail, sig.time.units):
                     raise TypeError("'tail' units (%s) are incompatible with signal's times: %s" % (tail.units.dimensionality, sig.times.units.dimensionality) )
                 
                 tail = tail.rescale(sig.times.units)
@@ -3012,7 +3017,7 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, rtol = 1e-5, at
     return fast_rise_start_times, fast_rise_stop_times, peak_times#, waves, dwaves
         
 
-def extract_AP_train(vm:neo.AnalogSignal,im:neo.AnalogSignal,
+def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple],
                      tail:pq.Quantity=0.5*pq.s,
                      method:str="state_levels",
                      box_size:numbers.Number=0, 
@@ -3023,6 +3028,9 @@ def extract_AP_train(vm:neo.AnalogSignal,im:neo.AnalogSignal,
                      resample_with_rate:(pq.Quantity, type(None)) = None):
 
     """
+    im: analog signal with current injection recording, or a tuple of three
+        elements: I hold (pA), t_start *(pq.s) and t_stop (pq.s)
+        
     tail: non-negative scalar Quantity (units: "s"); default is 0.5 s
         duration of the analyzed Vm trace after beyond the end of depolarizing 
         current injection step;
@@ -3065,7 +3073,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:neo.AnalogSignal,
     method: str, one of "state_levels" (default) or "kmeans"
     
     adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
-        called from neoutils.parse_step_waveform_signal() 
+        called from ephys.parse_step_waveform_signal() 
         
         Used only when method is "state_levels"
         
@@ -3080,7 +3088,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:neo.AnalogSignal,
             if resample_with_period.size > 1:
                 raise TypeError("new sampling period must be a scalar Quantity; got %s instead" % resample_with_period)
             
-            if dt.units_convertible(resample_with_period, vm.sampling_period):
+            if units_convertible(resample_with_period, vm.sampling_period):
                 if resample_with_period.units != vm.sampling_period.units:
                     resample_with_period.rescale(vm.sampling_period.units)
                     
@@ -3097,7 +3105,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:neo.AnalogSignal,
             if resample_with_rate.size > 1:
                 raise TypeError("new sampling rate must be a scalar Quantity; got %s instead" % resample_with_rate)
         
-            if dt.units_convertible(resample_with_rate, vm.sampling_rate):
+            if units_convertible(resample_with_rate, vm.sampling_rate):
                 if resample_with_rate.units != vm.sampling_rate.units:
                     resample_with_rate.rescale(vm.sampling_rate.units)
                     
@@ -3108,39 +3116,56 @@ def extract_AP_train(vm:neo.AnalogSignal,im:neo.AnalogSignal,
             raise TypeError("new sampling rate expected to be a scalar float, Quantity, or None; got %s instead" % type(resample_with_rate).__name__)
         
         if resample_with_rate is not None and resample_with_period is None:
-            resample_with_period = neoutils.sampling_rate_or_period(resample_with_rate, resample_with_period)
+            resample_with_period = ephys.sampling_rate_or_period(resample_with_rate, resample_with_period)
             
         elif resample_with_rate is not None and resample_with_period is not None:
-            if not neoutils.sampling_rate_or_period(resample_with_rate, resample_with_period):
+            if not ephys.sampling_rate_or_period(resample_with_rate, resample_with_period):
                 raise ValueError("resample_with_rate (%s) and resample_with_period (%s) are incompatible" % (resample_with_rate, resample_with_period))
     
 
-    d, u, inj, c, l = neoutils.parse_step_waveform_signal(im,
-                                                          method=method,
-                                                          box_size=box_size, 
-                                                          adcres=adcres,
-                                                          adcrange=adcrange,
-                                                          adcscale=adcscale)
-    
-    #if d < u:
-        #raise RuntimeError("Expecting a depolarizing current injection; got a hyperpolarizing current injection instead")
-    
-    
-    #vstep = vm.time_slice(u,d)
-    if d > u:
-        vstep = vm.time_slice(u,d + tail)
-        istep = im.time_slice(u,d)
-        
-    elif d < u:
-        vstep = vm.time_slice(d,u + tail)
-        istep = im.time_slice(d,u)
-        inj *= -1.0
-        
+    if isinstance(im, neo.AnalogSignal):
+        try:
+            d, u, inj, c, l = ephys.parse_step_waveform_signal(im,
+                                                                method=method,
+                                                                box_size=box_size, 
+                                                                adcres=adcres,
+                                                                adcrange=adcrange,
+                                                                adcscale=adcscale)
+            
+            
+            #print(f"d = {d} ({type(d)}), u = {u} ({type(u)})")
+            if d.ndim> 0:
+                d = d[0]
+            if u.ndim > 0:
+                u = u[0]
+            #if d < u:
+                #raise RuntimeError("Expecting a depolarizing current injection; got a hyperpolarizing current injection instead")
+            
+            
+            #vstep = vm.time_slice(u,d)
+            if d > u:
+                vstep = vm.time_slice(u,d + tail)
+                istep = im.time_slice(u,d)
+                
+            elif d < u:
+                vstep = vm.time_slice(d,u + tail)
+                istep = im.time_slice(d,u)
+                inj *= -1.0
+                
+            else:
+                vstep = vm.time_slice(d, d + tail)
+                istep = im.time_slice(d, d + tail)
+                
+            Ihold = istep.mean()
+        except:
+            print("Cannot parse current injection signal; use manually entered Ihold, start and stop times instead\n\n\n")
+            raise
+            
     else:
-        vstep = vm.time_slice(d, d + tail)
-        istep = im.time_slice(d, d + tail)
-        
-    Ihold = istep.mean()
+        Ihold = im[0]
+        inj = Ihold
+        vstep = vm.time_slice(im[1], im[2] + tail)
+        istep = im[1:]
     
     #print("extract_AP_train: Ihold", Ihold)
     #print("extract_AP_train: Iinj", inj)
@@ -3153,13 +3178,13 @@ def extract_AP_train(vm:neo.AnalogSignal,im:neo.AnalogSignal,
         #if resample_with_period < vstep.sampling_period:
         #upsampling = (vstep.sampling_period.rescale(pq.s)/resample_with_period.rescale(pq.s)).magnitude.flatten()[0]
             
-        vstep = neoutils.resample_pchip(vstep, resample_with_period)
+        vstep = ephys.resample_pchip(vstep, resample_with_period)
         
         if vstep.size == 0:
             raise RuntimeError("Check resampling; new period requested was %s and the resampled signal has vanished" % resample_with_period)
         
-        #vstep = neoutils.set_relative_time_start(vstep)
-        #istep = neoutils.set_relative_time_start(istep)
+        #vstep = ephys.set_relative_time_start(vstep)
+        #istep = ephys.set_relative_time_start(istep)
     
     return vstep, Ihold, inj, istep
 
@@ -3199,7 +3224,7 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
         min_fast_rise_duration *= pq.s
     
     elif isinstance(min_fast_rise_duration, pq.Quantity):
-        if not dt.units_convertible(min_fast_rise_duration, sig.times):
+        if not units_convertible(min_fast_rise_duration, sig.times):
             raise TypeError("units of 'min_fast_rise_duration' (%s) are not compatible with those of the signal's time domain (%s)" % (min_fast_rise_duration.units, sig.times.units))
         
         if min_fast_rise_duration.units != sig.times.units:
@@ -3223,10 +3248,10 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
                              units = pq.V, t_start = sig.t_start, time_units = pq.s, name=sig.name)
     vmsig.annotate(**sig.annotations)
     
-    dv_dt = neoutils.ediff1d(vmsig).rescale(pq.V/pq.s)  # 1st derivative of the Vm signal
+    dv_dt = ephys.ediff1d(vmsig).rescale(pq.V/pq.s)  # 1st derivative of the Vm signal
     
     if w is not None:
-        dv_dt_smooth = neoutils.convolve(dv_dt, w)        # and its smoothed version
+        dv_dt_smooth = ephys.convolve(dv_dt, w)        # and its smoothed version
         dv_dt_smooth.name = "%s_1st_derivative" % sig.name
         
     else:
@@ -3245,10 +3270,10 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
     
     dvmsig.annotate(**dv_dt_smooth.annotations)
     
-    d2v_dt2 = neoutils.ediff1d(dvmsig).rescale(pq.V/(pq.s**2)) # 2nd derivative of the Vm signal
+    d2v_dt2 = ephys.ediff1d(dvmsig).rescale(pq.V/(pq.s**2)) # 2nd derivative of the Vm signal
     
     if w is not None:
-        d2v_dt2_smooth = neoutils.convolve(d2v_dt2, w)                   # and its smoothed version 
+        d2v_dt2_smooth = ephys.convolve(d2v_dt2, w)                   # and its smoothed version 
         d2v_dt2_smooth.name = "%s_2nd_derivative" % sig.name
         
     else:
@@ -3579,7 +3604,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
         after *= pq.s
         
     elif isinstance(after, pq.Quantity):
-        if not dt.units_convertible(after, sig.times):
+        if not units_convertible(after, sig.times):
             raise TypeError("units of 'after' (%s) are not compatible with those of the signal's time domain (%s)" % (after.units, sig.times.units))
         
     elif after is not None:
@@ -3604,7 +3629,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
         min_fast_rise_duration *= pq.s
     
     elif isinstance(min_fast_rise_duration, pq.Quantity):
-        if not dt.units_convertible(min_fast_rise_duration, sig.times):
+        if not units_convertible(min_fast_rise_duration, sig.times):
             raise TypeError("units of 'min_fast_rise_duration' (%s) are not compatible with those of the signal's time domain (%s)" % (min_fast_rise_duration.units, sig.times.units))
         
         if min_fast_rise_duration.units != sig.times.units:
@@ -3620,7 +3645,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
         min_ap_isi *= pq.s
         
     elif isinstance(min_ap_isi, pq.Quantity):
-        if not dt.units_convertible(min_ap_isi, sig.times):
+        if not units_convertible(min_ap_isi, sig.times):
             raise TypeError("units of 'min_ap_isi' (%s) are not compatible with those of the signal's time domain (%s)" % (min_ap_isi.units, sig.times.units))
     
         if min_ap_isi.units != sig.times.units:
@@ -3644,7 +3669,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
         decay_ref *= sig.units
         
     elif isinstance(decay_ref, pq.Quantity):
-        if not dt.units_convertible(decay_ref, sig):
+        if not units_convertible(decay_ref, sig):
             raise TypeError("'decay_ref' units (%s) are incompatible with the signal's units (%s)" % (decay_ref.units, sig.units))
         
         if decay_ref.units != sig.units:
@@ -3657,7 +3682,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
         reference_Vm = get_duration_at_Vm * sig.units
         
     elif isinstance(get_duration_at_Vm, pq.Quantity):
-        if not dt.units_convertible(get_duration_at_Vm, sig.units):
+        if not units_convertible(get_duration_at_Vm, sig.units):
             raise TypeError("get_duration_at_Vm expected to have %s units; got %s instead" % (sig.units.dimensionality, get_duration_at_Vm.units.dimensionality))
         
         if get_duration_at_Vm.units != sig.units:
@@ -3907,12 +3932,14 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
                 # there are two alternative workarounds:
                 # (a) extrapolate a straight line from the point on half-max and 
                 #   find its intercept with the Vm onset value
-                if decay_intercept_approx.strip().lower() is "linear":
+                if decay_intercept_approx.strip().lower() == "linear":
+                    #print("decay_ref", decay_ref)
                     if isinstance(decay_ref, str):
-                        if decay_ref is "hm":
+                        if decay_ref == "hm":
+                            #print("hm_decay_slope", hm_decay_slope)
                             decay_onset_Vm_x = (ap_Vm_onset_values.magnitude[k] - vm_at_half_max.magnitude[k]) / hm_decay_slope + hm_decay_x
                             
-                        elif decay_ref is "qm":
+                        elif decay_ref == "qm":
                             decay_onset_Vm_x = (ap_Vm_onset_values.magnitude[k] - vm_at_quart_max.magnitude[k]) / qm_decay_slope + qm_decay_x
                             
                         else:
@@ -3954,7 +3981,12 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
             times_of_0_vm_on_decay.append(decay_0mV_x)
             
             times_of_onset_vm_on_rise.append(rise_onset_Vm_x)
-            times_of_onset_vm_on_decay.append(decay_onset_Vm_x)
+            #times_of_onset_vm_on_decay.append(decay_onset_Vm_x)
+            
+            if isinstance(decay_onset_Vm_x, (tuple, list, np.ndarray)):
+                times_of_onset_vm_on_decay.append(decay_onset_Vm_x[0])
+            else:
+                times_of_onset_vm_on_decay.append(decay_onset_Vm_x)
             
         except Exception as e:
             print("in waveform %d:" % k)
@@ -3974,6 +4006,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     time_array_0mV_decay = np.array(times_of_0_vm_on_decay).flatten() * sig.times.units
     
     time_array_onset_Vm_rise = np.array(times_of_onset_vm_on_rise).flatten() * sig.times.units
+    #print("times_of_onset_vm_on_decay", times_of_onset_vm_on_decay)
     time_array_onset_Vm_decay = np.array(times_of_onset_vm_on_decay).flatten() * sig.times.units
     
     ap_Vm_hmax_values = neo.IrregularlySampledSignal(time_array_half_max_rise,
@@ -4205,7 +4238,7 @@ def ap_duration_at_Vm(ap, value, **kwargs): #decay_ref, decay_intercept_approx="
             decay_ref *= ap.units
             
         elif isinstance(decay_ref, pq.Quantity):
-            if not dt.units_convertible(decay_ref, ap.units):
+            if not units_convertible(decay_ref, ap.units):
                 raise TypeError("decay_ref has incompatible units (%s)" % decay_ref.units.dimensionality)
             
             if decay_ref.units != ap.units:
@@ -4219,7 +4252,7 @@ def ap_duration_at_Vm(ap, value, **kwargs): #decay_ref, decay_intercept_approx="
             value *= ap.units
             
         elif isinstance(value, pq.Quantity):
-            if not dt.units_convertible(value, ap.units):
+            if not units_convertible(value, ap.units):
                 raise TypeError("value units (%s) not convertible to signal's units (%s)" % (value.units.dimensionality, ap.units.dimensionality))
             
             value = value.rescale(ap.units)
@@ -4231,7 +4264,7 @@ def ap_duration_at_Vm(ap, value, **kwargs): #decay_ref, decay_intercept_approx="
     rise_time, rise_value, rise_slope, decay_time, decay_value, decay_slope = ap_waveform_roots(ap, value, interpolate=interpolate)
     
     if decay_time is np.nan:
-        if decay_intercept_approx.strip().lower() is "linear":
+        if decay_intercept_approx.strip().lower() == "linear":
             ref_rise_time, ref_rise_value, ref_rise_slope, ref_decay_time, ref_decay_value, ref_decay_slope = ap_waveform_roots(ap, decay_ref, interpolate=interpolate)
             
             decay_time = (value - ref_decay_value)/ref_decay_slope + ref_decay_time
@@ -4259,7 +4292,7 @@ def ap_phase_plot_data(vm, dvdt=None, smooth_window=None):
     if not isinstance(vm, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % (type(vm).__name__))
     
-    if not dt.units_convertible(vm.units, pq.V):
+    if not units_convertible(vm.units, pq.V):
         warnings.warn("'vm' this does not seem to contain a Vm signal")
     
     if vm.ndim > 2 or (vm.ndim == 2 and vm.shape[1] > 1):
@@ -4272,12 +4305,12 @@ def ap_phase_plot_data(vm, dvdt=None, smooth_window=None):
         h = None
         
     if dvdt is None:
-        dvdt = neoutils.ediff1d(vm).rescale(pq.V/pq.s)
+        dvdt = ephys.ediff1d(vm).rescale(pq.V/pq.s)
         
         if h is not None:
-            dvdt = neoutils.convolve(dvdt, h)
+            dvdt = ephys.convolve(dvdt, h)
             
-    ret = dt.IrregularlySampledDataSignal(vm.magnitude * vm.units, 
+    ret = IrregularlySampledDataSignal(vm.magnitude * vm.units, 
                                           dvdt.magnitude * dvdt.units, 
                                           name="dV/dt",
                                           description="Phase plot data of %s" % vm.name)
@@ -4316,7 +4349,7 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None,
     if not isinstance(vm, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % (type(vm).__name__))
     
-    if not dt.units_convertible(vm.units, pq.V):
+    if not units_convertible(vm.units, pq.V):
         warnings.warn("this does not seem to be a Vm signal")
     
     if vm.ndim > 2 or (vm.ndim == 2 and vm.shape[1] > 1):
@@ -4329,25 +4362,25 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None,
         h = None
         
     if dvdt is None:
-        dvdt = neoutils.ediff1d(vm).rescale(pq.V/pq.s)
+        dvdt = ephys.ediff1d(vm).rescale(pq.V/pq.s)
         
         if h is not None:
-            dvdt = neoutils.convolve(dvdt, h)
+            dvdt = ephys.convolve(dvdt, h)
             
     if isinstance(dvdt_thr, numbers.Real):
         dvdt_thr *= dvdt.units
         
     elif isinstance(dvdt_thr, pq.Quantity):
-        if not dt.units_convertible(dvdt_thr, dvdt.units):
+        if not units_convertible(dvdt_thr, dvdt.units):
             raise TypeError("'dvdt_thr' expected to have %s units; got %s instead" % (dvdt.units.dimensionality, dvdt_thr.units.dimensionality))
         
         dvdt_thr = dvdt_thr.rescale(dvdt.units)
 
     if d2vdt2 is None:
-        d2vdt2 = neoutils.ediff1d(dvdt).rescale(pq.V/(pq.s**2))
+        d2vdt2 = ephys.ediff1d(dvdt).rescale(pq.V/(pq.s**2))
         
         if h is not None:
-            d2vdt2 = neoutils.convolve(d2vdt2, h)
+            d2vdt2 = ephys.convolve(d2vdt2, h)
     
     dvdt_ge_thr = dvdt >= dvdt_thr
     
@@ -4429,7 +4462,7 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None,
             ref_vm *= vm.units
             
         elif isinstance(ref_vm, pq.Quantity):
-            if not dt.units_convertible(ref_vm, vm.units):
+            if not units_convertible(ref_vm, vm.units):
                 raise TypeError("ref_vm has wrong units: %s" % ref_vm.units.dimensionality)
             
             #print("analyse_AP_waveform vm.units", vm.units)
@@ -4523,10 +4556,11 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
         raise ValueError("There are no segments in the block")
     
     if isinstance(VmSignal, str):
-        VmSignal = neoutils.get_index_of_named_signal(block.segments[0], VmSignal)
+        VmSignal = ephys.get_index_of_named_signal(block.segments[0], VmSignal)
         
     if isinstance(ImSignal, str):
-        ImSignal = neoutils.get_index_of_named_signal(block.segments[0], ImSignal)
+        ImSignal = ephys.get_index_of_named_signal(block.segments[0], ImSignal)
+        
         
     #times = None
     
@@ -4577,6 +4611,11 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
                         "an integer, a sequence of integers, a range or a slice, " + \
                         "all in the interval [0:%d)." % len(block.segments))
     
+    
+    #if isinstance(ImSignal, tuple):
+        #if len(ImSignal) != len(sgm):
+            #raise ValueError(f"When a tuple, ImSignal must contain {len(sgm)} segments for this data")
+    
     i_steps = list()
     v_steps = list()
     
@@ -4585,13 +4624,16 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
     for k, segment in enumerate(sgm):
         im = segment.analogsignals[ImSignal]
         vm = segment.analogsignals[VmSignal]
-        
-        d,u,_,_,_ = neoutils.parse_step_waveform_signal(im)
-        
-        start_stop = list((d,u))
+        if isinstance(im, neo.AnalogSignal):
+            d,u,_,_,_ = ephys.parse_step_waveform_signal(im)
+            
+            start_stop = list((d,u))
 
-        start_stop.sort()
-        
+            start_stop.sort()
+            
+        else:
+            start_stop = im[1:]
+            
         start_stop[0] -= head
         start_stop[1] += tail
         
@@ -4601,16 +4643,17 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
         if start_stop[1] > im.t_stop: # FIXME if this happens then we're in trouble
             start_stop[1] = im.t_stop
             
+        vstep = vm.time_slice(start_stop[0], start_stop[1]).copy() # so that block stays unchanged
+        v_steps.append(vstep.magnitude)
         
         istep = im.time_slice(start_stop[0], start_stop[1]).copy() # avoid references
-        vstep = vm.time_slice(start_stop[0], start_stop[1]).copy() # so that block stays unchanged
+        i_steps.append(istep.magnitude)
+            
         
         # reset the time domain, but use the same units else this breaks the AnalogSignal API
         #istep.t_start = 0 * istep.times.units
         #vstep.t_start = 0 * vstep.times.units
         
-        i_steps.append(istep.magnitude)
-        v_steps.append(vstep.magnitude)
         
     i_steps_signal = neo.AnalogSignal(np.concatenate(i_steps, axis=1), \
                                     units = block.segments[0].analogsignals[ImSignal].units, \
@@ -4691,9 +4734,9 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
 def analyse_AP_step_injection_series(data, **kwargs):
     """ Action potential (AP) detection and analysis in I-clamp experiment.
     
-    Performs action potential (AP) detection and analysis indata from a single 
-    I-clamp experiment containing a series of increasing depolarizing current 
-    injection steps.
+    Performs action potential (AP) detection and analysis in data from a single 
+    I-clamp experiment (a "run") with a series of increasing depolarizing current 
+    injection steps (one injection per "sweep").
     
     Parameters:
     ----------
@@ -4707,8 +4750,10 @@ def analyse_AP_step_injection_series(data, **kwargs):
         When a single neo.Segment, this contains data from a single step current
         injection.
         
-        Each segment and must contain at least two analog signals, one with the
-        injected current and the other, with the recorded membrane potential.
+        Prerequisites:
+        1. Each segment must contain two analog signals (neo.AnalogSignal ):
+        * recorded membrane potential
+        * the injected current
         
         It is assumed that the amount of injected current is different in each 
         segment and that the duration of the current injection step is the same 
@@ -4759,10 +4804,12 @@ def analyse_AP_step_injection_series(data, **kwargs):
     delta_I: python quantity (pA), float scalar, or None: size of the current injection increment
         When None (defaut) the value will be determined from the Im signal
         
+    Istart, Istop: time quantities for current step injection, or None
+        When given, all segments in the block must start at the same time
+        
     Iinj: None (default), or sequence of current injection values. When not None,
         this must contain as many elements as injection steps, and these must be
         python quantities in units compatible with pA
-        
         
     rheo: boolean, default True
     
@@ -4827,10 +4874,11 @@ def analyse_AP_step_injection_series(data, **kwargs):
         
         default is 0 (no boxcar filtering)
         
-    method: str, one of "state_levels" (default) or "kmeans"
+    method: str, one of "state_levels" (default) or "kmeans": methiod for detection
+        "up" vs "down" states of the step current injection waveform
     
     adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
-        called from neoutils.parse_step_waveform_signal() 
+        called from ephys.parse_step_waveform_signal() 
         
         Used only when method is "state_levels"
         
@@ -5094,7 +5142,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
     ret["Depolarising_steps"] = list()
     
     kwargs["VmSignal"] = VmSignal
-    kwargs["ImSignal"] = ImSignal
+    #kwargs["ImSignal"] = ImSignal # use this for each segmentm, below!
     kwargs["thr"] = thr
     
     Iinj_0 = kwargs.pop("Iinj_0", None)
@@ -5102,14 +5150,17 @@ def analyse_AP_step_injection_series(data, **kwargs):
     
     Iinj = kwargs.pop("Iinj", None)
     
-    if isinstance(Iinj_0, float):
+    Istart = kwargs.pop("Istart", None)
+    Istop = kwargs.pop("Istop", None)
+    
+    if isinstance(Iinj_0, (float, int)):
         Iinj_0 = Iinj_0 * pq.pA
         
     elif isinstance(Iinj_0, pq.Quantity):
         if Iinj_0.size != 1:
             raise TypeError("Iinj_0 must be a scalar quantity")
         
-        if dt.units_convertible(Iinj_0, pq.pA):
+        if units_convertible(Iinj_0, pq.pA):
             Iinj_0 = Iinj_0.rescale(pq.pA)
             
         else:
@@ -5120,14 +5171,14 @@ def analyse_AP_step_injection_series(data, **kwargs):
     
     #kwargs["Iinj_0"] = Iinj_0
     
-    if isinstance(delta_I, float):
+    if isinstance(delta_I, (float, int)):
         delta_I = delta_I * pq.pA
         
     elif isinstance(delta_I, pq.Quantity):
         if delta_I.size != 1:
             raise TypeError("delta_I must be a scalar quantity")
         
-        if dt.units_convertible(delta_I, pq.pA):
+        if units_convertible(delta_I, pq.pA):
             delta_I = delta_I.rescale(pq.pA)
             
         else:
@@ -5138,11 +5189,21 @@ def analyse_AP_step_injection_series(data, **kwargs):
     
     #kwargs["delta_I"] = delta_I
     
+    #NOTE: set up the of current injection amplitudes
+    # this is based on either:
+    # Iinj_0 and delta_I if given, or
+    # Iinj itself
+    # to be supplied together with Istart, Istop
+    # for use when current injection params would fail
+    
     if Iinj is None:
         if all([v is not None for v in (Iinj_0, delta_I)]):
             i_max = Iinj_0 + delta_I * (len(segments)-1)
             
             Iinj = np.linspace(Iinj_0, i_max, num=len(segments))
+            
+            if not isinstance(Iinj, pq.Quantity):
+                Iinj *= pq.pA
             
     elif isinstance(Iinj, (tuple, list)):
         if len(Iinj) != len(segments):
@@ -5151,7 +5212,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         if all([isinstance(v, float) for v in Iinj]):
             Iinj = np.array(Iinj) * pq.pA
             
-        elif all([isinstance(v, pq.Quantity) and dt.units_convertible(v, pq.pA) for v in Iinj]):
+        elif all([isinstance(v, pq.Quantity) and units_convertible(v, pq.pA) for v in Iinj]):
             Iinj = np.array([v.rescale(pq.pA).magnitude for v in Iinj]) * pq.pA
             
         else:
@@ -5169,16 +5230,18 @@ def analyse_AP_step_injection_series(data, **kwargs):
             
     else:
         raise TypeError("Unexpected type for Iinj: %s" % type(Iinj).__name__)
-        
-        
             
-    #print(kwargs)
     
     try:
         #__train_analysis_loop__(segments, ret, apIEI, apFrequency, nAPs,
                                 #apThr, apLatency, **kwargs)
         for k, segment in enumerate(segments):
-            step_result, vstep = analyse_AP_step_injection(segment, **kwargs)
+            if all(isinstance(v, pq.Quantity) for v in (Iinj, Istart, Istop)):
+                im = (Iinj[k], Istart, Istop)
+            else:
+                im = ImSignal
+            #print("segment %d" %k)
+            step_result, vstep = analyse_AP_step_injection(segment, ImSignal = im, **kwargs)
             
             if Iinj is not None:
                 # override the value measured from the Im signal
@@ -5218,7 +5281,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
                                                                    #units = i_units,
                                                                    #time_units = t_units)
         
-        ret["Injected_current"]     = dt.IrregularlySampledDataSignal(domain = seg_index,
+        ret["Injected_current"]     = IrregularlySampledDataSignal(domain = seg_index,
                                                                    signal = Iinj,
                                                                    units = i_units,
                                                                    dtype = np.dtype("float64"),
@@ -5266,28 +5329,28 @@ def analyse_AP_step_injection_series(data, **kwargs):
         
         nAPs = [seg_res["AP_analysis"]["Number_of_APs"] for seg_res in ret["Depolarising_steps"]]
         
-        ret["First_AP_threshold"]   = dt.IrregularlySampledDataSignal(domain = Iinj,
+        ret["First_AP_threshold"]   = IrregularlySampledDataSignal(domain = Iinj,
                                                                    signal = apThr,
                                                                    units = vstep.units,
                                                                    dtype = np.dtype("float64"),
                                                                    domain_units = i_units,
                                                                    name="First AP Onset")
         
-        ret["First_AP_latency"]     = dt.IrregularlySampledDataSignal(domain = Iinj,
+        ret["First_AP_latency"]     = IrregularlySampledDataSignal(domain = Iinj,
                                                                    signal = apLatency,
                                                                    units = vstep.times.units, 
                                                                    dtype = np.dtype("float64"),
                                                                    domain_units = i_units,
                                                                    name = "First AP latency")
         
-        ret["Mean_AP_Frequency"]    = dt.IrregularlySampledDataSignal(domain = Iinj,
+        ret["Mean_AP_Frequency"]    = IrregularlySampledDataSignal(domain = Iinj,
                                                                    signal = apFrequency,
                                                                    units = apFrequency[0].units, 
                                                                    dtype = np.dtype("float64"),
                                                                    domain_units = i_units,
                                                                    name="Mean AP Frequency")
         
-        ret["Number_of_APs"]        = dt.IrregularlySampledDataSignal(domain = Iinj,
+        ret["Number_of_APs"]        = IrregularlySampledDataSignal(domain = Iinj,
                                                                    signal = nAPs, 
                                                                    units = pq.dimensionless,
                                                                    dtype = np.dtype("float64"),
@@ -5322,7 +5385,7 @@ def analyse_AP_step_injection_series_replicate(*blocks, **kwargs):
     """AP analysis in several runs, each containing series of depolarising step current injections.
     DEPRECATED
     Iteratively applies analyse_AP_step_injection_series() for each series in the run
-    the summarizes the result (reports average values).
+    then summarizes the result (reports average values).
     
     Arguments:
     ==========
@@ -5519,7 +5582,7 @@ def analyse_AP_step_injection_series_replicate(*blocks, **kwargs):
     block_results = list()
     
     if isinstance(VmSignal, str):
-        VmSignal = neoutils.get_index_of_named_signal(blocks[0].segments[0], VmSignal)
+        VmSignal = ephys.get_index_of_named_signal(blocks[0].segments[0], VmSignal)
         
     Vm_units = blocks[0].segments[0].analogsignals[VmSignal].units
     time_units = blocks[0].segments[0].analogsignals[VmSignal].times.units
@@ -5570,7 +5633,7 @@ def analyse_AP_step_injection_series_replicate(*blocks, **kwargs):
                 #step_increment *= results_for_rheo[0]["Delta_I_step"].units
                 
             #elif isinstance(step_increment, pq.Quantity):
-                #if not dt.units_convertible(step_increment, results_for_rheo[0]["Delta_I_step"].units):
+                #if not units_convertible(step_increment, results_for_rheo[0]["Delta_I_step"].units):
                     #raise TypeError("require_same_step_increment has incompatible units (%s); expecting %s" % (step_increment.units, results_for_rheo[0]["Delta_I_step"].units))
                 
             #else:
@@ -5644,11 +5707,11 @@ def lookup_injected_current_for_frequency(data, frequency, atol = 10, rtol = 0, 
     
     See also:
     
-    neoutils.inverse_lookup()
+    ephys.inverse_lookup()
     
     """
     
-    ret, index, sigvals = neoutils.inverse_lookup(data, frequency, atol=atol, rtol=rtol, equal_nan=equal_nan)
+    ret, index, sigvals = ephys.inverse_lookup(data, frequency, atol=atol, rtol=rtol, equal_nan=equal_nan)
     
     return ret, sigvals
 
@@ -5867,10 +5930,10 @@ def get_AP_frequency_vs_injected_current(data, isi=None, name=None, description=
     else:
         raise TypeError("isi expected to be None, an int or a sequence of two int")
     
-    #result = dt.IrregularlySampledDataSignal(domain=iinj_domain,
+    #result = IrregularlySampledDataSignal(domain=iinj_domain,
                                                 #signal=signal,
                                                 #units = pq.Hz, domain_units = pq.pA)
-    result = dt.IrregularlySampledDataSignal(domain=iinj,
+    result = IrregularlySampledDataSignal(domain=iinj,
                                                 signal=signal,
                                                 units = pq.Hz, domain_units = pq.pA)
 
@@ -6038,7 +6101,7 @@ def get_AP_params_in_series(data,
                 for ap in step["AP_analysis"][container]:
                     params.append(ap[param_name]) # scalar Quantities, one per AP
                     
-                param_array = dt.IrregularlySampledDataSignal([k for k in range(len(params))], params,
+                param_array = IrregularlySampledDataSignal([k for k in range(len(params))], params,
                                                               units = params[0].units,
                                                               domain_units = pq.dimensionless,
                                                               name=param_name)
@@ -6066,12 +6129,12 @@ def get_AP_params_in_series(data,
             ivar_list.append(step["AP_analysis"][ivar_name]) # Quantity with length of 1
             
     if all([isinstance(v, (float, np.float64)) or v.size==1 for v in var_list]):
-        result = dt.IrregularlySampledDataSignal(ivar_list, var_list,
+        result = IrregularlySampledDataSignal(ivar_list, var_list,
                                                 domain_units = ivar_list[0].units,
                                                 units = var_list[0].units,
                                                 name=param_name)
     else:
-        ivar_data = dt.IrregularlySampledDataSignal([k for k in range(len(ivar_list))], ivar_list,
+        ivar_data = IrregularlySampledDataSignal([k for k in range(len(ivar_list))], ivar_list,
                                              domain_units = pq.dimensionless,
                                              units = ivar_list[0].units,
                                              name = ivar_name)
@@ -6323,7 +6386,7 @@ def summarise_AP_analysis_at_depol_step(*results, **kwargs):
             step_increment *= results_for_rheo[0]["Delta_I_step"].units
             
         elif isinstance(step_increment, pq.Quantity):
-            if not dt.units_convertible(step_increment, results_for_rheo[0]["Delta_I_step"].units):
+            if not units_convertible(step_increment, results_for_rheo[0]["Delta_I_step"].units):
                 raise TypeError("require_same_step_increment has incompatible units (%s); expecting %s" % (step_increment.units, results_for_rheo[0]["Delta_I_step"].units))
             
         else:
@@ -6390,7 +6453,7 @@ def summarise_AP_analysis_at_depol_step(*results, **kwargs):
             test_current *= ret["I"].units
             
         elif isinstance(test_current, pq.Quantity):
-            if not dt.units_convertible(test_current.units, ret["I"].units):
+            if not units_convertible(test_current.units, ret["I"].units):
                 raise TypeError("When specified, test_current must be either a float scalar, or a python quantity in %s " % ret["I"].units.dimensionality.string)
             
             if test_current.units != ret["I"].units:
@@ -6781,7 +6844,7 @@ def report_AP_analysis(data, name=None):
         #the execution. To upsample the Vm signal, pass here a value larger than 
         #the sampling period of the Vm signal.
         
-    #NOTE: The following are passed to neoutils.parse_step_waveform_signal():
+    #NOTE: The following are passed to ephys.parse_step_waveform_signal():
     
     #box_size: int >= 0; default is 0.
     
@@ -6794,7 +6857,7 @@ def report_AP_analysis(data, name=None):
     #method: str, one of "state_levels" (default) or "kmeans"
     
     #adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
-        #called from neoutils.parse_step_waveform_signal() 
+        #called from ephys.parse_step_waveform_signal() 
         
         #Used only when mthod is "state_levels"
         
@@ -6932,10 +6995,10 @@ def report_AP_analysis(data, name=None):
         ##raise ValueError("'ap_index' must be >= 0; got %d instead" % ap_index)
         
     #if isinstance(VmSignal, str):
-        #VmSignal = neoutils.get_index_of_named_signal(segment, VmSignal)
+        #VmSignal = ephys.get_index_of_named_signal(segment, VmSignal)
         
     #if isinstance(ImSignal, str):
-        #ImSignal = neoutils.get_index_of_named_signal(segment, ImSignal)
+        #ImSignal = ephys.get_index_of_named_signal(segment, ImSignal)
         
     #im = segment.analogsignals[ImSignal].copy()
     
@@ -6947,7 +7010,7 @@ def report_AP_analysis(data, name=None):
     ## inj  = injected current (difference between centroids )
     ## label = int array "mask" with 0 for down and 1 for up; same shape as im
     ##print("method", method)
-    #d, u, inj, c, l = neoutils.parse_step_waveform_signal(im,
+    #d, u, inj, c, l = ephys.parse_step_waveform_signal(im,
                                                           #method=method,
                                                           #box_size=box_size, 
                                                           #adcres=adcres,
@@ -6974,7 +7037,7 @@ def report_AP_analysis(data, name=None):
             #if resample_with_period.size > 1:
                 #raise TypeError("new sampling period must be a scalar Quantity; got %s instead" % resample_with_period)
             
-            #if dt.units_convertible(resample_with_period, vstep.sampling_period):
+            #if units_convertible(resample_with_period, vstep.sampling_period):
                 #if resample_with_period.units != vstep.sampling_period.units:
                     #resample_with_period.rescale(vstep.sampling_period.units)
                     
@@ -6991,7 +7054,7 @@ def report_AP_analysis(data, name=None):
             #if resample_with_rate.size > 1:
                 #raise TypeError("new sampling rate must be a scalar Quantity; got %s instead" % resample_with_rate)
         
-            #if dt.units_convertible(resample_with_rate, vstep.sampling_rate):
+            #if units_convertible(resample_with_rate, vstep.sampling_rate):
                 #if resample_with_rate.units != vstep.sampling_rate.units:
                     #resample_with_rate.rescale(vstep.sampling_rate.units)
                     
@@ -7002,10 +7065,10 @@ def report_AP_analysis(data, name=None):
             #raise TypeError("new sampling rate expected to be a scalar float, Quantity, or None; got %s instead" % type(resample_with_rate).__name__)
         
         #if resample_with_rate is not None and resample_with_period is None:
-            #resample_with_period = neoutils.sampling_rate_or_period(resample_with_rate, resample_with_period)
+            #resample_with_period = ephys.sampling_rate_or_period(resample_with_rate, resample_with_period)
             
         #elif resample_with_rate is not None and resample_with_period is not None:
-            #if not neoutils.sampling_rate_or_period(resample_with_rate, resample_with_period):
+            #if not ephys.sampling_rate_or_period(resample_with_rate, resample_with_period):
                 #raise ValueError("resample_with_rate (%s) and resample_with_period (%s) are incompatible" % (resample_with_rate, resample_with_period))
     
     ## resample the Vm signal
@@ -7016,7 +7079,7 @@ def report_AP_analysis(data, name=None):
             #warnings.warn("A sampling period larger than the signal's sampling period (%s) was requested (%s); the signal will be DOWNSAMPLED" % (vstep.sampling_period, resample_with_period), RuntimeWarning)
 
         #if resample_with_period < vstep.sampling_period:
-            #vstep = neoutils.resample_pchip(vstep, resample_with_period)
+            #vstep = ephys.resample_pchip(vstep, resample_with_period)
             
             #upsampling = int(vstep.sampling_period/resample_with_period)
             
@@ -7049,12 +7112,12 @@ def report_AP_analysis(data, name=None):
         #else:
             #segment.spiketrains.append(ap_train)
             
-        #result["AP_half_max_epoch"] = neoutils.signal2epoch(ap_train.annotations["AP_durations_V_half_max"])
-        #result["AP_quart_max_epoch"] = neoutils.signal2epoch(ap_train.annotations["AP_durations_V_quart_max"])
+        #result["AP_half_max_epoch"] = ephys.signal2epoch(ap_train.annotations["AP_durations_V_half_max"])
+        #result["AP_quart_max_epoch"] = ephys.signal2epoch(ap_train.annotations["AP_durations_V_quart_max"])
         
-        #result["AP_Vm0_epoch"] = neoutils.signal2epoch(ap_train.annotations["AP_durations_V_0"])
+        #result["AP_Vm0_epoch"] = ephys.signal2epoch(ap_train.annotations["AP_durations_V_0"])
         
-        #result["AP_onsetVm_epoch"] = neoutils.signal2epoch(ap_train.annotations["AP_durations_V_onset"])
+        #result["AP_onsetVm_epoch"] = ephys.signal2epoch(ap_train.annotations["AP_durations_V_onset"])
         
         #result["AP_half_max"] = ap_train.annotations["AP_half_max"]
         #result["AP_quart_max"]= ap_train.annotations["AP_quart_max"]
@@ -7203,7 +7266,7 @@ def analyse_AP_step_injection(segment,
     method: str, one of "state_levels" (default) or "kmeans"
     
     adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
-        called from neoutils.parse_step_waveform_signal() 
+        called from ephys.parse_step_waveform_signal() 
         
         Used only when method is "state_levels"
         
@@ -7337,14 +7400,21 @@ def analyse_AP_step_injection(segment,
     # 
     
     if isinstance(VmSignal, str):
-        VmSignal = neoutils.get_index_of_named_signal(segment, VmSignal)
-        
-    if isinstance(ImSignal, str):
-        ImSignal = neoutils.get_index_of_named_signal(segment, ImSignal)
-        
-    im = segment.analogsignals[ImSignal].copy()
+        VmSignal = ephys.get_index_of_named_signal(segment, VmSignal)
     
     vm = segment.analogsignals[VmSignal].copy()
+        
+    if isinstance(ImSignal, str):
+        im = segment.analogsignals[ephys.get_index_of_named_signal(segment, ImSignal)].copy()
+        
+    elif isinstance(ImSignal, int):
+        im = segment.analogsignals[ImSignal].copy()
+        
+    elif isinstance(ImSignal, tuple) and len(ImSignal) == 3:
+        im = ImSignal
+    else:
+        raise TypeError(f"ImSignal expected a str (signal name) int signal index) or a triplet (amplitude, start & stop times); got {ImSignal} instad")
+                
     
     # down, up, inj, centroids, label
     # down = time point of the up-down transition
@@ -7396,7 +7466,9 @@ def analyse_AP_step_injection(segment,
         # check to see if there already is a spike train of APs; don't just append
         for k, st in enumerate(segment.spiketrains):
             if is_AP_spiketrain(st):
-                segment.spiketrains[k] = ap_train
+                #segment.spiketrains[k] = ap_train
+                # NOTE: in neo >= 0.10.0 segment.spiketrains is a neo.SpikeTrainList
+                list(segment.spiketrains)[k] = ap_train
                 
     else:
         segment.spiketrains.append(ap_train)
@@ -7417,7 +7489,7 @@ def analyse_AP_step_injection(segment,
         # time of the end of last AP is time of start of last AP + last AP duration at Vonset
         
         #print("analyse_AP_step_injection for Iinj %g: ap_train[-1]: %g, AP_durations_V_onset[-1]: %g, ap_train[0]: %g" % (Iinj, ap_train[-1], ap_train.annotations["AP_durations_V_onset"][-1], ap_train[0]))
-        mean_ap_freq  = (len(ap_train) / (ap_train[-1] + ap_train[0])).rescale(pq.Hz)
+        mean_ap_freq  = ( len(ap_train) / ( ap_train[-1] - ap_train[0] ) ).rescale(pq.Hz)
         # why do I sometimes get np.nan here ?
         # because you need to also provide a tail in case the last AP is right on the end of the Vm signal!
         ap_intvl = np.diff(ap_train.magnitude, axis=0) * vm.times.units
@@ -7431,6 +7503,8 @@ def analyse_AP_step_injection(segment,
     else:
         mean_ap_freq = 0. * pq.Hz
         ap_intvl = np.array([np.nan]) * vm.times.units
+        
+    #print("mean_ap_freq", mean_ap_freq)
         
     result["Inter_AP_intervals"] = ap_intvl
     
@@ -7467,12 +7541,12 @@ def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
         Iinj: Quantity = the actual value of injected current calculated from the command signal
     
     """
-    averaged_block = neoutils.average_blocks(*data_blocks, step_index = step_index, signal_index = [Vm_index, Iinj_index], name=name_prefix)
+    averaged_block = ephys.average_blocks(*data_blocks, step_index = step_index, signal_index = [Vm_index, Iinj_index], name=name_prefix)
     
-    neoutils.set_relative_time_start(averaged_block)
+    ephys.set_relative_time_start(averaged_block)
     
-    neoutils.auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = True, label = "Ion", append=False)
-    neoutils.auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
+    ephys.auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = True, label = "Ion", append=False)
+    ephys.auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
     
     Ion = averaged_block.segments[0].events[0].times
     
@@ -7487,7 +7561,7 @@ def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
     AHP = (averaged_block.segments[0].analogsignals[Vm_index] - Base).time_slice(Ioff, averaged_block.segments[0].analogsignals[Vm_index].t_stop)
     
     AHP.name = "%s_AHP" % name_prefix
-    neoutils.set_relative_time_start(AHP)
+    ephys.set_relative_time_start(AHP)
 
     params = dict()
     params["name"] = name_prefix
@@ -7512,12 +7586,13 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
     Ioff = list()
     
     for b in data_blocks:
-        bb = neoutils.neo_copy(b)
+        bb = deepcopy(b)
+        #bb = ephys.neo_copy(b)
         
-        neoutils.set_relative_time_start(bb)
+        ephys.set_relative_time_start(bb)
         
-        neoutils.auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = True, label="Ion", append=False)
-        neoutils.auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
+        ephys.auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = True, label="Ion", append=False)
+        ephys.auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
         
         Ion.append(bb.segments[0].events[0].times)
         
@@ -7548,14 +7623,14 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
         
     ret = neo.Block()
     
-    ret.segments[:] = neoutils.average_segments(*segments, signal_index = [Vm_index, Iinj_index],
+    ret.segments[:] = ephys.average_segments(*segments, signal_index = [Vm_index, Iinj_index],
                                                 name = name_prefix)
     
     AHP = ret.segments[0].analogsignals[Vm_index].time_slice(Ioff[-1], ret.segments[0].analogsignals[Vm_index].t_stop)
     
     AHP.name = "%s_AHP_%d_%s" % (name_prefix, Iinj.magnitude, Iinj.units.dimensionality)
     
-    neoutils.set_relative_time_start(AHP)
+    ephys.set_relative_time_start(AHP)
 
     params = dict()
     params["name"] = name_prefix
@@ -7569,8 +7644,8 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
         
 def measure_AHP(signal):
     """Returns the peak and its integral (Simpson)
-    Signal = neo.AnalogSignal with t_start at 0 s and units of mV mwith one data channel
-    Thypically this is an AHP waveform already extracted using other functions in this module.
+    Signal = neo.AnalogSignal with t_start at 0 s and units of mV with one data channel
+    Typically this is an AHP waveform already extracted using other functions in this module.
     
     """
     from scipy import integrate
@@ -7742,7 +7817,7 @@ def get_ap_analysis_param(rdict, param_name, step_index, waveform_index = 0):
     
     # ensure that if Waveform is requested and is not found, then return None
     # instead of np.nan
-    if param_name is "Waveform":
+    if param_name == "Waveform":
         ret = None
         
     else:
@@ -7764,10 +7839,10 @@ def get_ap_analysis_param(rdict, param_name, step_index, waveform_index = 0):
         else:
             segdict = rdict
             
-        if param_name is "Vm_signal" and "Vm_signal" in segdict:
+        if param_name == "Vm_signal" and "Vm_signal" in segdict:
             return segdict["Vm_signal"]
         
-        if param_name is "AP_train":
+        if param_name == "AP_train":
             if "AP_analysis" in segdict:
                 return segdict["AP_analysis"]["AP_train"]
             
@@ -7851,10 +7926,10 @@ def get_ap_analysis_param(rdict, param_name, step_index, waveform_index = 0):
                 if isinstance(ret, float):
                     ret = np.array([ret])
                 
-            elif param_name is "time_units":
+            elif param_name == "time_units":
                 ret = segdict["Duration_at_half_max"].units
                 
-            elif param_name is "data_units":
+            elif param_name == "data_units":
                 ret = segdict["Vm_amplitude"].units
                 
             else:
