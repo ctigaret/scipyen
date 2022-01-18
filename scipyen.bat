@@ -1,5 +1,5 @@
 @echo off
-if not defined %VIRTUAL_ENV% CALL scipyact.bat
+rem if not defined %VIRTUAL_ENV% CALL scipyact.bat
 
 rem  set script=%~f0
 rem  echo %script%
