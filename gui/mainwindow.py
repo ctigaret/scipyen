@@ -4540,6 +4540,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_changeDirectory(self, targetDir=None):
+        print(f"MainWindow.slot_changeDirectory(targetDir = {targetDir})")
         if targetDir is None:
             if isinstance(self.sender(), QtWidgets.QAction):
                 targetDir = str(self.sender().text())
@@ -4550,7 +4551,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # returns the shortcut indicator character '&'
             targetDir = targetDir.replace('&','') 
                 
-        if targetDir is None or targetDir == "" or not os.path.exists(targetDir):
+        if targetDir is None or (isinstance(targetDir, str) and len(targetDir.strip()) == 0) or not os.path.exists(targetDir):
             targetDir = os.getenv("HOME")
         
         if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
@@ -4563,8 +4564,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             except:
                 pass
             
+            if sys.platform == "win32":
+                targetDir = rf"{targetDir}"
+
             if self.ipkernel is not None and self.shell is not None and self.console is not None:
-                self.console.execute(''.join(["cd '", targetDir, "'"]), hidden=True)
+                print(''.join(["cd '", targetDir, "'"]))
+                self.console.execute(''.join(["cd '", targetDir, "'"]), hidden=True if sys.platform=="linux" else False)
                 
             if self.external_console:
                 self.external_console.execute("".join(["os.chdir('", targetDir,"')"]))
