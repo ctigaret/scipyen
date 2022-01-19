@@ -1,5 +1,5 @@
 @echo off
-if not defined %VIRTUAL_ENV% CALL scipyact.bat
+rem if not defined %VIRTUAL_ENV% CALL scipyact.bat
 
 rem  set script=%~f0
 rem  echo %script%
@@ -10,6 +10,5 @@ rem  echo %link_target%
 rem  SET scipyendir=%~dp0
 SET scipyendir=e:\scipyen
 
-python %scipyendir%\scipyen.py
+cmd /C "python %scipyendir%\scipyen.py"
 echo on
-cmd /k
