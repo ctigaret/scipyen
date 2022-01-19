@@ -10,6 +10,5 @@ rem  echo %link_target%
 rem  SET scipyendir=%~dp0
 SET scipyendir=e:\scipyen
 
-python %scipyendir%\scipyen.py
+cmd /C "python %scipyendir%\scipyen.py"
 echo on
-cmd /k

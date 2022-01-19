@@ -4540,7 +4540,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_changeDirectory(self, targetDir=None):
-        print(f"MainWindow.slot_changeDirectory(targetDir = {targetDir})")
+        #print(f"MainWindow.slot_changeDirectory(targetDir = {targetDir})")
         if targetDir is None:
             if isinstance(self.sender(), QtWidgets.QAction):
                 targetDir = str(self.sender().text())
@@ -4552,7 +4552,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             targetDir = targetDir.replace('&','') 
                 
         if targetDir is None or (isinstance(targetDir, str) and len(targetDir.strip()) == 0) or not os.path.exists(targetDir):
-            targetDir = os.getenv("HOME")
+            targetDir = os.getenv("USERPROFILE") if sys.platform == "win32" else os.getenv("HOME")
         
         if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
             if os.path.isfile(targetDir):
@@ -4563,14 +4563,24 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 
             except:
                 pass
-            
+
             if sys.platform == "win32":
+                targetDir = targetDir.replace("\\", "/")
                 targetDir = rf"{targetDir}"
 
+            #print(f"MainWindow.slot_changeDirectory targetDir = {targetDir}")
+
             if self.ipkernel is not None and self.shell is not None and self.console is not None:
-                print(''.join(["cd '", targetDir, "'"]))
-                self.console.execute(''.join(["cd '", targetDir, "'"]), hidden=True if sys.platform=="linux" else False)
-                
+                #print(''.join(["cd '", targetDir, "'"]))
+                #if sys.platform == "linux":
+                    #self.console.execute(''.join(["cd '", targetDir, "'"]), hidden=True)
+                #else:
+                    #self.console.execute(''.join(["os.chdir('", targetDir, "')"]), hidden=False)
+
+                self.console.execute(''.join(["os.chdir('", targetDir, "')"]), hidden=True)
+
+                #self.console.execute(''.join(["cd '", targetDir, "'"]), hidden=True if sys.platform=="linux" else False)
+
             if self.external_console:
                 self.external_console.execute("".join(["os.chdir('", targetDir,"')"]))
                 
