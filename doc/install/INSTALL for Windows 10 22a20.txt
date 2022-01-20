@@ -1,9 +1,62 @@
 Dependencies:
 =============
 
-Compiler & toolset:
-------------------
-    VisualStudio 2019 Community edition:
+Compiler & toolsets - installed system-wide:
+---------------------------------------------
+1.    VisualStudio 2019 Community edition:
 The C compiler identification is MSVC 19.29.30133.0
 The CXX compiler identification is MSVC 19.29.30133.0
 Windows-10.0.19043
+
+2. CMake
+From https://cmake.org/download/ download
+cmake-3.22.1-windows-x86_64.msi and install; check (select) the following:
+    * for all users
+    * add cmake on PATH for all users
+
+3. git and gitk; optionally gh cli (from github)
+
+4. WarSetup (github fork)
+
+5. Inno setup
+
+
+
+Directories layout - AVOID FUNNY NAMES, USE ONY ALPHANUMERIC CHARACTERS, '_'
+(UNDERSCOPRE) AND '-' (DASH) IF NECESSARY; AVOID NAMED BEGINNING WITH DIGITS
+================================================================================
+1. Install Python3.9 (3.9.7)
+    USE the official Python installer from Python.org, NOT the Python app from
+    Windows store!
+
+2. Make virtual environment named "scipyenv" on a drive with enough space
+(at least 30 GiB, space needed to expand sources and build software)
+    2.1 make a "Scripts" folder in your personal folder, add it to PATH
+    2.2 inside, copy the scipyact.bat
+
+3. Make directory "scipyen_sdk" ideally on the same drive as "scipyenv" directory
+
+4. Clone scipyen git repo, ideally on the same drive as "scipyenv" directory
+    4.1 cd to "scipyen" and clone the branches:
+    "master":
+        git checkout master
+        git pull
+
+    "dev":
+        git checkout dev
+        git pull
+
+Build scipyen_sdk software libraries
+====================================
+NOTE: Some toolkits are installed system-wide (VisualStudio, CMake); these will
+be used to build scipyen_sdk libraries (i.e. libraries required by scipyen) and
+install them in the scipyen_sdk directory.
+
+Libraries will be built and installed in the order of their dependencies; these
+dependencies will be expected to be installed in scipyen_sdk; this is so that
+these libraries will NOT clobber other library versions installed on the system.
+
+We will then modify scipyact batch file to take those into account.
+
+
+
