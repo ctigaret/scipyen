@@ -1,0 +1,9 @@
+Dependencies:
+=============
+
+Compiler & toolset:
+------------------
+    VisualStudio 2019 Community edition:
+The C compiler identification is MSVC 19.29.30133.0
+The CXX compiler identification is MSVC 19.29.30133.0
+Windows-10.0.19043
