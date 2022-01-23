@@ -275,9 +275,11 @@ launch Visual Studio 2019:
     devenv
 
 open the solution zlib-1.2.11\contrib\vstudio\vc14\zlibvc.sln
+
     retarget the solution
     select Release and x64
-    In solution explorer select xlibvc -> right click for Properties -> change:
+    In solution explorer select xlibvc -> right click for Properties -> change
+    all from zlibwapi.* to zlib.* as follows:
      Configuration Properties
         General:
             Target Name:    zlib
@@ -379,7 +381,7 @@ open configuration manager,
 Skip this
 
 --------------------------------------------------------------------------------
-4. jpeg-turbo => supplies both jpeg AND jpeg-turbo
+4. jpeg-turbo => supplies both jpeg AND jpeg-turbo - taken from github
 --------------------------------------------------------------------------------
 cd %VIRTUAL_ENV%\src
 
@@ -593,6 +595,7 @@ paths below should be enclosed in double-quotes):
 NOTE: always use the same toolset setting!
 
 (skip this ) %VIRTUAL_ENV%\Boost.Build\bin\b2 toolset=msvc threading=multi address-model=64 variant=release link=shared -prefix=%VIRTUAL_ENV% --build-type=complete msvc stage
+
 %VIRTUAL_ENV%\Boost.Build\bin\b2 toolset=msvc threading=multi address-model=64 variant=release link=shared --prefix=%VIRTUAL_ENV% --build-type=complete msvc install
 
 When prefix is a drive this will install:

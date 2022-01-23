@@ -1,43 +1,50 @@
-Dependencies:
-=============
-
-Compiler & toolsets - installed system-wide:
----------------------------------------------
-1.    VisualStudio 2019 Community edition:
-The C compiler identification is MSVC 19.29.30133.0
-The CXX compiler identification is MSVC 19.29.30133.0
-Windows-10.0.19043
-
-2. CMake
-From https://cmake.org/download/ download
-cmake-3.22.1-windows-x86_64.msi and install; check (select) the following:
-    * for all users
-    * add cmake on PATH for all users
-
-3. git and gitk; optionally gh cli (from github)
-
-4. WarSetup (github fork)
-
-5. Inno setup
+Below, "PATH" refers to the PATH environment variable
 
 
+Directories layout:
+    AVOID FUNNY NAMES,
+    USE ONY ALPHANUMERIC CHARACTERS, '_' (UNDERSCOPRE) AND '-' (DASH) IF NECESSARY;
+    AVOID NAMES BEGINNING WITH DIGITS
 
-Directories layout - AVOID FUNNY NAMES, USE ONY ALPHANUMERIC CHARACTERS, '_'
-(UNDERSCOPRE) AND '-' (DASH) IF NECESSARY; AVOID NAMED BEGINNING WITH DIGITS
+
 ================================================================================
-1. Install Python3.9 (3.9.7)
-    USE the official Python installer from Python.org, NOT the Python app from
-    Windows store!
+I. PREPARATION
+================================================================================
 
-2. Make virtual environment named "scipyenv" on a drive with enough space
-(at least 30 GiB, space needed to expand sources and build software)
-    2.1 make a "Scripts" folder in your personal folder, add it to PATH
-    2.2 inside, copy the scipyact.bat
+--------------------------------------------------------------------------------
+1. Install Python3.9 (3.9.7), make virtual environment
+--------------------------------------------------------------------------------
+    USE the official Python installer downloaded from from Python.org, NOT the
+    Python app from Windows store!
 
-3. Make directory "scipyen_sdk" ideally on the same drive as "scipyenv" directory
+    Make sure you ACCEPT lifting the limit to the PATH environment variable, when
+    prompted by the installation dialogue.
 
-4. Clone scipyen git repo, ideally on the same drive as "scipyenv" directory
-    4.1 cd to "scipyen" and clone the branches:
+1.1. Make a Python virtual environment named "scipyenv" on a drive with enough
+    space (at least 30 GiB, space needed to expand sources and build software).
+
+    1.1.1 make a "Scripts" folder in your personal folder, add it to PATH
+    1.1.2 inside, copy the scipyact.bat ans scipyact_vs64.bat scripts.
+
+--------------------------------------------------------------------------------
+2. Make sdk directory tree, clone scipyen git repo
+--------------------------------------------------------------------------------
+2.1. Make directory "scipyen_sdk" ideally on the same drive as "scipyenv" directory
+    This is the place where 3rd party libraries are going to be installed.
+
+    Below, the "SDK" variable refers to this (scipyen_sdk) directory.
+
+    Make subdirectory %SDK%\bin\ and add it to the %PATH% variable
+
+2.2. Make directory "scipyen_sdk_src" where 3rd party libraries will be built.
+
+The SRC variable below refers to this directory ("scipyen_sdk_src").
+
+2.3. Clone the scipyen git repo, ideally on the same drive as "scipyenv" directory.
+This will create a "scipyen" directory alongside "scipyenv", "scipyen_sdk", and
+"scipyen_sdk_src".
+
+    5.1 cd to "scipyen" and clone the "master" and "dev" branches:
     "master":
         git checkout master
         git pull
@@ -46,17 +53,431 @@ Directories layout - AVOID FUNNY NAMES, USE ONY ALPHANUMERIC CHARACTERS, '_'
         git checkout dev
         git pull
 
-Build scipyen_sdk software libraries
-====================================
-NOTE: Some toolkits are installed system-wide (VisualStudio, CMake); these will
-be used to build scipyen_sdk libraries (i.e. libraries required by scipyen) and
-install them in the scipyen_sdk directory.
+================================================================================
+II. Install tools & tookits system-wide (if not already installed)
+================================================================================
 
-Libraries will be built and installed in the order of their dependencies; these
-dependencies will be expected to be installed in scipyen_sdk; this is so that
-these libraries will NOT clobber other library versions installed on the system.
+NOTE: Use the installer indicated below. We assume these will install software
+in the default locations, usually subdirectories of "c:\Program Files" and of
+"c:\Program Files (x86)".
 
-We will then modify scipyact batch file to take those into account.
+
+1. VisualStudio 2019 Community edition:
+    The C compiler identification is MSVC 19.29.30133.0
+    The CXX compiler identification is MSVC 19.29.30133.0
+    Windows-10.0.19043
+
+2. CMake - use the installer cmake-3.22.1-windows-x86_64.msi (or download from
+    https://cmake.org/download/)
+    and install; check (select) the following:
+        * for all users
+        * add cmake on PATH for all users
+
+3. git tools:
+--------------
+    3.1. git and gitk - use the installer Git-2.33.0.2-64-bit.exe - it will add
+the relevant "bin" directory to the PATH
+
+    3.2. gh cli (from github, optional): use gh_2.0.0_windows_amd64.msi
+    NOTE: Add the directory "C:\Program Files (x86)\GitHub CLI" to the PATH
+
+    3.3 Git desktop (optional) - use GitHubDesktopSetup-x64.exe
+
+4. doxygen: use the setup binary: doxygen-1.9.2-setup.exe; add
+    NOTE: Add "C:\Program Files\doxygen\bin" to the PATH
+
+5. 7zip - use 7z2103-x64.exe
+
+6. nasm  - use nasm-2.15.05-installer-x64.exe
+    dowlaod from https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/nasm-2.15.05-installer-x64.exe
+    run as administrator;
+    manually add c:\Programs Files\NASM to %PATH%
+
+7. strawberry-perl-5.32.1.1-64bit.msi      <- add C:\Strawberry\perl\bin to PATH
+                                            (only if necessary; the installer
+                                             should have done that)
+8. rubyinstaller-devkit-3.0.2-1-x64.exe
+
+9. node (node.js):
+node-v14.18.0-x64.exe                   <- from https://nodejs.org/en/download/
+
+
+================================================================================
+III. Build scipyen_sdk software libraries
+================================================================================
+NOTE: activate scipyenv AND VS x64 environment by calling scipyact_vs64
+
+--------------------------------------------------------------------------------
+1. zlib
+--------------------------------------------------------------------------------
+
+from https://zlib.net/ download zlib source code, version 1.2.11,
+zipfile format (730K,
+SHA-256 hash d7510a8ee1918b7d0cad197a089c0a2cd4d6df05fee22389f67f115e738b178d)
+
+1.1 launch the VStudio from the command line: 'devenv'
+
+1.2 open the solution zlib-1.2.11\contrib\vstudio\vc14\zlibvc.sln
+
+    1.2.1 In the dialogue make sure the following are selected:
+        * Windows SDK version: 10.0 (latest installed version)
+        * Platform toolset: Upgrade to v142
+
+        By default all sub-projects are selected; select ONLY zlib
+        (i.e., 'zlibvc.vcxproj').
+
+        Click 'OK'
+
+    1.2.2. From the drop-down combo-boxes in the toolbar select
+        "Release" and "x64"
+
+    1.2.3. In Solution Explorer select the zlibvc solution.
+        Right-click, select Properties; in the 'zlibvc Property Pages dialogue'
+        make the following changes: change all from zlibwapi.* to zlib.*, as
+        follows:
+        Configuration Properties
+            General:
+                Target Name:    zlib
+
+            Linker:
+                General:
+                    Output File:    $(OutDir)zlib.dll
+                Debugging:
+                    Generate Program Database file:     $(OutDir)zlib.pdb
+                    Map file Name:                      $(OutDir)zlib.map
+                Advanced:
+                    Import Library:                     $(OutDir)zlib.lib
+
+
+        Leave OutDir unchanges; we will copy files manually to scipyen_sdk
+
+    1.2.4. From the Build menu choose "Build Solution"
+
+    1.2.5. Manually install files
+        Close VStudio
+
+    from zlib-1.2.11\contrib\vstudio\vc14\x64\ZlibDllrelease copy:
+        zlib.dll to  %SDK%\bin\
+        zlib.lib, zlib.exp to  %SDK%\lib\
+
+    from zlib-1.2.11 copy:
+        zlib.h, zconf.h and all other *.h files to %SDK%\include\
+        zlib.3 to %SDK%\share\man\man3\
+        README, FAQ, zlib.3.pdf, doc\*.* to %SDK%\share\doc\zlib\
+
+--------------------------------------------------------------------------------
+2. libpng
+--------------------------------------------------------------------------------
+
+download lpng1637.zip from
+
+https://sourceforge.net/projects/libpng/files/libpng16/1.6.37/lpng1637.zip/download?use_mirror=jztkft
+
+copy lpng1637\scripts\pnglibconf.h.prebuilt
+to   lpng1637\pnglibconf.h
+
+launch VStudio (devenv)
+    then "open project or solution" -> choose:
+    %SRC%\lpng1637\projects\vstudio\vstudio.sln
+
+accept all projects
+
+accept migration to VS 14.2 (VS community edition 2019) -> adaps all *.vcxproj files in
+the subdirectories
+
+open configuration manager,
+    in active solution platform (currently, win32) choose <new> ->
+        choose new platform: x64, check ON create new project platforms
+
+    in Active solution configurations select Release
+
+    in the Build check ONLY libpng or at least UNCKECK zlib
+    (we will use the zlib built as above).
+
+
+    open properties for libpng (sub)project -> right click -> properties
+        -> Configuration properties:
+            -> VC++ directories:
+                -> Include directories -> add %SRC%\include
+                -> External include directories -> add %SRC%\include
+                    -> REMOVE the $(ZLibIncldDir)
+                -> Libray directories -> add %SRC%\lib;%SRC%\lib64;%SRC%\bin
+            -> C/C++:
+                -> General:
+                    -> Additional include directories -> add %SRC%\\lpng1637;%SRC%\include
+                    -> Treat warning as errors -> No (/WX-)
+
+            -> Linker:
+                -> General:
+                    -> Additional library directories -> add %SRC%\lib;%SRC%\lib64
+
+    Build menu -> build solution (Ctrl+Shift+B)
+
+install:
+    the built files are in
+    %SRC%\lpng1637\projects\vstudio\x64\Release
+    from there:
+        copy libpng16.dll, libpng16.pdb to %SDK%\bin\
+        copy libpng16.lib, libpng16.exp to %SDK%\lib\
+
+    copy all include files (*.h) from %SRC%\lpng1637 to %SDK%\include
+    copy
+        libpng3 and libpngpf.3 to %SDK%\share\man\man3\
+        png.5 to %SDK%\share\man\man5\
+        libpng-manual.txt, README, LICENSE to %SDK%\share\doc\libpng\
+
+
+--------------------------------------------------------------------------------
+3. jpeg-turbo => supplies both jpeg AND jpeg-turbo - use github repo
+--------------------------------------------------------------------------------
+cd %SRC%
+
+gh repo clone winlibs/libjpeg
+or
+git clone https://github.com/winlibs/libjpeg.git
+
+devenv
+
+open "folder" in VisualStudio 2019 -> CMake project
+
+open "CMake settings editor"
+    in Configurations (on the left) create x64-Release (click "add" then choose
+    "x64-Release")
+    IN top toolbar combo select x64-Release
+configuration x64-Release:
+    build type RelWithDebInfo
+    toolset msvc_x64_x64
+    CMake generator: Ninja
+    CMake variables:
+        CMAKE_BUILD_TYPE=RelWithDebInfo
+        ENABLE_SHARED (true)
+        ENABLE_STATIC (true)
+        FORCE_INLINE (true)
+        WITH_ARITH_DEC (true)
+        WITH_ARITH_ENC (true)
+        WITH_JPEG7 (true)
+        WITH_JPEG8 (true)
+        WITH_MEM_SCRDST (true)
+        WITH_SIMD (true)
+        WITH_TURBOJPEG (true)
+
+    Install directory -> choose %SDK%
+    CMake executable -> choose c:\Program Files\CMake\bin\cmake.exe
+
+build   -> build all
+        -> install
+
+--------------------------------------------------------------------------------
+4. libtiff
+--------------------------------------------------------------------------------
+In %SRC%, run
+    git clone https://gitlab.com/libtiff/libtiff.git
+
+    => will create a clone of libtiff repository in %SRC%\libtiff
+
+open visual studio
+    devenv
+
+    -> Open a folder -> select %SRC%\libtiff
+
+read through the CMake output
+
+create configuration x64-Release (in CMake Setting -> Configurations)
+
+Build menu -> build all
+Buils menu -> Install tiff
+
+check that it works:
+    from http://www.simplesystems.org/libtiff/images.html download
+    https://download.osgeo.org/libtiff/pics-3.8.0.tar.gz
+
+    unpack with 7zip => %SDK%\share\libtiffpic
+
+open command prompt, cd %SDK%\share\libtiffpic
+tiffcp -lzw cramps.tif x.tif
+tiffcmp cramps.tif x.tif
+tiff2pdf -o cramps.pdf cramps.tif
+tiff2bw jello.tif jello_bw.tif
+
+also you may run tiffinfo on all tif files in this directory
+
+--------------------------------------------------------------------------------
+5. fftw
+--------------------------------------------------------------------------------
+
+download fftw-3.3.5-dll64.zip from http://www.fftw.org/install/windows.html
+
+extract to %SRC%\fftw3
+
+cd into fftw3 then run:
+
+lib /machine:x64 /def:libfftw3-3.def
+lib /machine:x64 /def:libfftw3f-3.def
+lib /machine:x64 /def:libfftw3l-3.def
+
+then copy:
+    *.exe and *.dll files to %SDK%\bin\
+    *.lib, *.def, *.exp files to %SDK%\lib\
+    *.h files (actually, only fftw3.h) to %SDK%\include\
+    COPYING, COPYRIGHT, NEWS, README* to %SDK%\share\doc\fftw3\
+
+--------------------------------------------------------------------------------
+6. Imath (NOTE this is "eye-math" not "ell-math" !)
+--------------------------------------------------------------------------------
+
+get it from https://github.com/AcademySoftwareFoundation/Imath
+
+clone git repo:
+gh repo clone AcademySoftwareFoundation/Imath
+or
+git clone https://github.com/AcademySoftwareFoundation/Imath.git
+
+devenv
+
+open "folder" in VS2019; as above make x64 release configuration, select %SDK%
+for install directory (is possible, else install manually from the
+out/install/release tree).
+
+Build all
+Install Imath
+
+--------------------------------------------------------------------------------
+7. openssl
+--------------------------------------------------------------------------------
+git clone https://github.com/winlibs/openssl.git
+or
+gh repo clone winlibs/openssl
+
+follow the instructions at
+https://github.com/openssl/openssl/blob/master/NOTES-WINDOWS.md#native-builds-using-visual-c++
+
+In a nutshell:
+
+    cd openssl
+    perl Configure VC-WIN64A --prefix=%SDK% --openssldir=%SDK%
+    nmake
+    nmake tests
+    nmake install
+
+--------------------------------------------------------------------------------
+8. ICU
+--------------------------------------------------------------------------------
+gh repo clone unicode-org/icu
+or
+git clone https://github.com/unicode-org/icu.git
+
+cd icu
+devenv
+    open solution  %SRC%\icu\icu4c\source\allinone\allinone.sln
+    project -> retarget solution
+    choose Release x64;
+    open configuration manager, deselect all *_UWP from build column
+    build solution
+
+copy
+    %SRC%\icu\icu4c\bin64\*.* to %SDK%\bin\
+    %SRC%\icu\icu4c\include\*.* to %SDK%\include\
+    %SRC%\icu\icu4c\lib64\*.* to %SDK%\lib64\
+
+
+--------------------------------------------------------------------------------
+9. OpenEXR
+--------------------------------------------------------------------------------
+get it from https://github.com/AcademySoftwareFoundation/openexr
+cd to %SRC% and clone git repo :
+
+gh repo clone AcademySoftwareFoundation/openexr
+or
+git clone https://github.com/AcademySoftwareFoundation/openexr.git
+
+open Visual Studio -> open folder -> %SRC%\openexr
+create x64 release
+Imath should be recognized
+build all
+install openexr
+
+--------------------------------------------------------------------------------
+10. HDF5
+--------------------------------------------------------------------------------
+get the CMake version of the source tree :
+from https://www.hdfgroup.org/downloads/hdf5/source-code/
+download CMake-hdf5-1.12.1.zip
+extract
+copy build-VS2019-64-virtualenv.bat from downloads to
+%SRC%\CMake-hdf5-1.12.1\
+(edit INSTALLDIR=%SDK%)
+
+Open command prompt, run vs64
+
+cd to %SRC%\CMake-hdf5-1.12.1 and execute build-VS2019-64-virtualenv
+
+don't worry about test 1726 - H5DUMP-tfloatsattrs (Failed) message
+(see here https://forum.hdfgroup.org/t/h5dump-test-failed/8762/2)
+
+to install, extract the newly created zip file:
+
+%SRC%\CMake-hdf5-1.12.1\build\HDF5-1.12.1-win64.zip
+(NOTE: the %SRC%\CMake-hdf5-1.12.1\build\HDF5-1.12.1-win64.exe is an installer
+for system-wide installation; we just don't use it here)
+
+and copy the contents of the subdirectories to their corresponding directories
+in %SDK%\
+(e.g. from bin\*.* to %SDK%\bin, etc)
+NOTE: DO NOT copy zconf.h ! we use the one already present in %SDK%\include
+(they are identical, and the latter has been provided by zlib, see above)
+
+
+--------------------------------------------------------------------------------
+11. install pip requirements 0 for windows
+--------------------------------------------------------------------------------
+These include numpy, necessary for building boost python and boost numpy
+--------------------------------------------------------------------------------
+12 install bison & flex
+--------------------------------------------------------------------------------
+... (not really needed?)
+--------------------------------------------------------------------------------
+13. Boost
+--------------------------------------------------------------------------------
+
+download boost_1_77_0.7z
+from https://www.boost.org/doc/libs/1_77_0/more/getting_started/windows.html#get-boost
+
+extract to %SRC%\ => will create %SRC%\boost_1_77_0
+
+ATTENTION: do NOT build from scipyact_vs64 environment; use vs64 environment
+
+........................................
+12.1 Create the b2 Boost.Build program
+........................................
+
+cd boost_1_77_0\tools\build
+bootstrap
+.\b2 --prefix=%SRC%\Boost.Build toolset=msvc install
+
+........................................
+12.2 Build & install boost
+........................................
+
+cd %SRC%\boost_1_77_0
+
+run (NOTE: make sure to replace root with the full real path; as per PREAMBLE,
+     NO spaces in the ROOT path are allowed; where this is impossible, then all
+paths below should be enclosed in double-quotes):
+
+NOTE: always use the same toolset setting!
+
+(skip this ) %SDK%\Boost.Build\bin\b2 toolset=msvc threading=multi address-model=64 variant=release link=shared -prefix=%SDK% --build-type=complete msvc stage
+
+%SRC%\Boost.Build\bin\b2 toolset=msvc threading=multi address-model=64 variant=release link=shared --with-python --prefix=%SDK% --build-type=complete msvc install
+
+When prefix is a drive this will install:
+    * boost headers (*.hpp) in %SDK%\include\boost_1_77_0\boost
+        => add this to the INCLUDE environment variable
+
+    * the *.dll and *.lib files in %SDK%\lib
+
+    (you MAY want to copy the *.dll in %SDK%\bin also)
+
 
 
 
