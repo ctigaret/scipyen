@@ -4,3 +4,4 @@ sphinx          # needed to build VIGRA
 nose            # needed to build VIGRA
 confuse
 PyQt5           # on Unix must build, see c_cpp_requirements_unix.txt
+dill

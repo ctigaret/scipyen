@@ -1,4 +1,0 @@
-# AFTER installing PyQt5, see pip_requirements_0.txt
-PyQt5           # on Unix must build, see c_cpp_requirements_unix.txt
-python-magic-bin
-# tables # NOTE as of 2021-10-12 11:59:52 must compile from source if using Python >= 3.9.7

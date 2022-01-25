@@ -381,7 +381,7 @@ copy
 
 
 --------------------------------------------------------------------------------
-9. OpenEXR
+9. OpenEXR - skip!
 --------------------------------------------------------------------------------
 get it from https://github.com/AcademySoftwareFoundation/openexr
 cd to %SRC% and clone git repo :
@@ -478,6 +478,76 @@ When prefix is a drive this will install:
 
     (you MAY want to copy the *.dll in %SDK%\bin also)
 
+--------------------------------------------------------------------------------
+14. pip install  the rest of requirements
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+15. build & install vigra
+--------------------------------------------------------------------------------
+cd to %SRC%
+clone the vigra repo:
+git clone https://github.com/ukoethe/vigra.git
+    if cloning 1.11.0, replace:
+        vigra\src\impex\hdf5impex.cxx
+        vigra\vigranumpy\src\core\segmentation.cxx
+
+        with the ones supplied in downloads\vigra_patches
+
+        NOTE: the new hdf5impex.cxx uses a deprecated syntax which does not fit
+        the more recent function signature in H5Opublic.h
+
+        NOTE: the new segmentation.cxx adapts an issue in MSVC C++ sort
+        algorithm in <algorithm> header (apparently their compiler cannot
+        distinguish between iterator and const_iterator from the context -
+        unless there is a hidden compiler flag that would make it behave more
+        like gnu g++)
+
+
+Build using VisualStudio2019
+---------------------------------------
+
+launche VS2019 with 'devenv' command
+
+Open "folder" %SRC%\vigra
+
+create x64-Release configuration
+
+you may have to:
+1) point to the python libray - choose lib not dll !
+    %SDK%\lib\boost_python39-vc142-mt-x64-1_77.lib
+
+build
+
+install
+
+from src\vigra\out\install\x64-Release\ copy:
+    bin\vigraimpex to e:\bin and e\lib
+    lib\*.* to e:\lib
+    include\*.* to e:\include
+
+(here e:\is considered the root)
+
+ATTENTION: the following is required to get python to properly load the vigra
+libraries in windows 10 using Python 3.9:
+in your own Scripts directory create a pyton script wih the following contents:
+
+import os
+os.add_dll_directory("e:/bin") # <-- replace here where vigraimpex.lib and vigraimpex.dll are
+os.add_dll_directory("e:/lib") # <-- replace here where vigraimpex.lib and vigraimpex.dll are
+
+Add the following line to your scipyact.bat script:
+SET PYTHONSTARTUP=%USERPROFILE%\Scripts\scipyen_startup.py
+
+No need to build documentation -> see it online at
+http://ukoethe.github.io/vigra/doc-release/vigra/index.html
+
+###########
+ALTERNATIVE: Build vigra using CMake (cmake-gui) in an out-of tree build
+mkdir vigra-build; cd vigra-build; cmake-gui ..\vigra
+when first run, select "Visual Studio 16 2019" as generator
+skip openEXR
+###########
 
 
 
