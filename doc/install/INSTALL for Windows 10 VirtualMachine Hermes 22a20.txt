@@ -44,7 +44,9 @@ The SRC variable below refers to this directory ("scipyen_sdk_src").
 This will create a "scipyen" directory alongside "scipyenv", "scipyen_sdk", and
 "scipyen_sdk_src".
 
-    5.1 cd to "scipyen" and clone the "master" and "dev" branches:
+git clone https://github.com/ctigaret/scipyen.git
+
+    2.3.1 cd to "scipyen" and clone the "master" and "dev" branches:
     "master":
         git checkout master
         git pull
@@ -322,7 +324,7 @@ then copy:
     COPYING, COPYRIGHT, NEWS, README* to %SDK%\share\doc\fftw3\
 
 --------------------------------------------------------------------------------
-6. Imath (NOTE this is "eye-math" not "ell-math" !)
+6. Imath (NOTE this is "eye-math" not "ell-math" !) - for openexr
 --------------------------------------------------------------------------------
 
 get it from https://github.com/AcademySoftwareFoundation/Imath
