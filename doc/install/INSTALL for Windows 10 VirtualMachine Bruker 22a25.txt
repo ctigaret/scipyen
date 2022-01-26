@@ -514,3 +514,19 @@ Then run:
         Click "open project" => Opens VStudio
         in VStudio, make sure Release + x64 are selected
         Select ALL_BUILD then run Build/Build Solution
+        
+    The doc_cpp.vcxproj and doc_python.vcxproj will likely FAIL
+    Ignore that
+    
+    Then in Solution explorer select INSTALL project, right-click, build.
+    
+    This will install:
+        header files in scipeyn_sdk\include (including "windows.h")
+        vigranumpy in e:\scipyenv\lib\site-packages\vigra
+        vigraimpex.lib in e:\scipyen_sdk\lib64
+        vigraimpex.dll in e:\scipyen_sdk\bin
+        doc in e:\scipyen_sdk\doc
+        
+        
+        
+        
