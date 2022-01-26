@@ -1,3 +1,10 @@
+2022-01-26 10:37:43
+AVOID building on networked drive - created a 2nd VDI image for a 2nd partition
+(~100 GiB)
+
+Building on network drive will
+1) slow down the process
+2) interfere with building processes (e.g. HDF5 and VIGRA)
 
 ================================================
 1. Tools for building scipyen dependencies.
@@ -50,18 +57,18 @@ Z:\ drive (mapped network drive to a Linux parition
 -----------------------------------------------------------------------
 2.1 create a python virtual environment 
 -----------------------------------------------------------------------
-z:\>virtualenv scipyenv
+e:\>virtualenv scipyenv
 
 -----------------------------------------------------------------------
 2.2 make scipyen_sdk and scipyen_sdk_src directories
 -----------------------------------------------------------------------
-z:\>mkdir scipyen_sdk
-z:\>mkdir scipyen_sdk_src
+e:\>mkdir scipyen_sdk
+e:\>mkdir scipyen_sdk_src
 
 -----------------------------------------------------------------------
 2.3 clone scipyen git repo
 -----------------------------------------------------------------------
-z:\>git clone https://github.com/ctigaret/scipyen.git
+e:\>git clone https://github.com/ctigaret/scipyen.git
 
 clone master and dev branches; remain on dev branch for now:
     
@@ -100,7 +107,7 @@ to your home directory (%USERPROFILE%)
     EDIT scipyen.bat:
         change scipyendir to where sciyen git repo is located
         e.g.:
-            set scipyendir=z:\scipyen
+            set scipyendir=e:\scipyen
         
     EDIT scipyact.bat:
         edit activation_script to point to the virtual environment
@@ -131,14 +138,14 @@ Add %USERPROFILE%\Scripts to your PATH:
 From anywhere (but typically, the parent directory of scipyenv):
     
     3.1 activate the virtual environment, e.g.:
-        z:\>scipyact
+        e:\>scipyact
         
     3.2 call 'pip install -r ***' where *** is a pip_requirements_*_win64.txt
     found in scipyen\doc\install:
-        z:\>pip install -r pip_requirements_0_win64.txt
-        z:\>pip install -r z:\scipyen\doc\install\pip_requirements_1_win64.txt
-        z:\>pip install -r z:\scipyen\doc\install\pip_requirements_2.txt
-        z:\>pip install -r z:\scipyen\doc\install\pip_requirements_3.txt
+        e:\>pip install -r pip_requirements_0_win64.txt
+        e:\>pip install -r e:\scipyen\doc\install\pip_requirements_1_win64.txt
+        e:\>pip install -r e:\scipyen\doc\install\pip_requirements_2.txt
+        e:\>pip install -r e:\scipyen\doc\install\pip_requirements_3.txt
         
      (be prepared to wait)   
      
@@ -150,7 +157,7 @@ From anywhere (but typically, the parent directory of scipyenv):
 
 Open a new command prompt, activate sciyen WITH VidualStudio development
 
-z:\>scipyen_vs64
+e:\>scipyen_vs64
 
 --------------------------------------------------------------------------------
 4.1. Install vigra dependencies in scipyen_sdk
@@ -304,27 +311,15 @@ build with cmake-gui in out-of-source tree
 cd scipyen_sdk_src
 mkdir libjpeg-build
 cd libjpeg-build
-cmake-gui ..\libjpeg
+cmake-gui ..\libjpeg -DCMAKE_INSTALL_PREFIX=e:\scipyen_sdk -DDEPENDENCY_SEARCH_PREFIX=e:\scipyen_sdk
 => select VS 16 2019 + default native compilers
 configure -> select installation to <path to>\scipyen_sdk
 set WITH_JPEG7 and WITH_JPEG8 ON
 configure until no more red lines; check no errors
 generate -> check no errors
 open project => opens VS2019 -> select release + x64 -> build solution
-from libjpeg-build\Release copy:
-    *.exe and *.dll to scipyen_sdk\bin
-    *.lib and *.exp to scipyen_sdk\lib
-    
-from libjpeg copy:
-    doc to scipyen_sdk\share\doc\jpeg
-    
-    *.h files to scipyen_sdk\include i.e., run:
-        z:\scipyen_sdk_src\libjpeg>copy *.h ..\..\scipyen_sdk\include\
-            
-from libjpeg-build copy:
-        z:\scipyen_sdk_src\libjpeg-build>copy *.h ..\..\scipyen_sdk\include\
-    
-        (NOTE: this supplies jconfig.h and jconfigint.h)
+once this succeeds, then right-cligk on INSTALL solution in solution explorer,
+click on build solution -> this will install in scipyen_sdk
             
     
 .......................................................................                
@@ -347,7 +342,7 @@ then copy:
     copy *.lib ..\..\scipyen_sdk\lib\
     copy *.def ..\..\scipyen_sdk\lib\
     copy *.exp ..\..\scipyen_sdk\lib\
-    copy fftw3.h  ..\..\scipyen_sdk\include\
+    copy *.h  ..\..\scipyen_sdk\include\
         
     *.exe and *.dll files to %SDK%\bin\
     *.lib, *.def, *.exp files to %SDK%\lib\
@@ -355,53 +350,26 @@ then copy:
     COPYING, COPYRIGHT, NEWS, README* to %SDK%\share\doc\fftw3\
 
 .......................................................................                
-tiff - requires jpeg
+tiff - requires jpeg; no support for OpenGL and deflate
 .......................................................................                
-In z:\scipyen_sdk_src run:
+In e:\scipyen_sdk_src run:
     git clone https://gitlab.com/libtiff/libtiff.git
     
 build with cmake in out-of-source tree => generate VS2019 solution
     mkdir libtiff-build
     cd libtiff-build
     
-    cmake-gui ..\libtiff -DDEPENDENCY_SEARCH_PREFIX=..\..\scipyen_sdk\
+    cmake-gui -DCMAKE_INSTALL_PREFIX=e:\scipyen_sdk -DDEPENDENCY_SEARCH_PREFIX=e:\scipyen_sdk ..\libtiff
         
     configure: first run: select VS 16 2019, X64;
-    configure, set install_prefix to scipoyen_sdk, configure then generate
+    configure, set install_prefix to scipyen_sdk, configure then generate
     open project -> VS2019 -> import ALL BUILD
         select Release + x64
         Build -> build solution
+        once done, select INSTALL from solution explorer then right-click -> build
+        this will install libtiff in e:\scipyen_sdk; no need for actions below
+        close vs2019
         
-    close vs2019
-    cd libtiff-build\libtiff\release
-    copy *.exe z:\scipyen_sdk\bin\
-    copy *.dll z:\scipyen_sdk\bin\
-    copy *.lib z:\scipyen_sdk\lib\
-    cd ..\..\..\libtiff\libtiff
-    copy *.h z:\scipyen_sdk\include\
-    cd ..\man
-    copy *.1 z:\scipyen_sdk\share\man\man1\
-    copy *.3* z:\scipyen_sdk\share\man\man3\
-    cd ..
-    copy html z:\scipyen_sdk\share\doc\tiff\html\
-    and so on for the docs
-
-NOTE you may have to create target directories manually
-
-        
-
-open visual studio
-    devenv
-
-    -> Open a folder -> select %SRC%\libtiff
-
-read through the CMake output
-
-create configuration x64-Release (in CMake Setting -> Configurations)
-
-Build menu -> build all
-Buils menu -> Install tiff
-
 check that it works:
     from http://www.simplesystems.org/libtiff/images.html download
     https://download.osgeo.org/libtiff/pics-3.8.0.tar.gz
@@ -430,22 +398,22 @@ Create the b2 Boost.Build program
 
     cd boost_1_77_0\tools\build
     bootstrap
-    .\b2 --prefix=z:\scipyen_sdk_src\Boost.Build toolset=msvc install
+    .\b2 --prefix=e:\scipyen_sdk_src\Boost.Build toolset=msvc install
 
  Build & install boost
 
-    cd z:\scipyen_sdk_src\boost_1_77_0
+    cd e:\scipyen_sdk_src\boost_1_77_0
 
 
     Run:
         
-    ..\Boost.Build\bin\b2 toolset=msvc threading=multi address-model=64 variant=release link=shared --prefix=z:\scipyen_sdk --build-type=complete msvc install
+    ..\Boost.Build\bin\b2 toolset=msvc threading=multi address-model=64 variant=release link=shared --prefix=e:\scipyen_sdk --build-type=complete msvc install
 
     NOTE: always use the same toolset setting!
     
-When prefix is a drive this will install:
+    This will install:
     * boost headers (*.hpp) in scipyen_sdk\include\boost_1_77_0\boost
-        => add this path z:\scipyen_sdk\include\boost_1_77_0\
+        => add this path e:\scipyen_sdk\include\boost_1_77_0\
             to the relevant variables when building vigra
 
     * the *.dll and *.lib files in scipyen_sdk\lib
@@ -456,33 +424,93 @@ hdf5
 See:
 https://portal.hdfgroup.org/display/support/Building+HDF5+with+CMake
 
-Copy the build-VS2019-x64-virtualenv.bat script to scipyen_sdk_src\CMake-hdf5-1.12.1\
-    edit the INSTALLDIR to point to scipyen_sdk inside script
+recommended download: CMake-hdf5-1.12.0.zip
+but you may widh to use CMake-hdf5-1.10.6.zip; in this case DISREGARD the
+instructions to patch vigra for HDF5 below
 
-    run the script -> prepare to wait...
+extract CMake-hdf5-1.12.0.zip to e:\scipyen_sdk_src
+    => creates  e:\scipyen_sdk_src\CMake-hdf5-1.12.0 directory
     
-ATTENTION: Issues when building on the networked drive
-(the networked drive is actually on the local host machine, which
- is mapped to a network drive in the Windows 10 client via local loop
- network).
-
-NOTE: one  may NOT need to build HDF5 (and by consequence, HDF5 support in
-VIGRA, since Scipyen uses its own HDF5 functions based on h5py)
-
+    cd CMake-hdf5-1.12.0
+    
+    # Create a build script by running the following line:
+    # ATTENTION: NO COMMAS in the value to the -S option !
+e:\scipyen_sdk_src\CMake-hdf5-1.12.0>echo ctest -S HDF5config.cmake,BUILD_GENERATOR=VS201964,INSTALLDIR=e:\scipyen_sdk -C Release -V -O hdf5.log > build.bat
+    
+    #run the build script
+e:\scipyen_sdk_src\CMake-hdf5-1.12.0>build
+    
+This will generate a zip file inside the CMake-hdf5-1.12.0 directory:
+    HDF5-1.10.6-win64.zip
+    
+    extract and merge almost all of its contents with the correspnoding 
+    directories in e:\scipyen_sdk
+    
+    exceptions are:
+        * all document files in the root HDF5-1.10.6-win64 directory should go to
+            e:\scipyen_sdk\share\doc\hdf5
+        
+        * DO overwrite all files in the destination, when asked
+        (this will replace zlib from above with a new one - it's OK)
+        
 .......................................................................                
-VIGRA
+VIGRA - without OpenEXR support
 .......................................................................                
+e:\scipyen_sdk_src>git clone https://github.com/ukoethe/vigra.git
 
-z:\scipyen_sdk_src>git clone https://github.com/ukoethe/vigra.git
-    replace:
-        vigra\src\impex\hdf5impex.cxx
-        vigra\vigranumpy\src\core\segmentation.cxx
+patch the vigra source tree as per scipyen\doc\install\vigra_patches\README
 
-        with the ones supplied in downloads\vigra_patches
-z:\scipyen_sdk_src>mkdir vigra-build
-z:\scipyen_sdk_src>cd vigra-build
+a) for HDF5 ONLY if using HDF5 >= 1.11:
+        replace: 
+            vigra/impex/hdf5impex.cxx 
+            
+        with:
+            vigra_patches/hdf5_gt_1.10.6/vigra/impex/hdf5impex.cxx
+
+b) for CMake >= 3.22.1 (used to generate VStudio solution)
+        replace:
+            vigra.CMakeLists.txt
+            
+        with:
+            vigra_patches/windows/CMake_3.22.1/vigra/CMakeLists.txt
+
+c) for building the solution generated in (b)
+        replace:
+            vigra/vigranumpy/src/core/segmentation.cxx
+            
+        with:
+            vigra_patches/windows/windows/VisualStudio_2019/vigra/vigranumpy/src/segmentation.cxx
+
+Create out-of-source build tree:            
+e:\scipyen_sdk_src>mkdir vigra-build
+e:\scipyen_sdk_src>cd vigra-build
 
 Then run:
-    cmake-gui ..\vigra -DCMAKE_INSTALL_PREFIX=z:\scipyen_sdk -DDEPENDENCY_SEARCH_PREFIX=z:\scipyen_sdk
+    cmake-gui ..\vigra -DCMAKE_INSTALL_PREFIX=e:\scipyen_sdk -DDEPENDENCY_SEARCH_PREFIX=e:\scipyen_sdk
         
-    
+    in CMake GUI you must set:
+        Boost_PYTHON_LIBRARY to 
+            e:\scipyen_sdk\lib\boost_python39-vc142-mt-x64-1_77.lib
+        
+        deselect the following:
+            BUILD_TESTS, AUTOEXEC_TESTS, TEST_VIGRANUMPY
+        
+        set CMAKE_INSTALL_PREFIX to e:\scipyen_sdk
+        set LIB_SUFFIX to 64
+        
+        set CMAKE_INSTALL_PREFIX to
+            e:\scipyen_sdk
+            
+        Check all other libraries and paths are correct, especially for the 
+        dependencies built above (HDF5, jpeg, tiff, png)
+        
+        Check locations for Python are correct (yes, use the Python.exe in the 
+                                                scipyenv)
+        
+        Configure repeatedly until no more red lines in the GUI.
+        Check the output to have vigranumpy built and installed
+        
+        Finally press Generate to generate VStudio solution, then
+        Click "open project" => Opens VStudio
+        in VStudio, make sure Release + x64 are selected
+        Select ALL_BUILD then run Build/Build Solution
