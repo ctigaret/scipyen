@@ -157,6 +157,9 @@ to your home directory (%USERPROFILE%)
 
 from scipyen repo copy scipyen_startup.py to scipyenv\Scripts
 NOTE: scipyenv is the virtual environment directory
+2022-01-26 23:18:27
+    copy scipyen_startup.py into scipyen_sdk directory
+
     
 Add %USERPROFILE%\Scripts to your PATH:
     use Settings -> search for environment -> Edit environment variables
@@ -246,6 +249,18 @@ configure -> generate -> open project (opens with VStudio)
     Build ALL-BUILD
     Build INSTALL
 
+2022-01-26 22:54:42
+try this:
+git clone https://github.com/winlibs/libpng.git
+modify libpng/projects/vstudio2019/zlib.props to point to the zlib source above
+in scipyact_vs64 call devenv -> open libpng/projects/vstudio2019/vstudio.sln
+choose Release Library + x64 (i.e. build static)
+in solution explorer select libpng -> Build
+
+then configure vigra-build (using cmake-gui) to point to the static zlib and
+libpng_a libraries in "libpng/projects/vstudio2019/x64/Release Library"
+
+... AND IT WORKS!
 
 .......................................................................                
 jpeg - requires nasm

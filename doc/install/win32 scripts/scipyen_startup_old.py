@@ -1,14 +1,12 @@
 import os, sys
-__module_path__ = os.path.abspath(os.path.dirname(__file__))
 if sys.platform == "win32":
     scipyenvdir = os.getenv("VIRTUAL_ENV")
     if scipyenvdir is None:
         sys.exit("You are NOT inside a virtual Python environment")
 
-    scipyen_sdk = __module_path__
-    #scipyen_sdk = r"c:\scipyen_sdk"
+    scipyen_sdk = scipyenvdir+"_sdk"
 
-    #print(f"scipyen_sdk: {scipyen_sdk}")
+    print(f"scipyen_sdk: {scipyen_sdk}"))
 
     scipyenvbin     = os.path.join(scipyen_sdk,"bin")
     scipyenvlib     = os.path.join(scipyen_sdk,"lib")

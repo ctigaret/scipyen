@@ -201,22 +201,7 @@ def loadImageFile(fileName:str, asVolume:bool=False,
     '''    
     # NOTE: 2021-11-30 11:46:12
     # suppress warnings from vigra impex
-    from . import redirections
-    #f = io.StringIO()
-    #with warnings.catch_warnings():
-    #with contextlib.redirect_stderr(f):
-    #with redirections.output_stream_redirector(f, "stderr"):
-    if suppress_cpp_warnings:
-        cman = redirections.stderr_redirector(io.StringIO())
-    else:
-        cman = contextlib.nullcontext()
-        
-    with cman:
-        #if not sys.warnoptions:
-            #warnings.simplefilter("ignore")
-            
-        # NOTE: 2018-02-20 12:56:02
-        # coerce reading a volume as a volume!
+    if sys.platform == "win32":
         nFrames = vigra.impex.numberImages(fileName)
         
         if nFrames > 1:
@@ -227,7 +212,37 @@ def loadImageFile(fileName:str, asVolume:bool=False,
             
         else:
             ret = vigra.readImage(fileName)
+
+        return ret
         
+
+    from . import redirections
+    #f = io.StringIO()
+    #with warnings.catch_warnings():
+    #with contextlib.redirect_stderr(f):
+    #with redirections.output_stream_redirector(f, "stderr"):
+    if suppress_cpp_warnings:
+        cman = redirections.stderr_redirector(io.StringIO())
+    else:
+        cman = contextlib.nullcontext()
+
+    with cman:
+        #if not sys.warnoptions:
+            #warnings.simplefilter("ignore")
+
+        # NOTE: 2018-02-20 12:56:02
+        # coerce reading a volume as a volume!
+        nFrames = vigra.impex.numberImages(fileName)
+
+        if nFrames > 1:
+            asVolume = True
+
+        if asVolume:
+            ret = vigra.readVolume(fileName)
+
+        else:
+            ret = vigra.readImage(fileName)
+
     return ret
         
 # TODO: diverge onto HDF5, and bioformats handling
