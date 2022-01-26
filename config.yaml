@@ -1,10 +1,10 @@
+ImageViewer:
+    ColorMap: GreenFireBlue
 SignalViewer:
     VerticalCursorColor: teal
     CursorHoverColor: tomato
     LinkedVerticalCursorColor: violet
     CursorsShowValue: yes
-ImageViewer:
-    ColorMap: GreenFireBlue
 Fconf:
     name: np.linalg.norm
     args: []
