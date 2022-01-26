@@ -22,7 +22,18 @@ replicating the recipe on Hermes Windows 10 VirtualBox image
     path_to_vigraimpex = win32api.GetModuleFileName(win32api.LoadLibrary(vigraimpex_mod))
 pywintypes.error: (182, 'LoadLibrary', 'The operating system cannot run %1.')
 
+2022-01-26 20:46:50
+might have something to do with INSTALL projects overwriting runtime dlls in scipyen_sdk
 
+
+try re-installing in separate subdirs in scipyen_sdk, e.g.:
+scipyen_sdk\zlib
+scipyen_sdk\libjpeg
+scipyen_sdk\libpng
+scipyen_sdk\libtiff
+scipyen_sdk\hdf5
+(boost should NOT be affected)
+scipyen_sdk_vigra
 
 
 Building on network drive will
