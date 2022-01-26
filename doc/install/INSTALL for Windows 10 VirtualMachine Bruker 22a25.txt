@@ -1,6 +1,7 @@
 
 ================================================
-1. install system-wide (make sure there is enough space on C:\drive)
+1. Tools for building scipyen dependencies.
+install system-wide (make sure there is enough space on C:\drive)
 ================================================
 (see installers in the DownloadsForScipyen bundle)
 
@@ -33,7 +34,7 @@ MPICH
 
 nasm: (for jpeg)
     use nasm-2.15.05-installer-x64.exe
-    dowlaod from https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/nasm-2.15.05-installer-x64.exe
+    download from https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/nasm-2.15.05-installer-x64.exe
     run as administrator;
     manually add c:\Programs Files\NASM to %PATH%
 Ruby
@@ -459,5 +460,29 @@ Copy the build-VS2019-x64-virtualenv.bat script to scipyen_sdk_src\CMake-hdf5-1.
     edit the INSTALLDIR to point to scipyen_sdk inside script
 
     run the script -> prepare to wait...
+    
+ATTENTION: Issues when building on the networked drive
+(the networked drive is actually on the local host machine, which
+ is mapped to a network drive in the Windows 10 client via local loop
+ network).
 
+NOTE: one  may NOT need to build HDF5 (and by consequence, HDF5 support in
+VIGRA, since Scipyen uses its own HDF5 functions based on h5py)
 
+.......................................................................                
+VIGRA
+.......................................................................                
+
+z:\scipyen_sdk_src>git clone https://github.com/ukoethe/vigra.git
+    replace:
+        vigra\src\impex\hdf5impex.cxx
+        vigra\vigranumpy\src\core\segmentation.cxx
+
+        with the ones supplied in downloads\vigra_patches
+z:\scipyen_sdk_src>mkdir vigra-build
+z:\scipyen_sdk_src>cd vigra-build
+
+Then run:
+    cmake-gui ..\vigra -DCMAKE_INSTALL_PREFIX=z:\scipyen_sdk -DDEPENDENCY_SEARCH_PREFIX=z:\scipyen_sdk
+        
+    
