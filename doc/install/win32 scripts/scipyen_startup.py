@@ -1,14 +1,17 @@
 import os, sys
+# NOTE: copy this to scipyen sdk directory
+# in scipyact.bat set PYTHONSTARTUP to the fully qualified path to this module
+
+__module_path__ = os.path.abspath(os.path.dirname(__file__))
 if sys.platform == "win32":
     scipyenvdir = os.getenv("VIRTUAL_ENV")
     if scipyenvdir is None:
         sys.exit("You are NOT inside a virtual Python environment")
 
-    scipyen_sdk_dir = scipyenvdir+"_sdk"
-
-    scipyenvbin     = os.path.join(scipyenv_sdk_dir,"bin")
-    scipyenvlib     = os.path.join(scipyenv_sdk_dir,"lib")
-    scipyenvlib64   = os.path.join(scipyenv_sdk_dir,"lib64")
+    scipyen_sdk = __module_path__
+    scipyenvbin     = os.path.join(scipyen_sdk,"bin")
+    scipyenvlib     = os.path.join(scipyen_sdk,"lib")
+    scipyenvlib64   = os.path.join(scipyen_sdk,"lib64")
 
     if os.path.isdir(scipyenvbin):
         os.add_dll_directory(scipyenvbin)

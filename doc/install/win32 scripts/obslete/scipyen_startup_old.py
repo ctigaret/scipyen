@@ -4,11 +4,13 @@ if sys.platform == "win32":
     if scipyenvdir is None:
         sys.exit("You are NOT inside a virtual Python environment")
 
-    scipyen_sdk_dir = scipyenvdir+"_sdk"
+    scipyen_sdk = scipyenvdir+"_sdk"
 
-    scipyenvbin     = os.path.join(scipyenv_sdk_dir,"bin")
-    scipyenvlib     = os.path.join(scipyenv_sdk_dir,"lib")
-    scipyenvlib64   = os.path.join(scipyenv_sdk_dir,"lib64")
+    print(f"scipyen_sdk: {scipyen_sdk}"))
+
+    scipyenvbin     = os.path.join(scipyen_sdk,"bin")
+    scipyenvlib     = os.path.join(scipyen_sdk,"lib")
+    scipyenvlib64   = os.path.join(scipyen_sdk,"lib64")
 
     if os.path.isdir(scipyenvbin):
         os.add_dll_directory(scipyenvbin)

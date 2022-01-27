@@ -3,6 +3,8 @@ SignalViewer:
     LinkedVerticalCursorColor: violet
     CursorHoverColor: tomato
     VerticalCursorColor: teal
+ImageViewer:
+    ColorMap: GreenFireBlue
 Fconf:
     name: np.linalg.norm
     args: []

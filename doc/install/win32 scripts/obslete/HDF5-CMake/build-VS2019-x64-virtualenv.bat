@@ -1,0 +1,1 @@
+ctest -S HDF5config.cmake,BUILD_GENERATOR=VS201964,INSTALLDIR=%VIRTUAL_ENV% -C RelWithDebInfo -V -O hdf5.log

@@ -96,14 +96,14 @@ configuration
         read "RelWithDebInfo"
     toolset msvc_x64_x64 (as reported by VisualStudio)
 
-Configure to install each library in in ROOT (see above).
+Configure to install each library in ROOT (see above).
 
     For CMake-based projects build with Visual Studio 2019 the installation
     directory MUST be configured using the Advanced settings section of the
     IDE's CMake settings - DO NOT change CMAKE_INSTALL_PREFIX.
 
     Generally is it a BAD idea to make direct changes to CMake settings in
-    VisuaStudio - the only exception if building VigRA but we will use cmake-gui
+    VisuaStudio - the only exception is building ViGRA but we will use cmake-gui
     to generate a solution (*.sln) file.
 
 ================================================================================
@@ -201,7 +201,7 @@ NOTE: the vitual environemnt is NOT relocatable !!!
 
 By consequence, the virtual environment folder (with all the libraries built
 inside it) CANNOT be copied on another path on the machine, or on other machine
-(unless, of coure the structure of the path leading to it is idential to the
+(unless, of coure the structure of the path leading to it is identical to the
  one on the machine the virtual enviornemnt was built on)
 
 ================================================================================
@@ -275,9 +275,11 @@ launch Visual Studio 2019:
     devenv
 
 open the solution zlib-1.2.11\contrib\vstudio\vc14\zlibvc.sln
+
     retarget the solution
     select Release and x64
-    In solution explorer select xlibvc -> right click for Properties -> change:
+    In solution explorer select xlibvc -> right click for Properties -> change
+    all from zlibwapi.* to zlib.* as follows:
      Configuration Properties
         General:
             Target Name:    zlib
@@ -379,7 +381,7 @@ open configuration manager,
 Skip this
 
 --------------------------------------------------------------------------------
-4. jpeg-turbo => supplies both jpeg AND jpeg-turbo
+4. jpeg-turbo => supplies both jpeg AND jpeg-turbo - taken from github
 --------------------------------------------------------------------------------
 cd %VIRTUAL_ENV%\src
 
@@ -593,6 +595,7 @@ paths below should be enclosed in double-quotes):
 NOTE: always use the same toolset setting!
 
 (skip this ) %VIRTUAL_ENV%\Boost.Build\bin\b2 toolset=msvc threading=multi address-model=64 variant=release link=shared -prefix=%VIRTUAL_ENV% --build-type=complete msvc stage
+
 %VIRTUAL_ENV%\Boost.Build\bin\b2 toolset=msvc threading=multi address-model=64 variant=release link=shared --prefix=%VIRTUAL_ENV% --build-type=complete msvc install
 
 When prefix is a drive this will install:
@@ -1066,7 +1069,7 @@ pip install -r <path-where-scipyen-repo-is>\doc\install\pip_requirements_3.txt
 ================================================================================
 19 Build and install NEURON
 ================================================================================
-first install bison & flex
+first install bison & flex?
 
 
 git clone https://github.com/neuronsimulator/nrn

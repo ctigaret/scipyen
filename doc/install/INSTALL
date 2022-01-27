@@ -102,13 +102,16 @@ libXcomposite (*) (for NEURON)
 valgrind (optional)
 
 ================================================================================
-2. BUILD PYTHON (if unhappy with what the distribution offers)
+2. BUILD PYTHON (if unhappy with what the distribution offers, required if no
+Python 3.9 is on offer)
 ================================================================================
 
 NOTE: This is RECOMMENDED if the distribution is behind the latest Python by 
 (quite) a few minor versions.
 
-NOTE: If you choose to build python then the folloing python packages must also
+NOTE: 2022-01-20 22:02:56 Scipyen code is now essentially using Python3.9!
+
+NOTE: If you choose to build Python then the following python packages must also
 be built locally (from inside the activated virtual python environment, see below):
     sip
     PyQt5
@@ -125,10 +128,10 @@ To build Python from sources (e.g. 3.9.7) see the file:
 
     $HOME/scipyen/doc/install/Python/Unix/README
     
-NOTE: To avoid overshadowing/overwriting your system's python3 executable, 
+ATTENTION: To avoid overshadowing/overwriting your system's python3 executable,
 ALWAYS execute 'make altinstall' AND NOT 'make install' after building.
 
-'make altinstall' needs to be called as superuser (su then password, or sudo)
+'make altinstall' needs to be called as superuser (su/sudo)
 
 Also you MUST call ldconfig (again, as superuser).
 
@@ -139,7 +142,7 @@ link from $HOME/scipyen/doc/install/Python/Unix/pyenv to $HOME/pyenv
 (see $HOME/scipyen/doc/install/Python/Unix/README for details)
 
 NOTE: If you relocate the 'scipyen' directory you have to recreate these links.
-Have a look inside make_script_links.sh shell script to see what it does.
+Have a look inside make_script_links.sh bash script to see what it does.
 
 ================================================================================
 2.a IF YOU HAVE BUILT YOUR OWN PYTHON STACK

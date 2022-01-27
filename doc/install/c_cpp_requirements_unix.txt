@@ -40,7 +40,7 @@ PyQt5_sip-12.8.1        # scipyen GUI               Only on Unix (4,5)
 # FOOTNOTES:
 # (1) 
 #     on Windows, build from sources, possibly using VisualStudio 2019;
-#     on Unix, install the corresponding devel packages using your ditribution's
+#     on Unix, install the corresponding devel packages using your distribution's
 #     software manager
 #     
 # (2)
@@ -56,4 +56,4 @@ PyQt5_sip-12.8.1        # scipyen GUI               Only on Unix (4,5)
 #       may NOT 'see' the system-wide  Qt5 modules (especially the style plugins).
 #       Therefore I prefer to build this from sources on Unix, which requires
 #       installation of several devel packages (not least Qt5) and building the
-#       sipmanually beforehand, followed by building Pyqt5.sip after Pyqt5
+#       sip manually beforehand, followed by building Pyqt5.sip after Pyqt5
