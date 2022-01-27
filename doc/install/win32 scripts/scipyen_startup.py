@@ -1,6 +1,6 @@
 import os, sys
 # NOTE: copy this to scipyen sdk directory
-# in scipyact.bat set PYTHONSTARTUP to the fuilly qualified path to this module
+# in scipyact.bat set PYTHONSTARTUP to the fully qualified path to this module
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 if sys.platform == "win32":
@@ -9,10 +9,6 @@ if sys.platform == "win32":
         sys.exit("You are NOT inside a virtual Python environment")
 
     scipyen_sdk = __module_path__
-    #scipyen_sdk = r"c:\scipyen_sdk"
-
-    #print(f"scipyen_sdk: {scipyen_sdk}")
-
     scipyenvbin     = os.path.join(scipyen_sdk,"bin")
     scipyenvlib     = os.path.join(scipyen_sdk,"lib")
     scipyenvlib64   = os.path.join(scipyen_sdk,"lib64")
