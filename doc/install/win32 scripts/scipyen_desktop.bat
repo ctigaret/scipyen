@@ -1,10 +1,10 @@
 @echo off
 REM EDIT BELOW THE PATH TO CLONED scipyen GIT REPOSITORY
-SET scipyendir=c:\scipyen
+SET scipyendir=e:\scipyen
 REM EDIT BELOW PATH TO THE scipyenv ACTIVATION SCRIPT
-CALL "c:\scipyenv\Scripts\activate"
+CALL "e:\scipyenv\Scripts\activate"
 REM EDIT BELOW PATH TO THE scipyenv_sdk DIRECTORY
-set "SDK=c:\scipyen_sdk"
+set "SDK=e:\scipyen_sdk"
 set "LIB=%VIRTUAL_ENV%\lib;%VIRTUAL_ENV%\lib64;%VIRTUAL_ENV%\lib\site-packages\vigra;%SDK%\lib;%SDK%\lib64;%USERPROFILE%\AppData\Local\Programs\Python\Python39\libs;%LIB%"
 set "LIBPATH=%VIRTUAL_ENV%\lib;%VIRTUAL_ENV%\lib\site-packages\vigra;%VIRTUAL_ENV%\lib64;%SDK%\lib;%SDK%\lib64;%USERPROFILE%\AppData\Local\Programs\Python\Python39\libs;%LIBPATH%"
 set "INCLUDE=%VIRTUAL_ENV%\include;%SDK%\include;%USERPROFILE%\AppData\Local\Programs\Python\Python39\include;%INCLUDE%"
