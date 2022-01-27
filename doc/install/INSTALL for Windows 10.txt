@@ -1069,7 +1069,7 @@ pip install -r <path-where-scipyen-repo-is>\doc\install\pip_requirements_3.txt
 ================================================================================
 19 Build and install NEURON
 ================================================================================
-first install bison & flex
+first install bison & flex?
 
 
 git clone https://github.com/neuronsimulator/nrn
