@@ -1,8 +1,8 @@
 SignalViewer:
-    CursorsShowValue: yes
-    LinkedVerticalCursorColor: violet
-    CursorHoverColor: tomato
     VerticalCursorColor: teal
+    CursorHoverColor: tomato
+    LinkedVerticalCursorColor: violet
+    CursorsShowValue: yes
 ImageViewer:
     ColorMap: GreenFireBlue
 Fconf:
