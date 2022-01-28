@@ -1,18 +1,17 @@
 [Desktop Entry]
 Comment[en_GB]=
 Comment=
-Exec=$HOME/scipyenv/scipyen/scipyen
-GenericName[en_GB]=
-GenericName=
+Exec=/home/cezar/bin/scipyen_desktop.sh
+GenericName[en_GB]=Scipyen
+GenericName=Scipyen
 Icon=pythonbackend
 MimeType=
 Name[en_GB]=Scipyen
 Name=Scipyen
-NoDisplay=false
 Path=
 StartupNotify=true
 Terminal=true
-TerminalOptions=--hold
+TerminalOptions=\s--noclose
 Type=Application
 X-DBUS-ServiceName=
 X-DBUS-StartupType=
