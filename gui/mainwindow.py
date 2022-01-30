@@ -1592,7 +1592,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._lastVariableFind          = str()
         self._commandHistoryFinderList  = collections.deque()
         self._lastCommandFind           = str()
-        self._recentScripts             = collections.deque()
+        #self._recentScripts             = collections.deque()
+        self._recentScripts             = list()
         self._recent_scripts_dict_      = dict()
         self._showFilesFilter           = False
         self._console_docked_           = False
@@ -2002,21 +2003,27 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             self._lastCommandFind = str()
             
+    #def recentScripts(self) -> collections.deque:
     @property
-    def recentScripts(self) -> collections.deque:
+    def recentScripts(self) -> list:
         return self._recentScripts
     
-    #@markConfigurable("RecentScripts", "Qt")
-    @markConfigurable("RecentScripts", trait_notifier=True)
+    # NOTE:FIXME/TODO 2022-01-30 00:05:47
+    # Until I figure out a proper contents-observing traitType for Python
+    # collections like list, deque, dict, I stick with Qt configable here.
+    #@markConfigurable("RecentScripts", trait_notifier=True)
+    @markConfigurable("RecentScripts", "Qt")
     @recentScripts.setter
     def recentScripts(self, 
                          val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
-        print(f"ScipyenWindow.recentScripts.setter {val}")
+        #print(f"ScipyenWindow.recentScripts.setter {val}")
         if isinstance(val, (collections.deque, list, tuple)):
-            self._recentScripts = collections.deque((s for s in val if os.path.isfile(s)))
+            #self._recentScripts = collections.deque((s for s in val if os.path.isfile(s)))
+            self._recentScripts = list((s for s in val if os.path.isfile(s)))
             
         else:
-            self._recentScripts = collections.deque()
+            self._recentScripts = list()
+            #self._recentScripts = collections.deque()
             
         # NOTE:2022-01-28 23:16:57 
         # obsolete; this is added to configrabel_traits at __init__, AFTER
@@ -5790,14 +5797,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 # be saved in the config
                 # see solution at NOTE:2022-01-28 23:16:57
                 # 
-                self.recentScripts.appendleft(self._temp_python_filename_)
+                #self.recentScripts.appendleft(self._temp_python_filename_)
+                self.recentScripts.insert(0,self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
                 
             else:
                 if self._temp_python_filename_ != self.recentScripts[0]:
-                    self.recentScripts.remove(self._temp_python_filename_)
-                    self.recentScripts.appendleft(self._temp_python_filename_)
-                    self._refreshRecentScriptsMenu_()
+                    rscripts = [s for s in self.recentScripts if s != self._temp_python_filename_]
+                    rscripts.insert(0, self._temp_python_filename_)
+                    self.recentScripts = rscripts
+                
+                #if self._temp_python_filename_ != self.recentScripts[0]:
+                    #self.recentScripts.remove(self._temp_python_filename_)
+                    #self.recentScripts.appendleft(self._temp_python_filename_)
+                    #self._refreshRecentScriptsMenu_()
                 
             self._temp_python_filename_ = None
             

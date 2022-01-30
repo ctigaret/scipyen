@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Utilities for programming with traitlets
+"""Utilities for programming with traitlets.
+NOTE: 2022-01-29 13:32:21
+There are issues when trying to implement traitlets for collection's CONTENTS,
+see docstring in scipyen_traitlets module (FIXME/TODO 2022-01-29 13:29:19)
 """
 
 import enum
@@ -646,6 +649,10 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
     a) when a list contents has changed (i.e., gained/lost members)
     b) when an element in the list has changed (either a new value, or a new type)
     c) when the order of the elements has changed
+    FIXME: 2022-01-29 15:22:27
+    This does do what is promised above.
+    TODO: Revisit this.
+    See also FIXME/TODO:2022-01-29 13:29:19 in scipyen_traitlets module.
     """
     _trait = None
     

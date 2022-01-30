@@ -1035,7 +1035,7 @@ class ScipyenConfigurable(object):
         
         cfg = self._make_confuse_config_data_(change, isTop, parent, tag)
         
-        print("_observe_configurable_ cfg", dict(cfg))
+        #print("_observe_configurable_ cfg", dict(cfg))
             
         if isinstance(cfg, Bunch):
             for k,v in cfg.items():
@@ -1049,24 +1049,21 @@ class ScipyenConfigurable(object):
         write_config()
         
     def _make_confuse_config_data_(self, change, isTop=True, parent=None, tag=None):
-        # NOTE: 2022-01-28 23:38:11
-        # confuse does not handle collections such as as deque, tuple, list
-        # we convert these to a string representation of a basic Python sequence
-        # (i.e. of a tuple);
-        # to ensure a complete round-trip:
-        # 1. in __load_config_key_val__ we convert val to a tuple
-        # 2. the property setter in the configurable object MUST accept a tuple
-        # as argument for a list/deque property!
-        # the problem is that this only works with string elements!
-        #print("change", change)
-        if isinstance(change.new, (collections.deque, tuple, list)):
-            v = str(tuple(change.new)) if len(change.new) else ""
+        if isinstance(change.new, (collections.deque, tuple)):
+            v = [v_ for v_ in v] if len(change.new) else []
         elif isinstance(change.new, type):
-            v = ""
+            v = []
         else:
             v = change.new
             
-        print("change.new", change.new, "v", v, isinstance(change.new, type))
+        #if isinstance(change.new, (collections.deque, tuple, list)):
+            #v = str(tuple(change.new)) if len(change.new) else ""
+        #elif isinstance(change.new, type):
+            #v = ""
+        #else:
+            #v = change.new
+            
+        #print("change.new", change.new, "v", v, isinstance(change.new, type))
         #v = str(tuple(change.new)) if isinstance(change.new, (collections.deque, tuple, list)) else change.new
         
         if isTop:
