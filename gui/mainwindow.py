@@ -2540,8 +2540,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._sortWorkspaceViewFirstColumn_()
         self._resizeWorkspaceViewFirstColumn_()
         
-    #@pyqtSlot(bool)
-    #def slot_updateWorkspaceModel(self, value:bool):
     @pyqtSlot()
     def slot_updateWorkspaceModel(self):
         """ pyplot commands may produce or close a figure; we need to reflect this!
@@ -4532,15 +4530,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.workspaceView.sortByColumn(sortSection,sortOrder)
         self.workspaceView.setSortingEnabled(True)
         
-    
-    #@pyqtSlot(QtCore.QModelIndex, QtCore.QModelIndex, "QVector<int>")
-    #@safeWrapper
-    #def slot_fileSystemDataChanged(self, top_left, bottom_right, roles):
-        ## NOTE: 2018-10-17 21:28:20
-        ## not implemented because there are issues with this in Qt5. 
-        ## one could design a custom file watcher but this will introduce
-        ## significant overheads
-        #pass
     
     @pyqtSlot(QtCore.QModelIndex)
     @safeWrapper
