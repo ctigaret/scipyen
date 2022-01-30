@@ -2026,8 +2026,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             #self._recentScripts = collections.deque()
             
         # NOTE:2022-01-28 23:16:57 
-        # obsolete; this is added to configrabel_traits at __init__, AFTER
+        # obsolete; this is added to configurable_traits at __init__, AFTER
         # WorkspaceGuiMixin (ScipyenConfigurable) initialization
+        # albeit this mechanism it NOT currently used until I figure out a nice
+        # way to notify changes in the contents of list, deque, dict via the 
+        # DataBag & traitlets.TraitType framework.
+        #
+        
         #if isinstance(getattr(self, "configurable_traits", None), DataBag):
             #self.configurable_traits["RecentScripts"] = self._recentScripts
             
