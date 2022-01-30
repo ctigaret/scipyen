@@ -27,6 +27,7 @@ if [ $0 == 0 ] ; then
         xrdb -merge $scipyendir/neuron_python/app-defaults/nrniv
     fi
 fi
-python3 $scipyendir/scipyen.py &
+python3 $scipyendir/scipyen.py 
+# python3 $scipyendir/scipyen.py &
 
 # python3 -m cProfile -s 'cumtime' $scipyendir/scipyen.py > profile &

@@ -1,4 +1,20 @@
-import sys
+"""Very much work in progress.
+FIXME/TODO:2022-01-29 13:29:19
+The issue with collection "traits", I think, is that changes to the contents of
+the collection by using builtin API (e.g. list.append, deque.appendLeft) or 
+directly changing the value of an element does NOT involve the traitlet's 'set'
+method (traitlets are implemented using the descriptor protocol).
+
+Hence the traitlet is oblivious to these changes and will not notify any 
+observers that registered with it.
+
+
+A workaround is to create an object of the appropriate type and assign it via 
+the corresponding property setter (i.e. avoid modifying the collection instance
+in place)
+
+"""
+import sys, typing
 from warnings import warn, warn_explicit
 from collections import deque
 import quantities as pq
@@ -16,6 +32,132 @@ from .traitutils import enhanced_traitlet_set
 from .utilities import (gethash, safe_identity_test)
 
 # NOTE: DataBagTrait <- Instance <- ClassBasedTraitType <- TraitType <- BaseDescriptor
+
+class _NotifierDeque_(deque):
+    # TODO: 2022-01-29 23:42:54
+    # wrap and extend relevant deque methods to call obj._notify_trait
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._obj_ = None
+        self._trait_name_ = None
+        
+    def init_instance(self, obj:typing.Optional[object]=None, trait_name:typing.Optional[str]=None):
+        self._obj_ = obj
+        self._trait_name_ = trait_name
+        
+    def append(self, x):
+        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
+            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
+                                                 # because this may be expensive we only do this
+                                                 # when self is part of a traitlets.TraitType class
+            super().append(x)
+            new_value = deque(self)
+            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
+            
+        else:
+            super().append(x)
+            
+        
+    def appendleft(self, x):
+        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
+            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
+                                                 # because this may be expensive we only do this
+                                                 # when self is part of a traitlets.TraitType class
+            super().appendleft(x)
+            new_value = deque(self)
+            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
+            
+        else:
+            super().appendleft(x)
+            
+        
+    def clear(self):
+        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
+            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
+                                                 # because this may be expensive we only do this
+                                                 # when self is part of a traitlets.TraitType class
+            super().clear()
+            new_value = deque(self)
+            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
+            
+        else:
+            super().clear()
+            
+    def extend(self, x):
+        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
+            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
+                                                 # because this may be expensive we only do this
+                                                 # when self is part of a traitlets.TraitType class
+            super().extend(x)
+            new_value = deque(self)
+            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
+            
+        else:
+            super().extend(x)
+            
+    def extendleft(self, x):
+        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
+            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
+                                                 # because this may be expensive we only do this
+                                                 # when self is part of a traitlets.TraitType class
+            super().extendleft(x)
+            new_value = deque(self)
+            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
+            
+        else:
+            super().extendleft(x)
+            
+    def insert(self, i, x):
+        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
+            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
+                                                 # because this may be expensive we only do this
+                                                 # when self is part of a traitlets.TraitType class
+            super().insert(i,x)
+            new_value = deque(self)
+            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
+            
+        else:
+            super().insert(i,x)
+            
+    def pop(self):
+        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
+            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
+                                                 # because this may be expensive we only do this
+                                                 # when self is part of a traitlets.TraitType class
+            val = super().pop()
+            new_value = deque(self)
+            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
+            return val
+            
+        else:
+            return super().pop()
+            
+    def reverse(self):
+        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
+            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
+                                                 # because this may be expensive we only do this
+                                                 # when self is part of a traitlets.TraitType class
+            super().reverse()
+            new_value = deque(self)
+            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
+            
+        else:
+            super().reverse()
+        
+    def rotate(self, n=1):
+        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
+            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
+                                                 # because this may be expensive we only do this
+                                                 # when self is part of a traitlets.TraitType class
+            super().rotate(n)
+            new_value = deque(self)
+            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
+            
+        else:
+            super().rotate(n)
+            
+        
 
 class QuantityTrait(Instance):
     info_text = "Trait for python quantities"
@@ -461,7 +603,8 @@ class DataBagTrait(Instance):
             obj._notify_trait(self.name, old_value, new_value)
 
 class DequeTrait(Instance):
-    klass = deque
+    klass = _NotifierDeque_
+    #klass = deque
     _cast_types = (list, tuple)
     _valid_defaults = (deque, list, tuple, set, frozenset)
     
@@ -494,10 +637,13 @@ class DequeTrait(Instance):
                 value_trait = None
                 
         if default_value is Undefined:
-            default_value = deque()
+            default_value = self.klass()
+            #default_value = deque()
             args = ()
+            
         elif isinstance(default_value, self._valid_defaults):
             args = (default_value,)
+            
         else:
             raise TypeError(f"default_value expected to be {None} or one of {self._valid_defaults}")
         
@@ -536,6 +682,7 @@ class DequeTrait(Instance):
         
         try:
             old_value = obj._trait_values[self.name]
+            
         except KeyError:
             silent=False    # this will be the first time the observed sees us
                             # therefore forcibly notify it

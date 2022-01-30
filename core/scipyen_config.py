@@ -55,6 +55,7 @@ import confuse
 from types import new_class
 from functools import (partial, wraps,)
 from pprint import pprint
+import collections
 
 import matplotlib as mpl # needed to expose the mro of Figure.canvas
 from matplotlib.figure import Figure
@@ -982,6 +983,23 @@ class ScipyenConfigurable(object):
     the loadWindowSettings and saveWindowSettings in the gui.workspacegui module,
     or the syncQtSettings defined in this module.
     
+    Inherited directly by:
+        gui.workspacegui.WorkspaceGuiMixin
+        gui.consoles.ConsoleWidget
+        
+    and indirectly by the following classes:
+        via WorkspaceGuiMixin:
+            gui.mainwindow.ScipyenWindow
+            gui.consoles.ExternalConsoleWindow
+            gui.scipyenviewer.ScipyenViewer
+            gui.scipyenviewer.ScipyenFrameViewer (via ScipyenViewer)
+            all viewer classes in gui subpackage (via either ScipyenViewer or
+            ScipyenFrameViewer)
+            
+            
+        via ConsoleWidget:
+            gui.consoles.ScipyenConsole
+    
     """
     # NOTE: 2021-09-23 11:39:57
     # added self._tag and tag property getter/setter
@@ -1016,15 +1034,8 @@ class ScipyenConfigurable(object):
         tag = self.configTag
         
         cfg = self._make_confuse_config_data_(change, isTop, parent, tag)
-        #if hasattr(self, "isTopLevel") and self.isTopLevel:
-            #cfg = Bunch({self.__class__.__name__: Bunch({change.name:change.new})})
-        #else:
-            #parent = self._get_parent_()
-
-            #if parent:
-                #cfg = dict({parent.__class__.__name__:Bunch({self.__class__.__name__: Bunch({change.name:change.new})})})
-            #else:
-                #cfg = Bunch({self.__class__.__name__: Bunch({change.name:change.new})})
+        
+        #print("_observe_configurable_ cfg", dict(cfg))
             
         if isinstance(cfg, Bunch):
             for k,v in cfg.items():
@@ -1038,16 +1049,33 @@ class ScipyenConfigurable(object):
         write_config()
         
     def _make_confuse_config_data_(self, change, isTop=True, parent=None, tag=None):
+        if isinstance(change.new, (collections.deque, tuple)):
+            v = [v_ for v_ in v] if len(change.new) else []
+        elif isinstance(change.new, type):
+            v = []
+        else:
+            v = change.new
+            
+        #if isinstance(change.new, (collections.deque, tuple, list)):
+            #v = str(tuple(change.new)) if len(change.new) else ""
+        #elif isinstance(change.new, type):
+            #v = ""
+        #else:
+            #v = change.new
+            
+        #print("change.new", change.new, "v", v, isinstance(change.new, type))
+        #v = str(tuple(change.new)) if isinstance(change.new, (collections.deque, tuple, list)) else change.new
+        
         if isTop:
-            return Bunch({self.__class__.__name__:Bunch({change.name:change.new})})
+            return Bunch({self.__class__.__name__:Bunch({change.name:v})})
         
         if parent is not None:
             if isinstance(tag, str) and len(tag.strip()):
-                return dict({parent.__class__.__name__:Bunch({self.__class__.__name__:Bunch({tag:Bunch({change.name:change.new})})})})
+                return dict({parent.__class__.__name__:Bunch({self.__class__.__name__:Bunch({tag:Bunch({change.name:v})})})})
                 
-            return dict({parent.__class__.__name__:Bunch({self.__class__.__name__:Bunch({change.name:change.new})})})
+            return dict({parent.__class__.__name__:Bunch({self.__class__.__name__:Bunch({change.name:v})})})
         
-        return Bunch({self.__class__.__name__:Bunch({change.name:change.new})})
+        return Bunch({self.__class__.__name__:Bunch({change.name:v})})
         
     def _get_config_view_(self, isTop=True, parent=None, tag=None):
         if isTop:
@@ -1061,19 +1089,6 @@ class ScipyenConfigurable(object):
         
         return scipyen_config[self.__class__.__name__].get(None)
             
-    #def _update_config_view(self, user_conf, isTop, parent=None, tag=None):
-        #if isTop:
-            #scipyen_config[self.__class__.__name__].set(user_conf)
-        #else:
-            #if parent is not None:
-                #if isinstance(tag, str) and len(tag.strip()):
-                    #scipyen_config[parent.__class__.__name__][self.__class__.__name__][tag].set(user_conf)
-                #else:
-                    #scipyen_config[parent.__class__.__name__][self.__class__.__name__].set(user_conf)
-                    
-            #else:
-                #scipyen_config[self.__class__.__name__].set(user_conf)
-        
     @property
     def configTag(self) -> str:
         return self._tag
@@ -1135,13 +1150,16 @@ class ScipyenConfigurable(object):
             return
         
         group_name, prefix = qSettingsGroupPfx(self)
-        #print(f"self.saveWindowSettings {self.__class__.__name__}, group: {group_name}, prefix: {prefix} to {self.qsettings.fileName()}")
         saveWindowSettings(self.qsettings, self, group_name=group_name, prefix=prefix)
     
     def __load_config_key_val__(self, settername, val):
         #print("ScipyenConfigurable.__load_config_key_val__")
         #print("\tsettername: %s, val: %s" % (settername, val))
         setter = inspect.getattr_static(self, settername, None)
+        
+        if isinstance(val, str) and any(c in val for c in ("()")):
+            # this is a string rep of a basic Pyton sequence
+            val = tuple(v_.strip() for v_ in val.strip("()").split(","))
         
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             with self.configurable_traits.observer.hold_trait_notifications():
@@ -1207,6 +1225,8 @@ class ScipyenConfigurable(object):
             tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
             
             user_conf = self._get_config_view_(isTop, parent, tag)
+            
+            print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() user_conf", user_conf)
             
             changed = False
             

@@ -241,6 +241,8 @@ class DataBag(Bunch):
         # Might have to force dictionaries to behave as Any
         # because of the long processing times
         
+        
+        # NOTE: 2022-01-29 19:29:56 dynamic_trait is from traitutils
         if obj is self:
             dtrait = partial(dynamic_trait, 
                              allow_none=self.__hidden__.allow_none, 

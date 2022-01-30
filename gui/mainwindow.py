@@ -34,7 +34,7 @@ CHANGELOG:
 # ipykernel/zmqshell.py for ZMQInteractiveShell
 # ipykernel/inprocess/ipkernel.py for InProcessInteractiveshell
 #
-# TODO breadcrumbs navigation for the file system model.
+# TODO breadcrumbs navigation for the file system model & tree.
 
 # NOTE: 2021-10-21 13:24:24
 # all things imported below will be available in the user workspace
@@ -1584,19 +1584,21 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         #### BEGIN configurables; for each of these we define a read-write property
         # decorated with markConfigurable
-        self._recentFiles                = collections.OrderedDict()
-        self._recentDirectories          = collections.deque()
-        self._fileSystemFilterHistory    = collections.deque()
-        self._lastFileSystemFilter       = str()
-        self._recentVariablesList        = collections.deque()
-        self._lastVariableFind           = str()
-        self._commandHistoryFinderList   = collections.deque()
-        self._lastCommandFind            = str()
-        self._recentlyRunScripts         = collections.deque()
+        self._recentFiles               = collections.OrderedDict()
+        self._recentDirectories         = collections.deque()
+        self._fileSystemFilterHistory   = collections.deque()
+        self._lastFileSystemFilter      = str()
+        self._recentVariablesList       = collections.deque()
+        self._lastVariableFind          = str()
+        self._commandHistoryFinderList  = collections.deque()
+        self._lastCommandFind           = str()
+        #self._recentScripts             = collections.deque()
+        self._recentScripts             = list()
         self._recent_scripts_dict_      = dict()
         self._showFilesFilter           = False
         self._console_docked_           = False
-        # ### END configurables
+        
+        # ### END configurables, but see NOTE:2022-01-28 23:16:57 below
         
         self.navPrevDir                 = collections.deque()
         self.navNextDir                 = collections.deque()
@@ -1719,6 +1721,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # elements and signal-slot connections NOT defined in the *.ui file
         self._configureUI_()
         
+        # NOTE:2022-01-28 23:16:57
+        # when collections are modified directly (instead of setting via
+        # property setter, see  NOTE:FIXME:2022-01-28 23:11:59) the 
+        # configurable_traits are NOT populated/notified!
+        # Hence I need to force this here
+        
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["RecentScripts"] = self._recentScripts
+            
         # With all UI and their signal-slot connections in place we can now
         # apply stored settings, including the 'state' of the ScipyenWindow object
         #  (a QMainWindow instance)
@@ -1992,20 +2003,38 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             self._lastCommandFind = str()
             
+    #def recentScripts(self) -> collections.deque:
     @property
-    def recentRunScripts(self) -> collections.deque:
-        return self._recentlyRunScripts
+    def recentScripts(self) -> list:
+        return self._recentScripts
     
-    #@markConfigurable("RecentScripts", "Qt")
-    @recentRunScripts.setter
-    def recentRunScripts(self, 
+    # NOTE:FIXME/TODO 2022-01-30 00:05:47
+    # Until I figure out a proper contents-observing traitType for Python
+    # collections like list, deque, dict, I stick with Qt configable here.
+    #@markConfigurable("RecentScripts", trait_notifier=True)
+    @markConfigurable("RecentScripts", "Qt")
+    @recentScripts.setter
+    def recentScripts(self, 
                          val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
+        #print(f"ScipyenWindow.recentScripts.setter {val}")
         if isinstance(val, (collections.deque, list, tuple)):
-            self._recentlyRunScripts = collections.deque((s for s in val if os.path.isfile(s)))
-            #self._recentlyRunScripts = collections.deque(sorted((s for s in val if os.path.isfile(s))))
+            #self._recentScripts = collections.deque((s for s in val if os.path.isfile(s)))
+            self._recentScripts = list((s for s in val if os.path.isfile(s)))
             
         else:
-            self._recentlyRunScripts = collections.deque()
+            self._recentScripts = list()
+            #self._recentScripts = collections.deque()
+            
+        # NOTE:2022-01-28 23:16:57 
+        # obsolete; this is added to configurable_traits at __init__, AFTER
+        # WorkspaceGuiMixin (ScipyenConfigurable) initialization
+        # albeit this mechanism it NOT currently used until I figure out a nice
+        # way to notify changes in the contents of list, deque, dict via the 
+        # DataBag & traitlets.TraitType framework.
+        #
+        
+        #if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            #self.configurable_traits["RecentScripts"] = self._recentScripts
             
         self._refreshRecentScriptsMenu_()
     
@@ -2045,6 +2074,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     #### END   PyQt slots
     
     #### BEGIN Methods
+    
+    def _set_recentScripts_(self, value):
+        pass
+    
     @safeWrapper
     def _init_ExternalIPython_(self, new:str = ""):
         """External IPython launcher.
@@ -3580,12 +3613,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
         evt.accept()
         
-    def saveSettings(self):
-        self.saveWindowSettings()
-        self.saveAppSettings()
+    #def saveSettings(self):
+        #self.saveWindowSettings()
+        #self.saveAppSettings()
         
-    def saveAppSettings(self):
-        pass
+    #def saveAppSettings(self):
+        #pass
         
     def saveWindowSettings(self):
         gname, pfx = saveWindowSettings(self.qsettings, self, group_name = self.__class__.__name__)
@@ -3633,10 +3666,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     #@processtimefunc
     def loadSettings(self):
         """Overrides ScipyenConfigurable.loadSettings()"""
-        #print(self.__class__)
-        #print("qtconfigurables", self.qtconfigurables)
         super(WorkspaceGuiMixin, self).loadSettings() # inherited from ScipyenConfigurable
-        #self.loadWindowSettings()
         
     def loadWindowSettings(self):
         #print("%s.loadWindowSettings" % self.__class__.__name__)
@@ -3783,7 +3813,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.actionManageScripts.triggered.connect(self.slot_showScriptsManagerWindow)
         self.menuScripts.addAction(self.actionManageScripts)
         
-        #self.menuScripts.insertMenu(self.actionQuit, self.recentScriptsMenu)
         #### END scripts menu
         
         # NOTE: 2016-05-02 12:22:21 -- refactoring plugin codes
@@ -4145,12 +4174,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.recentScriptsMenu.clear()
         self._recent_scripts_dict_.clear()
         
-        if len(self.recentRunScripts) > 0:
-            for s in self.recentRunScripts:
+        if len(self.recentScripts) > 0:
+            for s in self.recentScripts:
                 s_name = os.path.basename(s)
                 self._recent_scripts_dict_[s] = s_name
-                action = self.recentScriptsMenu.addAction(s_name)
-                action.setText(s_name)
+                ss = rf"{s_name}"
+                action = self.recentScriptsMenu.addAction(ss)
+                action.setText(ss)
                 action.setToolTip(s)
                 action.setStatusTip(s)
                 action.triggered.connect(self._slot_runRecentPythonScript_)
@@ -4912,14 +4942,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 #self._temp_python_filename_ = fileName
                 #self._slot_python_code_to_console()
                 
-                if fileName not in self.recentRunScripts:
-                    self.recentRunScripts.appendleft(fileName)
+                if fileName not in self.recentScripts:
+                    self.recentScripts.appendleft(fileName)
                     self._refreshRecentScriptsMenu_()
                     
                 else:
-                    if fileName != self.recentRunScripts[0]:
-                        self.recentRunScripts.remove(fileName)
-                        self.recentRunScripts.appendleft(fileName)
+                    if fileName != self.recentScripts[0]:
+                        self.recentScripts.remove(fileName)
+                        self.recentScripts.appendleft(fileName)
                         self._refreshRecentScriptsMenu_()
                         
     @pyqtSlot()
@@ -4948,14 +4978,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 # TODO check if this is a legitimate ASCII file containing python code
                 self._run_python_source_code_(fileName, paste=False)
                 
-                if fileName not in self.recentRunScripts:
-                    self.recentRunScripts.appendleft(fileName)
+                if fileName not in self.recentScripts:
+                    self.recentScripts.appendleft(fileName)
                     self._refreshRecentScriptsMenu_()
                     
                 else:
-                    if fileName != self.recentRunScripts[0]:
-                        self.recentRunScripts.remove(fileName)
-                        self.recentRunScripts.appendleft(fileName)
+                    if fileName != self.recentScripts[0]:
+                        self.recentScripts.remove(fileName)
+                        self.recentScripts.appendleft(fileName)
                         self._refreshRecentScriptsMenu_()
                         
     @pyqtSlot(str, QtCore.QPoint)
@@ -5454,14 +5484,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if isinstance(self._temp_python_filename_, str) and len(self._temp_python_filename_.strip()) and os.path.isfile(self._temp_python_filename_):
             self._run_python_source_code_(self._temp_python_filename_, paste=True)
             
-            if self._temp_python_filename_ not in self.recentRunScripts:
-                self.recentRunScripts.appendleft(self._temp_python_filename_)
+            if self._temp_python_filename_ not in self.recentScripts:
+                self.recentScripts.appendleft(self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
                 
             else:
-                if self._temp_python_filename_ != self.recentRunScripts[0]:
-                    self.recentRunScripts.remove(self._temp_python_filename_)
-                    self.recentRunScripts.appendleft(self._temp_python_filename_)
+                if self._temp_python_filename_ != self.recentScripts[0]:
+                    self.recentScripts.remove(self._temp_python_filename_)
+                    self.recentScripts.appendleft(self._temp_python_filename_)
                     self._refreshRecentScriptsMenu_()
                     
     @pyqtSlot()
@@ -5479,12 +5509,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def _slot_forgetScripts_(self, o):
         if isinstance(o, str):
-            if o in self.recentRunScripts:
-                self.recentRunScripts.remove(o)
+            if o in self.recentScripts:
+                self.recentScripts.remove(o)
                 
         elif isinstance(o, (tuple, list)) and all([isinstance(v, str) for v in o]):
             for v in o:
-                self.recentRunScripts.remove(v)
+                self.recentScripts.remove(v)
                 
         self._refreshRecentScriptsMenu_()
         
@@ -5513,14 +5543,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if isinstance(self._temp_python_filename_, str) and len(self._temp_python_filename_.strip()) and os.path.isfile(self._temp_python_filename_):
             self._import_python_module_file_(self._temp_python_filename_)
         
-            if self._temp_python_filename_ not in self.recentRunScripts:
-                self.recentRunScripts.appendleft(self._temp_python_filename_)
+            if self._temp_python_filename_ not in self.recentScripts:
+                self.recentScripts.appendleft(self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
                 
             else:
-                if self._temp_python_filename_ != self.recentRunScripts[0]:
-                    self.recentRunScripts.remove(self._temp_python_filename_)
-                    self.recentRunScripts.appendleft(self._temp_python_filename_)
+                if self._temp_python_filename_ != self.recentScripts[0]:
+                    self.recentScripts.remove(self._temp_python_filename_)
+                    self.recentScripts.appendleft(self._temp_python_filename_)
                     self._refreshRecentScriptsMenu_()
                 
             self._temp_python_filename_ = None
@@ -5766,15 +5796,26 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def _slot_registerPythonSource_(self):
         if isinstance(self._temp_python_filename_, str) and len(self._temp_python_filename_.strip()) and os.path.isfile(self._temp_python_filename_):
-            if self._temp_python_filename_ not in self.recentRunScripts:
-                self.recentRunScripts.appendleft(self._temp_python_filename_)
+            if self._temp_python_filename_ not in self.recentScripts:
+                # NOTE:2022-01-28 23:11:59
+                # this bypasses self.recentScript.setter therefore this will NOT
+                # be saved in the config
+                # see solution at NOTE:2022-01-28 23:16:57
+                # 
+                #self.recentScripts.appendleft(self._temp_python_filename_)
+                self.recentScripts.insert(0,self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
                 
             else:
-                if self._temp_python_filename_ != self.recentRunScripts[0]:
-                    self.recentRunScripts.remove(self._temp_python_filename_)
-                    self.recentRunScripts.appendleft(self._temp_python_filename_)
-                    self._refreshRecentScriptsMenu_()
+                if self._temp_python_filename_ != self.recentScripts[0]:
+                    rscripts = [s for s in self.recentScripts if s != self._temp_python_filename_]
+                    rscripts.insert(0, self._temp_python_filename_)
+                    self.recentScripts = rscripts
+                
+                #if self._temp_python_filename_ != self.recentScripts[0]:
+                    #self.recentScripts.remove(self._temp_python_filename_)
+                    #self.recentScripts.appendleft(self._temp_python_filename_)
+                    #self._refreshRecentScriptsMenu_()
                 
             self._temp_python_filename_ = None
             
@@ -5789,14 +5830,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
             self._run_python_source_code_(self._temp_python_filename_, paste=False)
 
-            if self._temp_python_filename_ not in self.recentRunScripts:
-                self.recentRunScripts.appendleft(self._temp_python_filename_)
+            if self._temp_python_filename_ not in self.recentScripts:
+                self.recentScripts.appendleft(self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
                 
             else:
-                if self._temp_python_filename_ != self.recentRunScripts[0]:
-                    self.recentRunScripts.remove(self._temp_python_filename_)
-                    self.recentRunScripts.appendleft(self._temp_python_filename_)
+                if self._temp_python_filename_ != self.recentScripts[0]:
+                    self.recentScripts.remove(self._temp_python_filename_)
+                    self.recentScripts.appendleft(self._temp_python_filename_)
                     #self._refreshRecentScriptsMenu_()
                     
             self._temp_python_filename_ = None
