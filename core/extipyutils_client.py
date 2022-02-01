@@ -9,7 +9,7 @@ messaging API.
 # sent execute_request message["content"]["user_expressions"] NOTE that such
 # execute_request message is sent when client.execute(...) is called, and the 
 # user_expressions field of the message gets the valueof the user_expressions
-# parameter ot that call.
+# parameter to that call.
 
 # NOTE 2020-07-11 10:26:38
 # Strategies for getting information about the properties of an object located

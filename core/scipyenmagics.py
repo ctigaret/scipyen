@@ -82,8 +82,6 @@ class ScipyenMagics(Magics):
                 
         return ret
                 
-            
-            
     @line_magic
     @needs_local_scope
     def appdir(self, line, local_ns):

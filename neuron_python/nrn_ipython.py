@@ -27,10 +27,9 @@ b) as part of the initialization code when launching a NEURON-enabled external
 import os, sys
 import neuron
 from neuron import h, rxd, units, nrn
-from neuron.units import ms, mV
+from neuron.units import ms, mV, um
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-
 
 
 sys.path.insert(2, __module_path__)

@@ -73,13 +73,15 @@ class NeuronMagics(Magics):
     @line_magic
     @needs_local_scope
     def nrngui(self, line, local_ns):
-        """Starts NEURON modelling with gui
+        """Starts NEURON modelling with gui, in this kernel
         """
         get_ipython().run_line_magic("run", self.nrngui_magic_cmd)
         
     @line_magic
     @needs_local_scope
     def nrnpy(self, line, local_ns):
+        """Starts NEURON modelling (without gui), in this kernel
+        """
         get_ipython().run_line_magic("run", self.nrnpy_magic_cmd)
         
 #get_ipython().register_magics(NeuronMagics)
