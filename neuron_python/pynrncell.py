@@ -489,6 +489,9 @@ class PyNRNCell(object):
         an existing section of this cell (by default, the 0 end of the new section
         is connected to the 1 end of the parent section).
         
+        The section's geometry is specified either as a stylized geometry
+        (L and diam) or 
+        
         A section has two categories of properties:
         ===========================================
         1. Section variables
