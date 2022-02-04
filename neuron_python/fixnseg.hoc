@@ -16,11 +16,10 @@
 freq = 100      // Hz, frequency at which AC length constant will be computed
 d_lambda = 0.1
 
-// "i" is the frequency parameter passed to the function call
-// also, these implicitly work on the last section on h's stack
+// also, this implicitly work on the last accessed section on h's stack
 func lambda_f() { local i, x1, x2, d1, d2, lam
         if (n3d() < 2) {
-            // $1 points to "i" (the frequency)
+            // $1 is frequency
                 return 1e5*sqrt(diam/(4*PI*$1*Ra*cm))
         }
 // above was too inaccurate with large variation in 3d diameter
