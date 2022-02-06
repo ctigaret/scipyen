@@ -23,8 +23,8 @@ import pandas as pd
 # h object is global and gui imports but does not launch the NEURON gui 
 # (based on InterViews library) unless the gui is not running
 import neuron
-from neuron import h, rxd, nrn # gui should be imported via Scipyen
-from neuron.units import ms, mV
+from neuron import (h, rxd, nrn, sections) # gui should be imported via Scipyen
+from neuron.units import (ms, mV, um)
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -506,23 +506,74 @@ class PyNRNCell(object):
             #n_hh: Hodgkin-Huxley potassium conductance gating variable (dimensionless)
         #"""
                    
+    #def addSection(self, name:str, /, 
+                   #L:typing.Optional[Real]=None,
+                   #nseg:typing.Optional[int] = None,
+                   #diam:typing.Union[Real, tuple, list] = 1, 
+                   #diam_interp: typing.Optional[typing.Union[tuple, list]]=None,
+                   #Ra:typing.Optional[Real]=None,
+                   #cm:typing.Optional[typing.Union[Real, tuple, list]]=None,
+                   #cm_interp: typing.Optional[typing.Union[tuple, list]]=None,
+                   #freq:typing.Optional[Real]=None,
+                   #d_lambda:typing.Optional[Real]=None,
+                   #parent:typing.Optional[nrn.Section]=None,
+                   #parent_pos:typing.Optional[Real]=None,
+                   #orientation:typing.Optional[int]=None) -> nrn.Section:
+        
+    def connectSections(self, section:nrn.Section, parent:nrn.Section, 
+                        parent_pos:typing.Optional[Real]=None, 
+                        orientation:typing.Optional[int]=None) -> None:
+        
+        if not isinstance(section, nrn.Section):
+            raise TypeError(f"'section' expected to be a nrn.Section; got {type(section).__name__} instead")
+        
+        if section not in self or section.cell is not self:
+            raise ValueError(f"The specified section {section.name} does not belong to this cell")
+        
+        if not isinstance(parent, nrn.Section):
+            raise TypeError(f"'parent' expected to be a nrn.Section; got {type(parent).__name__} instead")
+        
+        if parent not in self or parent.cell is not self:
+            raise ValueError(f"The specified parent section {parent.name} does not belong to this cell")
+        
+        if section is parent or section.same(parent):
+            raise ValueError("Cannot connect a section to itself!")
+        
+        if isinstance(parent_pos, Real):
+            if isinstance(orientation, int):
+                if orientation not in (0,1):
+                    raise ValueError("When specified, orientation must be 0 (zero) or 1 (one); got %d instead" % orientation)
+                
+                section.connect(parent(parent_pos), orientation)
+                
+            else:
+                section.connect(parent(parent_pos))
+                
+        elif isinstance(orientation, int):
+            if orientation not in (0,1):
+                raise ValueError("When specified, orientation must be 0 (zero) or 1 (one); got %d instead" % orientation)
+
+            section.connect(parent, orientation)
+
+        else:
+            section.connect(parent)
+        
+        
+
     def addSection(self, name:str, /, 
+                   nseg:[int] = 1,
                    L:typing.Optional[Real]=None,
-                   nseg:typing.Optional[int] = None,
-                   diam:typing.Union[Real, tuple, list] = 1, 
-                   diam_interp: typing.Optional[typing.Union[tuple, list]]=None,
-                   Ra:typing.Optional[Real]=None,
-                   cm:typing.Optional[typing.Union[Real, tuple, list]]=None,
-                   cm_interp: typing.Optional[typing.Union[tuple, list]]=None,
-                   freq:typing.Optional[Real]=None,
-                   d_lambda:typing.Optional[Real]=None,
-                   parent:typing.Optional[nrn.Section]=None,
-                   parent_pos:typing.Optional[Real]=None,
-                   orientation:typing.Optional[int]=None) -> nrn.Section:
+                   diam:typing.Union[Real, tuple, list] = 1) -> nrn.Section:
         """Add a section to this cell.
         
-        The section is created using stylized geometry (L, nseg, diam) and a 
-        minimal set of biophysical properties (Ra, cm).
+        The section is created using stylized geometry (L, nseg, diam) with
+        'diam' being set the same across all 'nseg' discretization segments (or 
+        compartments), then added as an instance attribute to the cell.
+        
+        Once created in this way, the section's geometry and discretization can
+        be further refined by calling self.refineGeom(sec), ideally AFTER setting
+        new values for the section's Ra and cm attributes (by default, the newly
+        created section has the NEURON's default values for Ra: 35.4 and )
         
         A cell must have at least one section - usually called "soma" but one is
         free to use any name as long as it is unique.
@@ -577,10 +628,6 @@ class PyNRNCell(object):
             To use PyNRNCell default value (51) pass PyNRNCell.default_nseg 
             explicitly, here.
             
-            In all other cases, 'nseg' section variable is calculated according 
-            to the 'freq' and 'd_lambda' parameters, (see  'Discretization
-            parameters', below).
-                
         diam: one of:
             1) Real scalar > 0 : the diameter of the section (in µm); optional,
             the default is NEURON's default (500)
@@ -750,16 +797,14 @@ class PyNRNCell(object):
             raise TypeError(f"Expecting a str for 'name' parameter; got {type(name).__name__} instead")
     
         if len(name.strip()) == 0:
-            warnings.warn("Cannot accept empty section names")
+            raise ValueError("Cannot accept empty section names")
             return
         
         if name in self.sections:
-            warnings.warn(f"A section named {name} already exists in {self.__repr__()}")
-            return
+            raise ValueError(f"A section named {name} already exists in {self.__repr__()}")
         
         if hasattr(self, name):
             item = "A section" if isinstance(getattr(self, name), nrn.Section) else "An attribute"
-                
             raise ValueError(f"{item} named {name} already exists")
         
         # NOTE: 2021-02-05 23:01:47
@@ -773,192 +818,186 @@ class PyNRNCell(object):
         # This will have the NEURON's default values for nseg (1), L (100.0),
         # diam (500.0), Ra (35.4) and cm (1.0); i.e., it will have a single
         # right cylinder compartment with the default diam, L, Ra and cm.
-        # Of these parameters, only L, Ra and cm are used to calculate nseg via 
-        # d_lambda rule.
         section = h.Section(name=name, cell=self)
+        #section = sections.ExtendedSection(name=name, cell=self)
         
-        # NOTE: 2022-02-04 15:28:08
-        # section's L, Ra and cm are essential for determining the nseg via 
-        # d_lambda; set them early on, or rely on NEURON's defaults (set above)
-        if isinstance(L, Real) and L > 1:
+        if isinstance(L, Real) and L > 0:
             section.L = L
+        else:
+            h.delete_section(sec=section)
+            raise ValueError(f"'L' expected to be a strictly positive scalar; got {L} instead")
         
-        if isinstance(Ra, float) and Ra > 0:
-            section.Ra = Ra
+        if isinstance(diam, Real) and diam > 0:
+            section.diam = diam
+        else:
+            h.delete_section(sec = section)
+            raise ValueError(f"'diam' expected to be a strictly positive scalar; got {diam} instead")
+                
+        #if isinstance(Ra, float) and Ra > 0:
+            #section.Ra = Ra
+        #else:
+            #raise ValueError(f"'L' expected to be a strictly positive scalar; got {L} instead")
             
-        if isinstance(cm, float) and cm > 0:
-            # if cm was given as a positive float scalar, use it to calculate
-            # nseg; else leave the section.cm as the NEURON's default of 1
-            # and interpolate later over nseg (if given)
-            section.cm = cm 
+        #if isinstance(cm, float) and cm > 0:
+            ## if cm was given as a positive float scalar, use it to calculate
+            ## nseg; else leave the section.cm as the NEURON's default of 1
+            ## and interpolate later over nseg (if given)
+            #section.cm = cm 
+        #else:
+            #raise ValueError(f"'cm' expected to be a strictly positive scalar; got {cm} instead")
             
-        # NOTE: 2022-01-30 17:07:10
-        # Set up the number of segments in the section
-        # 1. EITHER specify nseg as an int
         if isinstance(nseg, int) and nseg >= 1:
             # to use PyNRNCell default pass PyNRNCell.default_nseg explicitly
             section.nseg = nseg
-            
-        # 2. OR use the d_lambda rule with 'freq' and 'd_lambda' parameters
-        # to calculate the AC length constant for given freq (λf, See The NEURON
-        # book), then calculate the 'optimal' nseg; reasonable values for freq
-        # is 100.
         else:
-            if not isinstance(freq, Real) or freq <=  0:
-                # is 'freq' was given as positive float scalar then use it to
-                # calculate nseg; else use the NEURON's recommended value of
-                # 100  Hz
-                freq = 100.
-                
-            if not isinstance(d_lambda, Real) or d_lambda <= 0:
-                # NOTE: 2022-02-04 11:28:02
-                # d_lambda = 0 will cause +Inf in lambda_f !
-                d_lambda = self.d_lambda # the default of 0.1
-                
-                
-            #print(f"section.n3d: {section.n3d()}; h.n3d: {h.n3d(sec=section)}")
-                
-            # now, go ahead and calculate an 'optimal' nseg
-            nseg = geomNseg(section, freq, d_lambda)
-            #print(f"calculated nseg: {nseg}")
-            section.nseg = nseg
+            h.delete_section(sec=section)
+            raise ValueError(f"'nseg' must be an int >= 1; got {nseg} instead")
             
-        
-        # set up section's diameter - this is a range variable, so we need 
-        # section.nseg to have been set already
-        if isinstance(diam, Real): # a constant diameter
-            # just call simply this below; this applies diam to all segments of
-            # 'section'
-            section.diam = diam
-                
-        elif isinstance(diam, (tuple, list)):
-            if all(isinstance(v, Real) and v > 0 for v in diam):
-                if len(diam) != 2:
-                    raise ValueError(f"When a sequence of scalars, diam must have exactly two elements; got {len(diam)} elements instead")
-                
-                if diam_interp is None:
-                    for segment in section.allseg(): # also iterates through ends
-                        segment.diam = np.interp(segment.x, [0., 1.], diam)
-                        
-                elif isinstance(diam_interp, (tuple, list)):
-                    if len(diam_interp) != 2:
-                        raise ValueError(f"For a 'diam' sequence of two scalars, 'diam_interp', when not None, it must have two elements; got {len(diam_interp)} elements instead")
-                    
-                    if all(isinstance(v, Real) and v >= 0 and v <= 1 for v in diam_interp):
-                        for segment in section.allseg(): # also iterates through ends
-                            segment.diam = np.interp(segment.x, diam_interp, diam)
-                    else:
-                        raise ValueError("For a 'diam' sequence of two scalars, 'diam_interp', when not None, it must have Real scalar elements")
-                        
-                else:
-                    raise ValueError("Incorrect diam_interp sprcified; expecting None or a sequence of two Real")
-                        
-            elif all(isinstance(v, (tuple, list)) and len(v) == 2 and all(isinstance(v_, Real) and v_ > 0 for v_ in v) for v in diam):
-                if len(diam) != section.nseg:
-                    raise ValueError(f"When 'diam' is given as a nested sequence, it must have as many elements as there are segments in the section ({section.nseg}); got {len(diam)} elements instead")
-                
-                if diam_interp is None:
-                    for k, segment in enumerate(section.allseg()): # also iterates through ends
-                        segment.diam = np.interp(segment.x, [0., 1.], diam[k])
-                        
-                elif isinstance(diam_interp, (tuple, list)):
-                    if len(diam_interp) != len(diam):
-                        raise ValueError(f"'diam_interp should have {len(diam)} elements; got {len(diam_interp)} elements instead")
-                    
-                    if all(isinstance(v, (tuple, list)) and len(v) ==2 and all(isinstance(v_, Real) and v_ >= 0 and v_ <= 1 for v_ in v) for v in diam_interp):
-                        for k, segment in enumerate(section.allseg()):
-                            segment.diam = np.interp(seg.x, diap_interp[k], diam[k])
-                        
-                    else:
-                        raise ValueError("When 'diam' is a nested sequence, 'diam_interp' should be a similar nested sequence of Real scalars")
-                    
-                else:
-                    raise ValueError(f"Incorrect 'diam_interp' specification; expecting a sequence of {len(diam)} real scalar pairs")
-                    
-                    
-        # set up section's cm; note that if 'cm' was given as a scalar, it had
-        # already been assigned to section's cm; regardless of how nseg was 
-        # assigned, we need do nothing further; however, if 'cm' was passed as
-        # a sequence for interpolation, when we need to set it up now.
-        if isinstance(cm, (tuple, list)):
-            if not all([isinstance(v, Real) for v in cm]):
-                raise TypeError("Expecting a sequence of scalars for 'cm'")
-            
-            if len(cm) < 2:
-                raise ValueError("When given as a sequence, 'cm' must have at least two elements")
-              
-            if cm_interp is None:
-                for segment in section.allseg(): # also iterates through ends
-                    segment.cm = np.interp(segment.x, [0., 1.], cm)
-                
-            elif isinstance(cm_interp, (tuple, list)):
-                if len(cm_interp) != len(cm):
-                    raise ValueError("lengths of 'cm' and 'cm_interp' sequences must be identical")
-                
-                if not all([isinstance(v, Real) for v in cm_interp]):
-                    raise TypeError("'cm_interp' must contain Real scalars")
-                
-                if not all([v >= 0 and v <=1 for v in cm_interp]):
-                    raise ValueError("'cm_interp' values must all be in the interval [0., 1.]")
-                
-                for segment in section.allseg(): # also iterates through ends
-                    segment.cm = np.interp(segment.x, cm_interp, cm)
-                    
-            else:
-                raise TypeError(f"'cm_interp' expected to be None, or a sequence (tuple, lits) of real scalars; got {type(cm_interp).__name__} instead.")
-                        
-                    
         # NOTE: 2022-01-30 16:56:00
         # self gains 'name' as attribute bound to the section
         setattr(self, name, section)
+        return section
         
+        ## 2. OR use the d_lambda rule with 'freq' and 'd_lambda' parameters
+        ## to calculate the AC length constant for given freq (λf, See The NEURON
+        ## book), then calculate the 'optimal' nseg; reasonable values for freq
+        ## is 100.
+        #else:
+            #if not isinstance(freq, Real) or freq <=  0:
+                ## is 'freq' was given as positive float scalar then use it to
+                ## calculate nseg; else use the NEURON's recommended value of
+                ## 100  Hz
+                #freq = 100.
+                
+            #if not isinstance(d_lambda, Real) or d_lambda <= 0:
+                ## NOTE: 2022-02-04 11:28:02
+                ## d_lambda = 0 will cause +Inf in lambda_f !
+                #d_lambda = self.d_lambda # the default of 0.1
+                
+                
+            ##print(f"section.n3d: {section.n3d()}; h.n3d: {h.n3d(sec=section)}")
+                
+            ## now, go ahead and calculate an 'optimal' nseg
+            #nseg = geomNseg(section, freq, d_lambda)
+            ##print(f"calculated nseg: {nseg}")
+            #section.nseg = nseg
+            
+        
+        ## set up section's diameter - this is a range variable, so we need 
+        ## section.nseg to have been set already
+        #if isinstance(diam, Real): # a constant diameter
+            ## just call simply this below; this applies diam to all segments of
+            ## 'section'
+            #section.diam = diam
+                
+        #elif isinstance(diam, (tuple, list)):
+            #if all(isinstance(v, Real) and v > 0 for v in diam):
+                #if len(diam) != 2:
+                    #raise ValueError(f"When a sequence of scalars, diam must have exactly two elements; got {len(diam)} elements instead")
+                
+                #if diam_interp is None:
+                    #for segment in section.allseg(): # also iterates through ends
+                        #segment.diam = np.interp(segment.x, [0., 1.], diam)
+                        
+                #elif isinstance(diam_interp, (tuple, list)):
+                    #if len(diam_interp) != 2:
+                        #raise ValueError(f"For a 'diam' sequence of two scalars, 'diam_interp', when not None, it must have two elements; got {len(diam_interp)} elements instead")
+                    
+                    #if all(isinstance(v, Real) and v >= 0 and v <= 1 for v in diam_interp):
+                        #for segment in section.allseg(): # also iterates through ends
+                            #segment.diam = np.interp(segment.x, diam_interp, diam)
+                    #else:
+                        #raise ValueError("For a 'diam' sequence of two scalars, 'diam_interp', when not None, it must have Real scalar elements")
+                        
+                #else:
+                    #raise ValueError("Incorrect diam_interp sprcified; expecting None or a sequence of two Real")
+                        
+            #elif all(isinstance(v, (tuple, list)) and len(v) == 2 and all(isinstance(v_, Real) and v_ > 0 for v_ in v) for v in diam):
+                #if len(diam) != section.nseg:
+                    #raise ValueError(f"When 'diam' is given as a nested sequence, it must have as many elements as there are segments in the section ({section.nseg}); got {len(diam)} elements instead")
+                
+                #if diam_interp is None:
+                    #for k, segment in enumerate(section.allseg()): # also iterates through ends
+                        #segment.diam = np.interp(segment.x, [0., 1.], diam[k])
+                        
+                #elif isinstance(diam_interp, (tuple, list)):
+                    #if len(diam_interp) != len(diam):
+                        #raise ValueError(f"'diam_interp should have {len(diam)} elements; got {len(diam_interp)} elements instead")
+                    
+                    #if all(isinstance(v, (tuple, list)) and len(v) ==2 and all(isinstance(v_, Real) and v_ >= 0 and v_ <= 1 for v_ in v) for v in diam_interp):
+                        #for k, segment in enumerate(section.allseg()):
+                            #segment.diam = np.interp(seg.x, diap_interp[k], diam[k])
+                        
+                    #else:
+                        #raise ValueError("When 'diam' is a nested sequence, 'diam_interp' should be a similar nested sequence of Real scalars")
+                    
+                #else:
+                    #raise ValueError(f"Incorrect 'diam_interp' specification; expecting a sequence of {len(diam)} real scalar pairs")
+                    
+                    
+        ## set up section's cm; note that if 'cm' was given as a scalar, it had
+        ## already been assigned to section's cm; regardless of how nseg was 
+        ## assigned, we need do nothing further; however, if 'cm' was passed as
+        ## a sequence for interpolation, when we need to set it up now.
+        #if isinstance(cm, (tuple, list)):
+            #if not all([isinstance(v, Real) for v in cm]):
+                #raise TypeError("Expecting a sequence of scalars for 'cm'")
+            
+            #if len(cm) < 2:
+                #raise ValueError("When given as a sequence, 'cm' must have at least two elements")
+              
+            #if cm_interp is None:
+                #for segment in section.allseg(): # also iterates through ends
+                    #segment.cm = np.interp(segment.x, [0., 1.], cm)
+                
+            #elif isinstance(cm_interp, (tuple, list)):
+                #if len(cm_interp) != len(cm):
+                    #raise ValueError("lengths of 'cm' and 'cm_interp' sequences must be identical")
+                
+                #if not all([isinstance(v, Real) for v in cm_interp]):
+                    #raise TypeError("'cm_interp' must contain Real scalars")
+                
+                #if not all([v >= 0 and v <=1 for v in cm_interp]):
+                    #raise ValueError("'cm_interp' values must all be in the interval [0., 1.]")
+                
+                #for segment in section.allseg(): # also iterates through ends
+                    #segment.cm = np.interp(segment.x, cm_interp, cm)
+                    
+            #else:
+                #raise TypeError(f"'cm_interp' expected to be None, or a sequence (tuple, lits) of real scalars; got {type(cm_interp).__name__} instead.")
+                        
+                    
         # NOTE: 2022-02-04 16:34:20
         # Finally, deal with connectivity
-        if isinstance(parent, nrn.Section) and parent.cell() is self \
-            and parent in self.all and parent is not section:
-            if isinstance(parent_pos, Real):
-                if isinstance(orientation, int):
-                    if orientation not in (0,1):
-                        raise ValueError("When specified, orientation must be 0 (zero) or 1 (one); got %d instead" % orientation)
-                    section.connect(parent(parent_pos), orientation)
-                else:
-                    section.connect(parent(parent_pos))
-                    
-            elif isinstance(orientation, int):
-                if orientation not in (0,1):
-                    raise ValueError("When specified, orientation must be 0 (zero) or 1 (one); got %d instead" % orientation)
-                section.connect(parent, orientation)
-            else:
-                section.connect(parent)
-        
-        return section
     
-    #def geomNseg(self, section:nrn.Section, freq:Real, 
-                 #d_lambda:typing.Optional[Real]=None) -> int:
-        #"""Calculates nseg according to d-lambda rule.
+    def geomNseg(self, section:nrn.Section, freq:Real, 
+                 d_lambda:typing.Optional[Real]=None) -> int:
+        """Calculates nseg according to d-lambda rule.
         
-        #Parameters:
-        #===========
-        #section: nrn.Section. The section specified here must belong to this 
-                #cell (otherwise, raises KeyError)
+        Parameters:
+        ===========
+        section: nrn.Section. The section specified here must belong to this 
+                cell (otherwise, raises KeyError)
                 
-        #freq: Real: AC frequency for which nseg is to be calculated
+        freq: Real: AC frequency for which nseg is to be calculated
         
-        #d_lambda: Real (optional, default is 0.1)
+        d_lambda: Real (optional, default is 0.1). Values must be in the 
+            semi-open interval (0., 1.]
         
-        #""" 
-        #if not isinstance(d_lambda, Real):
-            #d_lambda = self.d_lambda
-            ## NOTE: can d_lambda be set individually for each section?
+        """ 
+        if not isinstance(section, nrn.Section):
+            raise TypeError("Expecting a nrn.Section; got %s instead" % type(section).__name__)
+        
+        if section not in self.all:
+            raise KeyError("Section %s not found in %s" % (section, self))
+        
+        if not isinstance(d_lambda, Real):
+            d_lambda = self.d_lambda
             
-        #if isinstance(section, nrn.Section):
-            #if section not in self.all:
-                #raise KeyError("Section %s not found in %s" % (section, self))
+        elif d_lambda <= 0 or d_lambda > 1:
+            raise ValueError(f"d_lambda expected to be a scalar real on the semi-open interval (0., 1.]; got {d_lambda} instead")
             
-            #return int( (section.L/(d_lambda * lambda_f(freq, section)) + 0.9) /2 ) * 2 + 1
-            
-        #else:
-            #raise TypeError("Expecting a nrn.Section; got %s instead" % type(section).__name__)
+        return geomNseg(section, freq, d_lambda)
 
     def getSection(self, name):
         if not isinstance(name, str):
@@ -1218,7 +1257,7 @@ def remove_sections(cell:typing.Optional[PyNRNCell]=None):
     else:
         raise TypeError(f"A PyNRNCell instance or None was expected; got {type(cell).__name__} instead")
 
-def lambda_f(freq:Real, section:rtyping.Union[nrn.Section, tuple]) -> float:
+def lambda_f(freq:Real, section:nrn.Section) -> float:
     """Calculates the section's AC length constant at a given frequency (λf).
     See https://neuron.yale.edu/neuron/static/docs/d_lambda/d_lambda.html
     
@@ -1247,21 +1286,14 @@ def lambda_f(freq:Real, section:rtyping.Union[nrn.Section, tuple]) -> float:
         tuple or five scalars (diam, L, Ra, cm, n3d) in THIS order
     
     """
-    if isinstance(section, nrn.Section):
-        cm = section.cm
-        L = section.L
-        diam = section.diam
-        Ra = section.Ra
-        n3d = section.n3d()
-        
-    elif isinstance(section, (tuple, list)) and len(section) == 5:
-        diam, L, Ra, cm, n3d = section
-        
-    if cm == 0:
+    if not isinstance(section, nrn.Section):
+        raise TypeError(f"Expecting a nrn.Section for 'section'; got {type(section).__name__} instead")
+
+    if section.cm == 0:
         return 1e10
     
-    if n3d < 2:
-        return 1e5 * np.sqrt(diam / (4*np.pi*freq*Ra*cm))
+    if section.n3d() < 2:
+        return 1e5 * np.sqrt(section.diam / (4*np.pi*freq*section.Ra*section.cm))
     
     else:
         x1 = section.arc3d(0)
@@ -1295,7 +1327,7 @@ def geomNseg(section:nrn.Section, freq:Real,
     d_lambda: Real (optional, default is 0.1)
     
     """ 
-    if not isinstance(d_lambda, Real) or d_lambda <= 0:
+    if not isinstance(d_lambda, Real) or d_lambda <= 0 or d_lambda > 1:
         d_lambda = 0.1
         # NOTE: can d_lambda be set individually for each section?
         
