@@ -801,7 +801,7 @@ class PyNRNCell(object):
         # be left with a dangling reference
         #
         
-        # NOTE: 2022-02-04 09:42:08
+        # NOTE: 2022-02-04 09:42:08 
         # This will have the NEURON's default values for nseg (1), L (100.0),
         # diam (500.0), Ra (35.4) and cm (1.0); i.e., it will have a single
         # right cylinder compartment with the default diam, L, Ra and cm.
