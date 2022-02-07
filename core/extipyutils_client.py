@@ -143,7 +143,7 @@ init_commands.extend(
     "from matplotlib import pyplot as plt",
     "from matplotlib import cm",
     "import matplotlib.mlab as mlb",
-    "mpl.use('Qt5Agg')",
+    #"mpl.use('Qt5Agg')",
     "".join(["sys.path.insert(2, '", __scipyen_path__, "')"]),
     "from core import extipyutils_host as hostutils",
     "from core.workspacefunctions import *",
@@ -172,7 +172,7 @@ init_commands.extend(
     "from imaging.scandata import (AnalysisUnit, ScanData,)",
     "from iolib import pictio as pio",
     "from iolib import h5io, jsonio",
-    
+    "print('To use matplotlib run %matplotlib magic')"
     ])
     
 #init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, importlib",

@@ -17,7 +17,10 @@ extipyutils_client.
 To expose Scipyen API inside the REMOTE IPython kernel workspace, either insert
 relevant import statements in the init_commands list inside extipyutils_client
 module. NOTE: extipy_init module cannot be used for importing Scipyen API in 
-the REMOTE kernel namespace, as it is oblivious of Scipyen's module paths
+the REMOTE kernel namespace, as it is oblivious of Scipyen's module paths.
+
+NOTE: NeuronMagics are useful to start NEURON manually from an external IPython
+kernel, optionally with ('nrngui') or without NEURON GUI ('nrnpy')
 """
 
 import os, sys
