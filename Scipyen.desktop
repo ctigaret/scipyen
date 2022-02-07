@@ -1,6 +1,6 @@
 [Desktop Entry]
-Comment[en_GB]=
-Comment=
+Comment[en_GB]=Scientific Python Environment for Neuroscience
+Comment=Scientific Python Environment for Neuroscience
 Exec=/home/cezar/bin/scipyen_desktop.sh
 GenericName[en_GB]=Scipyen
 GenericName=Scipyen
@@ -14,6 +14,6 @@ Terminal=true
 TerminalOptions=\s--noclose
 Type=Application
 X-DBUS-ServiceName=
-X-DBUS-StartupType=
+X-DBUS-StartupType=none
 X-KDE-SubstituteUID=false
 X-KDE-Username=
