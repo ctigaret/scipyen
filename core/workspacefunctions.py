@@ -5,8 +5,6 @@ All functions defined here are to be imported in the top namespace
 DOES NOT WORK (yet)
 
 """
-#import pict
-
 from __future__ import print_function
 #from sys import getsizeof, stderr
 
@@ -425,7 +423,6 @@ def user_workspace() -> dict:
     """Returns a reference to the user workspace (a.k.a user namespace)
     """
     frame_records = inspect.getouterframes(inspect.currentframe())
-    
     for (n,f) in enumerate(frame_records):
         if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within Scipyen's IPython console
             return f[0].f_globals["mainWindow"].workspace
@@ -433,7 +430,6 @@ def user_workspace() -> dict:
 def scipyentopdir() -> str:
     user_ns = user_workspace()
     return user_ns["mainWindow"]._scipyendir_
-    
 
 def delvars(*args, glob=True, ws=None):
     """Delete variable named in *args from workspace ws
