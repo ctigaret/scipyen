@@ -40,6 +40,8 @@ versions for the dependent software libraries, hence not worth the effort.
 
 By comparison, building the 'sdk' is generally well streamlined on Linux.
 
+See also the file 'c_cpp_requirements_unix.txt'
+
 Steps:
 ================================================================================
 0. Clone the Scipyen git repo somewhere convenient (e.g. in $HOME)
@@ -388,7 +390,8 @@ pip3 install -r $VIRTUAL_ENV/src/nrn/docs/docs_requirements.txt
         recommonmark, plotly, etc) inside the virtual environment)
     
 cd $VIRTUAL_ENV/src/nrn-build
-make docs (NOTE this may fail --> no problems !)
+make docs (NOTE conversion of some jupyter notebooks this may fail --> no problems;
+           until this is solved, use the online documentation)
     
     Optionally, copy/move (or, better make a symbolic link) 
     $VIRTUAL_ENV/src/nrn/docs/_build to $VIRTUAL_ENV/doc/neuron
