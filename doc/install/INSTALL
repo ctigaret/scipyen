@@ -17,11 +17,28 @@ building software directly in this environment, without the need for administrat
 (superuser) privileges, and without interfering with system-wide or account-wide 
 software.
 
+This means the software can be uninstalled re-built, etc, without worrying about
+the local account or system-wide interference.
+
 The only exception is building Python directly from sources which may require
 admin privileges.
 
-This means the software can be uninstalled re-built, etc, without worrying about
-the local account or system-wide interference.
+NOTE: Unlike the situation on Widnows platform, the 3rd party software (a.k.a
+'scipyen_sdk') is installed directly inside the virtual environment. This is
+because all the dependencies (libraries, header files, pkgconfig files, etc) are
+placed inside a directory tree that follows the directory system structure
+of the /usr or /usr/local directory on UNIX (e.g., /usr/lib, /usr/lib64, /usr/man,
+etc.).
+
+In theory, the sdk COULD be built in a separate directory tree, but this would
+require further changes to environment variables such as PATH, LD_LIBRARY_PATH
+and might mess up the installation of 3rd party python modules (vigranumpy, NEURON).
+
+The only benefit might be to create a software bundle with the binaries (as for
+done Windows) but this would only be portable among machines with the same
+versions for the dependent software libraries, hence not worth the effort.
+
+By comparison, building the 'sdk' is generally well streamlined on Linux.
 
 Steps:
 ================================================================================
@@ -318,7 +335,15 @@ git clone https://github.com/neuronsimulator/nrn
 mkdir nrn-build && cd nrn-build
 cmake-gui ../nrn
 "Configure" will also pull iv, coreneuron
+
+Example (as of 2022-02-16 12:25:17 on Tumbleweed 20220213)
+        LIBEXECINSTALLDIR=$VIRTUAL_ENV/libexec
+        PKGCONFIG_FILED_DIR=$VIRTUAL_ENV/lib64/pkgconfig
+        PLUGIN_INSTALL_DIR=$VIRUTAL_ENV/lib64/mod2c
         CMAKE_INSTALL_PREFIX (-DCMAKE_INSTALL_PREFIX=) $VIRTUAL_ENV
+        CMAKE_INSTALL_LIBDIR=lib64
+        CMAKE_INSTALL_LIBEXECDIR=libexec
+        NRN_AVOID_ABSOLUTE_PATHS=true
         NRN_ENABLE_CORENEURON=true
         NRN_ENABLE_INTERVIEWS=true
         NRN_ENABLE_MECH_DLL_STYLE=true
@@ -328,13 +353,18 @@ cmake-gui ../nrn
         NRN_ENABLE_MPI=true
         NRN_ENABLE_MPI_DYNAMIC=false
         NRN_ENABLE_PYTHON=true (default python3 fallback to python2)
-        NRN_ENABLE_PYTHON_DYNAMIC=false
+        NRN_ENABLE_PYTHON_DYNAMIC=true
+        NRN_ENABLE_REL_RPATH=true
         NRN_ENABLE_RX3D=true
         NRN_ENABLE_SHARED=true
         NRN_ENABLE_TESTS=false
         NRN_ENABLE_THREADS=true
         LIB_INSTALL_DIR=$VIRTUAL_ENV/lib64
+        LIB_SUFFIX=64
         IV_ENABLE_SHARED=true
+        IV_ENABLE_X11_DYNAMIC=false # NOTE: 2022-02-16 12:50:18 setting to True prevents the GUI from showing!
+        MOD2C_ENABLE_LEGACY_UNITS=false
+        
 make 
 make install
 
@@ -345,6 +375,9 @@ cd $VIRTUAL_ENV/src/nrn-build/src/nrnpython
     
 python setup.py install 
     (to install nrnpython in site-packages)
+    
+    NOTE: This is IMPORTANT, especially when rebuiling NEURON following a machine
+    migration (either to a new distribution or distribution version)
     
     NOTE: Optional: Build neuron documentation locally and install locally 
         (see $VIRTUAL_ENV/src/nrn/docs/README.md)
@@ -424,6 +457,7 @@ Grab the git repo:
     git clone https://github.com/ganymede42/h5pyViewer.git
     
 Get your fingers dirty...
+
 ================================================================================
                                 
                                 !!! DONE !!!

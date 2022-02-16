@@ -18,10 +18,6 @@ Since Python 3.9 is a bit ahead of the curve for the current Linux distribution
 build Python from sources - it doesn't take long - and install it in /usr/local/
 (by calling `make altinstall`).
 
-    Third party software, built and installed FOR the virtual python environment
-    (detailed instructions are givenn in the accompanying INSTALL file in this
-     directory).
-    
     
     
     
