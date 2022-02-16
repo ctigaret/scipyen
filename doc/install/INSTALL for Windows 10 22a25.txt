@@ -13,8 +13,8 @@ replicating the recipe on Hermes Windows 10 VirtualBox image
     the issue is replicated on Hermes (despite apparently successful build):
 
     python.exe - Ordinal Not Found
-    the ordinal 169 could not be located in tghe dynamic link library
-    e:zscipyen_sdk\bin\libpng16.dll
+    the ordinal 169 could not be located in the dynamic link library
+    e:\scipyen_sdk\bin\libpng16.dll
 
     and, at command line:
     Traceback (most recent call last):

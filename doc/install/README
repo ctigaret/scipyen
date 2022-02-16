@@ -1,0 +1,27 @@
+To run Scipyen the following requirements must be met:
+    
+    Python 3.9.+ installed on the local machine.
+    
+    A python virtual environment (created with virtualenv, NOT conda/miniconda/anaconda or venv)
+    
+    Third party software
+    
+    To install all of these, read the following files in this directory:
+        
+    For GNU/Linux platforms:  INSTALL
+    
+    For Windows (10+):        INSTALL for Windows.txt
+    
+    
+Since Python 3.9 is a bit ahead of the curve for the current Linux distribution
+(on this machine, OpenSUSE Leap 15.2/15.3/Tumbleweed) I decided it is best to
+build Python from sources - it doesn't take long - and install it in /usr/local/
+(by calling `make altinstall`).
+
+    Third party software, built and installed FOR the virtual python environment
+    (detailed instructions are givenn in the accompanying INSTALL file in this
+     directory).
+    
+    
+    
+    
