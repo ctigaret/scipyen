@@ -16,8 +16,13 @@ To rebuild Python:
     build process) must be built with the same version of the gcc compiler, 
     including the test code.
 
-ATTENTION: Scipyen dependencies (3rd party software) that also need to be rebuilt
-includes:
+    
+ATTENTION:
+Since this means rebuilding Python with a new compiler version, the following 
+almost surely applies:
+
+Scipyen dependencies (3rd party software) that also need to be rebuilt
+(not least because of their dependence on Python, and of a new compiler) include:
     
     NEURON
         
@@ -39,5 +44,7 @@ includes:
                              # $SCIPYEN/doc/install/INSTALL file, where $SCIPYEN
                              # is the directory with the cloned scipyen git repo.
             
+    VIGRA
     
+    BOOST
 

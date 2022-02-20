@@ -109,7 +109,7 @@ NOTE: These have been created with the assumption that the build was configured
     HOWEVER: Because you have to call ldconfig (as superuser) after make install,
     is is a BadIdea NOT to install Python in the default location (/usr/local)
 
-Copy the pyenv bash script to your $HOME/bin directory
+Link the pyenv bash script to your $HOME/bin directory
 
 You MUST NOT make this executable.
 

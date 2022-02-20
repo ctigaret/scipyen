@@ -1,0 +1,76 @@
+# WARNING: some of the packages listed below may have already been installed, or 
+# are available from your Linux distribution.
+#
+# ATTENTION: ONLY USE THIS FILE INSIDE A VIRTUAL PYTHON ENVIRONMENT (see INSTALL
+# for details).
+#
+# You may manually check this list against the python packages installed on 
+# your machine (either locally as "user", see $HOME/local/lib/pythonX.Y/site-packages,
+# or system-wide, see /usr/lib64/PythonX.Y.site-packages) and comment out, below,
+# the ones already installed on your system. Otherwise, the packages installed 
+# here will take precedence over those available.
+
+numpy           
+sphinx          
+nose            
+confuse
+dill
+# PyQt5         # on Windows run 'pip install PyQt5'; 
+                # on Unix must build IF building Python from source,
+                # (see c_cpp_requirements.txt)
+                # else install via pip
+jupyter
+jupyter_qtconsole_colorschemes
+ipython
+matplotlib
+viscm
+scipy
+sympy
+pandas
+pyqtgraph
+nixio
+neo
+h5py
+qimage2ndarray
+imreg-dft
+seaborn
+statsmodels
+pyxdg
+python-magic
+cmocean
+cmasher
+nibabel
+twine
+jupyter_cms
+jupyterlab
+jupyterthemes
+nodejs
+pingouin
+researchpy
+scikit-learn
+scikit-image
+octave_kernel
+gnuplot_kernel
+matlab_kernel
+# tables # NOTE as of 2021-10-12 11:59:52 must compile from source if using Python >= 3.9.7
+cython
+bokeh
+pytest
+pyneuroml       # optional
+pylmeasure      # optional
+jupyter_cms
+jupyterlab
+jupyterthemes
+nodejs
+pingouin
+researchpy
+scikit-learn
+scikit-image
+language_tool_python
+# also see nrn/docs/docs_requirements.txt, reproduced below after excluding 
+# packages already listed above
+sphinx_rtd_theme
+nbconvert
+recommonmark
+plotnine
+plotly

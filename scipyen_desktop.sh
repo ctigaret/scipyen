@@ -1,7 +1,8 @@
 #!/bin/bash
-source $HOME/scipyenv39/bin/activate
-source $HOME/bin/pyenv 3.9
-scipyen
+realscript=`realpath $0`
+scipyendir=`dirname $realscript`
+scipyact
+$scipyendir/scipyen
 
 # scipyendir=$HOME/scipyen
 # if [ -z $VIRTUAL_ENV ]; then
