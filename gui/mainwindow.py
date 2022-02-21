@@ -39,7 +39,7 @@ CHANGELOG:
 # NOTE: 2021-10-21 13:24:24
 # all things imported below will be available in the user workspace
 #### BEGIN core python modules
-import faulthandler
+import faulthandler, importlib
 import sys, os, types, atexit, re, inspect, gc, sip, io, warnings, numbers
 import traceback, keyword, inspect, weakref, itertools, typing, functools, operator
 import json
@@ -154,6 +154,11 @@ from IPython.display import set_matplotlib_formats
 from jupyter_client.session import Message
 
 #### END 3rd party modules
+
+#### BEGIN 2022-02-21 15:43:38 check if NEURON python is installed
+neuron_spec = importlib.util.find_spec("neuron")
+has_neuron = neuron_spec is not None
+#### END
 
 #### BEGIN scipyen core modules
 #import core.prog as prog
@@ -3759,14 +3764,33 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.actionQuit.triggered.connect(self.slot_Quit)
         
+        self.actionConsole = QtWidgets.QAction("Scipyen Console")
         self.actionConsole.triggered.connect(self.slot_initQtConsole)
+        self.menuConsoles.addAction(self.actionConsole)
+        
+        self.actionExternalIPython = QtWidgets.QAction("External IPython")
+        self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
+        self.menuConsoles.addAction(self.actionExternalIPython)
+        
+        if has_neuron:
+            self.actionExternalNrnIPython = QtWidgets.QAction("External IPython for NEURON")
+            self.actionExternalNrnIPython.triggered.connect(self.slot_launchExternalNeuronIPython)
+            self.menuConsoles.addAction(self.actionExternalNrnIPython)
+        
+        self.menuWith_Running_Kernel = QtWidgets.QMenu("With Running Kernel", self)
+        self.menuConsoles.addMenu(self.menuWith_Running_Kernel)
+        self.actionRunning_IPython = QtWidgets.QAction("Choose kernel ...")
+        self.actionRunning_IPython.triggered.connect(self.slot_launchExternalRunningIPython)
+        self.menuWith_Running_Kernel.addAction(self.actionRunning_IPython)
+        
+        if has_neuron:
+            self.actionRunning_IPython_for_Neuron = QtWidgets.QAction("Choose kernel and launch NEURON")
+            self.actionRunning_IPython_for_Neuron.triggered.connect(self.slot_launchExternalRunningIPythonNeuron) 
+            self.menuWith_Running_Kernel.addAction(self.actionRunning_IPython_for_Neuron)
+        
         #self.actionRestore_Workspace.triggered.connect(self.slot_restoreWorkspace)
         self.actionHelp_On_Console.triggered.connect(self._helpOnConsole_)
         
-        self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
-        self.actionExternalNrnIPython.triggered.connect(self.slot_launchExternalNeuronIPython)
-        self.actionRunning_IPython.triggered.connect(self.slot_launchExternalRunningIPython) 
-        self.actionRunning_IPython_for_Neuron.triggered.connect(self.slot_launchExternalRunningIPythonNeuron) 
         self.actionOpen.triggered.connect(self.slot_openFiles)
         #self.actionOpen.triggered.connect(self.openFile)
         #self.actionOpen_Files.triggered.connect(self.slot_openFiles)

@@ -48,7 +48,7 @@
      <x>0</x>
      <y>0</y>
      <width>1115</width>
-     <height>30</height>
+     <height>28</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -105,17 +105,6 @@
     <property name="title">
      <string>Consoles</string>
     </property>
-    <widget class="QMenu" name="menuWith_Running_Kernel">
-     <property name="title">
-      <string>With Running Kernel</string>
-     </property>
-     <addaction name="actionRunning_IPython"/>
-     <addaction name="actionRunning_IPython_for_Neuron"/>
-    </widget>
-    <addaction name="actionConsole"/>
-    <addaction name="actionExternalIPython"/>
-    <addaction name="actionExternalNrnIPython"/>
-    <addaction name="menuWith_Running_Kernel"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuView"/>
