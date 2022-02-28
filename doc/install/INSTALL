@@ -504,10 +504,12 @@ cmake-gui ../vigra
 -------------------------------------------------------------------------------
 4.6. BUILD AND INSTALL PyTables (tables)
 -------------------------------------------------------------------------------
-This is REQUIRED if you are using a built Python stack (see above)
+This is REQUIRED if you are using a built Python stack (see above), but also
+helpful when using a virtual environment created with a system-wide python stack.
 
 NOTE: PyTables are available as 'tables'; to use you must 'import tables'
 gh repo clone PyTables/PyTables
+(or: git clone https://github.com/PyTables/PyTables.git)
 cd PyTables
 python setup.py build
 python setup.py install
@@ -527,13 +529,16 @@ mkdir nrn-build && cd nrn-build
 cmake-gui ../nrn
 "Configure" will also pull iv, coreneuron
 
-Example (as of 2022-02-16 12:25:17 on Tumbleweed 20220213)
+Example (as of 2022-02-16 12:25:17 on Tumbleweed 20220213) 
+    NOTE: SOME OF THESE MAY NOT BE AVAILABLE IN RECENT NEURON git snapshots!!!
         LIBEXECINSTALLDIR=$VIRTUAL_ENV/libexec
-        PKGCONFIG_FILED_DIR=$VIRTUAL_ENV/lib64/pkgconfig
+        PKGCONFIG_FILES_DIR=$VIRTUAL_ENV/lib64/pkgconfig
         PLUGIN_INSTALL_DIR=$VIRUTAL_ENV/lib64/mod2c
+    CMAKE
         CMAKE_INSTALL_PREFIX (-DCMAKE_INSTALL_PREFIX=) $VIRTUAL_ENV
         CMAKE_INSTALL_LIBDIR=lib64
         CMAKE_INSTALL_LIBEXECDIR=libexec
+    NRN
         NRN_AVOID_ABSOLUTE_PATHS=true
         NRN_ENABLE_CORENEURON=true
         NRN_ENABLE_INTERVIEWS=true

@@ -1,7 +1,7 @@
 #!/bin/bash
 realscript=`realpath $0`
 scipyendir=`dirname $realscript`
-scipyact
+source $HOME/scipyenv3.10/bin/activate
 $scipyendir/scipyen
 
 # scipyendir=$HOME/scipyen
