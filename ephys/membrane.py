@@ -4760,35 +4760,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         in all segments.
         
     Var-keyword parameters (kwargs):
-    ----------------------------------
-    
-    cell: str (default, "NA")
-        Cell ID
-        NOTE: Case-sensitive
-        
-    source: str (default, "NA")
-        Source ID (e.g. animal)
-        NOTE: Case-sensitive
-        
-    genotype: str (default "NA")
-        genotype (e.g., WT, HET, HOM or any other appropriate string)
-        NOTE: Case-sensitive
-        
-    sex: str (default "M")
-        sex: either "F" or "M"
-        NOTE: Case-insensitive
-        
-    treatment: str (default "veh") ATTENTION: case-sensitive!
-        
-    age: python Quantity (one of days, months, years), "NA" or None 
-        Default is None; either None or "NA" result in the string "NA" for age
-        
-    post_natal: bool (default True)
-    
-    thr : float or python Quantity
-        value of the dV/dt (in V/s) above which the waveform belongs to an AP.
-        optional; default is 20 V/s
-    
+    --------------------------------
     VmSignal: int or str
         integer index, or name (string) of the Vm analog signal
         optional; default is "Vm_prim_1"
@@ -4826,16 +4798,16 @@ def analyse_AP_step_injection_series(data, **kwargs):
         minimum number of curent injection steps where APs were triggered, for
         performing rheobase-latency analysis
         
-    name: str
-        name of the results (string), or None; 
-        optional; default is None
-        
+    thr : float or python Quantity
+        value of the dV/dt (in V/s) above which the waveform belongs to an AP.
+        optional; default is 20 V/s
+    
     plot_rheo: boolean, default is True 
         (plots the fitted curve) -- useful when a block or a list of segments is
         analyzed 
         
-    The following are used by analyse_AP_step_injection():
-    ========================================================
+    Var-keyword parameters passed on to analyse_AP_step_injection():
+    ----------------------------------------------------------------
     tail: scalar Quantity (units: "s"); default is 0 s
         duration of the analyzed Vm trace after current injection has ceased
     
@@ -4978,6 +4950,36 @@ def analyse_AP_step_injection_series(data, **kwargs):
             default: -15 mV
 
     NOTE: See analyse_AP_step_injection() documentation for details
+    
+    Var-keyword parameters related to the experiment "metadata"
+    -----------------------------------------------------------
+    cell: str (default, "NA")
+        Cell ID
+        NOTE: Case-sensitive
+        
+    source: str (default, "NA")
+        Source ID (e.g. animal)
+        NOTE: Case-sensitive
+        
+    genotype: str (default "NA")
+        genotype (e.g., WT, HET, HOM or any other appropriate string)
+        NOTE: Case-sensitive
+        
+    sex: str (default "M")
+        sex: either "F" or "M"
+        NOTE: Case-insensitive
+        
+    treatment: str (default "veh") ATTENTION: case-sensitive!
+        
+    age: python Quantity (one of days, months, years), "NA" or None 
+        Default is None; either None or "NA" result in the string "NA" for age
+        
+    post_natal: bool (default True)
+    
+    name: str
+        name of the results (string), or None; 
+        optional; default is None
+        
     
     Returns:
     ---------

@@ -5016,6 +5016,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             self._update_annotations_()
             
+            if isinstance(doc_title, str) and len(doc_title.strip()):
+                self.docTitle = doc_title
+            
             self.frameChanged.emit(self._current_frame_index_)
 
         except Exception as e:
@@ -5224,7 +5227,21 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 #warngins.warn("I need something to plot")
                 return
             
-        self._set_data_(x,y, **kwargs)
+        self._set_data_(x,y, 
+                        doc_title = doc_title,
+                        frameAxis = frameAxis, 
+                        signalChannelAxis = signalChannelAxis,
+                        frameIndex = frameIndex, 
+                        signalIndex = signalIndex, 
+                        SignalChannelIndex = signalChannelIndex,
+                        irregularSignalIndex = irregularSignalIndex, 
+                        irregularSignalChannelAxis = irregularSignalChannelAxis,
+                        irregularSignalChannelIndex = irregularSignalChannelIndex,
+                        separateSignalChannels = separateSignalChannels,
+                        interval = interval,
+                        plotStyle = plotStyle,
+                        showFrame = showFrame,
+                        **kwargs)
         
         if not self.isVisible():
             self.setVisible(True)
