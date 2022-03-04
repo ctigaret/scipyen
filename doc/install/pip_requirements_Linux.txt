@@ -67,6 +67,7 @@ researchpy
 scikit-learn
 scikit-image
 language_tool_python
+pyabf
 # also see nrn/docs/docs_requirements.txt, reproduced below after excluding 
 # packages already listed above
 sphinx_rtd_theme

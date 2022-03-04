@@ -4983,7 +4983,6 @@ def analyse_AP_step_injection_series(data, **kwargs):
     
     Returns:
     ---------
-    
     ret: ordered dict with the following key/value pairs:
     
         "Name": str or None; 
@@ -5137,7 +5136,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
     ret["Cell"] = cellid
     ret["Source"] = sourceid
     ret["Age"] = age
-    ret["Post-natal"] = post_natal
+    ret["Post_natal"] = post_natal
     ret["Genotype"] = genotype
     ret["Sex"] = sex
     ret["Treatment"] = treatment

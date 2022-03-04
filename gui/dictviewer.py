@@ -69,8 +69,9 @@ SINGLETONS = (tuple(), None, math.inf, math.nan, np.inf, np.nan, MISSING, pd.NA)
 class ScipyenTableWidget(TableWidget): # TableWidget imported from pyqtgraph
     """Another simple table widget, which allows zero-based row/column indices.
     
-    gui.tableeditor.TableEditorWidget does that too, and much more but is
-    too slow. 
+    gui.tableeditor.TableEditorWidget does that too, and more, but is too slow. 
+    
+    In contrast, pyqtgraph's TableWidget is much more efficient
     
     """
     def __init__(self, *args, natural_row_index=False, natural_col_index=False, **kwds):
@@ -80,12 +81,26 @@ class ScipyenTableWidget(TableWidget): # TableWidget imported from pyqtgraph
         
     def setData(self, data):
         super().setData(data)
+        #if isinstance(data, neo.core.dataobject.DataObject):
+            
         if isinstance(data, (np.ndarray, tuple, list, deque)):
             if self._pythonic_col_index:
                 self.setHorizontalHeaderLabels(["%d"%i for i in range(self.columnCount())])
                 
             if self._pythonic_row_index:
                 self.setVerticalHeaderLabels(["%d"%i for i in range(self.rowCount())])
+                
+        elif isinstance(data, pd.Series):
+            self.setHorizontalHeaderLabels(["%s"%i for i in data.index])
+            self.setVerticalHeaderLabels([data.name])
+            
+        elif isinstance(data, pd.DataFrame):
+            self.setHorizontalHeaderLabels(["%s"%i for i in data.index])
+            self.setVerticalHeaderLabels([data.columns])
+            
+        elif isinstance(data, pd.Index):
+            self.setHorizontalHeaderLabels(["%s"%i for i in data])
+            
         
     def iterFirstAxis(self, data):
         """Overrides TableWidget.iterFirstAxis.
@@ -175,7 +190,14 @@ class InteractiveTreeWidget(DataTreeWidget):
     
     """
     def __init__(self, *args, **kwargs):
+        """
+        Keyword parameters (selective list):
+        ------------------------------------
+        useTableEditor:bool, default is False; 
+            When True, use TableEditorWidget, else use ScipyenTableWidget
+        """
         self._visited_ = dict()
+        self._use_TableEditor_ = kwargs.pop("useTableEditor", False)
         self.top_title = "/"
         super(InteractiveTreeWidget, self).__init__(*args, **kwargs)
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -183,32 +205,54 @@ class InteractiveTreeWidget(DataTreeWidget):
         self.headerItem().setToolTip(1, "Type of child data mapped to a key or index.\nAdditional type information is shown in their tooltip.")
         self.headerItem().setToolTip(2, "Value of child data, or its length\n(when data is a nested collection).\nNumpy arrays ar displayed as a table")
         
+    def _makeTableWidget_(self, data):
+        if self._use_TableEditor_:
+            widget = TableEditorWidget(parent=self)
+            signalBlocker = QtCore.QSignalBlocker(widget.tableView)
+            widget.tableView.model().setModelData(data)
+            widget.readOnly=True
+        else:
+            widget = ScipyenTableWidget()
+            widget.setData(data)
+            
+        widget.setMaximumHeight(200)
+        
+        return widget
     def setData(self, data, top_title:str = ""):
         self._visited_.clear()
         if len(top_title.strip()) == 0:
             self.top_title = "/"
         else:
             self.top_title = top_title
-        super().setData(data)
+        super().setData(data) # calls self.buildTree(...), which then calls self.parse(...)
         self.topLevelItem(0).setText(0, self.top_title)
     
     def parse(self, data):
         """
-        Given any python object, return:
-        * type
-        * a short string representation
-        * a dict of sub-objects to be parsed
-        * optional widget to display as sub-node
-        * NOTE 2021-07-24 14:13:10 CMT
-        * keytype: the type of the key (for dict data) or of the index (for sequences)
-            The latter is useful for namedtuples
-            
+        Overrides pyqtgraph.DataTreeWidget.parse()
         
-        NOTE: 2020-10-11 13:48:51
-        override superclass parse to use ScipyenTableWidget instead
+        Given any python object, returns:
+        * typeStr - a string representation of the data type
+        * a short string representation
+        * a dict of sub-objects to be parsed further
+        * optional widget to display as sub-node
+        * NOTE 2021-07-24 14:13:10
+        * keytype: the type of the key (for dict data) or of the index (for 
+            sequences, this is always an int, except for namedtuples where it can
+            be a str).
+        
+        CHANGELOG (most recent first):
+        ------------------------------
+        
+        2022-03-04 10:00:57:
+        TableEditorWidget or ScipyenTableWidget selectable at initialization
+        TableEditorWidget is enabled by default
         
         NOTE: 2021-10-18 14:03:13
         ScipyenTableWidget DEPRECATED in favour of tableeditor.TableEditorWidget
+                
+        NOTE: 2020-10-11 13:48:51
+        override superclass parse to use ScipyenTableWidget instead
         
         """
         from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
@@ -280,57 +324,33 @@ class InteractiveTreeWidget(DataTreeWidget):
             
         elif isinstance(data, pd.DataFrame):
             desc = "length=%d, columns=%d" % (len(data), len(data.columns))
-            widget = TableEditorWidget(parent=self)
-            signalBlocker = QtCore.QSignalBlocker(widget.tableView)
-            widget.tableView.model().setModelData(data)
-            widget.setMaximumHeight(200)
-            widget.readOnly=True
+            widget = self._makeTableWidget_(data)
             
         elif isinstance(data, pd.Series):
             desc = "length=%d, dtype=%s" % (len(data), data.dtype)
-            widget = TableEditorWidget(parent=self)
-            signalBlocker = QtCore.QSignalBlocker(widget.tableView)
-            widget.setData(data)
-            widget.setMaximumHeight(200)
-            widget.readOnly=True
+            widget = self._makeTableWidget_(data)
             
         elif isinstance(data, pd.Index):
             desc = "length=%d" % len(data)
-            widget = TableEditorWidget(parent=self)
-            signalBlocker = QtCore.QSignalBlocker(widget.tableView)
-            widget.tableView.model().setModelData(data)
-            widget.setMaximumHeight(200)
-            widget.readOnly=True
+            widget = self._makeTableWidget_(data)
             
         elif isinstance(data, neo.core.dataobject.DataObject):
             desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
             if data.size == 1:
                 widget = QtWidgets.QLabel(str(data))
             else:
-                widget = TableEditorWidget(parent=self)
-                signalBlocker = QtCore.QSignalBlocker(widget.tableView)
-                widget.tableView.model().setModelData(data)
-                widget.setMaximumHeight(200)
-                widget.readOnly=True
+                widget = self._makeTableWidget_(data)
                 
         elif isinstance(data, pq.Quantity):
             desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
             if data.size == 1:
                 widget = QtWidgets.QLabel(str(data))
             else:
-                widget = TableEditorWidget(parent=self)
-                signalBlocker = QtCore.QSignalBlocker(widget.tableView)
-                widget.tableView.model().setModelData(data)
-                widget.setMaximumHeight(200)
-                widget.readOnly=True
+                widget = self._makeTableWidget_(data)
                 
         elif isinstance(data, np.ndarray):
             desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-            widget = TableEditorWidget(parent=self)
-            signalBlocker = QtCore.QSignalBlocker(widget.tableView)
-            widget.setData(data)
-            widget.setMaximumHeight(200)
-            widget.readOnly=True
+            widget = self._makeTableWidget_(data)
             
         elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
             frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
@@ -343,7 +363,26 @@ class InteractiveTreeWidget(DataTreeWidget):
         
         return typeStr, desc, children, widget, typeTip
     
-    def buildTree(self, data, parent, name="", nameTip = "", hideRoot=False, path=()):
+    def buildTree(self, data:object, parent:QtWidgets.QTreeWidgetItem, 
+                  name:str="", nameTip:str="", hideRoot:bool=False, 
+                  path:tuple=()):
+        """Overrides pyqtgraph.DataTreeWidget.buildTree
+        
+        Positional parameters:
+        ----------------------
+        data: ideally, a dict; when not a dict, its __dict__ attribute will be
+            used, instead.
+            
+        parent: the parent tree widget item (a.k.a 'node')
+        
+        Named parameters:
+        -----------------
+        name:str; default is the empty string ("")
+        nameTip:str; default is the empty string ("")
+        hideRoot:bool; default is False
+        path: tuple; default is the empty tuple
+        
+        """
         #from pyqtgraph.python2_3 import asUnicode
         
         # NOTE: 2021-07-24 13:15:38
@@ -384,8 +423,19 @@ class InteractiveTreeWidget(DataTreeWidget):
         #                           length (for collections)
         #                           value  (for str)
         #                           etc
+        
+        # NOTE: 2022-03-04 08:47:45
+        # 'node' is a QTreeWidgetItem
+        # when called by super(self).setData() this is set to either:
+        #
+        # (a) the parent item, if hideRoot is True (when this method is called from
+        #   the parent item is the tree widget's invisible root item)
+        #
+        # (b) an item constructed on a string list for the three columns, added
+        # to the 'parent' node passed to this method call
+        #
         if hideRoot:
-            node = parent
+            node = parent 
         else:
             node = QtWidgets.QTreeWidgetItem([name, "", ""])
             parent.addChild(node)
@@ -395,12 +445,15 @@ class InteractiveTreeWidget(DataTreeWidget):
         
         # NOTE: 2021-08-15 14:41:32
         # self.nodes is a dict
-        # path is a tuple (as index branch path) - this is hashable hence usable
-        # as dict key
+        # path is a tuple (as index branch path) - this is immutable, hence 
+        # hashable, hence usable as dict key
         self.nodes[path] = node
         
         typeStr, desc, children, widget, typeTip = self.parse(data)
         
+        # NOTE: 2022-03-04 09:04:50
+        # nameTip is NOT set when this method is called by super().setData()
+        # hence it will have the default value (an empty string)
         node.setToolTip(0, nameTip)
         node.setText(1, typeStr)
         node.setToolTip(1, typeTip)
@@ -453,12 +506,16 @@ class DataViewer(ScipyenViewer):
     Numpy arrays and pandas data types, although collection data types, are
     considered "leaf" objects.
     
-    Changelog:
-    ---------
-    2019: Uses InteractiveTreeWidget which inherits from pyqtgraph DataTreeWidget 
-    and in turn inherits from QTreeWidget.
+    Changelog (most recent first):
+    ------------------------------
+    2022-03-04 09:33:49: the constructor gives the options to choose between
+        TableEditorWidget and ScipyenTableWidget as widget for displaying tabular
+        data (data frames, series, arrays, matrices, signals, etc)
+        TODO: make this user-selectable in the GUI
     2021-08-15 22:51:43: support for circular references to hierarchical data types
         e.g., a dict can contain a key mapped to itself
+    2019: Uses InteractiveTreeWidget which inherits from pyqtgraph DataTreeWidget 
+    and in turn inherits from QTreeWidget.
     """
     sig_activated = pyqtSignal(int)
     closeMe  = pyqtSignal(int)
@@ -478,11 +535,13 @@ class DataViewer(ScipyenViewer):
     
     def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
                  ID:(int, type(None)) = None,  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
+                 useTableEditor:bool = True,
                  *args, **kwargs) -> None:
+        self._useTableEditor_ = useTableEditor
         super().__init__(data=data, parent=parent, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs)
         
     def _configureUI_(self):
-        self.treeWidget = InteractiveTreeWidget(parent = self)
+        self.treeWidget = InteractiveTreeWidget(parent = self, useTableEditor = self._useTableEditor_)
         
         self.treeWidget.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         
@@ -522,6 +581,9 @@ class DataViewer(ScipyenViewer):
         # Solutions to be implemented in the InteractiveTreeWidget in this module
         """
         #print(data)
+        
+        if not isinstance(data, dict):
+            data = data.__dict__
         
         if data is not self._data_:
             self._data_ = data
