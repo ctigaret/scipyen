@@ -163,6 +163,13 @@ from neo.core.baseneo import (MergeError, merge_annotations, intersect_annotatio
 from neo.core.dataobject import (DataObject, ArrayDict)
 import matplotlib as mpl
 import pyqtgraph as pg
+
+try:
+    import pyabf
+    hasPyABF = True
+except:
+    hasPyABF = False
+
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -239,6 +246,19 @@ if __debug__:
     global __debug_count__
 
     __debug_count__ = 0
+    
+def getABF(obj):
+    import os
+    if not hasPyABF:
+        return
+    
+    if not os.path.exists(getattr(obj, "file_origin", None)):
+        return
+    
+    try:
+        return pyabf.ABF(obj.file_origin)
+    except:
+        pass
     
 def copy_to_segment(obj:neo.core.dataobject.DataObject, new_seg:neo.Segment):
     new_obj = obj.copy()

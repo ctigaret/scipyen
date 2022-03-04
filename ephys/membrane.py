@@ -4738,6 +4738,43 @@ def analyse_AP_step_injection_series(data, **kwargs):
     I-clamp experiment (a "run") with a series of increasing depolarizing current 
     injection steps (one injection per "sweep").
     
+    The AP detection is performed over the sweep interval corresponding to a 
+    step current injection.
+    
+    The step current injection can be specified in one of three ways:
+    
+    a) pass a name or channel index to the ImSignal parameter (see below).
+        This is the preferred method when the recorded data CONTAINS a signal
+        representing the injected current.
+        
+        This is the index of the current injection signal in the sweep (or its
+        name). 
+        
+        The corresponding signal (a neo.AnalogSignal obejct) will then be used
+        to detect the current injection magnitude and time interval in each sweep.
+        
+    b) If a signal representing the injected current is NOT available/usable,
+        then use one of the methods described here:
+    
+        b.1) specify Iinj_0 and delta_I parameters - this assumes that the 
+        current injection steps (one per sweep) are changed by a constant value
+        (delta_I) from an initial value (Iinj_0) used in the first sweep.
+        
+        b.2) specify Iinj as a sequence of current injection magnitudes (the 
+        most general case)
+        
+        In both cases (b.1 and b.2) the time interval for the current injection
+        (Istart and Istop) must also be specified as floats or time quantities
+        
+        When ALL sweeps start at the same time (say, 0*pq.s) then Istart and Istop
+        values apply to every sweep. Itime_relative must be set to True
+        
+        When ALL sweeps start at incremental times (as is often recorded in Clampex)
+        Itime_relative must be set to True.
+        
+        Istart and Istop can also be specified as number of samples from the 
+        start of the sweep. In this case Itime_samples must be set to True.
+    
     Parameters:
     ----------
     data : neo.Block, list of neo.Segment, or a neo.Segment.
@@ -4767,7 +4804,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         
     ImSignal = int or str
         index, or name (string) of the Im analog signal
-        optional; default is "Im_sec_1"
+        optional; default is None
         
     Iinj_0: python quantity (pA), float scalar, or None: value of the first injected current
         When None (default) the value will be determined from the Im signal of the first
@@ -4778,6 +4815,15 @@ def analyse_AP_step_injection_series(data, **kwargs):
         
     Istart, Istop: time quantities for current step injection, or None
         When given, all segments in the block must start at the same time
+        
+    Itime_relative:bool, default is False; when False and Istart and Istop are
+        specified then all sweeps must start at the same time t0; when True,
+        then Istart and Istop are considered RELATIVE to the sweep's t0, in 
+        every sweep.
+        
+    Itime_samples: boold, default is False; when True, this flag indicates that
+        Istart and Istop (when given) are numbers of samples (form the start of
+        the sweep).
         
     Iinj: None (default), or sequence of current injection values. When not None,
         this must contain as many elements as injection steps, and these must be
@@ -5087,7 +5133,8 @@ def analyse_AP_step_injection_series(data, **kwargs):
     thr = kwargs.pop("thr", 10)
     
     VmSignal = kwargs.pop("VmSignal", "Vm_prim_1")
-    ImSignal = kwargs.pop("ImSignal", "Im_sec_1")
+    #ImSignal = kwargs.pop("ImSignal", "Im_sec_1")
+    ImSignal = kwargs.pop("ImSignal", None)
     
     rheo = kwargs.pop("rheo", True)
     
@@ -5130,19 +5177,6 @@ def analyse_AP_step_injection_series(data, **kwargs):
             finally:
                 del(cframe)
         
-    ret = collections.OrderedDict()
-    
-    ret["Data"] = name
-    ret["Cell"] = cellid
-    ret["Source"] = sourceid
-    ret["Age"] = age
-    ret["Post_natal"] = post_natal
-    ret["Genotype"] = genotype
-    ret["Sex"] = sex
-    ret["Treatment"] = treatment
-    ret["Depolarising_steps"] = list()
-    
-    kwargs["VmSignal"] = VmSignal
     #kwargs["ImSignal"] = ImSignal # use this for each segmentm, below!
     kwargs["thr"] = thr
     
@@ -5153,6 +5187,8 @@ def analyse_AP_step_injection_series(data, **kwargs):
     
     Istart = kwargs.pop("Istart", None)
     Istop = kwargs.pop("Istop", None)
+    Itime_samples = kwargs.pop("Itime_samples", False)
+    Itime_relative = kwargs.pop("Itime_relative", False)
     
     if isinstance(Iinj_0, (float, int)):
         Iinj_0 = Iinj_0 * pq.pA
@@ -5188,57 +5224,139 @@ def analyse_AP_step_injection_series(data, **kwargs):
     elif delta_I is not None:
         raise TypeError("Iinj_0 must be scalar float or quantity, or None; got %s instead" % type(delta_I).__name__)
     
-    #kwargs["delta_I"] = delta_I
     
     #NOTE: set up the of current injection amplitudes
     # this is based on either:
-    # Iinj_0 and delta_I if given, or
-    # Iinj itself
+    #   Iinj_0 and delta_I if given, or Iinj itself, or
+    # will be detected from ImSignal if given
+    #
     # to be supplied together with Istart, Istop
     # for use when current injection params would fail
     
-    if Iinj is None:
-        if all([v is not None for v in (Iinj_0, delta_I)]):
-            i_max = Iinj_0 + delta_I * (len(segments)-1)
+    if ImSignal is None:
+        # needs Iinj, or  (Iinj_0, delta_I)
+        if Iinj is None:
+            # needs Iinj_0 and delta_I
+            if all([v is not None for v in (Iinj_0, delta_I)]):
+                i_max = Iinj_0 + delta_I * (len(segments)-1)
+                
+                Iinj = np.linspace(Iinj_0, i_max, num=len(segments))
+                
+                if not isinstance(Iinj, pq.Quantity):
+                    Iinj *= pq.pA
+                    
+            else:
+                raise ValueError("I need Iinj_0 and delta_I")
+    
+        elif isinstance(Iinj, (tuple, list)):
+            if len(Iinj) != len(segments):
+                raise ValueError("Size mismatch between Iinj sequence (%d) and segments sequence (%d)" % (len(Iinj), len(segments)))
             
-            Iinj = np.linspace(Iinj_0, i_max, num=len(segments))
+            if all([isinstance(v, float) for v in Iinj]):
+                Iinj = np.array(Iinj) * pq.pA
+                
+            elif all([isinstance(v, pq.Quantity) and units_convertible(v, pq.pA) for v in Iinj]):
+                Iinj = np.array([v.rescale(pq.pA).magnitude for v in Iinj]) * pq.pA
+                
+            else:
+                raise TypeError("Unexpected type for Iinj: %s" % type(Iinj).__name__)
             
-            if not isinstance(Iinj, pq.Quantity):
-                Iinj *= pq.pA
+        elif isinstance(Iinj, pq.Quantity):
+            if Iinj.size != len(segments):
+                raise ValueError("Size mismatch between Iinj (%d) and segments sequence (%d)" % (Iinj.size, len(segments)))
             
-    elif isinstance(Iinj, (tuple, list)):
-        if len(Iinj) != len(segments):
-            raise ValueError("Size mismatch between Iinj sequence (%d) and segments sequence (%d)" % (len(Iinj), len(segments)))
-        
-        if all([isinstance(v, float) for v in Iinj]):
-            Iinj = np.array(Iinj) * pq.pA
-            
-        elif all([isinstance(v, pq.Quantity) and units_convertible(v, pq.pA) for v in Iinj]):
-            Iinj = np.array([v.rescale(pq.pA).magnitude for v in Iinj]) * pq.pA
-            
+            if Iinj.ndim > 1:
+                if Iinj.shape[1] > 1:
+                    raise TypeError("Iinj array must be a vector")
+                
+                Iinj = Iinj.flatten()
+                
         else:
             raise TypeError("Unexpected type for Iinj: %s" % type(Iinj).__name__)
         
-    elif isinstance(Iinj, pq.Quantity):
-        if Iinj.size != len(segments):
-            raise ValueError("Size mismatch between Iinj (%d) and segments sequence (%d)" % (Iinj.size, len(segments)))
+        # also needs Istart, Istop, Itime_relative, Itime_samples
+        if all([v is not None for v in (Istart, Istop)]):
+            if isinstance(Istart, (int, float)):
+                if Itime_samples:
+                    Istart = int(Istart)
+                else:
+                    Istart *= pq.s
+                
+            elif isinstance(Istart, pq.Quantity):
+                if Itime_samples:
+                    Istart = int(Istart)
+                else:
+                    if len(Istart) > 1:
+                        raise ValueError("Istart must be a scalar quantity)")
+                    
+                    if units_convertible(Istart, pq.s):
+                        Istart = Istart.rescale(pq.s)
+                    else:
+                        raise TypeError("Istart must be a tiem quantity")
+                
+            else:
+                raise TypeError("Istart must be a quantity (in s), a float, or an int")
+                
+            if isinstance(Istop, (int,float)):
+                if Itime_samples:
+                    Istop = int(Istop)
+                else:
+                    Istop *= pq.s
+                
+            elif isinstance(Istop, pq.Quantity):
+                if Itime_samples:
+                    Istop = int(Istop)
+                else:
+                    if len(Istop) > 1:
+                        raise ValueError("Istop must be a scalar quantity)")
+                    
+                    if units_convertible(Istop, pq.s):
+                        Istop = Istop.rescale(pq.s)
+                    else:
+                        raise TypeError("Istop must be a time quantity")
+                
+            else:
+                raise TypeError("Istop must be a quantity (in s), a float or an int")
+
+            # make sure they're ordered
+            Istart, Istop = (Istart, Istop) if Istart <= Istop else (Istop, Istart)
+            
+            if not Itime_samples and Itime_relative:
+                Istart = [s.t_start + Istart for s in segments]
+                Istop = [s.t_start + Istop for s in segments]
+                
+            else:
+                Istart = [Istart] * len(segments)
+                Istop = [Istop] * len(segments)
+                
+            
+        else:
+            raise ValueError("I need Istart and Istop")
         
-        if Iinj.ndim > 1:
-            if Iinj.shape[1] > 1:
-                raise TypeError("Iinj array must be a vector")
+    elif not isinstance(ImSignal, (int, str)):
+        raise TypeError("I need either ImSignal, or (Istart, Istop, Itime_samples and Itime_relative)")
+        
             
-            Iinj = Iinj.flatten()
-            
-    else:
-        raise TypeError("Unexpected type for Iinj: %s" % type(Iinj).__name__)
-            
+    ret = collections.OrderedDict()
+    
+    ret["Data"] = name
+    ret["Cell"] = cellid
+    ret["Source"] = sourceid
+    ret["Age"] = age
+    ret["Post_natal"] = post_natal
+    ret["Genotype"] = genotype
+    ret["Sex"] = sex
+    ret["Treatment"] = treatment
+    ret["Depolarising_steps"] = list()
+    
+    kwargs["VmSignal"] = VmSignal
     
     try:
         #__train_analysis_loop__(segments, ret, apIEI, apFrequency, nAPs,
                                 #apThr, apLatency, **kwargs)
         for k, segment in enumerate(segments):
-            if all(isinstance(v, pq.Quantity) for v in (Iinj, Istart, Istop)):
-                im = (Iinj[k], Istart, Istop)
+            if isinstance(Iinj, pq.Quantity):
+                im = (Iinj[k], Istart[k], Istop[k])
             else:
                 im = ImSignal
             #print("segment %d" %k)
@@ -5265,7 +5383,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         t_units = segments[0].analogsignals[0].times.units
         
         if Iinj is None:
-            # use the measured value (not recommended)
+            # use the measured value
             _inj = [seg_res["AP_analysis"]["Injected_current"] for seg_res in ret["Depolarising_steps"]]
             Iinj = np.array(_inj) * _inj[0].units
             
@@ -7204,8 +7322,9 @@ def report_AP_analysis(data, name=None):
     #return result, vstep
 
 def analyse_AP_step_injection(segment, 
-                              VmSignal = "Vm_prim_1", 
-                              ImSignal = "Im_sec_1", 
+                              VmSignal:typing.Union[int, str] = "Vm_prim_1", 
+                              ImSignal:typing.Union[int, str, tuple] = "Im_sec_1", 
+                              Itimes_samples:bool = False,
                               **kwargs):
     """AP Train analysis in a sweep (segment) of I-clamp experiments
     
@@ -7217,11 +7336,43 @@ def analyse_AP_step_injection(segment,
     Named parameters:
     ----------------
     
-    VmSignal, ImSignal: scalar indices or strings with analogsignal names containing,
-        respectively, the Vm reponse and membrane current injection
+    VmSignal: int, str.
+        Indicates the analog signal containing the Vm response.
         
-        optional (defaults are "Vm_prim_1" and "Im_sec_1", respectively)
+        When an int this is the scalar index of the signal, in 'segment'
         
+        When a str, this is the name of the Vm signal
+        
+        Default is "Vm_prim_1"
+        
+     ImSignal: int, str, tuple
+        Indicates the current injection parameters.
+        
+        When an int this is the scalar index, in 'segment', of the analog signal
+        containing the current injeciton step.
+        
+        When a str, this is the name of the current injection signal.
+        
+        When a tuple, it MUST contain three elements (Inj, Istart, Istop), where:
+        
+            Iinj: scalar quantity (in pA): the magnitude of the current injection
+                step
+                
+            Istart: scalar (int, float, or quantity in s): the start of the 
+                injection step
+                
+            Istop: scalar (int, float, or quantity in s): the stop of the 
+                injection step
+                
+            NOTE that Istart and Istop can also be given as numbers of samples.
+            In this case, Itimes_samples must be set to True (see below).
+        
+        Default is "Im_sec_1".
+        
+    Itimes_samples:bool, default is False
+        Set to True when the current injection start and stop times in the 
+        'ImSignal' tuple are given as samples (BEFORE any resampling, see below).
+    
     Var-keyword parameters (kwargs):
     --------------------------------
     
@@ -7411,8 +7562,13 @@ def analyse_AP_step_injection(segment,
     elif isinstance(ImSignal, int):
         im = segment.analogsignals[ImSignal].copy()
         
-    elif isinstance(ImSignal, tuple) and len(ImSignal) == 3:
+    elif isinstance(ImSignal, tuple) and len(ImSignal) == 3: # (Iinj, Istart, Istop)
         im = ImSignal
+        
+        if Itimes_samples:
+            for k in [1,2]:
+                im[k] *= VmSignal.sampling_period
+                im[k] = im[k].rescale(pq.s)
     else:
         raise TypeError(f"ImSignal expected a str (signal name) int signal index) or a triplet (amplitude, start & stop times); got {ImSignal} instad")
                 

@@ -36,6 +36,13 @@ import h5py
 import vigra
 import neo
 import confuse # for programmatic read/write of non-gui settings
+
+try:
+    import pyabf
+    hasPyABF=True
+except:
+    hasPyABF=False
+
 from PyQt5 import QtCore, QtGui, QtWidgets
 #### END 3rd party modules
 

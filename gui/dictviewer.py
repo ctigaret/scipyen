@@ -582,8 +582,8 @@ class DataViewer(ScipyenViewer):
         """
         #print(data)
         
-        if not isinstance(data, dict):
-            data = data.__dict__
+        #if not isinstance(data, dict):
+            #data = data.__dict__
         
         if data is not self._data_:
             self._data_ = data
