@@ -260,6 +260,17 @@ def getABF(obj):
     except:
         pass
     
+def getProtocolEpochs(obj):
+    if not hasPyABF:
+        return
+    
+    from core import pyabfbridge
+    
+    abf = getABF(obj)
+    
+    if abf:
+        return pyabfbridge.getEpochTables(abf, as_dataFrame=True)
+    
 def copy_to_segment(obj:neo.core.dataobject.DataObject, new_seg:neo.Segment):
     new_obj = obj.copy()
     new_obj.segment = new_seg

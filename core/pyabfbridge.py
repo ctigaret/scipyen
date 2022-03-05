@@ -45,11 +45,11 @@ def getEpochTables(x:object, as_dataFrame:bool=False):
     # only return the epoch tables that actually contain any non-OFF epochs
     
     if as_dataFrame:
-        return [epochTable2DF(e) for e in etable if len(e.epochs)]
+        return [epochTable2DF(e, x) for e in etable if len(e.epochs)]
     
     return [e for e in etable if len(e.epochs)]
 
-def epochTable2DF(x:object, abf:typing.optional[pyabf.ABF] = None):
+def epochTable2DF(x:object, abf:typing.Optional[pyabf.ABF] = None):
     """Returns a pandas.DataFrame with the data from the epoch table 'x'
     """
     if not hasPyABF:
@@ -59,7 +59,7 @@ def epochTable2DF(x:object, abf:typing.optional[pyabf.ABF] = None):
         raise TypeError(f"Expecting an EpochTable; got {type(x).__name__} instead")
 
     # NOTE: 2022-03-04 15:38:31
-    # code below taken & adapted from pyabf.waveform.EpochTable.text
+    # code below adapted from pyabf.waveform.EpochTable.text
     #
     
     rowIndex = ["Type", "First Level", "Delta Level", "First Duration (points)", "Delta Duration (points)",
@@ -76,48 +76,24 @@ def epochTable2DF(x:object, abf:typing.optional[pyabf.ABF] = None):
     if len(epochs):
         epochCount = len(epochs)
         epochLetters = [''] * epochCount
-        #epochTypes = [''] * epochCount
-        #epochLevels = [''] * epochCount
-        #epochLevelsDelta = [''] * epochCount
-        #durations = [''] * epochCount
-        #durationsDelta = [''] * epochCount
-        #durationsMs = [''] * epochCount
-        #durationsDeltaMs = [''] * epochCount
-        #digitalPatternLs = [''] * epochCount
-        #digitalPatternHs = [''] * epochCount
-        #trainPeriods = [''] * epochCount
-        #pulseWidths = [''] * epochCount
-        #pointsPerMsec = x.sampleRateHz*1000 # WRONG!
         
         epochData = dict()
         
         for i, epoch in enumerate(epochs):
             assert isinstance(epoch, pyabf.waveform.Epoch)
-            #epochLetters[i] = epoch.epochLetter
-            #epochTypes[i] = epoch.epochTypeStr
-            #epochLevels[i] = "%.02f" % epoch.level
-            #epochLevelsDelta[i] = "%.02f" % epoch.levelDelta
-            #durations[i] = "%d" % epoch.duration
-            #durationsDelta[i] = "%d" % epoch.durationDelta
-            #durationsMs[i] = "%.02f" % (epoch.duration/pointsPerMsec)
-            #durationsDeltaMs[i] = "%.02f" % (epoch.durationDelta/pointsPerMsec)
-            #digStr = "".join(str(int(x)) for x in epoch.digitalPattern)
-            #digitalPatternLs[i] = digStr[:4]
-            #digitalPatternHs[i] = digStr[4:]
-            #trainPeriods[i] = "%d" % epoch.pulsePeriod
-            #pulseWidths[i] = "%d" % epoch.pulseWidth
             
             if isinstance(abf, pyabf.ABF):
-                adcName, adcUnits = self._getAdcNameAndUnits(epoch.channel)
-                dacName, dacUnits = self._getDacNameAndUnits(epoch.channel)
+                adcName, adcUnits = abf._getAdcNameAndUnits(x.channel)
+                dacName, dacUnits = abf._getDacNameAndUnits(x.channel)
                 
             else:
                 adcName = adcUnits = dacName = dacUnits = None
                 
-            #level = epoch.level*
+            dacLevel = epoch.level*spq.unit_quantity_from_name_or_symbol(dacUnits) if isinstance(dacUnits, str) and len(dacUnits.strip()) else epoch.level
+            dacLevelDelta = epoch.levelDelta*spq.unit_quantity_from_name_or_symbol(dacUnits) if isinstance(dacUnits, str) and len(dacUnits.strip()) else epoch.levelDelta
 
             epValues = np.array([epoch.epochTypeStr,                              
-                              epoch.level, epoch.levelDelta,
+                              dacLevel, dacLevelDelta,
                               epoch.duration, epoch.durationDelta,
                               epoch.duration/x.sampleRateHz * 1000 * pq.ms, 
                               epoch.durationDelta/x.sampleRateHz * 1000 * pq.ms,

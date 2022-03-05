@@ -3025,7 +3025,9 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
                      adcrange:numbers.Number=10,
                      adcscale:numbers.Number=1e3,
                      resample_with_period:(pq.Quantity, type(None)) = None,
-                     resample_with_rate:(pq.Quantity, type(None)) = None):
+                     resample_with_rate:(pq.Quantity, type(None)) = None,
+                     Itimes_relative:bool = True,
+                     Itimes_samples:bool=False):
 
     """
     im: analog signal with current injection recording, or a tuple of three
@@ -3076,6 +3078,16 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
         called from ephys.parse_step_waveform_signal() 
         
         Used only when method is "state_levels"
+        
+        
+    Itimes_relative:bool, default is True; 
+        When True and im is a triplet, then im[1] and im[2] are the times of 
+        current injection start/stop relative to Vm signal start.
+        
+    Itimes_samples:bool, default is False.
+        When True, and im is a triplet, then im[1] and im[2] are the current
+        injection start/stop in number of samples; this implies they ALWAYS 
+        resolve to times relative to the Vm signal start.
         
     """
     
@@ -3157,15 +3169,60 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
                 istep = im.time_slice(d, d + tail)
                 
             Ihold = istep.mean()
+            
         except:
             print("Cannot parse current injection signal; use manually entered Ihold, start and stop times instead\n\n\n")
             raise
             
     else:
+        #print(f"extract_AP_train: im {im}, Vm t_start {vm.t_start}, Vm t_stop {vm.t_stop}")
         Ihold = im[0]
         inj = Ihold
-        vstep = vm.time_slice(im[1], im[2] + tail)
-        istep = im[1:]
+            
+        if Itimes_samples:
+            istart = int(im[1]) * vm.sampling_period
+            istop = int(im[2]) * vm.sampling_period
+            
+            istart, istop = (istart, istop) if istart <= istop else (istop, istart)
+            
+        elif Itimes_relative:
+            if isinstance(im[1], (int, float)):
+                istart = im[1] * pq.s
+                
+            elif isinstance(im[1], pq.Quantity):
+                if im[1].size > 1:
+                    raise TypeError(f"Expecting a scalar quantity in im[1]; got {im[1].size} instead")
+                
+                if units_convertible(im[1], pq.s):
+                    istart = im[1].rescale(pq.s)
+                else:
+                    raise TypeError(f"Expecting a time quantity in im[1]; got {im[1]} instead")
+                
+            else:
+                raise TypeError(f"Expecting an int, float or Quantity with time units in im[1]; got {type(im[1]).__name__} instead")
+
+            if isinstance(im[2], (int, float)):
+                istop = im[2] * pq.s
+                
+            elif isinstance(im[2], pq.Quantity):
+                if im[2].size > 1:
+                    raise TypeError(f"Expecting a scalar quantity in im[2]; got {im[2].size} instead")
+                
+                if units_convertible(im[2], pq.s):
+                    istop = im[2].rescale(pq.s)
+                else:
+                    raise TypeError(f"Expecting a time quantity in im[2]; got {im[2]} instead")
+                
+            else:
+                raise TypeError(f"Expecting an int, float or Quantity with time units in im[2]; got {type(im[2]).__name__} instead")
+
+            istart, istop = (istart, istop) if istart <= istop else (istop, istart)
+
+            istart = im[1] + vm.t_start
+            istop = im[2] + vm.t_start
+            
+        vstep = vm.time_slice(istart, istop + tail)
+        istep = [istart, istop]
     
     #print("extract_AP_train: Ihold", Ihold)
     #print("extract_AP_train: Iinj", inj)
@@ -4767,13 +4824,13 @@ def analyse_AP_step_injection_series(data, **kwargs):
         (Istart and Istop) must also be specified as floats or time quantities
         
         When ALL sweeps start at the same time (say, 0*pq.s) then Istart and Istop
-        values apply to every sweep. Itime_relative must be set to True
+        values apply to every sweep. Itimes_relative must be set to True
         
         When ALL sweeps start at incremental times (as is often recorded in Clampex)
-        Itime_relative must be set to True.
+        Itimes_relative must be set to True.
         
         Istart and Istop can also be specified as number of samples from the 
-        start of the sweep. In this case Itime_samples must be set to True.
+        start of the sweep. In this case Itimes_samples must be set to True.
     
     Parameters:
     ----------
@@ -4816,12 +4873,16 @@ def analyse_AP_step_injection_series(data, **kwargs):
     Istart, Istop: time quantities for current step injection, or None
         When given, all segments in the block must start at the same time
         
-    Itime_relative:bool, default is False; when False and Istart and Istop are
-        specified then all sweeps must start at the same time t0; when True,
-        then Istart and Istop are considered RELATIVE to the sweep's t0, in 
-        every sweep.
+    Itimes_relative:bool, default is True; 
+        When True, then Istart and Istop are considered RELATIVE to the sweep's 
+        t0, in every sweep (this is the default, because usually Istart and Istop
+        are given in the protocol configuration, where the times are always 
+        relative to the start of the sweep).
         
-    Itime_samples: boold, default is False; when True, this flag indicates that
+        When False and Istart and Istop are specified then all sweeps must start
+        at the same time t0.
+        
+    Itimes_samples: boold, default is False; when True, this flag indicates that
         Istart and Istop (when given) are numbers of samples (form the start of
         the sweep).
         
@@ -5187,8 +5248,8 @@ def analyse_AP_step_injection_series(data, **kwargs):
     
     Istart = kwargs.pop("Istart", None)
     Istop = kwargs.pop("Istop", None)
-    Itime_samples = kwargs.pop("Itime_samples", False)
-    Itime_relative = kwargs.pop("Itime_relative", False)
+    Itimes_samples = kwargs.pop("Itimes_samples", False)
+    Itimes_relative = kwargs.pop("Itimes_relative", True)
     
     if isinstance(Iinj_0, (float, int)):
         Iinj_0 = Iinj_0 * pq.pA
@@ -5274,67 +5335,12 @@ def analyse_AP_step_injection_series(data, **kwargs):
         else:
             raise TypeError("Unexpected type for Iinj: %s" % type(Iinj).__name__)
         
-        # also needs Istart, Istop, Itime_relative, Itime_samples
-        if all([v is not None for v in (Istart, Istop)]):
-            if isinstance(Istart, (int, float)):
-                if Itime_samples:
-                    Istart = int(Istart)
-                else:
-                    Istart *= pq.s
-                
-            elif isinstance(Istart, pq.Quantity):
-                if Itime_samples:
-                    Istart = int(Istart)
-                else:
-                    if len(Istart) > 1:
-                        raise ValueError("Istart must be a scalar quantity)")
-                    
-                    if units_convertible(Istart, pq.s):
-                        Istart = Istart.rescale(pq.s)
-                    else:
-                        raise TypeError("Istart must be a tiem quantity")
-                
-            else:
-                raise TypeError("Istart must be a quantity (in s), a float, or an int")
-                
-            if isinstance(Istop, (int,float)):
-                if Itime_samples:
-                    Istop = int(Istop)
-                else:
-                    Istop *= pq.s
-                
-            elif isinstance(Istop, pq.Quantity):
-                if Itime_samples:
-                    Istop = int(Istop)
-                else:
-                    if len(Istop) > 1:
-                        raise ValueError("Istop must be a scalar quantity)")
-                    
-                    if units_convertible(Istop, pq.s):
-                        Istop = Istop.rescale(pq.s)
-                    else:
-                        raise TypeError("Istop must be a time quantity")
-                
-            else:
-                raise TypeError("Istop must be a quantity (in s), a float or an int")
-
-            # make sure they're ordered
-            Istart, Istop = (Istart, Istop) if Istart <= Istop else (Istop, Istart)
-            
-            if not Itime_samples and Itime_relative:
-                Istart = [s.t_start + Istart for s in segments]
-                Istop = [s.t_start + Istop for s in segments]
-                
-            else:
-                Istart = [Istart] * len(segments)
-                Istop = [Istop] * len(segments)
-                
-            
-        else:
+        # also needs Istart, Istop, Itimes_relative, Itimes_samples
+        if all([v is None for v in (Istart, Istop)]):
             raise ValueError("I need Istart and Istop")
         
     elif not isinstance(ImSignal, (int, str)):
-        raise TypeError("I need either ImSignal, or (Istart, Istop, Itime_samples and Itime_relative)")
+        raise TypeError("I need either ImSignal, or (Istart, Istop, Itimes_samples and Itimes_relative)")
         
             
     ret = collections.OrderedDict()
@@ -5352,15 +5358,17 @@ def analyse_AP_step_injection_series(data, **kwargs):
     kwargs["VmSignal"] = VmSignal
     
     try:
-        #__train_analysis_loop__(segments, ret, apIEI, apFrequency, nAPs,
-                                #apThr, apLatency, **kwargs)
         for k, segment in enumerate(segments):
+            #print("segment %d" %k)
             if isinstance(Iinj, pq.Quantity):
-                im = (Iinj[k], Istart[k], Istop[k])
+                im = (Iinj[k], Istart, Istop)
             else:
                 im = ImSignal
-            #print("segment %d" %k)
-            step_result, vstep = analyse_AP_step_injection(segment, ImSignal = im, **kwargs)
+                
+            step_result, vstep = analyse_AP_step_injection(segment, ImSignal = im, 
+                                                           Itimes_relative = Itimes_relative,
+                                                           Itimes_samples = Itimes_samples,
+                                                           **kwargs)
             
             if Iinj is not None:
                 # override the value measured from the Im signal
@@ -7324,6 +7332,7 @@ def report_AP_analysis(data, name=None):
 def analyse_AP_step_injection(segment, 
                               VmSignal:typing.Union[int, str] = "Vm_prim_1", 
                               ImSignal:typing.Union[int, str, tuple] = "Im_sec_1", 
+                              Itimes_relative:bool=True,
                               Itimes_samples:bool = False,
                               **kwargs):
     """AP Train analysis in a sweep (segment) of I-clamp experiments
@@ -7339,7 +7348,7 @@ def analyse_AP_step_injection(segment,
     VmSignal: int, str.
         Indicates the analog signal containing the Vm response.
         
-        When an int this is the scalar index of the signal, in 'segment'
+        When an int, this is the scalar index of the signal, in 'segment'
         
         When a str, this is the name of the Vm signal
         
@@ -7348,7 +7357,7 @@ def analyse_AP_step_injection(segment,
      ImSignal: int, str, tuple
         Indicates the current injection parameters.
         
-        When an int this is the scalar index, in 'segment', of the analog signal
+        When an int, this is the scalar index, in 'segment', of the analog signal
         containing the current injeciton step.
         
         When a str, this is the name of the current injection signal.
@@ -7369,9 +7378,16 @@ def analyse_AP_step_injection(segment,
         
         Default is "Im_sec_1".
         
+    Itimes_relative:bool, default is True.
+        When ImSignal is a tuple, ImSignal[1] and ImSignal[2] are current 
+        injjection start and stp times, relative to the VmSignal start time.
+        
     Itimes_samples:bool, default is False
         Set to True when the current injection start and stop times in the 
         'ImSignal' tuple are given as samples (BEFORE any resampling, see below).
+        
+        When True, this implies the resolved times are relative to VmSingal
+        start time.
     
     Var-keyword parameters (kwargs):
     --------------------------------
@@ -7534,7 +7550,6 @@ def analyse_AP_step_injection(segment,
         cortical neurons. Nature 440, 1060–1063.
     
     """
-    #print("analyse_AP_step_injection kwargs:", kwargs)
     tail                    = kwargs.pop("tail", 0*pq.s)
     resample_with_period    = kwargs.pop("resample_with_period", None)
     resample_with_rate      = kwargs.pop("resample_with_rate", None)
@@ -7546,6 +7561,9 @@ def analyse_AP_step_injection(segment,
     smooth_window           = kwargs.pop("smooth_window", 5)
     
     kwargs.pop("return_all", None) # remove the debugging parameter
+    
+    Itimes_relative = kwargs.pop("Itimes_relative", True)
+    Itimes_samples = kwargs.pop("Itimes_samples", False)
     
     # NOTE: 2019-05-03 13:08:48
     # removed: result not has individual AP analysis for all detected APs
@@ -7565,10 +7583,6 @@ def analyse_AP_step_injection(segment,
     elif isinstance(ImSignal, tuple) and len(ImSignal) == 3: # (Iinj, Istart, Istop)
         im = ImSignal
         
-        if Itimes_samples:
-            for k in [1,2]:
-                im[k] *= VmSignal.sampling_period
-                im[k] = im[k].rescale(pq.s)
     else:
         raise TypeError(f"ImSignal expected a str (signal name) int signal index) or a triplet (amplitude, start & stop times); got {ImSignal} instad")
                 
@@ -7588,7 +7602,9 @@ def analyse_AP_step_injection(segment,
                                     adcrange=adcrange,
                                     adcscale=adcscale,
                                     resample_with_period=resample_with_period,
-                                    resample_with_rate=resample_with_rate)
+                                    resample_with_rate=resample_with_rate,
+                                    Itimes_relative = Itimes_relative,
+                                    Itimes_samples = Itimes_samples)
     
     #print("Ihold", Ihold)
     
