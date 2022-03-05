@@ -1,0 +1,7 @@
+ 
+scipyenvdir=$HOME/scipyenv3.10
+
+scipyact () {
+    source $scipyenvdir/bin/activate
+}
+

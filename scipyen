@@ -1,12 +1,13 @@
 #! /bin/sh 
-
 realscript=`realpath $0`
 scipyendir=`dirname $realscript`
+source $scipyendir/envact
 # scipyenvdir=`dirname $scipyendir`
 
 if [ -z $VIRTUAL_ENV ]; then
+    scipyact
 #     source $scipyenvdir/bin/activate
-    echo "You must run this script while in a virtual python environment"
+#     echo "You must run this script while in a virtual python environment"
 fi
 
 if [ -z $BROWSER ]; then
@@ -30,6 +31,5 @@ if [ $0 == 0 ] ; then
     fi
 fi
 python3 $scipyendir/scipyen.py 
-# python3 $scipyendir/scipyen.py &
 
 # python3 -m cProfile -s 'cumtime' $scipyendir/scipyen.py > profile &

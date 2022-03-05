@@ -540,7 +540,12 @@ class FrameIndexLookup(object):
         """
         pds = self.__getitem__(field)
         
-        cond = pds == value
+        if self.missingFrameIndex is pd.NA:
+            ppds = pds.fillna(np.nan)
+        else:
+            ppds = pds
+        
+        cond = ppds == value
         
         ret = list(pds.where(cond).dropna().index)
         

@@ -114,7 +114,7 @@ def epochTable2DF(x:object, abf:typing.optional[pyabf.ABF] = None):
             else:
                 adcName = adcUnits = dacName = dacUnits = None
                 
-            level = epoch.level*
+            #level = epoch.level*
 
             epValues = np.array([epoch.epochTypeStr,                              
                               epoch.level, epoch.levelDelta,

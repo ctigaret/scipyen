@@ -1,9 +1,9 @@
 [Desktop Entry]
-Comment[en_GB]=Scientific Python Environment for Neuroscience
-Comment=Scientific Python Environment for Neuroscience
-Exec=/home/cezar/bin/scipyen_desktop.sh
-GenericName[en_GB]=Scipyen
-GenericName=Scipyen
+Comment[en_GB]=Scientific Python Environment for Neurophysiology
+Comment=Scientific Python Environment for Neurophysiology
+Exec=scipyen
+GenericName[en_GB]=Scientific Python Environment for Neurophysiology
+GenericName=Scientific Python Environment for Neurophysiology
 Icon=pythonbackend
 MimeType=
 Name[en_GB]=Scipyen
@@ -11,9 +11,9 @@ Name=Scipyen
 Path=
 StartupNotify=true
 Terminal=true
-TerminalOptions=\s--noclose
+TerminalOptions=\s
 Type=Application
 X-DBUS-ServiceName=
-X-DBUS-StartupType=none
+X-DBUS-StartupType=
 X-KDE-SubstituteUID=false
 X-KDE-Username=
