@@ -1,5 +1,8 @@
 # WARNING: some of the packages listed below may have already been installed, or 
-# are available from your Linux distribution.
+# are available from your Linux distribution. Therefore by installing them INSIDE
+# the virtual environment they will overshadow the packages in the system-wide
+# site-packages directory. This has consequences ONLY IF the virtual environment 
+# was created with the --system-site-packages option .
 #
 # ATTENTION: ONLY USE THIS FILE INSIDE A VIRTUAL PYTHON ENVIRONMENT (see INSTALL
 # for details).
@@ -9,6 +12,11 @@
 # or system-wide, see /usr/lib64/PythonX.Y.site-packages) and comment out, below,
 # the ones already installed on your system. Otherwise, the packages installed 
 # here will take precedence over those available.
+#
+#
+# NOTE: Not all packages here are used/needed by Scipyen in its current version
+# (some are installed for experimentation, e.g. the extra jupyter kernel packages,
+# and others). 
 
 numpy           
 sphinx          
@@ -16,9 +24,7 @@ nose
 confuse
 dill
 # PyQt5         # on Windows run 'pip install PyQt5'; 
-                # on Unix must build IF building Python from source,
-                # (see c_cpp_requirements.txt)
-                # else install via pip
+                # on Unix must build  - see INSTALL file
 jupyter
 jupyter_qtconsole_colorschemes
 ipython
@@ -68,6 +74,7 @@ scikit-learn
 scikit-image
 language_tool_python
 pyabf
+ipyparallel
 # also see nrn/docs/docs_requirements.txt, reproduced below after excluding 
 # packages already listed above
 sphinx_rtd_theme

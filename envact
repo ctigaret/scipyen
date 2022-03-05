@@ -1,4 +1,14 @@
- 
+# NOTE: this bash script file MUST BE 'source'd in an interactive bash session,
+# or in a bash shell script.
+#
+# NOTE: Compatible with bash and zsh, not compatible with csh, and tcsh.
+#
+# ATTENTION: 
+# BEFORE USING, edit the next line of code to indicate the correct location of 
+# the virtual Python enviornment used by Scipyen.
+#
+# This file should also be sourced from .bashrc so that the environment can be
+# activated in an interactive shell with the 'scipyact' command
 scipyenvdir=$HOME/scipyenv3.10
 
 scipyact () {
