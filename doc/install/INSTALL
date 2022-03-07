@@ -55,6 +55,44 @@ Python >= 3.9
     fully qualified path at the command line, OR temporarily rename the 
     $HOME/.local/virtualenv file to something else
 
+Which Python?
+-------------
+As stated above, Scipyen should be used with Python >= 3.9
+
+On Linux, this can be the Python stack as distributed with the OS, or one 
+built locally from sources. 
+
+In the latter case it is important, when launching Scipyen, to point to the 
+correct directories of the installaiton of the localy built Pyhton stack. 
+For this purpose, use the pyenv script in the Python/Unix subdirectory here
+(see README file in that subdirectory)
+
+In a nutshell: 
+    Create a .scipyenrc in the $HOME directory with contents that depend on
+whether you use a Python stack suplied with the OS distribution or a locally 
+built oneto define the shell function:
+    
+    a) if using a Python stack supplied by the OS distribution:
+    
+    scipyenvdir=$HOME/scipyenv3.10
+
+    scipyact () {
+        source $scipyenvdir/bin/activate
+    }
+    
+    b) if using a locally-built Python stack (and then optionally installed
+    system-wide, e.g. in /usr/local which is the default installation target)
+    
+    b.1) edit pyenv so that environment cvalriables point to the correct locations
+    (see comments inside pyenv)
+
+    b.2) place the following in .scipyenrc
+    
+    scipyenvdir=$HOME/scipyenv39
+    scipyact () {
+        source $scipyenvdir/bin/activate
+        source $HOME/bin/pyenv 3.9
+    }
 
 
 VIGRA and its python bindings (vigranumpy) <-   jpeg

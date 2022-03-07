@@ -1,7 +1,8 @@
 #! /bin/sh 
 realscript=`realpath $0`
 scipyendir=`dirname $realscript`
-source $scipyendir/envact
+# source $scipyendir/envact
+source $HOME/.scipyenrc
 # scipyenvdir=`dirname $scipyendir`
 
 if [ -z $VIRTUAL_ENV ]; then

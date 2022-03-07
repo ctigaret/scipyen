@@ -1,6 +1,6 @@
-# Set up the environment variables for launching python3.10 tools (including
-# python3.10 itself)
-# This is so that a Python 3.10 built from sources and installed as per default
+# Set up the environment variables for launching python & tools for a localy 
+# built python stack (which may be installed system-wide)
+# This is so that a Python stack built from sources and installed as per default
 # in /usr/local using 'make altinstall' can execute the /etc/pythonstart file
 # (which is the $PYTHONSTARTUP set by default in OpenSuSE)
 ###############################################################################                                                                      
@@ -34,20 +34,21 @@ if [ "${BASH_SOURCE-}" = "$0" ]; then
     echo "You must source this script: \$ source $0" >&2
     exit 33
 fi
-if ! [ -z "${VIRTUAL_ENV+_}" ] ; then
+# if ! [ -z "${VIRTUAL_ENV+_}" ] ; then
+if [ -n "${VIRTUAL_ENV}" ] ; then
     declare -a ver_array
     ver_array=( `python --version` )
     pyver=${ver_array[1]::-2}
 else
     if [ $# -lt 1 ] ; then
-        echo "You must provide python version (major.minor), e.g.: \$ source $0 (3.10)" >&2
+        echo "You must provide python version (as major.minor), e.g.: \$ source $0 (3.10)" >&2
         return 33
     else
         pyver=$1
     fi
 fi
 
-if ! [ -z ${PYENV+_} ] ; then
+if ! [ -z "${PYENV}" ] ; then
     echo "You are already using $PYENV "
     echo "Call 'droppy' to deactivate before choosing another version."
     return 0
@@ -56,10 +57,12 @@ fi
 
 _OLD_PYTHONHOME="$PYTHONHOME"
 _OLD_PYTHONPATH="$PYTHONPATH"
-# _OLD_PYTHONPLATLIBDIR="$PYTHONPLATLIBDIR" # "lib64" - not really needed to do this
+_OLD_PYTHONPLATLIBDIR="$PYTHONPLATLIBDIR"
 _OLD_PYEXEC=`which python`
 
+# edit the next line to point to where the locally built Python is installed
 PYTHONHOME=/usr/local
+# the next three lines should not normally need editing but good to check
 PYTHONPATH=$PYTHONHOME/lib/python${pyver}
 PYTHONPLATLIBDIR=lib64
 PYEXEC=$PYTHONHOME/bin/python${pyver}
@@ -180,7 +183,7 @@ if [ -x $HOME/.local/bin/virtualenv ]; then
         alias virtualenv=$new_virtualenv
     fi
     
-elif [ -x $new_virtualenv ] ; then
+elif [-x $new_virtualenv ] ; then
     alias virtualenv=$new_virtualenv
     
 fi
