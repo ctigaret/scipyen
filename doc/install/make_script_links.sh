@@ -11,42 +11,45 @@ sed "s|PYTHON_INSTALL_DIR|$1|g" pyenv_src > ${HOME}/.pyenv
 
 make_scipyenrc () {
 # param $1 is scipyenvdir i.e. where virtual environment is
-# param $2 is pyver
 cat<<END > ${HOME}/.scipyenrc
 scipyenvdir=${1}
 scipyact () {
 source ${1}/bin/activate
 }
 END
-# # test if python complains about platform dependent libs
-# source ${1}/bin/activate 
-# err=$(mktemp)
-# if python -c "import sys" 2>"$err" ; then
-# # echo "$err"
-# shopt -s lastpipe
-# cat "$err" | grep "platform" | read error_msg
-# # echo "$error_msg"
-# if [ ! -z "$error_msg" ] ;then
-# make_pyenv ${1}
-# cat<<END > ${HOME}/.scipyenrc
-# scipyenvdir=${1}
-# scipyact () {
-# source ${1}/bin/activate
-# source ${HOME}/.pyenv ${2}
-# }
-# END
-# else
-# cat<<END > ${HOME}/.scipyenrc
-# scipyenvdir=${1}
-# scipyact () {
-# source ${1}/bin/activate
-# }
-# END
-# fi
-# else
-# echo "Cannot run python in ${1}: error code is "$?
-# fi
-# deactivate
+}
+
+make_scipyenrc_2 () {
+# test if python complains about platform dependent libs
+source ${1}/bin/activate 
+err=$(mktemp)
+if python -c "import sys" 2>"$err" ; then
+# echo "$err"{
+shopt -s lastpipe
+cat "$err" | grep "platform" | read error_msg
+echo "$error_msg"
+if [ ! -z "$error_msg" ] ;then
+make_pyenv ${1}
+echo ${1} ${2}
+cat<<END > ${HOME}/.scipyenrc
+scipyenvdir=${1}
+scipyact () {
+source ${1}/bin/activate
+source ${HOME}/.pyenv ${2}
+}
+END
+else
+cat<<END > ${HOME}/.scipyenrc
+scipyenvdir=${1}
+scipyact () {
+source ${1}/bin/activate
+}
+END
+fi
+else
+echo "Cannot run python in ${1}: error code is "$?
+fi
+deactivate
 }
 
 update_bashrc () {
@@ -155,7 +158,8 @@ get_python_data $scipyenvdir
 
 # echo pyver=$pyver
 
-make_scipyenrc $scipyenvdir $pyver && update_bashrc && source ${HOME}/.bashrc
+make_scipyenrc $scipyenvdir && update_bashrc && source ${HOME}/.bashrc
+# make_scipyenrc_2 $scipyenvdir $pyver && update_bashrc && source ${HOME}/.bashrc
 
 # exit
 
