@@ -8,7 +8,7 @@ import sys, os
 
 import atexit, re, inspect, gc, io, traceback
 import faulthandler
-import cProfile
+#import cProfile
 
 has_breeze_resources_for_win32 = False
 
@@ -154,5 +154,3 @@ if __name__ == '__main__':
         raise OSError(f"Scipyen requires Python >= 3.9 but the script is using {sys.version}")
     main()
     
-    #cProfile.run("main()", "profile.txt", 2)
-        

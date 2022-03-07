@@ -1,0 +1,194 @@
+# Set up the environment variables for launching python & tools for a localy 
+# built python stack (which may be installed system-wide)
+# This is so that a Python stack built from sources and installed as per default
+# in /usr/local using 'make altinstall' can execute the /etc/pythonstart file
+# (which is the $PYTHONSTARTUP set by default in OpenSuSE)
+###############################################################################                                                                      
+#               Copyright (C) 2021 Cezar M. Tigaret                
+#                                                                       
+#  This program is free software: you can redistribute it and/or modify 
+#  it under the terms of the GNU General Public License as published by 
+#  the Free Software Foundation, either version 3 of the License, or    
+#  (at your option) any later version.                                  
+#                                                                       
+#  This program is distributed in the hope that it will be useful,      
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of       
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the        
+#  GNU General Public License for more details.                         
+#                                                                       
+#  You should have received a copy of the GNU General Public License    
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#                                                                       
+#                                                                       
+#     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND    
+#     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES   
+#     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND          
+#     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT       
+#     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,      
+#     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING      
+#     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR     
+#     OTHER DEALINGS IN THE SOFTWARE.                                   
+###############################################################################
+
+if [ "${BASH_SOURCE-}" = "$0" ]; then
+    echo "You must source this script: \$ source $0" >&2
+    exit 33
+fi
+# if ! [ -z "${VIRTUAL_ENV+_}" ] ; then
+if [ -n "${VIRTUAL_ENV}" ] ; then
+    declare -a ver_array
+    ver_array=( `python --version` )
+    pyver=${ver_array[1]::-2}
+else
+    if [ $# -lt 1 ] ; then
+        echo "You must provide python version (as major.minor), e.g.: \$ source $0 (3.10)" >&2
+        return 33
+    else
+        pyver=$1
+    fi
+fi
+
+if ! [ -z "${PYENV}" ] ; then
+    echo "You are already using $PYENV "
+    echo "Call 'droppy' to deactivate before choosing another version."
+    return 0
+fi
+
+
+_OLD_PYTHONHOME="$PYTHONHOME"
+_OLD_PYTHONPATH="$PYTHONPATH"
+_OLD_PYTHONPLATLIBDIR="$PYTHONPLATLIBDIR"
+_OLD_PYEXEC=`which python`
+
+# edit the next line to point to where the locally built Python is installed
+PYTHONHOME=PYTHON_INSTALL_DIR
+# the next three lines should not normally need editing but good to check
+PYTHONPATH=$PYTHONHOME/lib/python${pyver}
+PYTHONPLATLIBDIR=lib64
+PYEXEC=$PYTHONHOME/bin/python${pyver}
+
+if ! [ -x $PYEXEC ] ; then
+    echo "Python version $pyver not found"
+    return 33
+fi
+
+droppy () {
+    if ! [ -z "${VIRTUAL_ENV+_}" ] && [ -n ${deactivate} ] ; then
+        deactivate
+    fi
+    
+    if ! [ -z "${_OLD_PYTHONHOME+_}" ] ; then
+        PYTHONHOME="$_OLD_PYTHONHOME"
+        if [ -n ${PYTHONHOME} ] ; then
+            export PYTHONHOME
+        else
+            unset PYTHONHOME
+        fi
+        unset _OLD_PYTHONHOME
+    fi
+
+    if ! [ -z "${_OLD_PYTHONPATH+_}" ] ; then
+        PYTHONPATH="$_OLD_PYTHONPATH"
+        if [ -n ${PYTHONPATH} ] ; then
+            export PYTHONPATH
+        else
+            unset PYTHONPATH
+        fi
+        unset _OLD_PYTHONPATH
+    fi
+    if ! [ -z "${_OLD_PYTHONPLATLIBDIR+_}" ] ; then
+        PYTHONPLATLIBDIR="$_OLD_PYTHONPLATLIBDIR"
+        if [ -n ${PYTHONPLATLIBDIR} ] ; then
+            export PYTHONPLATLIBDIR
+        else
+            unset PYTHONPLATLIBDIR
+        fi
+        unset _OLD_PYTHONPLATLIBDIR
+    fi
+
+    hash -r 2>/dev/null
+
+    if ! [ -z "${_OLD_PS1+_}" ] ; then
+        PS1="$_OLD_PS1"
+        export PS1
+        unset _OLD_PS1
+    fi
+
+    alias python 2>/dev/null >/dev/null && unalias python || true
+    alias pip 2>/dev/null >/dev/null && unalias pip || true
+    alias virtualenv 2>/dev/null >/dev/null && unalias virtualenv || true
+    
+    unset PYENV
+    unset PYEXEC
+    unset pyver
+    unset old_virtualenv
+    unset new_virtualenv
+    unset virtualenv_head
+    
+    unset -f droppy
+}
+
+
+if ! [ -z "${VIRTUAL_ENV+_}" ]; then
+    alias python=python${pyver}
+else
+    alias python=$PYEXEC
+fi
+alias pip=pip${pyver}
+
+PYENV="`$PYEXEC --version`"
+
+export PYTHONPATH
+export PYTHONPLATLIBDIR
+export PYEXEC
+
+
+if ! [ -z "${VIRTUAL_ENV+_}" ]; then
+    # do not export PYTHONHOME inside the virtual environment (as per activate)
+    _OLD_PS1=$PS1
+    declare -a ndx_array
+    ndx_array=( $PS1 )
+    sys_ps1=${ndx_array[1]}
+    PS1="(`basename ${VIRTUAL_ENV}` $PYENV) $sys_ps1"
+    
+    LD_LIBRARY_PATH=$VIRTUAL_ENV/lib:$VIRTUAL_ENV/lib64:$LD_LIBRARY_PATH
+    export LD_LIBRARY_PATH
+    export PYTHONHOME # you NEED this to find platform independent libraries !!!
+#     export PYTHONHOME=${VIRTUAL_ENV}
+else
+    echo "If you plan to activate a virtual environment with $PYENV "
+    echo "then you MUST do so BEFORE sourcing this script"
+    export PYTHONHOME
+    _OLD_PS1=$PS1
+    PS1="($PYENV) $PS1"
+    
+    # do this here because virtual environment activate sets up its own
+    alias pydoc=pydoc${pyver} 
+fi
+
+old_virtualenv=`which virtualenv`
+new_virtualenv=$HOME/.local/bin/virtualenv${pyver}
+
+if [ -x $HOME/.local/bin/virtualenv ]; then
+    virtualenv_head=`head -n 1 $HOME/.local/bin/virtualenv`
+    
+    if [ ${virtualenv_head:2} == $PYEXEC ] ; then
+        # virtualenv for this python version found => copy it to virtualenv${pyver}
+        cp $HOME/.local/bin/virtualenv $new_virtualenv
+        
+        if [ -x $old_virtualenv ]  &&  ! [ $old_virtualenv == $new_virtualenv ]; then
+            echo "WARNING: the 'virtualenv' alias shadows ${old_virtualenv}"
+        fi
+        
+        alias virtualenv=$new_virtualenv
+    fi
+    
+elif [-x $new_virtualenv ] ; then
+    alias virtualenv=$new_virtualenv
+    
+fi
+
+
+export PS1
+
+hash -r 2>/dev/null

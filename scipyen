@@ -1,16 +1,14 @@
 #! /bin/sh 
 realscript=`realpath $0`
 scipyendir=`dirname $realscript`
-# source $scipyendir/envact
-source $HOME/.scipyenrc
-# scipyenvdir=`dirname $scipyendir`
+source $HOME/.scipyenrc # supplies the shell function scipyact created by make_
 
 if [ -z $VIRTUAL_ENV ]; then
     scipyact
-#     source $scipyenvdir/bin/activate
-#     echo "You must run this script while in a virtual python environment"
 fi
 
+echo "Using Python environment in ${VIRTUAL_ENV}"
+echo ""
 if [ -z $BROWSER ]; then
     if [ -a $VIRTUAL_ENV/bin/browser ]; then
         source $VIRTUAL_ENV/bin/browser
