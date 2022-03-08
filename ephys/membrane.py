@@ -3090,7 +3090,6 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
         resolve to times relative to the Vm signal start.
         
     """
-    
     # parse resample_... parameters
     if not all([v is None for v in (resample_with_period, resample_with_rate)]):
         if isinstance(resample_with_period, float):
@@ -3184,6 +3183,9 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             istop = int(im[2]) * vm.sampling_period
             
             istart, istop = (istart, istop) if istart <= istop else (istop, istart)
+            
+            istart = istart.rescale(pq.s) + vm.t_start
+            istop = istop.rescale(pq.s) + vm.t_start
             
         elif Itimes_relative:
             if isinstance(im[1], (int, float)):
@@ -4882,7 +4884,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         When False and Istart and Istop are specified then all sweeps must start
         at the same time t0.
         
-    Itimes_samples: boold, default is False; when True, this flag indicates that
+    Itimes_samples: bool, default is False; when True, this flag indicates that
         Istart and Istop (when given) are numbers of samples (form the start of
         the sweep).
         
@@ -7332,7 +7334,7 @@ def report_AP_analysis(data, name=None):
 def analyse_AP_step_injection(segment, 
                               VmSignal:typing.Union[int, str] = "Vm_prim_1", 
                               ImSignal:typing.Union[int, str, tuple] = "Im_sec_1", 
-                              Itimes_relative:bool=True,
+                              Itimes_relative:bool = True,
                               Itimes_samples:bool = False,
                               **kwargs):
     """AP Train analysis in a sweep (segment) of I-clamp experiments
@@ -7561,9 +7563,6 @@ def analyse_AP_step_injection(segment,
     smooth_window           = kwargs.pop("smooth_window", 5)
     
     kwargs.pop("return_all", None) # remove the debugging parameter
-    
-    Itimes_relative = kwargs.pop("Itimes_relative", True)
-    Itimes_samples = kwargs.pop("Itimes_samples", False)
     
     # NOTE: 2019-05-03 13:08:48
     # removed: result not has individual AP analysis for all detected APs

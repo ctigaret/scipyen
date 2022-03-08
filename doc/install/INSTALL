@@ -651,7 +651,7 @@ Create a symbolic link of $HOME/scipyen/scipyen
 Drag and drop Scipyen.desktop to the desktop/panel/application menu editor.
 
 
-With this final procedure, the $VIRTUAL_ENV directory tree should look like this:
+Finally the $VIRTUAL_ENV directory tree should look like this:
     
   $HOME
         |

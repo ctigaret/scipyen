@@ -260,7 +260,7 @@ def getABF(obj):
     except:
         pass
     
-def getProtocolEpochs(obj):
+def getABFProtocolEpochs(obj):
     if not hasPyABF:
         return
     
