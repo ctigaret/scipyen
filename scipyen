@@ -9,6 +9,10 @@ fi
 
 echo "Using Python environment in ${VIRTUAL_ENV}"
 echo ""
+echo "PYTHONHOME=$PYTHONHOME"
+echo "PYTHONPATH=$PYTHONPATH"
+echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+
 if [ -z $BROWSER ]; then
     if [ -a $VIRTUAL_ENV/bin/browser ]; then
         source $VIRTUAL_ENV/bin/browser
@@ -29,6 +33,9 @@ if [ $0 == 0 ] ; then
         xrdb -merge $scipyendir/neuron_python/app-defaults/nrniv
     fi
 fi
-python3 $scipyendir/scipyen.py 
+
+if [ ! `python3 $scipyendir/scipyen.py` ]; then
+deactivate
+fi
 
 # python3 -m cProfile -s 'cumtime' $scipyendir/scipyen.py > profile &

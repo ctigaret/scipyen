@@ -4,7 +4,8 @@ realscript=`realpath $0`
 scipyendir=`dirname $realscript`
 
 make_pyenv () {
-# param $1 is scipyenvdir i.e. where virtual environment is
+# param $1 is where a custom built Python is installed
+# by default this is /usr/local
 # sed "s|PYTHON_INSTALL_DIR|$1|g" pyenv_src > ${HOME}/bin/pyenv
 sed "s|PYTHON_INSTALL_DIR|$1|g" pyenv_src > ${HOME}/.pyenv
 }
@@ -20,6 +21,10 @@ END
 }
 
 make_scipyenrc_2 () {
+# params:
+# $1 virtual environment directory (full path)
+# #2 location of custom built python installation (e.g. /usr/local)
+# $3 major.minor verison of python executable
 # test if python complains about platform dependent libs
 source ${1}/bin/activate 
 err=$(mktemp)
@@ -28,14 +33,15 @@ if python -c "import sys" 2>"$err" ; then
 shopt -s lastpipe
 cat "$err" | grep "platform" | read error_msg
 echo "$error_msg"
+# deactivate
 if [ ! -z "$error_msg" ] ;then
-make_pyenv ${1}
-echo ${1} ${2}
+make_pyenv ${2}
+# echo ${1} ${2}
 cat<<END > ${HOME}/.scipyenrc
 scipyenvdir=${1}
 scipyact () {
 source ${1}/bin/activate
-source ${HOME}/.pyenv ${2}
+source ${HOME}/.pyenv ${3}
 }
 END
 else
@@ -142,9 +148,13 @@ fi
 
 }
 
+scipyenvdir=${1}
+
+if [ -z ${scipyenvdir} ] ; then
 
 echo "Enter the full location of the virtual Python environment (e.g. ${HOME}/scipyenv39)"
 read -e scipyenvdir
+fi
 # echo "scipyenvdir "${scipyenvdir}
 # if [ ! -z ${scipyenvdir} ] && [ -d ${scipyenvdir} ]; then
 # if [ ! -z ${scipyenvdir} ] ; then
@@ -158,8 +168,8 @@ get_python_data $scipyenvdir
 
 # echo pyver=$pyver
 
-make_scipyenrc $scipyenvdir && update_bashrc && source ${HOME}/.bashrc
-# make_scipyenrc_2 $scipyenvdir $pyver && update_bashrc && source ${HOME}/.bashrc
+# make_scipyenrc $scipyenvdir && update_bashrc && source ${HOME}/.bashrc
+make_scipyenrc_2 $scipyenvdir $pynstall $pyver && update_bashrc && source ${HOME}/.bashrc
 
 # exit
 
