@@ -15,12 +15,12 @@ Python >= 3.9   vigra/vigranumpy/lib/__init__.py
 
 
 For both Linux and Windows 10:
-    if builing against a HDF5 libraries stack newer than 1.10.6:
+    if builing against a HDF5 libraries stack with version >= 1.11
         replace: 
             vigra/impex/hdf5impex.cxx 
             
         with:
-            vigra_patches/hdf5_gt_1.10.6/vigra/impex/hdf5impex.cxx
+            vigra_patches/hdf5_gt_1.11/vigra/impex/hdf5impex.cxx
             
     if building with vigranumpy against Python3.9 or newer:
         replace:

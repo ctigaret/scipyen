@@ -99,21 +99,12 @@ fi
 
 pyver=${1}
 
-# if ! [ -z "${VIRTUAL_ENV+_}" ] ; then
 if [ -z "${VIRTUAL_ENV}" ] ; then
     echo "pyenv script: Python virtual environment not activated"
     exit 33
-#     declare -a ver_array
-#     ver_array=( `python --version` )
-#     pyver=${ver_array[1]::-2}
 else
-echo "pyenv running with ${VIRTUAL_ENV} activated"
-#     if [ $# -lt 1 ] ; then
-#         echo "You must provide python version (as major.minor), e.g.: \$ source $0 (3.10)" >&2
-#         return 33
-#     else
-#         pyver=$1
-#     fi
+# echo "pyenv running with ${VIRTUAL_ENV} activated"
+
 _OLD_PYTHONHOME="$PYTHONHOME"
 _OLD_PYTHONPATH="$PYTHONPATH"
 _OLD_PYTHONPLATLIBDIR="$PYTHONPLATLIBDIR"
@@ -125,27 +116,27 @@ PYTHONHOME=PYTHON_INSTALL_DIR
 PYTHONPATH=$PYTHONHOME/lib/python${pyver}
 PYTHONPLATLIBDIR=lib64
 PYEXEC=$PYTHONHOME/bin/python${pyver}
-echo "PYEXEC=$PYEXEC"
-echo "in pyenv PYTHONHOME=$PYTHONHOME"
-echo "in pyenv PYTHONPATH=$PYTHONPATH"
-echo "in pyenv LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+# echo "PYEXEC=$PYEXEC"
+# echo "in pyenv PYTHONHOME=$PYTHONHOME"
+# echo "in pyenv PYTHONPATH=$PYTHONPATH"
+# echo "in pyenv LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 if ! [ -x $PYEXEC ] ; then
     echo "Python version $pyver not found"
     return 33
 fi
 
-echo "aliasing python=python${pyver} in ${VIRTUAL_ENV}"
+# echo "aliasing python=python${pyver} in ${VIRTUAL_ENV}"
 alias python=python${pyver}
 
 alias pip=pip${pyver}
 
 PYENV="`$PYEXEC --version`"
 
-_OLD_PS1=$PS1
-declare -a ndx_array
-ndx_array=( $PS1 )
-sys_ps1=${ndx_array[1]}
-PS1="(`basename ${VIRTUAL_ENV}` $PYENV) $sys_ps1"
+# _OLD_PS1=$PS1
+# declare -a ndx_array
+# ndx_array=( $PS1 )
+# sys_ps1=${ndx_array[1]}
+# PS1="(`basename ${VIRTUAL_ENV}` $PYENV) $sys_ps1"
 
 LD_LIBRARY_PATH=$VIRTUAL_ENV/lib:$VIRTUAL_ENV/lib64:${PYTHONHOME}/${PYTHONPLATLIBDIR}:/usr/lib:/usr/lib64:/usr/local/lib:/usr/local/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH
@@ -155,56 +146,10 @@ export PYTHONPATH
 export PYTHONPLATLIBDIR
 export PYEXEC
 
-export PS1
+# export PS1
 
 hash -r 2>/dev/null
 fi
 
-# 
-# if ! [ -z "${VIRTUAL_ENV+_}" ]; then
-#     echo "pyenv running with ${VIRTUAL_ENV} activated"
-#     # do not export PYTHONHOME inside the virtual environment (as per activate)
-#     _OLD_PS1=$PS1
-#     declare -a ndx_array
-#     ndx_array=( $PS1 )
-#     sys_ps1=${ndx_array[1]}
-#     PS1="(`basename ${VIRTUAL_ENV}` $PYENV) $sys_ps1"
-#     
-#     LD_LIBRARY_PATH=$VIRTUAL_ENV/lib:$VIRTUAL_ENV/lib64:$LD_LIBRARY_PATH:${PYTHONHOME}/${PYTHONPLATLIBDIR}
-#     export LD_LIBRARY_PATH
-#     export PYTHONHOME # you NEED this to find platform independent libraries !!!
-# #     export PYTHONHOME=${VIRTUAL_ENV}
-# else
-#     echo "If you plan to activate a virtual environment with $PYENV "
-#     echo "then you MUST do so BEFORE sourcing this script"
-#     export PYTHONHOME
-#     _OLD_PS1=$PS1
-#     PS1="($PYENV) $PS1"
-#     
-#     # do this here because virtual environment activate sets up its own
-#     alias pydoc=pydoc${pyver} 
-# fi
-
-# old_virtualenv=`which virtualenv`
-# new_virtualenv=$HOME/.local/bin/virtualenv${pyver}
-# 
-# if [ -x $HOME/.local/bin/virtualenv ]; then
-#     virtualenv_head=`head -n 1 $HOME/.local/bin/virtualenv`
-#     
-#     if [ ${virtualenv_head:2} == $PYEXEC ] ; then
-#         # virtualenv for this python version found => copy it to virtualenv${pyver}
-#         cp $HOME/.local/bin/virtualenv $new_virtualenv
-#         
-#         if [ -x $old_virtualenv ]  &&  ! [ $old_virtualenv == $new_virtualenv ]; then
-#             echo "WARNING: the 'virtualenv' alias shadows ${old_virtualenv}"
-#         fi
-#         
-#         alias virtualenv=$new_virtualenv
-#     fi
-#     
-# elif [ -x $new_virtualenv ] ; then
-#     alias virtualenv=$new_virtualenv
-#     
-# fi
 
 

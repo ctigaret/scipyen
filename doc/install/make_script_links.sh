@@ -10,17 +10,26 @@ make_pyenv () {
 sed "s|PYTHON_INSTALL_DIR|$1|g" pyenv_src > ${HOME}/.pyenv
 }
 
-make_scipyenrc () {
-# param $1 is scipyenvdir i.e. where virtual environment is
-cat<<END > ${HOME}/.scipyenrc
-scipyenvdir=${1}
-scipyact () {
-source ${1}/bin/activate
-}
-END
-}
+# make_scipyenrc_old () {
+# # param $1 is scipyenvdir i.e. where virtual environment is
+# cat<<END > ${HOME}/.scipyenrc
+# scipyenvdir=${1}
+# scipyact () {
+# source ${1}/bin/activate
+# }
+# END
+# }
 
-make_scipyenrc_2 () {
+make_scipyenrc () {
+# Creates ${HOME}/.scipeynrc which activates the virtual python environment
+# in order to run Scipyen
+# The ${HOME}/.scipyenrc defined a single bash function - 'scipyact' - which 
+# activates the virtual environment and optionally sets up a few needed environment
+# variables (see below in the code)
+# The ${HOME}/.scipyenrc script NEEDS TO BE SOURCED (in bash); this is done
+# automatically by the Scipyen launch bash script ('scipyen'), but also from 
+# .bashrc in order for the function 'scipyact' to be readily available to the user.
+#
 # params:
 # $1 virtual environment directory (full path)
 # #2 location of custom built python installation (e.g. /usr/local)
@@ -28,15 +37,31 @@ make_scipyenrc_2 () {
 # test if python complains about platform dependent libs
 source ${1}/bin/activate 
 err=$(mktemp)
-if python -c "import sys" 2>"$err" ; then
-# echo "$err"{
+
+# I found that when the virtual environment uses python built from sources (and 
+# installed in /usr/local as per defautl) then python complains that it cannot
+# find platform libraries. This happens when it is running /etc/pythonstartup
+# It might be related/specific to OpenSUSE, but not sure. Therefore below I 
+# check if running the python exec in the virtual environment finds  platform 
+# libraries.
+# If it doesn't then - CONTRARY to the policy of the virtualenv - I set the 
+# PYTHONHOME variable to point to where the built python is installed, by creating
+# the ${HOME}/.pyenv script file to be sourced from bash, AFTER activating the
+# python virtual environment - hence 'scipyact' function will be defined accordingly.
+#
+# In the situation where the python executable DOES find its platform libraries,
+# I create a simpler version of the 'scipyact' which only sources the default
+# activation script of the virtual environment.
+if ${1}/bin/python -c "import sys" 2>"$err" ; then
 shopt -s lastpipe
 cat "$err" | grep "platform" | read error_msg
-echo "$error_msg"
-# deactivate
+# echo "${1}/bin/python says: $error_msg"
 if [ ! -z "$error_msg" ] ;then
+# python did not find platform libraries, so we need to create ${HOME}/.pyenv
 make_pyenv ${2}
-# echo ${1} ${2}
+# then source ${HOME}/.pyenv AFTER the activation of the virtual environment
+# by calling 'activate' script indise the 'bin' directory of the virtual
+# environment
 cat<<END > ${HOME}/.scipyenrc
 scipyenvdir=${1}
 scipyact () {
@@ -45,11 +70,15 @@ source ${HOME}/.pyenv ${3}
 }
 END
 else
+# python DID find its own platform libraries, therefore we just source the 'activate'
+# script located inside the virtual environment 'bin' directory
+# NOTE: LD_LIBRARY_PATH export only needed when not invoking .pyenv
 cat<<END > ${HOME}/.scipyenrc
 scipyenvdir=${1}
 scipyact () {
 source ${1}/bin/activate
 }
+export LD_LIBRARY_PATH=${1}/lib:${1}/lib64:$LD_LIBRARY_PATH
 END
 fi
 else
@@ -148,7 +177,7 @@ fi
 
 }
 
-scipyenvdir=${1}
+scipyenvdir=`realpath ${1}`
 
 if [ -z ${scipyenvdir} ] ; then
 
@@ -169,60 +198,11 @@ get_python_data $scipyenvdir
 # echo pyver=$pyver
 
 # make_scipyenrc $scipyenvdir && update_bashrc && source ${HOME}/.bashrc
-make_scipyenrc_2 $scipyenvdir $pynstall $pyver && update_bashrc && source ${HOME}/.bashrc
+make_scipyenrc $scipyenvdir $pynstall $pyver && update_bashrc && source ${HOME}/.bashrc
 
-# exit
-
-# make $HOME/bin directory - in most Linux dsitributions, this should be in your
-# $PATH by default;
-# if it is not, then edit or create $HOME/.bashrc to contain
-# the following line (without the comment hash):
-# export PATH=$HOME/bin:$PATH
-# and re-start the terminal
-
-# # echo "Custom Python installation (leave empty if using distribution-provided Python):"
-# # read pynstall
-# # read -e -p "Custom Python installation (leave empty if not used): "
-# 
-# if [ ! -z $pynstall ] && [ -d $pynstall ] && [ -z $pyver ]; then 
-# echo "Enter major.minor version number for the custom Python (e.g. 3.9):"
-# read pyver
-# if [ -z $pyver ] ; then
-#     pyver=3.9
-# fi
-# echo "Configuring Scipyen to use Python ${pyver} in ${pynstall}"
-# 
-# echo "Creating ${HOME}/.scipyenrc"
-# cat<<END > ${HOME}/.scipyenrc
-# scipyenvdir=${scipyenvdir}
-# scipyact () {
-# source ${scipyenvdir}/bin/activate
-# source ${HOME}/bin/pyenv ${pyver}
-# }
-# END
-# 
-# else
-# echo "Using Python in the virtual environment in ${scipyenvdir}"
-# 
-# cat<<END > ${HOME}/.scipyenrc
-# scipyenvdir=${scipyenvdir}
-# scipyact () {
-# source ${scipyenvdir}/bin/activate
-# }
-# 
-# END
-# 
-# 
-# 
-# fi
 
 source ${HOME}/.scipyenrc
 
-# if [ -z ${VIRTUAL_ENV} ] ; then
-# echo "You must run this script while in a virtual python environment"
-# echo "in order to install other scripts"
-# exit 
-# fi
 
 link_scripts ${scipyenvdir} ${scipyendir}
 

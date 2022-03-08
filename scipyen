@@ -9,20 +9,17 @@ fi
 
 echo "Using Python environment in ${VIRTUAL_ENV}"
 echo ""
-echo "PYTHONHOME=$PYTHONHOME"
-echo "PYTHONPATH=$PYTHONPATH"
-echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+# echo "PYTHONHOME=$PYTHONHOME"
+# echo "PYTHONPATH=$PYTHONPATH"
+# echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 
 if [ -z $BROWSER ]; then
     if [ -a $VIRTUAL_ENV/bin/browser ]; then
         source $VIRTUAL_ENV/bin/browser
     fi
-#     if [ -a $scipyenvdir/bin/browser ]; then
-#         source $scipyenvdir/bin/browser
-#     fi
 fi
 
-export LD_LIBRARY_PATH=$VIRTUAL_ENV/lib:$VIRTUAL_ENV/lib64
+# export LD_LIBRARY_PATH=$VIRTUAL_ENV/lib:$VIRTUAL_ENV/lib64:$LD_LIBRARY_PATH
 
 # NOTE: 2021-02-04 18:00:07
 # On linux, override KDE or other DEs theming from overriding the resources 
@@ -34,8 +31,4 @@ if [ $0 == 0 ] ; then
     fi
 fi
 
-if [ ! `python3 $scipyendir/scipyen.py` ]; then
-deactivate
-fi
-
-# python3 -m cProfile -s 'cumtime' $scipyendir/scipyen.py > profile &
+python3 $scipyendir/scipyen.py
