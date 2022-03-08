@@ -55,6 +55,7 @@ import core.plots as plots
 import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.quantities import units_convertible
+import core.neoutils as neoutils
 #import core.triggerprotocols
 from core.triggerevent import (TriggerEvent, TriggerEventType)
 from core.triggerprotocols import (TriggerProtocol)
@@ -1021,6 +1022,13 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
     
     The signals are returned as a block where each Segment contains only the 
     Vm and Im analog signals.
+    
+    WARNING: Do NOT use for recordings that do not contain a useful injected 
+    current signal - either because it was not recorded or because the telegraph
+    and/or scaling information was messed up during the recording!.
+    In such cases, use neoutils.getABFProtocolEpochs to manually extract the 
+    parameters of the current injection steps i.e. Iinj_0, delta_I, Istart and 
+    Istop and pass those to analyse_AP_step_injection_series()
     
     Parameters:
     ------------
@@ -2630,7 +2638,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
             after = intervals.min()
             
         else:
-            if isinstance(iinj, tuple):
+            if isinstance(iinj, (tuple, list)):
                 after = iinj[1] - starts[0]
             else:
                 after = iinj.t_stop - starts[0]
@@ -5351,7 +5359,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
     ret["Cell"] = cellid
     ret["Source"] = sourceid
     ret["Age"] = age
-    ret["Post_natal"] = post_natal
+    ret["Post-natal"] = post_natal
     ret["Genotype"] = genotype
     ret["Sex"] = sex
     ret["Treatment"] = treatment
@@ -5840,7 +5848,7 @@ def lookup_injected_current_for_frequency(data, frequency, atol = 10, rtol = 0, 
     
     """
     
-    ret, index, sigvals = ephys.inverse_lookup(data, frequency, atol=atol, rtol=rtol, equal_nan=equal_nan)
+    ret, index, sigvals = neoutils.inverse_lookup(data, frequency, atol=atol, rtol=rtol, equal_nan=equal_nan)
     
     return ret, sigvals
 
@@ -5970,7 +5978,7 @@ def get_AP_frequency_vs_injected_current(data, isi=None, name=None, description=
         NOTE: returns np.nan if isi >= the number of inter-spike intervals
         
         When isi is a sequence of two int elements the function returns the 
-            average instantaneous frequency over the range of intevals specified 
+            average instantaneous frequency over the range of intervals specified 
             by the isi tuple.
             
             
@@ -5982,30 +5990,12 @@ def get_AP_frequency_vs_injected_current(data, isi=None, name=None, description=
         2) to get the instantaneous frequency averaged over the first three
         inter-spike intervals (see Gu et al, J. Physiol, 2007), pass
         
-        isi = (0,3) (NOTE that this willl average the instantaneous frequency
+        isi = (0,3) (NOTE that this will average the instantaneous frequency
             over inter-spike intervals 0, 1 and 2)
             
     
     """
     iinj = np.array([int(step["AP_analysis"]["Injected_current"]) for step in data["Depolarising_steps"]], dtype="float64")
-    
-    #i_start = int(iinj[0])
-    
-    #i_step = int(data["Delta_I_step"])
-    
-    #fl, int_val = math.modf(i_step/10)
-    
-    #if fl < 0.5:
-        #i_step = int(int_val*10)
-        
-    #else:
-        #i_step = int((int_val+1)*10)
-        
-    ##print("get_AP_frequency_vs_injected_current i_step", i_step)
-    
-    #i_max = i_start + i_step * (len(data["Depolarising_steps"])-1)
-    
-    #iinj_domain = np.linspace(i_start, i_max, num=len(data["Depolarising_steps"]))
     
     if isi is None:
         signal = np.array([step["AP_analysis"]["Mean_AP_Frequency"] for step in data["Depolarising_steps"]])
@@ -6059,9 +6049,6 @@ def get_AP_frequency_vs_injected_current(data, isi=None, name=None, description=
     else:
         raise TypeError("isi expected to be None, an int or a sequence of two int")
     
-    #result = IrregularlySampledDataSignal(domain=iinj_domain,
-                                                #signal=signal,
-                                                #units = pq.Hz, domain_units = pq.pA)
     result = IrregularlySampledDataSignal(domain=iinj,
                                                 signal=signal,
                                                 units = pq.Hz, domain_units = pq.pA)
@@ -6073,7 +6060,7 @@ def get_AP_frequency_vs_injected_current(data, isi=None, name=None, description=
     return result
 
 def get_AP_params_in_series(data, 
-                            parameter="duration", 
+                            parameter, 
                             normalize_to_first_spike=False, 
                             independent_variable="iinj", 
                             minaps = 5,
@@ -6081,19 +6068,17 @@ def get_AP_params_in_series(data,
     """Extract AP parameters from analyse_AP_step_injection_series result.
     Useful to collect parameters that change with firing frequency and/or injected current.
     
-    Function parameters:
-    ====================
+    Positional parameters:
+    ======================
     data: dict; the return of analyse_AP_step_injection_series(...)
     
         WARNING: no checks are performed against the contents of 'data'; if 'data'
         is not what is expected to be, the function will raise an Exception.
-    
-    Named function parameters:
-    =========================
-    
+        
     parameter: str, case-insensitive; the AP parameter that is extracted from data.
-        Acceptable values are:
-        "duration"  = AP duration at reference Vm (by default this is measured at -15 mV)
+        Acceptable values are the keys in the data/Depolarising_steps/AP_analysis 
+        nested dictionary, or one of the following 'aliases':
+        
         "amplitude" = peak amplitude
         "whm"       = AP duration at half-max
         "maxrise"   = AP max dV/dt
@@ -6101,9 +6086,9 @@ def get_AP_params_in_series(data,
         "isi"       = AP ISI
         "ifreq"     = AP instantaneous frequency (1/ISI)
         "freq"      = mean discharge frequency
-        
-        Default is "duration"
-        
+    
+    Named parameters:
+    =================
     normalize_to_first_spike: bool, default is False
         When True, the values are normalized to those of the first AP in the train
         except for the "freq".
