@@ -3261,7 +3261,7 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
                              atol = 1e-8):
     """Detects AP waveform time starts in an AP train elicited by step depolarizing current injection.
     
-    Detection is done primarily via thresholding on the st derivative of the Vm signal
+    Detection is done primarily via thresholding on the 1st derivative of the Vm signal
     
     Parameters:
     ===========

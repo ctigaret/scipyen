@@ -3403,7 +3403,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if ret == QtWidgets.QMessageBox.No:
             return
         
-        print(f"***\nScipyenWindow.slot_deleteSelectedVars varNames = {varNames}")
+        #print(f"***\nScipyenWindow.slot_deleteSelectedVars varNames = {varNames}")
         
         for n in varNames:
             obj = self.workspace[n]
