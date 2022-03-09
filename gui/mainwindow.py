@@ -2706,7 +2706,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
         """
         if isinstance(value, str) and by_name:
-            print(f"---\nScipyenWindow.removeFromWorkspace {value}")
+            #print(f"---\nScipyenWindow.removeFromWorkspace {value}")
             self.workspace.pop(value, None)
             
         else:
@@ -3417,12 +3417,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     #obj.closeEvent(QtGui.QCloseEvent())
                 self.deRegisterViewer(obj) # does not remove its symbol for workspace - this has already been removed by delete action
                 
-            self.removeFromWorkspace(n, by_name=True, update=True)
+            #self.removeFromWorkspace(n, by_name=True, update=True)
+            self.removeFromWorkspace(n, by_name=True, update=False)
             #self.workspace.pop(n, None)
             
         self.workspaceModel.currentItem = None
         
-        #self.workspaceModel.update()
+        self.workspaceModel.update()
         
     @pyqtSlot(bool)
     @safeWrapper

@@ -756,7 +756,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
         row = self.rowIndexForItemsWithProps(Name=dataname, Workspace=ns)
         
-        print("WorkspaceModel.removeRowForVariable data: %s ns: %s row: %s" % (dataname, ns, row))
+        #print("WorkspaceModel.removeRowForVariable data: %s ns: %s row: %s" % (dataname, ns, row))
         if row == -1:
             return
         
@@ -794,10 +794,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.observed_vars (via pre_execute and post_execute).
         """
         
-        print(f"WorkspaceModel.update observed_vars: {list(self.observed_vars.keys())}")
+        #print(f"WorkspaceModel.update observed_vars: {list(self.observed_vars.keys())}")
         del_vars = [name for name in self.observed_vars.keys() if name not in self.shell.user_ns.keys()]
 
-        print(f"WorkspaceModel.update del_vars = {del_vars}")
+        #print(f"WorkspaceModel.update del_vars = {del_vars}")
         for name in del_vars:
             self.removeRowForVariable(name)
 
