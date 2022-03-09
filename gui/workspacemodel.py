@@ -747,7 +747,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 self.setItem(rowindex, col, newrowdata[col])
 
     def removeRowForVariable(self, dataname, ns=None):
-        
         if isinstance(ns, str):
             if len(ns.strip()) == 0:
                 ns = "Internal"
@@ -757,10 +756,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
         row = self.rowIndexForItemsWithProps(Name=dataname, Workspace=ns)
         
+        print("WorkspaceModel.removeRowForVariable data: %s ns: %s row: %s" % (dataname, ns, row))
         if row == -1:
             return
         
-        #print("removeRowForVariable data: %s ns: %s row: %s" % (dataname, ns, row))
         
         if isinstance(row, list):
             for r in row:
@@ -787,16 +786,18 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
     def update(self, from_console:bool = False, force:bool=False):
         """Updates workspace model.
-        Must be called by code that adds/remove/mofifies or renames variables 
-        in the ScipyenWindow.workspace namespace in order to update the
-        workspace viewer.
+        Must be called by code that adds/remove/modifies/renames variables 
+        in the Scipyen's namespace in order to update the workspace viewer.
         
         Code executed in the main Scipyen's console does not (and SHOULD NOT)
         call this function, as the model is updated automatically by 
         self.observed_vars (via pre_execute and post_execute).
         """
+        
+        print(f"WorkspaceModel.update observed_vars: {list(self.observed_vars.keys())}")
         del_vars = [name for name in self.observed_vars.keys() if name not in self.shell.user_ns.keys()]
 
+        print(f"WorkspaceModel.update del_vars = {del_vars}")
         for name in del_vars:
             self.removeRowForVariable(name)
 

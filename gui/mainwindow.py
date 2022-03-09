@@ -2705,11 +2705,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             expensive updates of the workspace viewer after each variable.
             
         """
-        #print("ScipyenWindow.removeFromWorkspace", value)
         if isinstance(value, str) and by_name:
+            print(f"---\nScipyenWindow.removeFromWorkspace {value}")
             self.workspace.pop(value, None)
-            
-            #self.workspaceModel.update()
             
         else:
             # inverse lookup the key mapped to this value - will remove ALL
@@ -2719,8 +2717,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 for o in objects:
                     self.workspace.pop(o[0], None)
                     
-            #self.workspaceModel.update()
-            
         if update:
             self.workspaceModel.update()
         
@@ -3407,6 +3403,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if ret == QtWidgets.QMessageBox.No:
             return
         
+        print(f"***\nScipyenWindow.slot_deleteSelectedVars varNames = {varNames}")
+        
         for n in varNames:
             obj = self.workspace[n]
             if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
@@ -3419,12 +3417,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     #obj.closeEvent(QtGui.QCloseEvent())
                 self.deRegisterViewer(obj) # does not remove its symbol for workspace - this has already been removed by delete action
                 
-            self.removeFromWorkspace(n, by_name=True, update=False)
+            self.removeFromWorkspace(n, by_name=True, update=True)
             #self.workspace.pop(n, None)
             
         self.workspaceModel.currentItem = None
         
-        self.workspaceModel.update()
+        #self.workspaceModel.update()
         
     @pyqtSlot(bool)
     @safeWrapper
@@ -6212,9 +6210,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if isinstance(win, mpl.figure.Figure):
             plt.figure(win.number)
             plt.plot(obj)
+            if isinstance(win.canvas, QtWidgets.QWidget):
+                win.canvas.activateWindow()
            
         else:
             win.setData(obj, doc_title=objname) # , varname=objname)
+            win.activateWindow()
     
         return True
             
