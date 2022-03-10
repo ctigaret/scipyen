@@ -154,3 +154,14 @@ class ScipyenMagics(Magics):
             lscatWindow.show()
             
         #return line
+
+    @line_magic
+    @needs_local_scope
+    def clear(self, line, local_ns):
+        """Overrides zmq interactive shell 'clear' line magic
+        This is because in Scipyen with Python 3.10 'clear' clears the system 
+        console, NOT Scipyen's console.
+        """
+        console = local_ns.get("console", None)
+        if console.__class__.__name__ == 'ScipyenConsole':
+            console.centralWidget().clear()

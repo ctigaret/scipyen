@@ -181,6 +181,8 @@ class ScipyenInProcessKernel(InProcessKernel):
         self.io_loop.call_later(0.001, advance_eventloop)
     AttributeError: 'InProcessKernel' object has no attribute 'io_loop'
     
+    See also https://github.com/ipython/ipykernel/issues/319
+    
     (NOTE: This DOES NOT crash the kernel):
     ERROR:tornado.application:Exception in callback 
     functools.partial(<bound method Kernel.enter_eventloop of <ipykernel.inprocess.ipkernel.InProcessKernel object at 0x7f0b6abe5730>>)
@@ -189,8 +191,9 @@ class ScipyenInProcessKernel(InProcessKernel):
     "stays put".
     
     NOTE: 2022-03-05 16:36:35
-    In addition, this also overrides execute_request to await for the _abort_queues
-    instead of calling them direcrlt, see NOTE: 2022-03-05 16:04:03 below.
+    In addition, ScipyenInProcessKernel also overrides execute_request to await 
+    for the _abort_queues instead of calling them directly, see below, at
+    NOTE: 2022-03-05 16:04:03
     
     (It is funny that this happens in Scipyen, because this warning does not
     appear in jupyter qtconsole launched in the same virtual Python environment
@@ -271,7 +274,7 @@ class ScipyenInProcessKernel(InProcessKernel):
             await self._abort_queues() 
 
 class ScipyenInProcessKernelManager(QtInProcessKernelManager):
-    """Starts our own custom InProcessKernel (ScipyenInProcessKernel)
+    """Starts our own custom ScipyenInProcessKernel
     
     Workaround for a bug (?) in InProcessKernel API.
     
@@ -294,7 +297,16 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self.available_colors = ("nocolor", "linux", "lightbg")
         self.scrollbar_positions = Bunch({QtCore.Qt.LeftToRight: "right",
                                            QtCore.Qt.RightToLeft: "left"})
+        self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_X), self)
+        
+        self.clear_shortcut.activated.connect(self.slot_clearConsole)
+
         ScipyenConfigurable.__init__(self)
+        
+    @safeWrapper
+    def slot_clearConsole(self):
+        self.clear()
+        #self.ipkernel.shell.run_line_magic("clear", "", 2)
         
     @property
     def scrollBarPosition(self):
@@ -2961,9 +2973,10 @@ class ScipyenConsoleWidget(ConsoleWidget):
         
         self.defaultFixedFont = defaultFixedFont
         
-        self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_X), self)
+        #self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_X), self)
         
-        self.clear_shortcut.activated.connect(self.slot_clearConsole)
+        #self.clear_shortcut.activated.connect(self.slot_clearConsole)
+
         
         # NOTE: 2021-07-18 10:17:26 - FIXME bug or feature?
         # the line below won't have effect unless the RichJupyterWidget is visible
@@ -3199,9 +3212,6 @@ class ScipyenConsoleWidget(ConsoleWidget):
         elif isinstance(text, (tuple, list) and all([isinstance(s, str) for s in text])):
             self.__write_text_in_console_buffer__("\n".join(text))
         
-    @safeWrapper
-    def slot_clearConsole(self):
-        self.ipkernel.shell.run_line_magic("clear", "", 2)
         
     def set_pygment(self, scheme:typing.Optional[str]="", 
                     colors:typing.Optional[str]=None):
