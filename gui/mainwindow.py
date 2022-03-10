@@ -2555,7 +2555,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # self.slot_updateWorkspaceView(); in turn this will sort column 0
         # and resize its contents. 
         # This is because workspaceModel doesn't "know" anything about workspaceView.
-        self.workspaceModel.update() # emits WorkspaceModel.modelContentsChanged
+        self.workspaceModel.update() # emits WorkspaceModel.modelContentsChanged via var_observer
         
     @pyqtSlot()
     def slot_updateCwd(self):

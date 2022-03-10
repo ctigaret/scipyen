@@ -11,7 +11,8 @@ from traitlets.utils.importstring import import_item
 from core import quantities as cq
 from core.triggerprotocols import TriggerProtocol
 from core.quantities import units_convertible
-from core.prog import (ArgumentError, OneOf, DescriptorTypeValidator, DescriptorGenericValidator,
+from core.prog import (ArgumentError, OneOf, 
+                       DescriptorTypeValidator, DescriptorGenericValidator,
                        AttributeAdapter, get_descriptors, get_properties,
                        parse_descriptor_specification, WithDescriptors,
                        setup_descriptor)

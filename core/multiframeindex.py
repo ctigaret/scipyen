@@ -22,6 +22,8 @@ class IndexProxy(object):
     in the 'map' attribute (a DataFrame) of the owner of this proxy, with 
     the owner being an instance of FrameIndexLookup.
     
+    Implements the descriptor protocol.
+    
     """
     
     def __init__(self, field:str):

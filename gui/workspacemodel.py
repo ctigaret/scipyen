@@ -797,16 +797,21 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #print(f"WorkspaceModel.update observed_vars: {list(self.observed_vars.keys())}")
         del_vars = [name for name in self.observed_vars.keys() if name not in self.shell.user_ns.keys()]
 
-        #print(f"WorkspaceModel.update del_vars = {del_vars}")
-        for name in del_vars:
-            self.removeRowForVariable(name)
-
         self.observed_vars.remove_members(*del_vars)
         
         current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         
         self.observed_vars.update(current_vars)
         
+        #print(f"WorkspaceModel.update del_vars = {del_vars}")
+        
+        obsolete_displayed_vars = [n for n in self.getDisplayedVariableNames() if n not in self.shell.user_ns.keys()] # in the internal ws
+        
+        names_to_remove = set(del_vars) | set(obsolete_displayed_vars)
+        
+        for name in names_to_remove:
+            self.removeRowForVariable(name)
+
     def updateFromExternal(self, prop_dicts):
         """prop_dicts: {name: nested properties dict}
             nested properties dict: {property: {"display": str, "tooltip":str}}
@@ -1058,9 +1063,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def getDisplayedVariableNames(self, asStrings=True, ws="Internal"):
         '''Returns names of variables in the internal workspace, registered with the model.
 
-        Parameter: strings (boolean, optional, default True) variable names are 
-                            returned as (a Python list of) strings, otherwise 
-                            they are returned as Python list of QStandardItems
+        Parameter: asStrings (boolean, optional, default True) variable names 
+                    are returned as (a Python list of) strings, otherwise 
+                    they are returned as Python list of QStandardItems
         '''
         wscol = standard_obj_summary_headers.index("Workspace")
         ret = [self.item(row).text() if asStrings else self.item(row) for row in range(self.rowCount()) if self.item(row, wscol).text() == ws]
