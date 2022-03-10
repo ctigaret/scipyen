@@ -297,7 +297,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self.available_colors = ("nocolor", "linux", "lightbg")
         self.scrollbar_positions = Bunch({QtCore.Qt.LeftToRight: "right",
                                            QtCore.Qt.RightToLeft: "left"})
-        self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_X), self)
+        self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_K), self)
         
         self.clear_shortcut.activated.connect(self.slot_clearConsole)
 
