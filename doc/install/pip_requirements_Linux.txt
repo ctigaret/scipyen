@@ -58,7 +58,6 @@ scikit-image
 octave_kernel
 gnuplot_kernel
 matlab_kernel
-# tables # NOTE as of 2021-10-12 11:59:52 must compile from source if using Python >= 3.9.7
 cython
 bokeh
 pytest
@@ -82,3 +81,5 @@ nbconvert
 recommonmark
 plotnine
 plotly
+# NOTE as of 2021-10-12 11:59:52 might have to compile from source if using Python >= 3.9.7
+tables 
