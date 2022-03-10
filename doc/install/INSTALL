@@ -375,7 +375,7 @@ For each of these, cd into their source tree and run:
     python configure.py --confirm-license --qmake=`which qmake-qt5` --designer-plugindir=$VIRTUAL_ENV/lib/qt5/plugins/designer --qml-plugindir=$VIRTUAL_ENV/lib/qt5/plugins/PyQt5 --qsci-api-destdir=$VIRTUAL_ENV/share/qt5 --no-python-dbus --sip=$VIRTUAL_ENV/bin/sip5 > config_output 2>&1
     
     NOTE: configuration output will be redirected to the file config_output
-    NOTE: if in trouble at this stage, alsp pass --verbose option to configure.py
+    NOTE: if in trouble at this stage, also pass --verbose option to configure.py
     
     make 
     make install
@@ -538,6 +538,12 @@ cmake-gui ../vigra
 This is REQUIRED if you are using a built Python stack (see above), but might be
 helpful when using a virtual environment created with a system-wide python stack.
 
+To install a binary package run
+
+    pip install tables
+    
+otherwise, read on.
+
 NOTE: PyTables are available as 'tables'; to use you must 'import tables'
 gh repo clone PyTables/PyTables
 (or: git clone https://github.com/PyTables/PyTables.git)
@@ -573,7 +579,7 @@ cmake-gui ../nrn
 "Configure" will also pull iv, coreneuron
 
 Example (as of 2022-02-16 12:25:17 on Tumbleweed 20220213) 
-    NOTE: SOME OF THESE MAY NOT BE AVAILABLE IN RECENT NEURON git snapshots!!!
+    NOTE: SOME OF THESE MAY ONLY BE AVAILABLE AFTER SELECTING CORENEURON
         LIBEXECINSTALLDIR=$VIRTUAL_ENV/libexec
         PKGCONFIG_FILES_DIR=$VIRTUAL_ENV/lib64/pkgconfig
         PLUGIN_INSTALL_DIR=$VIRUTAL_ENV/lib64/mod2c
@@ -603,6 +609,7 @@ Example (as of 2022-02-16 12:25:17 on Tumbleweed 20220213)
         LIB_INSTALL_DIR=$VIRTUAL_ENV/lib64
         LIB_SUFFIX=64
         
+    IV
         IV_ENABLE_SHARED=true
         IV_ENABLE_X11_DYNAMIC=false # NOTE: 2022-02-16 12:50:18 setting to True prevents the GUI from showing!
         MOD2C_ENABLE_LEGACY_UNITS=false
@@ -637,7 +644,7 @@ Example (as of 2022-02-16 12:25:17 on Tumbleweed 20220213)
         make docs 
         
             (NOTE conversion of some jupyter notebooks this may fail --> 
-             until this is solved, use the online documentation)
+             until this is solved, please use the online documentation)
     
         Optionally, copy/move (or, better make a symbolic link) 
         $VIRTUAL_ENV/src/nrn/docs/_build to $VIRTUAL_ENV/doc/neuron
