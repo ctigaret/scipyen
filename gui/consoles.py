@@ -220,58 +220,59 @@ class ScipyenInProcessKernel(InProcessKernel):
         
         """
 
-        try:
-            content = parent['content']
-            code = content['code']
-            silent = content['silent']
-            store_history = content.get('store_history', not silent)
-            user_expressions = content.get('user_expressions', {})
-            allow_stdin = content.get('allow_stdin', False)
-        except Exception:
-            self.log.error("Got bad msg: ")
-            self.log.error("%s", parent)
-            return
+        with self._redirected_io(): # NOTE: 2022-03-14 22:12:02 this is ESSENTIAL!!!
+            try:
+                content = parent['content']
+                code = content['code']
+                silent = content['silent']
+                store_history = content.get('store_history', not silent)
+                user_expressions = content.get('user_expressions', {})
+                allow_stdin = content.get('allow_stdin', False)
+            except Exception:
+                self.log.error("Got bad msg: ")
+                self.log.error("%s", parent)
+                return
 
-        stop_on_error = content.get('stop_on_error', True)
+            stop_on_error = content.get('stop_on_error', True)
 
-        metadata = self.init_metadata(parent)
+            metadata = self.init_metadata(parent)
 
-        # Re-broadcast our input for the benefit of listening clients, and
-        # start computing output
-        if not silent:
-            self.execution_count += 1
-            self._publish_execute_input(code, parent, self.execution_count)
+            # Re-broadcast our input for the benefit of listening clients, and
+            # start computing output
+            if not silent:
+                self.execution_count += 1
+                self._publish_execute_input(code, parent, self.execution_count)
 
-        reply_content = self.do_execute(
-            code, silent, store_history,
-            user_expressions, allow_stdin,
-        )
-        if inspect.isawaitable(reply_content):
-            reply_content = await reply_content
+            reply_content = self.do_execute(
+                code, silent, store_history,
+                user_expressions, allow_stdin,
+            )
+            if inspect.isawaitable(reply_content):
+                reply_content = await reply_content
 
-        # Flush output before sending the reply.
-        sys.stdout.flush()
-        sys.stderr.flush()
-        # FIXME: on rare occasions, the flush doesn't seem to make it to the
-        # clients... This seems to mitigate the problem, but we definitely need
-        # to better understand what's going on.
-        if self._execute_sleep:
-            time.sleep(self._execute_sleep)
+            # Flush output before sending the reply.
+            sys.stdout.flush()
+            sys.stderr.flush()
+            # FIXME: on rare occasions, the flush doesn't seem to make it to the
+            # clients... This seems to mitigate the problem, but we definitely need
+            # to better understand what's going on.
+            if self._execute_sleep:
+                time.sleep(self._execute_sleep)
 
-        # Send the reply.
-        reply_content = json_clean(reply_content)
-        metadata = self.finish_metadata(parent, metadata, reply_content)
+            # Send the reply.
+            reply_content = json_clean(reply_content)
+            metadata = self.finish_metadata(parent, metadata, reply_content)
 
-        reply_msg = self.session.send(stream, 'execute_reply',
-                                      reply_content, parent, metadata=metadata,
-                                      ident=ident)
+            reply_msg = self.session.send(stream, 'execute_reply',
+                                        reply_content, parent, metadata=metadata,
+                                        ident=ident)
 
-        self.log.debug("%s", reply_msg)
+            self.log.debug("%s", reply_msg)
 
-        if not silent and reply_msg['content']['status'] == 'error' and stop_on_error:
-            # NOTE: 2022-03-05 16:04:10 
-            # this apparently fixes the issue at NOTE: 2022-03-05 16:04:03
-            await self._abort_queues() 
+            if not silent and reply_msg['content']['status'] == 'error' and stop_on_error:
+                # NOTE: 2022-03-05 16:04:10 
+                # this apparently fixes the issue at NOTE: 2022-03-05 16:04:03
+                await self._abort_queues() 
 
 class ScipyenInProcessKernelManager(QtInProcessKernelManager):
     """Starts our own custom ScipyenInProcessKernel
@@ -303,6 +304,24 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
 
         ScipyenConfigurable.__init__(self)
         
+    def _flush_pending_stream(self):
+        """ Flush out pending text into the widget.
+        NOTE: 2022-03-14 21:47:39 CMT
+        Fixes crashes with long list display until the qtconsole 5.3.0 comes to
+        life
+        """
+        text = self._pending_insert_text
+        self._pending_insert_text = []
+        buffer_size = self._control.document().maximumBlockCount()
+        if buffer_size > 0:
+            text = self._get_last_lines_from_list(text, buffer_size)
+        text = ''.join(text)
+        t = time.time()
+        self._insert_plain_text(self._get_end_cursor(), text, flush=True)
+        # Set the flush interval to equal the maximum time to update text.
+        self._pending_text_flush_interval.setInterval(max(100,
+                                                 int(time.time()-t)*1000)) # see NOTE: 2022-03-14 21:47:39 CMT
+
     @safeWrapper
     def slot_clearConsole(self):
         self.clear()
@@ -3373,6 +3392,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.consoleWidget.pythonFileReceived.connect(self.pythonFileReceived)
         self.consoleWidget.executed.connect(self.executed)
         self.consoleWidget.loadSettings() # inherited from ScipyenConfigurable
+        self.widget = self.consoleWidget
         self.active_frontend = self.consoleWidget
         WorkspaceGuiMixin.__init__(self, parent=parent)
         self._configureUI_()
