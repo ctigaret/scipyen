@@ -3358,6 +3358,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             #QtWidgets.QApplication.restoreOverrideCursor()
             self.unsetCursor()
             
+    def _workspaceItem_to_varName(self, index:QtCore.QModelIndex):
+        v = self.workspaceModel.item(index.row(), 0).text()
+        
+        return v if v in self.workspace.keys() else None
+            
     @pyqtSlot()
     @safeWrapper
     def slot_deleteSelectedVars(self):
@@ -3373,12 +3378,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         varNames = list()
         
-        varSet = set()
+        varSet = set((self._workspaceItem_to_varName(i) for i in indexList))
         
-        for i in indexList:
-            varSet.add(self.workspaceModel.item(i.row(),0).text())
+        #for i in indexList:
+            #varSet.add(self.workspaceModel.item(i.row(),0).text())
             
-        varNames = [v for v in sorted(unique([n for n in varSet])) if v in self.workspace.keys()]
+        varNames = sorted(varSet)# Python 3.8+ facility? NOTE 2022-03-14 16:52:48 in Python3.10 sets are sorted already?
+        #varNames = [v for v in sorted([n for n in varSet]) if v in self.workspace.keys()]
+        #varNames = [v for v in sorted(unique([n for n in varSet])) if v in self.workspace.keys()]
             
         msgBox = QtWidgets.QMessageBox()
         
@@ -3387,7 +3394,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             wintitle = "Delete variable"
             
         else:
-            prompt = "Delete %d selected variables?" % len(indexList)
+            prompt = "Delete %d selected variables?" % len(varSet)
             wintitle = "Delete variables"
             msgBox.setDetailedText("\n".join(varNames))
             

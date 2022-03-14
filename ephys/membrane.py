@@ -3258,7 +3258,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
 def detect_AP_waveform_times(sig, thr=10, smooth_window=5, 
                              min_ap_isi= 6e-3*pq.s, 
                              min_fast_rise_duration=None, 
-                             atol = 1e-8):
+                             atol = 1e-8, vm_thr=0):
     """Detects AP waveform time starts in an AP train elicited by step depolarizing current injection.
     
     Detection is done primarily via thresholding on the 1st derivative of the Vm signal
@@ -3355,7 +3355,8 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
                                                                             dv_dt_smooth,
                                                                             d2v_dt2_smooth,
                                                                             thr, min_ap_isi,
-                                                                            atol=atol)
+                                                                            atol=atol,
+                                                                            vm_thr=vm_thr)
     
     if ap_fast_rise_start_times is None:
         ap_fast_rise_durations = None
@@ -5065,6 +5066,14 @@ def analyse_AP_step_injection_series(data, **kwargs):
     get_duration_at_Vm: also get AP waveform duration at specified Vm,
         (in addition to Vhal-max and V0)
             default: -15 mV
+            
+    vm_thr: scalar, optional (default is 0) - discard Vm events that do not cross
+        this value, see detect_AP_rises
+        
+        This parameter prevents the fast passive rising phase of the Vm at the
+        start of current injection from being flagged as an AP (and similarly, 
+        for other fast-rising events)
+        
 
     NOTE: See analyse_AP_step_injection() documentation for details
     
@@ -7517,6 +7526,23 @@ def analyse_AP_step_injection(segment,
     decay_ref: str, one of "hm" or "zero", or floating point scalar
         Which Vm value should be used to approximate the end of the decay phase
         when using the "linear" approximation method (see above)
+        
+    Passed to detect_AP_rises
+    -------------------------
+    vm_thr: scalar: putative events (APs) that do not cross this threshold will be 
+                discarded (optional, default is 0)
+                
+                This parameter prevents flagging the passive rising phase of the Vm
+                at the start of the current injection as being an AP.
+            
+                It will also result in no AP waveforms being detected in poor 
+                recordings (e.g., where the APs do not seem to cross the 0 mV 
+                likely due to bad & leaky current clamp).
+                
+    
+    rtol, atol, return_all → see detect_AP_rises
+            
+    
         
     Returns:
     -------
