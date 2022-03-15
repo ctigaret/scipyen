@@ -673,7 +673,10 @@ class WindowManager(__QMainWindow__):
         if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             return
         
-        w_title = win.get_window_title() if isinstance(win, mpl.figure.Figure) else win.windowTitle()
+        # NOTE: 2022-03-15 11:28:09
+        # get_window_title is NOT a method of mpl Figue, but a DEPRECATED one
+        # of its canvas (backend)
+        #w_title = win.get_window_title() if isinstance(win, mpl.figure.Figure) else win.windowTitle()
         
         #print("WindowManager.deRegisterViewer %s %s" % (win.__class__, w_title))
         
@@ -5854,13 +5857,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self._run_python_source_code_(self._temp_python_filename_, paste=False)
 
             if self._temp_python_filename_ not in self.recentScripts:
-                self.recentScripts.appendleft(self._temp_python_filename_)
+                self.recentScripts.insert(0,self._temp_python_filename_)
+                #self.recentScripts.appendleft(self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
                 
             else:
                 if self._temp_python_filename_ != self.recentScripts[0]:
                     self.recentScripts.remove(self._temp_python_filename_)
-                    self.recentScripts.appendleft(self._temp_python_filename_)
+                    self.recentScripts.insert(0,self._temp_python_filename_)
+                    #self.recentScripts.appendleft(self._temp_python_filename_)
                     #self._refreshRecentScriptsMenu_()
                     
             self._temp_python_filename_ = None
@@ -6231,7 +6236,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 ylabel = f"{name} ({obj.units.dimensionality.string})"
                 plt.xlabel(xlabel)
                 plt.ylabel(ylabel)
-            else:
+                if isinstance(objname, str) and len(objname.strip()):
+                    plt.title(objname)
+                else:
                 plt.plot(obj)
             if isinstance(win.canvas, QtWidgets.QWidget):
                 win.canvas.activateWindow()
