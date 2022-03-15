@@ -729,6 +729,8 @@ class WindowManager(__QMainWindow__):
         if isinstance(obj, mpl.figure.Figure):
             plt.figure(obj.number)
             plt.get_current_fig_manager().canvas.activateWindow() # steals focus!
+            plt.get_current_fig_manager().canvas.update()
+            plt.get_current_fig_manager().canvas.draw_idle()
             obj.show() # steals focus!
             
         else:
@@ -749,6 +751,8 @@ class WindowManager(__QMainWindow__):
             self.viewers[type(obj)].append(obj)
 
         self.currentViewers[type(obj)] = obj
+        
+        #self._raiseCurrentWindow(obj) # circular call!
             
         if isinstance(obj, mpl.figure.Figure):
             plt.figure(obj.number)
@@ -6238,8 +6242,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 plt.ylabel(ylabel)
                 if isinstance(objname, str) and len(objname.strip()):
                     plt.title(objname)
-                else:
+            else:
                 plt.plot(obj)
+                
             if isinstance(win.canvas, QtWidgets.QWidget):
                 win.canvas.activateWindow()
            
