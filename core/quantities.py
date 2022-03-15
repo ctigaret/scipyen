@@ -449,11 +449,11 @@ def conversion_factor(x:pq.Quantity, y:pq.Quantity):
     else:
         return 1.0
     
-def symbol_from_quantity(q):
-    """Symbols of the physical quantity (NOT Python quantity symbol)
-    """
-    if not isinstance(q, pq.Quantity):
-        raise TypeError(f"Expecting a python Quantity; got {type(q).__name__} instead")
+#def symbol_from_quantity(q):
+    #"""Symbols of the physical quantity (NOT Python quantity symbol)
+    #"""
+    #if not isinstance(q, pq.Quantity):
+        #raise TypeError(f"Expecting a python Quantity; got {type(q).__name__} instead")
     
     
 

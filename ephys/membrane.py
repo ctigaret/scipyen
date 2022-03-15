@@ -2808,7 +2808,9 @@ def extract_pulse_triggered_APs(sig, times, tail = None):
     
     return waves
 
-def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, rtol = 1e-5, atol = 1e-8, return_all=False):
+def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, 
+                    vm_thr=0, rtol = 1e-5, atol = 1e-8, 
+                    return_all=False):
     # NOTE: 2019-11-29 16:49:14
     # use a Vm threshold to discard "aberrant" events
     
@@ -3258,7 +3260,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
 def detect_AP_waveform_times(sig, thr=10, smooth_window=5, 
                              min_ap_isi= 6e-3*pq.s, 
                              min_fast_rise_duration=None, 
-                             atol = 1e-8, vm_thr=0):
+                             rtol=1e-5, atol = 1e-8, vm_thr=0):
     """Detects AP waveform time starts in an AP train elicited by step depolarizing current injection.
     
     Detection is done primarily via thresholding on the 1st derivative of the Vm signal
@@ -3397,7 +3399,8 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
                         decay_intercept_approx = "linear",
                         decay_ref = "hm",
                         get_duration_at_Vm=None,
-                        return_all = False):
+                        return_all = False,
+                        vm_thr=0):
     """Detects action potentials in a Vm signal.
     For use with depolarizing step current injection experiments.
     
@@ -3778,7 +3781,9 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
             thr=thr, 
             smooth_window=smooth_window,
             min_ap_isi=min_ap_isi,
-            min_fast_rise_duration=min_fast_rise_duration)
+            min_fast_rise_duration=min_fast_rise_duration,
+            rtol=rtol, atol=atol,
+            vm_thr=vm_thr)
 
     # ### END detect APs by thresholding
     

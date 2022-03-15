@@ -752,7 +752,11 @@ class WindowManager(__QMainWindow__):
             #plt.get_current_fig_manager().canvas.activateWindow() # steals focus!
             plt.get_current_fig_manager().canvas.update()
             plt.get_current_fig_manager().canvas.draw_idle()
-            #obj.show() # steals focus!
+            if isinstance(obj.canvas, QtWidgets.QWidget):
+                obj.canvas.activateWindow()
+                obj.canvas.raise_()
+                obj.canvas.setVisible(True)
+            obj.show() # steals focus!
             
         else:
             obj.activateWindow()
@@ -3417,7 +3421,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
                 #print("%s.slot_deleteSelectedVars %s: %s" % (self.__class__.__name__, n, obj.__class__.__name__))
                 if isinstance(obj, mpl.figure.Figure):
-                    plt.close(obj)
+                    plt.close(obj) # also removes obj.number from plt.get_fignums()
                     
                 else:
                     obj.close()
@@ -6217,7 +6221,18 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         if isinstance(win, mpl.figure.Figure):
             plt.figure(win.number)
-            plt.plot(obj)
+            if isinstance(obj, neo.core.basesignal.BaseSignal) and hasattr(obj, "times"):
+                plt.plot(obj.times, obj)
+                times_units_str = obj.times.units.dimensionality.string
+                xlabel = "" if times_units_str == "dimensionless" else f"{cq.name_from_unit(obj.times.units)} ({obj.times.units.dimensionality.string})"
+                name = obj.name
+                if name is None or len(name.strip()) == 0:
+                    name = cq.name_from_unit(obj.units.dimensionality.string)
+                ylabel = f"{name} ({obj.units.dimensionality.string})"
+                plt.xlabel(xlabel)
+                plt.ylabel(ylabel)
+            else:
+                plt.plot(obj)
             if isinstance(win.canvas, QtWidgets.QWidget):
                 win.canvas.activateWindow()
            
