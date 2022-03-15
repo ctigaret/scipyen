@@ -57,7 +57,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     '''
     modelContentsChanged = pyqtSignal(name = "modelContentsChanged")
     
-    def __init__(self, shell, user_ns_hidden=dict(), parent=None):
+    def __init__(self, shell, user_ns_hidden=dict(), parent=None,
+                 mpl_figure_close_callback=None,
+                 mpl_figure_click_callback=None,
+                 mpl_figure_enter_callback=None):
         super(WorkspaceModel, self).__init__(parent)
         
         self.shell = shell # reference to IPython InteractiveShell of the internal console
@@ -100,6 +103,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.foreign_namespaces = DataBag(allow_none=True, mutable_types=True)
         # FIXME: 2021-08-19 21:45:17
         #self.foreign_namespaces.observe(self._foreign_namespaces_count_changed_, names="length")
+        
+        self.mpl_figure_close_callback = mpl_figure_close_callback
+        self.mpl_figure_click_callback = mpl_figure_click_callback
+        self.mpl_figure_enter_callback = mpl_figure_enter_callback
             
     def _foreign_namespaces_count_changed_(self, change):
         # FIXME / TODO 2020-07-30 23:49:13
@@ -564,8 +571,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return True
     
     def var_observer(self, change):
+        #print(f"WorkspaceModel.var_observer: change {change}")
         name = change.name
-        #generic_change_handler(change, "name") # for debugging
         displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
         
         if name in self.shell.user_ns:
@@ -583,18 +590,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # ones like the ones used by ipython internally)
         self.cached_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         
-        # check if there is a mpl Figure created in the console (but NOT bound to
-        # a user-available identifier)
-        
-        uscorevar = self.shell.user_ns.get("_", None)
-        
-        if isinstance(uscorevar, mpl.Figure):
-            if uscorevar not in self._cached_vars.values():
-                num = uscorevar.number
-                assert num in plt.get_fignums()
-                
-            
-        
 
         # need to withhold notifications here
         with self.observed_vars.hold_trait_notifications():
@@ -603,6 +598,32 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             self.observed_vars.update(self.cached_vars)
         
     def post_execute(self):
+        """Updates workspace model AFTER kernel execution.
+        Also takes into account matplotlib figures that have been created by
+        plt commands at the console
+        """
+        # NOTE: 2022-03-15 22:05:21
+        # check if there is a mpl Figure created in the console (but NOT bound to
+        # a user-available identifier)
+        
+        fig = self.shell.user_ns.get("_", None)
+        
+        if isinstance(fig, mpl.figure.Figure):
+            figures = [v for v in self.cached_vars.values() if isinstance(v, mpl.figure.Figure)]
+            if fig not in figures:
+                num = fig.number
+                assert num in plt.get_fignums()
+                self.shell.user_ns[f"Figure{num}"] = fig
+                self.observed_vars[f"Figure{num}"] = fig
+                if self.mpl_figure_close_callback:
+                    fig.canvas.mpl_connect("close_event", self.mpl_figure_close_callback)
+                    
+                if self.mpl_figure_click_callback:
+                    fig.canvas.mpl_connect("button_press", self.mpl_figure_click_callback)
+                    
+                if self.mpl_figure_enter_callback:
+                    fig.canvas.mpl_connect("figure_enter_event", self.mpl_figure_enter_callback)
+
         # just update the model directly
         self.update()
         
@@ -802,7 +823,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def clearTable(self):
         self.removeRows(0,self.rowCount())
         
-    #def update(self, from_console:bool = False, force:bool=False):
     def update(self):
         """Updates workspace model.
         Must be called by code that adds/remove/modifies/renames variables 
