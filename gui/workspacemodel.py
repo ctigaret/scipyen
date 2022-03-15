@@ -577,14 +577,33 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             self.modelContentsChanged.emit()
         
     def pre_execute(self):
+        """Updates observed_vars DataBag
+        """
+        # ensure we observe only "user" variables in user_ns (i.e. excluding the "hidden"
+        # ones like the ones used by ipython internally)
         self.cached_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        
+        # check if there is a mpl Figure created in the console (but NOT bound to
+        # a user-available identifier)
+        
+        uscorevar = self.shell.user_ns.get("_", None)
+        
+        if isinstance(uscorevar, mpl.Figure):
+            if uscorevar not in self._cached_vars.values():
+                num = uscorevar.number
+                assert num in plt.get_fignums()
+                
+            
+        
 
+        # need to withhold notifications here
         with self.observed_vars.hold_trait_notifications():
             self.observed_vars.clear()
             
             self.observed_vars.update(self.cached_vars)
         
     def post_execute(self):
+        # just update the model directly
         self.update()
         
     def _gen_item_for_object_(self, propdict:dict, 
@@ -772,7 +791,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def slot_updateTable(self):
         #print("slot_updateTable")
         self.update()
-        #self.update(from_console=False)
             
     def addRowForVariable(self, dataname, data):
         """CAUTION Only use for data in the internal workspace, not in remote ones.
@@ -784,7 +802,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def clearTable(self):
         self.removeRows(0,self.rowCount())
         
-    def update(self, from_console:bool = False, force:bool=False):
+    #def update(self, from_console:bool = False, force:bool=False):
+    def update(self):
         """Updates workspace model.
         Must be called by code that adds/remove/modifies/renames variables 
         in the Scipyen's namespace in order to update the workspace viewer.
