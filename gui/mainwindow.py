@@ -764,6 +764,7 @@ class WindowManager(__QMainWindow__):
                 obj.canvas.raise_()
                 obj.canvas.setVisible(True)
             obj.show() # steals focus!
+            plt.show()
             
         else:
             obj.activateWindow()
