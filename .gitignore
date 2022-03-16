@@ -8,5 +8,3 @@ __pycache__
 
 # Ignore dynaconf secret files
 .secrets.*
-config.yaml
-*.yaml
