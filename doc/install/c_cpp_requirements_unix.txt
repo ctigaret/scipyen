@@ -54,6 +54,8 @@ PyQt5_sip-12.8.1        # scipyen GUI               Only on Unix (4,5)
 # (5) PyQt5 can also be installed as a wheel using pip - recommended on Windows;
 #       However, on Unix, and depending on the OS distribution, the PyQt5 modules
 #       may NOT 'see' the system-wide  Qt5 modules (especially the style plugins).
-#       Therefore I prefer to build this from sources on Unix, which requires
-#       installation of several devel packages (not least Qt5) and building the
-#       sip manually beforehand, followed by building Pyqt5.sip after Pyqt5
+# 
+#       Therefore I prefer to build this from sources on Linux, which requires
+#       the installation of several devel packages (not least of Qt5) then building
+#       the sip library manually beforehand, followed by building of PyQt5 then 
+#       Pyqt5.sip

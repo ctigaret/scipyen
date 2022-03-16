@@ -1,43 +1,49 @@
 # -*- coding: utf-8 -*-
-"""Provides two IPython (Jupyter) consoles for the Scipyen app.
+"""Provides two IPython (Jupyter) Qt-based consoles for the Scipyen application.
 
-One is an internal Jupyter qt console running an in-process IPython kernel, for 
-dat-to-day use inside Scipyen.
+1) An "internal" Jupyter qt console, running an in-process IPython kernel for 
+dat-to-day use.
 
-The other, is an external Jupyter qt console running external (or "remote") 
-IPython kernels.
+2) An "external" Jupyter qt console running an external (or "remote") 
+IPython kernel.
 
 The main reason for the latter is the ability to run NEURON simulator (with its
-python bindings) without it bringing down the whole Scipyen app upon quitting the
-NEURON Gui.
+python bindings) without it bringing down the whole Scipyen app upon quitting
+NEURON from its Gui.
 
-As things stand (2020-07-10 15:29:33) quitting the NEURON Gui crashes the 
-(I)python kernel under which the NEURON Gui has been launched. This also brings 
-down Scipyen app, if the kernel is happens to be the in-process ipython kernel,
-or Scipyen's own python kernel (e.g. if NEURON Gui was started from code inside
-the Scipyen event loop)
+As things stand (2020-07-10 15:29:33) quitting the NEURON from the Gui crashes
+the (I)python kernel under which the NEURON Gui has been launched. If this
+were to happen inside the Scipyen's console (which is using an in-process kernel)
+this would also crash the Scipyen application.
 
 If NEURON Gui were to be launched inside an "external" kernel (i.e., running as 
-a separate process) the Scipyen app would remains alive beyond the lifetime of 
+a separate process) the Scipyen app would remain alive beyond the lifetime of 
 the external kernel.
 
-The most convenient solution is to integrate a JupyterQtConsoleApp-like console
-that uses Scipyen's own Qt Gui event loop. 
+A very convenient solution is therefore to employ a JupyterQtConsoleApp-like 
+console that uses Scipyen's own Qt Gui event loop, to connect to a remote 
+ipython kernel running NEURON/python.
 
-The External Jupyter Console (a modifed verison of JupyterQtConsoleApp) meets the
-requirements because it inherits from JupyerApp and JupyterConsoleApp, uses 
-qtconsole code logic for the Qt gui and has mechanisms to insulate the losses 
-selectivly to the affected kernel (which include the restarting a defunct kernel).
+Currently I have implemented this solution in the External Jupyter Console (a 
+modifed verison of JupyterQtConsoleApp). This inherits from JupyerApp and 
+JupyterConsoleApp, uses qtconsole code logic for the Qt gui and insulates the
+remote kernel crash (which can then be restared for a plain new session).
 
-The intention is to extablish (rather contorted) communcations with the remote 
-kernel namespace, so that some of the lost variables may in principle be salvaged
-across kill - restart cycles.
+A (rather contorted) communcations protocol between the remote kernel namespace
+and Scipyen's in-process ipython kernel namespace (a.k.a the 'User workspace'
+displayed in the Workspace viewer in Scipyen's main window) allows user-triggered
+copy of variables between the two namespaces and provides a mechanism to salvage
+some of the lost variables across kill - restart cycles.
 
 """
 import os
 import signal
 import json
 import sys, typing, traceback, itertools, subprocess
+# BEGIN NOTE: 2022-03-05 16:07:04 For execute_request
+import inspect, time
+from ipykernel.jsonutil import json_clean
+# END
 from functools import partial, partialmethod
 from collections import OrderedDict
 from warnings import warn
@@ -166,29 +172,110 @@ def get_available_syntax_styles():
 class ScipyenInProcessKernel(InProcessKernel):
     """Workaround the following exception when using InProcessKernel (see below).
     
-    It turns out that all we need is to set evbentloop to None so that tornado
-    "stays put".
-
+    Traceback (most recent call last):
+    File "/home/cezar/scipyenv39/lib64/python3.9/site-packages/tornado/ioloop.py", line 741, in _run_callback
+        ret = callback()
+    File "/home/cezar/scipyenv39/lib/python3.9/site-packages/ipykernel/kernelbase.py", line 419, in enter_eventloop
+        schedule_next()
+    File "/home/cezar/scipyenv39/lib/python3.9/site-packages/ipykernel/kernelbase.py", line 416, in schedule_next
+        self.io_loop.call_later(0.001, advance_eventloop)
+    AttributeError: 'InProcessKernel' object has no attribute 'io_loop'
+    
+    See also https://github.com/ipython/ipykernel/issues/319
+    
     (NOTE: This DOES NOT crash the kernel):
     ERROR:tornado.application:Exception in callback 
     functools.partial(<bound method Kernel.enter_eventloop of <ipykernel.inprocess.ipkernel.InProcessKernel object at 0x7f0b6abe5730>>)
     
-  Traceback (most recent call last):
-  File "/home/cezar/scipyenv39/lib64/python3.9/site-packages/tornado/ioloop.py", line 741, in _run_callback
-    ret = callback()
-  File "/home/cezar/scipyenv39/lib/python3.9/site-packages/ipykernel/kernelbase.py", line 419, in enter_eventloop
-    schedule_next()
-  File "/home/cezar/scipyenv39/lib/python3.9/site-packages/ipykernel/kernelbase.py", line 416, in schedule_next
-    self.io_loop.call_later(0.001, advance_eventloop)
-AttributeError: 'InProcessKernel' object has no attribute 'io_loop'
+    It turns out that all we need is to set eventloop to None so that tornado
+    "stays put".
+    
+    NOTE: 2022-03-05 16:36:35
+    In addition, ScipyenInProcessKernel also overrides execute_request to await 
+    for the _abort_queues instead of calling them directly, see below, at
+    NOTE: 2022-03-05 16:04:03
+    
+    (It is funny that this happens in Scipyen, because this warning does not
+    appear in jupyter qtconsole launched in the same virtual Python environment
+    as Scipyen (Python 3.10.2), and I don't think this has anything to do with 
+    setting eventloop to None)
+
     """
     eventloop = None
     
     def __init__(self, **traits):
         super().__init__(**traits)
     
+    async def execute_request(self, stream, ident, parent):
+        """handle an execute_request
+        
+        Overrides ipykernel.inprocess.ipkernel.InProcessKernel which in turn
+        calls ipykernel.kernelbase.Kernel.execute_request, to fix the issue below
+        
+        NOTE: 2022-03-05 16:04:03
+        
+        In the InProcessKernel _abort_queues is a coroutine and not a method 
+        (function); this raises the RuntimeWarning: 
+        coroutine 'InProcessKernel._abort_queues' was never awaited.
+        
+        """
+
+        with self._redirected_io(): # NOTE: 2022-03-14 22:12:02 this is ESSENTIAL!!!
+            try:
+                content = parent['content']
+                code = content['code']
+                silent = content['silent']
+                store_history = content.get('store_history', not silent)
+                user_expressions = content.get('user_expressions', {})
+                allow_stdin = content.get('allow_stdin', False)
+            except Exception:
+                self.log.error("Got bad msg: ")
+                self.log.error("%s", parent)
+                return
+
+            stop_on_error = content.get('stop_on_error', True)
+
+            metadata = self.init_metadata(parent)
+
+            # Re-broadcast our input for the benefit of listening clients, and
+            # start computing output
+            if not silent:
+                self.execution_count += 1
+                self._publish_execute_input(code, parent, self.execution_count)
+
+            reply_content = self.do_execute(
+                code, silent, store_history,
+                user_expressions, allow_stdin,
+            )
+            if inspect.isawaitable(reply_content):
+                reply_content = await reply_content
+
+            # Flush output before sending the reply.
+            sys.stdout.flush()
+            sys.stderr.flush()
+            # FIXME: on rare occasions, the flush doesn't seem to make it to the
+            # clients... This seems to mitigate the problem, but we definitely need
+            # to better understand what's going on.
+            if self._execute_sleep:
+                time.sleep(self._execute_sleep)
+
+            # Send the reply.
+            reply_content = json_clean(reply_content)
+            metadata = self.finish_metadata(parent, metadata, reply_content)
+
+            reply_msg = self.session.send(stream, 'execute_reply',
+                                        reply_content, parent, metadata=metadata,
+                                        ident=ident)
+
+            self.log.debug("%s", reply_msg)
+
+            if not silent and reply_msg['content']['status'] == 'error' and stop_on_error:
+                # NOTE: 2022-03-05 16:04:10 
+                # this apparently fixes the issue at NOTE: 2022-03-05 16:04:03
+                await self._abort_queues() 
+
 class ScipyenInProcessKernelManager(QtInProcessKernelManager):
-    """Starts our own custom InProcessKernel (ScipyenInProcessKernel)
+    """Starts our own custom ScipyenInProcessKernel
     
     Workaround for a bug (?) in InProcessKernel API.
     
@@ -211,7 +298,34 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self.available_colors = ("nocolor", "linux", "lightbg")
         self.scrollbar_positions = Bunch({QtCore.Qt.LeftToRight: "right",
                                            QtCore.Qt.RightToLeft: "left"})
+        self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_K), self)
+        
+        self.clear_shortcut.activated.connect(self.slot_clearConsole)
+
         ScipyenConfigurable.__init__(self)
+        
+    def _flush_pending_stream(self):
+        """ Flush out pending text into the widget.
+        NOTE: 2022-03-14 21:47:39 CMT
+        Fixes crashes with long list display until the qtconsole 5.3.0 comes to
+        life
+        """
+        text = self._pending_insert_text
+        self._pending_insert_text = []
+        buffer_size = self._control.document().maximumBlockCount()
+        if buffer_size > 0:
+            text = self._get_last_lines_from_list(text, buffer_size)
+        text = ''.join(text)
+        t = time.time()
+        self._insert_plain_text(self._get_end_cursor(), text, flush=True)
+        # Set the flush interval to equal the maximum time to update text.
+        self._pending_text_flush_interval.setInterval(max(100,
+                                                 int(time.time()-t)*1000)) # see NOTE: 2022-03-14 21:47:39 CMT
+
+    @safeWrapper
+    def slot_clearConsole(self):
+        self.clear()
+        #self.ipkernel.shell.run_line_magic("clear", "", 2)
         
     @property
     def scrollBarPosition(self):
@@ -2835,16 +2949,20 @@ class ScipyenConsoleWidget(ConsoleWidget):
         NOTE:
         Since August 2016 -- using Jupyter/IPython 4.x and qtconsole
         
+        Changelog (most recent first):
+        -------------------------------
+        NOTE 2020-07-07 12:32:40
+        ALWAYS uses the in-proces Qt kernel manager
+        
+        NOTE 2021-10-06 13:52:58
+        Use a customized InProcessKernel, see
+        ScipyenInProcessKernelManager and ScipyenInProcessKernel
+        for details
+        
         '''
         self.mainWindow = kwargs.pop("mainWindow", None)
         super().__init__(*args, **kwargs)
 
-        # NOTE 2020-07-07 12:32:40
-        # ALWAYS uses the in-proces Qt kernel manager
-        # NOTE 2021-10-06 13:52:58
-        # Use a customized InProcessKernel, see
-        # ScipyenInProcessKernelManager and ScipyenInProcessKernel
-        # for details
         self.kernel_manager = ScipyenInProcessKernelManager() # what if gui is NOT Qt?
         self.kernel_manager.start_kernel()
         self.kernel_manager.kernel.eventloop = None
@@ -2874,9 +2992,10 @@ class ScipyenConsoleWidget(ConsoleWidget):
         
         self.defaultFixedFont = defaultFixedFont
         
-        self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_X), self)
+        #self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_X), self)
         
-        self.clear_shortcut.activated.connect(self.slot_clearConsole)
+        #self.clear_shortcut.activated.connect(self.slot_clearConsole)
+
         
         # NOTE: 2021-07-18 10:17:26 - FIXME bug or feature?
         # the line below won't have effect unless the RichJupyterWidget is visible
@@ -3112,9 +3231,6 @@ class ScipyenConsoleWidget(ConsoleWidget):
         elif isinstance(text, (tuple, list) and all([isinstance(s, str) for s in text])):
             self.__write_text_in_console_buffer__("\n".join(text))
         
-    @safeWrapper
-    def slot_clearConsole(self):
-        self.ipkernel.shell.run_line_magic("clear", "", 2)
         
     def set_pygment(self, scheme:typing.Optional[str]="", 
                     colors:typing.Optional[str]=None):
@@ -3276,6 +3392,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.consoleWidget.pythonFileReceived.connect(self.pythonFileReceived)
         self.consoleWidget.executed.connect(self.executed)
         self.consoleWidget.loadSettings() # inherited from ScipyenConfigurable
+        self.widget = self.consoleWidget
         self.active_frontend = self.consoleWidget
         WorkspaceGuiMixin.__init__(self, parent=parent)
         self._configureUI_()

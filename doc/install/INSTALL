@@ -1,10 +1,20 @@
-Last modified / change log:
+Last modified:
 
-2021-10-09 18:15:17
+2022-02-19 15:17:55
 
-    
-2021-06-07 14:47:34
+Adapted to the situation where:
+1) the machine already has Python >= 3.9.7 installed.
 
+2) 3rd party libraries are provided system-wide by the distribution
+(boost, Qt5, PyQt5, pytables)
+
+3) source trees for what needs built are now located OUTSIDE the virtual
+environment
+
+4) Focussing on Python 3.10 where possible
+
+================================================================================
+PREAMBLE
 ================================================================================
 This file describes how to install scipyen and its dependencies in a virtual
 environment (python3), independent of the system or local (i.e. "user") python
@@ -17,15 +27,105 @@ building software directly in this environment, without the need for administrat
 (superuser) privileges, and without interfering with system-wide or account-wide 
 software.
 
-The only exception is building Python directly from sources which may require
-admin privileges.
-
 This means the software can be uninstalled re-built, etc, without worrying about
 the local account or system-wide interference.
 
+Disk space requirements: ~ 5 GiB (including sources and build binary dependencies
+in the virtual python environment)
+
+Dependencies
+------------
+1) Python >= 3.9 either supplied with the distribution, or built from sources 
+              (and installed typically in /usr/local)
+
+2) virtualenv
+
+3) Python pip packages listed in the pip requirements file:
+    pip_requirements_Linux.txt,   for Linux,
+    pip_requirements_Windows.txt, for Windows
+
+    WARNING: if migrating to a more recent Python version, and there are packages 
+    installed via pip as --user, then it is highly likely to have executable 
+    Python scripts in $HOME/.local/bin
+
+    In particular, the script "virtualenv" in $HOME/.local/bin WILL overshadow any
+    "virtualenv" script installed in the system-wide site-packages of your desired
+    Python version.
+
+    If that is the case then you may forcefully use the latter by launching it 
+    with a specific version of the Python interpreter
+    e.g., python3.10 -m virtualenv env_dir
+    
+    Where env_dir is the fully qualified path of the virtual environment directory
+    
+    OR temporarily rename the $HOME/.local/virtualenv file to something else
+    
+4) A python virtual environment running the desired version of Python executable.
+    
+    NOTE: This is in order to run Scipyen in a software environment insulated
+    form the system-wide or user-installed 3rd party libraries and Python packages
+    installed via pip.
+    
+    Be aware that some dependencies do rely on system-wide libraries and software
+    (e.g., fftw3, tiff, jpeg, png, doxygen, cmake, and build toolchain).
+    
+    This means that the software installed in the virtual environment MAY HAVE
+    TO BE REBUILT upon upgrading to a new OS distribution.
+
+5) Software libraries to be built from sources, and installed inside the virtual
+environment:
+    
+PyQt5 (including PyQt5.sip, sip5.5 if building PyQt5 from sources)
+    NOTE: on Windows, it is suffiient to install re-build PyQt5 via pip, inside
+        the virtual environment
+    
+    While pre-built PyQt5 can also be used on Linux, it has the disadvantage that
+    the PyQt5 binaries supplied via pip are oblivious to the system-wide Qt5 
+    plugins that are installed on the machine. This is manifest, e.g., in the 
+    inconvenience that PyQt5 widgets are unable to use the global appearance of 
+    other Qt5 aplications installed on the machine. For this reason, and for
+    insulating Scipyen from sysem-wide PyQt5 library upgrades, it is convenient
+    to build PyQt5 from sources inside the virtual environment.
+
+vigra 
+    NOTE: this needs:
+        boost - including boost python, graph, threads
+        fftw3, tiff, jpeg, png, optionally, openexr
+        python packages - numpy, sphinx, nose - these are listed in the pip 
+            requirements mentioned above
+
+NEURON
+    Optional, if you want to use Scipyen as a pseudo-IDE for NEURON
+    
+    Requires libXcomposite, bison, flex, CMake, cython, mpi, ncurses
+    
+    NOTE: This needs to be built from sources, especially on Linux; on Windows
+    I haven't yet tested the feasibility of using pre-build binaries (via pip).
+    
+6) Build chain toolkit - to build the software above
+    On Linux: gnu compiler collection, make, ld, qmake (for PyQt5)
+        
+    See also the file 'c_cpp_requirements_unix.txt'
+    
+    On Windows: , VisualStudio community edition (2019 or later)
+    
+    On both platforms: cmake, doxygen (documentation generator), git software
+    (to access source code repositories; optionally, you may use GitHub's gh 
+     command line utility, and/or GitDesktop on Windows only)
+    
+NOTE: On windows, these dependencies can be built OUTSIDE the virtual environment
+(see INSTALL for Windows.txt)
+
+Which Python?
+-------------
+Scipyen should be used with Python >= 3.9
+
+On Linux, this can be the Python stack as distributed with the OS, or one 
+built locally from sources. 
+
 Steps:
 ================================================================================
-0. Clone the Scipyen git repo somewhere convenient (e.g. in $HOME)
+1. Clone the Scipyen git repo somewhere convenient (e.g. in $HOME)
 ================================================================================
 
     REQUIRES:
@@ -74,179 +174,295 @@ regular intervals:
             git checkout dev
             git pull
             
-In the following we assume that scipyen has been cloned in $HOME/scipyen and all
-relative paths in this document are RELATIVE to $HOME/scipyen/
+In the following we assume that scipyen has been cloned in $HOME/scipyen
 
 ================================================================================
-1. INSTALL THE FOLLOWING PACKAGES AS PER YOUR OS DISTRIBUTION:
+2. INSTALL THE FOLLOWING PACKAGES AS PER YOUR OS DISTRIBUTION:
 ================================================================================
-(* indicates you also need to install their corresponding devel packages; where
- appropriate, a minimal version is specified):
 These will be installed system-wide hence will be available regardless of 
 whether you are in an activate python virtual environment or not.
+
+Unless specified, these MUST be installed together with their corresponding 
+'devel' packages.
+
+Where appropriate, a MINIMAL version is specified. If the current distribution 
+does NOT provide these, then they should be built. Examples on how to do this are
+given further below, for Python 3.9.7, boost 1.77.0
+
+        Software                            Required for/by:
+        packages
+================================================================================
+        Python >=3.9.7                      Running Scipyen
+        
+        This is necessary to satisfy dependencies of newer version of packages 
+        used by Scipyen, such as:
+        neo
+        
+    If not available from your distribution, you may want to build Python from 
+    source, and 'make altinstall' (see below, and Python/Unix/README for details)
     
-Qt5 (*)
-cmake3,     # NOTE this and the one below are required to configure vigra & neuron
-cmake3-full # (includes cmake-gui) 
-zlib (*)
-hdf5 (*)
-openexr (*)
-openssl >= 1.11 (*)
-fftw3 (*) (optionally and recomended with MPI bindings)
-mpich (*)
-tiff (*)
-jpeg (*)
-png (*)
-sqlite3 (*)
-libXcomposite (*) (for NEURON)
-valgrind (optional)
+        boost >= 1.77 including:               Build VIGRA
+        Boost.Python (py3), 
+        Boost.Python.NumPy, 
+        Boost.MPI,
+        Boost.MPI Python 3 serialization, 
+        Boost.Thread, 
+        Boost.Atomic, 
+        Boost.Chrono, 
+        Boost.Graph, 
+        Boost.Graph parallel
+        
+        NOTE: Boost can (and should) be built inside the virtual Python 
+        environment, see below.
+    
+    
+        Qt5                                 Scipyen GUI
+
+        cmake3, cmake3-full                 Build VIGRA and NEURON
+        Devel packages NOT necessary.
+    
+
+        zlib                                Build VIGRA
+        hdf5                                Build VIGRA
+        openexr                             Build VIGRA
+        openssl >= 1.11                     Build VIGRA
+        fftw3                               Build VIGRA
+        (optionally, but recomended
+        with MPI bindings)
+        mpich                               Build NEURON
+        tiff                                Build VIGRA
+        jpeg                                Build VIGRA
+        png                                 Build VIGRA
+        sqlite3                             Build VIGRA
+        libXcomposite  (for NEURON)         Build VIGRA
+        valgrind (optional)
+--------------------
+NOTES:
+ you also need to install their corresponding 'devel' packages
 
 ================================================================================
-2. BUILD PYTHON (if unhappy with what the distribution offers, required if no
-Python 3.9 is on offer)
+3. BUILD PYTHON (OPTIONAL, see above)
 ================================================================================
 
 NOTE: This is RECOMMENDED if the distribution is behind the latest Python by 
 (quite) a few minor versions.
 
+For example, OpenSuSE Leap 15.3 installs Python-3.6.12; here, we use Python 
+3.9.7 where there have been some significant changes, and because the latest neo 
+package doesn't support python < 3.7
+
 NOTE: 2022-01-20 22:02:56 Scipyen code is now essentially using Python3.9!
 
-NOTE: If you choose to build Python then the following python packages must also
+NOTE: If you choose to build Python then the following Python packages must also
 be built locally (from inside the activated virtual python environment, see below):
     sip
     PyQt5
     PyQt5_sip
     tables
-    
-
-For example, OpenSuSE Leap 15.3 installs Python-3.6.12; here, we use Python 
-3.9.7 where there have been some significant changes, and because the latest neo 
-package doesn't support python < 3.7
-
+        
 
 To build Python from sources (e.g. 3.9.7) see the file:
 
     $HOME/scipyen/doc/install/Python/Unix/README
     
 ATTENTION: To avoid overshadowing/overwriting your system's python3 executable,
-ALWAYS execute 'make altinstall' AND NOT 'make install' after building.
+ALWAYS run 'make altinstall' AND NOT 'make install' after 'make'-ing the Python
+software.
 
-'make altinstall' needs to be called as superuser (su/sudo)
-
-Also you MUST call ldconfig (again, as superuser).
+'make altinstall' needs to be followed by running 'ldconfig' (both as superuser)
 
 From here on we assume Python-3.9.7 was built then installed in /usr/local.
 
-Run the $HOME/scipyen/make_script_links.sh once - this will create a symbolic 
-link from $HOME/scipyen/doc/install/Python/Unix/pyenv to $HOME/pyenv
-(see $HOME/scipyen/doc/install/Python/Unix/README for details)
-
-NOTE: If you relocate the 'scipyen' directory you have to recreate these links.
-Have a look inside make_script_links.sh bash script to see what it does.
-
 ================================================================================
-2.a IF YOU HAVE BUILT YOUR OWN PYTHON STACK
+4. CREATE A PYTHON VIRTUAL ENVIRONMENT, INSTALL pip PACKAGES
 ================================================================================
 
-If you plan to use pytables AND you are using your own built Pyton stack, then
-you MUST build pytables yourself - see 4.6b, below.
+In short (example using sistem-wide Python 3.9):
+    
+    user@site:~> python3.9 -m virtualenv scipyenv39
+    
+    will create scipyenv39 in $HOME directory
+    
+    NOTE: Avoid paths with unicode characters and networked (e.g. NFS-mounted) 
+    partitions
+    
 
-================================================================================
-3. CREATE A PYTHON VIRTUAL ENVIRONMENT
-================================================================================
+4.1 Create Scipyen configuration scripts - $HOME/.scipyenrc
 
-(see $HOME/scipyen/doc/install/Python/Unix/README for details about creating it
- and then activating it)
+    user@site:~> cd scipyen/doc/install
+    user@site:~/scipyen/doc/install> ./make_script_links.sh <path-where-environment-is>
+    
+4.2 activate the environment:
+    start a new terminal the call 'scipyact'
 
 From here on we assume the environment directory is $HOME/scipyenv39 (the name
 reflects the use of Python-3.9)
 
+4.3 install pip requirements
 
-================================================================================
-4. ACTIVATE THE PYTHON VIRTUAL ENVIRONMENT AND BUILD DEPENDENCIES
-================================================================================
+call pip install -r $HOME/scipyen/doc/installation/pip_requirements_Linux.txt
 
-Once the virtual environment has been activated, a new environment variable 
-VIRTUAL_ENV becomes available, pointing to the location of the environment's
-directory (e.g., $HOME/scipyenv39) so we will use VIRTUAL_ENV through to the
-end of this document, when referring to the environment's directory.
+WARNING: The installation of PyQt5 wheel using pip is, by default, disabled in
+pip_requirements_Linux.txt (the line is simply commented-out) for the reasons
+pointed out in 5.1 below.
 
-NOTE: For convenience, the source trees will be placed in a directory 'src'
-inside the virtual environment's directory, i.e., $HOME/scipyenv39/src 
-(assuming the virtual environment is in $HOME/scipyenv39, see above).
+HOWEVER, PyQt5 IS REQUIRED to run Jupyter qtconsole and Scipyen's GUI. 
 
-NOTE that this is NOT necessary - you can have the src located somewhere else, 
-e.g. on a larger 'data' partition, but AVOID networked partitions.
+If you decide NOT to build PyQt5 but to rely on the installation of a binary PyQt5
+wheel, then enable the installation of PyQt5 in pip_requirements_Linux.txt first,
+by "un-commenting" the line (remove the "#" and any spaces at the beginning of 
+the line containing PyQt5).
+
+=================================================================
+5. BUILD DEPENDENCIES(*)
+=================================================================
+(*) If not installed system-wide. NOTE: You may want to build PyQt5 (see 
+    4.1, below) as pip only installs a pre-build wheel containing only the 
+    default Qt5 widget style (fusion) and no access to the system's widget 
+    styles.
+    
+    
+The directory of the virtual environment is referred to as VIRTUAL_ENV - a
+shell variable which will be available after activating the environment (see 4.2)
+
+
+It is recommended to individual subdirectories in VIRTUAL_ENV/src/ directory,
+for storing the source trees of the software to be built. 
+
+If there are space contraints, this src directory can be placed on another 
+local partition - avoid networked partitions.
 
 NOTE: From here on we assume all source trees are in $VIRTUAL_ENV/src  and
 we operate from an activated virtual environment, in the $VIRTUAL_ENV/src directory
 
 --------------------------------------------------------------------------------
-4.1 BUILD AND INSTALL BOOST LIBRARIES boost_1_77_0.tar.b2
+5.1 BUILD AND INSTALL sip-5.51, PyQt5-5.15.3, PyQt5_sip-12.8.1 IN THIS ORDER
 --------------------------------------------------------------------------------
-On Linux :
-    ./booststrap.sh --prefix=$VIRTUAL_ENV --with-python=/usr/local/bin/python3.9 --with-python-root=/usr/local
-    ./b2 --prefix=$VIRTUAL_ENV
+NOTE: These can also be installed via pip. However, the binary wheel installed
+has its own copy of Qt which comes only with a default style ("Fusion", on Linux)
+To use the host platform look and feel of Qt widgets you have to build PyQt5 and 
+PyQt5.sip as below.
 
---------------------------------------------------------------------------------
-4.2 INSTALL PIP REQUIREMENTS STAGE 0
---------------------------------------------------------------------------------
-call pip install -r $HOME/scipyen/doc/installation/pip_requirements_0.txt
+If you are not bothered by this, then skip to (4.2) below after enabling the
+instalaltion of PyQt5 (via pip) in pip_requirements_Linux.txt.
 
-NOTE: this prepares for bulding the other C++ libs
-
---------------------------------------------------------------------------------
-4.3 BUILD AND INSTALL NODEJS node-v15.6.0.tar.gz
---------------------------------------------------------------------------------
-  (required to use bokeh with NEURON and jupyterlab)
-  
-  cd into the extracted source tree then run:
-      
-      ./configure --prefix=$VIRTUAL_ENV
-      make -j4
-      make doc
-      make install
-
---------------------------------------------------------------------------------
-4.4 BUILD AND INSTALL sip-5.51, PyQt5-5.15.3, PyQt5_sip-12.8.1 IN THIS ORDER
---------------------------------------------------------------------------------
 For each of these, cd into their source tree and run:
 
 ..............
-4.4.1 sip:
+5.1.1 sip:
 ..............
+    Extract sip-5.5.1.dev2011271026.tar.gz from scipyen-dependencies/Unix
+    to $VIRTUAL_ENV/src
+
+    cd into the source directory tree,
+    activate the virtual environment, then run:
+    
     python setup.py build
     python setup.py install
     
 ..............
-4.4.2 PyQt5:
+5.1.2 PyQt5:
 ..............
-    python configure.py --confirm-license --qmake=`which qmake-qt5` --designer-plugindir=$VIRTUAL_ENV/lib/qt5/plugins/designer --qml-plugindir=$VIRTUAL_ENV/lib/qt5/plugins/PyQt5 --qsci-api-destdir=$VIRTUAL_ENV/share/qt5 --no-python-dbus
+    REQUIRES: Qt5 and Qt5-devel packages installed on the host machine.
+    
+    Use downloaded PyQt5-5.15.3.dev2012141313.tar.gz from scipyen-dependencies/Unix
+    
+    PyQt5-5.15.7.dev2202011035.tar.gz from here:
+
+    extract to $VIRTUAL_ENV/src, cd into the source directory tree,
+    activate the virtual environment, then run:
+    
+    python configure.py --confirm-license --qmake=`which qmake-qt5` --designer-plugindir=$VIRTUAL_ENV/lib/qt5/plugins/designer --qml-plugindir=$VIRTUAL_ENV/lib/qt5/plugins/PyQt5 --qsci-api-destdir=$VIRTUAL_ENV/share/qt5 --no-python-dbus --sip=$VIRTUAL_ENV/bin/sip5 > config_output 2>&1
+    
+    NOTE: configuration output will be redirected to the file config_output
+    NOTE: if in trouble at this stage, also pass --verbose option to configure.py
+    
     make 
     make install
-
+    
     pip list (should indicate PyQt5, sip)
 ................................
-4.4.3 PyQt5.sip extension module:
+5.1.3 PyQt5.sip extension module:
 ................................
+    Use PyQt5_sip-12.9.1
     python setup.py build
     python setup.py install
 
     pip show PyQt5-sip <-- verifies that PyQt5 sip module is installed
     
+After installing pip requirements below, test that PyQt5  was installed OK
+by launching 'jupyter qtconsole' - Qt widgets should have the style used by your
+desktop.
+    
 --------------------------------------------------------------------------------
-4.5 BUILD AND INSTALL VIGRA
+5.2 BUILD AND INSTALL BOOST LIBRARIES (OPTIONAL)
 --------------------------------------------------------------------------------
-git clone https://github.com/ukoethe/vigra.git
+
+NOTE: Optional, ONLY IF if the system-wide boost libraries are not available for the
+version of Python used to build vigranumpy, below. This may include the situation
+where some symbols are not found when linking against system-wide boost libs.
+
+NOTE: Better to do build it locally, to insulate against system-wide library 
+upgrades especially on Tumbleweed
+
+Download 7z archive of boost sources from boost.org extract in VIRTUAL_ENV/src
+-> will create 'boost_X_Y_Z' directory with X, Y, Z being the version tag
+
+cd to the directory containing the extracted boost sources
+
+On Linux :
+    ./bootstrap.sh --prefix=$VIRTUAL_ENV --with-python=/usr/local/bin/python3.9 --with-python-root=/usr/local
+    ./b2 --prefix=$VIRTUAL_ENV install
+
+    ATTENTION: make sure you point to the correct Python directories; when using
+    a distribution-supplied Python stack, this is usually installed in /usr, e.g.:
+    
+    --with-python=/usr/bin/python3.10 --with-python-root=/usr
+
+--------------------------------------------------------------------------------
+5.3 BUILD AND INSTALL NODEJS node-v15.6.0.tar.gz (OPTIONAL)
+--------------------------------------------------------------------------------
+  (OPTIONAL, required to use bokeh with NEURON and jupyterlab; however, 
+   installing nodejs via pip might just be enough)
+  
+  Download source archive node-v15.6.0.tar.gz 
+  NOTE: to use with Python 3.10 you need node-v16.14.0.tar.gz
+  
+  Extract in src -> creates the drectory node-v16.14.0 (or node-v15.6.0)
+  
+  cd into the extracted source tree then run:
+      
+      ./configure --prefix=$VIRTUAL_ENV > config_output 2>&1
+      make -j4
+      make doc
+      make install
+ 
+--------------------------------------------------------------------------------
+5.4 BUILD AND INSTALL VIGRA
+--------------------------------------------------------------------------------
 
 ....................................
-4.5.1 create out-of-source build tree
+5.4.1 Clone git repo in the src directory:
 ....................................
+    
+git clone https://github.com/ukoethe/vigra.git
+
+create an out-of-source build tree, also in src:
 
 mkdir vigra-build && cd vigra-build
 
 ....................................
-4.5.2 configure the build
+5.4.2 If needed, patch vigra sources
+....................................
+
+See scipyen/doc/install/vigra_patches/README for details. 
+
+Briefly, you need to patch src/hdf5impex.cxx if using hdf5 >= 1.11
+
+Other patches needed are for Python source code
+
+....................................
+5.4.3 configure the build
 ....................................
 
 cmake-gui ../vigra
@@ -263,7 +479,18 @@ cmake-gui ../vigra
             * set LIB_SUFFIX (-DLIB_SUFFIX=) 64 (optional; both lib and lib64 are added to LD_LIBRARY_PATH by the pyenv script)
                     
             * in the "WITH" group, make sure the following are checked (i.e. True): 
-            boost-thread, boost-graph, openexr, vigranumpy, valgrind
+            boost-thread, boost-graph, vigranumpy, openexr, valgrind
+            
+            NOTE:
+                1. openexr is optional only of you plan to use openEXR images
+                2. valgrind is optional, only is planning to debug software at
+                C++ level
+            
+            WARNING BOOST: if you have built boost inside the virtual environment
+            then make sure to point to THOSE libraries inside cmake-gui.
+            
+                NOTE: the various boost*_DIR variables refer to the boost cmake 
+                directory (for a locally built boost this is in 'lib' directory)
     
             * press configure until all options are satisfied (i.e. nothing is
             highlighted in red anymore) - NOTE: this is a recursive process
@@ -271,7 +498,7 @@ cmake-gui ../vigra
             * finally, press "Generate" and quit cmake-gui
                 
 ....................................
-4.5.3 make & install
+5.4.4 make & install
 ....................................
     make
     
@@ -283,23 +510,43 @@ cmake-gui ../vigra
         to:
                 except TypeError as e:
         (NOTE: this corrects deprecated syntax)
+    NOTE: 2022-02-20 22:26:47 the above issue did not come up on Tumbleweed and
+        Python 3.10
         
     make doc 
     make install (--> installs in $VIRTUAL_ENV/doc/vigra and $VIRTUAL_ENV/doc/vigranumpy)
     
+    NOTE 1: re-making after configuration changes:
+        make clean
+        make
+        make install
+    
+    NOTE 2:
+    The locally built boost python library won't be automatically found by 
+    vigranumpycore, unless the directory containing the boost python library is 
+    included in the LD_LIBRARY_PATH environment variable.
+    
+    This directory is usually the 'lib' subdirectory of the virtual environment
+    tree.
+    
+    The '.scipyenrc' bash script, which is sourced by Scipyen launch bash 
+    script, takes care of that (see make_script_links.sh in this directory)
+    
 -------------------------------------------------------------------------------
-4.6. INSTALL pip requirements 1 & 2
+5.5. BUILD AND INSTALL PyTables (tables)
 -------------------------------------------------------------------------------
-pip install -r $HOME/scipyen/doc/installation/pip_requirements_1.txt
-pip install -r $HOME/scipyen/doc/installation/pip_requirements_2.txt
+This is REQUIRED if you are using a built Python stack (see above), but might be
+helpful when using a virtual environment created with a system-wide python stack.
 
--------------------------------------------------------------------------------
-4.6b. BUILD AND INSTALL PyhTables (tables)
--------------------------------------------------------------------------------
-This is REQUIRED if you are using a built Python stack (see above)
+To install a binary package run
 
-NOTE: PyTables are avaiulbale as 'tables'; to use you must 'import tables'
+    pip install tables
+    
+otherwise, read on.
+
+NOTE: PyTables are available as 'tables'; to use you must 'import tables'
 gh repo clone PyTables/PyTables
+(or: git clone https://github.com/PyTables/PyTables.git)
 cd PyTables
 python setup.py build
 python setup.py install
@@ -311,14 +558,37 @@ Check that importing tables doesn't crash the interpreter:
     >>> import tables
     >>>
     
+    NOTE: do not import tables while in the PyTables source directory!!!
+    
 -------------------------------------------------------------------------------
-4.7 BUILD AND INSTALL NEURON
+5.6 BUILD AND INSTALL NEURON
 -------------------------------------------------------------------------------
+OPTIONAL: Only if you want to use NEURON/Python from within Scipyen.
+
+5.6.1: clone git repo
+
 git clone https://github.com/neuronsimulator/nrn
+
+5.6.2 make out-of-source built tree
+
 mkdir nrn-build && cd nrn-build
+
+5.6.3 configure the build
+
 cmake-gui ../nrn
 "Configure" will also pull iv, coreneuron
+
+Example (as of 2022-02-16 12:25:17 on Tumbleweed 20220213) 
+    NOTE: SOME OF THESE MAY ONLY BE AVAILABLE AFTER SELECTING CORENEURON
+        LIBEXECINSTALLDIR=$VIRTUAL_ENV/libexec
+        PKGCONFIG_FILES_DIR=$VIRTUAL_ENV/lib64/pkgconfig
+        PLUGIN_INSTALL_DIR=$VIRUTAL_ENV/lib64/mod2c
+    CMAKE
         CMAKE_INSTALL_PREFIX (-DCMAKE_INSTALL_PREFIX=) $VIRTUAL_ENV
+        CMAKE_INSTALL_LIBDIR=lib64
+        CMAKE_INSTALL_LIBEXECDIR=libexec
+    NRN
+        NRN_AVOID_ABSOLUTE_PATHS=true
         NRN_ENABLE_CORENEURON=true
         NRN_ENABLE_INTERVIEWS=true
         NRN_ENABLE_MECH_DLL_STYLE=true
@@ -328,62 +598,77 @@ cmake-gui ../nrn
         NRN_ENABLE_MPI=true
         NRN_ENABLE_MPI_DYNAMIC=false
         NRN_ENABLE_PYTHON=true (default python3 fallback to python2)
-        NRN_ENABLE_PYTHON_DYNAMIC=false
+        NRN_ENABLE_PYTHON_DYNAMIC=true
+        NRN_ENABLE_REL_RPATH=true
         NRN_ENABLE_RX3D=true
         NRN_ENABLE_SHARED=true
         NRN_ENABLE_TESTS=false
         NRN_ENABLE_THREADS=true
+        
+        # NOTE: next two available aftrer enabling CORENEURON
         LIB_INSTALL_DIR=$VIRTUAL_ENV/lib64
+        LIB_SUFFIX=64
+        
+    IV
         IV_ENABLE_SHARED=true
-make 
-make install
+        IV_ENABLE_X11_DYNAMIC=false # NOTE: 2022-02-16 12:50:18 setting to True prevents the GUI from showing!
+        MOD2C_ENABLE_LEGACY_UNITS=false
+        
+5.6.4 build & install
+
+    make 
+    make install
 
     NOTE: Run the following in order to properly install neuron python modules 
     inside the site-packages corresponding  to the environment's python version
+    (installs nrnpython in site-packages)
     
-cd $VIRTUAL_ENV/src/nrn-build/src/nrnpython
+    cd $VIRTUAL_ENV/src/nrn-build/src/nrnpython
     
-python setup.py install 
-    (to install nrnpython in site-packages)
+    python setup.py install 
+    
+    NOTE: This is IMPORTANT, especially when rebuilding NEURON after machine
+    migration (either to a new distribution or distribution version)
     
     NOTE: Optional: Build neuron documentation locally and install locally 
         (see $VIRTUAL_ENV/src/nrn/docs/README.md)
     
-pip3 install -r $VIRTUAL_ENV/src/nrn/docs/docs_requirements.txt
+        pip3 install -r $VIRTUAL_ENV/src/nrn/docs/docs_requirements.txt
     
-    (installs required python packages (e.g.commonmark, sphinx-rtd-theme, 
-        recommonmark, plotly, etc) inside the virtual environment)
+        (installs required python packages (e.g.commonmark, sphinx-rtd-theme, 
+        recommonmark, plotly, etc) inside the virtual environment; these are 
+        also included in the pip requirements files described at point 4.3. and 
+        in the PREAMBLE)
     
-cd $VIRTUAL_ENV/src/nrn-build
-make docs (NOTE this may fail --> no problems !)
+        cd $VIRTUAL_ENV/src/nrn-build
+        make docs 
+        
+            (NOTE conversion of some jupyter notebooks this may fail --> 
+             until this is solved, please use the online documentation)
     
-    Optionally, copy/move (or, better make a symbolic link) 
-    $VIRTUAL_ENV/src/nrn/docs/_build to $VIRTUAL_ENV/doc/neuron
+        Optionally, copy/move (or, better make a symbolic link) 
+        $VIRTUAL_ENV/src/nrn/docs/_build to $VIRTUAL_ENV/doc/neuron
     
 
--------------------------------------------------------------------------------
-4.8 INSTALL LAST PIP REQUIREMENTS
--------------------------------------------------------------------------------
-pip install -r $HOME/scipyen/doc/installation/pip_requirements_3.txt
+===============================================================================
+6. Create Scipyen launch desktop icon
+===============================================================================
+Create a symbolic link of $HOME/scipyen/scipyen
+
+Drag and drop Scipyen.desktop to the desktop/panel/application menu editor.
 
 
-================================================================================
-5. Make final script links while still in the active python virtual environment
-================================================================================
-
-cd $HOME/scipyen/
-./make_script_links.sh
-
-6. You may optionally create a symbolic link of $HOME/scipyen into $VIRTUAL_ENV.
-ln -s $HOME/scipyenv $VIRTUAL_ENV/scipyen
-
-With this final procedure, the $VIRTUAL_ENV directory tree should look like this:
+Finally the $VIRTUAL_ENV directory tree should look like this:
     
   $HOME
         |
-        -- scipyenv
+        -- scipyenvXY
                     |
                     -- bin
+                    |
+                    -- doc
+                    |
+                    -- etc
                     |
                     -- include
                     |
@@ -391,29 +676,34 @@ With this final procedure, the $VIRTUAL_ENV directory tree should look like this
                     |
                     -- lib64                            
                     |
-                    -- nrnipython
+                    -- man
                     |
-                    -- scipyen
+                    -- share
                     |
                     -- src
-                        |
-                        -- node-xxxx
-                        |
-                        -- nrn (github clone, done by git )
-                        |
-                        -- nrn-build   
-                        |
-                        -- vigra (github clone, done by git)
-                        |
-                        -- vigra-build
-                        |
-                        -- sip-xxx
-                        |
-                        -- PyQt5-xxx
-                        |
-                        -- PyQt5_sipxxx
-        
-NOTE: lib64 is typically a symbolic link to lib
+                    |   |
+                    |   -- boost_X_Y_Z
+                    |   |
+                    |   -- node-xxxx
+                    |   |
+                    |   -- nrn (github clone, done by git )
+                    |   |
+                    |   -- nrn-build   
+                    |   |
+                    |   -- vigra (github clone, done by git)
+                    |   |
+                    |   -- vigra-build
+                    |   |
+                    |   -- sip-xxx
+                    |   |
+                    |   -- PyQt5-xxx
+                    |   |
+                    |   -- PyQt5_sipxxx
+                    |
+                    |
+                    -- x86_64
+                    
+
 
 ================================================================================
 7.Optional: Install h5pyViewer
@@ -424,6 +714,7 @@ Grab the git repo:
     git clone https://github.com/ganymede42/h5pyViewer.git
     
 Get your fingers dirty...
+
 ================================================================================
                                 
                                 !!! DONE !!!

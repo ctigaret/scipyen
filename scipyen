@@ -1,22 +1,25 @@
 #! /bin/sh 
-
 realscript=`realpath $0`
 scipyendir=`dirname $realscript`
-# scipyenvdir=`dirname $scipyendir`
+source $HOME/.scipyenrc # supplies the shell function scipyact created by make_
 
 if [ -z $VIRTUAL_ENV ]; then
-#     source $scipyenvdir/bin/activate
-    echo "You must run this script while in a virtual python environment"
+    scipyact
 fi
+
+echo "Using Python environment in ${VIRTUAL_ENV}"
+echo ""
+# echo "PYTHONHOME=$PYTHONHOME"
+# echo "PYTHONPATH=$PYTHONPATH"
+# echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 
 if [ -z $BROWSER ]; then
     if [ -a $VIRTUAL_ENV/bin/browser ]; then
         source $VIRTUAL_ENV/bin/browser
     fi
-#     if [ -a $scipyenvdir/bin/browser ]; then
-#         source $scipyenvdir/bin/browser
-#     fi
 fi
+
+# export LD_LIBRARY_PATH=$VIRTUAL_ENV/lib:$VIRTUAL_ENV/lib64:$LD_LIBRARY_PATH
 
 # NOTE: 2021-02-04 18:00:07
 # On linux, override KDE or other DEs theming from overriding the resources 
@@ -27,7 +30,5 @@ if [ $0 == 0 ] ; then
         xrdb -merge $scipyendir/neuron_python/app-defaults/nrniv
     fi
 fi
-python3 $scipyendir/scipyen.py 
-# python3 $scipyendir/scipyen.py &
 
-# python3 -m cProfile -s 'cumtime' $scipyendir/scipyen.py > profile &
+python3 $scipyendir/scipyen.py

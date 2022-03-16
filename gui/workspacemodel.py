@@ -57,7 +57,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     '''
     modelContentsChanged = pyqtSignal(name = "modelContentsChanged")
     
-    def __init__(self, shell, user_ns_hidden=dict(), parent=None):
+    def __init__(self, shell, user_ns_hidden=dict(), parent=None,
+                 mpl_figure_close_callback=None,
+                 mpl_figure_click_callback=None,
+                 mpl_figure_enter_callback=None):
         super(WorkspaceModel, self).__init__(parent)
         
         self.shell = shell # reference to IPython InteractiveShell of the internal console
@@ -100,6 +103,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.foreign_namespaces = DataBag(allow_none=True, mutable_types=True)
         # FIXME: 2021-08-19 21:45:17
         #self.foreign_namespaces.observe(self._foreign_namespaces_count_changed_, names="length")
+        
+        self.mpl_figure_close_callback = mpl_figure_close_callback
+        self.mpl_figure_click_callback = mpl_figure_click_callback
+        self.mpl_figure_enter_callback = mpl_figure_enter_callback
             
     def _foreign_namespaces_count_changed_(self, change):
         # FIXME / TODO 2020-07-30 23:49:13
@@ -564,8 +571,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return True
     
     def var_observer(self, change):
+        #print(f"WorkspaceModel.var_observer: change {change}")
         name = change.name
-        #generic_change_handler(change, "name") # for debugging
         displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
         
         if name in self.shell.user_ns:
@@ -577,14 +584,47 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             self.modelContentsChanged.emit()
         
     def pre_execute(self):
+        """Updates observed_vars DataBag
+        """
+        # ensure we observe only "user" variables in user_ns (i.e. excluding the "hidden"
+        # ones like the ones used by ipython internally)
         self.cached_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        
 
+        # need to withhold notifications here
         with self.observed_vars.hold_trait_notifications():
             self.observed_vars.clear()
             
             self.observed_vars.update(self.cached_vars)
         
     def post_execute(self):
+        """Updates workspace model AFTER kernel execution.
+        Also takes into account matplotlib figures that have been created by
+        plt commands at the console
+        """
+        # NOTE: 2022-03-15 22:05:21
+        # check if there is a mpl Figure created in the console (but NOT bound to
+        # a user-available identifier)
+        
+        fig = self.shell.user_ns.get("_", None)
+        
+        if isinstance(fig, mpl.figure.Figure):
+            figures = [v for v in self.cached_vars.values() if isinstance(v, mpl.figure.Figure)]
+            if fig not in figures:
+                num = fig.number
+                assert num in plt.get_fignums()
+                self.shell.user_ns[f"Figure{num}"] = fig
+                self.observed_vars[f"Figure{num}"] = fig
+                if self.mpl_figure_close_callback:
+                    fig.canvas.mpl_connect("close_event", self.mpl_figure_close_callback)
+                    
+                if self.mpl_figure_click_callback:
+                    fig.canvas.mpl_connect("button_press", self.mpl_figure_click_callback)
+                    
+                if self.mpl_figure_enter_callback:
+                    fig.canvas.mpl_connect("figure_enter_event", self.mpl_figure_enter_callback)
+
+        # just update the model directly
         self.update()
         
     def _gen_item_for_object_(self, propdict:dict, 
@@ -747,7 +787,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 self.setItem(rowindex, col, newrowdata[col])
 
     def removeRowForVariable(self, dataname, ns=None):
-        
         if isinstance(ns, str):
             if len(ns.strip()) == 0:
                 ns = "Internal"
@@ -757,10 +796,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
         row = self.rowIndexForItemsWithProps(Name=dataname, Workspace=ns)
         
+        #print("WorkspaceModel.removeRowForVariable data: %s ns: %s row: %s" % (dataname, ns, row))
         if row == -1:
             return
         
-        #print("removeRowForVariable data: %s ns: %s row: %s" % (dataname, ns, row))
         
         if isinstance(row, list):
             for r in row:
@@ -773,7 +812,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def slot_updateTable(self):
         #print("slot_updateTable")
         self.update()
-        #self.update(from_console=False)
             
     def addRowForVariable(self, dataname, data):
         """CAUTION Only use for data in the internal workspace, not in remote ones.
@@ -785,20 +823,18 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def clearTable(self):
         self.removeRows(0,self.rowCount())
         
-    def update(self, from_console:bool = False, force:bool=False):
+    def update(self):
         """Updates workspace model.
-        Must be called by code that adds/remove/mofifies or renames variables 
-        in the ScipyenWindow.workspace namespace in order to update the
-        workspace viewer.
+        Must be called by code that adds/remove/modifies/renames variables 
+        in the Scipyen's namespace in order to update the workspace viewer.
         
         Code executed in the main Scipyen's console does not (and SHOULD NOT)
         call this function, as the model is updated automatically by 
         self.observed_vars (via pre_execute and post_execute).
         """
+        
+        #print(f"WorkspaceModel.update observed_vars: {list(self.observed_vars.keys())}")
         del_vars = [name for name in self.observed_vars.keys() if name not in self.shell.user_ns.keys()]
-
-        for name in del_vars:
-            self.removeRowForVariable(name)
 
         self.observed_vars.remove_members(*del_vars)
         
@@ -806,6 +842,15 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         self.observed_vars.update(current_vars)
         
+        #print(f"WorkspaceModel.update del_vars = {del_vars}")
+        
+        obsolete_displayed_vars = [n for n in self.getDisplayedVariableNames() if n not in self.shell.user_ns.keys()] # in the internal ws
+        
+        names_to_remove = set(del_vars) | set(obsolete_displayed_vars)
+        
+        for name in names_to_remove:
+            self.removeRowForVariable(name)
+
     def updateFromExternal(self, prop_dicts):
         """prop_dicts: {name: nested properties dict}
             nested properties dict: {property: {"display": str, "tooltip":str}}
@@ -1057,9 +1102,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def getDisplayedVariableNames(self, asStrings=True, ws="Internal"):
         '''Returns names of variables in the internal workspace, registered with the model.
 
-        Parameter: strings (boolean, optional, default True) variable names are 
-                            returned as (a Python list of) strings, otherwise 
-                            they are returned as Python list of QStandardItems
+        Parameter: asStrings (boolean, optional, default True) variable names 
+                    are returned as (a Python list of) strings, otherwise 
+                    they are returned as Python list of QStandardItems
         '''
         wscol = standard_obj_summary_headers.index("Workspace")
         ret = [self.item(row).text() if asStrings else self.item(row) for row in range(self.rowCount()) if self.item(row, wscol).text() == ws]

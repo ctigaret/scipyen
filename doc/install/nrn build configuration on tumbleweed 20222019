@@ -1,0 +1,67 @@
+Hermes: 22b28
+Operating System: openSUSE Tumbleweed 20220219
+KDE Plasma Version: 5.24.1
+KDE Frameworks Version: 5.91.0
+Qt Version: 5.15.2
+Kernel Version: 5.16.10-1-default (64-bit)
+Graphics Platform: X11
+Processors: 8 × Intel® Core™ i7-3770K CPU @ 3.50GHz
+Memory: 15.6 GiB of RAM
+Graphics Processor: NVIDIA GeForce GTX 660 Ti/PCIe/SSE2  
+  
+Configured NEURON 8.0
+
+You can now build NEURON using:
+  cmake --build . --parallel 8 [--target TARGET]
+You might want to adjust the number of parallel build jobs for your system.
+Some non-default targets you might want to build:
+--------------+--------------------------------------------------------------
+ Target       |   Description
+--------------+--------------------------------------------------------------
+install       | Will install NEURON to: /home/cezar/scipyenv3.10
+              | Change the install location of NEURON using:
+              |   cmake <src_path> -DCMAKE_INSTALL_PREFIX=<install_path>
+docs          | Build full docs. Calls targets: doxygen, notebooks, sphinx
+uninstall     | Removes files installed by make install (todo)
+--------------+--------------------------------------------------------------
+ Build option | Status
+--------------+--------------------------------------------------------------
+C COMPILER    | /usr/bin/cc
+CXX COMPILER  | /usr/bin/c++
+BUILD_TYPE    | RelWithDebInfo (allowed: Custom;Debug;Release;RelWithDebInfo;Fast)
+COMPILE FLAGS | -g  -O2 -Wno-write-strings
+Shared        | ON
+Default units | modern units (2019 nist constants)
+MPI           | ON
+  INC         | /usr/lib64/mpi/gcc/mpich/include
+  LIB         | /usr/lib64/mpi/gcc/mpich/lib64/libmpicxx.so
+  DYNAMIC     | OFF
+Python        | ON
+  EXE         | /home/cezar/scipyenv3.10/bin/python3
+  INC         | /usr/include/python3.10
+  LIB         | /usr/lib64/libpython3.10.so
+  MODULE      | ON
+  DYNAMIC     | ON
+    EXE       | /home/cezar/scipyenv3.10/bin/python3
+    INC       | /usr/include/python3.10
+    LIB       | /usr/lib64/libpython3.10.so
+    INSTALL C | /home/cezar/scipyenv3.10/bin/python3 setup.py install --prefix= --home=/usr/local
+Readline      | /usr/lib64/libreadline.so
+Curses        | /usr/lib64/libncurses.so;/usr/lib64/libform.so
+RX3D          | ON
+  OptLevel    | 0
+Interviews    | ON
+  PATH        | /home/cezar/scipyenv3.10/src/nrn/external/iv
+  INC         | /home/cezar/scipyenv3.10/src/nrn/external/iv/src/include
+  X11 (INC)   | /usr/include
+      (LIBDIR)| /usr/lib64
+CoreNEURON    | ON
+  PATH        | /home/cezar/scipyenv3.10/src/nrn/external/coreneuron
+  LINK FLAGS  | -Lx86_64 -lcorenrnmech
+  Legacy Units| OFF
+Tests         | OFF
+--------------+--------------------------------------------------------------
+ See documentation : https://www.neuron.yale.edu/neuron/
+--------------+--------------------------------------------------------------
+
+Configuring done

@@ -1,0 +1,13 @@
+{load_file("stdlib.hoc")}
+{xopen("my_import3d/import3d_sec.hoc")}
+{xopen("my_import3d/read_swc.hoc")}
+{xopen("my_import3d/read_nlcda.hoc")}
+{xopen("my_import3d/read_nlcda3.hoc")}
+{xopen("my_import3d/read_nts.hoc")}
+{xopen("my_import3d/read_morphml.hoc")}
+{xopen("my_import3d/import3d_gui.hoc")}
+objref tobj, nil
+proc makeimport3dtool() {
+	tobj = new Import3d_GUI(nil)
+	tobj = nil
+}

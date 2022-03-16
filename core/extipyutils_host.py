@@ -1,9 +1,26 @@
 # -*- coding: utf-8 -*-
-"""Module with utilities for an external IPython kernel.
-To be imported in the remote kernel namespace - facilitates code execution by 
-Scipyen app and its internal console -- the "client" -- inside the remote kernel
--- the "host". the "host" is normally launched and interacted with by Scipyen's
-External IPython Console
+"""Module with housekeeping utilities for an external IPython kernel.
+
+To be run/imported inside a REMOTE ipython kernel (see extipyutils_client).
+
+This module includes code for communication between the external (or REMOTE)
+IPython kernel and Scipyen's internal (embedded) IPython kernel, as well as code
+managing custom magics, see below) which are not needed for regular user access.
+
+NOTE: 2022-02-06 22:26:01
+Some initialization has already occurred, driven by extipyutils_client.py (and
+from there, via extipy_init.py) BEFORE this module.
+
+In fact, this module is imported as hostutils via executing the init_commands in 
+extipyutils_client.
+
+To expose Scipyen API inside the REMOTE IPython kernel workspace, either insert
+relevant import statements in the init_commands list inside extipyutils_client
+module. NOTE: extipy_init module cannot be used for importing Scipyen API in 
+the REMOTE kernel namespace, as it is oblivious of Scipyen's module paths.
+
+NOTE: NeuronMagics are useful to start NEURON manually from an external IPython
+kernel, optionally with ('nrngui') or without NEURON GUI ('nrnpy')
 """
 
 import os, sys
@@ -73,13 +90,15 @@ class NeuronMagics(Magics):
     @line_magic
     @needs_local_scope
     def nrngui(self, line, local_ns):
-        """Starts NEURON modelling with gui
+        """Starts NEURON modelling with gui, in this kernel
         """
         get_ipython().run_line_magic("run", self.nrngui_magic_cmd)
         
     @line_magic
     @needs_local_scope
     def nrnpy(self, line, local_ns):
+        """Starts NEURON modelling (without gui), in this kernel
+        """
         get_ipython().run_line_magic("run", self.nrnpy_magic_cmd)
         
 #get_ipython().register_magics(NeuronMagics)

@@ -31,6 +31,7 @@ original ={"neo.core.analogsignal._new_AnalogSignalArray": neo.core.analogsignal
 
 def _patch_new_neo(original_f, *args, **kwargs):
     sig = signature2Dict(original_f)
+    #print(f"sig: {sig}")
     sig_named = list(sig.named.keys())
     named = dict()
     var = list()
@@ -59,6 +60,7 @@ def _patch_new_neo(original_f, *args, **kwargs):
         if k in sig.named:
             named[k] = v
             
+    #print(f" var {var}, named {named}, kwargs {kwargs}")
     return original_f(*var, **named, **kwargs)
 
 

@@ -1226,7 +1226,7 @@ class ScipyenConfigurable(object):
             
             user_conf = self._get_config_view_(isTop, parent, tag)
             
-            print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() user_conf", user_conf)
+            #print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() user_conf", user_conf)
             
             changed = False
             

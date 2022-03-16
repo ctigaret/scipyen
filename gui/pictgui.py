@@ -439,7 +439,7 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
             if self.listWidget.verticalScrollBar():
                 w += self.listWidget.verticalScrollBar().sizeHint().width()
                 
-            self.listWidget.setMinimumWidth(w)
+            self.listWidget.setMinimumWidth(int(w))
 
     @pyqtSlot(QtWidgets.QListWidgetItem)
     def selectItem(self, item):

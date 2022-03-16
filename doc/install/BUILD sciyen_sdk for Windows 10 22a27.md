@@ -1,67 +1,5 @@
-## 2022-01-27 10:53:24
-Problem solved by building VIGRA against statically-built png libraries
-(libpng-a.lib);
-(should check if there are issues with building libpng from github as
-shared lib on Windows -i.e. as dll)
-
-All other dependencies of VIGRA (ZLIB, TIFF, JPEG, HDF5) were built dynamically
-and installed (as with static libpng) in scipyen_sdk.
-
-These dependencies were built as follows (these are general/generic steps;
-details for each library are given below; the list here assumes each step works
-w/o trouble):
-
- 1. activate the scipyen with VS2019 environment (call "scipyact_vs64", see below)
-
- 2. clone their git repository in a place e.g. "scipyen_sdk_src"
-    this will create the source tree (e.g., "scipyen_sdk_src\vigra")
-
- 3. create an out-of-source build tree (e.g., "vigra-build" alongside "vigra" in
-    the "scipyen_sdk_src" directory)
-
- 4. cd to the build tree and launch cmake-gui to configure, then generate a
- VisualStudio2019 solution for x64 platform
-
- 5. from cmake-gui launch VStudio (press "Open Project")
-
- 6. Inside VStudio:
-
-* At the toolbar select "Release" and "x64" (NOTE for libpng, "Release Library" was selected)
-
-* In Solution explorer select ALL_BUILD solution (or project), build it
-
-* In solution explorer, select INSTALL solution (or project), build it.
-
-
-
-It turns out one can archive scipyen_sdk as a zip file and carry it over to
-another Windows 10 machine.
-
-The "vigranumpy" python package is installed in scipyenv\Lib\site-packages\vigra
-on the build machine. This package can also be archived as zip file and carried
-over to another Windows 10 machine. On the new (target) machine the zip file
-needs to be extracted and its contents placed in the equivalent "site-packages"
-(sub)directory of the "scipyenv" virtual environment created on the target
-machine.
-
-NOTE that "scipyenv\Lib\site-packages" is created automatically WHEN INSTALLING
-3rd party pythyon packages in the virtual environment, using "pip"; therefore,
-these packages need to be installed first, by calling:
-    pip install -r <pip_requirements>
-
-where <pip_requirements> is the name of the requirements text file FOR WINDOWS,
-located in "scipyen\doc\install" directory.
-
-
-Finally, the batch scripts scipyact.bat, scipyact_vs64.bat and scipyen.bat only
-need to be edited to point to thew correct location of scipyen_sdk directory.
-
-NOTE that scipyact_vs64.bat is ONLY used to build the "scipyen_sdk" tree, from
-sources (located in "scipyen_sdk_src").
-
-To use scipyen one only needs to call scipyact.bat first, then "scipyen.bat".
-
-
+* * *
+# Build scipyen_sdk on Windows.
 ## 2022-01-26 10:37:43
 AVOID building on networked drive - on a virtual machine, create a 2nd VDI image
 for a 2nd partition (~100 GiB)
@@ -69,29 +7,6 @@ for a 2nd partition (~100 GiB)
 Building on network drive will:
 1. slow down the process
 2. interfere with building processes (e.g. HDF5 and VIGRA)
-
-## 2022-01-26 18:48:50
-Build attemps apparently works but launching scipyen fails with:
-
-    python.exe - Ordinal Not Found
-    the ordinal 169 could not be located in tghe dynamic link library
-    e:zscipyen_sdk\bin\libpng16.dll
-
-and, at command line:
-
-    Traceback (most recent call last):
-
-    File "e:\scipyen\scipyen.py", line 16, in <module>
-        path_to_vigraimpex = win32api.GetModuleFileName(win32api.LoadLibrary(vigraimpex_mod))
-        pywintypes.error: (182, 'LoadLibrary', 'The operating system cannot run %1.')
-
-        
-This was replicated on two Windows10 virtual machines.
-
-##### 2022-01-26 20:46:50
-This might have something to do with INSTALL projects overwriting runtime dlls in scipyen_sdk
-
-#### Workaround: build libpng as static libraries, then link VIGRA against these.
 
 
 * * *
@@ -640,3 +555,94 @@ make docs (NOTE this may fail --> no problems !)
     Optionally, copy/move (or, better make a symbolic link)
     $VIRTUAL_ENV/src/nrn/docs/_build to $VIRTUAL_ENV/doc/neuron
 
+
+* * * 
+# Change log:
+
+## 2022-01-27 10:53:24
+Problem solved by building VIGRA against statically-built png libraries
+(libpng-a.lib);
+(should check if there are issues with building libpng from github as
+shared lib on Windows -i.e. as dll)
+
+All other dependencies of VIGRA (ZLIB, TIFF, JPEG, HDF5) were built dynamically
+and installed (as with static libpng) in scipyen_sdk.
+
+These dependencies were built as follows (these are general/generic steps;
+details for each library are given below; the list here assumes each step works
+w/o trouble):
+
+ 1. activate the scipyen with VS2019 environment (call "scipyact_vs64", see below)
+
+ 2. clone their git repository in a place e.g. "scipyen_sdk_src"
+    this will create the source tree (e.g., "scipyen_sdk_src\vigra")
+
+ 3. create an out-of-source build tree (e.g., "vigra-build" alongside "vigra" in
+    the "scipyen_sdk_src" directory)
+
+ 4. cd to the build tree and launch cmake-gui to configure, then generate a
+ VisualStudio2019 solution for x64 platform
+
+ 5. from cmake-gui launch VStudio (press "Open Project")
+
+ 6. Inside VStudio:
+
+* At the toolbar select "Release" and "x64" (NOTE for libpng, "Release Library" was selected)
+
+* In Solution explorer select ALL_BUILD solution (or project), build it
+
+* In solution explorer, select INSTALL solution (or project), build it.
+
+
+
+It turns out one can archive scipyen_sdk as a zip file and carry it over to
+another Windows 10 machine.
+
+The "vigranumpy" python package is installed in scipyenv\Lib\site-packages\vigra
+on the build machine. This package can also be archived as zip file and carried
+over to another Windows 10 machine. On the new (target) machine the zip file
+needs to be extracted and its contents placed in the equivalent "site-packages"
+(sub)directory of the "scipyenv" virtual environment created on the target
+machine.
+
+NOTE that "scipyenv\Lib\site-packages" is created automatically WHEN INSTALLING
+3rd party pythyon packages in the virtual environment, using "pip"; therefore,
+these packages need to be installed first, by calling:
+    pip install -r <pip_requirements>
+
+where <pip_requirements> is the name of the requirements text file FOR WINDOWS,
+located in "scipyen\doc\install" directory.
+
+
+Finally, the batch scripts scipyact.bat, scipyact_vs64.bat and scipyen.bat only
+need to be edited to point to thew correct location of scipyen_sdk directory.
+
+NOTE that scipyact_vs64.bat is ONLY used to build the "scipyen_sdk" tree, from
+sources (located in "scipyen_sdk_src").
+
+To use scipyen one only needs to call scipyact.bat first, then "scipyen.bat".
+
+
+## 2022-01-26 18:48:50
+Build attemps apparently works but launching scipyen fails with:
+
+    python.exe - Ordinal Not Found
+    the ordinal 169 could not be located in tghe dynamic link library
+    e:zscipyen_sdk\bin\libpng16.dll
+
+and, at command line:
+
+    Traceback (most recent call last):
+
+    File "e:\scipyen\scipyen.py", line 16, in <module>
+        path_to_vigraimpex = win32api.GetModuleFileName(win32api.LoadLibrary(vigraimpex_mod))
+        pywintypes.error: (182, 'LoadLibrary', 'The operating system cannot run %1.')
+
+        
+This was replicated on two Windows10 virtual machines.
+
+### 2022-01-26 20:46:50
+This might have something to do with INSTALL projects overwriting runtime dlls in scipyen_sdk
+
+### Workaround:
+    Build libpng as static libraries, then link VIGRA against these.

@@ -25,24 +25,25 @@
 #     OTHER DEALINGS IN THE SOFTWARE.                                   
 ###############################################################################
 
-NOTE: This is for building Python (3.9.7 or later) on Unix
+NOTE: This is for building Python (3.9.7 or later) on Unix/GNU Linux, with 
+particulars for the OpenSUSE platform (the machine where this was written).
 
-For Windows 10 see the accompanying "README Windows 10 file.txt"
+For Windows 10 see the accompanying "README.txt" in the "../Windows" directory
 
-================================================================================
-Install prerequisites for building Python (disregard on Windows 10)
-================================================================================
+=========================================
+Install prerequisites for building Python
+=========================================
 
 Use the distribution's Software manager (e.g. YaST/zypper on OpenSuSE, yum, apt,
-etc., on others) search for and install, TOGETHER WITH THEIR CORRESPONDING 
-"devel" PACKAGES:
+etc., on others) search for, and install TOGETHER WITH THEIR CORRESPONDING 
+"devel" PACKAGES, the following:
 
     libnsl, 
     openssl (>= 1.1.1)
     tk
     sqlite3
 
-Exrtact the Python source code archive (e.g., Python-3.9.7.tar.xz) into your
+Extract the Python source code archive (e.g., Python-3.9.7.tar.xz) into your
 chosen place (e.g., ~/src)
 
 The cd into the chosen Python source tree (e.g. ~/src/Python-3.9.7) and run
@@ -57,7 +58,7 @@ make
 # run as superuser (either call su, or via sudo):
 
 make altinstall # NOTE: DO NOT CALL make install !!!! (this will overwrite your
-                #   ditribution's pytnhon executable)
+                #   ditribution's python3 executable)
                 
                 # NOTE: you could try to install Python locally somewhere under 
                 # your own $HOME tree
@@ -80,6 +81,8 @@ versions of gcc, nsl, oppenssl, sqlite3, tk, etc).
 
 As a rule of thumb, ALWAYS REBUILD Python (and other Scipyen ependencies) after
 an OS ugrade.
+
+For details, see the accompanying 'README migrating' file in this directory.
 
 If you decide to install Python in a non-standard place (e.g. ~/Python-3.9.7)
 you MUST add this directory to your PATH (edit ~/.bashrc)
@@ -106,7 +109,7 @@ NOTE: These have been created with the assumption that the build was configured
     HOWEVER: Because you have to call ldconfig (as superuser) after make install,
     is is a BadIdea NOT to install Python in the default location (/usr/local)
 
-Copy the pyenv bash script to your $HOME/bin directory
+Link/copy the pyenv bash script to your $HOME/bin directory
 
 You MUST NOT make this executable.
 

@@ -592,6 +592,7 @@ class DataBag(Bunch):
         #return dict((k,v) for k,v in self.items())
         
     def remove_members(self, *keys):
+        #print(f"DataBag.remove_members {keys}")
         try:
             obs = object.__getattribute__(self, "__observer__")
             

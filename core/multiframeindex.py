@@ -22,6 +22,8 @@ class IndexProxy(object):
     in the 'map' attribute (a DataFrame) of the owner of this proxy, with 
     the owner being an instance of FrameIndexLookup.
     
+    Implements the descriptor protocol.
+    
     """
     
     def __init__(self, field:str):
@@ -540,7 +542,12 @@ class FrameIndexLookup(object):
         """
         pds = self.__getitem__(field)
         
-        cond = pds == value
+        if self.missingFrameIndex is pd.NA:
+            ppds = pds.fillna(np.nan)
+        else:
+            ppds = pds
+        
+        cond = ppds == value
         
         ret = list(pds.where(cond).dropna().index)
         

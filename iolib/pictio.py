@@ -16,8 +16,16 @@ import inspect, os, sys, traceback, typing, warnings, io
 import contextlib, pathlib
 # import  threading
 import csv, numbers, mimetypes
-import dill as pickle
-#import pickle, pickletools, copyreg
+if sys.version_info.major >= 3 and sys.version_info.minor < 10:
+    # NOTE: 2022-03-06 13:05:46
+    # issues with dill on Python 3.10.2
+    import dill as pickle
+    # NOTE: 2022-03-06 11:56:53
+    # for debugging only; comment-out otherwise 
+    #pickle.detect.trace(True) # CAUTION: 2022-03-06 11:59:12 pickle aliased to dill
+else:
+    import pickle #, pickletools, copyreg
+    
 import concurrent.futures
 import collections
 #from functools import singledispatch
@@ -36,6 +44,13 @@ import h5py
 import vigra
 import neo
 import confuse # for programmatic read/write of non-gui settings
+
+try:
+    import pyabf
+    hasPyABF=True
+except:
+    hasPyABF=False
+
 from PyQt5 import QtCore, QtGui, QtWidgets
 #### END 3rd party modules
 
@@ -1062,7 +1077,7 @@ def loadPickleFile(fileName):
     return ret
         
     
-            
+@safeWrapper            
 def savePickleFile(val, fileName, protocol=None):
     #if inspect.isfunction(val): # DO NOT attempt to pickle unbound functions
         #return
@@ -1071,6 +1086,7 @@ def savePickleFile(val, fileName, protocol=None):
         protocol = pickle.HIGHEST_PROTOCOL
     
     (name,extn) = os.path.splitext(fileName)
+    
     if len(extn)==0 or extn != ".pkl":
         fileName += ".pkl"
         

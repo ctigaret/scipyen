@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Module with utilities for an external IPython kernel.
-To be used on the client side (i.e. Scipyen app side).
-Contains functions and types used ot communicate with the remote kernel via its
+To be used on the client side (i.e. Scipyen app side, NOT in the REMOTE kernel).
+Contains functions and types used to communicate with the remote kernel via its
 messaging API.
 """
 # on the client side, in a received execute_reply message the keys of
@@ -9,7 +9,7 @@ messaging API.
 # sent execute_request message["content"]["user_expressions"] NOTE that such
 # execute_request message is sent when client.execute(...) is called, and the 
 # user_expressions field of the message gets the valueof the user_expressions
-# parameter ot that call.
+# parameter to that call.
 
 # NOTE 2020-07-11 10:26:38
 # Strategies for getting information about the properties of an object located
@@ -86,12 +86,10 @@ if isinstance(__virtual_env_dir__, str) and len(__virtual_env_dir__.strip()):
 else:
     __virtual_site_packages__ = None
     
-# initialization script for ALL external IPython consoles
+# initialization script for ALL available external IPython consoles
 # private: call indirectly via init_commands!
 _ext_ipython_initialization_file = os.path.join(__module_path__, "extipy_init.py")
 _ext_ipython_initialization_cmd = " ".join(["get_ipython().run_cell(", "'run -i -n", _ext_ipython_initialization_file, "')"])
-
-#print("_ext_ipython_initialization_cmd", _ext_ipython_initialization_cmd)
 
 # initialization script for NEURON in external ipython process
 # only called when launching a NEURON external console
@@ -107,6 +105,8 @@ nrn_ipython_initialization_cmd = " ".join(["run -i -n", nrn_ipython_initializati
 # figure out how to use Qt5 Agg in the external ipython (mpl.use("Qt5Agg") crashes
 # the kernel when a mpl figure is shown)
 # for now stick with inline figures
+# TODO: 2022-02-06 22:28:41
+# consider consolidating these and the extipyutils_host if possible
 init_commands = [
     "import sys, os, io, warnings, numbers, types, typing, re, importlib",
     "import traceback, keyword, inspect, itertools, functools, collections",
@@ -117,6 +117,16 @@ if __virtual_site_packages__:
 if os.path.isfile(_ext_ipython_initialization_file):
     init_commands.append(_ext_ipython_initialization_cmd)
     
+# NOTE: 2022-02-06 22:30:26
+# some of the commands below expose Scipyen API to external kernels; this may
+# be done via such init commands as below; 
+# These MIGHT also be imported from within extipyutils_host BUT they won't be 
+# directly available in the REMOTE kernel workspace - but only indirectly as
+# members of the 'hostutils' module available in the REMOTE kernel workspace.
+# Hence, hostutils (a.k.a extipyutils_host) shoud only contain API deemed as
+# housekeeping for the REMOTE python kernel, including for communication
+# between the Scipyen kernel and the REMOTE kernel, and not requiring regular
+# access by the user.
 init_commands.extend(
     [
     "import signal, pickle, json, csv",
@@ -133,9 +143,36 @@ init_commands.extend(
     "from matplotlib import pyplot as plt",
     "from matplotlib import cm",
     "import matplotlib.mlab as mlb",
-    "mpl.use('Qt5Agg')",
+    #"mpl.use('Qt5Agg')",
     "".join(["sys.path.insert(2, '", __scipyen_path__, "')"]),
     "from core import extipyutils_host as hostutils",
+    "from core.workspacefunctions import *",
+    "from core import plots as plots",
+    "from core import datatypes as dt",
+    "from core import neoutils",
+    "from core.datatypes import * ",
+    "import core.signalprocessing as sigp",
+    "import core.curvefitting as crvf",
+    "import core.strutils as strutils",
+    "import core.data_analysis as anl",
+    "from core.utilities import (summarize_object_properties,standard_obj_summary_headers,safe_identity_test, unique, index_of, gethash,NestedFinder, normalized_index)",
+    "from core.prog import (safeWrapper, deprecation, iter_attribute,filter_type, filterfalse_type, filter_attribute, filterfalse_attribute)",
+    "from core import prog",
+    "from core.traitcontainers import DataBag",
+    "from core.triggerprotocols import TriggerProtocol",
+    "from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, )",
+    "from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)",
+    "from core.datazone import DataZone",
+    "from ephys import (ephys, ltp, membrane, ivramp,)",
+    "from systems import *",
+    "from imaging import (imageprocessing as imgp, imgsim,)",
+    "from imaging import axisutils, vigrautils",
+    "from imaging.axisutils import (axisTypeFromString, axisTypeName,axisTypeStrings,axisTypeSymbol, axisTypeUnits,dimEnum,dimIter,evalAxisTypeExpression,getAxisTypeFlagsInt,getNonChannelDimensions,hasChannelAxis,)",
+    "from imaging.axiscalibration import (AxesCalibration,AxisCalibrationData, ChannelCalibrationData, CalibrationData)",
+    "from imaging.scandata import (AnalysisUnit, ScanData,)",
+    "from iolib import pictio as pio",
+    "from iolib import h5io, jsonio",
+    "print('To use matplotlib run %matplotlib magic')"
     ])
     
 #init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, importlib",

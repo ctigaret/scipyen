@@ -39,7 +39,7 @@ CHANGELOG:
 # NOTE: 2021-10-21 13:24:24
 # all things imported below will be available in the user workspace
 #### BEGIN core python modules
-import faulthandler
+import faulthandler, importlib
 import sys, os, types, atexit, re, inspect, gc, sip, io, warnings, numbers
 import traceback, keyword, inspect, weakref, itertools, typing, functools, operator
 import json
@@ -154,6 +154,11 @@ from IPython.display import set_matplotlib_formats
 from jupyter_client.session import Message
 
 #### END 3rd party modules
+
+#### BEGIN 2022-02-21 15:43:38 check if NEURON python is installed
+neuron_spec = importlib.util.find_spec("neuron")
+has_neuron = neuron_spec is not None
+#### END
 
 #### BEGIN scipyen core modules
 #import core.prog as prog
@@ -473,7 +478,7 @@ class WindowManager(__QMainWindow__):
         
     @safeWrapper
     def handle_mpl_figure_click(self, evt):
-        self._raiseCurrentWindow(evt.canvas.figure)
+        self._raiseWindow(evt.canvas.figure)
     
     @safeWrapper
     def handle_mpl_figure_enter(self, evt):
@@ -482,7 +487,6 @@ class WindowManager(__QMainWindow__):
     @safeWrapper
     def handle_mpl_figure_close(self, evt):
         """Removes the figure from the workspace and updates the workspace table.
-        NOTE: handle_mpl_figure_close in WindowManager is now obsolete
         """
         fig_number = evt.canvas.figure.number
         fig_varname = "Figure%d" % fig_number
@@ -624,10 +628,7 @@ class WindowManager(__QMainWindow__):
             win.canvas.mpl_connect("button_press_event", self.handle_mpl_figure_click)
             win.canvas.mpl_connect("figure_enter_event", self.handle_mpl_figure_enter)
             
-            # NOTE: 2020-02-05 00:12:35
-            # this is now handled by the MainWindow as it needs to update the
-            # workspace table
-            #win.canvas.mpl_connect("close_event", self.handle_mpl_figure_close)
+            win.canvas.mpl_connect("close_event", self.handle_mpl_figure_close)
             
             winId = int(win.number)
         
@@ -668,7 +669,10 @@ class WindowManager(__QMainWindow__):
         if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             return
         
-        w_title = win.get_window_title() if isinstance(win, mpl.figure.Figure) else win.windowTitle()
+        # NOTE: 2022-03-15 11:28:09
+        # get_window_title is NOT a method of mpl Figue, but a DEPRECATED one
+        # of its canvas (backend)
+        #w_title = win.get_window_title() if isinstance(win, mpl.figure.Figure) else win.windowTitle()
         
         #print("WindowManager.deRegisterViewer %s %s" % (win.__class__, w_title))
         
@@ -709,7 +713,7 @@ class WindowManager(__QMainWindow__):
                         
                     self.currentViewers[viewer_type] = self.viewers[viewer_type][viewer_index]
                 
-    def _raiseCurrentWindow(self, obj):
+    def _raiseWindow(self, obj):
         """Sets obj to be the current window and raises it.
         Steals focus.
         """
@@ -721,6 +725,8 @@ class WindowManager(__QMainWindow__):
         if isinstance(obj, mpl.figure.Figure):
             plt.figure(obj.number)
             plt.get_current_fig_manager().canvas.activateWindow() # steals focus!
+            plt.get_current_fig_manager().canvas.update()
+            plt.get_current_fig_manager().canvas.draw_idle()
             obj.show() # steals focus!
             
         else:
@@ -741,18 +747,23 @@ class WindowManager(__QMainWindow__):
             self.viewers[type(obj)].append(obj)
 
         self.currentViewers[type(obj)] = obj
+        
+        #if isinstance(obj, mpl.figure.Figure):
+            #plt.figure(obj.number)
+            ##plt.get_current_fig_manager().canvas.activateWindow() # steals focus!
+            #plt.get_current_fig_manager().canvas.update()
+            #plt.get_current_fig_manager().canvas.draw_idle()
+            ##if isinstance(obj.canvas, QtWidgets.QWidget):
+                ##obj.canvas.activateWindow()
+                ##obj.canvas.raise_()
+                ##obj.canvas.setVisible(True)
+            ##obj.show() # steals focus!
+            ##plt.show()
             
-        if isinstance(obj, mpl.figure.Figure):
-            plt.figure(obj.number)
-            #plt.get_current_fig_manager().canvas.activateWindow() # steals focus!
-            plt.get_current_fig_manager().canvas.update()
-            plt.get_current_fig_manager().canvas.draw_idle()
-            #obj.show() # steals focus!
-            
-        else:
-            obj.activateWindow()
-            obj.raise_()
-            obj.setVisible(True)
+        #else:
+            #obj.activateWindow()
+            #obj.raise_()
+            #obj.setVisible(True)
         
     @property
     def matplotlib_figures(self):
@@ -1700,7 +1711,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.fileSystemModel            = QtWidgets.QFileSystemModel(parent=self)
         
-        self.workspaceModel             = WorkspaceModel(self.shell, parent=self)
+        self.workspaceModel             = WorkspaceModel(self.shell, parent=self,
+                                                         mpl_figure_close_callback=self.handle_mpl_figure_close,
+                                                         mpl_figure_click_callback=self.handle_mpl_figure_click,
+                                                         mpl_figure_enter_callback=self.handle_mpl_figure_enter)
         
         self.sig_windowRemoved.connect(self.slot_windowRemoved) # signal inherited from WindowManager
         
@@ -2540,8 +2554,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._sortWorkspaceViewFirstColumn_()
         self._resizeWorkspaceViewFirstColumn_()
         
-    #@pyqtSlot(bool)
-    #def slot_updateWorkspaceModel(self, value:bool):
     @pyqtSlot()
     def slot_updateWorkspaceModel(self):
         """ pyplot commands may produce or close a figure; we need to reflect this!
@@ -2552,7 +2564,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # self.slot_updateWorkspaceView(); in turn this will sort column 0
         # and resize its contents. 
         # This is because workspaceModel doesn't "know" anything about workspaceView.
-        self.workspaceModel.update() # emits WorkspaceModel.modelContentsChanged
+        self.workspaceModel.update() # emits WorkspaceModel.modelContentsChanged via var_observer
         
     @pyqtSlot()
     def slot_updateCwd(self):
@@ -2702,11 +2714,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             expensive updates of the workspace viewer after each variable.
             
         """
-        #print("ScipyenWindow.removeFromWorkspace", value)
         if isinstance(value, str) and by_name:
+            #print(f"---\nScipyenWindow.removeFromWorkspace {value}")
             self.workspace.pop(value, None)
-            
-            #self.workspaceModel.update()
             
         else:
             # inverse lookup the key mapped to this value - will remove ALL
@@ -2716,8 +2726,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 for o in objects:
                     self.workspace.pop(o[0], None)
                     
-            #self.workspaceModel.update()
-            
         if update:
             self.workspaceModel.update()
         
@@ -2771,9 +2779,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             selected_viewer_type_name = seltxt[0]
             
             win = self._newViewer(selected_viewer_type_name)# , name=win_name)
-            
-            if isinstance(win, mpl.figure.Figure):
-                win.canvas.mpl_connect("close_event", self.handle_mpl_figure_close)
             
     @pyqtSlot()
     @safeWrapper
@@ -2960,6 +2965,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #print("ScipyenWindow.slot_variableItemPressed %s", ndx)
         self.workspaceModel.currentItem = self.workspaceModel.item(ndx.row(),0)
         self.workspaceModel.currentItemName = self.workspaceModel.item(ndx.row(),0).text()
+        item = self.workspace[self.workspaceModel.currentItemName]
+        if isinstance(item, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
+            self._setCurrentWindow(item)
     
     @pyqtSlot(QtCore.QModelIndex)
     @safeWrapper
@@ -2980,9 +2988,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if QtWidgets.QWidget in inspect.getmro(type(item)):
             item.show()
         
-        #if isinstance(item, (QtWidgets.QMainWindow, mpl.figure.Figure)):
         if isinstance(item, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
-            self._setCurrentWindow(item)
+            self._raiseWindow(item)
             
         else:
             newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
@@ -3162,9 +3169,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 
             item = self.workspace[self.workspaceModel.currentItemName]
             
-            #if isinstance(item, (QtWidgets.QMainWindow, mpl.figure.Figure)):
-                #self._setCurrentWindow(item)
-                
         else:
             self.workspaceModel.currentItemName = ""
             self.workspaceModel.currentItem = None
@@ -3359,6 +3363,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             #QtWidgets.QApplication.restoreOverrideCursor()
             self.unsetCursor()
             
+    def _workspaceItem_to_varName(self, index:QtCore.QModelIndex):
+        v = self.workspaceModel.item(index.row(), 0).text()
+        
+        return v if v in self.workspace.keys() else None
+            
     @pyqtSlot()
     @safeWrapper
     def slot_deleteSelectedVars(self):
@@ -3374,12 +3383,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         varNames = list()
         
-        varSet = set()
+        varSet = set((self._workspaceItem_to_varName(i) for i in indexList))
         
-        for i in indexList:
-            varSet.add(self.workspaceModel.item(i.row(),0).text())
+        #for i in indexList:
+            #varSet.add(self.workspaceModel.item(i.row(),0).text())
             
-        varNames = [v for v in sorted(unique([n for n in varSet])) if v in self.workspace.keys()]
+        varNames = sorted(varSet)# Python 3.8+ facility? NOTE 2022-03-14 16:52:48 in Python3.10 sets are sorted already?
+        #varNames = [v for v in sorted([n for n in varSet]) if v in self.workspace.keys()]
+        #varNames = [v for v in sorted(unique([n for n in varSet])) if v in self.workspace.keys()]
             
         msgBox = QtWidgets.QMessageBox()
         
@@ -3388,7 +3399,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             wintitle = "Delete variable"
             
         else:
-            prompt = "Delete %d selected variables?" % len(indexList)
+            prompt = "Delete %d selected variables?" % len(varSet)
             wintitle = "Delete variables"
             msgBox.setDetailedText("\n".join(varNames))
             
@@ -3404,18 +3415,21 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if ret == QtWidgets.QMessageBox.No:
             return
         
+        #print(f"***\nScipyenWindow.slot_deleteSelectedVars varNames = {varNames}")
+        
         for n in varNames:
             obj = self.workspace[n]
             if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
                 #print("%s.slot_deleteSelectedVars %s: %s" % (self.__class__.__name__, n, obj.__class__.__name__))
                 if isinstance(obj, mpl.figure.Figure):
-                    plt.close(obj)
+                    plt.close(obj) # also removes obj.number from plt.get_fignums()
                     
                 else:
                     obj.close()
                     #obj.closeEvent(QtGui.QCloseEvent())
                 self.deRegisterViewer(obj) # does not remove its symbol for workspace - this has already been removed by delete action
                 
+            #self.removeFromWorkspace(n, by_name=True, update=True)
             self.removeFromWorkspace(n, by_name=True, update=False)
             #self.workspace.pop(n, None)
             
@@ -3761,14 +3775,33 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.actionQuit.triggered.connect(self.slot_Quit)
         
+        self.actionConsole = QtWidgets.QAction("Scipyen Console")
         self.actionConsole.triggered.connect(self.slot_initQtConsole)
+        self.menuConsoles.addAction(self.actionConsole)
+        
+        self.actionExternalIPython = QtWidgets.QAction("External IPython")
+        self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
+        self.menuConsoles.addAction(self.actionExternalIPython)
+        
+        if has_neuron:
+            self.actionExternalNrnIPython = QtWidgets.QAction("External IPython for NEURON")
+            self.actionExternalNrnIPython.triggered.connect(self.slot_launchExternalNeuronIPython)
+            self.menuConsoles.addAction(self.actionExternalNrnIPython)
+        
+        self.menuWith_Running_Kernel = QtWidgets.QMenu("With Running Kernel", self)
+        self.menuConsoles.addMenu(self.menuWith_Running_Kernel)
+        self.actionRunning_IPython = QtWidgets.QAction("Choose kernel ...")
+        self.actionRunning_IPython.triggered.connect(self.slot_launchExternalRunningIPython)
+        self.menuWith_Running_Kernel.addAction(self.actionRunning_IPython)
+        
+        if has_neuron:
+            self.actionRunning_IPython_for_Neuron = QtWidgets.QAction("Choose kernel and launch NEURON")
+            self.actionRunning_IPython_for_Neuron.triggered.connect(self.slot_launchExternalRunningIPythonNeuron) 
+            self.menuWith_Running_Kernel.addAction(self.actionRunning_IPython_for_Neuron)
+        
         #self.actionRestore_Workspace.triggered.connect(self.slot_restoreWorkspace)
         self.actionHelp_On_Console.triggered.connect(self._helpOnConsole_)
         
-        self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
-        self.actionExternalNrnIPython.triggered.connect(self.slot_launchExternalNeuronIPython)
-        self.actionRunning_IPython.triggered.connect(self.slot_launchExternalRunningIPython) 
-        self.actionRunning_IPython_for_Neuron.triggered.connect(self.slot_launchExternalRunningIPythonNeuron) 
         self.actionOpen.triggered.connect(self.slot_openFiles)
         #self.actionOpen.triggered.connect(self.openFile)
         #self.actionOpen_Files.triggered.connect(self.slot_openFiles)
@@ -4532,15 +4565,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.workspaceView.sortByColumn(sortSection,sortOrder)
         self.workspaceView.setSortingEnabled(True)
         
-    
-    #@pyqtSlot(QtCore.QModelIndex, QtCore.QModelIndex, "QVector<int>")
-    #@safeWrapper
-    #def slot_fileSystemDataChanged(self, top_left, bottom_right, roles):
-        ## NOTE: 2018-10-17 21:28:20
-        ## not implemented because there are issues with this in Qt5. 
-        ## one could design a custom file watcher but this will introduce
-        ## significant overheads
-        #pass
     
     @pyqtSlot(QtCore.QModelIndex)
     @safeWrapper
@@ -5636,13 +5660,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                                              cmds_get_foreign_data_props,
                                              cmd_foreign_shell_ns_listing,
                                              )
-        # TODO 2020-07-09 23:19:59
-        #### BEGIN get rid of this once done developing
-        #varname = strutils.str2symbol("_".join([msg["header"]["msg_type"], msg["header"]["session"]]))
-        #session_id = msg["header"]["session"]
-        #self.workspace[varname] = msg
-        #self.workspaceModel.update(from_console=False)
-        #### END get rid of this once done developing
         
         #print("_slot_ext_krn_shell_chnl_msg_recvd")
         #print("\ttab:", msg["workspace_name"], "\n\ttype:", msg["msg_type"], "\n\tstatus:", msg["content"]["status"])
@@ -5696,7 +5713,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 # external kernel namespace into our own
                     
                 self.workspace.update(vardict)
-                self.workspaceModel.update(from_console=False)
+                self.workspaceModel.update()
+                #self.workspaceModel.update(from_console=False)
                 
                 if len(prop_dicts):
                     #print("mainWindow: len(prop_dicts)", len(prop_dicts))
@@ -5831,13 +5849,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self._run_python_source_code_(self._temp_python_filename_, paste=False)
 
             if self._temp_python_filename_ not in self.recentScripts:
-                self.recentScripts.appendleft(self._temp_python_filename_)
+                self.recentScripts.insert(0,self._temp_python_filename_)
+                #self.recentScripts.appendleft(self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
                 
             else:
                 if self._temp_python_filename_ != self.recentScripts[0]:
                     self.recentScripts.remove(self._temp_python_filename_)
-                    self.recentScripts.appendleft(self._temp_python_filename_)
+                    self.recentScripts.insert(0,self._temp_python_filename_)
+                    #self.recentScripts.appendleft(self._temp_python_filename_)
                     #self._refreshRecentScriptsMenu_()
                     
             self._temp_python_filename_ = None
@@ -5900,7 +5920,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot(tuple)
     def slot_windowRemoved(self, name_obj):
         self.shell.user_ns.pop(name_obj[0], None)
-        self.workspaceModel.update(from_console=False)
+        self.workspaceModel.update()
                 
     @pyqtSlot()
     @safeWrapper
@@ -6198,10 +6218,27 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         if isinstance(win, mpl.figure.Figure):
             plt.figure(win.number)
-            plt.plot(obj)
+            if isinstance(obj, neo.core.basesignal.BaseSignal) and hasattr(obj, "times"):
+                plt.plot(obj.times, obj)
+                times_units_str = obj.times.units.dimensionality.string
+                xlabel = "" if times_units_str == "dimensionless" else f"{cq.name_from_unit(obj.times.units)} ({obj.times.units.dimensionality.string})"
+                name = obj.name
+                if name is None or len(name.strip()) == 0:
+                    name = cq.name_from_unit(obj.units.dimensionality.string)
+                ylabel = f"{name} ({obj.units.dimensionality.string})"
+                plt.xlabel(xlabel)
+                plt.ylabel(ylabel)
+                if isinstance(objname, str) and len(objname.strip()):
+                    plt.title(objname)
+            else:
+                plt.plot(obj)
+                
+            if isinstance(win.canvas, QtWidgets.QWidget):
+                win.canvas.activateWindow()
            
         else:
             win.setData(obj, doc_title=objname) # , varname=objname)
+            win.activateWindow()
     
         return True
             
@@ -6501,7 +6538,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             self.workspace["result"] = obj
             
-        self.workspaceModel.update(from_console=False)
+        self.workspaceModel.update()
+        #self.workspaceModel.update(from_console=False)
             
         self.workspaceChanged.emit()
         

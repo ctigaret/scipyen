@@ -1590,7 +1590,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.annotationsViewer.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.annotationsViewer.setDragDropMode(QtWidgets.QAbstractItemView.DragOnly)
         self.annotationsViewer.setDragEnabled(True)
-        self.annotationsViewer.customContextMenuRequested[QtCore.QPoint].connect(self.slot_annotationsContextMenuRequested)
+        
+        # NOTE: 2022-03-04 10:14:09 FIXME/TODO code to actually export to workspace
+        # items selected in the annotations viewer
+        #self.annotationsViewer.customContextMenuRequested[QtCore.QPoint].connect(self.slot_annotationsContextMenuRequested)
         
         self.annotationsDockWidget.setWidget(self.annotationsViewer)
         
@@ -2822,6 +2825,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if self._scipyenWindow_ is None: 
             return
         
+        # NOTE: 2022-03-04 10:05:14
+        # annotations viewer is dictviewer.InteractiveTreeWidget
         indexList = self.annotationsViewer.selectedIndexes()
         
         if len(indexList) == 0:
@@ -2892,13 +2897,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if dlg.exec() == QtWidgets.QDialog.Accepted:
                         newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
                         
-                        self._scipyenWindow_._assignToWorkspace_(newVarName, values[0])
+                        self._scipyenWindow_.assignToWorkspace(newVarName, values[0])
                         
                         
                 else:
                     for name, value in zip(item_paths, values):
                         newVarName = validate_varname(name, self._scipyenWindow_.workspace)
-                        self._scipyenWindow_._assignToWorkspace_(newVarName, value)
+                        self._scipyenWindow_.assignToWorkspace(newVarName, value)
         
         
     @pyqtSlot()
@@ -5016,6 +5021,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             self._update_annotations_()
             
+            if isinstance(doc_title, str) and len(doc_title.strip()):
+                self.docTitle = doc_title
+            
             self.frameChanged.emit(self._current_frame_index_)
 
         except Exception as e:
@@ -5224,7 +5232,21 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 #warngins.warn("I need something to plot")
                 return
             
-        self._set_data_(x,y, **kwargs)
+        self._set_data_(x,y, 
+                        doc_title = doc_title,
+                        frameAxis = frameAxis, 
+                        signalChannelAxis = signalChannelAxis,
+                        frameIndex = frameIndex, 
+                        signalIndex = signalIndex, 
+                        SignalChannelIndex = signalChannelIndex,
+                        irregularSignalIndex = irregularSignalIndex, 
+                        irregularSignalChannelAxis = irregularSignalChannelAxis,
+                        irregularSignalChannelIndex = irregularSignalChannelIndex,
+                        separateSignalChannels = separateSignalChannels,
+                        interval = interval,
+                        plotStyle = plotStyle,
+                        showFrame = showFrame,
+                        **kwargs)
         
         if not self.isVisible():
             self.setVisible(True)

@@ -5,7 +5,8 @@ This file describes how to install scipyen and its dependencies in a virtual
 environment (python3), independent of the system or local (i.e. "user") python
 site packages.
 
-Applies to: GNU/Linux platforms
+Applies to: GNU/Linux platforms (with particular for OpenSUSE Leap 15.2, 15.3
+and Tumbleweed).
 
 The advantage of a virtual environment include the possibility of installing and
 building software directly in this environment, without the need for administrator
@@ -17,6 +18,12 @@ admin privileges.
 
 This means the software can be uninstalled re-built, etc, without worrying about
 the local account or system-wide interference.
+
+NOTE: The following 3d party libraries must be REBUILT after the machine has been
+migrated / upgraded to a more recent verison of the OS distribution or another
+distrbution, (e.g. after migrating from Open SUSE Leap 15.2 to Tumbleweed):
+    
+    NEURON
 
 Steps:
 ================================================================================
