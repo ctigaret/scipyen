@@ -1,14 +1,12 @@
-@echo off
-rem if not defined %VIRTUAL_ENV% CALL scipyact.bat
-
-rem  set script=%~f0
-rem  echo %script%
-
-rem  for /f %%i in (powershell.exe -command "(Get-Item %script%).Target" ) do echo [%%i]
-
-rem  echo %link_target%
-rem  SET scipyendir=%~dp0
-SET scipyendir=e:\scipyen
-
+set scipyendir=E:\scipyen
+call E:\scipyenv\Scripts\activate
+set "SDK=e:\scipyen_sdk"
+set "LIB=%VIRTUAL_ENV%\lib;%VIRTUAL_ENV%\lib64;%VIRTUAL_ENV%\lib\site-packages\vigra;%SDK%\lib;%SDK%\lib64;%USERPROFILE%\AppData\Local\Programs\Python\Python39\libs;%LIB%"
+set "LIBPATH=%VIRTUAL_ENV%\lib;%VIRTUAL_ENV%\lib\site-packages\vigra;%VIRTUAL_ENV%\lib64;%SDK%\lib;%SDK%\lib64;%USERPROFILE%\AppData\Local\Programs\Python\Python39\libs;%LIBPATH%"
+set "INCLUDE=%VIRTUAL_ENV%\include;%SDK%\include;%USERPROFILE%\AppData\Local\Programs\Python\Python39\include;%INCLUDE%"
+set "PATH=%VIRTUAL_ENV%in;%VIRTUAL_ENV%\Scripts;%SDK%in;%USERPROFILE%\AppData\Local\Programs\Python\Python39\DLLs;%PATH%"
+set "PYTHONSTARTUP=%scipyendir%\scipyen_startup.py"
+set "PYTHONHOME=%USERPROFILE%\AppData\Local\Programs\Python\Python39"
+set "PY_HOME=%USERPROFILE%\AppData\Local\Programs\Python\Python39"
+echo "Using Python Virtual Environment in %VIRTUAL_ENV%"
 cmd /C "python %scipyendir%\scipyen.py"
-echo on

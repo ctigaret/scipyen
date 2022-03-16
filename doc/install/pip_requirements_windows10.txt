@@ -5,6 +5,8 @@ nose            # needed to build VIGRA
 confuse
 PyQt5           # on Unix must build, see c_cpp_requirements_unix.txt
 dill
+pywin32
+winshell
 # AFTER installing PyQt5
 jupyter
 jupyter_qtconsole_colorschemes

@@ -12,7 +12,7 @@ import faulthandler
 
 has_breeze_resources_for_win32 = False
 
-if sys.platform == "win32" and sys.version_info.minor >= 8:
+if sys.platform == "win32" and sys.version_info.minor >= 9:
     import win32api
     vigraimpex_mod = "vigraimpex"
     path_to_vigraimpex = win32api.GetModuleFileName(win32api.LoadLibrary(vigraimpex_mod))
