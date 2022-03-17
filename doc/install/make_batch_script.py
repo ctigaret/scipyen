@@ -58,7 +58,8 @@ def main():
     with winshell.shortcut(os.path.join(desktop, "Scipyen.lnk")) as shortcut:
         shortcut.path = str(target)
         shortcut.working_directory = workdir
-        shortcut.icon = sys.executable, 0
+        shortcut.icon = (str(Path(scipyendir / "doc" / "install" / "windows" / "pythonbackend.ico")), 0)
+        #shortcut.icon = sys.executable, 0
         shortcut.description = "Scipyen"
 
 if __name__ == "__main__":
