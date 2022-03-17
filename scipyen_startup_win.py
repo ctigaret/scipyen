@@ -10,7 +10,7 @@ if sys.platform == "win32":
         sys.exit("You are NOT inside a virtual Python environment")
 
     scipyen_sdk = __module_path__
-    print(f"scipyen_sdk={scipyen_sdk}")
+    #print(f"scipyen_sdk={scipyen_sdk}")
     scipyenvbin     = os.path.join(scipyen_sdk,"bin")
     scipyenvlib     = os.path.join(scipyen_sdk,"lib")
     scipyenvlib64   = os.path.join(scipyen_sdk,"lib64")
