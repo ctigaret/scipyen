@@ -37,8 +37,8 @@ def main():
     scipyenv_dir = os.getenv("VIRTUAL_ENV")
 
     with open(scipyendir / "scipyen.bat", mode = "wt") as batch_file:
-        batch_file.write(f"@echo off\n")
-        batch_file.write(f"set scipyendir={scipyendir}\n")
+        batch_file.write(f'@echo off\n')
+        batch_file.write(f'set scipyendir={scipyendir}\n')
         batch_file.write(f"call {Path(scipyenv_dir) / 'Scripts' / 'activate'}\n")
         batch_file.write(f'set "SDK={scipyen_sdk_dir}"\n')
         batch_file.write(f'set "LIB=%VIRTUAL_ENV%\lib;%VIRTUAL_ENV%\lib64;%VIRTUAL_ENV%\lib\site-packages\\vigra;%SDK%\lib;%SDK%\lib64;%LIB%"\n')
@@ -46,7 +46,7 @@ def main():
         batch_file.write('set "INCLUDE=%VIRTUAL_ENV%\include;%SDK%\include;%INCLUDE%"\n')#
         batch_file.write('set "PATH=%VIRTUAL_ENV%\\bin;%VIRTUAL_ENV%\Scripts;%SDK%\\bin;%PATH%"\n')
         batch_file.write('set "PYTHONSTARTUP=%scipyendir%\scipyen_startup_win.py"\n')
-        batch_file.write('echo "Using Python Virtual Environment in %VIRTUAL_ENV%"\n')
+        batch_file.write('echo Using Python Virtual Environment in %VIRTUAL_ENV%\n')
         batch_file.write('cmd /C "python %scipyendir%\scipyen.py"\n')
 
     linkpath = Path(scipyendir / "Scipyen.lnk")
