@@ -4,42 +4,46 @@ realscript=`realpath $0`
 scipyendir=`dirname $realscript`
 
 make_pyenv () {
-# param $1 is where a custom built Python is installed
-# by default this is /usr/local
-# sed "s|PYTHON_INSTALL_DIR|$1|g" pyenv_src > ${HOME}/bin/pyenv
+# NOTE: this function is only used when we intend to use Scipyen with a Python
+# virtual environment that uses a custom-built Python stack. Usually that is
+# installed in /usr/local and by calling 'make altinstall' so that it doesn't
+# interfere with the system-wide Python installed by the distribution
+#
+# Parameters:
+# $1 - absolute path of the directory where a custom built Python is installed
+#       by default this is /usr/local
+# The function uses 'pyenv_src'  template file 
 sed "s|PYTHON_INSTALL_DIR|$1|g" pyenv_src > ${HOME}/.pyenv
 }
 
-# make_scipyenrc_old () {
-# # param $1 is scipyenvdir i.e. where virtual environment is
-# cat<<END > ${HOME}/.scipyenrc
-# scipyenvdir=${1}
-# scipyact () {
-# source ${1}/bin/activate
-# }
-# END
-# }
-
 make_scipyenrc () {
 # Creates ${HOME}/.scipeynrc which activates the virtual python environment
-# in order to run Scipyen
-# The ${HOME}/.scipyenrc defined a single bash function - 'scipyact' - which 
-# activates the virtual environment and optionally sets up a few needed environment
-# variables (see below in the code)
-# The ${HOME}/.scipyenrc script NEEDS TO BE SOURCED (in bash); this is done
-# automatically by the Scipyen launch bash script ('scipyen'), but also from 
-# .bashrc in order for the function 'scipyact' to be readily available to the user.
+# used to run Scipyen.
 #
-# params:
-# $1 virtual environment directory (full path)
-# #2 location of custom built python installation (e.g. /usr/local)
-# $3 major.minor verison of python executable
+# The ${HOME}/.scipyenrc defines a single bash function - 'scipyact' - which 
+# when called, activates the virtual environment and optionally sets up a few 
+# needed environment variables (see below in the code)
+#
+# The .scipyenrc script NEEDS TO BE SOURCED (in bash); this is done automatically
+# by the Scipyen launch bash script ('scipyen'); for convenience, this script is
+# also sourced from ${HOME}/.bashrc in order for the function 'scipyact' to be
+# readily available to the user, at the console.
+#
+# Parameters::
+# $1 = absolute path to the virtual environment directory
+# $2 = absolute path to the custom built python installation (e.g. /usr/local)
+#       default: /usr/local
+#
+#       NOTE: ONLY USED IF PYTHON IS IN CUSTOM-BUILT
+#       
+# $3 = x.y, where x and y are, respectively, the major and minor verison of the
+#       python executable
 # test if python complains about platform dependent libs
 source ${1}/bin/activate 
 err=$(mktemp)
 
 # I found that when the virtual environment uses python built from sources (and 
-# installed in /usr/local as per defautl) then python complains that it cannot
+# installed in /usr/local as per default) then python complains that it cannot
 # find platform libraries. This happens when it is running /etc/pythonstartup
 # It might be related/specific to OpenSUSE, but not sure. Therefore below I 
 # check if running the python exec in the virtual environment finds  platform 
@@ -57,10 +61,9 @@ shopt -s lastpipe
 cat "$err" | grep "platform" | read error_msg
 # echo "${1}/bin/python says: $error_msg"
 if [ ! -z "$error_msg" ] ;then
-# python did not find platform libraries, so we need to create ${HOME}/.pyenv
-make_pyenv ${2}
+make_pyenv ${2} # we need to make .pyenv
 # then source ${HOME}/.pyenv AFTER the activation of the virtual environment
-# by calling 'activate' script indise the 'bin' directory of the virtual
+# by calling 'activate' script inside the 'bin' directory of the virtual
 # environment
 cat<<END > ${HOME}/.scipyenrc
 scipyenvdir=${1}
@@ -72,7 +75,7 @@ END
 else
 # python DID find its own platform libraries, therefore we just source the 'activate'
 # script located inside the virtual environment 'bin' directory
-# NOTE: LD_LIBRARY_PATH export only needed when not invoking .pyenv
+# NOTE: an updated LD_LIBRARY_PATH is exported ony when not invoking .pyenv
 cat<<END > ${HOME}/.scipyenrc
 scipyenvdir=${1}
 scipyact () {
@@ -97,9 +100,12 @@ echo "Sourcing ${HOME}/.bashrc"
 source ${HOME}/.bashrc
 else
 shopt -s lastpipe
+# check if .scipyenrc is sourced from .bashrc
 cat ${HOME}/.bashrc | grep "source ${HOME}/.scipyenrc" | read source_set
 # echo "source_set="$source_set
 if [ -z "${source_set}" ]; then
+# .scipyenrc not sources from .bashrc => backup .bashrc then append a line to
+# source .scipyenrc in there
 dt=`date '+%Y-%m-%d_%H-%M-%s'`
 echo "Copying ${HOME}/.bashrc to ${HOME}/dot.bashrc.$dt"
 cp ${HOME}/.bashrc ${HOME}/.bashrc.$dt
@@ -112,25 +118,30 @@ fi
 }
 
 get_python_data () {
-# param $1 is scipyenvdir i.e. where virtual environment is
+# Guess what python we're using
+# 
+# Parameters:
+# $1 = absolute path to where the virtual environment is
 if [ ! -r ${1}/pyvenv.cfg ]; then
 echo "Cannot read virtual environment configuration (pyvenv.cfg) in ${1}"
 exit
 fi
 shopt -s lastpipe
+# get these from reading pyvenv.cfg in the virtual environment directory
 cat ${1}/pyvenv.cfg | grep home | read a b pynstall
 cat ${1}/pyvenv.cfg | grep base-executable | read a b pyexec
 
-# echo "in get_python_data pyexec="$pyexec
 declare -a ver_array
 ver_array=( `$pyexec --version` )
 pyver=${ver_array[1]::-2}
-# echo "in get_python_data pyver="$pyver
 }
 
 link_scripts () {
-# parameter $1 is scipyenvdir where virtual environment is
-# parameter $2 is scipyendir, i.e. where scipyen git clone is 
+# Create symbolic links to scipyen launch and utility bash scripts
+#
+# Parameters:
+# $1 = absolute path to where virtual environment is
+# $2 = absolue path to where scipyen git clone is 
 if [ ! -d ${HOME}/bin ]; then
 mkdir ${HOME}/bin
 fi
@@ -184,9 +195,6 @@ if [ -z ${scipyenvdir} ] ; then
 echo "Enter the full location of the virtual Python environment (e.g. ${HOME}/scipyenv39)"
 read -e scipyenvdir
 fi
-# echo "scipyenvdir "${scipyenvdir}
-# if [ ! -z ${scipyenvdir} ] && [ -d ${scipyenvdir} ]; then
-# if [ ! -z ${scipyenvdir} ] ; then
 if [ -z ${scipyenvdir} ] ; then
 echo "I cannot continue without knowing where the virtual Python environment is..."
 echo "Goodbye!"
@@ -195,9 +203,6 @@ fi
 
 get_python_data $scipyenvdir
 
-# echo pyver=$pyver
-
-# make_scipyenrc $scipyenvdir && update_bashrc && source ${HOME}/.bashrc
 make_scipyenrc $scipyenvdir $pynstall $pyver && update_bashrc && source ${HOME}/.bashrc
 
 
