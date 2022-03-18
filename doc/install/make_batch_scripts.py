@@ -31,6 +31,33 @@ except:
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
+def install_precompiled_vigra(vigra_archive:Path, p:Path):
+    if not vigra_archive.exists():
+        raise RuntimeError("Cannot find archive with vigranumpy modules")
+
+    print(f"Installing vigranumpy package from {vigra_archive} to {p / 'Lib' / 'site-packages'}")
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        shutil.unpack_archive(vigra_archive, tmpdirname)
+        # is this a container dir or is it 'Lib'?
+        lib_dir = Path(tmpdirname) / 'Lib' #/ 'site-packages' / 'vigra'
+        if lib_dir.exists():
+            # Lib found in temp dir -> straight from archive
+            shutil.copytree(lib_dir, p / 'Lib' , dirs_exist_ok=True)
+            #shutil.copytree(lib_dir, p / 'Lib' / 'site-packages' , dirs_exist_ok=True)
+        else:
+            cc = list(c for c in Path(tmpdirname).iterdir() if c.is_dir())
+            if len(cc) == 1:
+                lib_dir = Path(cc[0] / 'Lib')
+                if lib_dir.exists():
+                    shutil.copytree(lib_dir, p / 'Lib' , dirs_exist_ok=True)
+                    #shutil.copytree(lib_dir, p / 'Lib' / 'site-packages' / 'vigra', dirs_exist_ok=True)
+                else:
+                    raise RuntimeError("Cannot find 'Lib' directory")
+
+            else:
+                raise RuntimeError("This does not seem to be an archive with vigranumpy package")
+
+
 def create_virtual_environment(p:Path):
     """Creates a virtual Python environment at path p.
     Also installs pip requirements
@@ -43,7 +70,7 @@ def create_virtual_environment(p:Path):
         if sp.returncode == 0:
             try:
                 # see https://www.a2hosting.co.uk/kb/developer-corner/python/activating-a-python-virtual-environment-from-a-script-file
-                vigra_pkg = input(f"Enter full path to archive with compiled vigranumpy package (e.g. 'e:\\vigra_pkg.zip'): ")
+                vigra_pkg = input(f"Enter full path to archive with compiled vigranumpy package (use forward slashes e.g. 'e:/vigra_pkg.zip'): ")
                 vigra_archive = Path(vigra_pkg)
 
                 activate_this = str(p / "Scripts" / "activate_this.py")
@@ -57,36 +84,30 @@ def create_virtual_environment(p:Path):
                 errors = " with errors" if psp.returncode > 0 else ""
                 print(f"Pip requirements installed{errors}!")
 
-                if not vigra_archive.exists():
-                    raise RuntimeError("Cannot find archive with vigranumpy modules")
+                install_precompiled_vigra(vigra_archive, p)
 
-                print("Installing vigranumpy package")
-                with tempfile.TemporaryDirectory() as tmpdirname:
-                    shutil.unpack_archive(vigra_archive, tmpdirname)
-                    # is this a container dir or is it 'Lib'?
-                    lib_dir = Path(tempdirname) / 'Lib' / 'site-packages' / 'vigra'
-                    if lib_dir.exists():
-                        # Lib found in temp dir -> straight from archive
-                        shutil.copytree(lib_dir, p / 'Lib' / 'site-packages' , dirs_exist_ok=True)
-                    else:
-                        cc = list(c for c in Path(tmpdirname).iterdir() if c.is_dir())
-                        if len(cc) == 1:
-                            lib_dir = Path(cc[0] / 'Lib' / 'site-packages' /'vigra')
-                            if lib_dir.exists():
-                                shutil.copytree(lib_dir, p / 'Lib' / 'site-packages', dirs_exist_ok=True)
-                            else:
-                                raise RuntimeError("Cannot find 'Lib' directory")
+                #if not vigra_archive.exists():
+                    #raise RuntimeError("Cannot find archive with vigranumpy modules")
 
-                        else:
-                            raise RuntimeError("This does not seem to be an archive with vigranumpy package")
+                #print("Installing vigranumpy package")
+                #with tempfile.TemporaryDirectory() as tmpdirname:
+                    #shutil.unpack_archive(vigra_archive, tmpdirname)
+                    ## is this a container dir or is it 'Lib'?
+                    #lib_dir = Path(tmpdirname) / 'Lib' / 'site-packages' / 'vigra'
+                    #if lib_dir.exists():
+                        ## Lib found in temp dir -> straight from archive
+                        #shutil.copytree(lib_dir, p / 'Lib' / 'site-packages' , dirs_exist_ok=True)
+                    #else:
+                        #cc = list(c for c in Path(tmpdirname).iterdir() if c.is_dir())
+                        #if len(cc) == 1:
+                            #lib_dir = Path(cc[0] / 'Lib' / 'site-packages' /'vigra')
+                            #if lib_dir.exists():
+                                #shutil.copytree(lib_dir, p / 'Lib' / 'site-packages', dirs_exist_ok=True)
+                            #else:
+                                #raise RuntimeError("Cannot find 'Lib' directory")
 
-
-                    #test_dir = Path(tmpdirname) / os.path.splitext(vigra_archive.name)[0]
-                    #if test_dir.exists():
-                        ## archive has a container name
-                    #libdir = [c for c in cc if c.name == 'Lib']
-
-                    #shutil.copytree(p / os.path.splitext(os.path.basename(vigra_pkg))[0], p, dirs_exist_ok=True)
+                        #else:
+                            #raise RuntimeError("This does not seem to be an archive with vigranumpy package")
 
                 return psp.returncode
             except:
@@ -134,10 +155,9 @@ def check_pyenv(scipyendir:Path, scipyen_sdk_dir:Path,
             # create the new environment
             if create_virtual_environment(env_dir) == 0:
                 try:
-                    if needs_activation_scripts:
-                        make_activation_script(scipyendir, env_dir, scipyen_sdk_dir,
-                                        script_name = activation_script,
-                                        scripts_dir = scripts_dir)
+                    make_activation_script(scipyendir, env_dir, scipyen_sdk_dir,
+                                    script_name = activation_script,
+                                    scripts_dir = scripts_dir)
                     return True
                 except:
                     traceback.print_exc()
@@ -151,10 +171,16 @@ def check_pyenv(scipyendir:Path, scipyen_sdk_dir:Path,
                 with open(activate_this) as f:
                     code = compile(f.read(), activate_this, 'exec')
                     exec(code, dict(__file__ = activate_this))
-                if needs_activation_scripts:
-                    make_activation_script(scipyendir, env_dir,scipyen_sdk_dir,
-                                            script_name = activation_script,
-                                            scripts_dir = scripts_dir)
+                try:
+                    import vigra
+                except:
+                    vigra_pkg = input(f"Enter full path to archive with compiled vigranumpy package (use forward slashes e.g. 'e:/vigra_pkg.zip'): ")
+                    vigra_archive = Path(vigra_pkg)
+                    install_precompiled_vigra(vigra_archive, env_dir)
+
+                make_activation_script(scipyendir, env_dir,scipyen_sdk_dir,
+                                        script_name = activation_script,
+                                        scripts_dir = scripts_dir)
                 return True
             except:
                 traceback.print_exc()
@@ -223,7 +249,8 @@ def make_sdk_activation_script(scipyendir:Path, scipyenv_dir:Path, scipyen_sdk_d
         batch_file.write('set "INCLUDE=%VIRTUAL_ENV%\include;%SDK%\include;%INCLUDE%"\n')#
         batch_file.write('set "PATH=%VIRTUAL_ENV%\\bin;%VIRTUAL_ENV%\Scripts;%SDK%\\bin;%PATH%"\n')
         batch_file.write('set "PYTHONSTARTUP=%scipyendir%\scipyen_startup_win.py"\n')
-        batch_file.write('echo Using Python Virtual Environment in %VIRTUAL_ENV%\n')
+        batch_file.write(f'echo Using Python {sys.version}')
+        batch_file.write('echo and Virtual Environment in %VIRTUAL_ENV%\n')
 
 
 def make_activation_script(scipyendir:Path, scipyenv_dir:Path, scipyen_sdk_dir:Path,
@@ -241,7 +268,10 @@ def make_activation_script(scipyendir:Path, scipyenv_dir:Path, scipyen_sdk_dir:P
 
     scipyact_bat = Path(scripts_dir) / script_name
 
-    print(f"Creating activation script {scipyact_bat} for environment in {scipyenv_dir} and SDK in {scipyen_sdk_dir}")
+
+
+    print(f"Creating activation script {scipyact_bat} for environment in {scipyenv_dir}")
+    print(f" with Python {sys.version} and SDK in {scipyen_sdk_dir}")
 
     # overwrite if it exists!
     with open(scipyact_bat, mode="wt") as batch_file:
@@ -254,7 +284,8 @@ def make_activation_script(scipyendir:Path, scipyenv_dir:Path, scipyen_sdk_dir:P
         batch_file.write('set "INCLUDE=%VIRTUAL_ENV%\include;%SDK%\include;%INCLUDE%"\n')#
         batch_file.write('set "PATH=%VIRTUAL_ENV%\\bin;%VIRTUAL_ENV%\Scripts;%SDK%\\bin;%PATH%"\n')
         batch_file.write('set "PYTHONSTARTUP=%scipyendir%\scipyen_startup_win.py"\n')
-        batch_file.write('echo Using Python Virtual Environment in %VIRTUAL_ENV%\n')
+        batch_file.write(f'echo Using Python {sys.version}')
+        batch_file.write('echo and Virtual Environment in %VIRTUAL_ENV%\n')
 
 def make_scipyen_launchers(scipyendir:Path, scipyen_sdk_dir:Path, scipyenv_dir:Path,
                            scripts_dir:str = "Scripts",
@@ -281,7 +312,7 @@ def make_scipyen_launchers(scipyendir:Path, scipyen_sdk_dir:Path, scipyenv_dir:P
         batch_file.write('set "INCLUDE=%VIRTUAL_ENV%\include;%SDK%\include;%INCLUDE%"\n')#
         batch_file.write('set "PATH=%VIRTUAL_ENV%\\bin;%VIRTUAL_ENV%\Scripts;%SDK%\\bin;%PATH%"\n')
         batch_file.write('set "PYTHONSTARTUP=%scipyendir%\scipyen_startup_win.py"\n')
-        batch_file.write('echo Using Python Virtual Environment in %VIRTUAL_ENV%\n')
+        batch_file.write(f'echo Using Python {sys.version} and Virtual Environment in %VIRTUAL_ENV%\n')
         batch_file.write('cmd /C "python %scipyendir%\scipyen.py"\n')
 
     #linkpath = Path(scipyendir / link_name)
@@ -300,17 +331,17 @@ def make_scipyen_launchers(scipyendir:Path, scipyen_sdk_dir:Path, scipyenv_dir:P
         shortcut.description = "Scipyen"
 
 def main():
-    env_activation = "scipyact2.bat"
-    user_scripts_dir = "Scripts2"
-    user_launch_script = "scipyen2.bat"
-    user_shortcut = "Scipyen2.lnk"
+    env_activation = "scipyact.bat"
+    user_scripts_dir = "Scripts"
+    user_launch_script = "scipyen.bat"
+    user_shortcut = "Scipyen.lnk"
 
     module_path_comps = Path(__module_path__).parts
     scipyen_dir_ndx = module_path_comps.index("scipyen")
     scipyendir = Path(*module_path_comps[:scipyen_dir_ndx+1])
 
     if len(sys.argv) < 2:
-        scipyen_sdk_dir = input("Enter the full path to Scipyen SDK directory: ")
+        scipyen_sdk_dir = input("Enter the full path to Scipyen SDK directory (use forward slashes e.g. 'e:/scipyen_sdk'): ")
     else:
         scipyen_sdk_dir = sys.argv[1]
 
@@ -338,6 +369,8 @@ def main():
                            script_name = user_launch_script)
 
     print(f"You should now be able to launch Scipyen by calling {user_launch_script} at the command prompt, or by clicking on the {user_shortcut} Desktop shortcut")
+    print("")
+    print(f"To activate the virtual environment just call {env_activation} script at the command prompt")
 
 if __name__ == "__main__":
     if sys.platform == "win32":
