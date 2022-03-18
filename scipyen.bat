@@ -1,14 +1,11 @@
 @echo off
-rem if not defined %VIRTUAL_ENV% CALL scipyact.bat
-
-rem  set script=%~f0
-rem  echo %script%
-
-rem  for /f %%i in (powershell.exe -command "(Get-Item %script%).Target" ) do echo [%%i]
-
-rem  echo %link_target%
-rem  SET scipyendir=%~dp0
-SET scipyendir=e:\scipyen
-
+set scipyendir=e:\scipyen
+call E:\scipyenv\Scripts\activate
+set "SDK=e:\scipyen_sdk"
+set "LIB=%VIRTUAL_ENV%\lib;%VIRTUAL_ENV%\lib64;%VIRTUAL_ENV%\lib\site-packages\vigra;%SDK%\lib;%SDK%\lib64;%LIB%"
+set "LIBPATH=%VIRTUAL_ENV%\lib;%VIRTUAL_ENV%\lib\site-packages\vigra;%VIRTUAL_ENV%\lib64;%SDK%\lib;%SDK%\lib64;%LIBPATH%"
+set "INCLUDE=%VIRTUAL_ENV%\include;%SDK%\include;%INCLUDE%"
+set "PATH=%VIRTUAL_ENV%\bin;%VIRTUAL_ENV%\Scripts;%SDK%\bin;%PATH%"
+set "PYTHONSTARTUP=%scipyendir%\scipyen_startup_win.py"
+echo "Using Python Virtual Environment in %VIRTUAL_ENV%"
 cmd /C "python %scipyendir%\scipyen.py"
-echo on

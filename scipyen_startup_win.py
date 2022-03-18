@@ -3,6 +3,7 @@ import os, sys
 # in scipyact.bat set PYTHONSTARTUP to the fully qualified path to this module
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
+
 if sys.platform == "win32":
     scipyenvdir = os.getenv("VIRTUAL_ENV")
     if scipyenvdir is None:
@@ -27,3 +28,4 @@ if sys.platform == "win32":
         print(f"{scipyenvlib64} directory not found; functionality will be limited")
 
     del scipyenvbin, scipyenvlib, scipyenvlib64
+
