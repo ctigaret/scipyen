@@ -321,14 +321,24 @@ def make_scipyen_launchers(scipyendir:Path, scipyen_sdk_dir:Path, scipyenv_dir:P
     workdir = os.getenv("USERPROFILE")
 
     desktop = winshell.desktop()
+    programs = winshell.programs()
 
-    print(f"Creating shortcut {os.path.join(desktop, link_name)}")
-    with winshell.shortcut(os.path.join(desktop, link_name)) as shortcut:
-        shortcut.path = str(target)
-        shortcut.working_directory = workdir
-        shortcut.icon = (str(Path(scipyendir / "doc" / "install" / "windows" / "pythonbackend.ico")), 0)
-        #shortcut.icon = sys.executable, 0
-        shortcut.description = "Scipyen"
+    for dest in (desktop, programs):
+        print(f"Creating shortcut {os.path.join(dest, link_name)}")
+        with winshell.shortcut(os.path.join(dest, link_name)) as shortcut:
+            shortcut.path = str(target)
+            shortcut.working_directory = workdir
+            shortcut.icon = (str(Path(scipyendir / "doc" / "install" / "windows" / "pythonbackend.ico")), 0)
+            #shortcut.icon = sys.executable, 0
+            shortcut.description = "Scipyen"
+
+    #print(f"Creating shortcut {os.path.join(desktop, link_name)}")
+    #with winshell.shortcut(os.path.join(desktop, link_name)) as shortcut:
+        #shortcut.path = str(target)
+        #shortcut.working_directory = workdir
+        #shortcut.icon = (str(Path(scipyendir / "doc" / "install" / "windows" / "pythonbackend.ico")), 0)
+        ##shortcut.icon = sys.executable, 0
+        #shortcut.description = "Scipyen"
 
 def main():
     env_activation = "scipyact.bat"
