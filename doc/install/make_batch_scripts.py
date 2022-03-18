@@ -368,9 +368,9 @@ def main():
                            link_name = user_shortcut,
                            script_name = user_launch_script)
 
-    print(f"You should now be able to launch Scipyen by calling {user_launch_script} at the command prompt, or by clicking on the {user_shortcut} Desktop shortcut")
+    print(f"You should now be able to launch Scipyen by calling {user_launch_script} at a new command prompt, or by clicking on the {user_shortcut} Desktop shortcut")
     print("")
-    print(f"To activate the virtual environment just call {env_activation} script at the command prompt")
+    print(f"To activate the virtual environment just call {env_activation} script at a new command prompt")
 
 if __name__ == "__main__":
     if sys.platform == "win32":
