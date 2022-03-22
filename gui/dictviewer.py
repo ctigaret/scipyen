@@ -218,13 +218,23 @@ class InteractiveTreeWidget(DataTreeWidget):
         widget.setMaximumHeight(200)
         
         return widget
-    def setData(self, data, top_title:str = ""):
+    
+    def setData(self, data, top_title:str = "", hideRoot=False):
+        """data should be a dictionary."""
         self._visited_.clear()
         if len(top_title.strip()) == 0:
             self.top_title = "/"
         else:
             self.top_title = top_title
-        super().setData(data) # calls self.buildTree(...), which then calls self.parse(...)
+            
+        #super().setData(data) # calls self.buildTree(...), which then calls self.parse(...)
+        self.clear()
+        self.widgets = []
+        self.nodes = {}
+        self.buildTree(data, self.invisibleRootItem(), hideRoot=hideRoot)
+        self.expandToDepth(3)
+        self.resizeColumnToContents(0)
+        
         self.topLevelItem(0).setText(0, self.top_title)
     
     def parse(self, data):

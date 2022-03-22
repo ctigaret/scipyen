@@ -2413,79 +2413,55 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
     return ap_results, report, ap_waves, ap_dvdt, ap_d2vdt2
 
 def get_AP_param_vs_injected_current(data, parameter):
-    if not isinstance(data, (dict, tuple, list)):
-        raise TypeError("Expecting a dict, tuple, or list; got %s instead" % type(data).__name__)
+    """
+    Get AP parameter vs injected current
+
+    Parameters:
+    -----------
     
-    if not isinstance(data, dict) or any([v not in data.keys() for v in ["Depolarising_steps", "Injected_current"]]):
-        raise ValueError("Data does not seem to be an AP analysis result")
+    data: dict, tuple, or list
     
-    steps = data["Depolarising_steps"]
-    
-    injected_current = data["Injected_current"]
-    
-    i_units = injected_current.units
-    
-        #if "Depolarising_steps" in data.keys():
-            #i_step = int(data["Delta_I_step"])
-            
-        #elif "AP_analysis" in data.keys():
-            #steps = [data]
-            #i_step = int(data["Injected_current"])
-            
-    #elif isinstance(data, (tuple, list)):
-        #if all([isinstance(d, dict) and "AP_analysis" in d.keys() for d in data]):
-            #steps = data
-            #i_step = steps[0]["Injected_current"]
-            
-        #else:
-            #raise ValueError("Sequence argument does not appear to contain AP analysis results")
+        When a dict, it is supposed to be the result of analyse_AP_step_injection_series
         
-    if not isinstance(parameter, str):
-        raise TypeError("'parameter' expected to be a str; got %s instead" % type(parameter).__name__)
+        When a tuple or list, it is expected to be the sequence of results for
+        each depolarising step
+
+    """
+    if isinstance(data, dict): 
+        if all(v in data.keys() for  in ["Depolarising_steps", "Injected_current"]):
+            steps = data["Depolarising_steps"]
+        else:
+            raise ValueError("Data does not seem to be an AP analysis result")
+
+    elif isinstance(data, (tuple, list)):
+        if all(["AP_analysis"] in d.keys() and isinstance(d["AP_analysis"], dict) for d in data):
+            steps = data
+        else:
+            raise ValueError("Data does not seem to be an AP analysis result")
+            
+    else:
+        raise TypeError("Expecting a dict, tuple, or list containing results for each depolarizing step; got %s instead" % type(data).__name__)
     
     if any([parameter not in step["AP_analysis"].keys() for step in steps]):
         raise ValueError("parameter %s not found in all injection step analyses" % parameter)
         
+    if isinstance(data, dict):
+        injected_current = data["Injected_current"]
+        
+    else:
+        injected_current = IrregularlySampledDataSignal(range(len(steps)),
+                                                       [s["AP_analysis"]["Injected_current"] for s in steps],
+                                                       domain_units = pq.dimensionless, units =pq.pA)
+    
+    i_units = injected_current.units
+    
     max_parameter_array_len = 0
     
     parameter_arrays_dict = dict()
     
     parameter_units = pq.dimensionless
     
-    #i_units = None
-    
-    #iinj_list = np.array([int(step["AP_analysis"]["Injected_current"]) for step in steps], dtype="float64")
-    
-    #i_start = int(iinj_list[0])
-    
-    #fl, int_val = math.modf(i_start/10)
-    
-    #if fl < 0.5:
-        #i_start = int(int_val*10)
-        
-    #else:
-        #i_start = int((int_val+1)*10)
-    
-    #fl, int_val = math.modf(i_step/10)
-    
-    #if fl < 0.5:
-        #i_step = int(int_val*10)
-        
-    #else:
-        #i_step = int((int_val+1)*10)
-    
-    ##i_step = int(data["Delta_I_step"])
-    
-    #i_max = i_start + i_step * (len(steps)-1)
-    
-    #injected_current = np.linspace(i_start, i_max, num=len(steps))
-    
     for ks, step in enumerate(steps):
-        #injected_current = float(step["AP_analysis"]["Injected_current"])
-        
-        #if i_units is None:
-            #i_units = step["AP_analysis"]["Injected_current"].units
-        
         parameter_data = step["AP_analysis"][parameter]
         
         if isinstance(parameter_data, neo.basesignal.BaseSignal):
@@ -2493,7 +2469,6 @@ def get_AP_param_vs_injected_current(data, parameter):
             
             max_parameter_array_len = max(max_parameter_array_len, len(parameter_data))
             
-            #parameter_arrays_dict[int(injected_current[ks])] = parameter_data.as_array()
             parameter_arrays_dict["%.2f" % injected_current[ks]] = parameter_data.as_array()
             
             
@@ -2506,29 +2481,12 @@ def get_AP_param_vs_injected_current(data, parameter):
         series_dict[key] = pd.Series(np.array([data[key]] * max_parameter_array_len, dtype="U"), name=key)
     
     for iinj, value in parameter_arrays_dict.items():
-        #exponent = math.floor(np.log10(np.abs(iinj)))
-        #exponent = np.copysign(round(np.log10(np.abs(iinj))), iinj)
-        
-        #int_part = int(math.modf(iinj//10)[1]*10)
-        
-        #int_part = int(math.ceil(math.floor(iinj)/10)*10)
-        
-        #print(int_part, exponent)
-        
-        #s_name = "%d" % int_part
-        #s_name = "%d" % iinj
-        #s_name = "%d" % (int_part * 100)
-        
-        #print("s_name",  s_name)
-        
         if len(value) < max_parameter_array_len:
             extension = np.full((max_parameter_array_len - len(value), 1), np.nan) * parameter_units
             
             if not isinstance(value, pq.Quantity):
                 value *= parameter_units
                 
-            #print(value.ndim, extension.ndim)
-            
             series = pd.Series(data=np.append(value.flatten(), extension.flatten()), name = iinj)
             
         else:
@@ -6073,204 +6031,68 @@ def get_AP_frequency_vs_injected_current(data, isi=None, name=None, description=
     
     return result
 
-def get_AP_params_in_series(data, 
-                            parameter, 
-                            normalize_to_first_spike=False, 
-                            independent_variable="iinj", 
-                            minaps = 5,
-                            ap_index = None):
-    """Extract AP parameters from analyse_AP_step_injection_series result.
-    Useful to collect parameters that change with firing frequency and/or injected current.
-    
-    Positional parameters:
-    ======================
-    data: dict; the return of analyse_AP_step_injection_series(...)
-    
-        WARNING: no checks are performed against the contents of 'data'; if 'data'
-        is not what is expected to be, the function will raise an Exception.
-        
-    parameter: str, case-insensitive; the AP parameter that is extracted from data.
-        Acceptable values are the keys in the data/Depolarising_steps/AP_analysis 
-        nested dictionary, or one of the following 'aliases':
-        
-        "amplitude" = peak amplitude
-        "whm"       = AP duration at half-max
-        "maxrise"   = AP max dV/dt
-        "onset"     = AP onset
-        "isi"       = AP ISI
-        "ifreq"     = AP instantaneous frequency (1/ISI)
-        "freq"      = mean discharge frequency
-    
-    Named parameters:
-    =================
-    normalize_to_first_spike: bool, default is False
-        When True, the values are normalized to those of the first AP in the train
-        except for the "freq".
-        
-    independent_variable: str, case-insensitive: the AP parameter against which 
-        the desired parameter is to be assessed.
-        
-        Acceptable values are:
-        "iinj" = injected current
-        "freq" = mean AP discharge frequency (only when 'parameter' is not 'freq')
-        
-    minaps: int; the minimum number of APs in the train, for the train to be 
-    considered for analysis
-    
-    ap_index: None (default) or non-negative int
-        When None, returns the value of the desired parameter for all APs in the
-        train.
-        
-        When an int, returns the value for the specified AP; if ap_index >= minaps
-        the value of minaps will be adjusted.
-        
-        NOTE: In Python indexing starts at 0. For example, to get the 5th AP, 
-        specify minaps=5, ap_index = 4 (minaps may be >= 5 in this example)
-        
-    Returns:
-    =======
-    
-    When parameters are queried for a single spike in each injection step, the 
-    function returns an irregularly sampled data signal where the domain contains
-    the independent variable, and the data contains the parameter values for the 
-    specified spike index at each injection step in the series.
-    
+def get_AP_param_vs_ISI0_frequency(data, parameter):
+    if isinstance(data, dict): 
+        if all(v in data.keys() for  in ["Depolarising_steps", "Injected_current"]):
+            steps = data["Depolarising_steps"]
+        else:
+            raise ValueError("Data does not seem to be an AP analysis result")
 
-    Otherwise, the function returns a list of two elements where:
-        
-        Elements [0] is an irregularly sampled data signal with the independent 
-        variable.
-        
-        Element [1] is a list with the parameter values (each a scalar or an irregularly
-        sampled signal) one for each injection step
-    
-    A list of with two elements, or a datatypes.IrregularlySampledDataSignal when as_signal:
-        lists, or of irregularly sampled signals. Each element in the list
-    contains the data corresponding to a depolarising step current injection
-    that generated at least one spike discharge.
-    
-    """
-    
-    invert = False
-    
-    if not isinstance(parameter, str):
-        raise TypeError("'parameter' expected to be a str; got %s instead" % type(parameter).__name__)
-    
-    parameter = parameter.strip().lower()
-
-    if parameter == "duration":
-        param_name = "Duration_at_ref_Vm"
-        container = "Action_potentials"
-        
-    elif parameter == "amplitude":
-        param_name = "Vm_amplitude"
-        container = "Action_potentials"
-    
-    elif parameter == "whm":
-        param_name = "Duration_at_half_max"
-        container = "Action_potentials"
-    
-    elif parameter == "maxrise":
-        param_name = "Max_dV_dt"
-        container = "Action_potentials"
-    
-    elif parameter == "onset":
-        param_name = "Vm_onset"
-        container = "Action_potentials"
-    
-    elif parameter == "isi":
-        param_name = "Inter_AP_intervals"
-        container = None
-    
-    elif parameter == "ifreq":
-        param_name = "Inter_AP_intervals"
-        invert = True
-        container = None
-    
-    elif parameter == "freq":
-        param_name = "Mean_AP_Frequency"
-        container = None
-        
-    else:
-        raise ValueError("Inadmissible 'parameter' %s" % parameter)
-        
-    if not isinstance(independent_variable, str):
-        raise TypeError("'independent_variable' expected to be a str; got %s instead" % type(independent_variable).__name__)
-
-    independent_variable = independent_variable.strip().lower()
-    
-    if independent_variable == "iinj":
-        ivar_name = "Injected_current"
-        
-    elif independent_variable == "freq":
-        if parameter == "freq":
-            warnings.warn("Retrieving frequency as function of frequency! Is this what you really want?")
-        ivar_name = "Mean_AP_Frequency"
-        
-    else:
-        raise ValueError("Inadmissible 'independent_variable' %s" % independent_variable)
-    
-    if isinstance(ap_index, int):
-        if ap_index < 0:
-            raise ValueError("When specified, 'ap_index' must be non-negative")
-        
-        if ap_index >= minaps:
-            minaps=ap_index+1
+    elif isinstance(data, (tuple, list)):
+        if all(["AP_analysis"] in d.keys() and isinstance(d["AP_analysis"], dict) for d in data):
+            steps = data
+        else:
+            raise ValueError("Data does not seem to be an AP analysis result")
             
-
-    # would be nice to do list comprehensions here but let's keep this code explicit
-    ivar_list = []
-    var_list = []
-    
-    for step in data["Depolarising_steps"]:
-        if step["AP_analysis"]["AP_train"] is not None:
-            if container == "Action_potentials":
-                params = []
-                for ap in step["AP_analysis"][container]:
-                    params.append(ap[param_name]) # scalar Quantities, one per AP
-                    
-                param_array = IrregularlySampledDataSignal([k for k in range(len(params))], params,
-                                                              units = params[0].units,
-                                                              domain_units = pq.dimensionless,
-                                                              name=param_name)
-            else:
-                # collects top level data such as ISI and / or mean freq
-                param_array = step["AP_analysis"][param_name] # this ARE irregularly sampled signals
-                
-            #print(len(param_array), minaps)
-                
-            if len(param_array) < minaps: # skip this if it has fewer than desired spikes
-                continue
-            
-            if invert: # this is only True for Inter_AP_intervals, to calculate instantaneous frequency
-                param_array = (1/param_array).rescale(pq.Hz)
-                
-            if normalize_to_first_spike:
-                param_array = (param_array.magnitude.flatten()/param_array[0].magnitude.flatten())*pq.dimensionless
-                
-            if isinstance(ap_index, int):
-                var_list.append(param_array[ap_index]*param_array.units) # extract a scalar value for a single AP
-                
-            else:
-                var_list.append(param_array) # extract the entire array
-                    
-            ivar_list.append(step["AP_analysis"][ivar_name]) # Quantity with length of 1
-            
-    if all([isinstance(v, (float, np.float64)) or v.size==1 for v in var_list]):
-        result = IrregularlySampledDataSignal(ivar_list, var_list,
-                                                domain_units = ivar_list[0].units,
-                                                units = var_list[0].units,
-                                                name=param_name)
     else:
-        ivar_data = IrregularlySampledDataSignal([k for k in range(len(ivar_list))], ivar_list,
-                                             domain_units = pq.dimensionless,
-                                             units = ivar_list[0].units,
-                                             name = ivar_name)
+        raise TypeError("Expecting a dict, tuple, or list containing results for each depolarizing step; got %s instead" % type(data).__name__)
     
-        result = [ivar_data, var_list]
+    if any([parameter not in step["AP_analysis"].keys() for step in steps]):
+        raise ValueError("parameter %s not found in all injection step analyses" % parameter)
+       
+    #isi0_freq = [(1/s["Inter_AP_intervals"][0]).rescale(pq.Hz) if s["Number_of_APs"] > 0 else np.nan * pq.Hz for s in steps]
+    isi0_freq= list()
+    
+    for ks, step in enumerate(steps):
+        if step["Number_of_APs"] == 0:
+            continue
         
-    return result
+        isi0_freq.append((1/step["Inter_AP_intervals"][0]).rescale(pq.Hz))
         
+        parameter_data = step["AP_analysis"][parameter]
+        
+        if isinstance(parameter_data, neo.basesignal.BaseSignal):
+            parameter_units = parameter_data.units
+            
+            max_parameter_array_len = max(max_parameter_array_len, len(parameter_data))
+            
+            parameter_arrays_dict["%.2f" % injected_current[ks]] = parameter_data.as_array()
+            
+        else:
+            parameter_arrays_dict["%.2f" % injected_current[ks]] = np.array([])
+            
+    series_dict = dict()
+    
+    for key in ["Data", "Cell", "Source", "Sex", "Genotype", "Age", "Post-natal", "Treatment"]:
+        series_dict[key] = pd.Series(np.array([data[key]] * max_parameter_array_len, dtype="U"), name=key)
+    
+    for ifreq, value in parameter_arrays_dict.items():
+        if len(value) < max_parameter_array_len:
+            extension = np.full((max_parameter_array_len - len(value), 1), np.nan) * parameter_units
+            
+            if not isinstance(value, pq.Quantity):
+                value *= parameter_units
+                
+            series = pd.Series(data=np.append(value.flatten(), extension.flatten()), name = iinj)
+            
+        else:
+            series = pd.Series(data=value.flatten(), name = iinj)
+            
+        series_dict[iinj] = series
+            
+    return pd.DataFrame(series_dict)
+        
+    
     
 def plot_rheobase_latency(data, xstart=None, xend=None):
     #import models

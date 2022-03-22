@@ -278,6 +278,9 @@ def name_from_unit(u, as_key:bool=False):
         
     dim = u.dimensionality
     
+    if len(dim.keys()) == 0:
+        return "Dimensionless"
+    
     unitQuantity = list(dim.keys()) # [k for k in dim.keys()]
     unitQuantityPower = list(dim.items()) # [k for k in dim.keys()]
     #unitPowers
