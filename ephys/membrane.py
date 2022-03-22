@@ -2425,10 +2425,18 @@ def get_AP_param_vs_injected_current(data, parameter):
         
         When a tuple or list, it is expected to be the sequence of results for
         each depolarising step
+        
+    Returns:
+    --------
+    a dict with:
+        keys: str (value of injected current in the format of %.2f)
+        values: scalars or arrays; when at least one value is an array, it will 
+            be padded to the maximum array length available in the data, using np.nan
+        
 
     """
     if isinstance(data, dict): 
-        if all(v in data.keys() for  in ["Depolarising_steps", "Injected_current"]):
+        if all(v in data.keys() for v in ["Depolarising_steps", "Injected_current"]):
             steps = data["Depolarising_steps"]
         else:
             raise ValueError("Data does not seem to be an AP analysis result")
@@ -2457,9 +2465,14 @@ def get_AP_param_vs_injected_current(data, parameter):
     
     max_parameter_array_len = 0
     
-    parameter_arrays_dict = dict()
+    # used when parameter data is ann array with size > 1
+    parameter_values_dict = dict()
     
-    parameter_units = pq.dimensionless
+    # used when prameter data is a scalar
+    parameter_values = list()
+    
+    #parameter_units = pq.dimensionless
+    parameter_units = set()
     
     for ks, step in enumerate(steps):
         parameter_data = step["AP_analysis"][parameter]
@@ -2469,32 +2482,77 @@ def get_AP_param_vs_injected_current(data, parameter):
             
             max_parameter_array_len = max(max_parameter_array_len, len(parameter_data))
             
-            parameter_arrays_dict["%.2f" % injected_current[ks]] = parameter_data.as_array()
+            parameter_values_dict["%.2f" % injected_current[ks]] = parameter_data.as_array()
             
+            parameter_units.add(parameter_data.units)
             
         else:
-            parameter_arrays_dict["%.2f" % injected_current[ks]] = np.array([])
+            if isinstance(parameter_data, np.ndarray) and size(parameter_data) > 1:
+                max_parameter_array_len = max(max_parameter_array_len, len(parameter_data))
+                
+            else:
+                max_parameter_array_len = 1
+                
+            if max_parameter_array_len == 1 and size(parameter_data) <= 1:
+                parameter_values.append(parameter_data)
+            else:
+                parameter_values_dict["%.2f" % injected_current[ks]] = parameter_data
+                
+            if isinstance(parameter_data, pq.Quantity):
+                parameter_units.add(parameter_data.units)
+            else:
+                parameter_units.add(pq.dimensionless)
             
+        #elif isinstance(parameter_data, np.ndarray):
+            #parameter_values_dict["%.2f" % injected_current[ks]] = np.array([])
+            
+    pu = list(parameter_units)
+
+    if len(pu) > 1:
+        if all(units.convertible(p, pu[0]) for p in pu):
+            if max_parameter_array_len > 1:
+                for k,v in parameter_values_dict.items():
+                    parameter_values_dict[k] = v.rescale(pu[0])
+                    
+            else:
+                for k,v in enumerate(parameter_values):
+                    parameter_values[k] = v.rescale(pu[0])
+                    
     series_dict = dict()
     
-    for key in ["Data", "Cell", "Source", "Sex", "Genotype", "Age", "Post-natal", "Treatment"]:
-        series_dict[key] = pd.Series(np.array([data[key]] * max_parameter_array_len, dtype="U"), name=key)
+    if max_parameter_array_len > 1:
+        # NOTE: storing signals as columns in a dataframe can only be done by losing 
+        # the units !
+        # furthermore, the signals must be 1D!
+        
+        # not needed: replicates data unnecessarily; can be added later after 
+        # collating analyses from several cells
+        #for key in ["Data", "Cell", "Source", "Sex", "Genotype", "Age", "Post-natal", "Treatment"]:
+            #series_dict[key] = pd.Series(np.array([data[key]] * max_parameter_array_len, dtype="U"), name=key)
     
-    for iinj, value in parameter_arrays_dict.items():
-        if len(value) < max_parameter_array_len:
-            extension = np.full((max_parameter_array_len - len(value), 1), np.nan) * parameter_units
-            
-            if not isinstance(value, pq.Quantity):
-                value *= parameter_units
+        for iinj, value in parameter_values_dict.items():
+            if hasattr(value, "len") and len(value) < max_parameter_array_len:
+                extension = np.full((max_parameter_array_len - len(value), 1), np.nan) * parameter_units
                 
-            series = pd.Series(data=np.append(value.flatten(), extension.flatten()), name = iinj)
+                if not isinstance(value, pq.Quantity):
+                    value *= parameter_units
+                    
+                series = pd.Series(data=np.append(value.flatten(), extension.flatten()), name = iinj)
+                
+            else:
+                series = pd.Series(data=value.flatten(), name = iinj)
+                
+            series_dict[iinj] = series
             
-        else:
-            series = pd.Series(data=value.flatten(), name = iinj)
+        ret = pd.DataFrame(series_dict)
+        
+    else:
+        if all(isinstance(v, pq.Quantity) for v in parameter_values_dict.values()):
+            pass
+        ret = IrregularlySampledDataSignal(domain=injected_current, signal = [parameter_values_dict["%.2f" % injected_current[k]] for k in len(injected_current)],
+                                           domain_units = injected_current.units, units)
             
-        series_dict[iinj] = series
-            
-    return pd.DataFrame(series_dict)
+    return ret
 
 def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_isi=False):
     """Extracts the AP waveforms from a Vm signal.
@@ -6033,7 +6091,7 @@ def get_AP_frequency_vs_injected_current(data, isi=None, name=None, description=
 
 def get_AP_param_vs_ISI0_frequency(data, parameter):
     if isinstance(data, dict): 
-        if all(v in data.keys() for  in ["Depolarising_steps", "Injected_current"]):
+        if all(v in data.keys() for v in ["Depolarising_steps", "Injected_current"]):
             steps = data["Depolarising_steps"]
         else:
             raise ValueError("Data does not seem to be an AP analysis result")
