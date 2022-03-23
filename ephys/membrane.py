@@ -408,36 +408,7 @@ def v_Nernst(x_out, x_in, z, temp):
     
     return constants.R * T * np.log(x_out/x_in) / (z * F)
     
-def __get_par__(rd, pn, units, step, wave=0):
-    """Get AP parameter from results dictionary
-    
-    rd: dict (results dictionary)
-    pn: str (parameter name)
-    units: pq.Quantity (units for the parameter)
-    """
-    value = get_ap_analysis_param(rd, pn, step, wave)
-    if isinstance(value, float):
-        value *= units
-        
-    return value
 
-def __block_fun__(block_ndx, **kwargs):
-    print("__block_fun__")
-    b = block_ndx[0]
-    k = block_ndx[1]
-    ret = analyse_AP_step_injection_series(b, **kwargs)
-    
-    if isinstance(block_ndx[0].name, str) and len(block_ndx[0].name.strip()):
-        block_name = block_ndx[0].name
-        
-    else:
-        block_name = "Block_%d" % block_ndx[1]
-        
-    ret["Block_Name"] = block_name
-    ret["Block_Index"] = block_ndx[1]
-    
-    return ret
-        
 def __wave_interp_root_near_val__(w, value):
     """Factored-out code in the for loop under NOTE:2017-09-04 22:09:38
     """
@@ -2412,9 +2383,20 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
     
     return ap_results, report, ap_waves, ap_dvdt, ap_d2vdt2
 
-def get_AP_param_vs_injected_current(data, parameter):
+def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], 
+                                     parameter:str, domain:str,
+                                     isi=None, name=None, description=None):
     """
-    Get AP parameter vs injected current
+    Get AP parameter from an AP analysis vs specific domain.
+    
+    The AP parameter is any of the field in the AP_analysis dictionary nested
+    in a Depolarizing step dictionary, in the result of calling the function
+    'analyse_AP_step_injection_series'
+    
+    The domain can be:
+        injected current
+        mean AP frequency per depolarizing step
+        isi frequency per depolarizing step
 
     Parameters:
     -----------
@@ -2424,7 +2406,19 @@ def get_AP_param_vs_injected_current(data, parameter):
         When a dict, it is supposed to be the result of analyse_AP_step_injection_series
         
         When a tuple or list, it is expected to be the sequence of results for
-        each depolarising step
+        each depolarising step (i.e. the "Depolarising_steps" member of the 
+        result of calling analyse_AP_step_injection_series)
+        
+        
+    parameter: str - the name of an AP analysis parameter (key in the AP_analysis nested dictionary)
+    
+    domain: str - one of:
+        "Injected_current", 
+        "Mean_AP_Frequency"
+        "ISI"
+        "Freq"
+        
+    isi: None or tuple - only used when domain is "ISI" or "Freq"
         
     Returns:
     --------
@@ -2452,16 +2446,44 @@ def get_AP_param_vs_injected_current(data, parameter):
     
     if any([parameter not in step["AP_analysis"].keys() for step in steps]):
         raise ValueError("parameter %s not found in all injection step analyses" % parameter)
-        
-    if isinstance(data, dict):
-        injected_current = data["Injected_current"]
-        
-    else:
-        injected_current = IrregularlySampledDataSignal(range(len(steps)),
-                                                       [s["AP_analysis"]["Injected_current"] for s in steps],
-                                                       domain_units = pq.dimensionless, units =pq.pA)
     
-    i_units = injected_current.units
+    if domain in ("Injected_current", "Mean_AP_Frequency"):
+        if isinstance(data, dict):
+            result_domain = data[domain]
+            
+        else:
+            result_domain = IrregularlySampledDataSignal(range(len(steps)),
+                                                        [s["AP_analysis"][domain] for s in steps],
+                                                        domain_units = pq.dimensionless, units = steps[0]["AP_analysis"][domain].units)
+        
+        result_domain_units = result_domain.units
+
+    elif domain in ("ISI", "Freq"):
+        isi_values = [s["AP_analysis"]["Inter_AP_intervals"] for s in steps]
+        
+        if domain == "Freq":
+            isi_values = [(1/s).rescale(pq.Hz) for s in isi_values]
+        
+        if isi is None:
+            result_domain = [np.nanmean(v) for v in isi_values]
+            
+        elif isinstance(isi, int) and isi >= 0:
+            result_domain = [v[isi] if isi < v.size else np.nan * v.units for v in isi_values]
+            
+        elif isinstance(isi, (tuple, list)) and len(isi) == 2 and all(isinstance(v,int) for v in isi):
+            result_domain = list()
+            
+            for ks, step in steps:
+                try:
+                    result_domain.append(np.nanmean(isi_values[ks][isi[0]:isi[1]]))
+                except:
+                    result_domain.append(np.nan * (pq.Hz if domain == "Freq" else isi_values[ks].units))
+                    
+            result_domain_units = pq.Hz if domain == "Freq" else isi_values[0][0].units
+            
+    else:
+        raise ValueError(f"Domain {domain} is not supported")
+                    
     
     max_parameter_array_len = 0
     
@@ -2469,90 +2491,252 @@ def get_AP_param_vs_injected_current(data, parameter):
     parameter_values_dict = dict()
     
     # used when prameter data is a scalar
-    parameter_values = list()
+    #parameter_values = list()
     
-    #parameter_units = pq.dimensionless
-    parameter_units = set()
+    parameter_units = pq.dimensionless
+    #parameter_units = set()
     
+    # NOTE: 2022-03-23 10:11:41
     for ks, step in enumerate(steps):
-        parameter_data = step["AP_analysis"][parameter]
+        parameter_data = step["AP_analysis"][parameter] # NOTE: if a quantity, this should have the same units throughout!!!
         
-        if isinstance(parameter_data, neo.basesignal.BaseSignal):
-            parameter_units = parameter_data.units
+        if isinstance(parameter_data, np.ndarray):
+            if isinstance(parameter_data, (neo.basesignal.BaseSignal, pq.Quantity)):
+                parameter_units = parameter_data.units
+            else:
+                parameter_units = pq.dimensionless
+                
+            if isinstance(parameter_data, neo.basesignal.BaseSignal):
+                parameter_value = parameter_data.as_array()
+                
+            else:
+                parameter_value = np.atleast_1d(parameter_data) # enforce it being sizeable to enable len(...)
+                
+        else:
+            parameter_value = parameter_data
+            if isinstance(parameter_data, pq.Quantity):
+                parameter_units = parameter_data.units
             
-            max_parameter_array_len = max(max_parameter_array_len, len(parameter_data))
-            
-            parameter_values_dict["%.2f" % injected_current[ks]] = parameter_data.as_array()
-            
-            parameter_units.add(parameter_data.units)
+        parameter_values_dict["%.2f" % result_domain[ks]] = parameter_value
+        
+    
+    #series_dict = dict()
+    # if all parameter values are numpy arrays, then find out the max length 
+    # and create fixed length arrays in series_dict
+    #
+    # if all parameters are scalars (or array with size 1), then create an 
+    # IrregularlySampledDataSignal
+    #
+    # otherwise return the dictionary
+    
+    if all(isinstance(v, np.array) for v in parameter_values_dict.values()):
+        max_parameter_array_len = max(len(v) for v in parameter_values_dict.values())
+        
+        if max_parameter_array_len > 1:
+            series_dict = dict()
+            for domain_val, value in parameter_values_dict.items():
+                if hasattr(value, "len") and len(value) < max_parameter_array_len:
+                    extension = np.full((max_parameter_array_len - len(value), 1), np.nan) * parameter_units
+                    
+                    if not isinstance(value, pq.Quantity):
+                        value *= parameter_units
+                        
+                    series = pd.Series(data=np.append(value.flatten(), extension.flatten()), name = domain_val)
+                    
+                else:
+                    series = pd.Series(data=value.flatten(), name = domain_val)
+                    
+                series_dict[domain_val] = series
+                
+            ret = pd.DataFrame(series_dict)
             
         else:
-            if isinstance(parameter_data, np.ndarray) and size(parameter_data) > 1:
-                max_parameter_array_len = max(max_parameter_array_len, len(parameter_data))
-                
-            else:
-                max_parameter_array_len = 1
-                
-            if max_parameter_array_len == 1 and size(parameter_data) <= 1:
-                parameter_values.append(parameter_data)
-            else:
-                parameter_values_dict["%.2f" % injected_current[ks]] = parameter_data
-                
-            if isinstance(parameter_data, pq.Quantity):
-                parameter_units.add(parameter_data.units)
-            else:
-                parameter_units.add(pq.dimensionless)
+            ret = IrregularlySampledDataSignal(domain = result_domain, signal = list(parameter_values_dict.values()),
+                                               domain_units = result_domain_units, units = parameter_units,
+                                               name = parameter)
             
-        #elif isinstance(parameter_data, np.ndarray):
-            #parameter_values_dict["%.2f" % injected_current[ks]] = np.array([])
             
-    pu = list(parameter_units)
-
-    if len(pu) > 1:
-        if all(units.convertible(p, pu[0]) for p in pu):
-            if max_parameter_array_len > 1:
-                for k,v in parameter_values_dict.items():
-                    parameter_values_dict[k] = v.rescale(pu[0])
-                    
-            else:
-                for k,v in enumerate(parameter_values):
-                    parameter_values[k] = v.rescale(pu[0])
-                    
-    series_dict = dict()
-    
-    if max_parameter_array_len > 1:
-        # NOTE: storing signals as columns in a dataframe can only be done by losing 
-        # the units !
-        # furthermore, the signals must be 1D!
-        
-        # not needed: replicates data unnecessarily; can be added later after 
-        # collating analyses from several cells
-        #for key in ["Data", "Cell", "Source", "Sex", "Genotype", "Age", "Post-natal", "Treatment"]:
-            #series_dict[key] = pd.Series(np.array([data[key]] * max_parameter_array_len, dtype="U"), name=key)
-    
-        for iinj, value in parameter_values_dict.items():
-            if hasattr(value, "len") and len(value) < max_parameter_array_len:
-                extension = np.full((max_parameter_array_len - len(value), 1), np.nan) * parameter_units
-                
-                if not isinstance(value, pq.Quantity):
-                    value *= parameter_units
-                    
-                series = pd.Series(data=np.append(value.flatten(), extension.flatten()), name = iinj)
-                
-            else:
-                series = pd.Series(data=value.flatten(), name = iinj)
-                
-            series_dict[iinj] = series
-            
-        ret = pd.DataFrame(series_dict)
-        
     else:
-        if all(isinstance(v, pq.Quantity) for v in parameter_values_dict.values()):
-            pass
-        ret = IrregularlySampledDataSignal(domain=injected_current, signal = [parameter_values_dict["%.2f" % injected_current[k]] for k in len(injected_current)],
-                                           domain_units = injected_current.units, units)
-            
+        if all(isinstance(v, numbers.Number) for v in parameter_values_dict.values()):
+            ret = IrregularlySampledDataSignal(domain = result_domain, signal = list(parameter_values_dict.values()),
+                                                domain_units = result_domain_units, units = parameter_units,
+                                                name = parameter)
+        else:
+            ret = parameter_values_dict
+        
     return ret
+        
+#def get_AP_param_vs_injected_current(data:typing.Union[dict, tuple, list], 
+                                     #parameter:str, domain:str):
+    #"""
+    #DEPRECATED
+    #Get AP parameter vs injected current
+
+    #Parameters:
+    #-----------
+    
+    #data: dict, tuple, or list
+    
+        #When a dict, it is supposed to be the result of analyse_AP_step_injection_series
+        
+        #When a tuple or list, it is expected to be the sequence of results for
+        #each depolarising step (i.e. the "Depolarising_steps" member of the 
+        #result of calling analyse_AP_step_injection_series)
+        
+        
+    #parameter: str - the name of an AP analysis parameter (key in the AP_analysis nested dictionary)
+    
+    #domain: str - one of:
+        #"Injected_current", 
+        #"Mean_AP_Frequency"
+        #"ISI0"
+        #"APFreq0"
+        
+    #Returns:
+    #--------
+    #a dict with:
+        #keys: str (value of injected current in the format of %.2f)
+        #values: scalars or arrays; when at least one value is an array, it will 
+            #be padded to the maximum array length available in the data, using np.nan
+        
+
+    #"""
+    #if isinstance(data, dict): 
+        #if all(v in data.keys() for v in ["Depolarising_steps", "Injected_current"]):
+            #steps = data["Depolarising_steps"]
+        #else:
+            #raise ValueError("Data does not seem to be an AP analysis result")
+
+    #elif isinstance(data, (tuple, list)):
+        #if all(["AP_analysis"] in d.keys() and isinstance(d["AP_analysis"], dict) for d in data):
+            #steps = data
+        #else:
+            #raise ValueError("Data does not seem to be an AP analysis result")
+            
+    #else:
+        #raise TypeError("Expecting a dict, tuple, or list containing results for each depolarizing step; got %s instead" % type(data).__name__)
+    
+    #if any([parameter not in step["AP_analysis"].keys() for step in steps]):
+        #raise ValueError("parameter %s not found in all injection step analyses" % parameter)
+        
+    #if isinstance(data, dict):
+        #injected_current = data["Injected_current"]
+        
+    #else:
+        #injected_current = IrregularlySampledDataSignal(range(len(steps)),
+                                                       #[s["AP_analysis"]["Injected_current"] for s in steps],
+                                                       #domain_units = pq.dimensionless, units =pq.pA)
+    
+    #i_units = injected_current.units
+    
+    #max_parameter_array_len = 0
+    
+    ## used when parameter data is ann array with size > 1
+    #parameter_values_dict = dict()
+    
+    ## used when prameter data is a scalar
+    ##parameter_values = list()
+    
+    #parameter_units = pq.dimensionless
+    ##parameter_units = set()
+    
+    ## NOTE: 2022-03-23 10:11:41
+    #for ks, step in enumerate(steps):
+        #parameter_data = step["AP_analysis"][parameter] # NOTE: if a quantity, this should have the same units throughout!!!
+        
+        #if isinstance(parameter_data, np.ndarray):
+            #if isinstance(parameter_data, (neo.basesignal.BaseSignal, pq.Quantity)):
+                #parameter_units = parameter_data.units
+            #else:
+                #parameter_units = pq.dimensionless
+                
+            #if isinstance(parameter_data, neo.basesignal.BaseSignal):
+                #parameter_value = parameter_data.as_array()
+                
+            #else:
+                #parameter_value = np.atleast_1d(parameter_data) # enforce it being sizeable to enable len(...)
+                
+        #else:
+            ##if isinstance(parameter_data, (tuple, list)):
+                ##parameter_value = list(parameter_data)
+            ##else:
+                ##parameter_value = [parameter_data]
+            #parameter_value = parameter_data
+            ##parameter_units = pq.dimensionless
+            
+        #parameter_values_dict["%.2f" % injected_current[ks]] = parameter_value
+        
+    
+    ##series_dict = dict()
+    ## if all parameter values are numpy arrays, then find out the max length 
+    ## and create fixed length arrays in series_dict
+    ##
+    ## if all parameters are scalars (or array with size 1), then create an 
+    ## IrregularlySampledDataSignal
+    ##
+    ## otherwise return the dictionary
+    
+    #if all(isinstance(v, np.array) for v in parameter_values_dict.values()):
+        #max_parameter_array_len = max(len(v) for v in parameter_values_dict.values())
+        
+        #if max_parameter_array_len > 1:
+            #series_dict = dict()
+            #for iinj, value in parameter_values_dict.items():
+                #if hasattr(value, "len") and len(value) < max_parameter_array_len:
+                    #extension = np.full((max_parameter_array_len - len(value), 1), np.nan) * parameter_units
+                    
+                    #if not isinstance(value, pq.Quantity):
+                        #value *= parameter_units
+                        
+                    #series = pd.Series(data=np.append(value.flatten(), extension.flatten()), name = iinj)
+                    
+                #else:
+                    #series = pd.Series(data=value.flatten(), name = iinj)
+                    
+                #series_dict[iinj] = series
+                
+            #ret = pd.DataFrame(series_dict)
+            
+        #else:
+            
+        
+    #elif all()
+        
+        
+    
+    #if max_parameter_array_len > 1:
+        ## NOTE: storing signals as columns in a dataframe can only be done by losing 
+        ## the units !
+        ## furthermore, the signals must be 1D!
+        
+        ## not needed: replicates data unnecessarily; can be added later after 
+        ## collating analyses from several cells
+        ##for key in ["Data", "Cell", "Source", "Sex", "Genotype", "Age", "Post-natal", "Treatment"]:
+            ##series_dict[key] = pd.Series(np.array([data[key]] * max_parameter_array_len, dtype="U"), name=key)
+    
+        #for iinj, value in parameter_values_dict.items():
+            #if hasattr(value, "len") and len(value) < max_parameter_array_len:
+                #extension = np.full((max_parameter_array_len - len(value), 1), np.nan) * parameter_units
+                
+                #if not isinstance(value, pq.Quantity):
+                    #value *= parameter_units
+                    
+                #series = pd.Series(data=np.append(value.flatten(), extension.flatten()), name = iinj)
+                
+            #else:
+                #series = pd.Series(data=value.flatten(), name = iinj)
+                
+            #series_dict[iinj] = series
+            
+        #ret = pd.DataFrame(series_dict)
+        
+    #else:
+        #if all(isinstance(v, pq.Quantity) for v in parameter_values_dict.values()):
+            #pass
+        ##ret = IrregularlySampledDataSignal(domain=injected_current, signal = [parameter_values_dict["%.2f" % injected_current[k]] for k in len(injected_current)],
+                                           ##domain_units = injected_current.units, units)
+            
+    #return ret
 
 def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_isi=False):
     """Extracts the AP waveforms from a Vm signal.
@@ -5548,291 +5732,6 @@ def analyse_AP_step_injection_series(data, **kwargs):
         print("In %s:" % name)
         traceback.print_exc()
         
-def analyse_AP_step_injection_series_replicate(*blocks, **kwargs):
-    """AP analysis in several runs, each containing series of depolarising step current injections.
-    DEPRECATED
-    Iteratively applies analyse_AP_step_injection_series() for each series in the run
-    then summarizes the result (reports average values).
-    
-    Arguments:
-    ==========
-    
-    blocks = comma-separated sequence of neo.Block data, each containing
-        I-clamp experiments (step depolarizing curent injections) for AP induction
-        from the same cell
-        
-    kwargs -- see also summarise_AP_analysis_at_depol_step, 
-        
-        NOTE: this function will monitor the progress across the entire set of 
-        neo.Block objects.
-        
-        thr: scalar, default 10; threshold for Vm rise slope - 1st derivative --  for AP detection)
-        
-        VmSignal: string (default is "Vm_prim_1") or signal index - the recorded Vm signal
-        ImSignal: string (default is "Im_sec_1" ) or signal index - the injected Im signal
-        
-        name: str or None
-        
-        showProgress: boolean (default is False)
-            Intended to display the progress in the console
-            
-            ATTENTION: this is broken in QtConsole!
-            
-        The following are passed directly to summarise_AP_analysis_at_depol_step()
-            
-        step_index: int or None (default)
-            specify a particular index of the current injection step as the "test"
-            current for the AP analysis data to be summarized
-            
-            The None (default) takes 2* rheobase as the test current
-    
-        minsteps: int (default is 3)
-            minimum number of curent injection steps where APs were triggered, 
-            for performing rheobase-latency analysis
-            
-        require_same_step_increment: boolean, int or Quantity, default is True
-        
-            When True, rheobase-latency analysis will be performed only if all
-            block_results have the same current injection step differences.
-            
-            When False, performs rheobase-latency analysis using all block results
-            
-            When an int or Quantity, rheobase-latency analysis will be performed
-            only on those block results having the injection step difference
-            equal to the specified value.
-        
-    Returns:
-    ========
-    
-    An ordered dictionary with the summarized AP train analysis for the *blocks arguments.
-    
-    Also appends the average waveform of first AP at 2x rheobase
-    
-    Side effects:
-    =============
-    generates a list of dictionaries directly in the caller's namespace
-
-    
-    """
-    warnings.warn("Do not use", DeprecationWarning)
-    
-    def __analysis_loop__(blocks, result_list, thr, VmSignal,ImSignal, 
-                          progressSignal=None,
-                          show_progress=False, 
-                          **kwargs):
-        
-        pbar = None # console progressbar if show_progress
-        
-        if progressSignal is None and show_progress:
-            if ProgressBar is not None:
-                pbar = ProgressBar("", "", total = len(blocks),
-                                   complete_symbol="█", not_complete_symbol="-")
-                
-                pbar.update()
-                
-                # NOTE: Thu May 2 22:19:24 2019 GMT+0100
-                # progressbar doesn't work in QtConsole
-                #pbar = ProgressBar(widgets = [Percentage(), " ", Bar(left="[", right="]"), " ", ETA()], 
-                                #maxval=len(blocks),
-                                #fd = sys.stdout)
-                
-                #pbar.start()
-                #pbar.update(0)
-        
-        for k, b in enumerate(blocks):
-            result = analyse_AP_step_injection_series(b, 
-                                       thr = thr, 
-                                       VmSignal=VmSignal, 
-                                       ImSignal=ImSignal, 
-                                       rheo=True,
-                                       plot_rheo=False,
-                                       **kwargs)
-            
-            if isinstance(b.name, str) and len(b.name.strip()):
-                block_name = b.name
-                
-            else:
-                block_name = "Block_%d" % k
-                
-            result["Block_Name"] = block_name
-            result["Block_Index"] = k
-            
-            result_list.append(result)
-            
-            if progressSignal is not None:
-                progressSignal.emit(k)
-                
-            elif pbar is not None:
-                pbar.set_stat(k+1)
-                pbar.update()
-                # NOTE: progressbar doesn't work in QtConsole
-                #pbar.update(k+1)
-
-        if pbar is not None:
-            pbar.end()
-            #pbar.end_m("Done!")
-            # NOTE: 2019-05-02 22:20:37
-            # progressbar doesn't work in QtConsole
-            #pbar.finish()
-    
-    if len(blocks) ==0:
-        raise ValueError("Expecting some data blocks to analyze")
-    
-    # unwrap blocks if it only has one tuple or list element
-    if len(blocks) == 1 and isinstance(blocks[0], (tuple, list)):
-        blocks = blocks[0]
-    
-    if not all([isinstance(b, neo.Block) for b in blocks]):
-        raise TypeError("Expecting a variadic list of neo.Block objects")
-    
-    #if not all([len(block[0].segments) == len(b.segments) for b in blocks[1:]]):
-        #raise ValueError("All blocks must have the same number of segments")
-    
-    thr = kwargs.pop("thr", 10)
-    
-    if not isinstance(thr, int):
-        thr = 10
-    
-    VmSignal = kwargs.pop("VmSignal", "Vm_prim_1")
-    
-    if not isinstance(VmSignal, str) or len(VmSignal.strip()) == 0:
-        VmSignal = "Vm_prim_1"
-    
-    ImSignal = kwargs.pop("ImSignal", "Im_sec_1")
-    
-    if not isinstance(ImSignal, str) or len(ImSignal.strip()) == 0:
-        ImSignal = "Im_sec_1"
-    
-    step_index = kwargs.pop("step_index", None)
-    
-    show_progress = kwargs.pop("show_progress", False)
-    
-    gui_progress = kwargs.pop("gui_progress", False)
-    
-    minsteps = kwargs.get("minsteps", 3)
-    
-    #step_increment = kwargs.get("require_same_step_increment", True)
-    
-    if not isinstance(minsteps, int):
-        raise TypeError("minsteps expected to be an int; got %s instead" % type(minsteps).__name__)
-
-    if minsteps < 1:
-        raise ValueError("minsteps must be > 0: got %s instead" % minsteps)
-    
-    #AP_index = kwargs.pop("AP_index", None)
-    
-    newkwargs = dict()
-    
-    newkwargs["test_current"] = kwargs.pop("test_current", None)
-    #newkwargs["plot"] = kwargs.pop("plot", True)
-    newkwargs["fitrheo"] = kwargs.pop("fitrheo", False)
-    newkwargs["xstart"] = kwargs.pop("xstart", 0)
-    newkwargs["xend"] = kwargs.pop("xend", 0.1)
-    newkwargs["npts"] = kwargs.pop("npts", 100)
-    newkwargs["minsteps"] = minsteps
-    
-    nrheo = kwargs.pop("nrheo", 2) # factor of rheobase at which test_current is taken
-    
-    kwargs["resample_with_period"] = 1e-5
-    
-    #print("resample_with_period", kwargs["resample_with_period"])
-    
-    if not isinstance(nrheo, int):
-        nrheo = 2
-        
-    newkwargs["nrheo"] = nrheo
-        
-    newkwargs["name"] = kwargs.pop("name", None)
-    
-    ret = collections.OrderedDict()
-    
-    block_results = list()
-    
-    if isinstance(VmSignal, str):
-        VmSignal = ephys.get_index_of_named_signal(blocks[0].segments[0], VmSignal)
-        
-    Vm_units = blocks[0].segments[0].analogsignals[VmSignal].units
-    time_units = blocks[0].segments[0].analogsignals[VmSignal].times.units
-    sampling_period = blocks[0].segments[0].analogsignals[VmSignal].sampling_period
-
-    try:
-        if gui_progress:
-            pd =  QtWidgets.QProgressDialog("AP analysis","Cancel", 0, len(blocks))
-            
-            worker = pgui.ProgressWorker(__analysis_loop__, pd, blocks, block_results, 
-                                 thr, VmSignal, ImSignal,
-                                 show_progress = False, **kwargs)
-            
-            worker.signals.signal_finished.connect(pd.reset)
-            
-            threadpool = QtCore.QThreadPool()
-            threadpool.start(worker)
-            
-        else:
-            __analysis_loop__(blocks, block_results, thr, VmSignal, ImSignal, 
-                              show_progress = show_progress, **kwargs)
-        
-    except Exception as e:
-        traceback.print_exc()
-
-    ret["Block_Results"] = block_results
-    
-    ## perform rheobase-latency analysis
-    #results_for_rheo = [r for r in block_results if test_for_rheobase_latency(r, minsteps)]
-    
-    #if len(results_for_rheo) == 0:
-        #print("No suitable series for rheobase analysis were found")
-    
-        #ret["Summary"]["rheobase_analysis"] = None
-        
-    #else:
-        #if isinstance(step_increment, bool) and step_increment:
-            #dIstep = results_for_rheo[0]["Delta_I_step"]
-            ##print(dIstep)
-            #r_ok = [r for r in results_for_rheo if r["Delta_I_step"] == dIstep]
-            
-            #results_for_rheo[:] = r_ok # this may be empty
-            
-            ##print(len(results_for_rheo))
-            
-        #else:
-            #if isinstance(step_increment, int):
-                #step_increment *= results_for_rheo[0]["Delta_I_step"].units
-                
-            #elif isinstance(step_increment, pq.Quantity):
-                #if not units_convertible(step_increment, results_for_rheo[0]["Delta_I_step"].units):
-                    #raise TypeError("require_same_step_increment has incompatible units (%s); expecting %s" % (step_increment.units, results_for_rheo[0]["Delta_I_step"].units))
-                
-            #else:
-                #raise TypeError("require_same_step_increment must be a bool, int or Quantity; got %s instead" % type(require_same_step_increment).__name__)
-            
-            #r_ok = [k for k, r in enumerate(results_for_rheo) if np.isclose(r["Delta_I_step"].magnitude, step_increment.magnitude)]
-                
-            #results_for_rheo[:] = r_ok # this may be empty
-            
-        #if len(results_for_rheo) == 0:
-            #print("No suitable series for rheobase analysis were found")
-            
-            #ret["Summary"]["rheobase_analysis"] = None
-            
-        #else:
-            #rheo_ret = rheobase_latency(*results_for_rheo, **kwargs)
-    
-            #ret["Summary"]["rheobase_analysis"] = rheo_ret
-        
-    # now summarize across block results
-    if len(block_results):
-        ret["Summary"] = summarise_AP_analysis_at_depol_step(*block_results, **newkwargs)
-        
-    elif step_index is not None:
-        newkwargs["step_index"] = step_index
-        ret["Summary"] = summarise_AP_analysis_at_depol_step(*block_results,  **newkwargs)
-        
-    else:
-        ret["Summary"] = None
-
-    return ret
-
 def lookup_injected_current_for_frequency(data, frequency, atol = 10, rtol = 0, equal_nan = True):
     """Lookup the current injection value(s) that generated AP discharge with a given nominal frequency.
     
@@ -6276,355 +6175,6 @@ def test_for_rheobase_latency(data, minsteps=3):
         return False
     
     return ok
-
-def summarise_AP_analysis_at_depol_step(*results, **kwargs):
-    """Summary of AP analysis at a specified injected current,
-    
-    Var-positional parameters:
-    -------------------------
-    *results: dictionaries output by analyse_AP_step_injection_series ("block results")
-
-    Var-keyword parameters:
-    ----------------------
-        nrheo: scalar; default is 2
-            nrheo x Irheobase is the current injection targeted for analysis
-            
-            Must be > 0. For meaningful results, it should be > 1
-            
-        test_current: None (default), or scalar (int, float or Quantity)
-            The value of the test current used as test case for summary. The 
-            function will use data from the current injection step with the 
-            nearest value to this parameter, as test case for summary.
-            
-            When specified (not None) it overrides nrheo.
-            
-        step_index: None (default) or an int
-            Index of the step current to be considered as test case for summary. 
-            
-            When specified, it overrides both nrheo and test_current.
-            
-        NOTE: Specifying either test_current or step_index will override nrheo parameter
-            
-        name: str or None (default)
-            the name of the experimental data set
-            
-        minsteps: int (default is 3)
-            minimum number of curent injection steps where APs were triggered, 
-            for performing rheobase-latency analysis
-            
-        require_same_step_increment: boolean, int or Quantity, default is True
-        
-            When True, rheobase-latency analysis will be performed only if all
-            block_results have the same current injection step differences.
-            
-            When False, performs rheobase-latency analysis using all block results
-            
-            When an int or Quantity, rheobase-latency analysis will be performed
-            only on those block results having the injection step difference
-            equal to the specified value.
-        
-            
-    Other parameters are passed on to the rheobase_latency() function, see
-        rheobase_latency documentation
-    
-    Each dictionary in *results contains the data returned by one call of analyse_AP_step_injection_series
-    """
-    #if len(results) < 2:
-        #raise ValueError("Expecting at least two block analysis results; got %d instead" % len(results))
-    
-    # find out data at 2x rheobase or 3x rheobase
-    # NOTE: 2017-09-27 12:57:36 update below from wkargs
-    
-    test_current = kwargs.pop("test_current", None)
-    
-    rheobase_factor = kwargs.pop("nrheo", 2) # 2x rheobase # default
-    
-    step_index = kwargs.pop("step_index", None)
-    
-    name = kwargs.pop("name", None)
-    
-    minsteps = kwargs.get("minsteps", 3)
-    
-    step_increment = kwargs.pop("require_same_step_increment", True)
-    
-    if not isinstance(minsteps, int):
-        raise TypeError("minsteps expected to be an int; got %s instead" % type(minsteps).__name__)
-
-    if minsteps < 1:
-        raise ValueError("minsteps must be > 0: got %s instead" % minsteps)
-    
-    # NOTE: 2017-09-07 15:39:44
-    # perform strength-latency analysis first
-    # this always uses the smallest current that fired APs
-    #kwargs["plot"] = False
-    
-    # TODO: exclude from args the results with fewer than minsteps current injection
-    # steps with APs detected
-    
-    if len(results) == 1 and isinstance(results[0], dict):
-        if "Block_Results" in results[0]:
-            try:
-                results = results[0]["Block_Results"]
-                
-            except:
-                print("Data does not appear to contain AP analysis in depolarising current steps")
-                return
-    
-    results_for_rheo = [r for r in results if test_for_rheobase_latency(r, minsteps)]
-    
-    #print(results_for_rheo)
-    
-    if len(results_for_rheo) == 0:
-        print("No suitable series for rheobase analysis were found")
-        return
-    
-    #print("step_increment", step_increment)
-    
-    if isinstance(step_increment, bool) and step_increment:
-        dIstep = results_for_rheo[0]["Delta_I_step"]
-        #print(dIstep)
-        r_ok = [r for r in results_for_rheo if r["Delta_I_step"] == dIstep]
-        
-        results_for_rheo[:] = r_ok # this may be empty
-        
-        #print(len(results_for_rheo))
-        
-    else:
-        if isinstance(step_increment, int):
-            step_increment *= results_for_rheo[0]["Delta_I_step"].units
-            
-        elif isinstance(step_increment, pq.Quantity):
-            if not units_convertible(step_increment, results_for_rheo[0]["Delta_I_step"].units):
-                raise TypeError("require_same_step_increment has incompatible units (%s); expecting %s" % (step_increment.units, results_for_rheo[0]["Delta_I_step"].units))
-            
-        else:
-            raise TypeError("require_same_step_increment must be a bool, int or Quantity; got %s instead" % type(require_same_step_increment).__name__)
-        
-        r_ok = [k for k, r in enumerate(results_for_rheo) if np.isclose(r["Delta_I_step"].magnitude, step_increment.magnitude)]
-            
-        results_for_rheo[:] = r_ok # this may be empty
-        
-    if len(results_for_rheo) == 0:
-        print("No suitable series for rheobase analysis were found")
-        return
-    
-    ret = rheobase_latency(*results_for_rheo, **kwargs)
-    
-    if ret is None:
-        return
-
-    # index of segment result
-    x_rheo_ndx = None
-    
-    if test_current is None:
-        if step_index is None:
-            # rely on rheobase factor 
-            # WARNING there may not be a recording for such a current step!
-            if not isinstance(rheobase_factor, numbers.Real):
-                raise TypeError("rheobase_factor expected to be a scalar; got %s instead" % type(rheobase_factor).__name__)
-            
-            if rheobase_factor <= 0:
-                raise ValueError("rheobase factor must be > 0; got %g instead" % rheobase_factor)
-            
-            test_current = ret["Irh"] * rheobase_factor
-            
-            itol = np.nanmean(np.diff(ret["I"].magnitude.flatten()))/2.
-            
-            x_rheo_ndx = np.where(np.isclose(ret["I"].magnitude, test_current.magnitude, atol = itol))[0]
-            
-            if len(x_rheo_ndx):
-                x_rheo_ndx = x_rheo_ndx[0]
-                Itest = ret["I"][x_rheo_ndx]
-                
-            else:
-                warnings.warn("No step with %s current injection (%g x %s rheobase) was found in data " % (test_current, rheobase_factor, ret["Irh"]))
-                Itest = None
-            
-        else:
-            if not isinstance(step_index, int):
-                raise TypeError("When neither nrheo nor test_current are given, step_index must be specified")
-            
-            if step_index < 0:
-                raise ValueError("step_index must be >= 0; got %d instead" % step_index)
-            
-            if step_index >= len(ret["I"]):
-                raise ValueError("step_index (%d) is too large for %d current injection steps" % (step_index, len(ret["I"])))
-            
-            Itest = ret["I"][step_index]
-            
-            x_rheo_ndx = step_index
-            
-            rheobase_factor = Itest/ret["Irh"]
-            
-    else:
-        if isinstance(test_current, numbers.Real):
-            test_current *= ret["I"].units
-            
-        elif isinstance(test_current, pq.Quantity):
-            if not units_convertible(test_current.units, ret["I"].units):
-                raise TypeError("When specified, test_current must be either a float scalar, or a python quantity in %s " % ret["I"].units.dimensionality.string)
-            
-            if test_current.units != ret["I"].units:
-                test_current.rescale(ret["I"].units)
-            
-        else:
-            raise TypeError("'test_current' must be either None or a scalar (float or Quantity); got %s instead" % type(test_current).__name__)
-
-        itol = np.nanmean(np.diff(ret["I"].magnitude.flatten()))/2.
-        
-        x_rheo_ndx = np.where(np.isclose(ret["I"].magnitude, test_current.magnitude, atol = itol))[0]
-        
-        if len(x_rheo_ndx):
-            x_rheo_ndx = int(x_rheo_ndx[0])
-            
-            Itest = ret["I"][x_rheo_ndx]
-            
-            rheobase_factor = Itest/ret["Irh"]
-            
-        else:
-            warnings.warn("No step with %s current injection was found in data" % test_current)
-            Itest = None
-            
-    #
-    # index of the segment where the injected current is rheobase_factor times Irheobase
-    #
-    # for current injection  = Irheobase * rheobase_factor, the following AP 
-    # measures are returned:
-    #  0) Segment: segment index where the injected current is rheobase_factor times Irheobase
-    #  1) mean maximal dV/dt for the first AP
-    #  2) mean Vthreshold of the first AP
-    #  3) mean peak value for the first AP
-    #  4) mean amplitude of the first AP
-    #  5) mean AP width at Vthreshold, for the first AP
-    #  6) mean AP width at Vm = 0, for the first AP
-    #  7) mean AP width at 1/2 maximum, for the first AP
-    #  8) Inter_AP_intervals
-    #  9) number of APs / curent injection duration
-    # 10) mean AP frequency
-    #
-    
-    # contains a summary of AP parameters at test current (averaged across the 
-    # block results used for rheobase analysis)
-    
-    r_ndx = []
-    
-    if Itest is not None:
-        results_with_APs_at_test_current = [r for r in results_for_rheo if get_ap_analysis_param(r, "AP_train", int(x_rheo_ndx)) is not None]
-        
-        if len(results_with_APs_at_test_current):
-            ret["Test_Current"] = collections.OrderedDict()
-            
-            ret["Test_Current"]["Value"]                          = Itest
-            ret["Test_Current"]["Rheobase_factor"]                = rheobase_factor
-            ret["Test_Current"]["Name"]                           = name
-            ret["Test_Current"]["Segment_index"]                  = x_rheo_ndx
-            
-            #print("segment index for test current", x_rheo_ndx)
-            
-            ret["Test_Current"]["Number_of_APs"]                  = np.array([get_ap_analysis_param(resdict, "Number_of_APs", int(x_rheo_ndx)) for resdict in results_with_APs_at_test_current])
-            nAPs = np.array([v for v in ret["Test_Current"]["Number_of_APs"] if isinstance(v, numbers.Real)])
-            ret["Test_Current"]["Average_number_of_APs"]          = nAPs.mean()
-            
-            # we need to know the minimum number of APs fired at test current so that we 
-            # summarize (mean) their parameters
-            ret["Test_Current"]["Minimum_number_of_APs"]          = nAPs.min()
-            min_nAPs = ret["Test_Current"]["Minimum_number_of_APs"]
-            
-            #print("min_nAPs", min_nAPs)
-            
-            freq_units      = get_ap_analysis_param(results_with_APs_at_test_current[0], "Mean_AP_Frequency", int(x_rheo_ndx)).units
-            time_units      = get_ap_analysis_param(results_with_APs_at_test_current[0], "Inter_AP_intervals", int(x_rheo_ndx)).units
-            Vm_units        = get_ap_analysis_param(results_with_APs_at_test_current[0], "Vm_onset", int(x_rheo_ndx)).units
-            dVdT_units      = get_ap_analysis_param(results_with_APs_at_test_current[0], "Max_dV_dt", int(x_rheo_ndx)).units
-            
-            sampling_period = get_ap_analysis_param(results_with_APs_at_test_current[0], "Vm_signal", int(x_rheo_ndx)).sampling_period
-            
-            
-            ap_freq = [__get_par__(resdict, "Mean_AP_Frequency", freq_units, int(x_rheo_ndx)) for resdict in results_with_APs_at_test_current]
-            
-            apfr = [v.rescale(freq_units) for v in ap_freq if isinstance(v, pq.Quantity)]
-            
-            ret["Test_Current"]["Mean_AP_Frequency"]  = np.nanmean(np.array(apfr)) * freq_units
-            
-            ap_ints  = [(k, get_ap_analysis_param(resdict, "Inter_AP_intervals", int(x_rheo_ndx))) for k, resdict in enumerate(results_with_APs_at_test_current)]
-            
-            ap_ints_ok = [a[1][:(min_nAPs-1)].flatten().rescale(time_units)[:,np.newaxis] for a in ap_ints if isinstance(a[1], np.ndarray) and len(a[1]) >= (min_nAPs-1)]
-            
-            if len(ap_ints_ok):
-                if len(ap_ints_ok) == 1:
-                    ret["Test_Current"]["AP_intervals"]                   = ap_ints_ok[0]
-                else:
-                    ret["Test_Current"]["AP_intervals"]                   = np.nanmean(np.concatenate(ap_ints_ok, axis=1), axis=1) * time_units
-                
-                ret["Test_Current"]["AP_Instantaneous_frequency"]     = (1/ret["Test_Current"]["AP_intervals"]).rescale(freq_units)
-                
-                ret["Test_Current"]["Action_potentials"] = list()
-                
-                for ap_index in range(min_nAPs):
-                    APdict                                 = collections.OrderedDict()
-                    APdict["Index"]                        = ap_index
-
-                    APdict["Mean_AP_Max_dV_dt"]                 = np.nanmean(np.array([__get_par__(resdict, "Max_dV_dt", dVdT_units, int(x_rheo_ndx), ap_index).rescale(dVdT_units) for resdict in results_with_APs_at_test_current])) * dVdT_units
-                    APdict["Mean_AP_Onset"]                     = np.nanmean(np.array([__get_par__(resdict, "Vm_onset", Vm_units, int(x_rheo_ndx), ap_index).rescale(Vm_units) for resdict in results_with_APs_at_test_current])) * Vm_units
-                    APdict["Mean_AP_Peak"]                      = np.nanmean(np.array([__get_par__(resdict, "Vm_peak", Vm_units, int(x_rheo_ndx), ap_index).rescale(Vm_units) for resdict in results_with_APs_at_test_current])) * Vm_units
-                    APdict["Mean_AP_Amplitude"]                 = np.nanmean(np.array([__get_par__(resdict, "Vm_amplitude", Vm_units, int(x_rheo_ndx), ap_index).rescale(Vm_units) for resdict in results_with_APs_at_test_current])) * Vm_units
-                    APdict["Mean_AP_duration_at_onset"]         = np.nanmean(np.array([__get_par__(resdict, "Duration_at_onset", time_units, int(x_rheo_ndx), ap_index).rescale(time_units) for resdict in results_with_APs_at_test_current])) * time_units
-                    APdict["Mean_AP_duration_at_0_Vm"]          = np.nanmean(np.array([__get_par__(resdict, "Duration_at_0mV", time_units, int(x_rheo_ndx), ap_index).rescale(time_units) for resdict in results_with_APs_at_test_current])) * time_units
-                    APdict["Mean_AP_duration_at_half_max"]      = np.nanmean(np.array([__get_par__(resdict, "Duration_at_half_max", time_units, int(x_rheo_ndx), ap_index).rescale(time_units) for resdict in results_with_APs_at_test_current])) * time_units
-                    APdict["Mean_AP_half_max"]                  = np.nanmean(np.array([__get_par__(resdict, "Vm_half_max", Vm_units, int(x_rheo_ndx), ap_index).rescale(Vm_units) for resdict in results_with_APs_at_test_current])) * Vm_units
-                    
-                    APdict["Mean_AP_duration_at_quarter_max"]   = np.nanmean(np.array([__get_par__(resdict, "Duration_at_quarter_max", time_units, int(x_rheo_ndx), ap_index) for resdict in results_with_APs_at_test_current])) * time_units
-                    APdict["Mean_AP_quarter_max"]               = np.nanmean(np.array([__get_par__(resdict, "Vm_quart_max", Vm_units, int(x_rheo_ndx), ap_index) for resdict in results_with_APs_at_test_current])) * Vm_units
-                    APdict["Mean_AP_duration_at_ref_Vm"]        = np.nanmean(np.array([__get_par__(resdict, "Duration_at_ref_Vm", time_units, int(x_rheo_ndx), ap_index) for resdict in results_with_APs_at_test_current])) * time_units
-                    APdict["Mean_AP_ref_Vm"]                    = np.nanmean(np.array([__get_par__(resdict, "Vm_ref", Vm_units, int(x_rheo_ndx), ap_index) for resdict in results_with_APs_at_test_current])) * Vm_units
-
-                    #APdict["Mean_AP_duration_at_quarter_max"]   = np.nanmean(np.array([__get_par__(resdict, "Duration_at_quarter_max", time_units, int(x_rheo_ndx), ap_index).rescale(time_units) for resdict in results_with_APs_at_test_current])) * time_units
-                    #APdict["Mean_AP_quarter_max"]               = np.nanmean(np.array([__get_par__(resdict, "Vm_quart_max", Vm_units, int(x_rheo_ndx), ap_index).rescale(Vm_units) for resdict in results_with_APs_at_test_current])) * Vm_units
-                    #APdict["Mean_AP_duration_at_ref_Vm"]        = np.nanmean(np.array([__get_par__(resdict, "Duration_at_ref_Vm", time_units, int(x_rheo_ndx), ap_index).rescale(time_units) for resdict in results_with_APs_at_test_current])) * time_units
-                    #APdict["Mean_AP_ref_Vm"]                    = np.nanmean(np.array([__get_par__(resdict, "Vm_ref", Vm_units, int(x_rheo_ndx), ap_index).rescale(Vm_units) for resdict in results_with_APs_at_test_current])) * Vm_units
-
-                    APdict["Waveforms"]                         = [get_ap_analysis_param(resdict, "Waveform", int(x_rheo_ndx), ap_index) for resdict in results_with_APs_at_test_current]
-                    
-                    if len(APdict["Waveforms"]):
-                        min_wave_len = min([len(w) for w in APdict["Waveforms"]])
-                        
-                        ap_waveforms = np.concatenate([w[0:min_wave_len, np.newaxis] for w in APdict["Waveforms"]], 
-                                                        axis=1)
-                        
-                        #print("summarise_AP_analysis_at_depol_step: ap_waveforms shape %d" % ap_index, ap_waveforms.shape)
-                        
-                        ap_waveforms_signal = neo.AnalogSignal(ap_waveforms, 
-                                                            units = Vm_units,
-                                                            t_start = 0 * time_units,
-                                                            sampling_period = sampling_period,
-                                                            name="AP_%d_at_test_current" % ap_index,
-                                                            description="AP %d at test current %s from each step series" % (ap_index, Itest))
-                        
-                        avg_waveform_signal = neo.AnalogSignal(np.nanmean(ap_waveforms_signal, axis=1),
-                                                                units = ap_waveforms_signal.units,
-                                                                t_start = ap_waveforms_signal.t_start,
-                                                                sampling_period = ap_waveforms_signal.sampling_period,
-                                                                name="Average_AP_%d_at_test_current" % ap_index,
-                                                                description="Average of AP %d at test current %s across all step series" % (ap_index, Itest))
-                    
-                        APdict["Waveforms_signals"] = ap_waveforms_signal
-                        APdict["Average_waveform_signal"] = avg_waveform_signal
-                        
-                    ret["Test_Current"]["Action_potentials"].append(APdict)
-        
-            r_ndx = [results.index(r) for r in results_with_APs_at_test_current]
-            
-            
-        else:
-            warnings.warn("No block result found with AP fired at %s current injection step (%d x %s at rheobase)" % (Itest, rheobase_factor, ret["Irh"]))
-            r_ndx = []
-            
-    else:
-        r_ndx= []
-    
-    ret["Block_result_indices"] = r_ndx
-    
-    return ret
 
 def report_AP_analysis(data, name=None):
     """Reports data from analyse_AP_step_series_replicate in pandas format.
@@ -7831,181 +7381,4 @@ def extract_AP_data_from_AP_train(ap_train, ap_index=0):
         
     return result
         
-        
-def get_ap_analysis_param(rdict, param_name, step_index, waveform_index = 0):
-    """Retrieves the numeric value of an AP analysis result.
-    DEPRECATED
-    
-    Positional parameters:
-    ---------------------
-    rdict: dict (or subclass)
-    
-        This is expected to be one of:
-        
-        a) result returned by analyse_AP_step_injection_series() function
-        
-        b) result returned by analyse_AP_step_injection() function
-        
-        c) result returned by extract_AP_data_from_AP_train() function
-        
-    param_name: str
-        A name of the variable in the AP analysis results (case-sensitive!) or
-        the strings "time_units" or "data_units".
-        
-    step_index: int >= 0
-        Index of the current injection step for which the AP analysis has been performed.
-        
-        Ignored in cases (b) and (c), above
-        
-    waveform_index: int >= 0
-        Index or the AP waveform for which the value of parameter is sought.
-        
-        Ignored in case (c) above
-        
-    NOTE: nochecks are performed on the dictionary data structure, but a traceback
-    is printed on stderr when an exception is made, while the value returned is
-    np.nan.
-    
-    Returns:
-    --------
-    
-    a scalar, or a Quantity, or a numpy array.
-    
-    When no AP train anaysis is found, or is does not contain a finite value
-    for the variable, it returns np.nan (or None when parameter_name is "waveform").
-    
-    Similarly, when step_index points past the list of segment results in 
-    rdict, a warning is issued and the function returns np.nan or None as above.
-    
-    """
-    warnings.warn("Do not use", DeprecationWarning)
-    
-    if not isinstance(rdict, dict):
-        raise TypeError("Expecting a dict; got %s instead" % type(rdict).__name__)
-    
-    # ensure that if Waveform is requested and is not found, then return None
-    # instead of np.nan
-    if param_name == "Waveform":
-        ret = None
-        
-    else:
-        ret = np.array([np.nan])
-        
-    #print("step_index", step_index)
-    
-    try:
-        if "Depolarising_steps" in rdict and isinstance(rdict["Depolarising_steps"], list):
-            if step_index < 0:
-                raise ValueError("step_index expected to be >= 0; got %d instead" % step_index)
-            
-            elif step_index >= len(rdict["Depolarising_steps"]):
-                warnings.warn("step_index (%d) too large for %d injection steps" % (step_index, len(rdict["Depolarising_steps"])))
-                return ret
-
-            segdict = rdict["Depolarising_steps"][step_index]
-            
-        else:
-            segdict = rdict
-            
-        if param_name == "Vm_signal" and "Vm_signal" in segdict:
-            return segdict["Vm_signal"]
-        
-        if param_name == "AP_train":
-            if "AP_analysis" in segdict:
-                return segdict["AP_analysis"]["AP_train"]
-            
-            else:
-                return None
-            
-        if "AP_analysis" in segdict:
-            ap_train = segdict["AP_analysis"]["AP_train"]
-            
-            if ap_train is None:
-                warnings.warn("No AP train analysis found for depolarizing step %d" % step_index)
-                #return np.array([np.nan])
-                return None
-            
-            if len(segdict["AP_analysis"]["Action_potentials"]):
-                ap_dict = segdict["AP_analysis"]["Action_potentials"][waveform_index]
-                
-            else:
-                ap_dict = None
-            
-            if param_name in ("Duration_at_half_max",
-                              "Duration_at_quarter_max",
-                              "Duration_at_ref_Vm",
-                                "Duration_at_onset",
-                                "Duration_at_0mV",
-                                "Latency",
-                                "Max_dV_dt",
-                                "Vm_amplitude",
-                                "Vm_half_max", 
-                                "Vm_quart_max",
-                                "Vm_ref",
-                                "Vm_onset", 
-                                "Vm_peak",
-                                "Waveform"):
-                if ap_dict is None:
-                    warnings.warn("AP analysis data for %dth AP was not found" % waveform_index)
-                    return np.array([np.nan])
-                else:
-                    ret = ap_dict[param_name]
-                    
-                    if ret is None:
-                        ret = np.nan
-                
-                    if isinstance(ret, float):
-                        ret = np.array([ret])
-                
-                
-            elif param_name in ("Injected_current",
-                                "Inter_AP_intervals",
-                                "Mean_AP_Frequency",
-                                "Number_of_APs"):
-                ret = segdict["AP_analysis"][param_name]
-                
-                if isinstance(ret, float):
-                    ret = np.array([ret])
-                
-            else:
-                raise ValueError("parameter %s not found" % param_name)
-            
-        else:
-            # maybe this is output from extract_AP_data_from_AP_train
-            if param_name in ("Duration_at_half_max",
-                              "Duration_at_quarter_max",
-                              "Duration_at_ref_Vm",
-                              "Duration_at_onset",
-                              "Duration_at_0mV",
-                              "Latency",
-                              "Max_dV_dt",
-                              "Vm_amplitude",
-                              "Vm_half_max", 
-                              "Vm_quart_max",
-                              "Vm_ref",
-                              "Vm_onset", 
-                              "Vm_peak",
-                              "Waveform"):
-                ret = segdict[param_name]
-                
-                if ret is None:
-                    ret = np.nan
-                
-                if isinstance(ret, float):
-                    ret = np.array([ret])
-                
-            elif param_name == "time_units":
-                ret = segdict["Duration_at_half_max"].units
-                
-            elif param_name == "data_units":
-                ret = segdict["Vm_amplitude"].units
-                
-            else:
-                raise ValueError("parameter %s not found in data" % param_name)
-        
-        return ret
-    
-    except Exception as e:
-        traceback.print_exc()
-        return ret
         
