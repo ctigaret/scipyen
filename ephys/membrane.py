@@ -2383,176 +2383,15 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
     
     return ap_results, report, ap_waves, ap_dvdt, ap_d2vdt2
 
-def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], 
-                                     parameter:str, domain:str,
-                                     isi=None, name=None, description=None,
-                                     min_APs:typing.Optional[int] = None):
+def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], parameter=str,
+                              min_APs:typing.Optional[int] = None):
     """
-    Get AP parameter from an AP analysis vs specific domain.
+    Get AP parameter from an AP analysis data for each depolarising step.
     
-    The AP parameter is any of the field in the AP_analysis dictionary nested
-    in a Depolarizing step dictionary, in the result of calling the function
-    'analyse_AP_step_injection_series'
-    
-    The domain can be:
-        injected current
-        mean AP frequency per depolarizing step
-        isi frequency per depolarizing step
-
-    Parameters:
-    -----------
-    
-    data: dict, tuple, or list
-    
-        When a dict, it is supposed to be the result of analyse_AP_step_injection_series
-        
-        When a tuple or list, it is expected to be the sequence of results for
-        each depolarising step (i.e. the "Depolarising_steps" member of the 
-        result of calling analyse_AP_step_injection_series)
-        
-        
-    parameter: str - the name of an AP analysis parameter (key in the AP_analysis nested dictionary)
-    
-    domain: str - one of:
-        "Injected_current", 
-        "ISI"
-        "Freq"
-        
-    isi: None, int or pair of int - REQUIRED when domain is "ISI" or "Freq"
-        When None, then the mean AP frequeny or inter-AP-interval per injection
-        step will be returned.
-        
-    min_APs: int, optional (default is None); when given, it must be > 0 restricting
-        results to those depolarising steps where the cell fired min_APs action
-        potentials
-        
     Returns:
-    --------
-    ret: list containing dicts with the results (one per injection step) each 
-         with the keys:
-        "step": int, index of the depolarising step (NOTE: steps without APs are discarded)
-        <domain_name>: Pytnon Quantity, the value of the domain at the depolarising
-            step (i.e., injected current, ISI or AP frequency)
-            <domain_name> will actually be set to the value of 'domain' parameter
-            optionally prefixed with "Mean" and suffixed with the 'isi' parameter.
-            
-            See examples, below.
-            
-        <parameter>: the valus of the AP parameter at the corresponding depolarising step
-        
-        values: scalars or arrays; when at least one value is an array, it will 
-            be padded to the maximum array length available in the data, using np.nan
-        
-    dom: IrregularlySampledDataSignal: the actual "domain" used ()
-
-    Example 1: query the AP durations at 1/3 of maximum vs injected current:
-    
-    ret, dom = get_AP_analysis_parameter(data, "AP_durations_V_third_max", domain="Injected_current")
-    
-    ret[0]
-    
-    {'step': 2,
-    'Injected_current': array([150.]) * pA,
-    'AP_durations_V_third_max': array([[0.001],
-            [0.001],
-            [0.001],
-            [0.001]])}
-            
-    dom
-    
-    IrregularlySampledDataSignal
-    Domain       Signal
-    0.       [ 50.]
-    1.       [100.]
-    2.       [150.]
-        ...
-    11.       [600.]
-    12.       [650.]
-    13.       [700.]
-    * 1.0 dimensionless       * 1.0 pA
-        
-    (NOTE that the values in AP_durations_V_third_max array are displayed as rounded)
-    
-    Example 2: query the AP durations at 1/3 of maximum vs average AP frequency:
-    
-    ret, dom = membrane.get_AP_analysis_parameter(rheo_0000_result, "AP_durations_V_third_max", domain="Freq")
-    
-    ret[0]
-
-    {'step': 2,
-    'Mean_Freq': array(16.9768) * Hz,
-    'AP_durations_V_third_max': array([[0.001],
-            [0.001],
-            [0.001],
-            [0.001]])}    
-            
-            
-    dom
-    
-    IrregularlySampledDataSignal
-    Domain       Signal
-    0.       [  nan]
-    1.       [  nan]
-    2.       [16.98]
-        ...
-    11.       [74.16]
-    12.       [76.48]
-    13.       [79.81]
-    * 1.0 dimensionless       * 1.0 Hz
-
-    Example 3: query the AP durations at 1/3 of maximum vs 1st interval AP frequency:
-    
-    ret, dom = membrane.get_AP_analysis_parameter(rheo_0000_result, "AP_durations_V_third_max", domain="Freq", isi=0)
-    
-    ret[0]
-
-    {'step': 2,
-    'Freq_0': array(18.6706) * Hz,
-    'AP_durations_V_third_max': array([[0.001],
-            [0.001],
-            [0.001],
-            [0.001]])}    
-            
-    dom
-    
-    IrregularlySampledDataSignal
-    Domain       Signal
-    0.       [   nan]
-    1.       [   nan]
-    2.       [ 18.67]
-    ...       ...
-    11.       [223.21]
-    12.       [234.74]
-    13.       [257.73]
-    * 1.0 dimensionless       * 1.0 Hz
-    
-    Example 4: query the AP durations at 1/3 of maximum vs inter-AP-interval between 1st AP (AP 0) and and 3rd AP (AP 2):
-    
-    ret, dom = membrane.get_AP_analysis_parameter(rheo_0000_result, "AP_durations_V_third_max", domain="ISI", isi=(0,2))
-    
-    ret[0]
-    
-    {'step': 2,
-    'Mean_ISI_0_2': array(0.058) * s,
-    'AP_durations_V_third_max': array([[0.001],
-            [0.001],
-            [0.001],
-            [0.001]])}
-
-    dom
-    
-    IrregularlySampledDataSignal
-    Domain       Signal
-    0.       [ nan]
-    1.       [ nan]
-    2.       [0.06]
-        ...
-    11.       [0.01]
-    12.       [0.01]
-    13.       [0.01]
-    * 1.0 dimensionless       * 1.0 s
-
+    a list of parameter values
     """
+
     if isinstance(data, dict): 
         if all(v in data.keys() for v in ["Depolarising_steps", "Injected_current"]):
             steps = data["Depolarising_steps"]
@@ -2577,100 +2416,53 @@ def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list],
     else:
         min_APs = None
     
-    #if domain in ("Injected_current", "Mean_AP_Frequency"):
-    if domain == "Injected_current":
-        if isinstance(data, dict):
-            result_domain = data[domain]
-            
-        else:
-            result_domain = IrregularlySampledDataSignal(range(len(steps)),
-                                                        [s["AP_analysis"][domain] for s in steps],
-                                                        domain_units = pq.dimensionless, units = steps[0]["AP_analysis"][domain].units)
-        
-        result_domain_units = result_domain.units
-        domain_name = domain
-
-    elif domain in ("ISI", "Freq"):
-        isi_values = [s["AP_analysis"]["Inter_AP_intervals"] for s in steps]
-        
-        if domain == "Freq":
-            isi_values = [(1/s).rescale(pq.Hz) for s in isi_values]
-        
-        if isi is None:
-            result_domain = [np.nanmean(v) for v in isi_values]
-            domain_name = f"Mean_{domain}"
-            
-            
-        if isinstance(isi, int) and isi >= 0:
-            result_domain = [v[isi] if isi < v.size else np.nan * v.units for v in isi_values]
-            domain_name = f"{domain}_{isi}"
-            
-        elif isinstance(isi, (tuple, list)) and len(isi) == 2 and all(isinstance(v,int) for v in isi):
-            result_domain = list()
-            
-            for ks, step in enumerate(steps):
-                try:
-                    result_domain.append(np.nanmean(isi_values[ks][isi[0]:isi[1]]))
-                except:
-                    result_domain.append(np.nan * (pq.Hz if domain == "Freq" else isi_values[ks].units))
-                    
-            domain_name = f"Mean_{domain}_{isi[0]}_{isi[1]}"
-                    
-        result_domain_units = pq.Hz if domain == "Freq" else isi_values[0][0].units
-            
-    else:
-        raise ValueError(f"Domain {domain} is not supported")
-                    
-    
     max_parameter_array_len = 0
     
     ret = list()
     
-    parameter_units = pq.dimensionless
+    parameter_units = None
     
     for ks, step in enumerate(steps):
-        if min_APs is None:
-            if len(step["AP_analysis"]["AP_train"] < 0):
-                continue
-        else:
-            if len(step["AP_analysis"]["AP_train"] < min_APs):
-                continue
+        if isinstance(min_APs, int):
+            if min_APs > 1:
+                if len(step["AP_analysis"]["AP_train"] < min_APs):
+                    continue
             
         parameter_data = step["AP_analysis"][parameter] # NOTE: if a quantity, this should have the same units throughout!!!
-        #print(type(parameter_data))
-        if result_domain[ks] is None or isinstance(result_domain[ks], np.ndarray) and np.all(np.isnan(result_domain[ks])):
-            continue
         
         if isinstance(parameter_data, np.ndarray):
-            if isinstance(parameter_data, (neo.basesignal.BaseSignal, pq.Quantity)):
-                parameter_units = parameter_data.units
-            else:
-                parameter_units = pq.dimensionless
+            if parameter_units is None or parameter_units == pq.dimensionless:
+                if isinstance(parameter_data, (neo.basesignal.BaseSignal, pq.Quantity)):
+                    parameter_units = parameter_data.units
+                else:
+                    parameter_units = pq.dimensionless
                 
             if isinstance(parameter_data, neo.basesignal.BaseSignal):
                 parameter_value = parameter_data.as_array()
                 
             else:
-                parameter_value = np.atleast_1d(parameter_data) # enforce it being sizeable to enable len(...)
+                parameter_value = np.atleast_1d(parameter_data.magnitude) # enforce it being sizeable to enable len(...)
                 
+        elif isinstance(parameter_data, numbers.Number):
+            parameter_value = np.atleast_1d(np.array([parameter_data]))
+            parameter_units = pq.dimensionless
+            
+        elif parameter_data is None:
+            parameter_value = np.full((1,1), fill_value = np.nan)
+            parameter_units = pq.dimensionless
+            
         else:
             parameter_value = parameter_data
+            parameter_units = pq.dimensionless
             
-            if isinstance(parameter_data, pq.Quantity):
-                parameter_units = parameter_data.units
-                
-        if parameter_data is None or isinstance(parameter_data, np.ndarray) and np.all(np.isnan(parameter_data)):
-            continue
+        if parameter_units is None:
+            parameter_units = pq.dimensionless
+            
         
-        ret.append({"step": ks, domain_name: result_domain[ks], parameter:parameter_value})
+        ret.append(parameter_value)
+        
+    return list(map(lambda x: x * parameter_units, ret))
 
-    dom = IrregularlySampledDataSignal(range(len(result_domain)), result_domain,
-                                       domain_units=pq.dimensionless,
-                                       units = result_domain_units, name=domain_name)
-        
-    return ret, dom
-        
-    
 
 def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_isi=False):
     """Extracts the AP waveforms from a Vm signal.
@@ -2715,7 +2507,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
             Required when "times" specifies only waveform START times and use_min_isi is False (see below)
             
             NOTE: when not None and "times" also specifies waveform STOP or DURATIONS,
-            the values in "after" will be added to the STOP/DURAITON values effectively
+            the values in "after" will be added to the STOP/DURATION values effectively
             resulting in longer waveforms
             
     use_min_isi: boolean, default False
@@ -5666,324 +5458,6 @@ def analyse_AP_step_injection_series(data, **kwargs):
         print("In %s:" % name)
         traceback.print_exc()
         
-def lookup_injected_current_for_frequency(data, frequency, atol = 10, rtol = 0, equal_nan = True):
-    """Lookup the current injection value(s) that generated AP discharge with a given nominal frequency.
-    
-    The function addresses the question "what is the value of the injected current
-    where this cell fired APs with a specific (nominal) frequency of X Hz?"
-    
-    Because the discharge frequency is calculated (as opposed to the injected 
-    current which is pre-determined), the function will search for actual frequency
-    values that are "close to" the specified nominal frequency. If such frequencies
-    are found, the function returns the injected current values that triggered
-    discharges with those frequencies that were found.
-    
-    The comparison is done by isclose() function in the `numpy` package.
-    
-    `a` and `b` are "close to" each other when
-    
-    absolute(`a` - `b`) <= (`atol` + `rtol` * absolute(`b`))
-    
-    Parameters:
-    ----------
-    
-    data: datatypes.IrregularlySampledDataSignal containing the calculated discharge
-        frequency for each injected current step.
-        
-        This is typically returned by get_AP_frequency_vs_injected_current().
-        
-    frequency: scalar float, the nominal frequency of AP discharge, for which 
-        the value of the injected current is sought.
-        
-    atol: scalar float, absolute tolerance in the frequency value
-    
-    rtol: scalar float, relative tolerance in the frequency value
-    
-    Returns:
-    -------
-    
-    A list of current injection values where the cell has discharged APs with a
-        frequency "close" to the nominal value.
-    
-    See also:
-    
-    ephys.inverse_lookup()
-    
-    """
-    
-    ret, index, sigvals = neoutils.inverse_lookup(data, frequency, atol=atol, rtol=rtol, equal_nan=equal_nan)
-    
-    return ret, sigvals
-
-def get_AP_frequency_for_specific_current_injection(data, iinj, isi=None, name=None, description=None):
-    """Retrieve the discharge frequencies triggered by a specific value of the depolarizing current injection.
-    
-    When no such injection exists, returns [nan * pq.Hz].
-    
-    NOTE:
-    Because technically it is possible to have more than one depolarizing steps with the
-    same value of injected current in the same series, we return these values as a list.
-    
-    However, in a typical experiment the current injection steps will have unique
-    values of iinj.
-    
-    Parameters
-    ==========
-    
-    data: dict, the result of AP analysis on a series of depoarizing steps
-    
-    Named parameters:
-    ================
-    isi: None (default), an int >= 0, or a tuple of ints. Type of AP frequency returned:
-    
-        When isi is None, the function returns the average discharge frequency
-        calulcate as the number of spikes divided by the duration of the spike
-        train.
-        
-        When isi is an int, the function returns the instantaneous AP frequency
-        corresponding to the isi interval in the train.
-        
-        NOTE: returns np.nan if isi >= the number of inter-spike intervals
-        
-        When isi is a sequence of two int elements the function returns the 
-            average instantaneous frequency over the range of intevals specified 
-            by the isi tuple.
-            
-            
-        Examples:
-        
-        1) to get the instantaneous frequency of the first inter-spike interval
-        pass isi = 0
-        
-        2) to get the instantaneous frequency averaged over the first three
-        inter-spike intervals (see Gu et al, J. Physiol, 2007), pass
-        
-        isi = (0,3) (NOTE that this willl average the instantaneous frequency
-            over inter-spike intervals 0, 1 and 2)
-            
-    
-    Returns:
-    =======
-    frequencies: tuple of frequencies (typical experiment will produce a list with
-            one element, see NOTE above)
-            
-    step_indices: tuple of indices of the injection step recordings that generated
-        AP discharge with those frequencies. 
-        
-        Each value in frequencies was generated during the injection current step
-        with the corresponding index in step_indices
-    
-    """
-
-    step_indices, injected_current_steps = zip(*[(k, step) for k, step in enumerate(data["Depolarising_steps"]) if step["AP_analysis"]["Injected_current"] == iinj])
-    
-    if len(injected_current_steps) == 0:
-        return [np.nan*pq.Hz]
-    
-    # NOTE: although unusual, is not impossible to have several step with the same injected current value
-    
-    frequencies = list()
-    
-    for step in injected_current_steps:
-        if isi is None:
-            value = step["AP_analysis"]["Mean_AP_Frequency"]
-            
-        elif isinstance(isi, int):
-            inst_freq = list()
-            
-            isi_freq = 1/step["AP_analysis"]["Inter_AP_intervals"]
-
-            isi_freq = isi_freq.rescale(pq.Hz)
-            
-            if isi < 0 or isi >= len(isi_freq):
-                value = np.nan * pq.Hz
-                
-            else:
-                value = (isi_freq[isi].magnitude)
-                
-        elif isinstance(isi, (tuple, list)) and len(isi) == 2 and all([isinstance(v, int) for v in isi]):
-            isi_freq = 1/step["AP_analysis"]["Inter_AP_intervals"]
-            
-            isi_freq = isi_freq.rescale(pq.Hz)
-            
-            try:
-                value = np.nanmean(isi_freq[isi[0]:isi[1]])
-                
-            except:
-                value = np.nan * pq.Hz
-                
-        else:
-            raise TypeError("isi expected to be None, an int or a sequence of two int")
-        
-        frequencies.append(value)
-        
-    return frequencies, step_indices
-
-def get_AP_frequency_vs_injected_current(data, isi=None, name=None, description=None):
-    """Retrieves AP discharge frequency from the result of AP analysis in a series of depolarising steps
-    
-    Parameters
-    ==========
-    
-    data: dict, the result of AP analysis on a series of depoarizing steps
-    
-    Named parameters:
-    ================
-    isi: None (default), an int >= 0, or a tuple of ints. Type of AP frequency returned:
-    
-        When isi is None, the function returns the average discharge frequency
-        calulcate as the number of spikes divided by the duration of the spike
-        train.
-        
-        When isi is an int, the function returns the instantaneous AP frequency
-        corresponding to the isi interval in the train.
-        
-        NOTE: returns np.nan if isi >= the number of inter-spike intervals
-        
-        When isi is a sequence of two int elements the function returns the 
-            average instantaneous frequency over the range of intervals specified 
-            by the isi tuple.
-            
-            
-        Examples:
-        
-        1) to get the instantaneous frequency of the first inter-spike interval
-        pass isi = 0
-        
-        2) to get the instantaneous frequency averaged over the first three
-        inter-spike intervals (see Gu et al, J. Physiol, 2007), pass
-        
-        isi = (0,3) (NOTE that this will average the instantaneous frequency
-            over inter-spike intervals 0, 1 and 2)
-            
-    
-    """
-    iinj = np.array([int(step["AP_analysis"]["Injected_current"]) for step in data["Depolarising_steps"]], dtype="float64")
-    
-    if isi is None:
-        signal = np.array([step["AP_analysis"]["Mean_AP_Frequency"] for step in data["Depolarising_steps"]])
-        
-        
-        if not isinstance(name, str):
-            name = "Mean AP Frequency"
-            
-    elif isinstance(isi, int):
-        inst_freq = list()
-        
-        for step in data["Depolarising_steps"]:
-            isi_freq = 1/step["AP_analysis"]["Inter_AP_intervals"]
-
-            isi_freq = isi_freq.rescale(pq.Hz)
-            
-            if isi < 0 or isi >= len(isi_freq):
-                value = np.nan * pq.Hz
-                
-            else:
-                value = (isi_freq[isi].magnitude)
-                
-            inst_freq.append(value)
-                
-        signal = inst_freq
-        
-        if not isinstance(name, str):
-            name = "Instantaneous AP Frequency %d" % isi
-            
-    elif isinstance(isi, (tuple, list)) and len(isi) == 2 and all([isinstance(v, int) for v in isi]):
-        inst_freq = list()
-        
-        for step in data["Depolarising_steps"]:
-            isi_freq = 1/step["AP_analysis"]["Inter_AP_intervals"]
-            
-            isi_freq = isi_freq.rescale(pq.Hz)
-            
-            try:
-                value = np.nanmean(isi_freq[isi[0]:isi[1]])
-                
-            except:
-                value = np.nan * pq.Hz
-                
-            inst_freq.append(value)
-                
-        signal = inst_freq
-        
-        if not isinstance(name, str):
-            name = "%d - %d ISI Averaged frequency" % (isi[0], isi[1])
-        
-    else:
-        raise TypeError("isi expected to be None, an int or a sequence of two int")
-    
-    result = IrregularlySampledDataSignal(domain=iinj,
-                                                signal=signal,
-                                                units = pq.Hz, domain_units = pq.pA)
-
-    result.name = name
-        
-    result.domain_name = "Injected current"
-    
-    return result
-
-def get_AP_param_vs_ISI0_frequency(data, parameter):
-    if isinstance(data, dict): 
-        if all(v in data.keys() for v in ["Depolarising_steps", "Injected_current"]):
-            steps = data["Depolarising_steps"]
-        else:
-            raise ValueError("Data does not seem to be an AP analysis result")
-
-    elif isinstance(data, (tuple, list)):
-        if all(["AP_analysis"] in d.keys() and isinstance(d["AP_analysis"], dict) for d in data):
-            steps = data
-        else:
-            raise ValueError("Data does not seem to be an AP analysis result")
-            
-    else:
-        raise TypeError("Expecting a dict, tuple, or list containing results for each depolarizing step; got %s instead" % type(data).__name__)
-    
-    if any([parameter not in step["AP_analysis"].keys() for step in steps]):
-        raise ValueError("parameter %s not found in all injection step analyses" % parameter)
-       
-    #isi0_freq = [(1/s["Inter_AP_intervals"][0]).rescale(pq.Hz) if s["Number_of_APs"] > 0 else np.nan * pq.Hz for s in steps]
-    isi0_freq= list()
-    
-    for ks, step in enumerate(steps):
-        if step["Number_of_APs"] == 0:
-            continue
-        
-        isi0_freq.append((1/step["Inter_AP_intervals"][0]).rescale(pq.Hz))
-        
-        parameter_data = step["AP_analysis"][parameter]
-        
-        if isinstance(parameter_data, neo.basesignal.BaseSignal):
-            parameter_units = parameter_data.units
-            
-            max_parameter_array_len = max(max_parameter_array_len, len(parameter_data))
-            
-            parameter_arrays_dict["%.2f" % injected_current[ks]] = parameter_data.as_array()
-            
-        else:
-            parameter_arrays_dict["%.2f" % injected_current[ks]] = np.array([])
-            
-    series_dict = dict()
-    
-    for key in ["Data", "Cell", "Source", "Sex", "Genotype", "Age", "Post-natal", "Treatment"]:
-        series_dict[key] = pd.Series(np.array([data[key]] * max_parameter_array_len, dtype="U"), name=key)
-    
-    for ifreq, value in parameter_arrays_dict.items():
-        if len(value) < max_parameter_array_len:
-            extension = np.full((max_parameter_array_len - len(value), 1), np.nan) * parameter_units
-            
-            if not isinstance(value, pq.Quantity):
-                value *= parameter_units
-                
-            series = pd.Series(data=np.append(value.flatten(), extension.flatten()), name = iinj)
-            
-        else:
-            series = pd.Series(data=value.flatten(), name = iinj)
-            
-        series_dict[iinj] = series
-            
-    return pd.DataFrame(series_dict)
-        
-    
     
 def plot_rheobase_latency(data, xstart=None, xend=None):
     #import models
