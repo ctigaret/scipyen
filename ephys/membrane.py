@@ -2385,7 +2385,8 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
 
 def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], 
                                      parameter:str, domain:str,
-                                     isi=None, name=None, description=None):
+                                     isi=None, name=None, description=None,
+                                     min_APs:typing.Optional[int] = None):
     """
     Get AP parameter from an AP analysis vs specific domain.
     
@@ -2420,6 +2421,10 @@ def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list],
     isi: None, int or pair of int - REQUIRED when domain is "ISI" or "Freq"
         When None, then the mean AP frequeny or inter-AP-interval per injection
         step will be returned.
+        
+    min_APs: int, optional (default is None); when given, it must be > 0 restricting
+        results to those depolarising steps where the cell fired min_APs action
+        potentials
         
     Returns:
     --------
@@ -2566,6 +2571,12 @@ def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list],
     if any([parameter not in step["AP_analysis"].keys() for step in steps]):
         raise ValueError("parameter %s not found in all injection step analyses" % parameter)
     
+    if isinstance(min_APs, int) and min_APs < 0:
+        raise ValueError("minAPs must be > 0")
+    
+    else:
+        min_APs = None
+    
     #if domain in ("Injected_current", "Mean_AP_Frequency"):
     if domain == "Injected_current":
         if isinstance(data, dict):
@@ -2618,6 +2629,13 @@ def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list],
     parameter_units = pq.dimensionless
     
     for ks, step in enumerate(steps):
+        if min_APs is None:
+            if len(step["AP_analysis"]["AP_train"] < 0):
+                continue
+        else:
+            if len(step["AP_analysis"]["AP_train"] < min_APs):
+                continue
+            
         parameter_data = step["AP_analysis"][parameter] # NOTE: if a quantity, this should have the same units throughout!!!
         #print(type(parameter_data))
         if result_domain[ks] is None or isinstance(result_domain[ks], np.ndarray) and np.all(np.isnan(result_domain[ks])):
