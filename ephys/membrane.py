@@ -2414,19 +2414,138 @@ def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list],
     
     domain: str - one of:
         "Injected_current", 
-        "Mean_AP_Frequency"
         "ISI"
         "Freq"
         
-    isi: None or tuple - only used when domain is "ISI" or "Freq"
+    isi: None, int or pair of int - REQUIRED when domain is "ISI" or "Freq"
+        When None, then the mean AP frequeny or inter-AP-interval per injection
+        step will be returned.
         
     Returns:
     --------
-    a dict with:
-        keys: str (value of injected current in the format of %.2f)
+    ret: list containing dicts with the results (one per injection step) each 
+         with the keys:
+        "step": int, index of the depolarising step (NOTE: steps without APs are discarded)
+        <domain_name>: Pytnon Quantity, the value of the domain at the depolarising
+            step (i.e., injected current, ISI or AP frequency)
+            <domain_name> will actually be set to the value of 'domain' parameter
+            optionally prefixed with "Mean" and suffixed with the 'isi' parameter.
+            
+            See examples, below.
+            
+        <parameter>: the valus of the AP parameter at the corresponding depolarising step
+        
         values: scalars or arrays; when at least one value is an array, it will 
             be padded to the maximum array length available in the data, using np.nan
         
+    dom: IrregularlySampledDataSignal: the actual "domain" used ()
+
+    Example 1: query the AP durations at 1/3 of maximum vs injected current:
+    
+    ret, dom = get_AP_analysis_parameter(data, "AP_durations_V_third_max", domain="Injected_current")
+    
+    ret[0]
+    
+    {'step': 2,
+    'Injected_current': array([150.]) * pA,
+    'AP_durations_V_third_max': array([[0.001],
+            [0.001],
+            [0.001],
+            [0.001]])}
+            
+    dom
+    
+    IrregularlySampledDataSignal
+    Domain       Signal
+    0.       [ 50.]
+    1.       [100.]
+    2.       [150.]
+        ...
+    11.       [600.]
+    12.       [650.]
+    13.       [700.]
+    * 1.0 dimensionless       * 1.0 pA
+        
+    (NOTE that the values in AP_durations_V_third_max array are displayed as rounded)
+    
+    Example 2: query the AP durations at 1/3 of maximum vs average AP frequency:
+    
+    ret, dom = membrane.get_AP_analysis_parameter(rheo_0000_result, "AP_durations_V_third_max", domain="Freq")
+    
+    ret[0]
+
+    {'step': 2,
+    'Mean_Freq': array(16.9768) * Hz,
+    'AP_durations_V_third_max': array([[0.001],
+            [0.001],
+            [0.001],
+            [0.001]])}    
+            
+            
+    dom
+    
+    IrregularlySampledDataSignal
+    Domain       Signal
+    0.       [  nan]
+    1.       [  nan]
+    2.       [16.98]
+        ...
+    11.       [74.16]
+    12.       [76.48]
+    13.       [79.81]
+    * 1.0 dimensionless       * 1.0 Hz
+
+    Example 3: query the AP durations at 1/3 of maximum vs 1st interval AP frequency:
+    
+    ret, dom = membrane.get_AP_analysis_parameter(rheo_0000_result, "AP_durations_V_third_max", domain="Freq", isi=0)
+    
+    ret[0]
+
+    {'step': 2,
+    'Freq_0': array(18.6706) * Hz,
+    'AP_durations_V_third_max': array([[0.001],
+            [0.001],
+            [0.001],
+            [0.001]])}    
+            
+    dom
+    
+    IrregularlySampledDataSignal
+    Domain       Signal
+    0.       [   nan]
+    1.       [   nan]
+    2.       [ 18.67]
+    ...       ...
+    11.       [223.21]
+    12.       [234.74]
+    13.       [257.73]
+    * 1.0 dimensionless       * 1.0 Hz
+    
+    Example 4: query the AP durations at 1/3 of maximum vs inter-AP-interval between 1st AP (AP 0) and and 3rd AP (AP 2):
+    
+    ret, dom = membrane.get_AP_analysis_parameter(rheo_0000_result, "AP_durations_V_third_max", domain="ISI", isi=(0,2))
+    
+    ret[0]
+    
+    {'step': 2,
+    'Mean_ISI_0_2': array(0.058) * s,
+    'AP_durations_V_third_max': array([[0.001],
+            [0.001],
+            [0.001],
+            [0.001]])}
+
+    dom
+    
+    IrregularlySampledDataSignal
+    Domain       Signal
+    0.       [ nan]
+    1.       [ nan]
+    2.       [0.06]
+        ...
+    11.       [0.01]
+    12.       [0.01]
+    13.       [0.01]
+    * 1.0 dimensionless       * 1.0 s
 
     """
     if isinstance(data, dict): 
@@ -2447,7 +2566,8 @@ def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list],
     if any([parameter not in step["AP_analysis"].keys() for step in steps]):
         raise ValueError("parameter %s not found in all injection step analyses" % parameter)
     
-    if domain in ("Injected_current", "Mean_AP_Frequency"):
+    #if domain in ("Injected_current", "Mean_AP_Frequency"):
+    if domain == "Injected_current":
         if isinstance(data, dict):
             result_domain = data[domain]
             
@@ -2457,6 +2577,7 @@ def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list],
                                                         domain_units = pq.dimensionless, units = steps[0]["AP_analysis"][domain].units)
         
         result_domain_units = result_domain.units
+        domain_name = domain
 
     elif domain in ("ISI", "Freq"):
         isi_values = [s["AP_analysis"]["Inter_AP_intervals"] for s in steps]
@@ -2466,20 +2587,25 @@ def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list],
         
         if isi is None:
             result_domain = [np.nanmean(v) for v in isi_values]
+            domain_name = f"Mean_{domain}"
             
-        elif isinstance(isi, int) and isi >= 0:
+            
+        if isinstance(isi, int) and isi >= 0:
             result_domain = [v[isi] if isi < v.size else np.nan * v.units for v in isi_values]
+            domain_name = f"{domain}_{isi}"
             
         elif isinstance(isi, (tuple, list)) and len(isi) == 2 and all(isinstance(v,int) for v in isi):
             result_domain = list()
             
-            for ks, step in steps:
+            for ks, step in enumerate(steps):
                 try:
                     result_domain.append(np.nanmean(isi_values[ks][isi[0]:isi[1]]))
                 except:
                     result_domain.append(np.nan * (pq.Hz if domain == "Freq" else isi_values[ks].units))
                     
-            result_domain_units = pq.Hz if domain == "Freq" else isi_values[0][0].units
+            domain_name = f"Mean_{domain}_{isi[0]}_{isi[1]}"
+                    
+        result_domain_units = pq.Hz if domain == "Freq" else isi_values[0][0].units
             
     else:
         raise ValueError(f"Domain {domain} is not supported")
@@ -2487,18 +2613,15 @@ def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list],
     
     max_parameter_array_len = 0
     
-    # used when parameter data is ann array with size > 1
-    parameter_values_dict = dict()
-    
-    # used when prameter data is a scalar
-    #parameter_values = list()
+    ret = list()
     
     parameter_units = pq.dimensionless
-    #parameter_units = set()
     
-    # NOTE: 2022-03-23 10:11:41
     for ks, step in enumerate(steps):
         parameter_data = step["AP_analysis"][parameter] # NOTE: if a quantity, this should have the same units throughout!!!
+        #print(type(parameter_data))
+        if result_domain[ks] is None or isinstance(result_domain[ks], np.ndarray) and np.all(np.isnan(result_domain[ks])):
+            continue
         
         if isinstance(parameter_data, np.ndarray):
             if isinstance(parameter_data, (neo.basesignal.BaseSignal, pq.Quantity)):
@@ -2514,229 +2637,22 @@ def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list],
                 
         else:
             parameter_value = parameter_data
+            
             if isinstance(parameter_data, pq.Quantity):
                 parameter_units = parameter_data.units
-            
-        parameter_values_dict["%.2f" % result_domain[ks]] = parameter_value
-        
-    
-    #series_dict = dict()
-    # if all parameter values are numpy arrays, then find out the max length 
-    # and create fixed length arrays in series_dict
-    #
-    # if all parameters are scalars (or array with size 1), then create an 
-    # IrregularlySampledDataSignal
-    #
-    # otherwise return the dictionary
-    
-    if all(isinstance(v, np.array) for v in parameter_values_dict.values()):
-        max_parameter_array_len = max(len(v) for v in parameter_values_dict.values())
-        
-        if max_parameter_array_len > 1:
-            series_dict = dict()
-            for domain_val, value in parameter_values_dict.items():
-                if hasattr(value, "len") and len(value) < max_parameter_array_len:
-                    extension = np.full((max_parameter_array_len - len(value), 1), np.nan) * parameter_units
-                    
-                    if not isinstance(value, pq.Quantity):
-                        value *= parameter_units
-                        
-                    series = pd.Series(data=np.append(value.flatten(), extension.flatten()), name = domain_val)
-                    
-                else:
-                    series = pd.Series(data=value.flatten(), name = domain_val)
-                    
-                series_dict[domain_val] = series
                 
-            ret = pd.DataFrame(series_dict)
-            
-        else:
-            ret = IrregularlySampledDataSignal(domain = result_domain, signal = list(parameter_values_dict.values()),
-                                               domain_units = result_domain_units, units = parameter_units,
-                                               name = parameter)
-            
-            
-    else:
-        if all(isinstance(v, numbers.Number) for v in parameter_values_dict.values()):
-            ret = IrregularlySampledDataSignal(domain = result_domain, signal = list(parameter_values_dict.values()),
-                                                domain_units = result_domain_units, units = parameter_units,
-                                                name = parameter)
-        else:
-            ret = parameter_values_dict
+        if parameter_data is None or isinstance(parameter_data, np.ndarray) and np.all(np.isnan(parameter_data)):
+            continue
         
-    return ret
-        
-#def get_AP_param_vs_injected_current(data:typing.Union[dict, tuple, list], 
-                                     #parameter:str, domain:str):
-    #"""
-    #DEPRECATED
-    #Get AP parameter vs injected current
+        ret.append({"step": ks, domain_name: result_domain[ks], parameter:parameter_value})
 
-    #Parameters:
-    #-----------
-    
-    #data: dict, tuple, or list
-    
-        #When a dict, it is supposed to be the result of analyse_AP_step_injection_series
+    dom = IrregularlySampledDataSignal(range(len(result_domain)), result_domain,
+                                       domain_units=pq.dimensionless,
+                                       units = result_domain_units, name=domain_name)
         
-        #When a tuple or list, it is expected to be the sequence of results for
-        #each depolarising step (i.e. the "Depolarising_steps" member of the 
-        #result of calling analyse_AP_step_injection_series)
-        
-        
-    #parameter: str - the name of an AP analysis parameter (key in the AP_analysis nested dictionary)
-    
-    #domain: str - one of:
-        #"Injected_current", 
-        #"Mean_AP_Frequency"
-        #"ISI0"
-        #"APFreq0"
-        
-    #Returns:
-    #--------
-    #a dict with:
-        #keys: str (value of injected current in the format of %.2f)
-        #values: scalars or arrays; when at least one value is an array, it will 
-            #be padded to the maximum array length available in the data, using np.nan
-        
-
-    #"""
-    #if isinstance(data, dict): 
-        #if all(v in data.keys() for v in ["Depolarising_steps", "Injected_current"]):
-            #steps = data["Depolarising_steps"]
-        #else:
-            #raise ValueError("Data does not seem to be an AP analysis result")
-
-    #elif isinstance(data, (tuple, list)):
-        #if all(["AP_analysis"] in d.keys() and isinstance(d["AP_analysis"], dict) for d in data):
-            #steps = data
-        #else:
-            #raise ValueError("Data does not seem to be an AP analysis result")
-            
-    #else:
-        #raise TypeError("Expecting a dict, tuple, or list containing results for each depolarizing step; got %s instead" % type(data).__name__)
-    
-    #if any([parameter not in step["AP_analysis"].keys() for step in steps]):
-        #raise ValueError("parameter %s not found in all injection step analyses" % parameter)
-        
-    #if isinstance(data, dict):
-        #injected_current = data["Injected_current"]
-        
-    #else:
-        #injected_current = IrregularlySampledDataSignal(range(len(steps)),
-                                                       #[s["AP_analysis"]["Injected_current"] for s in steps],
-                                                       #domain_units = pq.dimensionless, units =pq.pA)
-    
-    #i_units = injected_current.units
-    
-    #max_parameter_array_len = 0
-    
-    ## used when parameter data is ann array with size > 1
-    #parameter_values_dict = dict()
-    
-    ## used when prameter data is a scalar
-    ##parameter_values = list()
-    
-    #parameter_units = pq.dimensionless
-    ##parameter_units = set()
-    
-    ## NOTE: 2022-03-23 10:11:41
-    #for ks, step in enumerate(steps):
-        #parameter_data = step["AP_analysis"][parameter] # NOTE: if a quantity, this should have the same units throughout!!!
-        
-        #if isinstance(parameter_data, np.ndarray):
-            #if isinstance(parameter_data, (neo.basesignal.BaseSignal, pq.Quantity)):
-                #parameter_units = parameter_data.units
-            #else:
-                #parameter_units = pq.dimensionless
-                
-            #if isinstance(parameter_data, neo.basesignal.BaseSignal):
-                #parameter_value = parameter_data.as_array()
-                
-            #else:
-                #parameter_value = np.atleast_1d(parameter_data) # enforce it being sizeable to enable len(...)
-                
-        #else:
-            ##if isinstance(parameter_data, (tuple, list)):
-                ##parameter_value = list(parameter_data)
-            ##else:
-                ##parameter_value = [parameter_data]
-            #parameter_value = parameter_data
-            ##parameter_units = pq.dimensionless
-            
-        #parameter_values_dict["%.2f" % injected_current[ks]] = parameter_value
+    return ret, dom
         
     
-    ##series_dict = dict()
-    ## if all parameter values are numpy arrays, then find out the max length 
-    ## and create fixed length arrays in series_dict
-    ##
-    ## if all parameters are scalars (or array with size 1), then create an 
-    ## IrregularlySampledDataSignal
-    ##
-    ## otherwise return the dictionary
-    
-    #if all(isinstance(v, np.array) for v in parameter_values_dict.values()):
-        #max_parameter_array_len = max(len(v) for v in parameter_values_dict.values())
-        
-        #if max_parameter_array_len > 1:
-            #series_dict = dict()
-            #for iinj, value in parameter_values_dict.items():
-                #if hasattr(value, "len") and len(value) < max_parameter_array_len:
-                    #extension = np.full((max_parameter_array_len - len(value), 1), np.nan) * parameter_units
-                    
-                    #if not isinstance(value, pq.Quantity):
-                        #value *= parameter_units
-                        
-                    #series = pd.Series(data=np.append(value.flatten(), extension.flatten()), name = iinj)
-                    
-                #else:
-                    #series = pd.Series(data=value.flatten(), name = iinj)
-                    
-                #series_dict[iinj] = series
-                
-            #ret = pd.DataFrame(series_dict)
-            
-        #else:
-            
-        
-    #elif all()
-        
-        
-    
-    #if max_parameter_array_len > 1:
-        ## NOTE: storing signals as columns in a dataframe can only be done by losing 
-        ## the units !
-        ## furthermore, the signals must be 1D!
-        
-        ## not needed: replicates data unnecessarily; can be added later after 
-        ## collating analyses from several cells
-        ##for key in ["Data", "Cell", "Source", "Sex", "Genotype", "Age", "Post-natal", "Treatment"]:
-            ##series_dict[key] = pd.Series(np.array([data[key]] * max_parameter_array_len, dtype="U"), name=key)
-    
-        #for iinj, value in parameter_values_dict.items():
-            #if hasattr(value, "len") and len(value) < max_parameter_array_len:
-                #extension = np.full((max_parameter_array_len - len(value), 1), np.nan) * parameter_units
-                
-                #if not isinstance(value, pq.Quantity):
-                    #value *= parameter_units
-                    
-                #series = pd.Series(data=np.append(value.flatten(), extension.flatten()), name = iinj)
-                
-            #else:
-                #series = pd.Series(data=value.flatten(), name = iinj)
-                
-            #series_dict[iinj] = series
-            
-        #ret = pd.DataFrame(series_dict)
-        
-    #else:
-        #if all(isinstance(v, pq.Quantity) for v in parameter_values_dict.values()):
-            #pass
-        ##ret = IrregularlySampledDataSignal(domain=injected_current, signal = [parameter_values_dict["%.2f" % injected_current[k]] for k in len(injected_current)],
-                                           ##domain_units = injected_current.units, units)
-            
-    #return ret
 
 def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_isi=False):
     """Extracts the AP waveforms from a Vm signal.
