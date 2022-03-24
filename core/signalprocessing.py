@@ -580,15 +580,15 @@ def state_levels(x:np.ndarray, **kwargs) -> list:
 
 def nansize(x, **kwargs) -> int:
     """
-    TODO: allow calculation over specified axis; use np.sum instead of sum
+    Sample size for data containing np.nan
     """
     axis = kwargs.pop("axis", None)
     keepdims = kwargs.pop("keepdims", True)
     
     ret = np.sum(~np.isnan(x), axis=axis, keepdims=keepdims)
     
-    if len(ret) == 1:
-        return (int(ret))
+    #if ret.size == 1:
+        #return (int(ret))
     
     return ret
     
@@ -606,18 +606,14 @@ def sem(x:np.ndarray, **kwargs) -> np.ndarray:
     return np.std(x, ddof=ddof, axis=axis, out=None, keepdims=keepdims) / np.sqrt(sz-ddof)
 
 def nansem(x:np.ndarray, **kwargs) -> np.ndarray:
+    """SEM for data containing np.nan
+    """
     ddof = kwargs.pop("ddof", 1)
     axis = kwargs.pop("axis", None)
-    keepdims = kwargs.pop("keepdims", True)
+    keepdims = kwargs.pop("keepdims", False)
     
     sz = nansize(x, axis=axis, keepdims=keepdims)
     
-    if len(sz) == 1:
-        if sz <= 1:
-            return np.nan
-        
-        else:
-            sz[sz<=1] = np.nan
-    
-    return np.nanstd(x, ddof=ddof, axis=axis, keepdims=keepdims) / np.sqrt(nansize(x)-ddof)
+    #return np.nanstd(x, ddof=ddof, axis=axis, keepdims=keepdims) / np.sqrt(nansize(x)-ddof)
+    return np.nanstd(x, ddof=ddof, axis=axis, keepdims=keepdims) / np.sqrt(sz-ddof)
 

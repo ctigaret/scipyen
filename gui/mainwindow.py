@@ -821,6 +821,8 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
         addScript.triggered.connect(self.slot_addScripts)
         self.scriptsTable.customContextMenuRequested[QtCore.QPoint].connect(self.slot_customContextMenuRequested)
         self.scriptsTable.cellDoubleClicked[int, int].connect(self.slot_cellDoubleClick)
+        self.scriptsTable.setSortingEnabled(True)
+        #self.scriptsTable.sortByColumn(0, QtCore.Qt.AscendingOrder)
         self.acceptDrops = True
         self.scriptsTable.acceptDrops = True
         
@@ -845,16 +847,24 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
         self.scriptsTable.setRowCount(len(scriptsDict))
         
         for k, (key, value) in enumerate(scriptsDict.items()):
+            #print(f"ScriptManager.setData {k}: key={key}, value={value}")
+            path_item = QtWidgets.QTableWidgetItem(key)
+            path_item.setToolTip(key)
+            
             script_item = QtWidgets.QTableWidgetItem(value)
             script_item.setToolTip(value)
             
-            path_item = QtWidgets.QTableWidgetItem(key)
-            path_item.setToolTip(key)
             
             self.scriptsTable.setItem(k, 0, script_item)
             self.scriptsTable.setItem(k, 1, path_item)
             
+        #self.scriptsTable.sortByColumn(0, QtCore.Qt.AscendingOrder)
         self.scriptsTable.resizeColumnToContents(0)
+        
+    @safeWrapper
+    def dragEnterEvent(self, event):
+        event.acceptProposedAction()
+        event.accept()
         
     @safeWrapper
     def dropEvent(self, evt):
@@ -866,10 +876,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
                 mimeType = QtCore.QMimeDatabase().mimeTypeForFile(QtCore.QFileInfo(urls[0].path()))
                 
                 if all([s in mimeType.name() for s in ("text", "python")]):
-                    self.signal_pythonFileReceived.emit(urls[0].path(), evt.pos())
-                    #return
-            
-        
+                    self.signal_pythonFileAdded.emit(urls[0].path())
             
     def clear(self):
         self.scriptsTable.clearContents()
@@ -960,11 +967,8 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
             if isinstance(fileName, tuple):
                 fileName = fileName[0] # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
                 
-            #if isinstance(fileName, str) and len(fileName) > 0 and os.path.isfile(fileName):
-                #self.signal_pythonFileAdded.emit(fileName)
             if pio.checkFileReadAccess(fileName):
                 self.signal_pythonFileAdded.emit(fileName)
-                #self._scripts.append(fileName)
 
     @pyqtSlot()
     @safeWrapper
@@ -977,7 +981,6 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
         if pio.checkFileReadAccess(fileNames):
             for fileName in fileNames:
                 self.signal_pythonFileAdded.emit(fileName)
-            #self._scripts.extend(fileNames)
         
         
     @pyqtSlot()
