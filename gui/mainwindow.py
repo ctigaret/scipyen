@@ -254,6 +254,7 @@ from . import scipyen_colormaps as colormaps
 from . import colorwidgets
 from . import stylewidgets
 from . import gradientwidgets
+from . import interact
 
 from .triggerdetectgui import guiDetectTriggers
 
@@ -1611,6 +1612,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._recent_scripts_dict_      = dict()
         self._showFilesFilter           = False
         self._console_docked_           = False
+        self._script_manager_visible    = False
         
         # ### END configurables, but see NOTE:2022-01-28 23:16:57 below
         
@@ -1857,6 +1859,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.app.setStyle(val)
             
         self._current_GUI_style_name = val
+        
+    @property
+    def scriptManagerVisible(self):
+        self._script_manager_visible = self.scriptsManager.isVisible() and not self.scriptsManager.isMinimized()
+        return self._script_manager_visible
+    
+    @markConfigurable("ScriptManagerVisible", "qt")
+    @scriptManagerVisible.setter
+    def scriptManagerVisible(self, val:bool):
+        self._script_manager_visible = val is True
+        if self._script_manager_visible:
+            self.slot_showScriptsManagerWindow()
+        else:
+            self.scriptsManager.close()
             
     @property
     def maxRecentDirectories(self) -> int:
@@ -4984,6 +5000,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_showScriptsManagerWindow(self):
         self.scriptsManager.setData(self._recent_scripts_dict_)
         self.scriptsManager.setVisible(True)
+        self.scriptsManager.showNormal()
         #self.scriptsManager.exec_()
         
     @pyqtSlot()

@@ -558,7 +558,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.modified_vars.clear()
         self.new_vars.clear()
         self.deleted_vars.clear()
-        self.user_ns_hidden.clear()
+        #self.user_ns_hidden.clear()
         self.observed_vars.clear()
         
     def is_user_var(self, name, val):

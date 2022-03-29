@@ -478,6 +478,7 @@ class QuickDialog(QtWidgets.QDialog):
         self.widgets = []
         if not isinstance(title, str) or len(title.strip()) == 0:
             title = "QuickDialog"
+            
         self.setWindowTitle(title)
         #self.setOrientation(QtCore.Qt.Vertical)
         self.resize(500,-1)
