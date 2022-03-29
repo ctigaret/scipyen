@@ -2430,7 +2430,10 @@ def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], parameter=st
             
         parameter_data = step["AP_analysis"][parameter] # NOTE: if a quantity, this should have the same units throughout!!!
         
-        if isinstance(parameter_data, np.ndarray):
+        if parameter_data is None:
+            continue
+        
+        elif isinstance(parameter_data, np.ndarray):
             if parameter_units is None or parameter_units == pq.dimensionless:
                 if isinstance(parameter_data, (neo.basesignal.BaseSignal, pq.Quantity)):
                     parameter_units = parameter_data.units
@@ -2445,10 +2448,6 @@ def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], parameter=st
                 
         elif isinstance(parameter_data, numbers.Number):
             parameter_value = np.atleast_1d(np.array([parameter_data]))
-            parameter_units = pq.dimensionless
-            
-        elif parameter_data is None:
-            parameter_value = np.full((1,1), fill_value = np.nan)
             parameter_units = pq.dimensionless
             
         else:
