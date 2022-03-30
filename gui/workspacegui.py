@@ -91,8 +91,10 @@ class GuiMessages(object):
         
 class FileIOGui(object):
     @safeWrapper
-    def chooseFile(self, caption:typing.Optional[str]=None, fileFilter:typing.Optional[str]=None, 
-                   single:typing.Optional[bool]=True, save:bool=False,
+    def chooseFile(self, caption:typing.Optional[str]=None, 
+                   fileFilter:typing.Optional[str]=None, 
+                   single:typing.Optional[bool]=True, 
+                   save:bool=False,
                    targetDir:typing.Optional[str]=None) -> typing.Tuple[typing.Union[str, typing.List[str]], str]:
         """Launcher of file open dialog
         

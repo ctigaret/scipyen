@@ -100,6 +100,7 @@
      <string>Settings</string>
     </property>
     <addaction name="actionGUI_Style"/>
+    <addaction name="actionAuto_launch_Script_Manager"/>
    </widget>
    <widget class="QMenu" name="menuConsoles">
     <property name="title">
@@ -874,6 +875,14 @@ NOTE: you can click anywhere in the row to select</string>
   <action name="actionGUI_Style">
    <property name="text">
     <string>GUI Style...</string>
+   </property>
+  </action>
+  <action name="actionAuto_launch_Script_Manager">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Auto-launch Script Manager</string>
    </property>
   </action>
  </widget>

@@ -798,6 +798,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
     signal_openScriptFolder = pyqtSignal(str)
     signal_pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
     signal_pythonFileAdded = pyqtSignal(str)
+    signal_scriptManagerClosed = pyqtSignal()
     
     
     # NOTE recently run scripts is managed by ScipyenWindow instance mainWindow
@@ -829,7 +830,12 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
         
     def closeEvent(self, evt):
         self.saveSettings()
+        evt.accept()
+        self.close()
         
+        evt.accept()
+        #self.signal_scriptManagerClosed.emit()
+
     def loadSettings(self):
         loadWindowSettings(self.qsettings, self)
             
@@ -883,12 +889,6 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
         self.scriptsTable.clearContents()
         self.scriptsTable.setRowCount(0)
         
-    def closeEvent(self, evt):
-        self.saveSettings()
-        evt.accept()
-        self.close()
-        
-        evt.accept()
         
     @property
     def scriptsCount(self):
@@ -962,14 +962,24 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
     @safeWrapper
     def slot_addScript(self):
         targetDir = os.getcwd()
-        fileName = QtWidgets.QFileDialog.getOpenFileName(self, caption=u"Run python script", filter="Python script (*.py)", directory = targetDir)
+        fileName = self.chooseFile(caption=u"Add python script", 
+                                 fileFilter="Python script (*.py)", 
+                                 targetDir = targetDir)
+        #fileName = QtWidgets.QFileDialog.getOpenFileName(self, caption=u"Run python script", filter="Python script (*.py)", directory = targetDir)
         
-        if len(fileName) > 0:
-            if isinstance(fileName, tuple):
-                fileName = fileName[0] # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
+        if isinstance(fileName, tuple):
+            fileName = fileName[0] # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
+        if pio.checkFileReadAccess(fileName):
+            self.signal_pythonFileAdded.emit(fileName)
+            
+        #if len(fn.strip()) > 0:
+            #if pio.checkFileReadAccess(fn):
+                #self.signal_pythonFileAdded.emit(fn)
+            #if isinstance(fileName, tuple):
+                #fileName = fileName[0] # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
+            #if pio.checkFileReadAccess(fileName):
+                #self.signal_pythonFileAdded.emit(fileName)
                 
-            if pio.checkFileReadAccess(fileName):
-                self.signal_pythonFileAdded.emit(fileName)
 
     @pyqtSlot()
     @safeWrapper
@@ -977,11 +987,21 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
         targetDir = os.getcwd()
         
         # NOTE: returns a tuple (path list, filter)
-        fileNames, fileFilter = QtWidgets.QFileDialog.getOpenFileNames(self, caption=u"Run python script", filter="Python script (*.py)", directory = targetDir)
+        #fileNames, fileFilter = QtWidgets.QFileDialog.getOpenFileNames(self, caption=u"Run python script", filter="Python script (*.py)", directory = targetDir)
         
-        if pio.checkFileReadAccess(fileNames):
-            for fileName in fileNames:
+        fn, fl = self.chooseFile(caption=u"Add python scripts", 
+                                 filter="Python script (*.py)", 
+                                 targetDir = targetDir,
+                                 single=False)
+        
+        if pio.checkFileReadAccess(fn):
+            for fileName in fn:
                 self.signal_pythonFileAdded.emit(fileName)
+        
+        
+        #if pio.checkFileReadAccess(fileNames):
+            #for fileName in fileNames:
+                #self.signal_pythonFileAdded.emit(fileName)
         
         
     @pyqtSlot()
@@ -1612,7 +1632,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._recent_scripts_dict_      = dict()
         self._showFilesFilter           = False
         self._console_docked_           = False
-        self._script_manager_visible    = False
+        self._script_manager_autolaunch    = False
         
         # ### END configurables, but see NOTE:2022-01-28 23:16:57 below
         
@@ -1702,6 +1722,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.scriptsManager.signal_openScriptFolder[str].connect(self.slot_systemOpenParentFolder)
         self.scriptsManager.signal_pythonFileReceived[str, QtCore.QPoint].connect(self.slot_handlePythonTextFile)
         self.scriptsManager.signal_pythonFileAdded[str].connect(self._slot_scriptFileAddedInManager)
+        self.scriptsManager.signal_scriptManagerClosed.connect(self._slot_scriptManagerClosed)
         
         # NOTE: 2016-04-15 23:58:08
         # place holders for the tree widget item holding the commands in the 
@@ -1861,18 +1882,25 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._current_GUI_style_name = val
         
     @property
-    def scriptManagerVisible(self):
-        self._script_manager_visible = self.scriptsManager.isVisible() and not self.scriptsManager.isMinimized()
-        return self._script_manager_visible
+    def scriptManagerAutoLaunch(self):
+        self._script_manager_autolaunch = self.scriptsManager.isVisible() and not self.scriptsManager.isMinimized()
+        return self._script_manager_autolaunch
     
-    @markConfigurable("ScriptManagerVisible", "qt")
-    @scriptManagerVisible.setter
-    def scriptManagerVisible(self, val:bool):
-        self._script_manager_visible = val is True
-        if self._script_manager_visible:
-            self.slot_showScriptsManagerWindow()
+    @markConfigurable("ScriptManagerAutoLaunch", "qt")
+    @scriptManagerAutoLaunch.setter
+    def scriptManagerAutoLaunch(self, val:typing.Union[bool, str]):
+        
+        if isinstance(val, str):
+            val = True if val.lower() == "true" else False
+        
+        if val is True:
+            self._showScriptsManagerWindow()
         else:
             self.scriptsManager.close()
+            
+        self._script_manager_autolaunch = True
+        sigblock = QtCore.QSignalBlocker(self.actionAuto_launch_Script_Manager)
+        self.actionAuto_launch_Script_Manager.setChecked(val)
             
     @property
     def maxRecentDirectories(self) -> int:
@@ -1981,7 +2009,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             #self._recentVariablesList = collections.deque(sorted((s for s in val)))
             
         else:
-            self._recentVariablesList = collections.deque
+            self._recentVariablesList = collections.deque()
             
         if len(self._recentVariablesList):
             self.varNameFilterFinderComboBox.clear()
@@ -3634,16 +3662,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.console = None
             
         plt.close("all")
-
+        
         self.saveSettings()
         
-        #self.app.closeAllWindows()
-        #open_windows = (obj for obj in self.workspace.values() if isinstance(obj, QtWidgets.QWidget) and type(obj) not in VTH.gui_handlers and obj.isVisible())
-        
-        #for o in open_windows:
-            #o.close()
-        
-            
         evt.accept()
         
     #def saveSettings(self):
@@ -3756,7 +3777,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # list of available syle names
         self._available_Qt_style_names_ = QtWidgets.QStyleFactory.keys()
         self.actionGUI_Style.triggered.connect(self._slot_set_Application_style)
-
+        self.actionAuto_launch_Script_Manager.toggled.connect(self._slot_set_scriptManagerAutoLaunch)
         # NOTE: 2016-05-02 14:26:58
         # add HERE a "Recent Files" submenu to the menuFile
 
@@ -4084,6 +4105,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.consoleDockWidget.setVisible(False)
         #### END console dock
         #### END Dock widgets management
+        
+        
     @pyqtSlot()
     @safeWrapper
     def slot_keyDeleteStuff(self):
@@ -4998,10 +5021,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_showScriptsManagerWindow(self):
+        self._showScriptsManagerWindow()
+        
+    def _showScriptsManagerWindow(self):
         self.scriptsManager.setData(self._recent_scripts_dict_)
         self.scriptsManager.setVisible(True)
         self.scriptsManager.showNormal()
-        #self.scriptsManager.exec_()
+        #self._script_manager_autolaunch = True
         
     @pyqtSlot()
     @safeWrapper
@@ -5829,6 +5855,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def _slot_scriptFileAddedInManager(self, fileName):
         self._temp_python_filename_ = fileName
         self._slot_registerPythonSource_()
+        
+    @pyqtSlot()
+    def _slot_scriptManagerClosed(self):
+        self.scriptManagerAutoLaunch = False
+        
+    @pyqtSlot(bool)
+    def _slot_set_scriptManagerAutoLaunch(self, val):
+        self.scriptManagerVisible = val
         
     @pyqtSlot()
     @safeWrapper
