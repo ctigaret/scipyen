@@ -92,7 +92,7 @@ def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None,
     -----------------
     
     glob: bool (default is True)
-        When True, the strings in args are treated as UNIC shell-style globs; 
+        When True, the strings in args are treated as UNIX shell-style globs; 
             otherwise, they are treated as regular expression strings.
         
     ws: dict (default None) = the search namespace

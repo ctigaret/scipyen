@@ -1,4 +1,5 @@
-"""quickdialog module adaptedfrom vigranumpy.pyqt.quickdialog
+"""quickdialog module adapted from vigranumpy.pyqt.quickdialog
+Useful to have even when vigranumpy is not installed.
 """
 #######################################################################
 #                                                                      
@@ -334,6 +335,8 @@ class HDialogGroup(DialogGroup):
 class VDialogGroup(DialogGroup):
     def __init__(self, parent):
         DialogGroup.__init__(self, parent, 1)
+        
+
        
 class QuickDialogComboBox(QtWidgets.QFrame):
     """A combobox to use with a QuickDialog.
