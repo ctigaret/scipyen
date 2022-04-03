@@ -7,7 +7,7 @@ Changelog:
 
 """
 import warnings
-from enum import IntEnum
+#from enum import IntEnum
 from numbers import (Number, Real,)
 from copy import (deepcopy, copy,)
 from itertools import chain
