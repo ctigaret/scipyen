@@ -14,8 +14,9 @@ def check_rise_decay_params(x):
     
     return (len(x)-3) // 2
 
-def generic_exp_decay(x, offset, scale, delay, decay):
-    """Realizes f(x) = scale * exp(-(x-delay)/decay) + offset
+def generic_exp_decay(x, y₀, α, x₀, τ):
+    """Realizes y = α × exp(-(x-x₀)/τ) + y₀
+    
     """
     
     return scale * np.exp(-(x-delay)/decay) + offset
@@ -25,20 +26,20 @@ def exp_rise_multi_decay(x, parameters, returnDecays = False):
         n exponential decays (d1..dn), at an onset (delay) x0 and a given 
         "DC" component (offset) o: 
 
-        y = (1 - exp( -(x-x0)/r ) * ( a_0     * exp( -(x-x0)/d_0) + 
-                                      a_1     * exp( -(x-x0)/d_1) +
-                                      .                           +
-                                      .                           +
-                                      a_(n-1) * exp( -(x-x0)/d_(n-1) ) ) + o               (1)
+        y = (1 - exp( -(x-x₀)/r ) * ( a₀     * exp( -(x-x₀)/d₀) + 
+                                      a₁     * exp( -(x-x₀)/d₁) +
+                                      .                         +
+                                      .                         +
+                                      aₙ₋₁   * exp( -(x-x₀)/dₙ₋₁ ) ) + o               (1)
 
 
         where:
 
-            x0        = onset (delay) of the transient; only makes sense when x0 >= 0
-            r         = rising phase time constant; 
-            a_0...a_(n-1)   = scale for each of the n decay components;
-            d_0...d_(n-1)   = time constant for each of the decay components;
-            o         = offset (`DC' component)
+            x₀          = onset (delay) of the transient; only makes sense when x0 >= 0
+            r           = rising phase time constant; 
+            a₀...aₙ₋₁   = scale for each of the n decay components;
+            d₀...dₙ₋₁   = time constant for each of the decay components;
+            o           = offset (`DC' component)
             
             
     Arguments:
