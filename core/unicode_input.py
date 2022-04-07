@@ -1,3 +1,4 @@
+import IPython.core.completer as completer
 
 unicode_input = dict()
 
@@ -13,3 +14,6 @@ with open("unicode_input") as src:
             continue
         unicode_input[items[2]]=items[1]
 
+for k,i in unicode_input.items():
+    if k not in completer.latex_symbols:
+        latex_symbols[k]=i

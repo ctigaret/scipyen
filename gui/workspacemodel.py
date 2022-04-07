@@ -632,6 +632,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                             elidetip:typing.Optional[bool] = False,
                             background:typing.Optional[QtGui.QBrush]=None, 
                             foreground:typing.Optional[QtGui.QBrush]=None) -> QtGui.QStandardItem:
+        #print(propdict)
         item = QtGui.QStandardItem(propdict["display"])
         
         ttip = propdict["tooltip"]
@@ -647,6 +648,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         item.setStatusTip(propdict["tooltip"])
         item.setWhatsThis(propdict["tooltip"])
         item.setEditable(editable)
+        #if editable:
+            #item.setData(propdict["display"], role=QtCore.Qt.DisplayRole)
         
         if isinstance(background, QtGui.QBrush):
             item.setBackground(background)

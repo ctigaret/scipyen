@@ -14,23 +14,34 @@ def check_rise_decay_params(x):
     
     return (len(x)-3) // 2
 
-def generic_exp_decay(x, y₀, α, x₀, τ):
+def generic_exp_decay(x, y0, α, x0, τ):
     """Realizes y = α × exp(-(x-x₀)/τ) + y₀
     
+    NOTE: Python 3 only supports a subset of the unicode character set for 
+    identifiers (or variable names). 
+    
+    For example, the following are invalid variable names: 'a₀' or 'α₀', although
+    they MAY be used in documetation; on the other hand the following ARE valid:
+    'a0', 'a_0', 'α0', or 'α_0'
+
+    To insert unicode characters in variable names in Scipyen's console, use
+    '\'followed by 'Tab' key (and if necessary, press 'Tab' a second time).
+    
+    This works as well in jupyter qtconsole, but not in plain python REPL
     """
     
-    return scale * np.exp(-(x-delay)/decay) + offset
+    return α * np.exp(-(x-x0)/τ) + y0
 
 def exp_rise_multi_decay(x, parameters, returnDecays = False):
     """ Realization of a transient signal with a single exponential rise (r) and
         n exponential decays (d1..dn), at an onset (delay) x0 and a given 
         "DC" component (offset) o: 
 
-        y = (1 - exp( -(x-x₀)/r ) * ( a₀     * exp( -(x-x₀)/d₀) + 
-                                      a₁     * exp( -(x-x₀)/d₁) +
-                                      .                         +
-                                      .                         +
-                                      aₙ₋₁   * exp( -(x-x₀)/dₙ₋₁ ) ) + o               (1)
+        y = (1 - exp( -(x-x₀)/r ) * ( a₀     * exp( -(x-x₀)/d₀)     + 
+                                      a₁     * exp( -(x-x₀)/d₁)     +
+                                      .                             +
+                                      .                             +
+                                      aₙ₋₁   * exp( -(x-x₀)/dₙ₋₁ )) + o               (1)
 
 
         where:
@@ -56,18 +67,18 @@ def exp_rise_multi_decay(x, parameters, returnDecays = False):
             
             Model parameter values are interpreted to be given in the following order:
             
-            a0, d0, <a1, d1, ...an, dn>, o, r, x0
+            a₀, d₀, <a₁, d₁, ...aₙ, dₙ>, o, r, x₀
             
             For each decay component there are two parameters: 
             a (scale) and d (time constant).
             
-            Decay components are given in order (scale0, decay0, scale1, decay1, etc)
-            and are followed by offset (o), rise time constant (r) and delay (x0).
+            Decay components are given in order (scale₀, decay₀, scale₁, decay₁, etc)
+            and are followed by offset (o), rise time constant (r) and delay (x₀).
             
-            For example, [a0, sd0, a1, d1, o, r, x0] specifies a transient signal 
-            with two decay components, (a0, d0, a1, d1)
+            For example, [a₀, d₀, a₁, d₁, o, r, x₀] specifies a transient signal 
+            with two decay components, (a₀, d₀, a₁, d₁)
             
-            The time constants (r, d_0, d_1, ...) and the delay x0 are considered to
+            The time constants (r, d₀, d₁, ...) and the delay x₀ are considered to
             be given in the same time units as x. The offset and scale parameters
             are considered to be given in the units of the signal.
             For code simplicity I do NOT use python quantities here, so appropriate scaling
@@ -80,6 +91,19 @@ def exp_rise_multi_decay(x, parameters, returnDecays = False):
     
     yd = a list of model curves for each scaled decay component; it has as many curves
         as there are 'a' and 'd' elements in parameters
+        
+        
+    NOTE: Python 3 only supports a subset of the unicode character set for 
+    identifiers (or variable names). 
+    
+    For example, the following are invalid variable names: 'a₀' or 'α₀', although
+    they MAY be used in documetation; on the other hand the following ARE valid:
+    'a0', 'a_0', 'α0', or 'α_0'
+
+    To insert unicode characters in variable names in Scipyen's console, use
+    '\'followed by 'Tab' key (and if necessary, press 'Tab' a second time).
+    
+    This works as well in jupyter qtconsole, but not in plain python terminal
     
     """
     

@@ -330,6 +330,48 @@ if CaTanalysis.LSCaTWindow not in gui_viewers:
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
+__scipyendir__ = os.path.dirname(__module_path__)
+
+
+#### BEGIN NOTE: 2022-04-07 22:39:44 
+## the code below supplemets the atbel of IPython's core completer latex symbols
+## with extra unicode characters from Julia
+## HOWEVER, Python 3 only supports a subset of these, for variable names (a.k.a
+## identifiers)
+## for example, the following are invalid variable names: 'a₀' or 'α₀', although
+## they MAY be used in documetation; on the other hand the following ARE valid:
+## 'a0', 'a_0', 'α0', or 'α_0'
+## Since Unicode support is guaranteed in jupyter qtconsole (plain python REPL
+## relies on the capabilities of the terminal) it is preferable to avoid using 
+## this code. There is no harm in using it, other than the annoyance of finding
+## out that your fancy unicode identifier is not a valid identifier (the latex
+## symbols tables in IPytyon.core.completer module is already filtered to allow
+## only uncode glyphs acceptable in Python variable names)
+## 
+
+#import IPython
+
+#unicode_input = dict()
+
+#with open(os.path.join(__scipyendir__, "core","unicode_input_table")) as src:
+    #while True:
+        #l = src.readline()
+        #if len(l) == 0:
+            #break
+        #items = l.split("\t")
+        #if len(items) != 4:
+            #break
+        #if "tab completion sequence" in items[2].lower():
+            #continue
+        #unicode_input[items[2]]=items[1]
+
+#for k,i in unicode_input.items():
+    #if k not in IPython.core.completer.latex_symbols:
+        #IPython.core.completer.latex_symbols[k]=i
+        
+#IPython.core.completer.reverse_latex_symbol = {v:k for k,v in IPython.core.completer.latex_symbols.items()}
+
+#### END NOTE: 2022-04-07 22:39:44 
 
 _valid_varname__regex_ = '^[A-Za-z_][A-Za-z0-9_]{1,30}$'
 
@@ -374,7 +416,7 @@ _info_banner_.append("pictgui -> pgui (*)      ancillary GUI stuff")
 _info_banner_.append("pictio -> pio (*)        i/o functions")
 _info_banner_.append("datatypes                new python quantities and data types")
 _info_banner_.append("xmlutils                 GUI viewer for XML documents + utilities")
-_info_banner_.append("ephys                 utilities for neo core objects")
+_info_banner_.append("ephys                    utilities for neo core objects")
 _info_banner_.append("tiwt                     wavelet function + purelet denoise")
 _info_banner_.append("ephys                    package with various electrophysiology routines")
 _info_banner_.append("curvefitting -> crvf")
