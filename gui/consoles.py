@@ -397,7 +397,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     @property
     def fontWeight(self) -> typing.Union[int, QtGui.QFont.Weight]:
         return self.font.weight()
-
+    
     @markConfigurable("FontWeight", "qt")
     @fontWeight.setter
     def fontWeight(self, val:typing.Union[int, QtGui.QFont.Weight, str]) -> None:
