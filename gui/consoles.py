@@ -3380,6 +3380,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     loadUrls = pyqtSignal(object, bool, QtCore.QPoint)
     pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
     executed = pyqtSignal()
+    #sig_shell_msg_received = pyqtSignal(object)
     
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -3457,7 +3458,16 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self.settings_menu.addAction(self.choose_font_act)
         self.addAction(self.choose_font_act)
+        #self.widget.kernel_client.shell_channel.message_received.connect(self.slot_kernel_shell_chnl_msg_recvd)
 
+    #@pyqtSlot(object)
+    #def slot_kernel_shell_chnl_msg_recvd(self, msg:object):
+        #msg["workspace_name"]="Internal"
+        #msg["connection_file"] = ""
+        #self.sig_shell_msg_received.emit(msg)
+        
+        
+            
     def loadSettings(self):
         self.consoleWidget.loadSettings() # inherited from ScipyenConfigurable
         super(WorkspaceGuiMixin, self).loadSettings()
@@ -3481,6 +3491,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
     def execute(self, *args, **kwargs):
         self.consoleWidget.execute(*args, **kwargs)
+        
         
     def writeText(self, text):
         self.consoleWidget.writeText(text)

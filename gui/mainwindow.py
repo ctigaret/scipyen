@@ -1783,7 +1783,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                                                          mpl_figure_close_callback=self.handle_mpl_figure_close,
                                                          mpl_figure_click_callback=self.handle_mpl_figure_click,
                                                          mpl_figure_enter_callback=self.handle_mpl_figure_enter)
-        
+        self.workspaceModel.workingDir.connect(self._slot_workdirChangedInConsole)
         self.sig_windowRemoved.connect(self.slot_windowRemoved) # signal inherited from WindowManager
         
         # NOTE: 2020-10-22 13:30:54
@@ -2510,6 +2510,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.console.workspaceItemsDropped.connect(self.slot_pasteWorkspaceSelection)
             self.console.loadUrls[object, bool, QtCore.QPoint].connect(self.slot_loadDroppedURLs)
             self.console.pythonFileReceived[str, QtCore.QPoint].connect(self.slot_handlePythonTextFile)
+            #self.console.sig_shell_msg_received[object].connect(self._slot_int_krn_shell_chnl_msg_recvd)
 
             self.historyTreeWidget.insertTopLevelItems(0, items)
             self.historyTreeWidget.scrollToItem(self.currentSessionTreeWidgetItem)
@@ -4736,7 +4737,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             mpl.rcParams["savefig.directory"] = targetDir
             self.setWindowTitle("Scipyen %s" % targetDir)
             
+    def _slot_workdirChangedInConsole(self, targetDir):
+        self._updateFileSystemView_(targetDir, cd=True)
+            
     def _updateFileSystemView_(self, targetDir, cd=True):
+        if self.fileSystemModel.rootPath() == targetDir:
+            return
         self.fileSystemModel.setRootPath(targetDir)
         self.fileSystemTreeView.scrollTo(self.fileSystemModel.index(targetDir))
         if cd:
@@ -5711,6 +5717,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             #if len(varnames):
                 #self.external_console.execute(cmd_copies_from_foreign(*varnames),
                                               #where = wsname)
+    
+    @pyqtSlot(object)
+    def _slot_int_krn_shell_chnl_msg_recvd(self, msg):
+        if msg["msg_type"] == "execute_reply":
+            pass
     
     @pyqtSlot(object)
     @safeWrapper

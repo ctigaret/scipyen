@@ -56,6 +56,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     
     '''
     modelContentsChanged = pyqtSignal(name = "modelContentsChanged")
+    workingDir=pyqtSignal(str, name="workingDir")
     
     def __init__(self, shell, user_ns_hidden=dict(), parent=None,
                  mpl_figure_close_callback=None,
@@ -599,8 +600,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
     def post_execute(self):
         """Updates workspace model AFTER kernel execution.
-        Also takes into account matplotlib figures that have been created by
-        plt commands at the console
+        Also takes into account:
+        1) matplotlib figures that have been created by plt commands at the console
         """
         # NOTE: 2022-03-15 22:05:21
         # check if there is a mpl Figure created in the console (but NOT bound to
@@ -626,6 +627,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         # just update the model directly
         self.update()
+        
+        current_dir = os.getcwd()
+        
+        self.workingDir.emit(current_dir)
+        
         
     def _gen_item_for_object_(self, propdict:dict, 
                             editable:typing.Optional[bool] = False, 
