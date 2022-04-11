@@ -1012,17 +1012,10 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
         if isinstance(fileName, tuple):
             fileName = fileName[0] # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
         if pio.checkFileReadAccess(fileName):
-            self.signal_pythonFileAdded.emit(fileName)
+            mime_file_type = pio.getMimeAndFileType(fileName)
+            if any("python" in s for s in mime_file_type):
+                self.signal_pythonFileAdded.emit(fileName)
             
-        #if len(fn.strip()) > 0:
-            #if pio.checkFileReadAccess(fn):
-                #self.signal_pythonFileAdded.emit(fn)
-            #if isinstance(fileName, tuple):
-                #fileName = fileName[0] # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
-            #if pio.checkFileReadAccess(fileName):
-                #self.signal_pythonFileAdded.emit(fileName)
-                
-
     @pyqtSlot()
     @safeWrapper
     def slot_addScripts(self):
@@ -1038,13 +1031,9 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
         
         if pio.checkFileReadAccess(fn):
             for fileName in fn:
-                self.signal_pythonFileAdded.emit(fileName)
-        
-        
-        #if pio.checkFileReadAccess(fileNames):
-            #for fileName in fileNames:
-                #self.signal_pythonFileAdded.emit(fileName)
-        
+                mft = pio.getMimeAndFileType(fileName)
+                if any("python" in s for s in mft):
+                    self.signal_pythonFileAdded.emit(fileName)
         
     @pyqtSlot()
     @safeWrapper
@@ -4372,9 +4361,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             openFileObjects = cm.addAction("Open")
             openFileObjects.triggered.connect(self.slot_openSelectedFileItems)
             
-            if all([any([s in pio.getMimeAndFileType(f)[0] for s in ("spreadsheet", "excel", "csv", "tab-separated-values")]) for f in fileNames]):
+            if all([pio.checkFileReadAccess(f) and any([s in pio.getMimeAndFileType(f)[0] for s in ("spreadsheet", "excel", "csv", "tab-separated-values")]) for f in fileNames]):
                 importAsDataFrame = cm.addAction("Open as DataFrame")
                 importAsDataFrame.triggered.connect(self.slot_importDataFrame)
+                
+            if all(pio.checkFileReadAccess(f) and any("python" in s for s in pio.getMimeAndFileType(f)) for f in fileNames):
+                addToScriptManager = cm.addAction("Add to Script Manager")
+                addToScriptManager.triggered.connect(self._slot_cm_AddPythonScriptToManager)
             
             fileNamesToConsole = cm.addAction("Send Name(s) to Console")
             fileNamesToConsole.triggered.connect(self._sendFileNamesToConsole_)
@@ -5908,6 +5901,21 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def _slot_scriptFileAddedInManager(self, fileName):
         self._temp_python_filename_ = fileName
         self._slot_registerPythonSource_()
+        
+    @pyqtSlot()
+    def _slot_cm_AddPythonScriptToManager(self):
+        selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes() \
+                         if item.column() == 0 and not self.fileSystemModel.isDir(item)]# list of QModelIndex
+        
+        if len(selectedItems) == 0:
+            return
+        
+        fileNames = [self.fileSystemModel.filePath(i) for i in selectedItems]
+        
+        
+        for f in fileNames:
+            self._slot_scriptFileAddedInManager(f)
+        
         
     @pyqtSlot()
     def _slot_scriptManagerClosed(self):

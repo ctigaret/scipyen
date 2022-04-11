@@ -1,4 +1,32 @@
-TODO enable Drag & Drop from PICT window to KDE applications / desktop
+TODO:
+    finish up API for ScanData, Results
+    
+    generic "smart" GUI for function arguments:
+        * use inspect.Signature to dig out parameters for the callable then 
+            dynamically egenerate a dialog to prompt user for parameter values
+            (populated with defaults where applicable); result (if any) returned
+            to the Workspace (with option to bind the return variables to 
+                              identifiers)
+        * for POD types, tuple, list: enter values directly (number, str)
+        * for "compound" objects (including dict) use the workspace
+            symbol that is bound to the variable needed as parameter
+    
+    "smart" "Preferences" gui dialog/wizard for Qt Configurables
+        * collect QtConfigurables then inspect getter & setter properties for
+            default and new values, respectively
+        * build dialog to enter new values → call the setters.
+        * POD types, tuple and list should be supported directly (i.e. enter value in dialog UI elements)
+        * compound objects: not supported by the QSettings backend anyway!
+
+    re-activate plugin mechanism → factor code in epys, imaging, etc, as plugins.
+    
+    file System panel:
+        enable drag python source code & drop to script manager window
+        breadcrumbs navigation
+        
+    enable Drag & Drop from PICT window to KDE applications / desktop
+    
+    write documentation
 
 NOTE 2019-10-06 00:41:18
 Stop using vigra.pyqt package, as it depends on VigraQt which as of the time of
