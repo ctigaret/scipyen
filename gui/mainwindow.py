@@ -39,7 +39,7 @@ CHANGELOG:
 # NOTE: 2021-10-21 13:24:24
 # all things imported below will be available in the user workspace
 #### BEGIN core python modules
-import faulthandler, importlib
+import faulthandler, importlib, subprocess
 import sys, os, types, atexit, re, inspect, gc, sip, io, warnings, numbers
 import traceback, keyword, inspect, weakref, itertools, typing, functools, operator
 import json
@@ -92,7 +92,8 @@ import seaborn as sb # statistical data visualization
 import pyqtgraph as pg # used throughout - based on Qt5 
 pg.Qt.lib = "PyQt5" # pre-empt the use of PyQt5
 # TODO make this peristent  user-modifiable configuration
-pg.setConfigOptions(background="w", foreground="k", editorCommand="kwrite")
+#pg.setConfigOptions(background="w", foreground="k", editorCommand="kwrite")
+pg.setConfigOptions(background="w", foreground="k", editorCommand="kate")
 #pg.setConfigOptions(editorCommand="kwrite")
 #### END migration to pyqtgraph -- setup global parameters
 
@@ -1007,7 +1008,6 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
         fileName = self.chooseFile(caption=u"Add python script", 
                                  fileFilter="Python script (*.py)", 
                                  targetDir = targetDir)
-        #fileName = QtWidgets.QFileDialog.getOpenFileName(self, caption=u"Run python script", filter="Python script (*.py)", directory = targetDir)
         
         if isinstance(fileName, tuple):
             fileName = fileName[0] # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
@@ -1658,7 +1658,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._lastVariableFind          = str()
         self._commandHistoryFinderList  = collections.deque()
         self._lastCommandFind           = str()
-        #self._recentScripts             = collections.deque()
         self._recentScripts             = list()
         self._recent_scripts_dict_      = dict()
         self._showFilesFilter           = False
@@ -1677,14 +1676,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.shell                      = None
         self.historyAccessor            = None
         
-        #self.scipyenEditor              = "kwrite"
+        self._scipyenEditor             = "kate"
+        self._overrideSystemEditor      = False
         
         self.external_console           = None
         
         self._maxRecentFiles = 10 # TODO: make this user-configurable
         self._maxRecentDirectories = 100 # TODO: make this user-configurable
     
-        #pg.setConfigOptions(editorCommand=self.scipyenEditor)
+        #pg.setConfigOptions(editorCommand=self._scipyenEditor)
         
         #self._default_scipyen_settings_ = defaults
         
@@ -2087,6 +2087,27 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def lastCommandSearch(self) -> str:
         return self._lastCommandFind
     
+    @property
+    def scipyenEditor(self) -> str:
+        return self._scipyenEditor
+    
+    @markConfigurable("ScipyenEditor", "Qt")
+    @scipyenEditor.setter
+    def scipyenEditor(self, val:typing.Optional[str]=None):
+        if isinstance(val, str) and len(val.strip()):
+            self._scipyenEditor = val
+        else:
+            self._scipyenEditor = ""
+            
+    @property
+    def overrideSystemEditor(self) -> bool:
+        return self._overrideSystemEditor
+    
+    @markConfigurable("OvererideSystemEditor", "Qt")
+    @overrideSystemEditor.setter
+    def overrideSystemEditor(self, val:bool=False):
+        self._overrideSystemEditor = val is True
+        
     @markConfigurable("LastCommandSearch", "Qt")
     @lastCommandSearch.setter
     def lastCommandSearch(self, val:typing.Optional[str]=None) -> None:
@@ -4345,6 +4366,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                             warnings.warn("ScipyenWindow.slot_loadDroppedURLs: I don't know how to handle %s" % path)
                     else:
                         warnings.warn("ScipyenWindow.slot_loadDroppedURLs: Remote URLs not yet supported", NotImplemented)
+                        
     @pyqtSlot(QtCore.QPoint)
     @safeWrapper
     def slot_fileSystemContextMenuRequest(self, point):
@@ -4930,8 +4952,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def slot_systemEditScript(self, fileName):
         if os.path.exists(fileName) and os.path.isfile(fileName):
-            url = QtCore.QUrl.fromLocalFile(fileName)
-            QtGui.QDesktopServices.openUrl(url)
+            if not self._overrideSystemEditor:
+                url = QtCore.QUrl.fromLocalFile(fileName)
+                QtGui.QDesktopServices.openUrl(url)
+            else:
+                try:
+                    subprocess.run([editor, filename])
+                except:
+                    traceback.print_exc()
             #QtGui.QDesktopServices.openUrl(QtCore.QUrl("file://%s" % fileName))
         
     @pyqtSlot(str)
