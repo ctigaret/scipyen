@@ -17,8 +17,9 @@ if [ $isgit -eq "0" ]; then
 branch=`git -C $scipyendir branch --show-current`
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+BLUE='\033[0;34m'
 NC='\033[0m'
-echo -e "${RED}WARNING:${NC} Running ${GREEN}$branch${NC} branch of local scipyen git repository in $scipyendir with status:"
+echo -e "${RED}WARNING:${NC} Running ${GREEN}$branch${NC} branch of local scipyen git repository in ${BLUE}$scipyendir${NC} with status:"
 git -C $scipyendir status --short --branch
 echo "Using Python environment in ${VIRTUAL_ENV}"
 echo ""
