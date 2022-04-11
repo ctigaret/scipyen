@@ -1,14 +1,31 @@
 #! /bin/sh 
 realscript=`realpath $0`
 scipyendir=`dirname $realscript`
-source $HOME/.scipyenrc # supplies the shell function scipyact created by make_
 
+# the line below supplies the shell function 'scipyact' created by make_scripts
+source $HOME/.scipyenrc 
 if [ -z $VIRTUAL_ENV ]; then
     scipyact
 fi
 
+# are we using scipyen from a git repository?
+git -C $scipyendir rev-parse 2>/dev/null;
+isgit=`echo $?`
+
+if [ $isgit -eq "0" ]; then
+# scigitstatus=`git -C $scipyendir status --short --branch`
+branch=`git -C $scipyendir branch --show-current`
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+echo -e "${RED}WARNING:${NC} Running ${GREEN}$branch${NC} branch of local scipyen git repository in $scipyendir with status:"
+git -C $scipyendir status --short --branch
 echo "Using Python environment in ${VIRTUAL_ENV}"
 echo ""
+else
+echo "Using Python environment in ${VIRTUAL_ENV}"
+echo ""
+fi
 # echo "PYTHONHOME=$PYTHONHOME"
 # echo "PYTHONPATH=$PYTHONPATH"
 # echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
