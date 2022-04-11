@@ -27,6 +27,9 @@ TODO:
     enable Drag & Drop from PICT window to KDE applications / desktop
     
     write documentation
+    
+NOTE 2022-04-11 10:21:45
+    runs on Python>=3.10
 
 NOTE 2019-10-06 00:41:18
 Stop using vigra.pyqt package, as it depends on VigraQt which as of the time of
