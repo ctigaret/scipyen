@@ -3612,12 +3612,6 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     if sig.ndim > 2 or (sig.ndim == 2 and sig.shape[1] > 1):
         raise TypeError("Signal must be a vector")
     
-    #if smooth_window > 0:
-        #w = boxcar(smooth_window)/smooth_window
-        
-    #else:
-        #w = None
-    
     if min_fast_rise_duration is None:
         min_fast_rise_duration = (10**(np.floor(np.log10(sig.sampling_period.rescale(pq.s).magnitude)) + 1)) * pq.s
         
@@ -4732,14 +4726,47 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
 def analyse_AP_step_injection_series(data, **kwargs):
     """ Action potential (AP) detection and analysis in I-clamp experiment.
     
-    Performs action potential (AP) detection and analysis in data from a single 
-    I-clamp experiment (a "run") with a series of increasing depolarizing current 
-    injection steps (one injection per "sweep").
+    Detects and analyses action potentials (AP) fired during depolarizing current
+    injections in current clamp.
     
-    The AP detection is performed over the sweep interval corresponding to a 
-    step current injection.
+    The record may contain several sweeps where the current injection amplitude
+    is varied progressively (typically incremented by the same amount from an 
+    inital value).
     
-    The step current injection can be specified in one of three ways:
+    The current injection occurs during a defined time interval which should 
+    start at the same time relative to the beginning of the sweep, and have the
+    same duration in all sweeps.
+    
+    In each sweep, action potentials are detected in the membrane voltage signal
+    on the time interval (time slice) corresponding to the current injection.
+    
+    The amplitude, onset and duration of the current injection can be detected
+    automatically from an analog signal record of the injection waveform, if 
+    such signal is present in all sweeps.
+        
+    Alternatively, the current injection amplitude(s) and time interval can be 
+    specified using the following parameters:
+    
+    * for current injection amplitude:
+        'Iinj_0' and 'delta_I' (initial amplitude and increment from one sweep 
+            to the next)
+            
+        or:
+        
+        'Iinj': a sequence of current injection amplitudes - the length of the 
+        sequemce must equal the number of sweeps (i.e. neo.Segment objects) in
+        the data.
+        
+    * for current injection time interval:
+        Istart, Istop (int for samples, or python Quantity in time units)
+        
+        NOTE 1: it is assumed that current injection starts at the same time
+        relative to the beginning of the sweep, in all sweeps.
+        
+        NOTE 2: when all sweeps start at the same time, Istart and Istop may be
+        specified in absolute time values
+    
+    The current injection parameters can be specified in one of three ways:
     
     a) pass a name or channel index to the ImSignal parameter (see below).
         This is the preferred method when the recorded data CONTAINS a signal
@@ -4777,38 +4804,43 @@ def analyse_AP_step_injection_series(data, **kwargs):
     ----------
     data : neo.Block, list of neo.Segment, or a neo.Segment.
         Contains the recording from one run of a series of depolarizing current 
-            injections steps.
+            injections steps (one rectangular current injection pulse - or step
+            followed by return to initial condition).
             
-        When a neo.Block or a list of neo.Segment objects, each segment must 
-        contain a recorded sweep of rectangular current injection "step".
+        When data is a neo.Block or a list of neo.Segment objects, with each 
+        segment containing one epoch of depolarizing current injection.
         
-        When a single neo.Segment, this contains data from a single step current
-        injection.
+        When data is a single neo.Segment, this contains data from a single step 
+        current injection with the same meaning as above.
         
-        Prerequisites:
-        1. Each segment must contain two analog signals (neo.AnalogSignal ):
-        * recorded membrane potential
-        * the injected current
+        The signal data is stored in the segments' 'analogsignals' attribute, 
+        containing the recorded membrane voltage signal and, optionally, a
+        recorded signal with the current injection waveform.
         
-        It is assumed that the amount of injected current is different in each 
-        segment and that the duration of the current injection step is the same 
-        in all segments.
+        When data has several segments, the membran voltage and the optional
+        current injection signals MUST have the same index in the 'analogsignals'
+        attribute of the segments.
+        
         
     Var-keyword parameters (kwargs):
     --------------------------------
-    VmSignal: int or str
+    VmSignal: int or str; index or name of the Vm analog signal
         integer index, or name (string) of the Vm analog signal
-        optional; default is "Vm_prim_1"
+        NOTE: the index is the signal's index in the segments' 'analogsignals'
+        attribute (a list of AnalogSignal objects)
         
-    ImSignal = int or str
-        index, or name (string) of the Im analog signal
-        optional; default is None
+    ImSignal: int or str; index or name of the Im analog signal; optional, 
+        default is None
+        NOTE: the index has the same meaning as above.
         
-    Iinj_0: python quantity (pA), float scalar, or None: value of the first injected current
-        When None (default) the value will be determined from the Im signal of the first
-        depolarization step
+    Iinj_0: python quantity (pA), float scalar, or None: amplitude of the first 
+        current injection in the series; optional default is None.
+        
+        NOTE: When None, the value of the first will be determined from the Im 
+        signal of the segment
     
-    delta_I: python quantity (pA), float scalar, or None: size of the current injection increment
+    delta_I: python quantity (pA), float scalar, or None; current injection 
+        increment.
         When None (defaut) the value will be determined from the Im signal
         
     Istart, Istop: time quantities for current step injection, or None
@@ -5037,8 +5069,8 @@ def analyse_AP_step_injection_series(data, **kwargs):
         optional; default is None
         
     
-    Returns:
-    ---------
+    Returns (see also 'Side effects', below):
+    -----------------------------------------
     ret: ordered dict with the following key/value pairs:
     
         "Name": str or None; 
@@ -5065,37 +5097,43 @@ def analyse_AP_step_injection_series(data, **kwargs):
             values of Vm at AP threshold, one per segment.
             
         ret["Reference_AP_latency"] : neo.IrregularlySampledSignal
-            the latency of the first AP detected (time from start of step current 
-            injection), one per segment.
+            the latency of the first AP detected (time from start of step 
+            current injection), one per segment.
             
         ret["Mean_AP_Frequency"] : neo.IrregularlySampledSignal
             mean AP frequency (ie. number of APs / duration of the current injection
             step, expressed in Hz), one for each segment,
             
-        ret["Inter_AP_intervals"]   = list of arrays with inter-AP intervals
+        ret["Inter_AP_intervals"] : list of arrays with inter-AP intervals
             (one array per segment) or None for segments without APs
         
-        ret["AP_peak_values"]            = list of arrays with AP_peak_values
+        ret["AP_peak_values"] : list of arrays with AP_peak_values
             (one for each segment, or None for segments without APs)
             
-        ret["AP_peak_amplitudes"]        = list of arrays with AP amplitudes
+        ret["AP_peak_amplitudes"] : list of arrays with AP amplitudes
             (one for each segment or None for segments without APs)
         
-        ret["AP_durations_at_half-max"]     = list of arrays with AP width at 1/2 max
+        ret["AP_durations_at_half-max"] : list of arrays with AP width at 1/2 max
             (one for eaxch segment or None for segments without APs)
             
-        ret["AP_durations_V_0"]         = list of arrays with AP width at Vm = 0
+        ret["AP_durations_V_0"] : list of arrays with AP width at Vm = 0
             (one for each segment, or None for segments without APs)
             
-        ret["AP_durations_V_onset"]    = list of arrays with AP_width_at_threshold vm
-            (one for each segment or None for segments without APs)
+        ret["AP_durations_V_onset"] : list of arrays with AP width at 
+            Vm = threshold potential (one for each segment or None for segments
+            without APs)
             
-        ret["AP_maximum_dV_dt"]          = list of arrays with the maximum dV/dt per AP
+        ret["AP_maximum_dV_dt"] : list of arrays with the maximum dV/dt per AP
             (one for each segment, or None for segments without APs)
     
-    NOTE: the lengths of the arrays returned as list elements equals the number of APs
-        detected in the corresponding segment; if no APs are detected, None is inserted
-        instead of an empty array.
+        NOTE: the lengths of the arrays returned as list elements equals the 
+            number of APs detected in the corresponding segment; if no APs are
+            detected, None is inserted instead of an empty array.
+        
+    Side effects
+    ------------
+        The detected APs are embedded as SpikeTrain objects in the segments
+        where they have been detected.
         
     """
     if not isinstance(data, (neo.Block, neo.Segment)):
@@ -5143,7 +5181,6 @@ def analyse_AP_step_injection_series(data, **kwargs):
     thr = kwargs.pop("thr", 10)
     
     VmSignal = kwargs.pop("VmSignal", "Vm_prim_1")
-    #ImSignal = kwargs.pop("ImSignal", "Im_sec_1")
     ImSignal = kwargs.pop("ImSignal", None)
     
     rheo = kwargs.pop("rheo", True)
@@ -5345,18 +5382,12 @@ def analyse_AP_step_injection_series(data, **kwargs):
             Iinj = np.array(_inj) * _inj[0].units
             
         i_units = Iinj[0].units
-        #v_units = apThr[0].units
         
         ret["Name"] = "%s_%s" % (prefix, name)
         
         #print(ret["Name"], len(segments), "segments")
         
         # these are the collated data relevant for rheobase_latency
-        #ret["Injected_current"]     = neo.IrregularlySampledSignal(times = seg_times,
-                                                                   #signal = Iinj,
-                                                                   #units = i_units,
-                                                                   #time_units = t_units)
-        
         ret["Injected_current"]     = IrregularlySampledDataSignal(domain = seg_index,
                                                                    signal = Iinj,
                                                                    units = i_units,
