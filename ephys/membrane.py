@@ -1629,7 +1629,7 @@ def ap_waveform_roots(w, value, interpolate=False):
     
     if len(ge_value_starts) == 0:
         # bail out gracefully
-        print("ap_waveform_roots: cannot find start flag for signal >= %s" % value)
+        warnings.warn("ap_waveform_roots: cannot find where signla becomes >= %s" % value, RuntimeWarning)
         return rise_x, rise_y, rise_cslope, decay_x, decay_y, decay_cslope
         
     
@@ -2846,6 +2846,8 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi,
             
     # ### END 
     
+    #print(f"detect_AP_rises: vm_thr = {vm_thr}")
+    
     # ### BEGIN NOTE: 2019-11-29 16:40:34 New algorithm
     # slightly modified detection algorithm:
     # 1) get the logical index where dv/dt >= threshold -- as in NOTE: 2019-04-25 09:22:13
@@ -2873,30 +2875,6 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi,
     # this shuould also preclude the use of a minisi condition
     # ### END NOTE: 2019-11-29 16:40:34 New algorithm
     
-    # ### BEGIN NOTE: 2019-04-25 09:24:45 DEPRECATED
-    # select end of the fast (initial) rising phase
-    # here, the Vm rising phase "slows down" but nevertheless faster than 10 V/s ("threshold")
-    # in other words, the following are satisfied:
-    #
-    # a) dVm/dt >= threshold
-    #
-    # b) d2Vm/dt2 < 0 (dVm/dt is MONOTONICALLY DECREASING)
-    #
-    #fast_rise_stops  = (dsdt.magnitude >= dsdt_thr) & (d2sdt2.magnitude < (0 - atol))
-    
-    #fast_rise_stop_flags  = np.ediff1d(np.asfarray(fast_rise_stops),  to_begin = 0) == 1 
-    
-    #fast_rise_stop_times  = sig.times[fast_rise_stop_flags]
-    
-    # ### END NOTE: 2019-04-25 09:24:45
-    
-    # ### BEGIN NOTE: 2019-11-29 17:19:01 DEPRECATED 2019-11-29 17:30:40 we don't use 2nd derivative anymore
-    # Although mathematically correct, the code at NOTE: 2019-04-25 09:24:45
-    # might pick up the end of the first "hump" in the 2st derivative of the AP 
-    # waveform, when the AP is not monotonically rising (see below at 
-    # NOTE: 2019-04-29 08:40:55) This would result in curtailed rise phases.
-    # ### END DEPRECATED 2019-11-29 17:30:40 we don't use 2nd derivative anymore
-    
     # NOTE: 2019-04-29 09:52:03
     # to find out when the fast rising phase of the waveform ends we get the time
     # of the next local maximum in the dsdt waveform slice following each fast 
@@ -2911,14 +2889,6 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi,
     # we'll have to pick the only first of such occurrence, which involves more CPU work
     peak_times              = np.full_like(fast_rise_start_times, np.nan)
     
-    # NOTE: 2019-11-29 17:36:23 use of minisi is DEPRECATED
-    # instead we use the signal time slice between two consecutive fast rise 
-    # start times
-    
-    #waves = list()
-    #dwaves = list()
-    
-        
     #print("detect_AP_rises signal t_start=%s, t_stop=%s" % (s.t_start, s.t_stop))
     #print("detect_AP_rises dsdt t_start=%s, t_stop=%s" % (dsdt.t_start, dsdt.t_stop))
     
@@ -2928,11 +2898,6 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi,
             # this won't ever happen would it?
             t = s.t_start
         
-        #t1 = t + minisi DEPRECATED use of minisi
-        # avoid going past signal t_stop
-        #if t1 > s.t_stop:
-            #t1 = s.t_stop
-            
         if k < len(fast_rise_start_times)-1:
             t1 = fast_rise_start_times[k+1]
             
@@ -2965,28 +2930,43 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
                      Itimes_samples:bool=False):
 
     """
-    im: analog signal with current injection recording, or a tuple of three
-        elements: I hold (pA), t_start *(pq.s) and t_stop (pq.s)
+    Extract the time slice of the VM corresponding to a current injection step.
+    
+    If a signal containing a rectangular current injection waveform is given, it
+    will also extract the corresponding time slice.
+    
+    Parameters:
+    -----------
+    
+    vm: neo.AnalogSignal; the recorded membrane voltage
+    
+    im: neo.AnalogSignal (with current injection rectangular waveform) or
+        a tuple of three python Quantity objects as follows: 
+            current injection amplitude (pA), t_start (pq.s) and t_stop (pq.s)
+            
+        where t_start and t_stop are the onset and the end of the current 
+        injection waveform.
+            
+        If 'im' is an AnalogSignal then t_start and t_stop will be determined
+        form the waveform, assuming it is a rectangular wave.
         
     tail: non-negative scalar Quantity (units: "s"); default is 0.5 s
-        duration of the analyzed Vm trace after beyond the end of depolarizing 
-        current injection step;
+        duration to be added to t_stop (see above) before slicing the signals
         
-        
-    resample_with_period: None (default), scalar float or Quantity
+    resample_with_period: None (default), scalar float or python Quantity
         When not None, the Vm signal will be resampled before processing.
         
-        When Quantity, it must be in units convertible (scalable) to the signal's
-        sampling period units.
+        When a Quantity, it must be in units convertible (scalable) to the 
+        signal's sampling period units.
         
-        Resampling occurs on the region corresponding to the depolarizing current
-        injection, before detection of AP waveforms.
+        Resampling occurs on the region corresponding to the current injection, 
+        prior to AP waveform detection.
         
-        Upsampling might be useful (see Naundorf et al, 2006) but slows down
-        the execution. To upsample the Vm signal, pass here a value smaller than
+        NOTE 1: Upsampling might be useful (see Naundorf et al, 2006) but slows
+        the code. To upsample the Vm signal, pass here a value smaller than
         the sampling period of the Vm signal.
         
-    resample_with_rate: None (default), scalar float or Quantity
+    resample_with_rate: None (default), scalar float or python Quantity.
         When not None, the Vm signal will be resampled before processing.
         
         When Quantity, it must be in units convertible (scalable) to the signal's
@@ -2995,25 +2975,28 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
         Resampling occurs on the region corresponding to the depolarizing current
         injection, before performing detection of AP waveforms.
         
-        Upsampling might be useful (see Naundorf et al, 2006) but slows down
-        the execution. To upsample the Vm signal, pass here a value larger than 
-        the sampling period of the Vm signal.
+        See NOTE 1 above.
         
     box_size: int >= 0; default is 0.
     
         size of the boxcar (scipy.signal.boxcar) used for filtering the Im signal
-        (containing the step current injection) before detecting the step 
-        boundaries (start & stop)
+        containing the current injection rectangular waveform, before detecting 
+        the waveform boundaries (t_start & t_stop)
         
         default is 0 (no boxcar filtering)
         
     method: str, one of "state_levels" (default) or "kmeans"
+        Detection method for the two "states" ("ON" and "OFF") in the rectangular
+        current injection.
+        
+        See also the functions:
+        ephys.parse_step_waveform_signal
     
-    adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
-        called from ephys.parse_step_waveform_signal() 
-        
+    adcres, adcrange, adcscale: float scalars
+        See also the functions:
+        ephys.parse_step_waveform_signal and signalprocessing.state_levels.
+    
         Used only when method is "state_levels"
-        
         
     Itimes_relative:bool, default is True; 
         When True and im is a triplet, then im[1] and im[2] are the times of 
@@ -3071,6 +3054,11 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
 
     if isinstance(im, neo.AnalogSignal):
         try:
+            # down, up, inj, centroids, label
+            # down = time point of the up-down transition
+            # up   = time point of the down-up transition
+            # inj  = injected current (difference between centroids )
+            # label = int array "mask" with 0 for down and 1 for up; same shape as im
             d, u, inj, c, l = ephys.parse_step_waveform_signal(im,
                                                                 method=method,
                                                                 box_size=box_size, 
@@ -3079,23 +3067,18 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
                                                                 adcscale=adcscale)
             
             
-            #print(f"d = {d} ({type(d)}), u = {u} ({type(u)})")
-            if d.ndim> 0:
+            if d.ndim > 0:
                 d = d[0]
             if u.ndim > 0:
                 u = u[0]
-            #if d < u:
-                #raise RuntimeError("Expecting a depolarizing current injection; got a hyperpolarizing current injection instead")
             
-            
-            #vstep = vm.time_slice(u,d)
             if d > u:
-                vstep = vm.time_slice(u,d + tail)
-                istep = im.time_slice(u,d)
+                vstep = vm.time_slice(u, d + tail)
+                istep = im.time_slice(u, d + tail)
                 
             elif d < u:
-                vstep = vm.time_slice(d,u + tail)
-                istep = im.time_slice(d,u)
+                vstep = vm.time_slice(d, u + tail)
+                istep = im.time_slice(d, u + tail)
                 inj *= -1.0
                 
             else:
@@ -3109,7 +3092,6 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             raise
             
     else:
-        #print(f"extract_AP_train: im {im}, Vm t_start {vm.t_start}, Vm t_stop {vm.t_stop}")
         Ihold = im[0]
         inj = Ihold
             
@@ -3161,25 +3143,16 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
         vstep = vm.time_slice(istart, istop + tail)
         istep = [istart, istop]
     
-    #print("extract_AP_train: Ihold", Ihold)
-    #print("extract_AP_train: Iinj", inj)
-    
-    # resample the Vm signal
+    # resample the Vm signal (the sliced one)
     if resample_with_period is not None:
         if resample_with_period > vstep.sampling_period:
             warnings.warn("A sampling period larger than the signal's sampling period (%s) was requested (%s); the signal will be DOWNSAMPLED" % (vstep.sampling_period, resample_with_period), RuntimeWarning)
 
-        #if resample_with_period < vstep.sampling_period:
-        #upsampling = (vstep.sampling_period.rescale(pq.s)/resample_with_period.rescale(pq.s)).magnitude.flatten()[0]
-            
         vstep = ephys.resample_pchip(vstep, resample_with_period)
         
         if vstep.size == 0:
             raise RuntimeError("Check resampling; new period requested was %s and the resampled signal has vanished" % resample_with_period)
         
-        #vstep = ephys.set_relative_time_start(vstep)
-        #istep = ephys.set_relative_time_start(istep)
-    
     return vstep, Ihold, inj, istep
 
 def detect_AP_waveform_times(sig, thr=10, smooth_window=5, 
@@ -3273,17 +3246,14 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
     else:
         d2v_dt2_smooth = d2v_dt2
         
+    ap_rises = detect_AP_rises(sig,
+                                dv_dt_smooth,
+                                d2v_dt2_smooth,
+                                thr, min_ap_isi,
+                                atol=atol,
+                                vm_thr=vm_thr)
     
-    #ap_fast_rise_start_times = detect_AP_start_times(sig, dv_dt_smooth, d2v_dt2_smooth, thr)
-    
-    #return ap_fast_rise_start_times
-    
-    ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_peak_times = detect_AP_rises(sig,
-                                                                            dv_dt_smooth,
-                                                                            d2v_dt2_smooth,
-                                                                            thr, min_ap_isi,
-                                                                            atol=atol,
-                                                                            vm_thr=vm_thr)
+    ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_peak_times = ap_rises
     
     if ap_fast_rise_start_times is None:
         ap_fast_rise_durations = None
@@ -3327,7 +3297,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
                         return_all = False,
                         vm_thr=0):
     """Detects action potentials in a Vm signal.
-    For use with depolarizing step current injection experiments.
+    For use with experiments using "steps" of depolarizing current injections.
     
     Parameters:
     ----------
@@ -3582,9 +3552,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     from scipy.interpolate import PchipInterpolator as pchip
     from scipy.signal import boxcar, convolve
     
-    #print(thr, before, after, min_fast_rise_duration, rtol, atol)
-    
-    #### BEGIN psrse parameters
+    #### BEGIN parse parameters
     # make sure before & after are quantities with compatible time units
     
     if isinstance(before, numbers.Real):
@@ -3692,18 +3660,16 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     #### BEGIN Detect APs by thresholding on the 1st derivative of the Vm signal
     #
     
-    # parse parameters
-    #print("min_fast_rise_duration", min_fast_rise_duration)
-    # NOTE: 2019-07-11 15:31:59
-    # detection code moved to detect_AP_waveform_times()
-    ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_fast_rise_durations, ap_peak_times, dv_dt, d2v_dt2 = detect_AP_waveform_times(sig, 
-            thr=thr, 
-            smooth_window=smooth_window,
-            min_ap_isi=min_ap_isi,
-            min_fast_rise_duration=min_fast_rise_duration,
-            rtol=rtol, atol=atol,
-            vm_thr=vm_thr)
+    #print(f"detect_AP_waveforms_in_train: vm_thr = {vm_thr}")
+    ap_waveform_times = detect_AP_waveform_times(sig, thr=thr, 
+                                                 smooth_window=smooth_window,
+                                                 min_ap_isi=min_ap_isi,
+                                                 min_fast_rise_duration=min_fast_rise_duration,
+                                                 rtol=rtol, atol=atol,
+                                                 vm_thr=vm_thr)
 
+    ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_fast_rise_durations, ap_peak_times, dv_dt, d2v_dt2 = ap_waveform_times
+    
     # ### END detect APs by thresholding
     
     train_annotations = dict()
@@ -3726,7 +3692,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     train_annotations["AP_d2V_dt2_waveforms"]    = None
     
     
-    ap_train            = neo.SpikeTrain([], t_stop = 0*pq.s, units = pq.s)
+    ap_train = neo.SpikeTrain([], t_stop = 0*pq.s, units = pq.s)
     
     if ap_fast_rise_start_times is None:
         ap_train.annotations.update(train_annotations)
@@ -3766,8 +3732,10 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     
     # ### BEGIN Collect the AP waveforms
     #
-    ## this is a list of neo.AnalogSignals!
-    ap_waveform_signals, inter_AP_intervals, wave_starts, wave_stops = extract_AP_waveforms(sig, iinj, ap_fast_rise_start_times, before=before, after=after, use_min_isi=use_min_detected_isi)
+    ap_waves = extract_AP_waveforms(sig, iinj, ap_fast_rise_start_times, before=before, after=after, use_min_isi=use_min_detected_isi)
+    
+    ## ap_waveform_signals is a list of neo.AnalogSignals!
+    ap_waveform_signals, inter_AP_intervals, wave_starts, wave_stops = ap_waves
     
     #
     # ### END Collect the AP waveforms
@@ -3822,7 +3790,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     #
     # ### END Collect AP amplitude values
     
-    # ### BEGIN Calculate AP durations at half-maximum, 0 mV, and onset Vm
+    # ### BEGIN Calculate AP durations at various levels
     # 
     # NOTE: 2019-04-30 11:12:42
     # the onset Vm is a sample value (the value of the sample at sig_AP_start_index)
@@ -3846,9 +3814,9 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     #half_max = ap_amplitudes.magnitude / 2. # NOT a quantity
     half_max = ap_amplitudes / 2. # Quantity array
     
-    quarter_max = ap_amplitudes / 4.# Quantity array
-    
     third_max = ap_amplitudes / 3. # Quantity array
+    
+    quarter_max = ap_amplitudes / 4.# Quantity array
     
     # NOTE: 2019-04-30 11:08:28
     # Vm values at half max are calculated; to get their time points we need to
@@ -3894,17 +3862,19 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
             # NOTE: 2019-04-25 13:48:45
             # and same for Vm == Vm at onset ("instantaneous AP threshold")
             #print("find AP >= onset Vm %s" % ap_Vm_onset_values[k])
-            #rise_onset_Vm_x, decay_onset_Vm_x, rise_onset_slope, decay_onset_slope = __wave_interp_root_near_val__(w, ap_Vm_onset_values[k])
-            rise_onset_Vm_x, rise_onset_Vm_y, rise_onset_slope, decay_onset_Vm_x, decay_onset_Vm_y, decay_onset_slope = ap_waveform_roots(w, ap_Vm_onset_values[k])
+            ap_roots_onset =  ap_waveform_roots(w, ap_Vm_onset_values[k])
+            rise_onset_Vm_x, rise_onset_Vm_y, rise_onset_slope, decay_onset_Vm_x, decay_onset_Vm_y, decay_onset_slope = ap_roots_onset
 
             #print("find AP >= Vm half max %s" % vm_at_half_max[k])
-            #hm_rise_x, hm_decay_x, hm_rise_slope, hm_decay_slope = __wave_interp_root_near_val__(w, vm_at_half_max[k])
-            hm_rise_x, hm_rise_y, hm_rise_slope, hm_decay_x, hm_decay_y, hm_decay_slope = ap_waveform_roots(w, vm_at_half_max[k])
+            ap_roots_half_max = ap_waveform_roots(w, vm_at_half_max[k])
+            hm_rise_x, hm_rise_y, hm_rise_slope, hm_decay_x, hm_decay_y, hm_decay_slope = ap_roots_half_max
             
             # for 1/4 of maximum
-            qm_rise_x, qm_rise_y, qm_rise_slope, qm_decay_x, qm_decay_y, qm_decay_slope = ap_waveform_roots(w, vm_at_quart_max[k])
+            ap_roots_quart_max = ap_waveform_roots(w, vm_at_quart_max[k])
+            qm_rise_x, qm_rise_y, qm_rise_slope, qm_decay_x, qm_decay_y, qm_decay_slope = ap_roots_quart_max
             
-            tm_rise_x, tm_rise_y, tm_rise_slope, tm_decay_x, tm_decay_y, tm_decay_slope = ap_waveform_roots(w, vm_at_third_max[k])
+            ap_roots_third_max = ap_waveform_roots(w, vm_at_third_max[k])
+            tm_rise_x, tm_rise_y, tm_rise_slope, tm_decay_x, tm_decay_y, tm_decay_slope = ap_roots_third_max
             
             #print("find AP >= 0 Vm")
             # NOTE: 2019-04-25 13:48:32
@@ -4668,61 +4638,6 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
     
     return ret
 
-#"def" __train_analysis_loop__(segments, ret, iei, apfreq, naps,
-                            #apthr, aplat, **kwargs):
-    #"""Only collect relevant data !
-    #"""
-    
-    #istart = kwargs.get("istart", None)
-    #istep = kwargs.get("istep", None)
-    
-    
-    #ret["Depolarising_steps"] = list()
-    
-    #for k,segment in enumerate(segments):
-        ##print("analyse_AP_step_injection_series segment %d" % k)
-        #try:
-            #step_result, vstep = analyse_AP_step_injection(segment, **kwargs)
-            
-        #except Exception as e:
-            #print("in segment %d:" % k)
-            #traceback.print_exc()
-            #raise e
-        
-        #if segment.name is None or isinstance(segment.name, str) and len(segment.name.strip()) == 0:
-            #seg_name = "Segment_%d" % k
-            
-        #else:
-            #seg_name = "Segment_%s" % segment.name
-            
-        #segment_result = collections.OrderedDict()
-        #segment_result["Index"] = k
-        #segment_result["Name"] = seg_name
-        #segment_result["AP_analysis"] = step_result
-        #segment_result["Vm_signal"] = vstep
-        
-        #ret["Depolarising_steps"].append(segment_result)
-        
-        ## NOTE: 2019-05-02 13:02:54
-        ## collates relevant data for rheobase-latency from across all segments
-        ##i_inj.append(step_result["Injected_current"])
-        #iei.append(step_result["Inter_AP_intervals"])
-        #apfreq.append(step_result["Mean_AP_Frequency"])
-        #naps.append(step_result["Number_of_APs"])
-        
-        ## NOTE: 2019-05-02 12:05:57
-        ## collect data for rheobase-latency: 
-        ## ALWAYS work on the first AP!
-        ##if isinstance(step_result["AP_train"], neo.SpikeTrain) and len(step_result["AP_train"]):
-        #if is_AP_spiketrain(step_result["AP_train"]) and len(step_result["AP_train"]):
-            #ap_train = step_result["AP_train"]
-            #apthr.append(ap_train.annotations["AP_durations_V_onset"][0])
-            #aplat.append(ap_train[0]-ap_train.t_start)
-            
-        #else:
-            #apthr.append(np.array([np.nan]) * vstep.units)
-            #aplat.append(np.array([np.nan]) * vstep.times.units)
-            
 def analyse_AP_step_injection_series(data, **kwargs):
     """ Action potential (AP) detection and analysis in I-clamp experiment.
     
@@ -4733,18 +4648,21 @@ def analyse_AP_step_injection_series(data, **kwargs):
     is varied progressively (typically incremented by the same amount from an 
     inital value).
     
-    The current injection occurs during a defined time interval which should 
-    start at the same time relative to the beginning of the sweep, and have the
-    same duration in all sweeps.
+    The current injection occurs during a defined time interval starting at the  
+    same time relative to the beginning of the sweep, and of identical duration
+    all sweeps.
     
-    In each sweep, action potentials are detected in the membrane voltage signal
-    on the time interval (time slice) corresponding to the current injection.
+    In each sweep, action potentials are detected in the signal containing the 
+    recorded membrane voltage, during the time interval (or time slice) 
+    corresponding to the current injection.
     
-    The amplitude, onset and duration of the current injection can be detected
-    automatically from an analog signal record of the injection waveform, if 
-    such signal is present in all sweeps.
-        
-    Alternatively, the current injection amplitude(s) and time interval can be 
+    The current injection waveform can be recoded alongside the membrane voltage.
+    
+    When available, the current injection signal must be present in all sweeps
+    and is used to determine the amplitude, onset and duration of the current 
+    injection "step".
+    
+    Alternatively, the current injection amplitude(s) and time interval must be
     specified using the following parameters:
     
     * for current injection amplitude:
@@ -4764,41 +4682,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         relative to the beginning of the sweep, in all sweeps.
         
         NOTE 2: when all sweeps start at the same time, Istart and Istop may be
-        specified in absolute time values
-    
-    The current injection parameters can be specified in one of three ways:
-    
-    a) pass a name or channel index to the ImSignal parameter (see below).
-        This is the preferred method when the recorded data CONTAINS a signal
-        representing the injected current.
-        
-        This is the index of the current injection signal in the sweep (or its
-        name). 
-        
-        The corresponding signal (a neo.AnalogSignal obejct) will then be used
-        to detect the current injection magnitude and time interval in each sweep.
-        
-    b) If a signal representing the injected current is NOT available/usable,
-        then use one of the methods described here:
-    
-        b.1) specify Iinj_0 and delta_I parameters - this assumes that the 
-        current injection steps (one per sweep) are changed by a constant value
-        (delta_I) from an initial value (Iinj_0) used in the first sweep.
-        
-        b.2) specify Iinj as a sequence of current injection magnitudes (the 
-        most general case)
-        
-        In both cases (b.1 and b.2) the time interval for the current injection
-        (Istart and Istop) must also be specified as floats or time quantities
-        
-        When ALL sweeps start at the same time (say, 0*pq.s) then Istart and Istop
-        values apply to every sweep. Itimes_relative must be set to True
-        
-        When ALL sweeps start at incremental times (as is often recorded in Clampex)
-        Itimes_relative must be set to True.
-        
-        Istart and Istop can also be specified as number of samples from the 
-        start of the sweep. In this case Itimes_samples must be set to True.
+        specified in absolute time values (and pass Itimes_relative = False)
     
     Parameters:
     ----------
@@ -4807,6 +4691,8 @@ def analyse_AP_step_injection_series(data, **kwargs):
             injections steps (one rectangular current injection pulse - or step
             followed by return to initial condition).
             
+        NOTE 3: one neo.Segment corresponds to one "sweep" in the experiment.
+            
         When data is a neo.Block or a list of neo.Segment objects, with each 
         segment containing one epoch of depolarizing current injection.
         
@@ -4814,12 +4700,13 @@ def analyse_AP_step_injection_series(data, **kwargs):
         current injection with the same meaning as above.
         
         The signal data is stored in the segments' 'analogsignals' attribute, 
-        containing the recorded membrane voltage signal and, optionally, a
-        recorded signal with the current injection waveform.
+        containing the recorded membrane voltage signal and, optionally, the
+        signal with the recorded current injection waveform.
         
-        When data has several segments, the membran voltage and the optional
-        current injection signals MUST have the same index in the 'analogsignals'
-        attribute of the segments.
+        When data has several segments and the signals are specified using 
+        integer indices, the membrane voltage and the optional current injection
+        signals MUST have the same index in the 'analogsignals' attribute of the
+        segments.
         
         
     Var-keyword parameters (kwargs):
@@ -5148,13 +5035,6 @@ def analyse_AP_step_injection_series(data, **kwargs):
             
     else:
         segments = [data]
-    
-    #Iinj                = list()
-    #apIEI               = list()
-    #apFrequency         = list()
-    #nAPs                = list()
-    #apThr               = list()
-    #apLatency           = list()
     
     cellid = kwargs.pop("cell", "NA")
     sourceid = kwargs.pop("source", "NA")
@@ -5786,418 +5666,6 @@ def report_AP_analysis(data, name=None):
     
     return summary, params, waveforms
 
-#"def" analyse_AP_step_injection_old(segment, 
-                              #VmSignal = "Vm_prim_1", 
-                              #ImSignal = "Im_sec_1", 
-                              #tail = 0 * pq.s, 
-                              #resample_with_period = None, 
-                              #resample_with_rate=None,
-                              #**kwargs):
-    #"""AP Train analysis in a sweep (segment) of I-clamp experiments
-    
-    #Positional parameters:
-    #---------------------
-    
-    #segment: a neo.Segment with at least two analog signals (see below)
-    
-    #Named parameters:
-    #----------------
-    
-    #VmSignal, ImSignal: scalar indices or strings with analogsignal names containing,
-        #respectively, the Vm reponse and membrane current injection
-        
-        #optional (defaults are "Vm_prim_1" and "Im_sec_1", respectively)
-        
-    #tail: scalar Quantity (units: "s"); default is 0 s
-        #duration of the analyzed Vm trace after current injection has ceased
-    
-    #Var-keyword parameters (kwargs):
-    #--------------------------------
-    
-    #resample_with_period: None (default), scalar float or Quantity
-        #When not None, the Vm signal will be resampled before processing.
-        
-        #When Quantity, it must be in units convertible (scalable) to the signal's
-        #sampling period units.
-        
-        #Resampling occurs on the region corresponding to the depolarizing current
-        #injection, before detection of AP waveforms.
-        
-        #Upsampling might be useful (see Naundorf et al, 2006) but slows down
-        #the execution. To upsample the Vm signal, pass here a value smaller than
-        #the sampling period of the Vm signal.
-        
-    #resample_with_rate: None (default), scalar float or Quantity
-        #When not None, the Vm signal will be resampled before processing.
-        
-        #When Quantity, it must be in units convertible (scalable) to the signal's
-        #sampling rate units.
-        
-        #Resampling occurs on the region corresponding to the depolarizing current
-        #injection, before performing detection of AP waveforms.
-        
-        #Upsampling might be useful (see Naundorf et al, 2006) but slows down
-        #the execution. To upsample the Vm signal, pass here a value larger than 
-        #the sampling period of the Vm signal.
-        
-    #NOTE: The following are passed to ephys.parse_step_waveform_signal():
-    
-    #box_size: int >= 0; default is 0.
-    
-        #size of the boxcar (scipy.signal.boxcar) used for filtering the Im signal
-        #(containing the step current injection) before detecting the step 
-        #boundaries (start & stop)
-        
-        #default is 0 (no boxcar filtering)
-        
-    #method: str, one of "state_levels" (default) or "kmeans"
-    
-    #adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
-        #called from ephys.parse_step_waveform_signal() 
-        
-        #Used only when mthod is "state_levels"
-        
-    #NOTE: The following are passed directly to detect_AP_waveforms_in_train():
-    
-    #thr: floating point scalar: the minimum value of dV/dt of the Vm waveform to
-        #be considered an action potential (default is 10) -- parameter is passed to detect_AP_waveforms_in_train()
-        
-    #before, after: floating point scalars, or Python Quantity objects in time 
-        #units convertible to the time units used by VmSignal.
-        #interval of the VmSignal data, respectively, before and after the actual
-        #AP in the returned AP waveforms -- parameters are passed to detect_AP_waveforms_in_train()
-        
-        #defaults are:
-        #before: 1e-3
-        #after: None
-        
-    #min_fast_rise_duration : None, scalar or Quantity (units "s");
-    
-        #The minimum duration of the initial (fast) segment of the rising 
-        #phase of a putative AP waveform.
-        
-        #When None, is will be set to the next higher power of 10 above the sampling period
-        #of the signal.
-    
-    #min_ap_isi : None, scalar or Quantity;
-    
-                #Minimum interval between two consecutive AP fast rising times 
-                #("kinks"). Used to discriminate against suprious fast rising time
-                #points that occur DURING the rising phase of AP waveforms.
-                
-                #This can happen when the AP waveforms has prominent IS and the SD 
-                #"spikes", 
-                
-                #see Bean, B. P. (2007) The action potential in mammalian central neurons.
-                #Nat.Rev.Neurosci (8), 451-465
-
-    #rtol, atol: float scalars;
-        #the relative and absolute tolerance, respectively, used in value 
-        #comparisons (see numpy.isclose())
-        
-        #defaults are:
-        #rtol: 1e-5
-        #atol: 1e-8
-                
-    #use_min_detected_isi: boolean, default True
-    
-        #When True, individual AP waveforms cropped from the Vm signal "sig" will
-            #have the duration equal to the minimum detected inter-AP interval.
-        
-        #When False, the durations of the AP waveforms will be taken to the onset
-            #of the next AP waveform, or the end of the Vm signal
-            
-    #smooth_window: int >= 0; default is 5
-        #The length (in samples) of a smoothing window (boxcar) used for the 
-        #signal's derivatives.
-        
-        #The length of the window will be adjusted if the signal is upsampled.
-        
-    #interpolate_roots: boolean, default False
-        #When true, use linear inerpolation to find the time coordinates of the
-        #AP waveform rise and decay phases crossing over the onset, half-maximum
-        #and 0 mV. 
-        
-        #When False, uss the time coordinate of the first & last sample >= Vm value
-        #(onset, half-max, or 0 mV) respectively, on the rise and decay phases of
-        #the AP waveform.
-        
-        #see ap_waveform_roots()
-        
-    #decay_intercept_approx: str, one of "linear" (default) or "levels"
-        #Used when the end of the decay phase cannot be estimated from the onset
-        #Vm.
-        
-        #The end of the decay is considerd to be the time point when the decaying
-        #Vm crosses over (i.e. goes below) the onset value of the action potential.
-        
-        #Whe the AP waveform is riing on a rising baseline, this time point cannot
-        #be determined.
-        
-        #Instead, it is estimated as specified by "decay_intercept_approx" parameter:
-        
-        #When decay_intercept_approx is "linear", the function uses linear extrapolation
-        #from a (higher than Vm onset) value specified by decay_ref (see below)
-        #to the onset value.
-        
-        #When decay_intercept_approx is "levels", the function estimates a "pseudo-baseline"
-        #as the lowest of two state levels determined from the AP waveform histogram.
-        
-        #The pseudo-baseline is then used to estimate the time intercept on the decay
-        #phase.
-        
-    #decay_ref: str, one of "hm" or "zero", or floating point scalar
-        #Which Vm value should be used to approximate the end of the decay phase
-        #when using the "linear" approximation method (see above)
-        
-    #Returns:
-    #-------
-    #result : ordered dict; 
-        #key names should be self-explanatory
-        
-        #contains the result of the AP train analysis, including the AP train
-        #itself, and AP waveforms and derivatves (1st and 2nd order) as 
-        #neo.AnalogSignals -- see detect_AP_waveforms_in_train()
-    
-    #vstep : neo.AnalogSignal; 
-        #contains the time slice of the Vm signal, encompassing  the AP train
-    
-    #References:
-    #-----------
-    
-    #Naundorf et al (2006). Unique features of action potential initiation in 
-        #cortical neurons. Nature 440, 1060–1063.
-    
-    #"""
-    ##print("analyse_AP_step_injection kwargs:", kwargs)
-    #method      = kwargs.pop("method", "state_levels")
-    #box_size    = kwargs.pop("box_size", 0)
-    #adcres      = kwargs.pop("adcres", 15)
-    #adcrange    = kwargs.pop("adcrange", 10)
-    #adcscale    = kwargs.pop("adcscale", 1e3) # (mV -> V)
-    
-    #kwargs.pop("return_all", None) # remove the debugging parameter
-    
-    ## NOTE: 2019-05-03 13:08:48
-    ## removed: result not has individual AP analysis for all detected APs
-    ## 
-    
-    ##ap_index = kwargs.pop("ap_index", 0)
-    
-    ##if not isinstance(ap_index, int):
-        ##raise TypeError("'ap_index' expected to be an int; got %s instead" % type(ap_index).__name__)
-    
-    ##if ap_index < 0:
-        ##raise ValueError("'ap_index' must be >= 0; got %d instead" % ap_index)
-        
-    #if isinstance(VmSignal, str):
-        #VmSignal = ephys.get_index_of_named_signal(segment, VmSignal)
-        
-    #if isinstance(ImSignal, str):
-        #ImSignal = ephys.get_index_of_named_signal(segment, ImSignal)
-        
-    #im = segment.analogsignals[ImSignal].copy()
-    
-    #vm = segment.analogsignals[VmSignal].copy()
-    
-    ## down, up, inj, centroids, label
-    ## down = time point of the up-down transition
-    ## up   = time point of the down-up transition
-    ## inj  = injected current (difference between centroids )
-    ## label = int array "mask" with 0 for down and 1 for up; same shape as im
-    ##print("method", method)
-    #d, u, inj, c, l = ephys.parse_step_waveform_signal(im,
-                                                          #method=method,
-                                                          #box_size=box_size, 
-                                                          #adcres=adcres,
-                                                          #adcrange=adcrange,
-                                                          #adcscale=adcscale)
-    
-    #if d < u:
-        #raise RuntimeError("Expecting a depolarizing current injection; got a hyperpolarizing current injection instead")
-    
-    
-    ##vstep = vm.time_slice(u,d)
-    #vstep = vm.time_slice(u,d + tail)
-    #Ihold = im.time_slice(d, im.t_stop).mean()
-    
-    ## NOTE: 2019-04-29 13:32:46
-    ## upsample the Vm signal if required
-    
-    ## parse resample_... parameters
-    #if not all([v is None for v in (resample_with_period, resample_with_rate)]):
-        #if isinstance(resample_with_period, float):
-            #resample_with_period *= vstep.sampling_period.units
-            
-        #elif isinstance(resample_with_period, pq.Quantity):
-            #if resample_with_period.size > 1:
-                #raise TypeError("new sampling period must be a scalar Quantity; got %s instead" % resample_with_period)
-            
-            #if units_convertible(resample_with_period, vstep.sampling_period):
-                #if resample_with_period.units != vstep.sampling_period.units:
-                    #resample_with_period.rescale(vstep.sampling_period.units)
-                    
-            #else:
-                #raise TypeError("new sampling period has incompatible units (%s); expecting (%s)" % (resample_with_period.units, vstep.sampling_period.units))
-            
-        #elif resample_with_period is not None:
-            #raise TypeError("new sampling period expected to be a scalar float, Quantity, or None; got %s instead" % type(resample_with_period).__name__)
-        
-        #if isinstance(resample_with_rate, float):
-            #resample_with_rate *= vstep.sampling_rate.units
-            
-        #elif isinstance(resample_with_rate, pq.Quantity):
-            #if resample_with_rate.size > 1:
-                #raise TypeError("new sampling rate must be a scalar Quantity; got %s instead" % resample_with_rate)
-        
-            #if units_convertible(resample_with_rate, vstep.sampling_rate):
-                #if resample_with_rate.units != vstep.sampling_rate.units:
-                    #resample_with_rate.rescale(vstep.sampling_rate.units)
-                    
-            #else:
-                #raise TypeError("new sampling rate has incompatible units (%s); expecting (%s)" % (resample_with_rate.units, vstep.sampling_rate.units))
-            
-        #elif resample_with_rate is not None:
-            #raise TypeError("new sampling rate expected to be a scalar float, Quantity, or None; got %s instead" % type(resample_with_rate).__name__)
-        
-        #if resample_with_rate is not None and resample_with_period is None:
-            #resample_with_period = ephys.sampling_rate_or_period(resample_with_rate, resample_with_period)
-            
-        #elif resample_with_rate is not None and resample_with_period is not None:
-            #if not ephys.sampling_rate_or_period(resample_with_rate, resample_with_period):
-                #raise ValueError("resample_with_rate (%s) and resample_with_period (%s) are incompatible" % (resample_with_rate, resample_with_period))
-    
-    ## resample the Vm signal
-    #if resample_with_period is not None:
-        #smooth_window = kwargs.get("smooth_window", 0)
-        
-        #if resample_with_period > vstep.sampling_period:
-            #warnings.warn("A sampling period larger than the signal's sampling period (%s) was requested (%s); the signal will be DOWNSAMPLED" % (vstep.sampling_period, resample_with_period), RuntimeWarning)
-
-        #if resample_with_period < vstep.sampling_period:
-            #vstep = ephys.resample_pchip(vstep, resample_with_period)
-            
-            #upsampling = int(vstep.sampling_period/resample_with_period)
-            
-            ## adjust the smooth window for the new sampling_period
-            #if smooth_window > 0:
-                #smooth_window *= upsampling
-                
-                #if upsampling % 2 == 0:
-                    #smooth_window += 1
-                    
-                #kwargs["smooth_window"] = smooth_window
-
-            #if vstep.size == 0:
-                #raise RuntimeError("Check resampling; new period requested was %s and the resampled signal has vanished" % resample_with_period)
-    
-    ## returns the array of time "stamps" (neo.SpikeTrain) and a list of AP
-    ## waveforms (neo.AnalogSignal objects)
-    #ap_train, ap_waveform_signals = detect_AP_waveforms_in_train(vstep, **kwargs)
-    
-    #result = collections.OrderedDict() #dict()
-    
-    ##if isinstance(ap_train, neo.SpikeTrain) and len(ap_train):
-    #if is_AP_spiketrain(ap_train):
-        #if len(segment.spiketrains) > 0: 
-            ## check to see if there already is a spike train of APs; don't just append
-            #for k, st in enumerate(segment.spiketrains):
-                #if is_AP_spiketrain(st):
-                    #segment.spiketrains[k] = ap_train
-                    
-        #else:
-            #segment.spiketrains.append(ap_train)
-            
-        #result["AP_half_max_epoch"] = ephys.signal2epoch(ap_train.annotations["AP_durations_V_half_max"])
-        #result["AP_quart_max_epoch"] = ephys.signal2epoch(ap_train.annotations["AP_durations_V_quart_max"])
-        
-        #result["AP_Vm0_epoch"] = ephys.signal2epoch(ap_train.annotations["AP_durations_V_0"])
-        
-        #result["AP_onsetVm_epoch"] = ephys.signal2epoch(ap_train.annotations["AP_durations_V_onset"])
-        
-        #result["AP_half_max"] = ap_train.annotations["AP_half_max"]
-        #result["AP_quart_max"]= ap_train.annotations["AP_quart_max"]
-        #result["AP_peak_amplitudes"] = ap_train.annotations["AP_peak_amplitudes"]
-        #result["AP_peak_values"] = ap_train.annotations["AP_peak_values"]
-        
-        #if all([v in ap_train.annotations.keys() for v in ("AP_durations_at_Ref_Vm", "Ref_Vm")]):
-            #result["AP_durations_at_Ref_Vm"] = ap_train.annotations["AP_durations_at_Ref_Vm"]
-            #result["Ref_Vm"] = ap_train.annotations["Ref_Vm"]
-            
-        #else:
-            #result["AP_durations_at_Ref_Vm"] = None
-            #result["Ref_Vm"] = None
-            
-        
-        #result["AP_train"] = ap_train
-        
-        ##result["AP_waveforms"] = ap_waveform_signals
-        
-        #result["Injected_current"] = inj
-        #result["Ihold"] = Ihold
-        
-        ## NOTE: mean AP frequency:
-        #if len(ap_train) > 1:
-            ## Mean AP freq = number of APs / full duration of the AP train;
-            ## full AP train duration (NOT the duration of the depolarized Vm region)
-            ## is the time difference between the end of the last AP and start of the
-            ## first AP;
-            ## time of the end of last AP is time of start of last AP + last AP duration at Vm  ==  Vonset
-            #mean_ap_freq  = (len(ap_train) / (ap_train[-1] + ap_train.annotations["AP_durations_V_onset"][-1] - ap_train[0])).rescale(pq.Hz)
-            #ap_intvl = np.diff(ap_train.magnitude, axis=0) * vm.times.units
-            
-        #else: # just 1 AP:
-            ## here, there is NO AP train (just one AP) so we're forced to use the
-            ## full duration of the depolarized Vm trace
-            #mean_ap_freq = np.array([1. / vstep.duration.magnitude]) * pq.Hz
-            #ap_intvl = np.array([np.nan]) * vm.times.units
-            
-        #result["Inter_AP_intervals"] = ap_intvl
-        
-        #result["Mean_AP_Frequency"]  = mean_ap_freq
-        
-        #result["Number_of_APs"] = len(ap_train)
-        
-        #result["Action_potentials"] = list()
-        
-        ##if len(ap_train):
-        #for k in range(len(ap_train)):
-            ## this will contain all relevant parameters, extracted
-            ## for each AP -- saves typing later to access them but uses 
-            ## a lot of memory
-            ## this also stores the waveform array
-            #ap_dict = extract_AP_data_from_AP_train(ap_train, k)
-            
-            ## the waveforms numpy ndarray are cropped or padded to have the same
-            ## size on axis 0 (see NOTE: 2019-04-24 14:01:33 and NOTE: 2019-05-03 13:32:58
-            ## in detect_AP_waveforms_in_train code)
-            ## therefore we also store here a ref to the waveform as a neo.AnalogSignal
-            ## (neither cropped, nor padded)
-            #ap_dict["Waveform_signal"] = ap_waveform_signals[k]
-            
-            #result["Action_potentials"].append(ap_dict)
-                
-    #else:
-        #result["AP_onsetVm_epoch"] = None
-        #result["AP_half_max_epoch"] = None
-        #result["AP_quart_max_epoch"] = None
-        #result["AP_Vm0_epoch"] = None
-        #result["AP_half_max"] = None
-        #result["AP_quart_max"] = None
-        #result["AP_peak_amplitudes"] = None
-        #result["AP_peak_values"] = None
-        #result["AP_train"] = None
-        #result["AP_waveforms"] = []
-        #result["Injected_current"] = inj
-        #result["Inter_AP_intervals"] = np.array([np.nan]) * vm.times.units
-        #result["Mean_AP_Frequency"] = np.array([np.nan]) * pq.Hz
-        #result["Number_of_APs"] = 0
-        #result["Action_potentials"] = list()
-        ##result["First_AP"] = None
-        ##result["Reference_AP"] = None
-        
-    #return result, vstep
-
 def analyse_AP_step_injection(segment, 
                               VmSignal:typing.Union[int, str] = "Vm_prim_1", 
                               ImSignal:typing.Union[int, str, tuple] = "Im_sec_1", 
@@ -6470,13 +5938,6 @@ def analyse_AP_step_injection(segment,
         raise TypeError(f"ImSignal expected a str (signal name) int signal index) or a triplet (amplitude, start & stop times); got {ImSignal} instad")
                 
     
-    # down, up, inj, centroids, label
-    # down = time point of the up-down transition
-    # up   = time point of the down-up transition
-    # inj  = injected current (difference between centroids )
-    # label = int array "mask" with 0 for down and 1 for up; same shape as im
-    #print("method", method)
-    
     vstep, Ihold, Iinj, istep = extract_AP_train(vm,im,
                                     tail=tail,
                                     method=method,
@@ -6488,8 +5949,6 @@ def analyse_AP_step_injection(segment,
                                     resample_with_rate=resample_with_rate,
                                     Itimes_relative = Itimes_relative,
                                     Itimes_samples = Itimes_samples)
-    
-    #print("Ihold", Ihold)
     
     # adjust the smooth window for the new sampling_period
     if smooth_window > 0:

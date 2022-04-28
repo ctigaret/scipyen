@@ -67,7 +67,7 @@ def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None) -> bool:
         raise TypeError("Expecting a str ('on' or 'off'), a bool, or None; got %s instead" % arg)
         
 def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, 
-            var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None,
+            var_type:typing.Optional[typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]]=None,
             sort:bool=False, sortkey:object=None, reverse:bool=False):
     """List names of variables in a namespace, according to a selection criterion.
     

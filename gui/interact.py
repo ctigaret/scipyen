@@ -43,13 +43,19 @@ class _InputSpec():
         return self._default
                 
 
-def selectWSData(*args, glob:bool=True, title="", single=True):
+def selectWSData(*args, title="", single=True, asDict=False, **kwargs):
+    """Selection of workspace variables from a list
+    """
     from core.workspacefunctions import (lsvars, getvarsbytype, user_workspace)
     
-    ws = user_workspace()
+    glob = kwargs.pop("glob", True)
+    
+    ws = kwargs.pop("ws", user_workspace())
+    
+    #ws = user_workspace()
     user_ns_visible = dict([(k,v) for k,v in ws.items() if not k.startswith("_") and k not in ws["mainWindow"].workspaceModel.user_ns_hidden])
     
-    name_vars = lsvars(*args, glob=glob, ws=user_ns_visible)
+    name_vars = lsvars(*args, glob=True, ws=user_ns_visible, **kwargs)
     
     if len(name_vars) == 0:
         return list()
@@ -69,9 +75,12 @@ def selectWSData(*args, glob:bool=True, title="", single=True):
     ans = dialog.exec()
     
     if ans == QtWidgets.QDialog.Accepted:
+        if asDict:
+            return dict((i, ws[i]) for i in dialog.selectedItemsText)
+        
         return tuple(ws[i] for i in dialog.selectedItemsText)
         
-    return list()
+    return dict() if asDict else list()
     
 
 def getInput(prompts:dict,
