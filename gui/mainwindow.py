@@ -920,13 +920,22 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
     def dropEvent(self, evt):
         if evt.mimeData().hasUrls():
             urls = evt.mimeData().urls()
+            for url in urls:
+                if (url.isRelative() or url.isLocalFile()) and os.path.isfile(url.path()):
+                    # check if this is a python source file
+                    mimeType = QtCore.QMimeDatabase().mimeTypeForFile(QtCore.QFileInfo(url.path()))
+                    #print(mimeType.name())
+                    if all([s in mimeType.name() for s in ("text", "python")]):
+                        self.signal_pythonFileAdded.emit(url.path())
             
-            if len(urls) == 1 and (urls[0].isRelative() or urls[0].isLocalFile()) and os.path.isfile(urls[0].path()):
-                # check if this is a python source file
-                mimeType = QtCore.QMimeDatabase().mimeTypeForFile(QtCore.QFileInfo(urls[0].path()))
-                
-                if all([s in mimeType.name() for s in ("text", "python")]):
-                    self.signal_pythonFileAdded.emit(urls[0].path())
+            #if len(urls) == 1 and (urls[0].isRelative() or urls[0].isLocalFile()) and os.path.isfile(urls[0].path()):
+                ## check if this is a python source file
+                #mimeType = QtCore.QMimeDatabase().mimeTypeForFile(QtCore.QFileInfo(urls[0].path()))
+                #print(mimeType.name())
+                #if all([s in mimeType.name() for s in ("text", "python")]):
+                    #self.signal_pythonFileAdded.emit(urls[0].path())
+                    
+        evt.accept()
             
     def clear(self):
         self.scriptsTable.clearContents()
