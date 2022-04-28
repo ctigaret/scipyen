@@ -1,6 +1,6 @@
 """A collection of functions to prompt user input using GUI
 """
-import typing
+import typing, collections, dataclasses
 import pyqtgraph as pg # used throughout - based on Qt5 
 pg.Qt.lib = "PyQt5" # pre-empt the use of PyQt5
 from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
@@ -8,6 +8,40 @@ from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 from PyQt5.uic import loadUiType
 from . import quickdialog as qd
 from gui.pictgui import ItemsListDialog
+
+
+class _InputSpec():
+    """Encapsulates arguments to interact.getInput(...)
+    """
+    __slots__ = ("_default", "_mytype")
+    
+    def __init__(self, default = dataclasses.MISSING, mytype=type(dataclasses.MISSING)):
+        if isinstance(mytype, type):
+            if mytype in (type(dataclasses.MISSING), type(None)): # type not specified
+                if default not in (dataclasses.MISSING, None): # get it from default's type
+                    mytype = type(default)
+                    
+            if default in (dataclasses.MISSING, None) and mytype not in (type(dataclasses.MISSING), type(None)):
+                # mytype specified, but no default given -> instantiate it from mytype
+                default = mytype()
+                
+            elif not isinstance(default, mytype): # consistency/sanity check
+                raise TypeError(f"default expected to be a {type.__name__}; got {type(default).__name__} instead")
+            
+        else:
+            mytype = type(default)
+
+        self._default=default
+        self._mytype=mytype
+        
+    @property
+    def type(self):
+        return self._mytype
+    
+    @property
+    def default(self):
+        return self._default
+                
 
 def selectWSData(*args, glob:bool=True, title="", single=True):
     from core.workspacefunctions import (lsvars, getvarsbytype, user_workspace)
@@ -47,10 +81,13 @@ def getInput(prompts:dict,
     Parameters:
     -----------
     prompts: a dict with str keys (the name of the prompted variable) mapped to
-        dicts with keys: 
-            "type" mapped to one of the supported types: int, float, str
-            "default" mapped to a default value (which is expected to be an instance
-                of the acceptable types in "type" or None)
+        either:
+            an _InputSpec that enapsulates the default prompt value and type of
+                the value; the latter is used to determine what kind of GUI input
+                field will be used in the dialog as a prompt for the variable.
+                
+        any object: the object value is the default, and the object type determines
+            what kind of gui input field should be used 
                 
     mapping:bool, optional default is False
     
@@ -69,7 +106,7 @@ def getInput(prompts:dict,
     diaog.
     
     """
-    dlg = qd.QuickDialog(title="Input")
+    dlg = qd.QuickDialog(title="Input values")
     if not isinstance(prompts, dict):
         raise TypeError(f"'prompts' expected to be a dict; got {type(prompts).__name__} instead")
     
@@ -78,50 +115,44 @@ def getInput(prompts:dict,
     group = qd.VDialogGroup(dlg)
     
     for k,v in prompts.items():
-        if not isinstance(v, dict):
-            raise TypeError(f"the 'prompts' dictionary expected to contain dict objects; got {type(v).__name__} instead")
-        
-        if any(s not in v for s in ("type", "default")):
-            raise ValueError("inner dictionary missing 'type' and 'default' keys")
-        
-        #if isinstance(v["type"], (tuple, list)):
-            #if all(isinstance(vv, type) for vv in v["type"]):
-                #types = v["type"]
-            #else:            
-                #raise TypeError("'types' expected to contain Python type objects")
-        
-        #el
-        if not isinstance(v["type"], type) or v["type"] not in (int, float, str, bool):
-            raise TypeError(f"'type' must be maped to int, float or str")
+        if isinstance(v, _InputSpec):
+            #if v.default not in (dataclasses.MISSING, None):
+                #if v.type in (type(dataclasses.MISSING), type(None)):
+                    #v.type = type(v.default)
+                #elif not isinstance(v.type, type(v.default)):
+                    #raise TypeError(f"Inconsistent input specification")
+                
+            def_val  = v.default
+            v_type = v.type
             
-        if v["default"] is not None:
-            if not isinstance(v["default"], v["type"]):
-                raise TypeError(f"specified default has wrong type {type(v['default'].__name__)}; expecting None or {v['type'].__name__}")
-            
-        def_text = str(v["default"]) if v["default"] is not None else ""
+        else:
+            def_val = v
+            v_type = type(v)
+        
+        def_text = str(def_val) if def_val not in (dataclasses.MISSING, None) else ""
         
         label = QtWidgets.QLabel(f"{k}:", group)
         group.addWidget(label)
         group.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Preferred)
         
-        if v["type"] == int:
+        if v_type == int:
             w = qd.IntegerInput(group,"")
             w.setValue(def_text)
             
-        elif v["type"] == float:
+        elif v_type == float:
             w = qd.FloatInput(group, "")
             w.setValue(def_text)
             
-        elif v["type"] == str:
+        elif v_type == str:
             w = qd.StringInput(group, "")
             w.setText(def_text)
             
-        elif v["type"] == bool:
+        elif v_type == bool:
             w = qd.CheckBox(group, "")
-            w.setCheckState(QtCore.Qt.Checked if v["default"] is True else QtCore.Qt.Unchecked)
+            w.setCheckState(QtCore.Qt.Checked if def_val is True else QtCore.Qt.Unchecked)
             
         else:
-            raise TypeError(f"{types[0]} types are not yet supported")
+            raise TypeError(f"{v_type} types are not yet supported")
         
         if hasattr(w, "variable"):
             w.variable.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Preferred)
