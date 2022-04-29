@@ -1615,12 +1615,14 @@ class AxisCalibrationData(CalibrationData):
                         stacklevel=2)
             chcal = chcal[0]
             
+        #print(f"AxisCalibrationData.getChannelCalibration: chcal = {chcal}")
+            
         if len(chcal):
             if full:
                 return chcal
         
             else:
-                return chcal[1]
+                return chcal[0]
             
     def getChannelIndex(self, name:str) -> typing.Optional[int]:
         """Returns the index of the channel with given name.
