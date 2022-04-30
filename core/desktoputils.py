@@ -66,22 +66,41 @@ def special_directories():
     TODO
     """
     if sys.platform == "linux" and HAS_PYXDG:
-        if os.environ.get("XDG_SESSION_DESKTOP", "") == "KDE" and "plasma5" in os.environ.get("DESKTOP_SESSION"):
+        if os.environ.get("XDG_SESSION_DESKTOP", "") == "KDE" and "plasma5" in os.environ.get("DESKTOP_SESSION", ""):
             pass
             
 
 def get_user_places():
+    ret = dict()
+    
     if sys.platform == "linux" and HAS_PYXDG:
         user_places = pio.loadXMLFile(os.path.join(xdg.BaseDirectory.xdg_data_home, "user-places.xbel"))
             
         if "xbel" not in user_places.documentElement.tagName.lower():
-            return
+            return ret
         
         bookmarks = user_places.getElementsByTagName("bookmark")
         
-        return bookmarks
+        for b in user_places.getElementsByTagName("bookmark"):
+            place_name = b.getElementsByTagName("title")[0].childNodes[0].data
+            place_path = b.getAttribute("href")
+            
+            info_node = b.getElementsByTagName("info")[0]
+            info_metadata_nodes = info_node.getElementsByTagName("metadata")
+            
+            place_icon_name = info_metadata_nodes[0].getElementsByTagName("bookmark:icon")[0].getAttribute("name")
+            
+            is_system_place = info_metadata_nodes[1].getElementsByTagName("isSystemItem")[0].childNodes[0].data
+            is_hidden = info_metadata_nodes[1].getElementsByTagName("isSystemItem")[0].childNodes[0].data
+            
+            ret[place_name] = {"path": place_path, 
+                               "icon": place_icon_name, # can be a system icon name or a path/file name
+                               "system":is_system_place == "true",
+                               "hidden":is_hidden == "true"}
+            
         
-        
+    return ret
+
 def get_user_place(path:typing.Union[pathlib.Path, str]) -> str:
     path = ""
     if isinstance(path, pathlib.Path):
