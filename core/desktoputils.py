@@ -83,7 +83,7 @@ def get_user_places():
         
         for b in user_places.getElementsByTagName("bookmark"):
             place_name = b.getElementsByTagName("title")[0].childNodes[0].data
-            place_path = b.getAttribute("href")
+            place_url = b.getAttribute("href")
             
             info_node = b.getElementsByTagName("info")[0]
             info_metadata_nodes = info_node.getElementsByTagName("metadata")
@@ -92,6 +92,7 @@ def get_user_places():
             
             systemitem_nodes = info_metadata_nodes[1].getElementsByTagName("isSystemItem")
             hidden_nodes = info_metadata_nodes[1].getElementsByTagName("isHidden")
+            only_in_app_nodes = info_metadata_nodes[1].getElementsByTagName("OnlyInApp")
             
             if len(systemitem_nodes):
                 is_system_place = systemitem_nodes[0].childNodes[0].data == "true"
@@ -102,8 +103,13 @@ def get_user_places():
                 is_hidden = hidden_nodes[0].childNodes[0].data == "true"
             else:
                 is_hidden = False
+                
+            if len(only_in_app_nodes):
+                app = True
+            else:
+                app = None
             
-            ret[place_name] = {"path": place_path, 
+            ret[place_name] = {"url": place_url, 
                                "icon": place_icon_name, # can be a system icon name or a path/file name
                                "system":is_system_place == "true",
                                "hidden":is_hidden == "true"}
