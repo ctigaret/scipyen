@@ -92,7 +92,7 @@ def get_user_places():
             
             systemitem_nodes = info_metadata_nodes[1].getElementsByTagName("isSystemItem")
             hidden_nodes = info_metadata_nodes[1].getElementsByTagName("isHidden")
-            only_in_app_nodes = info_metadata_nodes[1].getElementsByTagName("OnlyInApp")
+            app_nodes = info_metadata_nodes[1].getElementsByTagName("OnlyInApp")
             
             if len(systemitem_nodes):
                 is_system_place = systemitem_nodes[0].childNodes[0].data == "true"
@@ -104,15 +104,20 @@ def get_user_places():
             else:
                 is_hidden = False
                 
-            if len(only_in_app_nodes):
-                app = True
+            if len(app_nodes):
+                app_info = app_nodes[0].childNodes
+                if len(app_info):
+                    app = app_info[0].data
+                else:
+                    app = None
             else:
                 app = None
             
             ret[place_name] = {"url": place_url, 
                                "icon": place_icon_name, # can be a system icon name or a path/file name
                                "system":is_system_place == "true",
-                               "hidden":is_hidden == "true"}
+                               "hidden":is_hidden == "true",
+                               "app":app}
             
         
     return ret
