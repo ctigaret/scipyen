@@ -90,8 +90,18 @@ def get_user_places():
             
             place_icon_name = info_metadata_nodes[0].getElementsByTagName("bookmark:icon")[0].getAttribute("name")
             
-            is_system_place = info_metadata_nodes[1].getElementsByTagName("isSystemItem")[0].childNodes[0].data
-            is_hidden = info_metadata_nodes[1].getElementsByTagName("isSystemItem")[0].childNodes[0].data
+            systemitem_nodes = info_metadata_nodes[1].getElementsByTagName("isSystemItem")
+            hidden_nodes = info_metadata_nodes[1].getElementsByTagName("isHidden")
+            
+            if len(systemitem_nodes):
+                is_system_place = systemitem_nodes[0].childNodes[0].data == "true"
+            else:
+                is_system_place=False
+                
+            if len(hidden_nodes):
+                is_hidden = hidden_nodes[0].childNodes[0].data == "true"
+            else:
+                is_hidden = False
             
             ret[place_name] = {"path": place_path, 
                                "icon": place_icon_name, # can be a system icon name or a path/file name
