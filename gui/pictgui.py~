@@ -74,7 +74,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 from core.traitcontainers import DataBag
 from core.prog import (safeWrapper, deprecated,
                        timefunc, processtimefunc,)
-from core.utilities import (unique, index_of,)
+#from core.utilities import (unique, index_of,)
 from core.workspacefunctions import debug_scipyen
 
 
@@ -127,9 +127,9 @@ def genColorTable(cmap, ncolors=256):
     return colortable
 
 class GuiWorkerSignals(QtCore.QObject):
-    signal_finished = pyqtSignal()
-    sig_error = pyqtSignal(tuple)
-    signal_result = pyqtSignal(object)
+    signal_finished = pyqtSignal(name="signal_finished")
+    sig_error = pyqtSignal(tuple, name="sig_error")
+    signal_result = pyqtSignal(object, name="signal_result")
     
 class GuiWorker(QtCore.QRunnable):
     def __init__(self, fn, *args, **kwargs):
@@ -338,6 +338,8 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         self.listWidget.itemClicked.connect(self.selectItem)
         self.listWidget.itemDoubleClicked.connect(self.selectAndGo)
 
+        self.selectionMode = selectmode
+        
         if isinstance(itemsList, (tuple, list)) and \
             all([isinstance(i, str) for i in itemsList]):
             
@@ -349,17 +351,24 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
                 
             self.setItems(itemsList)
             
-        self.selectionMode = selectmode
-            
     @pyqtSlot(str)
     def slot_locateSelectName(self, txt):
-        found_items = self.listWidget.findItems(txt, QtCore.Qt.MatchContains)
-        for row in range(self.listWidget.count()):
-            self.listWidget.item(row).setSelected(False)
+        found_items = self.listWidget.findItems(txt, QtCore.Qt.MatchContains | QtCore.Qt.MatchCaseSensitive)
+        if len(found_items):
+            for row in range(self.listWidget.count()):
+                self.listWidget.item(row).setSelected(False)
+                
+            for k, item in enumerate(found_items):
+                item.setSelected(True)
+                self.itemSelected.emit(str(item.text()))
+                
+            sel_indexes = self.listWidget.selectedIndexes()
             
-        for item in found_items:
-            item.setSelected(True)
-            self.itemSelected.emit(str(item.text()))
+            if len(sel_indexes):
+                self.listWidget.scrollTo(sel_indexes[0])
+                if len(sel_indexes) == 1:
+                    self.itemSelected.emit(str(found_items[0].text()))
+                #self.itemSelected.emit()
             
     def validateItems(self, itemsList):
         # 2016-08-10 11:51:07
@@ -419,10 +428,10 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
             longestItem = itemsList[longestItemNdx]
             
             for k, s in enumerate(self.preSelected):
-                ndx = self.preSelected.index(s)
-                self.listWidget.item(ndx).setSelected(True)
-                if k == 0:
-                    self.listWidget.setCurrentRow(ndx)
+                ndx = itemsList.index(s)
+                item = self.listWidget.item(ndx)
+                self.listWidget.setCurrentItem(item)
+                self.listWidget.scrollToItem(item)
                 
             fm = QtGui.QFontMetrics(self.listWidget.font())
             w = fm.width(longestItem) * 1.1
@@ -430,7 +439,7 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
             if self.listWidget.verticalScrollBar():
                 w += self.listWidget.verticalScrollBar().sizeHint().width()
                 
-            self.listWidget.setMinimumWidth(w)
+            self.listWidget.setMinimumWidth(int(w))
 
     @pyqtSlot(QtWidgets.QListWidgetItem)
     def selectItem(self, item):

@@ -4671,7 +4671,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             
         else:
             self._scans_processing_idle_ = True
-            
             scansWorker = None
             
         if sceneWorker is not None:

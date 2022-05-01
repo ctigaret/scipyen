@@ -13,7 +13,9 @@ Add signature annotations to file loaders to help file data handling
 from __future__ import print_function
 
 import inspect, os, sys, traceback, typing, warnings, io
-import contextlib, pathlib
+import contextlib, pathlib, urllib
+import ctypes
+
 # import  threading
 import csv, numbers, mimetypes
 if sys.version_info.major >= 3 and sys.version_info.minor < 10:
@@ -26,7 +28,7 @@ if sys.version_info.major >= 3 and sys.version_info.minor < 10:
 else:
     import pickle #, pickletools, copyreg
     
-import concurrent.futures
+#import concurrent.futures
 import collections
 #from functools import singledispatch
 #from contextlib import (contextmanager,
@@ -164,6 +166,40 @@ def __ndArray2csv__(data, writer):
     for l in data:
         writer.writerow(l)
         
+def is_hidden(filepath:typing.Union[str, pathlib.Path]):
+    """See https://stackoverflow.com/questions/284115/cross-platform-hidden-file-detection
+    """
+    if isinstance(filepath, str):
+        name = os.path.basename(os.path.abspath(filepath))
+    elif isinstance(filepath, pathlib.Path):
+        name = filepath.name
+        filepath = str(filepath)
+    
+    if sys.platform == "win32":
+        try:
+            attrs = ctypes.windll.kernel32.GetFileAttributesW(filepath)
+            assert attrs != -1
+            result = bool(attrs & 2) or name.startswith(".")
+        except:(AttributeError, AssertionError):
+            result = False
+            
+        return result
+    
+    elif sys.platform == "linux":
+        return name.startswith(".")
+    
+    elif sys.platform == "darwin":
+        # NOTE: 2022-05-01 23:05:40 TODO:
+        # check ~/src/Python/OS X hidden files.py downloaded from
+        # http://pastebin.com/aCUwTumB
+        # via
+        # https://stackoverflow.com/questions/284115/cross-platform-hidden-file-detection
+        return name.startswith(".")   
+    
+    else:
+        return name.startswith(".")   
+        
+
         
 def loadHDF5File(fName:str):
     """FIXME/TODO 2021-12-08 12:19:08

@@ -122,6 +122,9 @@ def get_user_places():
         
     return ret
 
+def getDisplayName(pathorurl):
+    pass
+
 def get_user_place(path:typing.Union[pathlib.Path, str]) -> str:
     path = ""
     if isinstance(path, pathlib.Path):

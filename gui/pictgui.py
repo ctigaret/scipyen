@@ -127,9 +127,9 @@ def genColorTable(cmap, ncolors=256):
     return colortable
 
 class GuiWorkerSignals(QtCore.QObject):
-    signal_finished = pyqtSignal()
-    sig_error = pyqtSignal(tuple)
-    signal_result = pyqtSignal(object)
+    signal_finished = pyqtSignal(name="signal_finished")
+    sig_error = pyqtSignal(tuple, name="sig_error")
+    signal_result = pyqtSignal(object, name="signal_result")
     
 class GuiWorker(QtCore.QRunnable):
     def __init__(self, fn, *args, **kwargs):
@@ -141,10 +141,12 @@ class GuiWorker(QtCore.QRunnable):
         
         self.signals = GuiWorkerSignals()
         
+        self.result = None
+        
     @pyqtSlot()
     def run(self):
         try:
-            result = self.fn(*self.args, **self.kwargs)
+            self.result = self.fn(*self.args, **self.kwargs)
             
         except:
             traceback.print_exc()
@@ -154,7 +156,7 @@ class GuiWorker(QtCore.QRunnable):
             self.signals.sig_error.emit((exc_type, value, traceback.format_exc()))
             
         else:
-            self.signals.signal_result.emit(result)  # Return the result of the processing
+            self.signals.signal_result.emit(self.result)  # Return the result of the processing
             self.signals.signal_finished.emit()  # Done
             
         finally:
