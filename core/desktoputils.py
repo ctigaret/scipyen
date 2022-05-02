@@ -122,40 +122,37 @@ def get_user_places():
         
     return ret
 
-def getDisplayName(pathorurl):
-    pass
-
-def get_user_place(path:typing.Union[pathlib.Path, str]) -> str:
-    path = ""
-    if isinstance(path, pathlib.Path):
-        path = path.as_uri()
+#def get_user_place(path:typing.Union[pathlib.Path, str]) -> str:
+    #path = ""
+    #if isinstance(path, pathlib.Path):
+        #path = path.as_uri()
         
-    else: # normalize path string as uri string
-        parsed_path = urllib.parse.urlparse(path)
+    #else: # normalize path string as uri string
+        #parsed_path = urllib.parse.urlparse(path)
         
-        if len(parsed_path.scheme) == 0:
-            if not os.path.isabs(path):
-                path = os.path.abspath(path)
+        #if len(parsed_path.scheme) == 0:
+            #if not os.path.isabs(path):
+                #path = os.path.abspath(path)
                 
-            path = pathlib.Path(path).as_uri()
+            #path = pathlib.Path(path).as_uri()
             
-        #return path
+        ##return path
         
             
-    if sys.platform == "linux" and HAS_PYXDG:
-        user_places = pio.loadTextFile(os.path.join(xdg.BaseDirectory.xdg_data_home, "user-places.xbel"), forceText=True)
-        root = ET.fromstring(user_places)
+    #if sys.platform == "linux" and HAS_PYXDG:
+        #user_places = pio.loadTextFile(os.path.join(xdg.BaseDirectory.xdg_data_home, "user-places.xbel"), forceText=True)
+        #root = ET.fromstring(user_places)
         
-        if root.tag != "xbel":
-            return path
+        #if root.tag != "xbel":
+            #return path
         
-        place = root.findtext(".//*[@href='%s']/title" % path)
+        #place = root.findtext(".//*[@href='%s']/title" % path)
         
-        if place is None:
-            return path
+        #if place is None:
+            #return path
         
-        return place
+        #return place
 
         
-    else:
-        return path
+    #else:
+        #return path

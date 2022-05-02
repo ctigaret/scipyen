@@ -180,7 +180,7 @@ def is_hidden(filepath:typing.Union[str, pathlib.Path]):
             attrs = ctypes.windll.kernel32.GetFileAttributesW(filepath)
             assert attrs != -1
             result = bool(attrs & 2) or name.startswith(".")
-        except:(AttributeError, AssertionError):
+        except (AttributeError, AssertionError):
             result = False
             
         return result
@@ -199,7 +199,15 @@ def is_hidden(filepath:typing.Union[str, pathlib.Path]):
     else:
         return name.startswith(".")   
         
-
+def concatPaths(path1:str, path2:str):
+    assert(path2.startswith("/"))
+    
+    if len(path1) == 0:
+        return path2
+    elif not path1.endswith("/"):
+        return path1 + "/" + path2
+    else:
+        return path1 + path2
         
 def loadHDF5File(fName:str):
     """FIXME/TODO 2021-12-08 12:19:08

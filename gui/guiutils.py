@@ -19,11 +19,29 @@ class UnitsStringValidator(QtGui.QValidator):
         except:
             return QtGui.QValidator.Invalid
         
-def get_elided_text(s,w):
+def csqueeze(s:str, w:int):
+    if len(s) > w and w > 3:
+        part = (w-3)/2
+        return s[0:part] + "..."
+    return s
+
+def rsqueeze(s:str, w:int):
+    if len(s) > w:
+        part = w - 3
+        return s[0:part] + "..."
+    return s
+
+def lsqueeze(s:str, w:int):
+    if len(s) > w:
+        part = w - 3
+        return "..." + s[part:]
+    return s
+        
+def get_elided_text(s:str, w:int):
     fm = QtWidgets.QApplication.fontMetrics()
     return fm.elidedText(s, QtCore.Qt.ElideRight, w)
 
-def get_text_width(s, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
+def get_text_width(s:str, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
     fm = QtWidgets.QApplication.fontMetrics()
     sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
     return sz.width()

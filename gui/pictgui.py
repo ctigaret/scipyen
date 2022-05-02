@@ -112,7 +112,7 @@ def generateBrushCycle(color:typing.Optional[QtGui.QColor] = None,
             # single value spec (R,G,B,A)
             brushes = itertools.cycle(QtGui.Brush(QtGui.QColor(*c)))
             
-    pass
+    #pass
 
 def generatePenCycle():
     pass
@@ -147,6 +147,7 @@ class GuiWorker(QtCore.QRunnable):
     def run(self):
         try:
             self.result = self.fn(*self.args, **self.kwargs)
+            self.signals.signal_result.emit(self.result)  # Return the result of the processing
             
         except:
             traceback.print_exc()
@@ -156,7 +157,7 @@ class GuiWorker(QtCore.QRunnable):
             self.signals.sig_error.emit((exc_type, value, traceback.format_exc()))
             
         else:
-            self.signals.signal_result.emit(self.result)  # Return the result of the processing
+            #self.signals.signal_result.emit(self.result)  # Return the result of the processing
             self.signals.signal_finished.emit()  # Done
             
         finally:
