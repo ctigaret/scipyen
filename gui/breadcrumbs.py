@@ -774,8 +774,52 @@ class _NavigatorPrivate(QCore.QObject):
             button.removeEventFilter(self.q)
             
     def applyUncommittedUrl(self):
-        pass
-    
+        # NOTE: 2022-05-02 21:55:31
+        # unlike KIO code, we only support local protocols urls (i.e. file scheme):
+        # no remote:/, trash:/, or anything other than local:/
+        #
+        # TODO: 2022-05-02 22:51:17
+        # check in self.q if QUrl.fromUserInput is a valid local url!!!
+        def __applyUrl__(url, pathbox, q):
+            if url.scheme() != "file":
+                return
+            
+            if not url.isEmpty() and url.path().isEmpty():
+                url.setPath("/")
+                
+            urlStr = url.toString()
+            # TODO/FIXME: 2022-05-02 22:04:39
+            # use logic in ScipyenWindow or just move it here instead of below
+            urls = pathbox.urls() # a list
+            
+            if urlStr in urls:
+                urls.remove(urlStr)
+                
+            urls.insert(0, urlStr)
+            pathbox.setUrls(urls, UrlComboBox.RemoveBottom)
+
+            q.setLocationUrl(url)
+            pathbox.setUrl(self.q.locationUrl())
+        
+        text = self._pathBox.currentText().strip()
+        q_url = self.q.locationUrl()
+        path = q_url.path()
+        if not path.endswith("/"):
+            path += "/"
+            
+            
+        q_url.setPath(path + text)
+        
+        if pathlib.Path(q_url.path()).is_dir():
+            __applyUrl__(q_url, self._pathBox, self.q)
+        else:
+            __applyUrl(QtCore.QUrl.fromUserInput(text))
+        
+        
+        
+        #__applyUrl__(url, self._pathBox, self.q)
+        
+        
     @pyqtSlot
     def slotReturnPressed(self):
         pass
@@ -788,7 +832,7 @@ class _NavigatorPrivate(QCore.QObject):
         pass
     
     def appendWidget(self, widget:QtWidgets.QWidget, stretch:int = 0):
-        pass
+        self._layout.insertWidget(self._layout.count()-1, widget, stretch)
     
     @pyqtSlot
     def slotToggleEditableButtonPressed(self):
