@@ -15,7 +15,7 @@ event handlers pre_execute() and post_execute().
 # filter/finder in workspace viewer
 #
 
-import traceback, typing, inspect, os
+import traceback, typing, inspect, os, asyncio
 from copy import deepcopy
 import json
 
@@ -57,6 +57,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     '''
     modelContentsChanged = pyqtSignal(name = "modelContentsChanged")
     workingDir=pyqtSignal(str, name="workingDir")
+    varsChanged = pyqtSignal(dict, name="varsChanged")
     
     def __init__(self, shell, user_ns_hidden=dict(), parent=None,
                  mpl_figure_close_callback=None,
@@ -64,6 +65,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                  mpl_figure_enter_callback=None):
         super(WorkspaceModel, self).__init__(parent)
         
+        self.loop = asyncio.get_event_loop()
         self.shell = shell # reference to IPython InteractiveShell of the internal console
         
         self.cached_vars = dict()
@@ -108,6 +110,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.mpl_figure_close_callback = mpl_figure_close_callback
         self.mpl_figure_click_callback = mpl_figure_click_callback
         self.mpl_figure_enter_callback = mpl_figure_enter_callback
+        
+        self.varsChanged.connect(self.slot_observe)
             
     def _foreign_namespaces_count_changed_(self, change):
         # FIXME / TODO 2020-07-30 23:49:13
@@ -572,7 +576,24 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return True
     
     def var_observer(self, change):
+        self.varsChanged.emit(change)
         #print(f"WorkspaceModel.var_observer: change {change}")
+        #asyncio.create_task(self._observe_coro, name="Observe_variables")
+        #self.loop.run_until_complete(self._observe_coro)
+        
+        #name = change.name
+        #displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
+        
+        #if name in self.shell.user_ns:
+            #if name not in displayed_vars_types:
+                #self.addRowForVariable(name, self.shell.user_ns[name])
+            #else:
+                #self.updateRowForVariable(name, self.shell.user_ns[name])
+                
+            #self.modelContentsChanged.emit()
+        
+    @pyqtSlot(dict)
+    def slot_observe(self, change):
         name = change.name
         displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
         
@@ -583,6 +604,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 self.updateRowForVariable(name, self.shell.user_ns[name])
                 
             self.modelContentsChanged.emit()
+            
+        else:
+            self.removeRowForVariable(name)
+            
         
     def pre_execute(self):
         """Updates observed_vars DataBag
@@ -853,12 +878,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         #print(f"WorkspaceModel.update del_vars = {del_vars}")
         
-        obsolete_displayed_vars = [n for n in self.getDisplayedVariableNames() if n not in self.shell.user_ns.keys()] # in the internal ws
+        #obsolete_displayed_vars = [n for n in self.getDisplayedVariableNames() if n not in self.shell.user_ns.keys()] # in the internal ws
         
-        names_to_remove = set(del_vars) | set(obsolete_displayed_vars)
+        #names_to_remove = set(del_vars) | set(obsolete_displayed_vars)
         
-        for name in names_to_remove:
-            self.removeRowForVariable(name)
+        #for name in names_to_remove:
+            #self.removeRowForVariable(name)
 
     def updateFromExternal(self, prop_dicts):
         """prop_dicts: {name: nested properties dict}

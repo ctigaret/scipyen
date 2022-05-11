@@ -238,8 +238,8 @@ class DataBag(Bunch):
         
     def _light_trait_(self, obj):
         # NOTE: 2021-09-14 13:00:51 
-        # Might have to force dictionaries to behave as Any
-        # because of the long processing times
+        # Might have to change traiturils.dynamic_trait to force dictionaries to 
+        # behave as traitlets.Any because of the long processing times
         
         
         # NOTE: 2022-01-29 19:29:56 dynamic_trait is from traitutils
@@ -284,16 +284,10 @@ class DataBag(Bunch):
         #       d.23 = "a string"
         #
         # which is syntactically invalid in Python (see "6.3.1 Attribute references" 
-        # in The Python Launguage Reference).
+        # in The Python Language Reference).
         #
-        # Therefore, attribute access emulation comes with the price that the key
-        # in the key/value pair passed to __setattr__ must be a str, and that str
-        # must be a valid Python identifier.
-        #
-        # NOTE 2020-09-05 12:47:37 One may be tempted to convert the non-string
-        # key to its string representation - but that would open a can of worms:
-        # the string representation of non numeric types and custom objects is
-        # too complex for this purpose.
+        # Therefore, DataBag does NOT implement attribute access to its trait members
+        # 
         
         if not isinstance(key, str):
             raise TypeError("Expecting a str key; got %s instead" % type(key).__name__)

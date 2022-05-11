@@ -497,81 +497,6 @@ def hashiterable(x:typing.Iterable[typing.Any]) -> Number:
     in order to prevent infinite recursion when these elements contain reference(s)
     to the iterable being 'hashed'.
     
-    Example 1:
-    
-    import random # to generate random sequences
-    random.seed()
-    
-    # generate 10 random sequences
-    k = 11
-    seqs = [random.sample(range(k), k) for i in range(k)]
-
-    seqs
-    
-        [[7, 5, 10, 1, 4, 2, 6, 3, 9, 8, 0],
-         [9, 0, 7, 1, 5, 8, 3, 10, 6, 4, 2],
-         [7, 10, 9, 3, 6, 4, 8, 1, 5, 0, 2],
-         [1, 6, 8, 2, 5, 10, 9, 4, 0, 7, 3],
-         [5, 7, 2, 0, 9, 6, 8, 4, 3, 10, 1],
-         [6, 0, 2, 9, 7, 1, 8, 3, 4, 10, 5],
-         [10, 2, 6, 7, 4, 1, 5, 9, 0, 8, 3],
-         [3, 7, 5, 1, 10, 0, 9, 6, 8, 4, 2],
-         [0, 5, 3, 8, 2, 9, 1, 6, 4, 7, 10],
-         [9, 10, 2, 3, 5, 8, 0, 1, 4, 7, 6],
-         [8, 9, 0, 3, 5, 7, 1, 4, 2, 6, 10]]    
-        
-    sums = [sum(hashiterable(x)) for x in seqs]
-
-    sums
-
-        [103034808763.81586,
-         103034808806.43579,
-         103034808697.90562,
-         103034808809.05049,
-         103034808811.85916,
-         103034808796.93391,
-         103034808824.6124,
-         103034808735.8485,
-         103034808837.7218,
-         103034808790.48198,
-         103034808795.09956]
-        
-    Example 2:
-    
-    k = 10
-    
-    eye = [[0]*k for i in range(k)]
-    
-    for i, s in enumerate(eye):
-        s[i]=1
-        
-    eye
-    
-        [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]
-
-    sums = [sum(hashiterable(x)) for s in eye]
-    
-    sums
-    
-        [102740977801.8254,
-         102740977802.8254,
-         102740977801.15872,
-         102740977804.8254,
-         102740977801.02539,
-         102740977806.8254,
-         102740977800.96825,
-         102740977808.8254,
-         102740977800.93651,
-         102740977810.8254]
         
     """
     if not hasattr(x, "__iter__"):
@@ -579,10 +504,86 @@ def hashiterable(x:typing.Iterable[typing.Any]) -> Number:
     
     # NOTE: 2021-08-21 10:02:46 FIXME
     # ATTENTION:
-    # The line below generate infinite recursion when v contains references to x
+    # The line below generates infinite recursion when v contains references to x
     #return (gethash(v) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
     # NOTE: 2021-08-21 10:08:01 FIXED
-    return ( (hash(type(v)) if (hasattr(v, "__iter__") or v is x) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
+    return hash( (type(x),) + tuple(type(v) if hasattr(v, "__iter__") or v is x else v for v in x) )
+    #return ( (hash(type(v)) if (hasattr(v, "__iter__") or v is x ) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
+    #Example 1:
+    
+    #import random # to generate random sequences
+    #random.seed()
+    
+    ## generate 10 random sequences
+    #k = 11
+    #seqs = [random.sample(range(k), k) for i in range(k)]
+
+    #seqs
+    
+        #[[7, 5, 10, 1, 4, 2, 6, 3, 9, 8, 0],
+         #[9, 0, 7, 1, 5, 8, 3, 10, 6, 4, 2],
+         #[7, 10, 9, 3, 6, 4, 8, 1, 5, 0, 2],
+         #[1, 6, 8, 2, 5, 10, 9, 4, 0, 7, 3],
+         #[5, 7, 2, 0, 9, 6, 8, 4, 3, 10, 1],
+         #[6, 0, 2, 9, 7, 1, 8, 3, 4, 10, 5],
+         #[10, 2, 6, 7, 4, 1, 5, 9, 0, 8, 3],
+         #[3, 7, 5, 1, 10, 0, 9, 6, 8, 4, 2],
+         #[0, 5, 3, 8, 2, 9, 1, 6, 4, 7, 10],
+         #[9, 10, 2, 3, 5, 8, 0, 1, 4, 7, 6],
+         #[8, 9, 0, 3, 5, 7, 1, 4, 2, 6, 10]]    
+        
+    #sums = [sum(hashiterable(x)) for x in seqs]
+
+    #sums
+
+        #[103034808763.81586,
+         #103034808806.43579,
+         #103034808697.90562,
+         #103034808809.05049,
+         #103034808811.85916,
+         #103034808796.93391,
+         #103034808824.6124,
+         #103034808735.8485,
+         #103034808837.7218,
+         #103034808790.48198,
+         #103034808795.09956]
+        
+    #Example 2:
+    
+    #k = 10
+    
+    #eye = [[0]*k for i in range(k)]
+    
+    #for i, s in enumerate(eye):
+        #s[i]=1
+        
+    #eye
+    
+        #[[1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+         #[0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+         #[0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+         #[0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+         #[0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+         #[0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+         #[0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+         #[0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+         #[0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+         #[0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]
+
+    #sums = [sum(hashiterable(x)) for s in eye]
+    
+    #sums
+    
+        #[102740977801.8254,
+         #102740977802.8254,
+         #102740977801.15872,
+         #102740977804.8254,
+         #102740977801.02539,
+         #102740977806.8254,
+         #102740977800.96825,
+         #102740977808.8254,
+         #102740977800.93651,
+         #102740977810.8254]
     #return ( (hash(type(v)) if isinstance(v, (list, deque, dict)) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
 
 @safeWrapper
@@ -611,51 +612,68 @@ def gethash(x:typing.Any) -> Number:
     
     # Arguably, we don't need to monitor elemental vale changes in these large
     # data sets, just their ndim/shape/size/axistags, etc
-    def _sumarr(_x):
-        return sum((hash(_x.ndim), hash(_x.size), hash(_x.shape),))
+    def _hasharr(_x):
+        return hash((type(_x), _x.size, _x.shape))
+        #return sum((hash(_x.size), hash(_x.shape),))
+        #return sum((hash(_x.ndim), hash(_x.size), hash(_x.shape),))
         
-    def _sumarrdtype(_x):
-        return _sumarr(_x) + hash(_x.dtype)
+    def _hasharrdtype(_x):
+        return hash((type(x), _x.size, _x.shape, _x.dtype))
+        #return _hasharr(_x) + hash(_x.dtype)
 
     try:
         if is_hashable(x):
             return hash(x)
         
         elif isinstance(x, pq.Quantity):
-            return hash(type(x)) + _sumarrdtype(x) + hash(x.dimensionality)
+            return hash((type(x), x.size, x.shape, x.dtype, x.dimensionality))
+            #return hash(type(x)) + _hasharrdtype(x) + hash(x.dimensionality)
         
         elif isinstance(x, vigra.VigraArray):
-            return hash(type(x)) + _sumarrdtype(x) + hash(x.axistags)
+            return hash((type(x), x.size, x.shape, x.dtype, x.axistags))
+            #return hash(type(x)) + _hasharrdtype(x) + hash(x.axistags)
             #return hash(type(x)) + gethash(np.array(x)) + hash(x.axistags)
         
         elif isinstance(x, vigra.vigranumpycore.ChunkedArrayBase):
-            return hash(type(x)) + _sumarrdtype(x) + sum((hash(x.chunk_array_shape), hash(x.chunk_shape), ))
+            return hash((type(x), x.chunk_array_shape, x.chunk_shape))
+            #return hash(type(x)) + _hasharrdtype(x) + sum((hash(x.chunk_array_shape), hash(x.chunk_shape), ))
         
         elif isinstance(x, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
-            return hash(type(x)) + hash(x)
+            return hash(type(x), x)
+            #return hash(type(x)) + hash(x)
             #return HASHRANDSEED + hash(x)
         
         elif isinstance(x, np.ndarray):
-            return hash(type(x)) + _sumarrdtype(x)
+            return _hasharrdtype(x)
+            #return hash(type(x)) + _hasharrdtype(x)
             #return HASHRANDSEED + sum([hash(x.shape), hash(x.size), hash(x.ndim) , hash(x.dtype)])
         
         elif isinstance(x, pd.DataFrame):
-            return hash(type(x)) + _sumarr(x) + gethash(x.index) + gethash(x.columns) + sum((gethash(x[c]) for c in x.columns))
+            return hash((type(x), x.size, x.shape, x.dtype, x.index, x.columns))
+            #return hash(type(x)) + _hasharr(x) + gethash(x.index) + gethash(x.columns) + sum((gethash(x[c]) for c in x.columns))
         
         elif isinstance(x, pd.Series):
-            return hash(type(x)) + _sumarrdtype(x) + hash(tuple(x.index)) + hash(tuple(x.name))
+            return hash(type(x), x.size, x.shape, x.dtype, x.index, x.name)
+            #return hash(type(x)) + _hasharrdtype(x) + hash(tuple(x.index)) + hash(tuple(x.name))
             #return HASHRANDSEED + hash(tuple(x.index)) + hash(tuple(x.name)) + hash(tuple(x)) + hash(x.dtype)
         
         elif isinstance(x, pd.Index):
-            return hash(type(x)) + _sumarrdtype(x)
+            return hash(type(x), tuple(x))
+            #return hash(type(x)) + _hasharrdtype(x)
             #return HASHRANDSEED + hash(tuple(x)) 
             
         elif hasattr(x, "__iter__"):
-            return hash(type(x)) + sum(hashiterable(x))
+            return hash((type(x),tuple(x)))
+            #return hashiterable(x)
+            #return hash(type(x)) + sum(hashiterable(x))
+            
+        elif isinstance(x, dict):
+            return hash((type(x), tuple(x)))
         
         elif not is_hashable(x):
             if hasattr(x, "__dict__"):
-                return hash(type(x)) + gethash(x.__dict__)
+                return hash((type(x), x.__dict__))
+                #return hash(type(x)) + gethash(x.__dict__)
             
             else:
                 return hash(type(x)) # FIXME 2021-08-20 14:22:13
