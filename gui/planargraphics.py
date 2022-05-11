@@ -4138,10 +4138,10 @@ class PlanarGraphics():
         entity.attr.update({"__graphics_descriptors__": h5io.make_attr(self.descriptors)})
         
         # NOTE: 2021-11-25 09:59:42
-        # do NOT use the generic h5io.make_hdf5_entity here, although states is
+        # do NOT use the generic h5io.makeHDF5Entity here, although states is
         # a list; thisns because we don't want to deeply nest the states' databags
         # as HDF5 Group objects; see NOTE: 2021-11-25 10:04:00 below
-        #states_group = h5io.make_hdf5_entity(self.states, "states", self.name,
+        #states_group = h5io.makeHDF5Entity(self.states, "states", self.name,
                                              #compression, chunbks, track_order,
                                              #entity_cache)
         

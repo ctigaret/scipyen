@@ -787,7 +787,8 @@ def pandas2Structarray(obj):
     #numpy_struct_array_dtypes = [pandasDtype2HF5Dtype(obj_dtypes[col], obj_rndx.loc[:, col], categorical_info) for col in obj_rndx.columns]
     original_obj_dtypes, numpy_struct_array_dtypes = zip(*list((obj_dtypes[col], pandasDtype2HF5Dtype(obj_dtypes[col], obj_rndx.loc[:, col], categorical_info)) for col in obj_rndx.columns))
 
-    dtype = np.dtype(numpy_struct_array_dtypes)
+    #print("numpy_struct_array_dtypes", numpy_struct_array_dtypes)
+    dtype = np.dtype(list(numpy_struct_array_dtypes))
     
     sarr = np.zeros(v.shape[0], dtype)
     
@@ -1228,7 +1229,7 @@ def makeDatasetAttrs(obj):
     if isinstance(obj, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
         # NOTE: 2021-11-18 12:31:59
         # in vigranumpy all kernels are float ?
-        return makeAttrDict(__dtype__ = jsonio.dtype2json(np.dtype(float)))
+        return makeAttrDict(__dtype__ = jsonio.dtype2JSON(np.dtype(float)))
         
     return dict()
 
@@ -1237,7 +1238,7 @@ def _(obj):
     attrs = dict()
     dtype = obj.dtype
     fields = dtype.fields
-    attrs["__dtype__"] = jsonio.dtype2json(obj.dtype)
+    attrs["__dtype__"] = jsonio.dtype2JSON(obj.dtype)
     if fields is not None: # structured array or recarray; type is in makeDataTypeAttrs
         attrs["__dtype_fields__"] = list(f for f in obj.dtype.fields)
     
@@ -1246,7 +1247,7 @@ def _(obj):
 @makeDatasetAttrs.register(pq.Quantity)
 def _(obj):
     attrs = dict()
-    attrs["__dtype__"] = jsonio.dtype2json(obj.dtype)
+    attrs["__dtype__"] = jsonio.dtype2JSON(obj.dtype)
     attrs["__units__"] = obj.units
     
     return makeAttrDict(**attrs)
@@ -1274,7 +1275,7 @@ def _(obj):
 
 @makeDatasetAttrs.register(vigra.VigraArray)
 def _(obj):
-   return makeAttrDict(__dtype__ = jsonio.dtype2json(obj.dtype), 
+   return makeAttrDict(__dtype__ = jsonio.dtype2JSON(obj.dtype), 
                          __axistags__ = obj.axistags.toJSON())
 
 @singledispatch

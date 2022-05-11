@@ -737,7 +737,7 @@ def numpyDtype2JSON(d:np.dtype) -> dict:
         
     else:   
         if fields is None:
-            print("dtype:", d)
+            #print("dtype:", d)
             value = np.lib.format.dtype_to_descr(d) # does not perform well for structured arrays?
         else:
             value = dict((name, (dtype2JSON(value[0]), *value[1:])) for name, value in d.fields.items())

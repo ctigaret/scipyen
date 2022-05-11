@@ -4451,9 +4451,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def slot_addVarNameToFinderHistory(self):
         varTxt = self.varNameFilterFinderComboBox.lineEdit().text()
-        if len(varTxt) > 0 and varTxt not in self.recentVariablesList:
-            self.recentVariablesList.appendleft(varTxt)
-            self.lastVariableFind = varTxt
+        if len(varTxt) > 0 and varTxt not in self._recentVariablesList:
+            self._recentVariablesList.appendleft(varTxt)
+            self._lastVariableFind = varTxt
         
     # NOTE: 2017-08-03 08:44:34
     # TODO/FIXME decide on the match; basically works with match2
@@ -4499,8 +4499,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_removeVarNameFromFinderHistory(self):
         currentNdx = self.varNameFilterFinderComboBox.currentIndex()
         varTxt = self.varNameFilterFinderComboBox.itemText(currentNdx)
-        if varTxt in self.recentVariablesList:
-            self.recentVariablesList.remove(varTxt)
+        if varTxt in self._recentVariablesList:
+            self._recentVariablesList.remove(varTxt)
             
         self.varNameFilterFinderComboBox.removeItem(currentNdx)
         self.varNameFilterFinderComboBox.lineEdit().setClearButtonEnabled(True)

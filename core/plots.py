@@ -1416,7 +1416,7 @@ def barplot_sb(*args, x=None, y=None, hue=None, data=None, order=None,
     NOTE It is preferable that all parameters are passed as key=value pairs.
     
     x, y, hue: names of variables in "data", or vector data
-        In particular, when data is a Pandas DataFrame, x, "y" and "hue" are
+        In particular, when "data" is a Pandas DataFrame, x, "y" and "hue" are
         column names such that:
         
         "x" is the name of the categorical, or categorical-like column, which 
@@ -1432,7 +1432,7 @@ def barplot_sb(*args, x=None, y=None, hue=None, data=None, order=None,
             variable to be considered as a "factor" in the data (i.e. different 
             from the predictor)
             
-        Categorical data in 2x" and "hue" may be nominal, dichotomous, or ordinal.
+        Categorical data in "x" and "hue" may be nominal, dichotomous, or ordinal.
         
         When "x" is ordinal, it is useful to specify the "order" parameter (see below)
         so that a relation between "x" and "y" becomes clear.
@@ -1474,6 +1474,7 @@ def barplot_sb(*args, x=None, y=None, hue=None, data=None, order=None,
         
     Additional keyword arguments controlling the appearance of the 
     overlaid stripplot. These are embedded in kwargs (default values in parantheses):
+    NOTE: The stripplot contains the overlaid data points
     -----------
     strip_jitter (True or float value)
     strip_dodge (value of the dodge argument, for a nice overlay on the bar plot)
@@ -1507,7 +1508,7 @@ def barplot_sb(*args, x=None, y=None, hue=None, data=None, order=None,
     
     Returns:
     -------
-    ax: plot axes -- see ax.bar? doe arguments controlling the appearance of the bars
+    ax: plot axes -- see ax.bar for arguments controlling the appearance of the bars
     
     plotter: SB_BarPlotter instance:
         plotter.statistic: numpy array with the calculated statistics (e.g., mean)
@@ -1563,7 +1564,7 @@ def barplot_sb(*args, x=None, y=None, hue=None, data=None, order=None,
     kwargs.pop("edgecolor", None)
     kwargs.pop("linewidth", None)
     
-    if overlay_stripplot:
+    if overlay_stripplot: # NOTE: plot the data points
         #sb.stripplot(x=x, y=y, hue=hue, data=data, order=order, hue_order = hue_order,
                      #jitter=strip_jitter, dodge=strip_dodge, orient=orient,
                      #edgecolor=strip_edgecolor, color=strip_color,palette=strip_palette,

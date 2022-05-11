@@ -1211,7 +1211,7 @@ class TriggerProtocol(object):
             else:
                 oname = name
                 
-            h5io.make_hdf5_entity(trigger, entity,
+            h5io.makeHDF5Entity(trigger, entity,
                                   name=name, oname=oname, 
                                   compression=compression, chunks=chunks, 
                                   track_order = track_order, entity_cache=entity_cache)

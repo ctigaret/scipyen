@@ -602,8 +602,16 @@ def sem(x:np.ndarray, **kwargs) -> np.ndarray:
         
     else:
         sz = x.shape[axis]
+        
+    if isinstance(x, pq.Quantity):
+        x = x.magnitude
+        
+    if isinstance(x, (pd.DataFrame, pd.Series)):
+        ret = np.std(x, ddof=ddof, axis=axis, out=None) / np.sqrt(sz-ddof)
+    else:
+        ret = np.std(x, ddof=ddof, axis=axis, out=None, keepdims=keepdims) / np.sqrt(sz-ddof)
     
-    return np.std(x, ddof=ddof, axis=axis, out=None, keepdims=keepdims) / np.sqrt(sz-ddof)
+    #return np.std(x, ddof=ddof, axis=axis, out=None, keepdims=keepdims) / np.sqrt(sz-ddof)
 
 def nansem(x:np.ndarray, **kwargs) -> np.ndarray:
     """SEM for data containing np.nan
