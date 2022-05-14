@@ -22,7 +22,7 @@ from .traitutils import (traitlets, dynamic_trait, transform_link,
                          HasTraits, TraitType, TraitsObserver, 
                          ContainerTraitsObserver, Int, Bool, All, observe)
 
-from .prog import safeWrapper
+from .prog import safeWrapper, timefunc, processtimefunc
 from .strutils import str2symbol
 
 class DataBagTraitsObserver(HasTraits):
@@ -625,7 +625,7 @@ class DataBag(Bunch):
         """
         try:
             ret = self.__getitem__(key)
-            self.__delitem__(key) # also updates __hidden__.length
+            self.__delitem__(key) # also calls remove_trait on the observed, and updates __hidden__.length
             return ret
         except:
             if len(args) == 0:
@@ -776,6 +776,7 @@ class DataBag(Bunch):
                        use_casting=self.use_casting,
                        allow_none=self.allow_none)
             
+    #@timefunc
     def update(self, other):
         """Updates this DataBag with key/value pairs from 'other'.
         

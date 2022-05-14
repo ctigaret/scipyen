@@ -47,6 +47,7 @@ import quantities as pq
 from core import datasignal
 from core.quantities import units_convertible
 from core.utilities import gethash, safe_identity_test
+from .prog import (timefunc, processtimefunc)
 
 # NOTE :2021-08-20 09:50:52
 # to figure out traitlets classes use the following idioms:
@@ -95,14 +96,17 @@ TRAITSMAP = {           # use casting versions
     #function:   (Any,)
     }
 
+#@timefunc
 def enhanced_traitlet_set(instance, obj, value):
     """Overrides traitlets.TraitType.set to check for special hash.
     This is supposed to also detect changes in the order of elements in sequences.
+    WARNING: Slows down execution
     """
     #print("enhanced set for %s" % type(instance).__name__)
     #print("enhanced set for %s; value %s" % (type(instance).__name__, value))
     
-    new_value = instance._validate(obj, value)
+    #new_value = instance._validate(obj, value)
+    new_value = value
     
     try:
         old_value = obj._trait_values[instance.name]
@@ -141,6 +145,57 @@ def enhanced_traitlet_set(instance, obj, value):
         # we explicitly compare silent to True just in case the equality
         # comparison above returns something other than True/False
         obj._notify_trait(instance.name, old_value, new_value)
+
+#@timefunc
+def standard_traitlet_set(instance, obj, value):
+    """Overrides traitlets.TraitType.set to check for special hash.
+    This is supposed to also detect changes in the order of elements in sequences.
+    """
+    #print("enhanced set for %s" % type(instance).__name__)
+    #print("enhanced set for %s; value %s" % (type(instance).__name__, value))
+    
+    #new_value = instance._validate(obj, value)
+    new_value = value
+    
+    try:
+        old_value = obj._trait_values[instance.name]
+        
+    except KeyError:
+        #print(f"{instance.name} not found")
+        old_value = instance.default_value
+        
+
+    obj._trait_values[instance.name] = new_value
+    
+    obj._notify_trait(instance.name, old_value, new_value)
+    
+    #try:
+        ##silent = new_value is old_value
+        #new_hash = gethash(new_value)
+        ##print("\told %s (hash %s)\n\tnew %s (hash %s)" % (old_value, instance.hashed, new_value, new_hash))
+        ##print(instance.name, "old hashed", instance.hashed, "new_hash", new_hash)
+        #silent = (new_hash == instance.hashed)
+        
+        #if not silent:
+            #instance.hashed = new_hash
+            
+        ### NOTE: 2021-08-19 16:17:23
+        ### check for change in contents
+        ##if silent is not False:
+            ##new_hash = gethash(new_value)
+            ##silent = (new_hash == instance.hashed)
+            ##print("%s: silent after hash" % instance.name, silent)
+            ##if not silent:
+                ##instance.hashed = new_hash
+    #except:
+        #traceback.print_exc()
+        ## if there is an error in comparing, default to notify
+        #silent = False
+        
+    #if silent is not True:
+        ## we explicitly compare silent to True just in case the equality
+        ## comparison above returns something other than True/False
+        #obj._notify_trait(instance.name, old_value, new_value)
 
 def _dynatrtyp_exec_body_(ns, setfn = enhanced_traitlet_set):
     #print("ns:", ns)
@@ -369,7 +424,7 @@ def dynamic_trait(x, *args, **kwargs):
     set_function: a function of the signature f(instance, obj, value)
         Optional, default is None
         
-        When None, the generated trait type uses the function enhanced_traitlet_set 
+        When None, the generated trait type uses the function standard_traitlet_set
         defined in this module.
         
         For details see traitlets.TraitType.set()
@@ -428,8 +483,9 @@ def dynamic_trait(x, *args, **kwargs):
         traitclass = (force_trait, )
         
     else:
+        traitclass = (Any,)
         # NOTE: 2021-08-20 12:22:12 For a finer granularity
-        traitclass = TRAITSMAP.get(myclass, (None, ))
+        #traitclass = TRAITSMAP.get(myclass, (None, ))
         
     if traitclass[0] is None:
         # NOTE: 2021-10-10 17:10:02
@@ -439,6 +495,7 @@ def dynamic_trait(x, *args, **kwargs):
         
     if not isfunction(set_function) or len(signature(set_function).parameters) != 3:
         set_function = enhanced_traitlet_set
+        #set_function = standard_traitlet_set
 
     exec_body_fn = partial(_dynatrtyp_exec_body_, setfn=set_function)
     
@@ -651,7 +708,7 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
     b) when an element in the list has changed (either a new value, or a new type)
     c) when the order of the elements has changed
     FIXME: 2022-01-29 15:22:27
-    This does do what is promised above.
+    This doesn't do what is promised above?
     TODO: Revisit this.
     See also FIXME/TODO:2022-01-29 13:29:19 in scipyen_traitlets module.
     """

@@ -32,7 +32,7 @@ import matplotlib.mlab as mlb
 import numpy as np
 import seaborn as sb
 
-from core.prog import safeWrapper
+from core.prog import (safeWrapper, timefunc, processtimefunc)
 from core.utilities import (summarize_object_properties,
                             standard_obj_summary_headers,
                             safe_identity_test,
@@ -608,7 +608,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             self.removeRowForVariable(name)
             
-        
+    #@timefunc
     def pre_execute(self):
         """Updates observed_vars DataBag
         """
@@ -619,10 +619,25 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         # need to withhold notifications here
         with self.observed_vars.hold_trait_notifications():
-            self.observed_vars.clear()
+            observed_set = set(self.observed_vars.keys())
+            cached_set = set(self.cached_vars)
             
-            self.observed_vars.update(self.cached_vars)
+            observed_not_cached = observed_set - cached_set
+            for var in observed_not_cached:
+                self.observed_vars.pop(var, None)
+                
+            #self.observed_vars.update(self.cached_vars)
+            #cached_not_observed = cached_set - observed_set
+            
+            #for var in cached_not_observed:
+                #self.observed_vars[var] = self.cached_vars[var]
+                    
+                    
+            #self.observed_vars.clear()
+            
+            #self.observed_vars.update(self.cached_vars)
         
+    #@timefunc
     def post_execute(self):
         """Updates workspace model AFTER kernel execution.
         Also takes into account:
