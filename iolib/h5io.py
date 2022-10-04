@@ -1006,7 +1006,27 @@ def makeAttrDict(**kwargs):
             
     return ret
 
-def fromEntityAttrs(attrs):
+def makeObjFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
+    """attempt to roundtrip of makeHDF5Entity
+    """
+    
+    # Brief reminder of what makeHDF5Entity does:
+    # 
+    # Object type      ->       Entity
+    # ---------------------------------
+    # 
+    #
+    #
+    #
+    attrs = attrs2dict(entity.attrs)
+    
+    if isinstance(entity, h5py.Group):
+        
+    else:
+        pass
+    
+    
+def attrs2dict(attrs):
     """Generates a dict object from a h5py Group or Dataset 'attrs' property.
     Not exactly a complete roundtrip...
     """
@@ -1153,8 +1173,7 @@ def makeEntryName(obj):
     
     return type(obj).__name__
     
-def makeObjAttrs(obj:typing.Any, 
-                   oname:typing.Optional[str]=None):#, parent:h5py.Group):
+def makeObjAttrs(obj:typing.Any, oname:typing.Optional[str]=None):
     """Generates name and attrs dict for a HDF5 entity
     
     Parameters:
@@ -2435,7 +2454,6 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
     return data
 
 @safeWrapper
-#@singledispatch
 def makeHDF5Entity(obj, group:h5py.Group,
                     name:typing.Optional[str]=None,
                     oname:typing.Optional[str]=None,
@@ -2622,7 +2640,7 @@ def makeHDF5Entity(obj, group:h5py.Group,
             return cached_entity
 
         data, categorical_info, pandas_dtypes = pandas2Structarray(obj)
-        #data, datadtype, categorical_info = pandas2Structarray(obj)
+
         entity = group.create_group(target_name,track_order=track_order)
         
         obj_entity = makeHDF5Dataset(data, entity, name="PandasData",
@@ -2630,8 +2648,6 @@ def makeHDF5Entity(obj, group:h5py.Group,
                                      chunks=chunks,
                                      track_order=track_order,
                                      entity_cache = entity_cache)
-        #obj_entity = entity.create_dataset("PandasData", data=data, compression=compression,
-                                     #chunks=chunks)
         
         if len(categorical_info):
             catgrp = makeHDF5Group(categorical_info, entity, name="PandasCategoricalInfo",
@@ -3136,4 +3152,12 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     return grp
     
     
+    
+def read_hdf5(h5file:h5py.File):
+    groups = [k for k in h5file.keys()]
+    if len(groups != 1):
+        raise RuntimeError("Expecting a single group in the h5py File; got %d instead" % len(groups))
+
+    root_name = groups[0]
+    root = h5file[groups[0]]
     
