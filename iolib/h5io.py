@@ -1045,7 +1045,7 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
         
     
     if isinstance(entity, h5py.Group):
-        expr = 
+        # expr = 
         pass
     else:
         pass
