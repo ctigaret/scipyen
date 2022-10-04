@@ -222,7 +222,7 @@ def is_convertible_to_numpy_array(s):
         try:
             a = np.array(s)
         except:
-            traceback_print_exc()
+            traceback.print_exc()
             ret = False
             
     return ret

@@ -1006,28 +1006,58 @@ def makeAttrDict(**kwargs):
             
     return ret
 
-def makeObjFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
-    """attempt to roundtrip of makeHDF5Entity
+def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
+    """attempt to round trip of makeHDF5Entity
     """
     
     # Brief reminder of what makeHDF5Entity does:
     # 
-    # Object type      ->       Entity
-    # ---------------------------------
-    # 
+    # Object type                       ->  Entity  Notes
+    # ------------------------------------------------------------------------
+    # <container> dict, list, deque         Group   The container's elements
+    #                                               are stored as children
+    #                                               which are either Group
+    #                                               or Dataset
     #
+    # <PODs> str, bytes, numpy ndarray
+    # and numpy structured array            Dataset
     #
+    # vigra.Kernel1D                        Dataset (via conversion to numpy
+    # vigra.Kernel2D                        array)
     #
+    # vigra.VigraArray
+    # neo DataObject (AnalogSignal etc)     Group   contains with at least two
+    #                                               Datasets, one for the array
+    #                                               data, and one for each array
+    #                                               axis
+    #
+    
     attrs = attrs2dict(entity.attrs)
     
-    if isinstance(entity, h5py.Group):
+    obj_type = attrs["__type_name__"]
+    
+    try:
+        python_class = eval(attrs["__python_class__"])
+    except:
+        traceback.print_exc()
+        raise
+    
         
+    
+    if isinstance(entity, h5py.Group):
+        expr = 
+        pass
     else:
         pass
     
     
-def attrs2dict(attrs):
+def attrs2dict(attrs:h5py.AttributeManager):
     """Generates a dict object from a h5py Group or Dataset 'attrs' property.
+    
+    Althogh one can simply call `dict(attrs)` or `dict(attrs.items())`, this
+    function also decodes the items of `attrs` to reverse the actions of 
+    makeObjAttrs and makeDataTypeAttrs
+    
     Not exactly a complete roundtrip...
     """
     ret = dict()
@@ -2464,12 +2494,15 @@ def makeHDF5Entity(obj, group:h5py.Group,
                     **kwargs) -> typing.Union[h5py.Group, h5py.Dataset]:
     """
     HDF5 entity  maker for Python objects.
+    Generates a HDF5 Group or Dataset (NOTE: a HDF5 File has overlapping API
+    with HDF5 Group).
     
     Parameters:
     -----------
-    obj: object A python object to be stored _as_ a HDF5 entity (Group or Dataset)
+    obj: object A python object to be stored as a HDF5 entity (Group or Dataset)
     
-    group: h5py.Group The HDF5 parent group, _where_ obj will be stored _as_ a HDF5 entity 
+    group: h5py.Group The HDF5 parent group, where obj will be stored as a HDF5 
+        entity 
         NOTE: this can be a h5py.File as well, opened for writing
         name: str, optional default is None:
             name of the entity which will contain obj data and will be created by
@@ -2512,15 +2545,15 @@ def makeHDF5Entity(obj, group:h5py.Group,
         
         
     NOTE: 2021-12-12 12:12:25
-    Objects are stored in 'group', typically as a child data set, or as a child 
-    group containing one or more data sets. These child entities are generated 
+    Objects are stored in 'group', typically as a child Dataset, or as a child 
+    Group containing one or more data sets. These child entities are generated 
     by delegating to 'makeHDF5Group' and 'makeHDF5Dataset', respectively, 
     according to the following general rule:
     
     * a container object (e.g., dict, list, deque) generates a child group 
         (via 'makeHDF5Group'), with the container's elements stored inside the 
         newly generated child group (either as a data set, or as a nested group,
-        according to the object's type AND this rule)    
+        according to the object's type AND the rules described here)    
     
     * str, bytes, bytearray, numpy ndarray (including numpy structured array) 
         objects are stored directly as data sets (via makeHDF5Dataset)
@@ -2532,11 +2565,14 @@ def makeHDF5Entity(obj, group:h5py.Group,
     rule. 
     
     Kernel1D, Kernel2D (vigra.filters):
-        These are converted to numpy array (see vigrautils.kernel2array) stored
-        stored as child dataset.
+        These are converted to numpy array (see vigrautils.kernel2array) then 
+        stored as child Dataset.
       
-    VigraArray (vigra) and neo's DataObjects (e.g., AnalogSignal, etc), 
-        stored as a group + main data set + axes data sets.
+    VigraArray (vigra) and neo's DataObjects (e.g., AnalogSignal, etc), are ALL
+        stored as a Group containing at least two Dataset objects:
+        1. a Dataset that stores the main data  
+        2. a Dataset for each axis, that stores the information for the 
+        correspondong array axis.
       
         The main data set stores the (typically, numeric) array data of the 
         object.
