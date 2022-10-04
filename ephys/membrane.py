@@ -51,7 +51,7 @@ import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.models as models
 import core.datatypes as dt
-import core.plots as plots
+import plots.plots as plots
 import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.quantities import units_convertible

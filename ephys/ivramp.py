@@ -34,7 +34,7 @@ import core.workspacefunctions as wf
 import core.datatypes as datatypes
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
-import core.plots as plots
+import plots.plots as plots
 import core.models as models
 import core.strutils as strutils
 import core.neoutils as neoutils
