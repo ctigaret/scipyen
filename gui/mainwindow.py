@@ -176,7 +176,7 @@ from core import scipyen_config as scipyenconf
 from core.scipyen_config import (markConfigurable, confuse, 
                                  saveWindowSettings, loadWindowSettings, )
 from core.scipyen_config import scipyen_config as scipyen_settings
-from core import plots as plots
+from plots import plots as plots
 from core import datatypes as dt
 from core import neoutils
 # also imports datetime & time; all become directly available in console, see 

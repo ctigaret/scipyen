@@ -628,7 +628,7 @@ import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.datatypes as dt
 from core.quantities import units_convertible
-import core.plots as plots
+import plots.plots as plots
 import core.models as models
 import core.triggerprotocols as tp
 from core.triggerevent import (TriggerEvent, TriggerEventType,)

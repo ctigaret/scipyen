@@ -211,7 +211,6 @@ import pyqtgraph as pg
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-#from . import plots
 from core.prog import safeWrapper
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.triggerevent import (TriggerEvent, TriggerEventType, )
@@ -1689,7 +1688,7 @@ def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
 @safeWrapper
 def plot_signal_vs_signal(x: typing.Union[neo.AnalogSignal, neo.Segment, neo.Block],
                           *args, **kwargs):
-    from . import plots
+    from plots import plots
     
     if isinstance(x, neo.Block):
         segment = kwargs.pop("segment", 0)

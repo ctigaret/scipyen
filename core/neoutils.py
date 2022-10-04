@@ -173,7 +173,7 @@ except:
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-#from . import plots
+
 from .prog import (safeWrapper, deprecation, 
                    filter_attr, filterfalse_attr,
                    filter_type, filterfalse_type,
