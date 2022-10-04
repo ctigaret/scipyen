@@ -1,4 +1,5 @@
-import pandas as pd
+import numpy as np
+import pandas as pd # for DataFrame, Series etc
 import seaborn as sb
 from six import string_types
 # from seaborn.external.six import string_types
@@ -715,144 +716,52 @@ class SB_PointPlotter(SB_CategoricalStatPlotter):
         if self.orient == "h":
             ax.invert_yaxis()
 
-# class SB_StripPlotter(sb.categorical._CategoricalScatterPlotter):
-#     """1-d scatterplot with categorical organization."""
-#     def __init__(self, x, y, hue, data, order, hue_order,
-#                  jitter, dodge, orient, color, palette):
-#         """Initialize the plotter."""
-#         self.establish_variables(x, y, hue, data, orient, order, hue_order)
-#         self.establish_colors(color, palette, 1)
+
+# def stripplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
+#               jitter=True, dodge=False, orient=None, color=None, palette=None,
+#               size=5, edgecolor="gray", linewidth=0, ax=None, 
+#               alpha=1, **kwargs):
+#     """Adapted from seaborn.stripplot
+#     
+#     Additional keyword arguments:
+#     ----------------------------
+#     add_legend (True)
+#     """
+#     
+#     add_legend=kwargs.pop("add_legend", True)
 # 
-#         # Set object attributes
-#         self.dodge = dodge
-#         self.width = .8
+#     if "split" in kwargs:
+#         dodge = kwargs.pop("split")
+#         msg = "The `split` parameter has been renamed to `dodge`."
+#         warnings.warn(msg, UserWarning)
 # 
-#         if jitter == 1:  # Use a good default for `jitter = True`
-#             jlim = 0.1
-#         else:
-#             jlim = float(jitter)
-#             
-#         if self.hue_names is not None and dodge:
-#             jlim /= len(self.hue_names)
-#             
-#         self.jitterer = stats.uniform(-jlim, jlim * 2).rvs
+#     #strip_jitter = kwargs.pop("strip_jitter", True)
+#     #strip_size = kwargs.pop("strip_size", 5)
+#     #strip_dodge = kwargs.pop("strip_dodge", dodge)
+#     #strip_edgecolor = kwargs.pop("strip_edgecolor", "gray")
+#     #strip_color = kwargs.pop("strip_color", color)
+#     #strip_palette = kwargs.pop("strip_palette", palette)
+#     #strip_linewidth = kwargs.pop("strip_linewidth", 0)
+#     #strip_alpha = kwargs.pop("strip_alpha", 1)
+#     #strip_legend = kwargs.pop("strip_legend", False)
 #         
-#     @property
-#     def hue_offsets(self):
-#         """A list of center positions for plots when hue nesting is used."""
-#         n_levels = len(self.hue_names)
-#         if isinstance(self.dodge, bool) and self.dodge:
-#             each_width = self.width / n_levels
-#             offsets = np.linspace(0, self.width - each_width, n_levels)
-#             offsets -= offsets.mean()
-#             
-#         elif isinstance(self.dodge, float):
-#             each_width = (self.width / n_levels) * self.dodge
-#             offsets = np.linspace(0, self.width - each_width, n_levels)
-#             offsets -= offsets.mean()
-#             
-#         else:
-#             offsets = np.zeros(n_levels)
+#     plotter = SB_StripPlotter(x, y, hue, data, order, hue_order,
+#                             jitter, dodge, orient, color, palette)
+#     if ax is None:
+#         ax = plt.gca()
 # 
-#         return offsets
+#     kwargs.setdefault("zorder", 3)
+#     size = kwargs.get("s", size)
+#     if linewidth is None:
+#         linewidth = size / 10
+#     if edgecolor == "gray":
+#         edgecolor = plotter.gray
+#     kwargs.update(dict(s=size ** 2,
+#                        edgecolor=edgecolor,
+#                        linewidth=linewidth))
 # 
-# 
-#     def draw_stripplot(self, ax, kws):
-#         """Draw the points onto `ax`."""
-#         # Set the default zorder to 2.1, so that the points
-#         # will be drawn on top of line elements (like in a boxplot)
-#         for i, group_data in enumerate(self.plot_data):
-#             if self.plot_hues is None or not self.dodge:
-# 
-#                 if self.hue_names is None:
-#                     hue_mask = np.ones(group_data.size, np.bool)
-#                 else:
-#                     hue_mask = np.array([h in self.hue_names
-#                                          for h in self.plot_hues[i]], np.bool)
-#                     # Broken on older numpys
-#                     # hue_mask = np.in1d(self.plot_hues[i], self.hue_names)
-# 
-#                 strip_data = group_data[hue_mask]
-# 
-#                 # Plot the points in centered positions
-#                 cat_pos = np.ones(strip_data.size) * i
-#                 cat_pos += self.jitterer(len(strip_data))
-#                 kws.update(c=self.point_colors[i][hue_mask])
-#                 if self.orient == "v":
-#                     ax.scatter(cat_pos, strip_data, **kws)
-#                 else:
-#                     ax.scatter(strip_data, cat_pos, **kws)
-# 
-#             else:
-#                 offsets = self.hue_offsets
-#                 for j, hue_level in enumerate(self.hue_names):
-#                     hue_mask = self.plot_hues[i] == hue_level
-#                     strip_data = group_data[hue_mask]
-# 
-#                     # Plot the points in centered positions
-#                     center = i + offsets[j]
-#                     cat_pos = np.ones(strip_data.size) * center
-#                     cat_pos += self.jitterer(len(strip_data))
-#                     kws.update(c=self.point_colors[i][hue_mask])
-#                     if self.orient == "v":
-#                         ax.scatter(cat_pos, strip_data, **kws)
-#                     else:
-#                         ax.scatter(strip_data, cat_pos, **kws)
-# 
-#     def plot(self, ax, kws, add_legend=True):
-#         """Make the plot."""
-#         self.draw_stripplot(ax, kws)
-#         if add_legend:
-#             self.add_legend_data(ax)
-#         self.annotate_axes(ax)
-#         if self.orient == "h":
-#             ax.invert_yaxis()
-
-def stripplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
-              jitter=True, dodge=False, orient=None, color=None, palette=None,
-              size=5, edgecolor="gray", linewidth=0, ax=None, 
-              alpha=1, **kwargs):
-    """Adapted from seaborn.stripplot
-    
-    Additional keyword arguments:
-    ----------------------------
-    add_legend (True)
-    """
-    
-    add_legend=kwargs.pop("add_legend", True)
-
-    if "split" in kwargs:
-        dodge = kwargs.pop("split")
-        msg = "The `split` parameter has been renamed to `dodge`."
-        warnings.warn(msg, UserWarning)
-
-    #strip_jitter = kwargs.pop("strip_jitter", True)
-    #strip_size = kwargs.pop("strip_size", 5)
-    #strip_dodge = kwargs.pop("strip_dodge", dodge)
-    #strip_edgecolor = kwargs.pop("strip_edgecolor", "gray")
-    #strip_color = kwargs.pop("strip_color", color)
-    #strip_palette = kwargs.pop("strip_palette", palette)
-    #strip_linewidth = kwargs.pop("strip_linewidth", 0)
-    #strip_alpha = kwargs.pop("strip_alpha", 1)
-    #strip_legend = kwargs.pop("strip_legend", False)
-        
-    plotter = SB_StripPlotter(x, y, hue, data, order, hue_order,
-                            jitter, dodge, orient, color, palette)
-    if ax is None:
-        ax = plt.gca()
-
-    kwargs.setdefault("zorder", 3)
-    size = kwargs.get("s", size)
-    if linewidth is None:
-        linewidth = size / 10
-    if edgecolor == "gray":
-        edgecolor = plotter.gray
-    kwargs.update(dict(s=size ** 2,
-                       edgecolor=edgecolor,
-                       linewidth=linewidth))
-
-    plotter.plot(ax, kwargs, add_legend=add_legend)
-    return ax, plotter
+#     plotter.plot(ax, kwargs, add_legend=add_legend)
+#     return ax, plotter
 
 def swarmplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
               dodge=False, orient=None, color=None, palette=None,
