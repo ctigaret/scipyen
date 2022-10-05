@@ -1084,21 +1084,20 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
     #                                               data is ascii then the 
     #                                               dataset has the dtype h5py.string_dtype
                                                 
-    
-    
-        
     attrs = attrs2dict(entity.attrs)
     
     
     try:
+        type_name = attrs["__type_name__"]
+        python_class = attrs["__python_class__"]
+        python_class_comps = python_class.split(".")
         module_name = attrs["__module_name__"]
         module_name_comps = module_name.split(".")
+        
         if module_name_comps[0] == "builtins":
-            target_class = eval(attrs["__type_name__"])
+            target_class = eval(type_name)
         else:
             try:
-                python_class_comps = attrs["__python_class__"].split(".")
-                
                 # print(module_name in sys.modules)
                 if module_name_comps[0] not in sys.modules:
                     print(f"importing {module_name_comps[0]} for {module_name}")
@@ -1114,14 +1113,16 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             except:
                 print(f"in entity {entity}")
                 print(f"module_name = {module_name}")
-                print(f"python_class = {attrs['__python_class__']}")
-                print(f"type_name = {attrs['__type_name__']}")
+                print(f"python_class = {python_class}")
+                print(f"type_name = {type_name}")
                 traceback.print_exc()
                 raise
             
     except:
         traceback.print_exc()
         raise
+    
+    print(f"target_class: {target_class}")
     
     if isinstance(entity, h5py.Dataset):
         if len(entity.shape) == 0: 
@@ -1145,6 +1146,43 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             obj = target_class()
             for k in entity.keys():
                 obj[k] = objectFromEntity(entity[k])
+                
+        elif list in mro:
+            obj = target_class()
+            for k in entity.keys():
+                obj.append(objectFromEntity(entity[k]))
+                
+        elif "neo.core.spiketrain.SpikeTrain" in python_class:
+            # search for a child dataset with name set as this group's name and
+            # suffixed with "_data"
+            obj = target_class # for now
+            data_set_name = "".join([entity.name.split('/')[-1], "_data"])
+            data_set = entity[data_set_name] if data_set_name in entity else None
+            waveforms_set_name = "".join([entity.name.split('/')[-1], "_waveforms"])
+            waveforms_set = entity[waveforms_set_name] if waveforms_set_name in entity else None
+            
+            axes_group_name = "".join([entity.name.split('/')[-1], "_axes"])
+            axes_group = entity[axes_group_name] if axes_group_name in entity else None
+            
+            annotations_group_name = "".join([entity.name.split('/')[-1], "_annotations"])
+            annotations_group = entity[annotations_group_name] if annotations_group_name in entity else None
+            
+            if data_set is None or data_set.shape is None:
+                # empty SpikeTrain
+                obj = neo.SpikeTrain([], t_stop = 0*pq.s, units = pq.s)
+                
+            else:
+                times = np.array(data_set)
+                
+                if axes_group is not None:
+                    pass # TODO: iterate axes NOTE: for non-signal DataObject there is only one axis
+                
+                if annotations_group is not None:
+                    train_annotations = objectFromEntity(annotations_group)
+                    
+            
+            
+            
         else:
             obj = target_class # for now
 
@@ -1907,7 +1945,7 @@ def _(obj, axisindex:int):
         
         ret = makeNeoSignalAxisDict(obj, axisindex)
         
-    else: # data objects that are NOT base signals
+    else: # data objects that are NOT base signals; these include SpikeTrain!!!
         array_annotations = getattr(obj,"array_annotations", None)
         if isinstance(array_annotations, ArrayDict) and len(array_annotations): # this is the number of fields NOT channels!
             # NOTE: skip silently is length different for obj size on axis 1
@@ -2814,7 +2852,7 @@ def makeHDF5Entity(obj, group:h5py.Group,
         # NOTE: 2021-11-21 12:49:10
         # obj_entity is a h5py.Group
         # for vigra.VigraArray and neo.core.dataobject.DataObject objects !!!
-        # see dispatched versions of makeHDF5Dataset
+        # see single dispatched versions of makeHDF5Dataset
         obj_entity = makeHDF5Dataset(obj, entity, name=target_name, 
                                        compression = compression,
                                        chunks = chunks, 
@@ -2827,7 +2865,7 @@ def makeHDF5Entity(obj, group:h5py.Group,
         # segment representations in the parent group
         #
         if hasattr(obj, "segment"): 
-            # we expicitly check for a 'segment' attribute first, because 
+            # we explicitly check for a 'segment' attribute first, because 
             # getattr(x,"segment", None) effectively bypasses this (i.e. it 
             # behaves as 'x' had this attribute albeit set to None
             parent_segment = getattr(obj, "segment")
@@ -2839,7 +2877,7 @@ def makeHDF5Entity(obj, group:h5py.Group,
                     entity["segment"] = parent_segment_entity
                     
                 # NOTE: 2021-11-24 14:35:03
-                # Since segment if a reference to the containing segment it is OK
+                # Since segment is a reference to the containing segment it is OK
                 # if it doesn't show up in here; we just want to store a reference
                 # to it, if possible
             
@@ -3103,6 +3141,10 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     # NOTE: 2021-11-20 13:39:52
     # waveforms of the neo.SpikeTrain objects should go into the main data object
     # group
+    #
+    # NOTE: 2022-10-05 23:29:51
+    # since just before neo 0.11.0 Spiketraisn also have a "left_sweep" attribute
+    # which is takec care of by makeAxisScale/makeNeoDataAxisDict
     waveforms = getattr(obj, "waveforms", None)
     if isinstance(waveforms, np.ndarray) and waveforms.size > 0:
         waveforms_dset = makeHDF5Entity(waveforms, group, 

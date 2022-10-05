@@ -2928,7 +2928,6 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
                      resample_with_rate:(pq.Quantity, type(None)) = None,
                      Itimes_relative:bool = True,
                      Itimes_samples:bool=False):
-
     """
     Extract the time slice of the VM corresponding to a current injection step.
     
@@ -4638,6 +4637,8 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
     
     return ret
 
+
+
 def analyse_AP_step_injection_series(data, **kwargs):
     """ Action potential (AP) detection and analysis in I-clamp experiment.
     
@@ -4773,7 +4774,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         (plots the fitted curve) -- useful when a block or a list of segments is
         analyzed 
         
-    Var-keyword parameters passed on to analyse_AP_step_injection():
+    Var-keyword parameters passed on to analyse_AP_step_injection_sweep():
     ----------------------------------------------------------------
     tail: scalar Quantity (units: "s"); default is 0 s
         duration of the analyzed Vm trace after current injection has ceased
@@ -4924,7 +4925,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         for other fast-rising events)
         
 
-    NOTE: See analyse_AP_step_injection() documentation for details
+    NOTE: See analyse_AP_step_injection_sweep() documentation for details
     
     Var-keyword parameters related to the experiment "metadata"
     -----------------------------------------------------------
@@ -4968,13 +4969,13 @@ def analyse_AP_step_injection_series(data, **kwargs):
             
             "Name": the name of the kth segment
             
-            "AP_analysis": the result returned by calling analyse_AP_step_injection on
+            "AP_analysis": the result returned by calling analyse_AP_step_injection_sweep on
                 the kth segment
             
             "Vm_signal": the region of the Vm signal in the kth segment, that 
                 has been analyzed (possibly, upsampled); this corresponds to the
                 current injection step or longer as specified by the "tail" 
-                parameter to the analyse_AP_step_injection function, so it is usually only
+                parameter to the analyse_AP_step_injection_sweep function, so it is usually only
                 a time slice of the original Vm signal.
         
         ret["Injected_current"] : neo.IrregularlySampledSignal
@@ -5231,7 +5232,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
             else:
                 im = ImSignal
                 
-            step_result, vstep = analyse_AP_step_injection(segment, ImSignal = im, 
+            step_result, vstep = analyse_AP_step_injection_sweep(segment, ImSignal = im, 
                                                            Itimes_relative = Itimes_relative,
                                                            Itimes_samples = Itimes_samples,
                                                            **kwargs)
@@ -5469,7 +5470,7 @@ def test_for_rheobase_latency(data, minsteps=3):
                 neo.IrregularlySampledSignal objects
         
             "Depolarising_steps" is a list of dictionaries as output by a call
-                to analyse_AP_step_injection().
+                to analyse_AP_step_injection_sweep().
         
     b) The number of "Depolarising_steps" with at least one AP detected >= minsteps
         
@@ -5666,7 +5667,7 @@ def report_AP_analysis(data, name=None):
     
     return summary, params, waveforms
 
-def analyse_AP_step_injection(segment, 
+def analyse_AP_step_injection_sweep(segment, 
                               VmSignal:typing.Union[int, str] = "Vm_prim_1", 
                               ImSignal:typing.Union[int, str, tuple] = "Im_sec_1", 
                               Itimes_relative:bool = True,
@@ -6003,7 +6004,7 @@ def analyse_AP_step_injection(segment,
         # first AP;
         # time of the end of last AP is time of start of last AP + last AP duration at Vonset
         
-        #print("analyse_AP_step_injection for Iinj %g: ap_train[-1]: %g, AP_durations_V_onset[-1]: %g, ap_train[0]: %g" % (Iinj, ap_train[-1], ap_train.annotations["AP_durations_V_onset"][-1], ap_train[0]))
+        #print("analyse_AP_step_injection_sweep for Iinj %g: ap_train[-1]: %g, AP_durations_V_onset[-1]: %g, ap_train[0]: %g" % (Iinj, ap_train[-1], ap_train.annotations["AP_durations_V_onset"][-1], ap_train[0]))
         mean_ap_freq  = ( len(ap_train) / ( ap_train[-1] - ap_train[0] ) ).rescale(pq.Hz)
         # why do I sometimes get np.nan here ?
         # because you need to also provide a tail in case the last AP is right on the end of the Vm signal!
