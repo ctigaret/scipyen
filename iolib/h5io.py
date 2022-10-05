@@ -556,7 +556,7 @@ mammal lion     80.5     run
 
 
 import os, sys, tempfile, traceback, warnings, numbers, datetime, enum
-import types, typing, inspect, functools, itertools
+import types, typing, inspect, functools, itertools, importlib
 from functools import (partial, singledispatch)
 from pprint import (pprint, pformat)
 import collections, collections.abc
@@ -647,6 +647,9 @@ __DEBUG__=False
 
 class HDFDataError(Exception):
     pass
+
+def dataset2string(d:h5py.Dataset):
+    return np.atleast_1d(d)[0].decode("utf-8")
 
 def pandasDtype2HF5Dtype(dtype, col, categorical_info:dict=None):
     """Helper function for pandas2Structarray.
@@ -851,6 +854,38 @@ def getCachedEntity(cache:dict, obj:typing.Any):
 def printHdf(v):
     return v if isinstance(v, str) else v.decode() if isinstance(v, bytes) else v[()]
 
+def h5pyIterator(g:h5py.Group, prefix:str='',
+                 entity_cache:typing.Optional[dict]=None):
+    """HDF5 Group traverser.
+    
+    See Answer 1 in 
+    https://stackoverflow.com/questions/50117513/can-you-view-hdf5-files-in-pycharm
+    
+    Moved outside of exploreHDF ("traverse_datasets") to be widely accessible
+    
+    Parameters:
+    ===========
+    g:h5py.Group (this can also be a h5py.File).
+        It is the responsibility of the caller to manage `g` (e.g. close it, if
+        it is a File object).
+        
+    prefix:str, optional default is ""; name of the parent
+    
+    """
+    for key in g.keys():
+        item = g[key]
+        path = '{}/{}'.format(prefix, key)
+        if isinstance(item, h5py.Dataset): # test for dataset
+            #yield (path, item)
+            return objectFromEntity(item)
+            # yield (path, item, item.attrs)
+        elif isinstance(item, h5py.Group): # test for group (go down)
+            print(f"Group '{item.name}' attributes:")
+            for k,v in item.attrs.items():
+                print(f"\t{k}: {printHdf(v)}")
+            #pprint(dict(item.attrs))
+            yield from h5pyDatasetIterator(item, path)
+            
 def h5pyDatasetIterator(g:h5py.Group, prefix:str=''):
     """HDF5 Group traverser.
     
@@ -900,13 +935,24 @@ def exploreHDF(hdf_file:typing.Union[str, h5py.Group]):
         for k,v in attrs.items():
             print(f"\t{k}: {printHdf(v)}")
         print("\n")
-        if len(dset.dims):
-            print("with dimension scales:")
-            for kd, dim in enumerate(dset.dims):
-                print(f"\tdimension {kd}:")
-                for k,v in dim.items():
-                    print(f"\t\t{k}: {printHdf(v)}, (type: {type(v)}, dtype: {v.dtype.kind})")
+        try:
+            for kd, dim in enumerate(dest.dims):
+                print(f"\t\t{k}: {printHdf(v)}, (type: {type(v)}, dtype: {v.dtype.kind})")
             print("\n")
+        except:
+            print(f"cannot read dimension scales in {dset.name}")
+            pass
+                
+        # print(h5py.h5ds.get_num_scales(dset))
+        
+        # dimscales = [(k, d) for k, d in enumerate(dset.dims)]
+        # if len(dimscales):
+        #     print("with dimension scales:")
+        #     for kd, dim in dimscales:
+        #         print(f"\tdimension {kd}:")
+        #         for k,v in dim.items():
+        #             print(f"\t\t{k}: {printHdf(v)}, (type: {type(v)}, dtype: {v.dtype.kind})")
+        #     print("\n")
 
     if isinstance(hdf_file, str):
         if os.path.isfile(hdf_file):
@@ -1031,25 +1077,80 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
     #                                               data, and one for each array
     #                                               axis
     #
+    # bytes, bytearray                      Dataset stored by the way of a
+    #                                               numpy array
+    #                                   
+    #                                               If the bytes or bytearray
+    #                                               data is ascii then the 
+    #                                               dataset has the dtype h5py.string_dtype
+                                                
     
+    
+        
     attrs = attrs2dict(entity.attrs)
     
-    obj_type = attrs["__type_name__"]
     
     try:
-        python_class = eval(attrs["__python_class__"])
+        module_name = attrs["__module_name__"]
+        module_name_comps = module_name.split(".")
+        if module_name_comps[0] == "builtins":
+            target_class = eval(attrs["__type_name__"])
+        else:
+            try:
+                python_class_comps = attrs["__python_class__"].split(".")
+                
+                # print(module_name in sys.modules)
+                if module_name_comps[0] not in sys.modules:
+                    print(f"importing {module_name_comps[0]} for {module_name}")
+                    pymodule = importlib.import_module(module_name_comps[0])
+                    
+                else:
+                    pymodule = sys.modules[module_name_comps[0]]
+
+                # NOTE: 2022-10-05 18:40:53
+                # this doesn't work if the module is imported under an alias
+                target_class = eval(".".join(python_class_comps[1:]), pymodule.__dict__)
+                    
+            except:
+                print(f"in entity {entity}")
+                print(f"module_name = {module_name}")
+                print(f"python_class = {attrs['__python_class__']}")
+                print(f"type_name = {attrs['__type_name__']}")
+                traceback.print_exc()
+                raise
+            
     except:
         traceback.print_exc()
         raise
     
-        
-    
-    if isinstance(entity, h5py.Group):
-        # expr = 
-        pass
+    if isinstance(entity, h5py.Dataset):
+        if len(entity.shape) == 0: 
+            # no axes imply no Dataset dimscales either
+            # most likely a scalar and therefore we attempt to instantiate
+            # one as such
+            if target_class == bool:
+                obj = target_class(entity)
+            elif target_class == str:
+                obj = dataset2string(entity)
+                
+            else:
+                obj = target_class
+        else:
+            obj = target_class # for now
+            
     else:
-        pass
-    
+        mro = inspect.getmro(target_class)
+        print(f"mro {mro}")
+        if dict in mro:
+            obj = target_class()
+            for k in entity.keys():
+                obj[k] = objectFromEntity(entity[k])
+        else:
+            obj = target_class # for now
+
+    return obj
+
+# def generateObject(klass, )
     
 def attrs2dict(attrs:h5py.AttributeManager):
     """Generates a dict object from a h5py Group or Dataset 'attrs' property.
@@ -2841,12 +2942,6 @@ def makeHDF5Dataset(obj, group: h5py.Group, name:typing.Optional[str]=None,
     if isinstance(name, str) and len(name.strip()):
         target_name = name
 
-    #cached_entity = getCachedEntity(entity_cache, obj)
-    
-    #if isinstance(cached_entity, h5py.Dataset):
-        #group[target_name] = cached_entity # make a hard link
-        #return cached_entity
-        
     dset = makeDataset(obj, group, obj_attrs, target_name, 
                         compression = compression, chunks = chunks,
                         track_order = track_order, entity_cache = entity_cache)
