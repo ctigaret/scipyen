@@ -1069,6 +1069,57 @@ def group2neoSignal(g, target_class):
     # DataSignal, IrregularlySampledDataSignal
     # ImageSequencene.
     attrs = attr2dict(g.attrs)
+    name = attrs.get("__name__", None)
+    # TODO/FIXME: 2022-10-06 09:04:15
+    # in this case the segment property is a reference to the neo.Segment
+    # where the spike train was originally defined
+    #
+    # this may be in a different file / data object, in which case
+    # that reference sems to have been lost
+    # (it is funny, though, as in the pickle version this segment 
+    # AND its contents ARE saved (as a serialized copy) into the pickle)
+    # which is probably the reason why the pickle containing the 
+    # spike train on its owmn is actually LARGER than the pickle 
+    #  containing the original segment, see the sxample files in 
+    # analysis_Bruker_22i21)
+    segment = attrs.get("__segment__", None)
+    if segment in ["__ref__", "null"]:
+        segment = None
+    description = attrs.get("__description__", None)
+    units = attrs.get("__units__", pq.s)
+    name = attrs.get("__name__", "")
+    file_origin = attrs.get("__file_origin__", None)
+    description = attrs.get("__description__", None)
+    
+    data_set_name = f"{g.name.split('/')[-1]}_data"
+    # data_set_name = "".join([g.name.split('/')[-1], "_data"])
+    data_set = g.get(data_set_name, None)
+    
+    axes_group_name = f"{g.name.split('/')[-1]}_axes"
+    # axes_group_name = "".join([g.name.split('/')[-1], "_axes"])
+    axes_group = g.get(axes_group_name, None)
+    
+    signal = []
+    ax0 = dict()
+    ax0["t_start"] = 0.*units
+    ax0["sampling_rate"] = 1.*pq.Hz
+    ax0["name"] = "Time"
+    ax0["key"] = "T"
+    
+    ax1 = dict() # TODO 2022-10-06 23:50:44
+    ax1["channel_ids"] = 0
+    ax1["channel_names"] = ""
+    
+    
+    if isinstance(data_set, h5py.Dataset):
+        signal = np.array(data_set)
+        
+        if isinstance(axes_grop, h5py.Group):
+            ax0g = axes_group.get("axis_0", None)
+            if isinstance(ax0g, h5py.Dataset):
+                ax0["t_start"] = ax0attrs.get("__origin__", 0.*units)
+                ax0["name"] = ax0attrs.get("__name__", None)
+                ax0["sampling_rate"] = ax0attrs.get("__sampling_rate__", 1.*pq.Hz)
     
 
 def group2neoDataObject(g, target_class):
@@ -1104,8 +1155,6 @@ def group2neoDataObject(g, target_class):
         labels = objectFromEntity(labels_set)
     else:
         labels = None
-    
-    
     
     annotations_group_name = f"{g.name.split('/')[-1]}_annotations"
     # annotations_group_name = "".join([g.name.split('/')[-1], "_annotations"])
@@ -1167,27 +1216,28 @@ def group2neoDataObject(g, target_class):
                            file_origin=file_origin, description = description)
     
     elif target_class == neo.Event:
-        pass
+        return target_class # TODO
     
     elif target_class == neo.Epoch:
-        pass
+        return target_class # TODO
     
     elif target_class == DataZone:
-        pass
+        return target_class # TODO
     
     elif DataMark in inspect.getmro(target_class):
         mark_type = entity.name.split("/")[-1]
         if target_class == TriggerEvent:
+            etype = TriggerEventType[mark_type]
+        else:
+            etype = MarkType[mark_type]
             
-            obj = TriggerEvent(times=times, labels=labels, units=units,name=name,
-                               description=description,file_origin=file_origin,
-                               event_type = TriggerEventType[mark_type])
-            obj.segment = segment
-            return obj
+        obj = target_class(times=times, labels=labels, units=units,name=name,
+                            description=description,file_origin=file_origin,
+                            event_type = etype)
         
+    else:
+        raise NotImplementedError(f"{target_class} if not yet supported")
         
-        pass
-    
     obj.annotations.update(annotations)
     obj.segment = segment
     
@@ -1207,7 +1257,7 @@ def group2neo(g:h5py.Group, target_class:type):
     elif neo.core.container.Container in mro:
         return group2neoContainer(g, target_class)
     elif target_class == neo.ChannelView:
-        pass # TODO
+        return target_class # TODO
     else:
         raise typeError(f"Don't know how to manage {target_class}")
             
@@ -1348,143 +1398,146 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             for k in entity.keys():
                 obj.append(objectFromEntity(entity[k]))
                 
-        elif ".".join([target_class.__module__, target_class.__name__]) == "neo.core.spiketrain.SpikeTrain":
-            # search for a child dataset with name set as this group's name and
-            # suffixed with "_data"
-            # obj = target_class # for now
-            
-            data_set_name = "".join([entity.name.split('/')[-1], "_data"])
-            data_set = entity[data_set_name] if data_set_name in entity else None
-            
-            axes_group_name = "".join([entity.name.split('/')[-1], "_axes"])
-            axes_group = entity[axes_group_name] if axes_group_name in entity else None
-            
-            annotations_group_name = "".join([entity.name.split('/')[-1], "_annotations"])
-            annotations_group = entity[annotations_group_name] if annotations_group_name in entity else None
-            
-            waveforms_set_name = "".join([entity.name.split('/')[-1], "_waveforms"])
-            waveforms_set = entity[waveforms_set_name] if waveforms_set_name in entity else None
-            
-            # NOTE: 2022-10-06 09:00:26
-            # THIS below is the spike train's name!
-            train_name = attrs.get("__name__", None)
-            
-            # train_unit = attrs.get("__unit__", None) # not sure this even exists in neo API anymore...
+        elif neo.core.baseneo.BaseNeo in inspect.getmro(target_class):
+            obj = group2neo(entity, target_class)
                 
-            # TODO/FIXME: 2022-10-06 09:04:15
-            # in this case the segment property is a reference to the neo.Segment
-            # where the spike train was originally defined
-            #
-            # this may be in a different file / data object, in which case
-            # that reference sems to have been lost
-            # (it is funny, though, as in the pickle version this segment 
-            # AND its contents ARE saved (as a serialized copy) into the pickle)
-            # which is probably the reason why the pickle containing the 
-            # spike train on its owmn is actually LARGER than the pickle 
-            #  containing the original segment, see the sxample files in 
-            # analysis_Bruker_22i21)
-            train_segment = attrs.get("__segment__", None)
-            
-            # NOTE: 2022-10-06 08:21:35
-            # Prepare an empty SpikeTrain in case something goes awry
-            # We will construct the real thing below
-            #
-            # NOTE 2022-10-06 08:28:07: mandatory arguments for the c'tor are:
-            # times
-            # t_stop
-            # units (if neither times nor t_stop is a quantity)
-            obj = neo.SpikeTrain([], t_stop = 0*pq.s, units = pq.s)
-            # if data_set is None or data_set.shape is None:
-                # empty SpikeTrain
-                
-            if data_set is not None and data_set.shape is not None:
-                times = np.array(data_set)
-                
-                if axes_group is not None:
-                    # TODO: 2022-10-06 10:31:02 factor out in parseAxesGroup()
-                    # NOTE: 2022-10-06 10:31:07 iterate axes 
-                    # NOTE: for non-signal DataObject there is only one axis !!!
-                    # NOTE: Furthermore, this axis is empty (acts like a tag)
-                    #       but its attrs property contains the relevant data:
-                    #       expected to be present there (names mangled with '__'):
-                    #       origin -> t_start
-                    #       name
-                    #       left_sweep
-                    #       sampling_rate
-                    #       units
-                    #       end ->t_stop
-                    #       
-                    #       The following are NOT used by SpikeTrain:
-                    #       key -> str
-                    #       
-                    #       The following SpikeTrain properties are NOT stored
-                    #       in h5 data but we check for them:
-                    #
-                    #       sort (bool)
-                    #
-                    # NOTE: 2022-10-06 10:32:52 
-                    # general comment for DataObjects axis groups:
-                    # some of the members of the axis data set attributes are
-                    # redundant with some fo these being reserved for later 
-                    # (unspecified) use e.g. "__name__" , "__units__", etc, and 
-                    # their information can sometimes be inferred from the concrete 
-                    # type of DataObject
-                    #
-                    # Also, NOTE that properties like "units" are stored in attrs
-                    # as json objects (hence why the use of attrs2dict is recommended
-                    # instead of dict(attrs))
-                    #
-                    if "axis_0" in axes_group:
-                        axis_set = axes_group["axis_0"]
-                        
-                        # NOTE: 2022-10-06 08:23:37
-                        # this none below should do most of the conversions for us
-                        #
-                        axis_attributes = attrs2dict(axis_set.attrs)
-                        t_stop = axis_attributes["__end__"] # this one MUST be present
-                        t_start = axis_attributes.get("__origin__", 0.)
-                        sampling_rate = axis_attributes.get("__sampling_rate__", None)
-                        units = axis_attributes.get("__units__", pq.s) # just make sure we have units
-                        name = axis_attributes.get("__name__",None)
-                        left_sweep = axis_attributes.get("__left_sweep__", None)
-                        key = axis_attributes.get("__key__", "")
-                            
-                        file_origin = axis_attributes.get("__file_origin__", None)
-                        description = axis_attributes.get("__description__", None)
-                        
-                    else:
-                        # NOTE: 2022-10-06 08:30:25
-                        # supply reasonable defaults
-                        units = pq.s
-                        t_start = times[0]
-                        t_stop = times[-1] # by default
-                        name = None
-                        key = ""
-                        sampling_rate = 1.*pq.Hz
-                        left_sweep = None
-                        file_origin = None
-                        description = None
-                        
-                if annotations_group is not None:
-                    train_annotations = objectFromEntity(annotations_group)
-                else:
-                    train_annotations = dict()
-            
-                if waveforms_set is not None:
-                    waveforms = np.array(waveforms_set)
-                else:
-                    waveforms = None
-                    
-                obj = neo.SpikeTrain(times, t_stop, units=units, t_start=t_start,
-                                     sampling_rate=sampling_rate, 
-                                     left_sweep=left_sweep, name=train_name,
-                                     waveforms=waveforms, file_origin=file_origin,
-                                     description = description)  
-                
-                # obj.unit = train_unit
-                obj.segment = train_segment
-                obj.annotations.update(train_annotations) # safer that via c'tor above
-                
+#         elif ".".join([target_class.__module__, target_class.__name__]) == "neo.core.spiketrain.SpikeTrain":
+#             # search for a child dataset with name set as this group's name and
+#             # suffixed with "_data"
+#             # obj = target_class # for now
+#             
+#             data_set_name = "".join([entity.name.split('/')[-1], "_data"])
+#             data_set = entity.get(data_set_name, None)
+#             
+#             axes_group_name = "".join([entity.name.split('/')[-1], "_axes"])
+#             axes_group = entity.get(axes_group_name, None)
+#             
+#             annotations_group_name = "".join([entity.name.split('/')[-1], "_annotations"])
+#             annotations_group = entity.get(annotations_group_name, None)
+#             
+#             waveforms_set_name = "".join([entity.name.split('/')[-1], "_waveforms"])
+#             waveforms_set = entity[waveforms_set_name] if waveforms_set_name in entity else None
+#             
+#             # NOTE: 2022-10-06 09:00:26
+#             # THIS below is the spike train's name!
+#             train_name = attrs.get("__name__", None)
+#             
+#             # train_unit = attrs.get("__unit__", None) # not sure this even exists in neo API anymore...
+#                 
+#             # TODO/FIXME: 2022-10-06 09:04:15
+#             # in this case the segment property is a reference to the neo.Segment
+#             # where the spike train was originally defined
+#             #
+#             # this may be in a different file / data object, in which case
+#             # that reference sems to have been lost
+#             # (it is funny, though, as in the pickle version this segment 
+#             # AND its contents ARE saved (as a serialized copy) into the pickle)
+#             # which is probably the reason why the pickle containing the 
+#             # spike train on its owmn is actually LARGER than the pickle 
+#             #  containing the original segment, see the sxample files in 
+#             # analysis_Bruker_22i21)
+#             train_segment = attrs.get("__segment__", None)
+#             
+#             # NOTE: 2022-10-06 08:21:35
+#             # Prepare an empty SpikeTrain in case something goes awry
+#             # We will construct the real thing below
+#             #
+#             # NOTE 2022-10-06 08:28:07: mandatory arguments for the c'tor are:
+#             # times
+#             # t_stop
+#             # units (if neither times nor t_stop is a quantity)
+#             obj = neo.SpikeTrain([], t_stop = 0*pq.s, units = pq.s)
+#             # if data_set is None or data_set.shape is None:
+#                 # empty SpikeTrain
+#                 
+#             if data_set is not None and data_set.shape is not None:
+#                 times = np.array(data_set)
+#                 
+#                 if axes_group is not None:
+#                     # TODO: 2022-10-06 10:31:02 factor out in parseAxesGroup()
+#                     # NOTE: 2022-10-06 10:31:07 iterate axes 
+#                     # NOTE: for non-signal DataObject there is only one axis !!!
+#                     # NOTE: Furthermore, this axis is empty (acts like a tag)
+#                     #       but its attrs property contains the relevant data:
+#                     #       expected to be present there (names mangled with '__'):
+#                     #       origin -> t_start
+#                     #       name
+#                     #       left_sweep
+#                     #       sampling_rate
+#                     #       units
+#                     #       end ->t_stop
+#                     #       
+#                     #       The following are NOT used by SpikeTrain:
+#                     #       key -> str
+#                     #       
+#                     #       The following SpikeTrain properties are NOT stored
+#                     #       in h5 data but we check for them:
+#                     #
+#                     #       sort (bool)
+#                     #
+#                     # NOTE: 2022-10-06 10:32:52 
+#                     # general comment for DataObjects axis groups:
+#                     # some of the members of the axis data set attributes are
+#                     # redundant with some fo these being reserved for later 
+#                     # (unspecified) use e.g. "__name__" , "__units__", etc, and 
+#                     # their information can sometimes be inferred from the concrete 
+#                     # type of DataObject
+#                     #
+#                     # Also, NOTE that properties like "units" are stored in attrs
+#                     # as json objects (hence why the use of attrs2dict is recommended
+#                     # instead of dict(attrs))
+#                     #
+#                     if "axis_0" in axes_group:
+#                         axis_set = axes_group["axis_0"]
+#                         
+#                         # NOTE: 2022-10-06 08:23:37
+#                         # this none below should do most of the conversions for us
+#                         #
+#                         axis_attributes = attrs2dict(axis_set.attrs)
+#                         t_stop = axis_attributes["__end__"] # this one MUST be present
+#                         t_start = axis_attributes.get("__origin__", 0.)
+#                         sampling_rate = axis_attributes.get("__sampling_rate__", None)
+#                         units = axis_attributes.get("__units__", pq.s) # just make sure we have units
+#                         name = axis_attributes.get("__name__",None)
+#                         left_sweep = axis_attributes.get("__left_sweep__", None)
+#                         key = axis_attributes.get("__key__", "")
+#                             
+#                         file_origin = axis_attributes.get("__file_origin__", None)
+#                         description = axis_attributes.get("__description__", None)
+#                         
+#                     else:
+#                         # NOTE: 2022-10-06 08:30:25
+#                         # supply reasonable defaults
+#                         units = pq.s
+#                         t_start = times[0]
+#                         t_stop = times[-1] # by default
+#                         name = None
+#                         key = ""
+#                         sampling_rate = 1.*pq.Hz
+#                         left_sweep = None
+#                         file_origin = None
+#                         description = None
+#                         
+#                 if annotations_group is not None:
+#                     train_annotations = objectFromEntity(annotations_group)
+#                 else:
+#                     train_annotations = dict()
+#             
+#                 if waveforms_set is not None:
+#                     waveforms = np.array(waveforms_set)
+#                 else:
+#                     waveforms = None
+#                     
+#                 obj = neo.SpikeTrain(times, t_stop, units=units, t_start=t_start,
+#                                      sampling_rate=sampling_rate, 
+#                                      left_sweep=left_sweep, name=train_name,
+#                                      waveforms=waveforms, file_origin=file_origin,
+#                                      description = description)  
+#                 
+#                 # obj.unit = train_unit
+#                 obj.segment = train_segment
+#                 obj.annotations.update(train_annotations) # safer that via c'tor above
+#                 
         # elif "neo.core.analogsignal.AnalogSignal" in python_class:
         elif ".".join([target_class.__module__, target_class.__name__]) == "neo.core.analogsignal.AnalogSignal":
             # NOTE: 2022-10-06 09:46:42
@@ -1511,7 +1564,7 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             name = attrs.get("__name__", "")
             file_origin = attrs.get("__file_origin__", None)
             description = attrs.get("__description__", None)
-            signal_segment = attrs.get("__segment__", None)
+            # signal_segment = attrs.get("__segment__", None)
             
             # prepare default; mandatory args are:
             # signal (e.g. empty array-like)
@@ -2575,9 +2628,8 @@ def makeAxisScale(obj,
     
     return axis_dset
 
-def from_dataset(dset:typing.Union[str, h5py.Dataset],
-                 group:typing.Optional[h5py.Group]=None, 
-                 order:typing.Optional[str]=None):
+def from_dataset(dset:typing.Union[str, h5py.Dataset], group:typing.Optional[h5py.Group]=None, order:typing.Optional[str]=None):
+    """DEPRECATED"""
     if isinstance(dset, str) and len(dset.strip()):
         if not isinstance(group, h5py.Group):
             raise TypeError(f"When the data set is indicated by its name, 'group' must a h5py.Group; got {type(group).__name__} instead")
@@ -2868,7 +2920,7 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
         elif isinstance(labels, np.ndarray):
             labels = np.asarray(labels, dtype=np.dtype("U"))
                 
-        elif labels is not None: # how ot interpret anything else? loose it for now
+        elif labels is not None: # how to interpret anything else? loose it for now
             labels = None
                 
         data = data.view(np.ndarray).transpose()
@@ -3034,14 +3086,7 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
     return data
 
 @safeWrapper
-def makeHDF5Entity(obj, group:h5py.Group,
-                    name:typing.Optional[str]=None,
-                    oname:typing.Optional[str]=None,
-                    compression:typing.Optional[str]="gzip",
-                    chunks:typing.Optional[bool]=None,
-                    track_order:typing.Optional[bool] = True, 
-                    entity_cache:typing.Optional[dict]=None,
-                    **kwargs) -> typing.Union[h5py.Group, h5py.Dataset]:
+def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:typing.Optional[str]=None,compression:typing.Optional[str]="gzip",chunks:typing.Optional[bool]=None,track_order:typing.Optional[bool] = True, entity_cache:typing.Optional[dict]=None,**kwargs):# -> typing.Union[h5py.Group, h5py.Dataset]:
     """
     HDF5 entity  maker for Python objects.
     Generates a HDF5 Group or Dataset (NOTE: a HDF5 File has overlapping API
@@ -3377,12 +3422,7 @@ def makeHDF5Entity(obj, group:h5py.Group,
                        chunks=chunks, track_order=track_order, entity_cache = entity_cache)
         
 
-def makeHDF5Dataset(obj, group: h5py.Group, name:typing.Optional[str]=None,
-                      compression:typing.Optional[str]="gzip",
-                      chunks:typing.Optional[bool] = None,
-                      track_order:typing.Optional[bool]=True,
-                      entity_cache:typing.Optional[dict] = None,
-                      ) -> h5py.Dataset:
+def makeHDF5Dataset(obj, group: h5py.Group, name:typing.Optional[str]=None, chunks:typing.Optional[bool] = None, track_order:typing.Optional[bool]=True, entity_cache:typing.Optional[dict] = None) -> h5py.Dataset:
     """Creates a HDF5 Dataset in group based on obj.
     Delegates to makeDataset to create a data set then adorns its attrs 
     with obj-specific information.
@@ -3402,10 +3442,7 @@ def makeHDF5Dataset(obj, group: h5py.Group, name:typing.Optional[str]=None,
     return dset
 
 @singledispatch
-def makeDataset(obj, group:h5py.Group, attrs:dict, name:str,
-                 compression:typing.Optional[str]="gzip", 
-                 chunks:typing.Optional[bool] = None,
-                 track_order=True, entity_cache = None):
+def makeDataset(obj, group:h5py.Group, attrs:dict, name:str, compression:typing.Optional[str]="gzip", chunks:typing.Optional[bool] = None, track_order=True, entity_cache = None):
     #print(f"makeDataset for {type(obj).__name__} with name {name} in group {group}")
     # for scalar objects only, and basic python sequences EXCEPT for strings
     # because reading back strings can be confused with stored bytes data
@@ -3621,11 +3658,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     storeEntityInCache(entity_cache, obj, dset)
     return dset
 
-def makeHDF5Group(obj, group:h5py.Group, name:typing.Optional[str]=None,
-                    compression:typing.Optional[str]="gzip", 
-                    chunks:typing.Optional[bool]=None,
-                    track_order:typing.Optional[bool] = True,
-                    entity_cache:typing.Optional[dict] = None) -> h5py.Group:
+def makeHDF5Group(obj, group:h5py.Group, name:typing.Optional[str]=None, compression:typing.Optional[str]="gzip",  chunks:typing.Optional[bool]=None, track_order:typing.Optional[bool] = True, entity_cache:typing.Optional[dict] = None):# -> h5py.Group:
     target_name, obj_attrs = makeObjAttrs(obj)
     if isinstance(name, str) and len(name.strip()):
         target_name = name
@@ -3638,11 +3671,7 @@ def makeHDF5Group(obj, group:h5py.Group, name:typing.Optional[str]=None,
     return entity
     
 @singledispatch
-def makeGroup(obj, group:h5py.Group, attrs:dict, name:str, 
-                    compression:typing.Optional[str]="gzip",
-                    chunks:typing.Optional[bool]=None,
-                    track_order:typing.Optional[bool] = True,
-                    entity_cache:typing.Optional[dict] = None) -> h5py.Group:
+def makeGroup(obj, group:h5py.Group, attrs:dict, name:str, compression:typing.Optional[str]="gzip", chunks:typing.Optional[bool]=None, track_order:typing.Optional[bool] = True, entity_cache:typing.Optional[dict] = None):# -> h5py.Group:
     cached_entity = getCachedEntity(entity_cache, obj)
     
     if isinstance(cached_entity, h5py.Group):

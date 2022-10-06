@@ -263,9 +263,7 @@ class DataMark(DataObject):
             
         return times
 
-    def __new__(cls, places=None, times=None, labels=None, units=None, name=None, 
-                description=None, file_origin=None, mark_type=None, event_type=None, 
-                array_annotations=None, **annotations):
+    def __new__(cls, places=None, times=None, labels=None, units=None, name=None, description=None, file_origin=None, mark_type=None, event_type=None, array_annotations=None, **annotations):
         
         if places is None:
             if times is None:
@@ -385,9 +383,7 @@ class DataMark(DataObject):
         return obj
 
     
-    def __init__(self, places=None, times=None, labels=None, units=None, 
-                 name=None, description=None, file_origin=None, 
-                 mark_type=None, array_annotations=None, **annotations):
+    def __init__(self, places=None, times=None, labels=None, units=None, name=None, description=None, file_origin=None, mark_type=None, array_annotations=None, **annotations):
         """Constructs a DataMark.
         
         For DataMark objects, event_type is by default MarkType.place
