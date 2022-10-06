@@ -4052,7 +4052,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         # NOTE 2020-11-28 10:19:07
         # upgrade to matplotlib 3.x
-        colormapnames = sorted([n for n in colormaps.cm._cmap_registry.keys()])
+        colormapnames = sorted([n for n in mpl.colormaps.keys()])
         
         if isinstance(self._colorMap, colormaps.colors.Colormap):
             d = pgui.ItemsListDialog(self, itemsList=colormapnames,

@@ -73,12 +73,6 @@ from PyQt5 import QtCore, QtGui
 
 try:
     import cmocean # some cool palettes/luts
-    # NOTE 2021-03-09 16:44:36
-    # the following is not required as these will be registered in matplotlib.cm._cmap_registry
-    # upon importing the cmocean module, with the "cmo." prefix added to their name
-    #for k, cmap in cmocean.cm.cmap_d.items():
-        #cm.register_cmap(name=k, cmap=cmap)
-    #del(k, cmap)
 except:
     pass
 
@@ -1150,15 +1144,10 @@ def register_colormaps(colormap_dict, prefix:typing.Optional[str]=None,
             cdata = colormap_dict[cmap]
             register_colormap(cdata, name=cmap, prefix=None, N=N, gamma=gamma)
             
-        # if cmap not in cm._cmap_registry:
-        #     cdata = colormap_dict[cmap]
-        #     register_colormap(cdata, name=cmap, prefix=None, N=N, gamma=gamma)
-            
-
 def register_colormap(cdata, name:typing.Optional[str]=None, 
                       prefix:typing.Optional[str]=None,
                       N:typing.Optional[int]=None, 
-                      gamma:typing.Optional[float]=0.1):
+                      gamma:typing.Optional[float]=1.0):
     """Registers a custom colormap with matplotlib.
     """
     if isinstance(cdata, dict) and all([s in cdata for s in ("red", "green", "blue")]):
@@ -1171,7 +1160,8 @@ def register_colormap(cdata, name:typing.Optional[str]=None,
         if mpl._version.version_tuple[1] >= 6:
             if name not in mpl.colormaps:
                 mpl.colormaps.register(cmap = colors.LinearSegmentedColormap(name=name, segmentdata=cdata, N=N, gamma=gamma),
-                                       name = name)
+                                       name=name,force=True)
+                                       
                 
         else:
             if name in cm._cmap_registry:
@@ -1191,8 +1181,7 @@ def register_colormap(cdata, name:typing.Optional[str]=None,
         
         if mpl._version.version_tuple[1] >= 6:
             if name not in mpl.colormaps:
-                mpl.colormaps.register(cmap = colors.ListedColormap(np.array(cdata), name=name, N=N),
-                                       name = name)
+                mpl.colormaps.register(cmap = colors.ListedColormap(np.array(cdata), name=name, N=N), force=True)
                 
         else:
             if name in cm._cmap_registry:
@@ -1209,8 +1198,7 @@ def register_colormap(cdata, name:typing.Optional[str]=None,
             
         if mpl._version.version_tuple[1] >= 6:
             if name not in mpl.colormaps:
-                mpl.colormaps.register(cmap = colors.ListedColormap(cdata, name=name, N=N),
-                                       name = name)
+                mpl.colormaps.register(cmap = colors.ListedColormap(cdata, name=name, N=N), force=True)
                 
         else:
             if name in cm._cmap_registry:
@@ -1224,13 +1212,13 @@ def register_colormap(cdata, name:typing.Optional[str]=None,
                 name = "%s.%s" % (prefix, name)
                 
             if mpl._version.versino_tuple[1] >= 6:
-                mpl.colormaps.register(cmap = cdata, name=name)
+                mpl.colormaps.register(cmap = cdata, name=name, force=True)
             else:
                 cm.register_cmap(name=name, cmap=cdata)
             
         else:
             if mpl._version.version_tuple[1] >= 6:
-                mpl.colormaps.register(cdata)
+                mpl.colormaps.register(cdata, force=True)
             else:
                 cm.register_cmap(cmap=cdata)
             
