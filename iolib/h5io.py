@@ -463,6 +463,10 @@ ScanData
 ================================================================================
     
 """
+# TODO: 2022-10-06 11:24:20
+# • a LOT of code refactoring on the reading side
+# • deal with neo DataObject array_annotations (how ?!?)
+# • what to do with references to segment, unit, in neo.DataObject/Container ?
 
 # wading into pandas writing as HDF5
 # see https://stackoverflow.com/questions/30773073/save-pandas-dataframe-using-h5py-for-interoperabilty-with-other-hdf5-readers
@@ -1133,9 +1137,13 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
         traceback.print_exc()
         raise
     
-    # print(f"target_class: {target_class}")
+    print(f"target_class: {target_class}")
     
     if isinstance(entity, h5py.Dataset):
+        # NOTE: 2022-10-06 11:57:32
+        # for now, this code branch applies ONLY to "stand-alone" datasets, and 
+        # not to data sets that are children of groups encapsulating more 
+        # specialized objects such a neo signal etc
         if len(entity.shape) == 0: 
             # no axes imply no Dataset dimscales either
             # most likely a scalar and therefore we attempt to instantiate
@@ -1163,7 +1171,8 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             for k in entity.keys():
                 obj.append(objectFromEntity(entity[k]))
                 
-        elif "neo.core.spiketrain.SpikeTrain" in python_class:
+        # elif "neo.core.spiketrain.SpikeTrain" in python_class:
+        elif "".join([target_class.__module__, target_class.__name__]) == "neo.core.spiketrain.SpikeTrain":
             # search for a child dataset with name set as this group's name and
             # suffixed with "_data"
             # obj = target_class # for now
@@ -1188,22 +1197,19 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             if train_unit == "null":
                 train_unit = None
                 
+            # TODO/FIXME: 2022-10-06 09:04:15
+            # in this case the segment property is a reference to the neo.Segment
+            # where the spike train was originally defined
+            #
+            # this may be in a different file / data object, in which case
+            # that reference sems to have been lost
+            # (it is funny, though, as in the pickle version this segment 
+            # AND its contents ARE saved (as a serialized copy) into the pickle)
+            # which is probably the reason why the pickle containing the 
+            # spike train on its owmn is actually LARGER than the pickle 
+            #  containing the original segment, see the sxample files in 
+            # analysis_Bruker_22i21)
             train_segment = attrs.get("__segment__", None)
-            
-            if train_segment in ["__ref__", "null"]:
-                # TODO/FIXME: 2022-10-06 09:04:15
-                # in this case the segment property is a reference to the neo.Segment
-                # where the spike train was originally defined
-                #
-                # this may be in a different file / data object, in which case
-                # that reference sems to have been lost
-                # (it is funny, though, as in the pickle version this segment 
-                # AND its contents ARE saved (as a serialized copy) into the pickle)
-                # which is probably the reason why the pickle containing the 
-                # spike train on its owmn is actually LARGER than the pickle 
-                #  containing the original segment, see the sxample files in 
-                # analysis_Bruker_22i21)
-                trains_segment = None
             
             # NOTE: 2022-10-06 08:21:35
             # Prepare an empty SpikeTrain in case something goes awry
@@ -1305,7 +1311,8 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
                 obj.segment = train_segment
                 obj.annotations.update(train_annotations) # safer that via c'tor above
                 
-        elif "neo.core.analogsignal.AnalogSignal" in python_class:
+        # elif "neo.core.analogsignal.AnalogSignal" in python_class:
+        elif ".".join([target_class.__module__, target_class.__name__]) == "neo.core.analogsignal.AnalogSignal":
             # NOTE: 2022-10-06 09:46:42
             # as all neo DataObjects these re also stored as a Group
             # contrary to SpikeTrain we don't have a waveform data set
@@ -1326,11 +1333,17 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
                 # FIXME: see TODO/FIXME: 2022-10-06 09:04:15
                 signal_segment = None
                 
+            units = attrs.get("__units__", pq.s)
+            name = attrs.get("__name__", "")
+            file_origin = attrs.get("__file_origin__", None)
+            description = attrs.get("__description__", None)
+            signal_segment = attrs.get("__segment__", None)
+            
             # prepare default; mandatory args are:
             # signal (e.g. empty array-like)
             # units
             # sampling rate
-            obj = neo.AnalogSignal([], units = ps.q, sampling_rate = 1*pq.Hz)
+            obj = neo.AnalogSignal([], units = units, sampling_rate = 1*pq.Hz)
             
             if data_set is not None and data_set.shape is not None:
                 # NOTE: 2022-10-06 10:48:24
@@ -1347,7 +1360,7 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
                     # • NOTE: 2022-10-06 10:31:07
                     # • NOTE: 2022-10-06 10:32:52
                     # we expect two axes
-                    if ["axis_0"] in axes_group:
+                    if "axis_0" in axes_group:
                         axis_0_set = axes_group["axis_0"] # a Dataset for axis 0
                         # in the case of AnalogSignal this is the time axis
                         axis_0_attrs = attrs2dict(axis_0_set.attrs)
@@ -1379,11 +1392,11 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
                     
                 obj = neo.AnalogSignal(signal_data, units=units, t_start=t_start,
                                        sampling_rate=sampling_rate, name=name,
-                                       description=description)
+                                       description=description, file_origin=file_origin)
                 
                 obj.annotations.update(signal_annotations)
                 
-                    
+                obj.segment = signal_segment
                     
             
             
