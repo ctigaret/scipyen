@@ -3428,7 +3428,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
         when using the "linear" approximation method (see above)
         
     get_duration_at_Vm: None or scalar:
-        When a scalar, the function report the AP waveform durations at the specified
+        When a scalar, the function reports the AP waveform durations at the specified
         Vm value, IN ADDITION TO the duration at 0 mV and half-max (which may vary
         across cells!)
             
