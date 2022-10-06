@@ -583,7 +583,7 @@ from core import prog
 from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.datazone import DataZone
-from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType)
+from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, MarkType)
 from core.triggerprotocols import TriggerProtocol
 
 from core.quantities import(arbitrary_unit, 
@@ -606,7 +606,7 @@ from core.datatypes import (TypeEnum,UnitTypes, GENOTYPES,
                             )
 
 from core.modelfitting import (FitModel, ModelExpression,)
-from core.triggerevent import (TriggerEvent, TriggerEventType,)
+# from core.triggerevent import (TriggerEvent, TriggerEventType,) # already done above
 from core.triggerprotocols import TriggerProtocol
 from core.utilities import unique
 from core.strutils import (str2symbol, str2float, numbers2str, get_int_sfx,)
@@ -1176,8 +1176,16 @@ def group2neoDataObject(g, target_class):
         pass
     
     elif DataMark in inspect.getmro(target_class):
+        mark_type = entity.name.split("/")[-1]
         if target_class == TriggerEvent:
-            pass
+            
+            obj = TriggerEvent(times=times, labels=labels, units=units,name=name,
+                               description=description,file_origin=file_origin,
+                               event_type = TriggerEventType[mark_type])
+            obj.segment = segment
+            return obj
+        
+        
         pass
     
     obj.annotations.update(annotations)
@@ -3726,8 +3734,6 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
                                                  entity_cache = entity_cache,
                                                  parent_neo_container_entity = (obj,grp))
     return grp
-    
-    
     
 def read_hdf5(h5file:h5py.File):
     groups = [k for k in h5file.keys()]

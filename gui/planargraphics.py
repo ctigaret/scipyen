@@ -4113,18 +4113,18 @@ class PlanarGraphics():
         import h5py
         from iolib import h5io, jsonio
         
-        cached_entity = get_cached_entity(entity_cache, self)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
         
         if isinstance(cached_entity, h5py.Group):
             group[target_name] = cached_entity
             return cached_entity
         
-        target_name, obj_attrs = h5io.make_obj_attrs(obj, oname=oname)
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         if isinstance(name, str) and len(name.strip()):
             target_name = name
         
         entity = group.create_group(target_name)
-        h5io.store_entity_in_cache(entity_cache, self, entity)
+        h5io.storeEntityInCache(entity_cache, self, entity)
         entity.attrs.update(obj_attrs)
         entity.attrs.update({"__graphics_type_name__": self.type_name})
                 
@@ -4150,7 +4150,7 @@ class PlanarGraphics():
         # for each state in the states list create an empty HDF5 Dataset, then
         # store the descriptor name/value pairs of the state as Dataset attrs
         states_group = entity.create_group("states")
-        #h5io.store_entity_in_cache(entity_cache, self.states, states_group)
+        #h5io.storeEntityInCache(entity_cache, self.states, states_group)
         
         for k, state in enumerate(self.states):
             state_dset = states_group.create_dataset(f"state_{k}")

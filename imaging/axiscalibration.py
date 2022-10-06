@@ -1537,8 +1537,7 @@ class AxisCalibrationData(CalibrationData):
         for (k,c) in self.channels:
             self._data_.pop(k, None)
                 
-    def getChannelCalibration(self, index:typing.Optional[typing.Union[int, str]]=None,
-                              full:typing.Optional[bool]=False) -> typing.Optional[typing.Union[list, ChannelCalibrationData]]:
+    def getChannelCalibration(self, index:typing.Optional[typing.Union[int, str]]=None, full:typing.Optional[bool]=False) -> typing.Optional[typing.Union[list, ChannelCalibrationData]]:
         """ChannelCalibrationData for a single channel.
         
         Parameters:

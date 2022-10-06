@@ -606,7 +606,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             self.modelContentsChanged.emit()
             
         else:
-            self.removeRowForVariable(name)
+            self.removeRowForVariable(name) # this actually might never be reached!!!
             
     #@timefunc
     def pre_execute(self):
@@ -848,7 +848,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #print("WorkspaceModel.removeRowForVariable data: %s ns: %s row: %s" % (dataname, ns, row))
         if row == -1:
             return
-        
         
         if isinstance(row, list):
             for r in row:

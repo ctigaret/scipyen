@@ -4222,10 +4222,18 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                             else:
                                 sval = "(%s)" % "; ".join(["%.2f" % v for v in val])
                         
-                        else:
+                        else: 
+                            # NOITE: 2022-10-06 17:15:22
+                            # single channel => channelCalibration only has ONE channel
+                            # but WARNING: if calling with index argument, one MUST specify
+                            # the value of the channel's property, which is not always
+                            # what you expect.
+                            #
+                            # If in doubt, then just call without specifying the index
                             val = float(img[x,y])
                             if self._axes_calibration_:
-                                cval = self._axes_calibration_["c"].getChannelCalibration()[1].calibratedMeasure(val)
+                                cval = self._axes_calibration_["c"].getChannelCalibration().calibratedMeasure(val)
+                                # cval = self._axes_calibration_["c"].getChannelCalibration()[1].calibratedMeasure(val)
                                 sval = "(%s)" % quantity2str(cval)
                             else:
                                 sval = "(%.2f)" % val
