@@ -2824,9 +2824,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
         """
         if isinstance(value, str) and by_name:
-            #print(f"---\nScipyenWindow.removeFromWorkspace {value}")
+            # print(f"---\nScipyenWindow.removeFromWorkspace {value}")
             self.workspace.pop(value, None)
-            
+            self.workspaceModel.removeRowForVariable(value)
         else:
             # inverse lookup the key mapped to this value - will remove ALL
             # references to value that exist in the workspace
@@ -2834,6 +2834,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if len(objects):
                 for o in objects:
                     self.workspace.pop(o[0], None)
+                    self.workspaceModel.removeRowForVariable(o[0])
                     
         if update:
             self.workspaceModel.update()
@@ -3538,8 +3539,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     #obj.closeEvent(QtGui.QCloseEvent())
                 self.deRegisterViewer(obj) # does not remove its symbol for workspace - this has already been removed by delete action
                 
-            #self.removeFromWorkspace(n, by_name=True, update=True)
-            self.removeFromWorkspace(n, by_name=True, update=False)
+            self.removeFromWorkspace(n, by_name=True, update=True)
+            # self.removeFromWorkspace(n, by_name=True, update=False)
             #self.workspace.pop(n, None)
             
         self.workspaceModel.currentItem = None

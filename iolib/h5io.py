@@ -1060,6 +1060,151 @@ def makeAttrDict(**kwargs):
             
     return ret
 
+def group2neoContainer(g, target_class):
+    # treats Segment, Block, Group
+    pass
+
+def group2neoSignal(g, target_class):
+    # treats AnalogSignal, IrregularlySampledSignal
+    # DataSignal, IrregularlySampledDataSignal
+    # ImageSequencene.
+    attrs = attr2dict(g.attrs)
+    
+
+def group2neoDataObject(g, target_class):
+    # treats SpikeTrain, Event, Epoch, TriggerEvent, DataZone
+    # the following are delegated to group2neoSignal:
+    # AnalgSignal, IrregularlySampledSignal,
+    # DataSignal, IrregularlySampledDataSignal
+    if neo.core.basesignal.BaseSignal in inspect.getmro(target_class):
+        return group2neoSignal(g, target_class)
+    
+    attrs = attr2dict(g.attrs)
+    name = attrs.get("__name__", None)
+    units = attrs.get("__units__", pq.s)
+    segment = attrs.get("__segment__", None)
+    file_origin = attrs.get("__file_origin__", None)
+    descripton = attrs.get("__description__", None)
+    
+    # unit = attrs.get("__unit__", None)
+    
+    data_set_name = f"{g.name.split('/')[-1]}_data"
+    # data_set_name = "".join([g.name.split('/')[-1], "_data"])
+    data_set = g.get(data_set_name, None)
+    
+    axes_group_name = f"{g.name.split('/')[-1]}_axes"
+    # axes_group_name = "".join([g.name.split('/')[-1], "_axes"])
+    axes_group = g.get(axes_group_name, None)
+    
+    # for Epoch, Event, DataMark, DataZone, TriggerEvent
+    labels_set_name = f"{g.name.split('/')[-1]}_labels"
+    labels_set = g.get(labels_set_name, None)
+    
+    if isinstance(labels_set, hyp5.Dataset):
+        labels = objectFromEntity(labels_set)
+    else:
+        labels = None
+    
+    
+    
+    annotations_group_name = f"{g.name.split('/')[-1]}_annotations"
+    # annotations_group_name = "".join([g.name.split('/')[-1], "_annotations"])
+    annotations_group = g,get(annotations_group_name, None)
+    
+    if isinstance(annotations_group, h5py.Group):
+        annotations = objectFromEntity(annotations_group)
+    else:
+        annotations = dict()
+
+    times = []
+    
+    ax0 = dict()
+    ax0["t_start"] = 0.*units
+    ax0["t_stop"] = None
+    ax0["sampling_rate"] = 1.*pq.Hz
+    ax0["left_sweep"] = None
+    
+    ax1 = dict()
+    
+    
+    if isinstance(data_set, h5py.Dataset):
+        times = np.array(data_set)
+        
+        if isinstance(axes_group, h5py.Group):
+            # axis 0 is ALWAYS the domain axis
+            # axis 1 is ALWAYS the signal axis (or channels axis)
+            # for DataObject other than BaseSignal, axis 1 is just a tag-like
+            # data - these all have one axis!!
+            ax0g = axes_group.get("axis_0", None)
+            
+            if isinstance(ax0g, h5py.Dataset):
+                ax0attrs = attrs2dict(ax0g.attrs)
+                ax0["t_stop"] = ax0attrs.get("__end__", None)
+                ax0["t_start"] = ax0attrs.get("__origin__", 0.*units)
+                ax0["sampling_rate"] = ax0attrs.get("__sampling_rate__", 1.*pq.Hz)
+                ax0["left_sweep"] = ax0attrs.get("__left_sweep__", None)
+            
+            ax1g = axes_group.get("axis_1", None)
+            
+            if isinstance(ax1g, h5py.Group):
+                ax1attrs = attrs2dict(ax1g.attrs)
+    
+    if target_class == neo.SpikeTrain:
+        waveforms_set_name = f"{g.name.split('/')[-1]}_waveforms"
+        # waveforms_set_name = "".join([g.name.split('/')[-1], "_waveforms"])
+        waveforms_set = g[waveforms_set_name] if waveforms_set_name in g else None
+        if isinstance(waveforms_set, h5py.Dataset):
+            waveforms  = np.array(waveforms_set)
+        else:
+            waveforms = None
+            
+        obj = target_class(times, units=units,  
+                           t_start = ax0["t_start"],
+                           t_stop = ax0["t_stop"],
+                           sampling_rate=ax0["sampling_rate"], 
+                           left_sweep=ax0["left_sweep"], 
+                           name=name, waveforms=waveforms, 
+                           file_origin=file_origin, description = description)
+    
+    elif target_class == neo.Event:
+        pass
+    
+    elif target_class == neo.Epoch:
+        pass
+    
+    elif target_class == DataZone:
+        pass
+    
+    elif DataMark in inspect.getmro(target_class):
+        if target_class == TriggerEvent:
+            pass
+        pass
+    
+    obj.annotations.update(annotations)
+    obj.segment = segment
+    
+    return obj
+    
+        
+def group2neo(g:h5py.Group, target_class:type):
+    """Reconstructs BaseNeo objects
+    """
+    # TODO 2022-10-06 13:44:05 factoring out neo object reconstruction
+    # call this after checking neo.core.baseneo.BaseNeo is in target's mro, 
+    # in the caller
+    mro = inspect.getmro(target_class)
+    
+    if neo.core.dataobject.DataObject in mro:
+        return group2neoDataObject(g, target_class)
+    elif neo.core.container.Container in mro:
+        return group2neoContainer(g, target_class)
+    elif target_class == neo.ChannelView:
+        pass # TODO
+    else:
+        raise typeError(f"Don't know how to manage {target_class}")
+            
+    
+
 def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
     """attempt to round trip of makeHDF5Entity
     """
@@ -1137,28 +1282,52 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
         traceback.print_exc()
         raise
     
-    print(f"target_class: {target_class}")
+    # print(f"entity: {entity.name}, target_class: {target_class}")
     
     if isinstance(entity, h5py.Dataset):
         # NOTE: 2022-10-06 11:57:32
         # for now, this code branch applies ONLY to "stand-alone" datasets, and 
         # not to data sets that are children of groups encapsulating more 
         # specialized objects such a neo signal etc
-        if len(entity.shape) == 0: 
+        # hence these will be dealt with in the "group" branch below; don't
+        # call objectFromEntity on the children datsets there!
+        if entity.shape is None or len(entity.shape) == 0: 
             # no axes imply no Dataset dimscales either
             # most likely a scalar and therefore we attempt to instantiate
             # one as such
             if target_class == bool:
                 obj = target_class(entity)
+                
             elif target_class == str:
                 obj = dataset2string(entity)
+                
+            elif target_class in [int, float]:
+                obj = target_class(entity[()])
+                
+            elif target_class == pq.Quantity:# or ".".join([target_class.__module__, target_class.__name__]) == "quantities.quantity.Quantity":
+                units = attrs.get("__units__", pq.dimensionless)
+                data = np.array(entity)
+                obj = data*units
+            
+            # TODO: numpy array, vigra kernels, vigra
                 
             else:
                 obj = target_class
         else:
-            obj = target_class # for now
+            if target_class == pq.Quantity:# or ".".join([target_class.__module__, target_class.__name__]) == "quantities.quantity.Quantity":
+                units = attrs.get("__units__", pq.dimensionless)
+                data = np.array(entity)
+                obj = data*units
+            else:
+                obj = target_class # for now
             
-    else:
+    else: # entity is a group
+        # NOTE: 2022-10-06 13:50:07
+        # some specilized arrray-like data objects (e.g. neo DataObject etc)
+        # are encapsulatd in h5py Group and store their actual array data in 
+        # h5py Dataset children of this Group;
+        # therefore, we parse these datasets HERE instead of calling objectFromEntity
+        # recursively as we do for Groups storing regular python collections!
         mro = inspect.getmro(target_class)
         # print(f"entity: {entity.name} mro {mro}")
         if dict in mro:
@@ -1171,8 +1340,7 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             for k in entity.keys():
                 obj.append(objectFromEntity(entity[k]))
                 
-        # elif "neo.core.spiketrain.SpikeTrain" in python_class:
-        elif "".join([target_class.__module__, target_class.__name__]) == "neo.core.spiketrain.SpikeTrain":
+        elif ".".join([target_class.__module__, target_class.__name__]) == "neo.core.spiketrain.SpikeTrain":
             # search for a child dataset with name set as this group's name and
             # suffixed with "_data"
             # obj = target_class # for now
@@ -1193,9 +1361,7 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             # THIS below is the spike train's name!
             train_name = attrs.get("__name__", None)
             
-            train_unit = attrs.get("__unit__", None)
-            if train_unit == "null":
-                train_unit = None
+            # train_unit = attrs.get("__unit__", None) # not sure this even exists in neo API anymore...
                 
             # TODO/FIXME: 2022-10-06 09:04:15
             # in this case the segment property is a reference to the neo.Segment
@@ -1307,7 +1473,7 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
                                      waveforms=waveforms, file_origin=file_origin,
                                      description = description)  
                 
-                obj.unit = train_unit
+                # obj.unit = train_unit
                 obj.segment = train_segment
                 obj.annotations.update(train_annotations) # safer that via c'tor above
                 
@@ -3364,8 +3530,8 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
         makeAxisScale(obj, dset, axgroup, k, compression, chunks)
         
     # NOTE: 2021-11-20 13:38:33
-    # labels for data object types neo.Event, neo.Epoch, DataMark and DataZone
-    # should go to the main data object group 'group'
+    # labels for data object types neo.Event, neo.Epoch, DataMark, DataZone, TriggerEvent
+    # should go into a Dataset child of the main data object group 'group'
     labels = getattr(obj, "labels", None)
     if isinstance(labels, np.ndarray) and labels.size:
         labels_dset = makeHDF5Entity(labels, group, 
@@ -3381,7 +3547,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     #
     # NOTE: 2022-10-05 23:29:51
     # since just before neo 0.11.0 SpikeTrain also have a "left_sweep" attribute
-    # which is takec care of by makeAxisScale/makeNeoDataAxisDict
+    # which is taken care of by makeAxisScale/makeNeoDataAxisDict
     waveforms = getattr(obj, "waveforms", None)
     if isinstance(waveforms, np.ndarray) and waveforms.size > 0:
         waveforms_dset = makeHDF5Entity(waveforms, group, 
