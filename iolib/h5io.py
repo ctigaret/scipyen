@@ -651,6 +651,10 @@ class HDFDataError(Exception):
 def dataset2string(d:h5py.Dataset):
     return np.atleast_1d(d)[0].decode("utf-8")
 
+def parseAxesGroup(g:h5py.Group):
+    # TODO
+    pass
+
 def pandasDtype2HF5Dtype(dtype, col, categorical_info:dict=None):
     """Helper function for pandas2Structarray.
     
@@ -1088,7 +1092,9 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
     
     
     try:
-        type_name = attrs["__type_name__"]
+        type_name = attrs.get("__type_name__", None)
+        if type_name is None:
+            return None
         python_class = attrs["__python_class__"]
         python_class_comps = python_class.split(".")
         module_name = attrs["__module_name__"]
@@ -1100,7 +1106,7 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             try:
                 # print(module_name in sys.modules)
                 if module_name_comps[0] not in sys.modules:
-                    print(f"importing {module_name_comps[0]} for {module_name}")
+                    # print(f"importing {module_name_comps[0]} for {module_name}")
                     pymodule = importlib.import_module(module_name_comps[0])
                     
                 else:
@@ -1111,18 +1117,19 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
                 target_class = eval(".".join(python_class_comps[1:]), pymodule.__dict__)
                     
             except:
-                print(f"in entity {entity}")
-                print(f"module_name = {module_name}")
-                print(f"python_class = {python_class}")
-                print(f"type_name = {type_name}")
+                # print(f"in entity {entity}")
+                # print(f"module_name = {module_name}")
+                # print(f"python_class = {python_class}")
+                # print(f"type_name = {type_name}")
                 traceback.print_exc()
                 raise
             
     except:
+        print(f"entity: {entity.name}")
         traceback.print_exc()
         raise
     
-    print(f"target_class: {target_class}")
+    # print(f"target_class: {target_class}")
     
     if isinstance(entity, h5py.Dataset):
         if len(entity.shape) == 0: 
@@ -1141,7 +1148,7 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             
     else:
         mro = inspect.getmro(target_class)
-        print(f"mro {mro}")
+        # print(f"entity: {entity.name} mro {mro}")
         if dict in mro:
             obj = target_class()
             for k in entity.keys():
@@ -1158,8 +1165,6 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             obj = target_class # for now
             data_set_name = "".join([entity.name.split('/')[-1], "_data"])
             data_set = entity[data_set_name] if data_set_name in entity else None
-            waveforms_set_name = "".join([entity.name.split('/')[-1], "_waveforms"])
-            waveforms_set = entity[waveforms_set_name] if waveforms_set_name in entity else None
             
             axes_group_name = "".join([entity.name.split('/')[-1], "_axes"])
             axes_group = entity[axes_group_name] if axes_group_name in entity else None
@@ -1167,22 +1172,120 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             annotations_group_name = "".join([entity.name.split('/')[-1], "_annotations"])
             annotations_group = entity[annotations_group_name] if annotations_group_name in entity else None
             
-            if data_set is None or data_set.shape is None:
-                # empty SpikeTrain
-                obj = neo.SpikeTrain([], t_stop = 0*pq.s, units = pq.s)
+            waveforms_set_name = "".join([entity.name.split('/')[-1], "_waveforms"])
+            waveforms_set = entity[waveforms_set_name] if waveforms_set_name in entity else None
+            
+            # NOTE: 2022-10-06 09:00:26
+            # THIS below is the spiek train's name!
+            train_name = entity.attrs.get("__name__", None)
+            
+            train_unit = entity.attrs.get("__unit__", None)
+            if train_unit == "null":
+                train_unit = None
                 
-            else:
+            train_segment = entity.attrs.get("__segment__", None)
+            
+            if train_segment == "__ref__":
+                # TODO/FIXME: 2022-10-06 09:04:15
+                # in this case the segment property is a reference to the neo.Segment
+                # where the spike train was originally defined
+                #
+                # this may be in a different file / data object, in which case
+                # that reference sems to have been lost
+                # (it is funny, though, as in the pickle version this segment 
+                # AND its contents ARE saved (as a serialized copy) into the pickle)
+                # which is probably the reason why the pickle containing the 
+                # spike train on its owmn is actually LARGER than the pickle 
+                #  containing the original segment, see the sxample files in 
+                # analysis_Bruker_22i21)
+                trains_segment = None
+            
+            # NOTE: 2022-10-06 08:21:35
+            # Prepare an empty SpikeTrain in case something goes awry
+            # We will construct the real thing below
+            #
+            # NOTE 2022-10-06 08:28:07: mandatory arguments for the c'tor are:
+            # times
+            # t_stop
+            # units (if neither times nor t_stop is a quantity)
+            obj = neo.SpikeTrain([], t_stop = 0*pq.s, units = pq.s)
+            # if data_set is None or data_set.shape is None:
+                # empty SpikeTrain
+                
+            if data_set is not None and data_set.shape is not None:
                 times = np.array(data_set)
                 
                 if axes_group is not None:
-                    pass # TODO: iterate axes NOTE: for non-signal DataObject there is only one axis
-                
+                    # TODO: factor out in parseAxesGroup()
+                    # NOTE: iterate axes 
+                    # NOTE: for non-signal DataObject there is only one axis !!!
+                    # NOTE: Furthermore, this axis is empty (acts like a tag)
+                    #       but its attrs property contains the relevant data:
+                    #       expected to be present there (names mangled with '__'):
+                    #       origin -> t_start
+                    #       name
+                    #       left_sweep
+                    #       sampling_rate
+                    #       units
+                    #       end ->t_stop
+                    #       
+                    #       The following are NOT used by SpikeTrain:
+                    #       key -> str
+                    #       
+                    #       The following SpikeTrain properties are NOT stored
+                    #       in h5 data but we check for them:
+                    #
+                    #       sort (bool)
+                    #
+                    if "axis_0" in axes_group:
+                        axis_set = axes_group["axis_0"]
+                        
+                        # NOTE: 2022-10-06 08:23:37
+                        # this none below should do most of the conversions for us
+                        axis_attributes = attrs2dict(axis_set.attrs)
+                        t_stop = axis_attributes["__end__"] # this one MUST be present
+                        t_start = axis_attributes.get("__origin__", 0.)
+                        sampling_rate = axis_attributes.get("__sampling_rate__", None)
+                        units = axis_attributes.get("__units__", pq.s) # just make sure we have units
+                        name = axis_attributes.get("__name__",None)
+                        left_sweep = axis_attributes.get("__left_sweep__", None)
+                        key = axis_attributes.get("__key__", "")
+                        file_origin = axis_attributes.get("__file_origin__", None)
+                        description = axis_attributes.get("__description__", None)
+                        # if isinstance(units, pq.Quantity)
+                        
+                    else:
+                        # NOTE: 2022-10-06 08:30:25
+                        # supply reasonable defaults
+                        units = pq.s
+                        t_start = times[0]
+                        t_stop = times[-1] # by default
+                        name = None
+                        key = ""
+                        sampling_rate = 1.*pq.Hz
+                        left_sweep = None
+                        file_origin = None
+                        description = None
+                        
                 if annotations_group is not None:
                     train_annotations = objectFromEntity(annotations_group)
+                else:
+                    train_annotations = dict()
+            
+                if waveforms_set is not None:
+                    waveforms = np.array(waveforms_set)
+                else:
+                    waveforms = None
                     
-            
-            
-            
+                obj = neo.SpikeTrain(times, t_stop, units=units, t_start=t_start,
+                                     sampling_rate=sampling_rate, 
+                                     left_sweep=left_sweep, name=train_name,
+                                     waveforms=waveforms, file_origin=file_origin,
+                                     description = description)  
+                
+                obj.unit = train_unit
+                obj.segment = train_segment
+                obj.annotations.update(train_annotations) # safer that via c'tor above
         else:
             obj = target_class # for now
 
@@ -1203,6 +1306,7 @@ def attrs2dict(attrs:h5py.AttributeManager):
     for k,v in attrs.items():
         # NOTE: 2021-11-10 12:47:52
         # FIXME / TODO
+        # print(f"k = {k} v = {v}")
         if hasattr(v, "dtype"):
             if v.dtype == h5py.string_dtype():
                 v = np.array(v, dtype=np.dtype("U"))[()]
@@ -1215,7 +1319,12 @@ def attrs2dict(attrs:h5py.AttributeManager):
                     v = v[()]
                     
             else:
-                v = v[()]
+                if type(v) == bytes:
+                    v = v.decode()
+                    
+                # else:
+                    # v = v[()]
+                # v = v[()]
                 
             if isinstance(v, str) and v.startswith("{") and v.endswith("}"):
                 v = jsonio.loads(v)
@@ -3143,7 +3252,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     # group
     #
     # NOTE: 2022-10-05 23:29:51
-    # since just before neo 0.11.0 Spiketraisn also have a "left_sweep" attribute
+    # since just before neo 0.11.0 SpikeTrain also have a "left_sweep" attribute
     # which is takec care of by makeAxisScale/makeNeoDataAxisDict
     waveforms = getattr(obj, "waveforms", None)
     if isinstance(waveforms, np.ndarray) and waveforms.size > 0:
