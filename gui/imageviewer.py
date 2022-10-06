@@ -3543,10 +3543,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             colorMap  = self._colorMap
             
         if isinstance(image, vigra.VigraArray):
-            if np.isnan(image).any():
+            if not isinstance(colorMap, colormaps.colors.Colormap):
                 return image
             
-            if not isinstance(colorMap, colormaps.colors.Colormap):
+            if np.isnan(image).any():
                 return image
             
             if image.min() == image.max():
@@ -3700,7 +3700,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                             self._currentFrameData_ = self._currentFrameData_.squeeze()
                             
                         cFrame = self._applyColorTable_(self._currentFrameData_, colorMap)
-                        
+                        # print(f"ImageViewer {self.windowTitle()} displayFrame colorMap {colorMap.name} image dtype {cFrame.dtype}")
                         if cFrame.min() == cFrame.max():
                             self.viewerWidget.view(cFrame.qimage(normalize = False))
                         else:

@@ -252,6 +252,7 @@ from . import scipyenviewer
 from . import consoles
 from . import gui_viewers
 from . import scipyen_colormaps as colormaps
+# colormaps.registerCustomColorMaps()
 from . import colorwidgets
 from . import stylewidgets
 from . import gradientwidgets

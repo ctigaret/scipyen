@@ -1138,11 +1138,10 @@ def register_colormaps(colormap_dict, prefix:typing.Optional[str]=None,
             matplotlib.colors.LinearSegmentedColormap()
     
     """
+    # print(f"Registering custom colormaps {colormap_dict}")
     for cmap in colormap_dict:
-        if isinstance(prefix, str) and len(prefix.strip()):
-            cmap = "%s.%s" % (prefix, cmap)
-            cdata = colormap_dict[cmap]
-            register_colormap(cdata, name=cmap, prefix=None, N=N, gamma=gamma)
+        cdata = colormap_dict[cmap]
+        register_colormap(cdata, name=cmap, prefix=None, N=N, gamma=gamma)
             
 def register_colormap(cdata, name:typing.Optional[str]=None, 
                       prefix:typing.Optional[str]=None,
@@ -1150,6 +1149,7 @@ def register_colormap(cdata, name:typing.Optional[str]=None,
                       gamma:typing.Optional[float]=1.0):
     """Registers a custom colormap with matplotlib.
     """
+    # print(f"register_colormap cdata: {cdata}")
     if isinstance(cdata, dict) and all([s in cdata for s in ("red", "green", "blue")]):
         if not (isinstance(name, str) and len(name.strip())):
             name = "LinearSegmentedMap"
@@ -1157,17 +1157,18 @@ def register_colormap(cdata, name:typing.Optional[str]=None,
         if isinstance(prefix, str) and len(prefix.strip()):
             name = "%s.%s" % (prefix, name)
             
-        if mpl._version.version_tuple[1] >= 6:
-            if name not in mpl.colormaps:
-                mpl.colormaps.register(cmap = colors.LinearSegmentedColormap(name=name, segmentdata=cdata, N=N, gamma=gamma),
-                                       name=name,force=True)
-                                       
-                
-        else:
-            if name in cm._cmap_registry:
-                warnings.warn("Colormap %s is already registered; this will overwrite it")
-        
-            cm.register_cmap(name = name, cmap = colors.LinearSegmentedColormap(name=name, segmentdata=cdata, N=N, gamma=gamma))
+        # print(f"Registering Colormap: {name}")
+        if name not in mpl.colormaps:
+            mpl.colormaps.register(cmap = colors.LinearSegmentedColormap(name, cdata, N, gamma),
+                                    name=name,force=True)
+#         if mpl._version.version_tuple[1] >= 6:
+#                                        
+#                 
+#         else:
+#             if name in cm._cmap_registry:
+#                 warnings.warn("Colormap %s is already registered; this will overwrite it")
+#         
+#             cm.register_cmap(name = name, cmap = colors.LinearSegmentedColormap(name, cdata, N, gamma))
                     
                 
         
@@ -1181,13 +1182,13 @@ def register_colormap(cdata, name:typing.Optional[str]=None,
         
         if mpl._version.version_tuple[1] >= 6:
             if name not in mpl.colormaps:
-                mpl.colormaps.register(cmap = colors.ListedColormap(np.array(cdata), name=name, N=N), force=True)
+                mpl.colormaps.register(cmap = colors.ListedColormap(np.array(cdata), name, N), force=True)
                 
         else:
             if name in cm._cmap_registry:
                 warnings.warn("Colormap %s is already registered; this will overwrite it")
         
-            cm.register_cmap(name=name, cmap=colors.ListedColormap(np.array(cdata), name=name, N=N))
+            cm.register_cmap(name=name, cmap=colors.ListedColormap(np.array(cdata), name, N))
         
     elif isinstance(cdata, np.array) and cdata.shape[1] == 3:
         if not (isinstance(name, str) and len(name.strip())):
@@ -1198,13 +1199,13 @@ def register_colormap(cdata, name:typing.Optional[str]=None,
             
         if mpl._version.version_tuple[1] >= 6:
             if name not in mpl.colormaps:
-                mpl.colormaps.register(cmap = colors.ListedColormap(cdata, name=name, N=N), force=True)
+                mpl.colormaps.register(cmap = colors.ListedColormap(cdata, name, N), force=True)
                 
         else:
             if name in cm._cmap_registry:
                 warnings.warn("Colormap %s is already registered; this will overwrite it")
         
-            cm.register_cmap(name=name, cmap=colors.ListedColormap(cdata, name=name, N=N))
+            cm.register_cmap(name=name, cmap=colors.ListedColormap(cdata, name, N))
         
     elif isinstance(cdata, colors.Colormap):
         if isinstance(name, str) and len(name.strip()):
@@ -1314,7 +1315,7 @@ def read_colormap(filename:str, name:typing.Optional[str]=None,
     
     name:str (optional default is None)
         Name of the colormap. When None or an empty string, the colormap gets 
-        its name fromt hen basename of the file
+        its name from the basename of the file
     
     N:int (default: 256) number of colors 
     
@@ -1473,6 +1474,9 @@ if mpl._version.version_tuple[1] >= 6:
     mpl.colormaps.register(cmap = mpl.colormaps.get("gray"), name="None")
 else:
     cm.register_cmap(name="None", cmap=cm.get_cmap(name="gray"))
+    
+# def registerCustomColorMaps():
+#     register_colormaps(CustomColorMaps)
 
 register_colormaps(CustomColorMaps)
     
