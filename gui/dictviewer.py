@@ -266,7 +266,7 @@ class InteractiveTreeWidget(DataTreeWidget):
         
         """
         from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
-        from pyqtgraph.pgcollections import OrderedDict
+        from collections import OrderedDict
         #from pyqtgraph.python2_3 import asUnicode
         from core.datatypes import is_namedtuple
         

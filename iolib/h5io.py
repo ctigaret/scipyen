@@ -1059,8 +1059,12 @@ def makeAttrDict(**kwargs):
 def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
     """attempt to round trip of makeHDF5Entity
     """
+    # TODO 2022-10-06 11:02:41
+    # factor out much of this code for related object types (i.e. with a
+    # common package ancestor, such as all neo.DataObject, neo.Container)
     
-    # Brief reminder of what makeHDF5Entity does:
+    # NOTE: 2022-10-06 11:03:49
+    # Brief reminder of what makeHDF5Entity does (see also this module docstrin)
     # 
     # Object type                       ->  Entity  Notes
     # ------------------------------------------------------------------------
@@ -1162,7 +1166,8 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
         elif "neo.core.spiketrain.SpikeTrain" in python_class:
             # search for a child dataset with name set as this group's name and
             # suffixed with "_data"
-            obj = target_class # for now
+            # obj = target_class # for now
+            
             data_set_name = "".join([entity.name.split('/')[-1], "_data"])
             data_set = entity[data_set_name] if data_set_name in entity else None
             
@@ -1176,16 +1181,16 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             waveforms_set = entity[waveforms_set_name] if waveforms_set_name in entity else None
             
             # NOTE: 2022-10-06 09:00:26
-            # THIS below is the spiek train's name!
-            train_name = entity.attrs.get("__name__", None)
+            # THIS below is the spike train's name!
+            train_name = attrs.get("__name__", None)
             
-            train_unit = entity.attrs.get("__unit__", None)
+            train_unit = attrs.get("__unit__", None)
             if train_unit == "null":
                 train_unit = None
                 
-            train_segment = entity.attrs.get("__segment__", None)
+            train_segment = attrs.get("__segment__", None)
             
-            if train_segment == "__ref__":
+            if train_segment in ["__ref__", "null"]:
                 # TODO/FIXME: 2022-10-06 09:04:15
                 # in this case the segment property is a reference to the neo.Segment
                 # where the spike train was originally defined
@@ -1216,8 +1221,8 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
                 times = np.array(data_set)
                 
                 if axes_group is not None:
-                    # TODO: factor out in parseAxesGroup()
-                    # NOTE: iterate axes 
+                    # TODO: 2022-10-06 10:31:02 factor out in parseAxesGroup()
+                    # NOTE: 2022-10-06 10:31:07 iterate axes 
                     # NOTE: for non-signal DataObject there is only one axis !!!
                     # NOTE: Furthermore, this axis is empty (acts like a tag)
                     #       but its attrs property contains the relevant data:
@@ -1237,11 +1242,24 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
                     #
                     #       sort (bool)
                     #
+                    # NOTE: 2022-10-06 10:32:52 
+                    # general comment for DataObjects axis groups:
+                    # some of the members of the axis data set attributes are
+                    # redundant with some fo these being reserved for later 
+                    # (unspecified) use e.g. "__name__" , "__units__", etc, and 
+                    # their information can sometimes be inferred from the concrete 
+                    # type of DataObject
+                    #
+                    # Also, NOTE that properties like "units" are stored in attrs
+                    # as json objects (hence why the use of attrs2dict is recommended
+                    # instead of dict(attrs))
+                    #
                     if "axis_0" in axes_group:
                         axis_set = axes_group["axis_0"]
                         
                         # NOTE: 2022-10-06 08:23:37
                         # this none below should do most of the conversions for us
+                        #
                         axis_attributes = attrs2dict(axis_set.attrs)
                         t_stop = axis_attributes["__end__"] # this one MUST be present
                         t_start = axis_attributes.get("__origin__", 0.)
@@ -1250,9 +1268,9 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
                         name = axis_attributes.get("__name__",None)
                         left_sweep = axis_attributes.get("__left_sweep__", None)
                         key = axis_attributes.get("__key__", "")
+                            
                         file_origin = axis_attributes.get("__file_origin__", None)
                         description = axis_attributes.get("__description__", None)
-                        # if isinstance(units, pq.Quantity)
                         
                     else:
                         # NOTE: 2022-10-06 08:30:25
@@ -1286,6 +1304,89 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
                 obj.unit = train_unit
                 obj.segment = train_segment
                 obj.annotations.update(train_annotations) # safer that via c'tor above
+                
+        elif "neo.core.analogsignal.AnalogSignal" in python_class:
+            # NOTE: 2022-10-06 09:46:42
+            # as all neo DataObjects these re also stored as a Group
+            # contrary to SpikeTrain we don't have a waveform data set
+            data_set_name = "".join([entity.name.split('/')[-1], "_data"])
+            data_set = entity[data_set_name] if data_set_name in entity else None
+            
+            axes_group_name = "".join([entity.name.split('/')[-1], "_axes"])
+            axes_group = entity[axes_group_name] if axes_group_name in entity else None
+            
+            annotations_group_name = "".join([entity.name.split('/')[-1], "_annotations"])
+            annotations_group = entity[annotations_group_name] if annotations_group_name in entity else None
+            
+            signal_name = attrs.get("__name__", None)
+            signal_segment = attrs.get("__segment__", None)
+            description = attrs.get("__description__", None)
+            
+            if signal_segment in ["__ref__", "null"]:
+                # FIXME: see TODO/FIXME: 2022-10-06 09:04:15
+                signal_segment = None
+                
+            # prepare default; mandatory args are:
+            # signal (e.g. empty array-like)
+            # units
+            # sampling rate
+            obj = neo.AnalogSignal([], units = ps.q, sampling_rate = 1*pq.Hz)
+            
+            if data_set is not None and data_set.shape is not None:
+                # NOTE: 2022-10-06 10:48:24
+                # some of the attrs of data_set are redundant since they 
+                # are also present in `entity.attrs` or in the data_set.attrs
+                # • __name__  = signal's name
+                # • __units__ = signal's units
+                # • __description__ = signal's description
+                signal_data = np.array(data_set)
+                
+                if axes_group is not None:
+                    # NOTE: see also:
+                    # • TODO: 2022-10-06 10:31:02
+                    # • NOTE: 2022-10-06 10:31:07
+                    # • NOTE: 2022-10-06 10:32:52
+                    # we expect two axes
+                    if ["axis_0"] in axes_group:
+                        axis_0_set = axes_group["axis_0"] # a Dataset for axis 0
+                        # in the case of AnalogSignal this is the time axis
+                        axis_0_attrs = attrs2dict(axis_0_set.attrs)
+                        
+                        t_start = axis_0_attrs.get("__origin__", 0.*pq.s)
+                        sampling_rate = axis_0_attrs.get("__sampling_rate__", 1.*pq.Hz)
+                    else:
+                        t_start = 0.*pq.s
+                        sampling_rate = 1.*pq.Hz
+                    # axis_1_set = axes_group["axis_1"] #  the channels axis
+                    # NOTE: 2022-10-06 10:54:31 this is an empty axis (sort of a
+                    # pseudo-tag)
+                    # redundant atrs members are (see entity.attrs)
+                    # • name
+                    # • units
+                    #
+                    # TODO: revisit this with real analog signals where there
+                    # may be channel info
+                    
+                else:
+                    t_start = 0*pq.s
+                    sampling_rate = 1.*pq.Hz
+                    
+                if annotations_group is not None:
+                    signal_annotations = objectFromEntity(annotations_group)
+                else:
+                    signal_annotations = dict()
+                    
+                    
+                obj = neo.AnalogSignal(signal_data, units=units, t_start=t_start,
+                                       sampling_rate=sampling_rate, name=name,
+                                       description=description)
+                
+                obj.annotations.update(signal_annotations)
+                
+                    
+                    
+            
+            
         else:
             obj = target_class # for now
 
@@ -1296,43 +1397,57 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
 def attrs2dict(attrs:h5py.AttributeManager):
     """Generates a dict object from a h5py Group or Dataset 'attrs' property.
     
-    Althogh one can simply call `dict(attrs)` or `dict(attrs.items())`, this
-    function also decodes the items of `attrs` to reverse the actions of 
-    makeObjAttrs and makeDataTypeAttrs
+    Althogh one can simply call `dict(attrs)` or `dict(attrs.items())`, 
+    this function also decodes the items of `attrs` to reverse the actions of 
+    makeObjAttrs and makeDataTypeAttrs.
+    
+    This is important for those obkects that were stored as a json string
+    inside attrs.
     
     Not exactly a complete roundtrip...
+    
+    Must be used with caution !!!
     """
     ret = dict()
     for k,v in attrs.items():
         # NOTE: 2021-11-10 12:47:52
         # FIXME / TODO
-        # print(f"k = {k} v = {v}")
-        if hasattr(v, "dtype"):
-            if v.dtype == h5py.string_dtype():
-                v = np.array(v, dtype=np.dtype("U"))[()]
-                
-            elif v.dtype.kind == "O":
-                if type(v[()]) == bytes:
-                    v = v[()].decode()
+        try:
+            if isinstance(v, str) and v == "null":
+                v = None
+            
+            elif hasattr(v, "dtype"):
+                if v.dtype == h5py.string_dtype():
+                    v = list(v)
+                    # v = v.decode("utf-8")
+                    # v = np.array(v, dtype=np.dtype("U"))[()]
                     
+                elif v.dtype.kind == "O":
+                    if type(v[()]) == bytes:
+                        v = v[()].decode()
+                        
+                    else:
+                        v = v[()]
+                        
                 else:
-                    v = v[()]
-                    
-            else:
-                if type(v) == bytes:
-                    v = v.decode()
-                    
-                # else:
+                    if type(v) == bytes:
+                        v = v.decode()
+                        
+                    # else:
+                        # v = v[()]
                     # v = v[()]
-                # v = v[()]
-                
-            if isinstance(v, str) and v.startswith("{") and v.endswith("}"):
-                v = jsonio.loads(v)
-                
-        elif isinstance(v, str):
-            if v.startswith("{") and v.endswith("}"):
-                v = jsonio.loads(v)
-                
+                    
+                if isinstance(v, str) and v.startswith("{") and v.endswith("}"):
+                    v = jsonio.loads(v)
+                    
+            elif isinstance(v, str):
+                if v.startswith("{") and v.endswith("}"):
+                    v = jsonio.loads(v)
+                    
+        except:
+            print(f"k = {k} v = {v} v.dtype = {v.dtype}")
+            traceback.print_exc()
+            
         ret[k] = v
         
     return ret
