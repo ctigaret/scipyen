@@ -698,7 +698,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     
     @safeWrapper
     def generateRowContents(self, dataname:str, data:object, namespace:str="Internal"):
-        print("generateRowContents", dataname, data, namespace)
+        # print("generateRowContents", dataname, data, namespace)
         obj_props = summarize_object_properties(dataname, data, namespace=namespace)
         #print("generateRowContents obj_props", obj_props)
         return self.genRowFromPropDict(obj_props)

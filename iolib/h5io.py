@@ -1550,18 +1550,24 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             elif target_class == str:
                 obj = dataset2string(entity)
                 
-            elif target_class in [int, float, complex, np.integer, np.floating, np.complexfloating]:
+            # elif target_class in [int, float, complex, np.integer, np.floating, np.complexfloating]:
+            elif any(k in inspect.getmro(target_class) for k in (int, float, complex)):
                 obj = target_class(entity[()])
                 
             elif target_class == pq.Quantity:# or ".".join([target_class.__module__, target_class.__name__]) == "quantities.quantity.Quantity":
                 units = attrs.get("__units__", pq.dimensionless)
                 data = np.array(entity)
                 obj = data*units
+                
+            else:
+                try:
+                    obj = entity[()]
+                except:
+                    obj = target_class
+                    traceback.print_exc()
             
             # TODO: numpy array, vigra kernels, vigra
                 
-            else:
-                obj = target_class
         else:
             if target_class == pq.Quantity:# or ".".join([target_class.__module__, target_class.__name__]) == "quantities.quantity.Quantity":
                 units = attrs.get("__units__", pq.dimensionless)
@@ -1596,232 +1602,6 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
         elif neo.core.baseneo.BaseNeo in inspect.getmro(target_class):
             obj = group2neo(entity, target_class)
                 
-#         elif ".".join([target_class.__module__, target_class.__name__]) == "neo.core.spiketrain.SpikeTrain":
-#             # search for a child dataset with name set as this group's name and
-#             # suffixed with "_data"
-#             # obj = target_class # for now
-#             
-#             data_set_name = "".join([entity.name.split('/')[-1], "_data"])
-#             data_set = entity.get(data_set_name, None)
-#             
-#             axes_group_name = "".join([entity.name.split('/')[-1], "_axes"])
-#             axes_group = entity.get(axes_group_name, None)
-#             
-#             annotations_group_name = "".join([entity.name.split('/')[-1], "_annotations"])
-#             annotations_group = entity.get(annotations_group_name, None)
-#             
-#             waveforms_set_name = "".join([entity.name.split('/')[-1], "_waveforms"])
-#             waveforms_set = entity[waveforms_set_name] if waveforms_set_name in entity else None
-#             
-#             # NOTE: 2022-10-06 09:00:26
-#             # THIS below is the spike train's name!
-#             train_name = attrs.get("__name__", None)
-#             
-#             # train_unit = attrs.get("__unit__", None) # not sure this even exists in neo API anymore...
-#                 
-#             # TODO/FIXME: 2022-10-06 09:04:15
-#             # in this case the segment property is a reference to the neo.Segment
-#             # where the spike train was originally defined
-#             #
-#             # this may be in a different file / data object, in which case
-#             # that reference sems to have been lost
-#             # (it is funny, though, as in the pickle version this segment 
-#             # AND its contents ARE saved (as a serialized copy) into the pickle)
-#             # which is probably the reason why the pickle containing the 
-#             # spike train on its owmn is actually LARGER than the pickle 
-#             #  containing the original segment, see the sxample files in 
-#             # analysis_Bruker_22i21)
-#             train_segment = attrs.get("__segment__", None)
-#             
-#             # NOTE: 2022-10-06 08:21:35
-#             # Prepare an empty SpikeTrain in case something goes awry
-#             # We will construct the real thing below
-#             #
-#             # NOTE 2022-10-06 08:28:07: mandatory arguments for the c'tor are:
-#             # times
-#             # t_stop
-#             # units (if neither times nor t_stop is a quantity)
-#             obj = neo.SpikeTrain([], t_stop = 0*pq.s, units = pq.s)
-#             # if data_set is None or data_set.shape is None:
-#                 # empty SpikeTrain
-#                 
-#             if data_set is not None and data_set.shape is not None:
-#                 times = np.array(data_set)
-#                 
-#                 if axes_group is not None:
-#                     # TODO: 2022-10-06 10:31:02 factor out in parseAxesGroup()
-#                     # NOTE: 2022-10-06 10:31:07 iterate axes 
-#                     # NOTE: for non-signal DataObject there is only one axis !!!
-#                     # NOTE: Furthermore, this axis is empty (acts like a tag)
-#                     #       but its attrs property contains the relevant data:
-#                     #       expected to be present there (names mangled with '__'):
-#                     #       origin -> t_start
-#                     #       name
-#                     #       left_sweep
-#                     #       sampling_rate
-#                     #       units
-#                     #       end ->t_stop
-#                     #       
-#                     #       The following are NOT used by SpikeTrain:
-#                     #       key -> str
-#                     #       
-#                     #       The following SpikeTrain properties are NOT stored
-#                     #       in h5 data but we check for them:
-#                     #
-#                     #       sort (bool)
-#                     #
-#                     # NOTE: 2022-10-06 10:32:52 
-#                     # general comment for DataObjects axis groups:
-#                     # some of the members of the axis data set attributes are
-#                     # redundant with some fo these being reserved for later 
-#                     # (unspecified) use e.g. "__name__" , "__units__", etc, and 
-#                     # their information can sometimes be inferred from the concrete 
-#                     # type of DataObject
-#                     #
-#                     # Also, NOTE that properties like "units" are stored in attrs
-#                     # as json objects (hence why the use of attrs2dict is recommended
-#                     # instead of dict(attrs))
-#                     #
-#                     if "axis_0" in axes_group:
-#                         axis_set = axes_group["axis_0"]
-#                         
-#                         # NOTE: 2022-10-06 08:23:37
-#                         # this none below should do most of the conversions for us
-#                         #
-#                         axis_attributes = attrs2dict(axis_set.attrs)
-#                         t_stop = axis_attributes["__end__"] # this one MUST be present
-#                         t_start = axis_attributes.get("__origin__", 0.)
-#                         sampling_rate = axis_attributes.get("__sampling_rate__", None)
-#                         units = axis_attributes.get("__units__", pq.s) # just make sure we have units
-#                         name = axis_attributes.get("__name__",None)
-#                         left_sweep = axis_attributes.get("__left_sweep__", None)
-#                         key = axis_attributes.get("__key__", "")
-#                             
-#                         file_origin = axis_attributes.get("__file_origin__", None)
-#                         description = axis_attributes.get("__description__", None)
-#                         
-#                     else:
-#                         # NOTE: 2022-10-06 08:30:25
-#                         # supply reasonable defaults
-#                         units = pq.s
-#                         t_start = times[0]
-#                         t_stop = times[-1] # by default
-#                         name = None
-#                         key = ""
-#                         sampling_rate = 1.*pq.Hz
-#                         left_sweep = None
-#                         file_origin = None
-#                         description = None
-#                         
-#                 if annotations_group is not None:
-#                     train_annotations = objectFromEntity(annotations_group)
-#                 else:
-#                     train_annotations = dict()
-#             
-#                 if waveforms_set is not None:
-#                     waveforms = np.array(waveforms_set)
-#                 else:
-#                     waveforms = None
-#                     
-#                 obj = neo.SpikeTrain(times, t_stop, units=units, t_start=t_start,
-#                                      sampling_rate=sampling_rate, 
-#                                      left_sweep=left_sweep, name=train_name,
-#                                      waveforms=waveforms, file_origin=file_origin,
-#                                      description = description)  
-#                 
-#                 # obj.unit = train_unit
-#                 obj.segment = train_segment
-#                 obj.annotations.update(train_annotations) # safer that via c'tor above
-#                 
-#         # elif "neo.core.analogsignal.AnalogSignal" in python_class:
-#         elif ".".join([target_class.__module__, target_class.__name__]) == "neo.core.analogsignal.AnalogSignal":
-#             # NOTE: 2022-10-06 09:46:42
-#             # as all neo DataObjects these re also stored as a Group
-#             # contrary to SpikeTrain we don't have a waveform data set
-#             data_set_name = "".join([entity.name.split('/')[-1], "_data"])
-#             data_set = entity[data_set_name] if data_set_name in entity else None
-#             
-#             axes_group_name = "".join([entity.name.split('/')[-1], "_axes"])
-#             axes_group = entity[axes_group_name] if axes_group_name in entity else None
-#             
-#             annotations_group_name = "".join([entity.name.split('/')[-1], "_annotations"])
-#             annotations_group = entity[annotations_group_name] if annotations_group_name in entity else None
-#             
-#             signal_name = attrs.get("__name__", None)
-#             signal_segment = attrs.get("__segment__", None)
-#             description = attrs.get("__description__", None)
-#             
-#             if signal_segment in ["__ref__", "null"]:
-#                 # FIXME: see TODO/FIXME: 2022-10-06 09:04:15
-#                 signal_segment = None
-#                 
-#             units = attrs.get("__units__", pq.s)
-#             name = attrs.get("__name__", "")
-#             file_origin = attrs.get("__file_origin__", None)
-#             description = attrs.get("__description__", None)
-#             # signal_segment = attrs.get("__segment__", None)
-#             
-#             # prepare default; mandatory args are:
-#             # signal (e.g. empty array-like)
-#             # units
-#             # sampling rate
-#             obj = neo.AnalogSignal([], units = units, sampling_rate = 1*pq.Hz)
-#             
-#             if data_set is not None and data_set.shape is not None:
-#                 # NOTE: 2022-10-06 10:48:24
-#                 # some of the attrs of data_set are redundant since they 
-#                 # are also present in `entity.attrs` or in the data_set.attrs
-#                 # • __name__  = signal's name
-#                 # • __units__ = signal's units
-#                 # • __description__ = signal's description
-#                 signal_data = np.array(data_set)
-#                 
-#                 if axes_group is not None:
-#                     # NOTE: see also:
-#                     # • TODO: 2022-10-06 10:31:02
-#                     # • NOTE: 2022-10-06 10:31:07
-#                     # • NOTE: 2022-10-06 10:32:52
-#                     # we expect two axes
-#                     if "axis_0" in axes_group:
-#                         axis_0_set = axes_group["axis_0"] # a Dataset for axis 0
-#                         # in the case of AnalogSignal this is the time axis
-#                         axis_0_attrs = attrs2dict(axis_0_set.attrs)
-#                         
-#                         t_start = axis_0_attrs.get("__origin__", 0.*pq.s)
-#                         sampling_rate = axis_0_attrs.get("__sampling_rate__", 1.*pq.Hz)
-#                     else:
-#                         t_start = 0.*pq.s
-#                         sampling_rate = 1.*pq.Hz
-#                     # axis_1_set = axes_group["axis_1"] #  the channels axis
-#                     # NOTE: 2022-10-06 10:54:31 this is an empty axis (sort of a
-#                     # pseudo-tag)
-#                     # redundant atrs members are (see entity.attrs)
-#                     # • name
-#                     # • units
-#                     #
-#                     # TODO: revisit this with real analog signals where there
-#                     # may be channel info
-#                     
-#                 else:
-#                     t_start = 0*pq.s
-#                     sampling_rate = 1.*pq.Hz
-#                     
-#                 if annotations_group is not None:
-#                     signal_annotations = objectFromEntity(annotations_group)
-#                 else:
-#                     signal_annotations = dict()
-#                     
-#                     
-#                 obj = neo.AnalogSignal(signal_data, units=units, t_start=t_start,
-#                                        sampling_rate=sampling_rate, name=name,
-#                                        description=description, file_origin=file_origin)
-#                 
-#                 obj.annotations.update(signal_annotations)
-#                 
-#                 obj.segment = signal_segment
-#                     
-            
-            
         else:
             obj = target_class # for now
 
