@@ -1453,8 +1453,6 @@ def group2neo(g:h5py.Group, target_class:type):
     else:
         raise typeError(f"Don't know how to manage {target_class}")
             
-    
-
 def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
     """attempt to round trip of makeHDF5Entity
     """
@@ -1519,10 +1517,6 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
                 target_class = eval(".".join(python_class_comps[1:]), pymodule.__dict__)
                     
             except:
-                # print(f"in entity {entity}")
-                # print(f"module_name = {module_name}")
-                # print(f"python_class = {python_class}")
-                # print(f"type_name = {type_name}")
                 traceback.print_exc()
                 raise
             
@@ -1550,7 +1544,6 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             elif target_class == str:
                 obj = dataset2string(entity)
                 
-            # elif target_class in [int, float, complex, np.integer, np.floating, np.complexfloating]:
             elif any(k in inspect.getmro(target_class) for k in (int, float, complex)):
                 obj = target_class(entity[()])
                 
@@ -1561,7 +1554,7 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
                 
             else:
                 try:
-                    obj = entity[()]
+                    obj = entity[()] # shouldn't get here but keep in case I've messed/missed smthng
                 except:
                     obj = target_class
                     traceback.print_exc()
@@ -1576,6 +1569,10 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
                 
             elif target_class == np.ndarray:
                 obj = np.array(entity)
+                
+            elif target_class in (vigra.filters.Kernel1D, vigra.filters.Kernel2D):
+                data = np.array(entity)
+                obj = vu.kernelfromarray(data)
                 
             else:
                 obj = target_class # for now
@@ -1711,14 +1708,18 @@ def makeDataTypeAttrs(data):
             attrs["__python_class_def__"] = f"{data.__name__} = collections.namedtuple({data.__name__}, {list(fields_list)})"
         else:
             attrs["__python_class_def__"] = prog.class_def(data)
-    
-        if hasattr(data, "__new__"):
-            sig_dict = signature2Dict(getattr(data, "__new__"))
-            attrs["__python_new__"] = jsonio.dumps(sig_dict)
             
-        if hasattr(data, "__init__"):
-            init_dict = signature2Dict(getattr(data, "__init__"))
-            attrs["__python_init__"] = jsonio.dumps(init_dict)
+            
+        if data not in (vigra.filters.Kernel1D, vigra.filters.Kernel2D):
+            # NOTE: 2022-10-07 23:23:01
+            # just skip the above types
+            if hasattr(data, "__new__"):
+                sig_dict = signature2Dict(getattr(data, "__new__"))
+                attrs["__python_new__"] = jsonio.dumps(sig_dict)
+                
+            if hasattr(data, "__init__"):
+                init_dict = signature2Dict(getattr(data, "__init__"))
+                attrs["__python_init__"] = jsonio.dumps(init_dict)
         
     return makeAttrDict(**attrs)
         
@@ -3294,14 +3295,14 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
         return entity
     
     if isinstance(obj, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
-        # vigra Kernel types
+        # vigra Kernel types → straight to Dataset
         cached_entity = getCachedEntity(entity_cache, obj)
         
         if isinstance(cached_entity, h5py.Dataset):
             group[target_name] = cached_entity
             return cached_entity
             
-        data = vu.kernel2array(obj)
+        data = vu.kernel2array(obj, True) # need to pass compact=True to get an array!!!
         
         entity = group.create_dataset(target_name, data = data, 
                                       compression = compression, 
