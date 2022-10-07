@@ -84,11 +84,7 @@ import ephys.ephys as ephys
 
 
 @safeWrapper
-def segment_Rs_Rin(segment: neo.Segment,
-                   Im: typing.Union[str, int],
-                   Vm: typing.Union[str, int, pq.Quantity, float],
-                   regions: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None,
-                   channel: typing.Optional[int] = None) -> pq.Quantity:
+def segment_Rs_Rin(segment: neo.Segment,Im: typing.Union[str, int],Vm: typing.Union[str, int, pq.Quantity, float],regions: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None,channel: typing.Optional[int] = None):
     """Calculates the series (Rs) and input (Rin) resistances in voltage-clamp.
     
     Parameters:
@@ -292,12 +288,7 @@ def segment_Rs_Rin(segment: neo.Segment,
     
 
 @safeWrapper
-def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                   baseline: typing.Union[SignalCursor, tuple],
-                   rs: typing.Union[SignalCursor, tuple],
-                   rin: typing.Union[SignalCursor, tuple], 
-                   vstep: typing.Union[float, pq.Quantity],
-                   channel: typing.Optional[int] = None) -> pq.Quantity:
+def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],baseline: typing.Union[SignalCursor, tuple],rs: typing.Union[SignalCursor, tuple],rin: typing.Union[SignalCursor, tuple], vstep: typing.Union[float, pq.Quantity],channel: typing.Optional[int] = None):
     """Calculates series and input resistance from voltage-clamp recording.
     
     Applies to voltage-clamp recordings (membrane current signal)
@@ -352,10 +343,7 @@ def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     return np.array([Rs, Rin]) * Rin.units
 
 @safeWrapper
-def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                 epoch: typing.Union[neo.Epoch, tuple],
-                 vstep: typing.Union[float, pq.Quantity],
-                 channel: typing.Optional[int] = None) -> pq.Quantity:
+def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],epoch: typing.Union[neo.Epoch, tuple],vstep: typing.Union[float, pq.Quantity],channel: typing.Optional[int] = None):
     """Calculates series and input resistance based on epochs.
     
     The baseline, Rs and Rin are calculated across the time intervals
@@ -1156,10 +1144,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
     return data
     
 
-def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None, 
-                   steadyStateDuration = 0.05 * pq.s, 
-                   box_size = 0, 
-                   Iinj=None):
+def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None, steadyStateDuration = 0.05 * pq.s, box_size = 0, Iinj=None):
     """
     Square pulse current injection in I-clamp experiments.
     
@@ -1443,13 +1428,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None,
     return vbase, vss, vsag, vrebound, Rin, Rss, time_constant, vfit, v_flt
 
 
-def PassiveMembranePropertiesAnalysis(block:neo.Block, 
-                                      Vm_index:(int,str) = "Vm_prim_1", 
-                                      Im_index:(int,str) = "Im_sec_1", 
-                                      box_size:int = 63, 
-                                      name:(str, type(None)) = None, 
-                                      plot:bool = True,
-                                      **kwargs):
+def PassiveMembranePropertiesAnalysis(block:neo.Block, Vm_index:(int,str) = "Vm_prim_1", Im_index:(int,str) = "Im_sec_1", box_size:int = 63, name:(str, type(None)) = None,plot:bool = True,**kwargs):
     """User-friendly wrap around the passive_Iclamp function.
     
     Arguments:
@@ -1719,14 +1698,7 @@ def ap_waveform_roots(w, value, interpolate=False):
             
     return float(rise_x), float(rise_y), float(rise_cslope), float(decay_x), float(decay_y), float(decay_cslope)
 
-def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,
-                            triggers=None, tail=None,
-                            thr=20, atol=1e-8, smooth_window = 5,
-                            resample_with_period = 1e-5, t0=None, t1=None, 
-                            dataname=None, cell="NA", genotype="NA", source="NA", gender="NA",
-                            age=np.nan, record=None, protocol_name=None, 
-                            ref_vm = None, ref_vm_relative_onset=False,
-                            output_prefix=None):
+def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=None, tail=None,thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, dataname=None, cell="NA", genotype="NA", source="NA", gender="NA",age=np.nan, record=None, protocol_name=None,ref_vm = None, ref_vm_relative_onset=False,output_prefix=None):
     """Batch analysis for pulse-triggered APs in current-clamp.
     
     Loops through neo.Segments in data, calling analyse_AP_pulse_train for each
@@ -1973,13 +1945,7 @@ def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,
     else:
         return report, aggregated_report, grouped_report, segments_ap_results, segments_ap_waves, segments_ap_dvdt, segments_ap_d2vdt2
         
-def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,
-                           tail=None, thr=20, atol=1e-8, smooth_window = 5,
-                           resample_with_period = 1e-5, t0=None, t1=None, 
-                           record=None, dataname=None,
-                           cell="NA", genotype="NA", source="NA", gender="NA",
-                           age=np.nan, protocol_name="NA", 
-                           ref_vm = None, ref_vm_relative_onset=False):
+def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, record=None, dataname=None,cell="NA", genotype="NA", source="NA", gender="NA",age=np.nan, protocol_name="NA", ref_vm = None, ref_vm_relative_onset=False):
     
     """
     Analyses AP waveforms triggered by a train of current injection pulses.
@@ -2175,11 +2141,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,
     return ap_result, ap_report, ap_waves, ap_dvdt, ap_d2vdt2
     
 
-def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth_window = 5,
-                           resample_with_period = 1e-5, t0=None, t1=None, record=None, 
-                           cell="NA", genotype="NA", source="NA", gender="NA",
-                           age=np.nan, dataname=None, protocol_name="NA", 
-                           ref_vm = None, ref_vm_relative_onset=False):
+def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, record=None, cell="NA", genotype="NA", source="NA", gender="NA",age=np.nan, dataname=None, protocol_name="NA", ref_vm = None, ref_vm_relative_onset=False):
     """Waveform analysis for action potentials elicited individually by brief 
     pulses of current injection.
     
@@ -2383,8 +2345,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
     
     return ap_results, report, ap_waves, ap_dvdt, ap_d2vdt2
 
-def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], parameter=str,
-                              min_APs:typing.Optional[int] = None):
+def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], parameter=str,min_APs:typing.Optional[int] = None):
     """
     Get AP parameter from an AP analysis data for each depolarising step.
     
@@ -2733,9 +2694,7 @@ def extract_pulse_triggered_APs(sig, times, tail = None):
     
     return waves
 
-def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, 
-                    vm_thr=0, rtol = 1e-5, atol = 1e-8, 
-                    return_all=False):
+def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, rtol = 1e-5, atol = 1e-8, return_all=False):
     # NOTE: 2019-11-29 16:49:14
     # use a Vm threshold to discard "aberrant" events
     
@@ -2917,17 +2876,7 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi,
     return fast_rise_start_times, fast_rise_stop_times, peak_times#, waves, dwaves
         
 
-def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple],
-                     tail:pq.Quantity=0.5*pq.s,
-                     method:str="state_levels",
-                     box_size:numbers.Number=0, 
-                     adcres:numbers.Number=15,
-                     adcrange:numbers.Number=10,
-                     adcscale:numbers.Number=1e3,
-                     resample_with_period:(pq.Quantity, type(None)) = None,
-                     resample_with_rate:(pq.Quantity, type(None)) = None,
-                     Itimes_relative:bool = True,
-                     Itimes_samples:bool=False):
+def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple],tail:pq.Quantity=0.5*pq.s,method:str="state_levels",box_size:numbers.Number=0, adcres:numbers.Number=15,adcrange:numbers.Number=10,adcscale:numbers.Number=1e3,resample_with_period:(pq.Quantity, type(None)) = None,resample_with_rate:(pq.Quantity, type(None)) = None,Itimes_relative:bool = True,Itimes_samples:bool=False):
     """
     Extract the time slice of the VM corresponding to a current injection step.
     
@@ -3154,10 +3103,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
         
     return vstep, Ihold, inj, istep
 
-def detect_AP_waveform_times(sig, thr=10, smooth_window=5, 
-                             min_ap_isi= 6e-3*pq.s, 
-                             min_fast_rise_duration=None, 
-                             rtol=1e-5, atol = 1e-8, vm_thr=0):
+def detect_AP_waveform_times(sig, thr=10, smooth_window=5, min_ap_isi= 6e-3*pq.s, min_fast_rise_duration=None, rtol=1e-5, atol = 1e-8, vm_thr=0):
     """Detects AP waveform time starts in an AP train elicited by step depolarizing current injection.
     
     Detection is done primarily via thresholding on the 1st derivative of the Vm signal
@@ -3281,20 +3227,7 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
     return ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_fast_rise_durations, ap_peak_times, dv_dt, d2v_dt2
     
     
-def detect_AP_waveforms_in_train(sig, iinj, thr = 10, 
-                        before = 0.001, 
-                        after = None, 
-                        min_fast_rise_duration = None, 
-                        min_ap_isi = 6e-3*pq.s, 
-                        rtol = 1e-5, atol = 1e-8, 
-                        use_min_detected_isi=True,
-                        smooth_window = 5,
-                        interpolate_roots = False,
-                        decay_intercept_approx = "linear",
-                        decay_ref = "hm",
-                        get_duration_at_Vm=None,
-                        return_all = False,
-                        vm_thr=0):
+def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = None, min_fast_rise_duration = None, min_ap_isi = 6e-3*pq.s, rtol = 1e-5, atol = 1e-8, use_min_detected_isi=True,smooth_window = 5,interpolate_roots = False,decay_intercept_approx = "linear",decay_ref = "hm",get_duration_at_Vm=None,return_all = False, vm_thr=0):
     """Detects action potentials in a Vm signal.
     For use with experiments using "steps" of depolarizing current injections.
     
@@ -4282,9 +4215,7 @@ def ap_phase_plot_data(vm, dvdt=None, smooth_window=None):
     return ret
 
 
-def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, 
-                        ref_vm_relative_onset=False, atol=1e-8, smooth_window = None,
-                        detect_times=True, dvdt_thr=10):
+def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relative_onset=False, atol=1e-8, smooth_window = None,detect_times=True, dvdt_thr=10):
     """ AP waveform analysis for APs triggered by individual current pulses.
     
     WARNING: only to be used on isolated AP waveforms, obtained by calling
@@ -5667,12 +5598,7 @@ def report_AP_analysis(data, name=None):
     
     return summary, params, waveforms
 
-def analyse_AP_step_injection_sweep(segment, 
-                              VmSignal:typing.Union[int, str] = "Vm_prim_1", 
-                              ImSignal:typing.Union[int, str, tuple] = "Im_sec_1", 
-                              Itimes_relative:bool = True,
-                              Itimes_samples:bool = False,
-                              **kwargs):
+def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "Vm_prim_1", ImSignal:typing.Union[int, str, tuple] = "Im_sec_1", Itimes_relative:bool = True,Itimes_samples:bool = False,**kwargs):
     """AP Train analysis in a sweep (segment) of I-clamp experiments
     
     Positional parameters:

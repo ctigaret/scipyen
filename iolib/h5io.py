@@ -1065,10 +1065,43 @@ def group2neoContainer(g, target_class):
     pass
 
 def group2neoSignal(g, target_class):
-    # treats AnalogSignal, IrregularlySampledSignal
-    # DataSignal, IrregularlySampledDataSignal
-    # ImageSequencene.
-    attrs = attr2dict(g.attrs)
+    """Reconstructs neo.core.basesignal.BaseSignal objects from their HDF5 Group.
+
+    These object types are:
+    • neo.AnalogSignal
+    • neo.IrregularlySampledSignal
+    • DataSignal
+    • IrregularlySampledDataSignal
+    • neo.ImageSequencene
+    
+    """
+    # first prepare some defaults
+    signal = []
+    times = []
+    annotations = dict()
+
+    ax0 = dict()
+    ax0["t_start"] = 0.*pq.s
+    ax0["name"] = "Time"
+    ax0["sampling_rate"] = 1.*pq.Hz
+    ax0["key"] = "T"
+    ax0["units"] = pq.s
+    
+    ax1 = dict() # TODO 2022-10-06 23:50:44
+    ax1["name"] = ""
+    ax1["units"] = pq.dimensionless
+    ax1["key"] = '?'
+    ax1["array_annotations"] = None
+    
+    # now extract metadata info from the signal's HDF5 Group
+    # these are (in no particular order):
+    # • name
+    # • segment
+    # • file_origin
+    # • description
+    # • units
+    # 
+    attrs = attrs2dict(g.attrs)
     name = attrs.get("__name__", None)
     # TODO/FIXME: 2022-10-06 09:04:15
     # in this case the segment property is a reference to the neo.Segment
@@ -1089,53 +1122,211 @@ def group2neoSignal(g, target_class):
     units = attrs.get("__units__", pq.s)
     name = attrs.get("__name__", "")
     file_origin = attrs.get("__file_origin__", None)
-    description = attrs.get("__description__", None)
+    dtype = attrs.get("__dtype__", np.dtype(float))
+    
+    # now try to get data from the children entities of the signal's HDF5 Group:
+    # • the signal's data ← child Dataset
+    #
     
     data_set_name = f"{g.name.split('/')[-1]}_data"
     # data_set_name = "".join([g.name.split('/')[-1], "_data"])
     data_set = g.get(data_set_name, None)
     
+    # • signal's axes ← axes Group with two Datasets:
+    # NOTE:
+    # 1) 𝐚𝐱𝐢𝐬 𝟎 contains the signal's DOMAIN information (i.e. space, time, etc) 
+    # for AnalogSignal, DataSignal, IrregularlySampledSignal and 
+    # IrregularlySampledDataSignal, and the frame axis for ImageSequence:
+    # • time_units - these are important for IrregularlySampledSignal and 
+    #               IrregularlySampledDataSignal
+    # • t_start     
+    # • sampling_rate: for AnalogSignal, DataSignal, and ImageSequence (for the
+    #   latter, this is the inverse of frame_duration)
+    #
+    # 2) 𝐚𝐱𝐢𝐬 𝟏 contains :
+    #   ∘ signal DATA information (i.e. the variable dependent on the DOMAIN) 
+    #   for AnalogSignal, DataSignal, IrregularlySampledSignal,
+    #   and IrregularlySampledDataSignal; 
+    #   □ ATTENTION: this includes channel information (if any), for the data,
+    #       in the form of array annotations (neo.core.dataobject.ArrayDict)
+    #   
+    #   ∘ the SECOND DOMAIN AXIS information for ImageSequence.
+    #
+    #   Now, typically, the ImageSeqence is either a 3D numpy array, or a list
+    #   of 2D numpy arrays, presumably with the same shape. Furthermore, it seems
+    #   to assume a square sampling grid, therefore its 2nd and 3rd axes would 
+    #   carry the same kind of information (for a square pixel) and would both
+    #   reflect the same DOMAIN (typically, Space).
+    #
+    #   So, given that ImageSequence is a 3D data array organized in 
+    #   [frame][row][column] it follows that the data only has ONE channel that
+    #   varies in TWO DOMAINS:
+    #
+    #   (0) TIME → along the frame axis
+    #   (1) SPACE (typically) → along the row and column axes
+    #
+    #   Therefore we can affort to "compress" the information for the 2nd domain
+    #   in one HDF5 Group for 𝐚𝐱𝐢𝐬 𝟏.
+    #
+    #   (NOTE these limitations are the main reasons why Scipyen uses VIGRA arrays 
+    #   instead of ImageSeqence)
+    #
+    #
     axes_group_name = f"{g.name.split('/')[-1]}_axes"
     # axes_group_name = "".join([g.name.split('/')[-1], "_axes"])
     axes_group = g.get(axes_group_name, None)
     
-    signal = []
-    ax0 = dict()
-    ax0["t_start"] = 0.*units
-    ax0["sampling_rate"] = 1.*pq.Hz
-    ax0["name"] = "Time"
-    ax0["key"] = "T"
+    # • signal annotations ← Group of annotations
+    # (these are NOT array_annotations !!!) 
+    annotations_group_name = f"{g.name.split('/')[-1]}_annotatinos"
+    annotations_group = g.get(annotations_group_name, None)
     
-    ax1 = dict() # TODO 2022-10-06 23:50:44
-    ax1["channel_ids"] = 0
-    ax1["channel_names"] = ""
+    if isinstance(annotations_group, h5py.Group):
+        annotations = objectFromEntity(annotations_group)
     
-    
+    # ❗ if the signal does not have a data set just create a default
+    # instance of target_class and return it
+    # NOTE: we don't return None because the Entity is not a 'null'
     if isinstance(data_set, h5py.Dataset):
         signal = np.array(data_set)
+        data_attrs = attrs2dict(data_set.attrs)
+        # TODO: decide if we use the data set attrs at all or not
         
-        if isinstance(axes_grop, h5py.Group):
-            ax0g = axes_group.get("axis_0", None)
-            if isinstance(ax0g, h5py.Dataset):
+        if isinstance(axes_group, h5py.Group):
+            # NOTE: 2022-10-07 13:44:46 ATTENTION: ❗❗❗
+            # for AnalogSignal and DataSignal, axis0 data set is empty!
+            # axis0 data set only contains data for irregular signals, where it
+            # defines the DOMAIN (time for IrregularlySampledSignal and time, 
+            # space or anything else for IrregularlySampledDataSignal)
+            #
+            # HOWEVER: ❗❗❗
+            # the specifics of the domain are stored in this data set attrs property
+            ax0ds = axes_group.get("axis_0", None)
+            if isinstance(ax0ds, h5py.Dataset):
+                if isinstance(ax0ds.shape, tuple):
+                    times = np.array(ax0ds)
+                ax0attrs = attrs2dict(ax0ds.attrs)
                 ax0["t_start"] = ax0attrs.get("__origin__", 0.*units)
+                ax0["dtype"] = ax0attrs.get("__dtype__", np.dtype(float))
                 ax0["name"] = ax0attrs.get("__name__", None)
                 ax0["sampling_rate"] = ax0attrs.get("__sampling_rate__", 1.*pq.Hz)
+                ax0["key"] = ax0attrs.get("__key__", "")
+                ax0["units"] = ax0attrs.get("__units__", pq.s)
+                
+            # NOTE: 2022-10-07 13:45:37 ATTENTION: ❗❗❗
+            # axis1 data set is ALWAYS empty i.e it has NO data !!!
+            # the relevant meta information is contains in its attrs property.
+            ax1ds = axes_group.get("axis_1", None)
+            if isinstance(ax1ds, h5py.Dataset):
+                ax1attrs = attrs2dict(ax1ds.attrs)
+                ax1["name"] = ax1attrs.get("__name__", "")
+                ax1["units"] = ax1attrs.get("__units__", pq.dimensionless)
+                ax1["key"] = ax1attrs.get("__key__", '?')
+                ax1["spatial_scale"] = ax1attrs.get("__spatial_scale__", 1.0)
+                ax1["array_annotations"] = ax1attrs.get("__array_annotations__", None)
+                
+    if target_class == neo.ImageSequence:
+        obj = target_class(signal, units=units,dtype=dtype,t_start=ax0["t_start"],
+                           sampling_rate=ax0["sampling_rate"],
+                           spatial_scale=ax1["spatial_scale"],
+                           file_origin=file_origin,
+                           description=description)
+        
+    elif target_class == IrregularlySampledDataSignal:
+        obj = target_class(times, signal, 
+                            units=units, 
+                            domain_units=ax0["units"],
+                            dtype=dtype, domain_dtype=ax0["dtype"],
+                            name=name, file_origin=file_origin, 
+                            description=description)
+    elif target_class == neo.IrregularlySampledSignal:
+        obj = target_class(times, signal, 
+                            units=units, time_units=ax0["units"],
+                            dtype=dtype,
+                            name=name, file_origin=file_origin, 
+                            description=description)
+
+    elif target_class == DataSignal:
+        obj = target_class(signal, units=units, time_units=ax0["units"],
+                            t_start=ax0["t_start"],sampling_rate=ax0["sampling_rate"],
+                            dtype=dtype, name=name,
+                            file_origin=file_origin,description=description)
+    elif target_class == neo.AnalogSignal:
+        obj = target_class(signal, units=units, name=name, t_start=ax0["t_start"],
+                            sampling_rate=ax0["sampling_rate"], dtype=dtype,
+                            file_origin=file_origin,description=description)
+        
+    else:
+        raise RuntimeError(f"Reading {target_class.__name__} objects is not implemented")
+            
+    obj.segment=segment
+    obj.annotations.update(annotations)
     
+    arrann = ax1.get("array_annotations", None)
+    
+    if arrann is not None:
+        obj.array_annotations = arrann
+    
+    return obj
 
 def group2neoDataObject(g, target_class):
-    # treats SpikeTrain, Event, Epoch, TriggerEvent, DataZone
-    # the following are delegated to group2neoSignal:
-    # AnalgSignal, IrregularlySampledSignal,
-    # DataSignal, IrregularlySampledDataSignal
+    """Reconstructs neo.core.dataobject.DataObject objects from their HDF5 Group.
+    
+    These object types are:
+    • Signal objects → delegated to group2neoSignal():
+        ∘ neo.AnalogSignal
+        ∘ neo.IrregularlySampledSignal
+        ∘ DataSignal
+        ∘ IrregularlySampledDataSignal
+        ∘ neo.ImageSequencene
+        
+    • neo.Epoch
+    • DataZone
+    • neo.Event
+    • DataMark
+    • TriggerEvent
+    • neo.SpikeTrain
+    
+    """
+    # delegate as needed
     if neo.core.basesignal.BaseSignal in inspect.getmro(target_class):
         return group2neoSignal(g, target_class)
     
-    attrs = attr2dict(g.attrs)
+    # prepare defaults
+    times = []
+    
+    # NOTE: 2022-10-07 10:59:48
+    # For these objects, 𝐚𝐱𝐢𝐬 𝟎 contains domain information, whereas
+    # 𝐚𝐱𝐢𝐬 𝟏 is just a tag...
+    ax0 = dict()
+    ax0["t_start"] = pq.s
+    ax0["t_stop"] = None
+    ax0["sampling_rate"] = 1.*pq.Hz
+    ax0["left_sweep"] = None
+    
+    # NOTE: 2022-10-07 11:29:31
+    # array annotations for BaseSignal are stored in axis 1; for all other data
+    # objects they are stored in axis 0
+    ax0["array_annotations"] = None
+    
+    ax1 = dict()
+    
+    # now extract metadata info from the data object's HDF5 Group
+    # these are (in no particular order):
+    # • name
+    # • segment
+    # • file_origin
+    # • description
+    # • units
+    # 
+    
+    
+    attrs = attrs2dict(g.attrs)
     name = attrs.get("__name__", None)
     units = attrs.get("__units__", pq.s)
     segment = attrs.get("__segment__", None)
     file_origin = attrs.get("__file_origin__", None)
-    descripton = attrs.get("__description__", None)
+    description = attrs.get("__description__", None)
     
     # unit = attrs.get("__unit__", None)
     
@@ -1151,39 +1342,30 @@ def group2neoDataObject(g, target_class):
     labels_set_name = f"{g.name.split('/')[-1]}_labels"
     labels_set = g.get(labels_set_name, None)
     
-    if isinstance(labels_set, hyp5.Dataset):
+    if isinstance(labels_set, h5py.Dataset):
         labels = objectFromEntity(labels_set)
     else:
         labels = None
     
     annotations_group_name = f"{g.name.split('/')[-1]}_annotations"
     # annotations_group_name = "".join([g.name.split('/')[-1], "_annotations"])
-    annotations_group = g,get(annotations_group_name, None)
+    annotations_group = g.get(annotations_group_name, None)
     
     if isinstance(annotations_group, h5py.Group):
         annotations = objectFromEntity(annotations_group)
     else:
         annotations = dict()
 
-    times = []
-    
-    ax0 = dict()
-    ax0["t_start"] = 0.*units
-    ax0["t_stop"] = None
-    ax0["sampling_rate"] = 1.*pq.Hz
-    ax0["left_sweep"] = None
-    
-    ax1 = dict()
-    
-    
     if isinstance(data_set, h5py.Dataset):
-        times = np.array(data_set)
+        if isinstance(data_set.shape, tuple):
+            times = np.array(data_set)
         
         if isinstance(axes_group, h5py.Group):
             # axis 0 is ALWAYS the domain axis
             # axis 1 is ALWAYS the signal axis (or channels axis)
             # for DataObject other than BaseSignal, axis 1 is just a tag-like
             # data - these all have one axis!!
+            # ATTENTION: ❗❗❗ see NOTE: 2022-10-07 13:44:46 and NOTE: 2022-10-07 13:45:37
             ax0g = axes_group.get("axis_0", None)
             
             if isinstance(ax0g, h5py.Dataset):
@@ -1192,6 +1374,7 @@ def group2neoDataObject(g, target_class):
                 ax0["t_start"] = ax0attrs.get("__origin__", 0.*units)
                 ax0["sampling_rate"] = ax0attrs.get("__sampling_rate__", 1.*pq.Hz)
                 ax0["left_sweep"] = ax0attrs.get("__left_sweep__", None)
+                ax0["array_annotations"] = ax0attrs.get("__array_annotations__", None)
             
             ax1g = axes_group.get("axis_1", None)
             
@@ -1200,8 +1383,8 @@ def group2neoDataObject(g, target_class):
     
     if target_class == neo.SpikeTrain:
         waveforms_set_name = f"{g.name.split('/')[-1]}_waveforms"
-        # waveforms_set_name = "".join([g.name.split('/')[-1], "_waveforms"])
         waveforms_set = g[waveforms_set_name] if waveforms_set_name in g else None
+        
         if isinstance(waveforms_set, h5py.Dataset):
             waveforms  = np.array(waveforms_set)
         else:
@@ -1213,13 +1396,19 @@ def group2neoDataObject(g, target_class):
                            sampling_rate=ax0["sampling_rate"], 
                            left_sweep=ax0["left_sweep"], 
                            name=name, waveforms=waveforms, 
-                           file_origin=file_origin, description = description)
+                           file_origin=file_origin, 
+                           description = description)
     
     elif target_class == neo.Event:
-        return target_class # TODO
+        obj = target_class(times=times, labels=labels, units=units,
+                           name=name, file_origin=file_origin,
+                           description=description)
+        # return target_class # TODO
     
     elif target_class == neo.Epoch:
-        return target_class # TODO
+        obj = target_class(times=times, durations=durations,labels=labels, units=units,
+                           name=name, file_origin=file_origin,
+                           description=description)
     
     elif target_class == DataZone:
         return target_class # TODO
@@ -1238,8 +1427,11 @@ def group2neoDataObject(g, target_class):
     else:
         raise NotImplementedError(f"{target_class} if not yet supported")
         
-    obj.annotations.update(annotations)
     obj.segment = segment
+    obj.annotations.update(annotations)
+    
+    if isinstance(ax0["array_annotations"], dict):
+        obj.array_annotations = ax0["array_annotations"]
     
     return obj
     
@@ -1300,8 +1492,7 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
     #                                               dataset has the dtype h5py.string_dtype
                                                 
     attrs = attrs2dict(entity.attrs)
-    
-    
+
     try:
         type_name = attrs.get("__type_name__", None)
         if type_name is None:
@@ -1538,93 +1729,93 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
 #                 obj.segment = train_segment
 #                 obj.annotations.update(train_annotations) # safer that via c'tor above
 #                 
-        # elif "neo.core.analogsignal.AnalogSignal" in python_class:
-        elif ".".join([target_class.__module__, target_class.__name__]) == "neo.core.analogsignal.AnalogSignal":
-            # NOTE: 2022-10-06 09:46:42
-            # as all neo DataObjects these re also stored as a Group
-            # contrary to SpikeTrain we don't have a waveform data set
-            data_set_name = "".join([entity.name.split('/')[-1], "_data"])
-            data_set = entity[data_set_name] if data_set_name in entity else None
-            
-            axes_group_name = "".join([entity.name.split('/')[-1], "_axes"])
-            axes_group = entity[axes_group_name] if axes_group_name in entity else None
-            
-            annotations_group_name = "".join([entity.name.split('/')[-1], "_annotations"])
-            annotations_group = entity[annotations_group_name] if annotations_group_name in entity else None
-            
-            signal_name = attrs.get("__name__", None)
-            signal_segment = attrs.get("__segment__", None)
-            description = attrs.get("__description__", None)
-            
-            if signal_segment in ["__ref__", "null"]:
-                # FIXME: see TODO/FIXME: 2022-10-06 09:04:15
-                signal_segment = None
-                
-            units = attrs.get("__units__", pq.s)
-            name = attrs.get("__name__", "")
-            file_origin = attrs.get("__file_origin__", None)
-            description = attrs.get("__description__", None)
-            # signal_segment = attrs.get("__segment__", None)
-            
-            # prepare default; mandatory args are:
-            # signal (e.g. empty array-like)
-            # units
-            # sampling rate
-            obj = neo.AnalogSignal([], units = units, sampling_rate = 1*pq.Hz)
-            
-            if data_set is not None and data_set.shape is not None:
-                # NOTE: 2022-10-06 10:48:24
-                # some of the attrs of data_set are redundant since they 
-                # are also present in `entity.attrs` or in the data_set.attrs
-                # • __name__  = signal's name
-                # • __units__ = signal's units
-                # • __description__ = signal's description
-                signal_data = np.array(data_set)
-                
-                if axes_group is not None:
-                    # NOTE: see also:
-                    # • TODO: 2022-10-06 10:31:02
-                    # • NOTE: 2022-10-06 10:31:07
-                    # • NOTE: 2022-10-06 10:32:52
-                    # we expect two axes
-                    if "axis_0" in axes_group:
-                        axis_0_set = axes_group["axis_0"] # a Dataset for axis 0
-                        # in the case of AnalogSignal this is the time axis
-                        axis_0_attrs = attrs2dict(axis_0_set.attrs)
-                        
-                        t_start = axis_0_attrs.get("__origin__", 0.*pq.s)
-                        sampling_rate = axis_0_attrs.get("__sampling_rate__", 1.*pq.Hz)
-                    else:
-                        t_start = 0.*pq.s
-                        sampling_rate = 1.*pq.Hz
-                    # axis_1_set = axes_group["axis_1"] #  the channels axis
-                    # NOTE: 2022-10-06 10:54:31 this is an empty axis (sort of a
-                    # pseudo-tag)
-                    # redundant atrs members are (see entity.attrs)
-                    # • name
-                    # • units
-                    #
-                    # TODO: revisit this with real analog signals where there
-                    # may be channel info
-                    
-                else:
-                    t_start = 0*pq.s
-                    sampling_rate = 1.*pq.Hz
-                    
-                if annotations_group is not None:
-                    signal_annotations = objectFromEntity(annotations_group)
-                else:
-                    signal_annotations = dict()
-                    
-                    
-                obj = neo.AnalogSignal(signal_data, units=units, t_start=t_start,
-                                       sampling_rate=sampling_rate, name=name,
-                                       description=description, file_origin=file_origin)
-                
-                obj.annotations.update(signal_annotations)
-                
-                obj.segment = signal_segment
-                    
+#         # elif "neo.core.analogsignal.AnalogSignal" in python_class:
+#         elif ".".join([target_class.__module__, target_class.__name__]) == "neo.core.analogsignal.AnalogSignal":
+#             # NOTE: 2022-10-06 09:46:42
+#             # as all neo DataObjects these re also stored as a Group
+#             # contrary to SpikeTrain we don't have a waveform data set
+#             data_set_name = "".join([entity.name.split('/')[-1], "_data"])
+#             data_set = entity[data_set_name] if data_set_name in entity else None
+#             
+#             axes_group_name = "".join([entity.name.split('/')[-1], "_axes"])
+#             axes_group = entity[axes_group_name] if axes_group_name in entity else None
+#             
+#             annotations_group_name = "".join([entity.name.split('/')[-1], "_annotations"])
+#             annotations_group = entity[annotations_group_name] if annotations_group_name in entity else None
+#             
+#             signal_name = attrs.get("__name__", None)
+#             signal_segment = attrs.get("__segment__", None)
+#             description = attrs.get("__description__", None)
+#             
+#             if signal_segment in ["__ref__", "null"]:
+#                 # FIXME: see TODO/FIXME: 2022-10-06 09:04:15
+#                 signal_segment = None
+#                 
+#             units = attrs.get("__units__", pq.s)
+#             name = attrs.get("__name__", "")
+#             file_origin = attrs.get("__file_origin__", None)
+#             description = attrs.get("__description__", None)
+#             # signal_segment = attrs.get("__segment__", None)
+#             
+#             # prepare default; mandatory args are:
+#             # signal (e.g. empty array-like)
+#             # units
+#             # sampling rate
+#             obj = neo.AnalogSignal([], units = units, sampling_rate = 1*pq.Hz)
+#             
+#             if data_set is not None and data_set.shape is not None:
+#                 # NOTE: 2022-10-06 10:48:24
+#                 # some of the attrs of data_set are redundant since they 
+#                 # are also present in `entity.attrs` or in the data_set.attrs
+#                 # • __name__  = signal's name
+#                 # • __units__ = signal's units
+#                 # • __description__ = signal's description
+#                 signal_data = np.array(data_set)
+#                 
+#                 if axes_group is not None:
+#                     # NOTE: see also:
+#                     # • TODO: 2022-10-06 10:31:02
+#                     # • NOTE: 2022-10-06 10:31:07
+#                     # • NOTE: 2022-10-06 10:32:52
+#                     # we expect two axes
+#                     if "axis_0" in axes_group:
+#                         axis_0_set = axes_group["axis_0"] # a Dataset for axis 0
+#                         # in the case of AnalogSignal this is the time axis
+#                         axis_0_attrs = attrs2dict(axis_0_set.attrs)
+#                         
+#                         t_start = axis_0_attrs.get("__origin__", 0.*pq.s)
+#                         sampling_rate = axis_0_attrs.get("__sampling_rate__", 1.*pq.Hz)
+#                     else:
+#                         t_start = 0.*pq.s
+#                         sampling_rate = 1.*pq.Hz
+#                     # axis_1_set = axes_group["axis_1"] #  the channels axis
+#                     # NOTE: 2022-10-06 10:54:31 this is an empty axis (sort of a
+#                     # pseudo-tag)
+#                     # redundant atrs members are (see entity.attrs)
+#                     # • name
+#                     # • units
+#                     #
+#                     # TODO: revisit this with real analog signals where there
+#                     # may be channel info
+#                     
+#                 else:
+#                     t_start = 0*pq.s
+#                     sampling_rate = 1.*pq.Hz
+#                     
+#                 if annotations_group is not None:
+#                     signal_annotations = objectFromEntity(annotations_group)
+#                 else:
+#                     signal_annotations = dict()
+#                     
+#                     
+#                 obj = neo.AnalogSignal(signal_data, units=units, t_start=t_start,
+#                                        sampling_rate=sampling_rate, name=name,
+#                                        description=description, file_origin=file_origin)
+#                 
+#                 obj.annotations.update(signal_annotations)
+#                 
+#                 obj.segment = signal_segment
+#                     
             
             
         else:
@@ -1691,6 +1882,32 @@ def attrs2dict(attrs:h5py.AttributeManager):
         ret[k] = v
         
     return ret
+
+def extract_array_annotations(obj):
+    """Extracts array annotations from neo data objects
+    """
+    # NOTE: 2022-10-07 11:27:36
+    # we don't store array_annotations directly (as an ArrayDict); instead,
+    # we copy it into a regular dict then we re-apply it to the object at
+    # reconstruction time
+    array_annotations = getattr(obj,"array_annotations", None)
+    arrann = None
+    if isinstance(array_annotations, ArrayDict) and len(array_annotations): 
+        # len is the number of fields, not 'length' a.k.a channels!
+        # NOTE: skip silently is length different for obj size on axis 1
+        # ATTENTION: the 'length' property of the ArrayDict seems to be the 
+        # same as the 2nd dimension of the signal's array (documentation
+        # is a bit misleading), and NOT the same as then number of fields
+        # in the ArrayDict !!! (each field is a numpy array)
+        # 
+        if array_annotations.length == obj.shape[1]:
+            arrann = dict(array_annotations)
+            # arrann = dict()
+            # for field, value in array_annotations.items():
+            #     arrann[field] = value
+                # seed[__mangle_name__(field)] = value
+                
+    return arrann
                 
 def makeDataTypeAttrs(data):
     if not isinstance(data, type):
@@ -2384,38 +2601,93 @@ def _(obj, axisindex:int):
         raise TypeError(f"'axisindex' expected to be an int; got {type(axisindex).__name__} instead")
     
     seed = dict()
-    #name = name_from_unit(obj.times.units) if axisindex == 0 else name_from_unit(obj.units)
-    #print("name", name)
     seed["__name__"] = name_from_unit(obj.times.units) if axisindex == 0 else name_from_unit(obj.units)
-    #print("seed: __name__", seed["__name__"])
     seed["__key__"] = name_from_unit(obj.times.units, True) if axisindex == 0 else name_from_unit(obj.units, True)
-    #print("seed: __key__", seed["__key__"])
-    #seed["__key__"] = name_from_unit(obj.times.units) if axisindex == 0 else name_from_unit(obj.units)
-    #seed["__name__"] = seed["__key__"] if axisindex == 0 else getattr(obj, "name", type(obj).__name__)
     seed["__units__"] = obj.times.units if axisindex == 0 else obj.units
+    seed["__array_annotations__"] = None
     
+    # NOTE: 2022-10-07 11:26:34
+    # all dataobject seem to have array_annotations now, except for ImageSequence
+    # arrann = None
+    if axisindex == 1:
+        if isinstance(obj, neo.core.basesignal.BaseSignal):
+            # arann = extract_array_annotations(obj)
+            seed["__array_annotations__"] = extract_array_annotations(obj)
+            
+            
+    elif axisindex == 0:
+        if not isinstance(obj, neo.core.basesignal.BaseSignal):
+            seed["__array_annotations__"] = extract_array_annotations(obj)
+        
+    # if isinstance(obj, neo.core.basesignal.BaseSignal) and axisindex == 1:
+    #     # channels axis
+    #     #  NOTE: 2021-11-17 13:41:04
+    #     # array annotations SHOULD be empty for non-signals
+    #     # ImageSequence does NOT have array_annotations member
+    #     arann = extract_array_annotations(obj)
+    # else:
+    #     arann = extract_array_annotations(obj)
+        
+    # seed["__array_annotations__"] = arrann
+    
+#     if axisindex == 1: 
+#         # channels axis
+#         #  NOTE: 2021-11-17 13:41:04
+#         # array annotations SHOULD be empty for non-signals
+#         # ImageSequence does NOT have array_annotations member
+#         #
+#         # NOTE: 2022-10-07 11:27:36
+#         # we don't store array_annotations directly (as an ArrayDict); instead,
+#         # we copy it into a regular dict then we re-apply it to the object at
+#         # reconstruction time
+#         array_annotations = getattr(obj,"array_annotations", None)
+#         arrann = None
+#         if isinstance(array_annotations, ArrayDict) and len(array_annotations): # this is the number of fields NOT channels!
+#             # NOTE: skip silently is length different for obj size on axis 1
+#             # ATTENTION: the 'length' property of the ArrayDict seems to be the 
+#             # same as the 2nd dimension of the signal's array (documentation
+#             # is a bit misleading), and NOT the same as then number of fields
+#             # in the ArrayDict !!! (each field is a numpy array)
+#             # 
+#             if array_annotations.length == obj.shape[1]:
+#                 arrann = dict()
+#                 for field, value in array_annotations.items():
+#                     arrann[field] = value
+#                     # seed[__mangle_name__(field)] = value
+#         seed["__array_annotations__"] = arrann
+#    
+
     if isinstance(obj, neo.core.basesignal.BaseSignal):
-        if axisindex == 1: 
-            # channels axis
-            #  NOTE: 2021-11-17 13:41:04
-            # array annotations SHOULD be empty for non-signals
-            # ImageSequence does NOT have array_annotations member
-            array_annotations = getattr(obj,"array_annotations", None)
-            if isinstance(array_annotations, ArrayDict) and len(array_annotations): # this is the number of fields NOT channels!
-                # NOTE: skip silently is length different for obj size on axis 1
-                if array_annotations.length == obj.shape[1]:
-                    for field, value in array_annotations.items():
-                        seed[__mangle_name__(field)] = value
+        # if axisindex == 1: 
+        #     # channels axis
+        #     #  NOTE: 2021-11-17 13:41:04
+        #     # array annotations SHOULD be empty for non-signals
+        #     # ImageSequence does NOT have array_annotations member
+        #     array_annotations = getattr(obj,"array_annotations", None)
+        #     arrann = None
+        #     if isinstance(array_annotations, ArrayDict) and len(array_annotations): # this is the number of fields NOT channels!
+        #         # NOTE: skip silently is length different for obj size on axis 1
+        #         # ATTENTION: the 'length' property of the ArrayDict seems to be the 
+        #         # same as the 2nd dimension of the signal's array (documentation
+        #         # is a bit misleading), and NOT the same as then number of fields
+        #         # in the ArrayDict !!! (each field is a numpy array)
+        #         # 
+        #         if array_annotations.length == obj.shape[1]:
+        #             arrann = dict()
+        #             for field, value in array_annotations.items():
+        #                 arrann[field] = value
+        #                 # seed[__mangle_name__(field)] = value
+        #     seed["__array_annotations__"] = arrann
         
         ret = makeNeoSignalAxisDict(obj, axisindex)
         
     else: # data objects that are NOT base signals; these include SpikeTrain!!!
-        array_annotations = getattr(obj,"array_annotations", None)
-        if isinstance(array_annotations, ArrayDict) and len(array_annotations): # this is the number of fields NOT channels!
-            # NOTE: skip silently is length different for obj size on axis 1
-            if array_annotations.length == obj.shape[1]:
-                for field, value in array_annotations.items():
-                    seed[__mangle_name__(field)] = value
+        # array_annotations = getattr(obj,"array_annotations", None)
+        # if isinstance(array_annotations, ArrayDict) and len(array_annotations): # this is the number of fields NOT channels!
+        #     # NOTE: skip silently is length different for obj size on axis 1
+        #     if array_annotations.length == obj.shape[1]:
+        #         for field, value in array_annotations.items():
+        #             seed[__mangle_name__(field)] = value
                     
         ret = makeNeoDataAxisDict(obj, axisindex)
         
@@ -2555,14 +2827,7 @@ def _(obj, axisindex):
     return ret
 
 @safeWrapper
-def makeAxisScale(obj,
-                    dset:h5py.Dataset, 
-                    axesgroup:h5py.Group,
-                    dimindex:int,
-                    axisdict:dict,
-                    compression:str="gzip",
-                    chunks:bool=None,
-                    track_order=True)-> h5py.Dataset:
+def makeAxisScale(obj,dset:h5py.Dataset, axesgroup:h5py.Group,dimindex:int,axisdict:dict,compression:str="gzip",chunks:bool=None,track_order=True):
     """
     Attaches a dimension scale for a specific dimension in a HDF5 Dataset.
     
@@ -3245,6 +3510,7 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
         return entity
     
     if isinstance(obj, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
+        # vigra Kernel types
         cached_entity = getCachedEntity(entity_cache, obj)
         
         if isinstance(cached_entity, h5py.Dataset):
@@ -3264,6 +3530,7 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
         return entity
     
     elif isinstance(obj, (pd.DataFrame, pd.Series)):
+        # pandas types
         cached_entity = getCachedEntity(entity_cache, obj)
         
         if isinstance(cached_entity, h5py.Dataset):
@@ -3422,7 +3689,7 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
                        chunks=chunks, track_order=track_order, entity_cache = entity_cache)
         
 
-def makeHDF5Dataset(obj, group: h5py.Group, name:typing.Optional[str]=None, chunks:typing.Optional[bool] = None, track_order:typing.Optional[bool]=True, entity_cache:typing.Optional[dict] = None) -> h5py.Dataset:
+def makeHDF5Dataset(obj, group: h5py.Group, name:typing.Optional[str]=None, compression:typing.Optional[str]="gzip", chunks:typing.Optional[bool] = None, track_order:typing.Optional[bool]=True, entity_cache:typing.Optional[dict] = None):
     """Creates a HDF5 Dataset in group based on obj.
     Delegates to makeDataset to create a data set then adorns its attrs 
     with obj-specific information.
@@ -3435,15 +3702,10 @@ def makeHDF5Dataset(obj, group: h5py.Group, name:typing.Optional[str]=None, chun
                         compression = compression, chunks = chunks,
                         track_order = track_order, entity_cache = entity_cache)
     
-    #dset.attrs.update(obj_attrs)
-    
-    #storeEntityInCache(entity_cache, obj, dset)
-    
     return dset
 
 @singledispatch
 def makeDataset(obj, group:h5py.Group, attrs:dict, name:str, compression:typing.Optional[str]="gzip", chunks:typing.Optional[bool] = None, track_order=True, entity_cache = None):
-    #print(f"makeDataset for {type(obj).__name__} with name {name} in group {group}")
     # for scalar objects only, and basic python sequences EXCEPT for strings
     # because reading back strings can be confused with stored bytes data
     cached_entity = getCachedEntity(entity_cache, obj)
@@ -3553,6 +3815,12 @@ def _(obj, group:h5py.Group, attrs:dict, name:str,
 
 @makeDataset.register(neo.core.dataobject.DataObject)
 def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
+    # for all neo DataObject types:
+    # 1) create a data set with their contents (these are time stamps)
+    # 2) create an axes group with axis 0 
+    # 3) if the object has a labels property: create a labels dataset
+    # 4) if the object has a wavforms property: create a waveforms dataset
+    # 5) create an annotations group (NOT array annotations!!!)
     cached_entity = getCachedEntity(entity_cache, obj)
     if isinstance(cached_entity, h5py.Dataset):
         group[target_name] = cached_entity # make a hard link

@@ -365,6 +365,19 @@ For each of these, cd into their source tree and run:
 ..............
     REQUIRES: Qt5 and Qt5-devel packages installed on the host machine.
     
+    NOTE: This is building PyQt5 binary libaries from source, using Qt5 
+    libraries (and devel packages) available on your local platform (usually,
+    system-wide, and independent of the python's virtual environment).
+    
+    YOU MAY HAVE TO REBUILD the PyQt5 binaries after upgrading your platform's 
+    Qt5 stack. This is more likely to happen when your platform is running a 
+    "rolling release" OS distribution such as OpenSUSE Tumbleweed. 
+    
+    If, after such upgrade you see messages about missing symbols or version 
+    mismatches related to one of libQt5xxx libraries when launching scipyen from 
+    the terminal, then it is very likely you need to rebuild PyQt5.
+    
+    
     Use downloaded PyQt5-5.15.3.dev2012141313.tar.gz from scipyen-dependencies/Unix
     
     PyQt5-5.15.7.dev2202011035.tar.gz from here:
@@ -389,6 +402,8 @@ For each of these, cd into their source tree and run:
     python setup.py install
 
     pip show PyQt5-sip <-- verifies that PyQt5 sip module is installed
+    
+    NOTE: You may have to rebuild Pyt5.sip after rebuilding PyQt5 itself
     
 After installing pip requirements below, test that PyQt5  was installed OK
 by launching 'jupyter qtconsole' - Qt widgets should have the style used by your
