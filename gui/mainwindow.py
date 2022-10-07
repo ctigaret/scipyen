@@ -1603,9 +1603,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     # NOTE: 2016-04-17 16:14:18
     # argument parsing code moved to _installPluginFunction_ ini order to keep
     # this decorator small: this decorator should only do this: DECORATE
-    def slot_wrapPluginFunction(self, f, nReturns = 0, argumentTypes = None, \
-                                argumentNames=None, argumentDefaults=None, \
-                                variadicArguments=None, keywordArguments=None):
+    def slot_wrapPluginFunction(self, f, nReturns = 0, argumentTypes = None, argumentNames=None, argumentDefaults=None, variadicArguments=None, keywordArguments=None):
         '''
         Defines a new slot for plugins functionality
         '''
@@ -1633,9 +1631,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         return sw_f
 
     #@processtimefunc
-    def __init__(self, app:QtWidgets.QApplication, 
-                 parent:typing.Optional[QtWidgets.QWidget]=None,
-                 *args, **kwargs) -> None:
+    def __init__(self, app:QtWidgets.QApplication, parent:typing.Optional[QtWidgets.QWidget]=None, *args, **kwargs):
         """Scipyen's main window initializer (constructor).
         
         Parameters:
@@ -1896,7 +1892,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         
     @property
-    def maxRecentFiles(self) -> int:
+    def maxRecentFiles(self):
         return self._maxRecentFiles
     
     @markConfigurable("MaxRecentFiles", "Qt")
@@ -1906,12 +1902,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self._maxRecentFiles = val
             
     @property
-    def guiStyle(self) -> str:
+    def guiStyle(self):
         return self._current_GUI_style_name
     
     @markConfigurable("WidgetStyle", "qt", default="Default")
     @guiStyle.setter
-    def guiStyle(self, val:str) -> None:
+    def guiStyle(self, val:str):
         if not isinstance(val, str) or val not in self._available_Qt_style_names_:
             return
         
@@ -1944,7 +1940,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.actionAuto_launch_Script_Manager.setChecked(val)
             
     @property
-    def maxRecentDirectories(self) -> int:
+    def maxRecentDirectories(self):
         return self._maxRecentDirectories
     
     @markConfigurable("MaxRecentDirectories", "Qt", default=10)
@@ -1954,12 +1950,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self._maxRecentDirectories = val
         
     @property
-    def recentFiles(self) -> collections.OrderedDict:
+    def recentFiles(self):
         return self._recentFiles
     
     @markConfigurable("RecentFiles", "Qt", default=10)
     @recentFiles.setter
-    def recentFiles(self, val:typing.Optional[typing.Union[collections.OrderedDict, tuple, list]]=None) -> None:
+    def recentFiles(self, val:typing.Optional[typing.Union[collections.OrderedDict, tuple, list]]=None):
         if isinstance(val, collections.OrderedDict):
             self._recentFiles = val
         elif isinstance(val, (tuple, list)):
@@ -1970,12 +1966,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._refreshRecentFilesMenu_()
             
     @property
-    def recentDirectories(self) -> collections.deque:
+    def recentDirectories(self):
         return self._recentDirectories
     
     @markConfigurable("RecentDirectories", "Qt")
     @recentDirectories.setter
-    def recentDirectories(self, val:typing.Optional[typing.Union[collections.deque, list, tuple]]=None) -> None:
+    def recentDirectories(self, val:typing.Optional[typing.Union[collections.deque, list, tuple]]=None):
         if isinstance(val, (collections.deque, list, tuple)):
             self._recentDirectories = collections.deque(val)
         else:
@@ -1987,13 +1983,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.slot_changeDirectory(self._recentDirectories[0]) # alse refreshes gui
             
     @property
-    def fileSystemFilterHistory(self) -> collections.deque:
+    def fileSystemFilterHistory(self):
         return self._fileSystemFilterHistory
     
     @markConfigurable("RecentFileSystemFilters", "Qt")
     @fileSystemFilterHistory.setter
-    def fileSystemFilterHistory(self, 
-                                val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
+    def fileSystemFilterHistory(self, val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None):
         if isinstance(val, (collections.deque, list, tuple)):
             self._fileSystemFilterHistory = collections.deque(val)
             
@@ -2007,12 +2002,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     self.fileSystemFilter.addItem(item)
             
     @property
-    def lastFileSystemFilter(self) -> str:
+    def lastFileSystemFilter(self):
         return self._lastFileSystemFilter
     
     @markConfigurable("LastFileSystemFilter", "Qt")
     @lastFileSystemFilter.setter
-    def lastFileSystemFilter(self, val:typing.Optional[str] = None) -> None:
+    def lastFileSystemFilter(self, val:typing.Optional[str] = None):
         if isinstance(val, str):
             self._lastFileSystemFilter = val
         else:
@@ -2022,12 +2017,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.fileSystemModel.setNameFilters(self._lastFileSystemFilter.split())
         
     @property
-    def showFileSystemFilter(self) -> bool:
+    def showFileSystemFilter(self):
         return self._showFilesFilter
     
     @markConfigurable("FilesFilterVisible", "Qt")
     @showFileSystemFilter.setter
-    def showFileSystemFilter(self, val:typing.Optional[typing.Union[bool, str, int]]=None) -> None:
+    def showFileSystemFilter(self, val:typing.Optional[typing.Union[bool, str, int]]=None):
         if isinstance(val, str) and val.strip().lower() == "true":
             val = True
         elif isinstance(val, int) and val > 0:
@@ -2038,13 +2033,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.filesFilterFrame.setVisible(self._showFilesFilter)
             
     @property
-    def variableSearches(self) -> collections.deque:
+    def variableSearches(self):
         return self._recentVariablesList
     
     @markConfigurable("VariableSearch", "Qt")
     @variableSearches.setter
-    def variableSearches(self, 
-                         val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
+    def variableSearches(self, val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None):
         if isinstance(val, (collections.deque, list, tuple)):
             self._recentVariablesList = collections.deque(val)
             #self._recentVariablesList = collections.deque(sorted((s for s in val)))
@@ -2060,25 +2054,24 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.varNameFilterFinderComboBox.setCurrentText("")
     
     @property
-    def lastVariableSearch(self) -> str:
+    def lastVariableSearch(self):
         return self._lastVariableFind
     
     @markConfigurable("LastVariableSearch", "Qt")
     @lastVariableSearch.setter
-    def lastVariableSearch(self, val:typing.Optional[str]=None) -> None:
+    def lastVariableSearch(self, val:typing.Optional[str]=None):
         if isinstance(val, str):
             self._lastVariableFind = val
         else:
             self._lastVariableFind = str()
             
     @property
-    def commandSearches(self) -> collections.deque:
+    def commandSearches(self):
         return self._commandHistoryFinderList
     
     @markConfigurable("CommandSearch", "Qt")
     @commandSearches.setter
-    def commandSearches(self, 
-                        val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
+    def commandSearches(self, val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None):
         if isinstance(val, (collections.deque, list, tuple)):
             self._commandHistoryFinderList = collections.deque(val)
             #self._commandHistoryFinderList = collections.deque(sorted((s for s in val)))
@@ -2094,11 +2087,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.commandFinderComboBox.setCurrentText("")
             
     @property
-    def lastCommandSearch(self) -> str:
+    def lastCommandSearch(self):
         return self._lastCommandFind
     
     @property
-    def scipyenEditor(self) -> str:
+    def scipyenEditor(self):
         return self._scipyenEditor
     
     @markConfigurable("ScipyenEditor", "Qt")
@@ -2110,7 +2103,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self._scipyenEditor = ""
             
     @property
-    def overrideSystemEditor(self) -> bool:
+    def overrideSystemEditor(self):
         return self._overrideSystemEditor
     
     @markConfigurable("OvererideSystemEditor", "Qt")
@@ -2120,15 +2113,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
     @markConfigurable("LastCommandSearch", "Qt")
     @lastCommandSearch.setter
-    def lastCommandSearch(self, val:typing.Optional[str]=None) -> None:
+    def lastCommandSearch(self, val:typing.Optional[str]=None):
         if isinstance(val, str):
             self._lastCommandFind = val
         else:
             self._lastCommandFind = str()
             
-    #def recentScripts(self) -> collections.deque:
     @property
-    def recentScripts(self) -> list:
+    def recentScripts(self):
         return self._recentScripts
     
     # NOTE:FIXME/TODO 2022-01-30 00:05:47
@@ -2137,8 +2129,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     #@markConfigurable("RecentScripts", trait_notifier=True)
     @markConfigurable("RecentScripts", "Qt")
     @recentScripts.setter
-    def recentScripts(self, 
-                         val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
+    def recentScripts(self, val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None):
         #print(f"ScipyenWindow.recentScripts.setter {val}")
         if isinstance(val, (collections.deque, list, tuple)):
             #self._recentScripts = collections.deque((s for s in val if os.path.isfile(s)))
@@ -2786,7 +2777,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         return varnames
     
-    def removeFromWorkspace(self, value:typing.Any, by_name:bool=True, update:bool=True) -> None:
+    def removeFromWorkspace(self, value:typing.Any, by_name:bool=True, update:bool=True):
         """Removes an object from the workspace via GUI operations.
         
         By default, the object to be removed is specified by the symbol (name)
@@ -5310,82 +5301,84 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if fileReader is None:
                 return False
             
-            reader_signature = inspect.signature(fileReader)
-            
-            # NOTE: 2020-02-18 12:24:38
-            # return_types is inspect.Signature.empty when the function has no
-            # annotated return signature; otherwise, is a:
-            # a) type - when the function returns a variable of determined type 
-            #   (this includes NoneType)
-            # b) sequence
-            #   all elements are types when the function returns either:
-            #   b.1) a sequence of variables, each with a determined type
-            #   b.2) a single variable with one of several possible types
-            #   SOME of its elements are sequences of types => the function
-            #   returns a sequence of variables, SOME of which can have one of
-            #   several possible types (contained in the sequence elements of the
-            #   return_types)
-            return_types = reader_signature.return_annotation
+#             reader_signature = inspect.signature(fileReader)
+#             
+#             # NOTE: 2020-02-18 12:24:38
+#             # return_types is inspect.Signature.empty when the function has no
+#             # annotated return signature; otherwise, is a:
+#             # a) type - when the function returns a variable of determined type 
+#             #   (this includes NoneType)
+#             # b) sequence
+#             #   all elements are types when the function returns either:
+#             #   b.1) a sequence of variables, each with a determined type
+#             #   b.2) a single variable with one of several possible types
+#             #   SOME of its elements are sequences of types => the function
+#             #   returns a sequence of variables, SOME of which can have one of
+#             #   several possible types (contained in the sequence elements of the
+#             #   return_types)
+#             return_types = reader_signature.return_annotation
             
             #print("return_types", return_types)
             
             data = fileReader(fName)
             
-            #print("loaded data", data)
+            # print(f"loaded data {data} for binding to variable name {bName}")
             
-            if return_types is inspect.Signature.empty:
-                # no return annotation
-                self.workspace[bName] = data
-                
-            else:
-                # see NOTE: 2020-02-18 12:24:38
-                if isinstance(return_types, type): 
-                    # case (a) in NOTE: 2020-02-18 12:24:38
-                    if type(data) != return_types:
-                        warnings.warn("Unexpected return type (%s); expecting %s from %s" % (type(data).__name__, type(return_types).__name__, fileReader))
-                        
-                    self.workspace[bName] = data
-                    
-                else:
-                    if isinstance(return_types, (tuple, list)):
-                        if isinstance(data, (tuple, list)):
-                            # case (b) in NOTE: 2020-02-18 12:24:38
-                            if len(return_types) != len(data):
-                                warnings.warn("Unexpected number of return variables (%d); expecting %d from %s" % (len(data), len(return_types), fileReader))
-                                self.workspace[bName] = data
-                                
-                            else:
-                                for k,d in enumerate(data):
-                                    if isinstance(return_types[k], type):
-                                        if type(data[k]) != return_types[k]:
-                                            warnings.warn("Unexpected return type (%s) for %dth variable; expecting %s, in %s" % (type(data[k]).__name__, k, type(return_types[k]).__name__, fileReader))
-                                            self.workspace[bName] = data
-                                            break
-                                            
-                                    elif isinstance(return_types[k], (tuple, list)) and all([isinstance(rt, type) for rt in return_types[k]]):
-                                        if type(data[k]) not in return_types[k]:
-                                            warnings.warn("Unexpected return type (%s) for %dth variable; expecting %s, in %s" % (type(data[k]).__name__, k, str(return_types[k]), fileReader))
-                                            self.workspace[bName] = data
-                                            break
-                                            
-                                    else:
-                                        warnings.warn("Cannot interpret the return signature of %s" % fileReader)
-                                        self.workspace[bName] = data
-                                        break
-                                        
-                                    if k == 0:
-                                        self.workspace[bName] = data[k]
-                                    else:
-                                        name = "%s_%s_%d" % (bName, "var", k)
-                                        self.workspace[name] = data[k]
-                                        
-                        else:
-                            if type(data) not in return_types[0]:
-                                # TODO / FIXME
-                                warnings.warn("Data type %s is not listed in the return signature of %s" % (type(data), fileReader))
-                                
-                            self.workspace[bName] = data
-                                        
+            self.workspace[bName] = data
+            
+#             if return_types is inspect.Signature.empty:
+#                 # no return annotation
+#                 self.workspace[bName] = data
+#                 
+#             else:
+#                 # see NOTE: 2020-02-18 12:24:38
+#                 if isinstance(return_types, type): 
+#                     # case (a) in NOTE: 2020-02-18 12:24:38
+#                     if type(data) != return_types:
+#                         warnings.warn("Unexpected return type (%s); expecting %s from %s" % (type(data).__name__, type(return_types).__name__, fileReader))
+#                         
+#                     self.workspace[bName] = data
+#                     
+#                 else:
+#                     if isinstance(return_types, (tuple, list)):
+#                         if isinstance(data, (tuple, list)):
+#                             # case (b) in NOTE: 2020-02-18 12:24:38
+#                             if len(return_types) != len(data):
+#                                 warnings.warn("Unexpected number of return variables (%d); expecting %d from %s" % (len(data), len(return_types), fileReader))
+#                                 self.workspace[bName] = data
+#                                 
+#                             else:
+#                                 for k,d in enumerate(data):
+#                                     if isinstance(return_types[k], type):
+#                                         if type(data[k]) != return_types[k]:
+#                                             warnings.warn("Unexpected return type (%s) for %dth variable; expecting %s, in %s" % (type(data[k]).__name__, k, type(return_types[k]).__name__, fileReader))
+#                                             self.workspace[bName] = data
+#                                             break
+#                                             
+#                                     elif isinstance(return_types[k], (tuple, list)) and all([isinstance(rt, type) for rt in return_types[k]]):
+#                                         if type(data[k]) not in return_types[k]:
+#                                             warnings.warn("Unexpected return type (%s) for %dth variable; expecting %s, in %s" % (type(data[k]).__name__, k, str(return_types[k]), fileReader))
+#                                             self.workspace[bName] = data
+#                                             break
+#                                             
+#                                     else:
+#                                         warnings.warn("Cannot interpret the return signature of %s" % fileReader)
+#                                         self.workspace[bName] = data
+#                                         break
+#                                         
+#                                     if k == 0:
+#                                         self.workspace[bName] = data[k]
+#                                     else:
+#                                         name = "%s_%s_%d" % (bName, "var", k)
+#                                         self.workspace[name] = data[k]
+#                                         
+#                         else:
+#                             if type(data) not in return_types[0]:
+#                                 # TODO / FIXME
+#                                 warnings.warn("Data type %s is not listed in the return signature of %s" % (type(data), fileReader))
+#                                 
+#                             self.workspace[bName] = data
+#                                         
             if addToRecent:
                 self._addRecentFile_(fName, fileReader)
             
@@ -6065,7 +6058,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
     @pyqtSlot(str)
     @safeWrapper
-    def _slot_test_gui_style(self, val:str)->None:
+    def _slot_test_gui_style(self, val:str):
         self._prev_gui_style_name = self._current_GUI_style_name
         
         if val == "Default":

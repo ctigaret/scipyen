@@ -1550,7 +1550,7 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             elif target_class == str:
                 obj = dataset2string(entity)
                 
-            elif target_class in [int, float]:
+            elif target_class in [int, float, complex, np.integer, np.floating, np.complexfloating]:
                 obj = target_class(entity[()])
                 
             elif target_class == pq.Quantity:# or ".".join([target_class.__module__, target_class.__name__]) == "quantities.quantity.Quantity":
@@ -1567,6 +1567,10 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
                 units = attrs.get("__units__", pq.dimensionless)
                 data = np.array(entity)
                 obj = data*units
+                
+            elif target_class == np.ndarray:
+                obj = np.array(entity)
+                
             else:
                 obj = target_class # for now
             
@@ -3353,7 +3357,7 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset], group:typing.Optional[h5p
 @safeWrapper
 def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:typing.Optional[str]=None,compression:typing.Optional[str]="gzip",chunks:typing.Optional[bool]=None,track_order:typing.Optional[bool] = True, entity_cache:typing.Optional[dict]=None,**kwargs):# -> typing.Union[h5py.Group, h5py.Dataset]:
     """
-    HDF5 entity  maker for Python objects.
+    HDF5 entity maker for Python objects.
     Generates a HDF5 Group or Dataset (NOTE: a HDF5 File has overlapping API
     with HDF5 Group).
     
@@ -4033,10 +4037,10 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     return grp
     
 def read_hdf5(h5file:h5py.File):
-    groups = [k for k in h5file.keys()]
-    if len(groups != 1):
-        raise RuntimeError("Expecting a single group in the h5py File; got %d instead" % len(groups))
-
-    root_name = groups[0]
-    root = h5file[groups[0]]
+    ret = dict((k, objectFromEntity(i)) for k,i in h5file.items())
+    
+    if len(ret)==1:
+        return [v for v in ret.values()][0]
+    
+    return ret
     

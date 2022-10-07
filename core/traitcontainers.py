@@ -357,67 +357,6 @@ class DataBag(Bunch):
                 
             super().__setitem__(key, val)
             
-    #def __setattr__(self, key, val):
-        #"""Implements dotted assignment: obj.key = val
-        #"""
-        #if not isinstance(key, str):
-            #raise TypeError(f"Expecting a str; got {type(val).__name__} instead")
-        
-        #try:
-            #obs = object.__getattribute__(self, "__observer__")
-        #except:
-            #obs = DataBagTraitsObserver()
-            #object.__setattr__(self, "__observer__", obs)
-            
-        #try:
-            #hid = object.__getattribute__(self, "__hidden__")
-            
-        #except:
-            #hid = DataBag._make_hidden()
-            #object.__setattr__(self, "__hidden__", hid)
-            
-        #if key in hid:
-            #hid[key] = val
-            
-            #if key == "use_casting" and hid["use_casting"]:
-                #hid["use_mutable"] = False
-                
-            #if key == "use_mutable" and hid["use_mutable"]:
-                #hid["use_casting"] = False
-
-            #return
-        
-        #if obs.has_trait(key):
-            #try:
-                #old_value = object.__getattribute__(obs,key)
-                #target_type = type(old_value)
-                
-                #if type(val) != target_type:
-                    #if hid["use_casting"]:
-                        #new_val = target_type(val)
-                        #object.__setattr__(obs, key, new_val)
-                        
-                    #elif hid["use_mutable"]:
-                        #self.__coerce_trait__(obs, key, val)
-                        
-                    #else:
-                        #object.__setattr__(obs, key, val)
-                #else:
-                    #object.__setattr__(obs, key, val)
-                    
-                #super().__setitem__(key, val)
-            #except:
-                #traceback.print_exc()
-                
-        #else: #add new trait
-            #if key not in ("__observer__", "__hidden__") and key not in hid.keys():
-                #trdict = {key:self._light_trait_(val)}
-                #obs.add_traits(**trdict)
-                #object.__setattr__(obs, key, val)
-                #object.__getattribute__(self, "__hidden__").length = len(trdict)
-                
-            #super().__setitem__(key, val)
-                        
     def __len__(self):
         obs = object.__getattribute__(self, "__observer__") # bypass self.__getitem__()
         ret = len(obs.traits())
@@ -500,20 +439,6 @@ class DataBag(Bunch):
         except:
             raise #KeyError("%s" % key)
         
-    #def __contains__(self, key):
-        #"""Implements membership test ("in" keyword).
-        
-    
-        #"""
-        # NOTE: 2021-10-11 12:08:05 
-        # This doesn't work because the base type dict has __iter__(), and 'in'
-        # keyword goes for it first
-        #try:
-            #obs = object.__getattribute__(self, "__observer__")
-            #return obs.has_trait(key)
-        #except:
-            #raise
-        
     def __getstate__(self):
         """Returns the state of this object's observer wrapped in a dict
         """
@@ -526,12 +451,6 @@ class DataBag(Bunch):
         else:
             d = {"__observer__": {"_trait_notifiers":{}, "_trait_validators":{}}}
             
-        #obs = object.__getattribute__(self, "__observer__", None)
-        #if obs is None:
-            #d = {"__observer--": {"_trait_notifiers":{}, "_trait_validators":{}}}
-        #else:
-            #state = obs.__getstate__()
-            #d = {"__observer__": state}
         return d
     
     def __setstate__(self, state:dict):
@@ -583,7 +502,6 @@ class DataBag(Bunch):
         
         """
         return self._trait_values
-        #return dict((k,v) for k,v in self.items())
         
     def remove_members(self, *keys):
         #print(f"DataBag.remove_members {keys}")

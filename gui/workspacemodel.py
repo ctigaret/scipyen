@@ -59,10 +59,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     workingDir=pyqtSignal(str, name="workingDir")
     varsChanged = pyqtSignal(dict, name="varsChanged")
     
-    def __init__(self, shell, user_ns_hidden=dict(), parent=None,
-                 mpl_figure_close_callback=None,
-                 mpl_figure_click_callback=None,
-                 mpl_figure_enter_callback=None):
+    def __init__(self, shell, user_ns_hidden=dict(), parent=None, mpl_figure_close_callback=None, mpl_figure_click_callback=None, mpl_figure_enter_callback=None):
         super(WorkspaceModel, self).__init__(parent)
         
         self.loop = asyncio.get_event_loop()
@@ -577,7 +574,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     
     def var_observer(self, change):
         self.varsChanged.emit(change)
-        #print(f"WorkspaceModel.var_observer: change {change}")
+        # print(f"WorkspaceModel.var_observer: change {change}")
         #asyncio.create_task(self._observe_coro, name="Observe_variables")
         #self.loop.run_until_complete(self._observe_coro)
         
@@ -673,11 +670,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.workingDir.emit(current_dir)
         
         
-    def _gen_item_for_object_(self, propdict:dict, 
-                            editable:typing.Optional[bool] = False, 
-                            elidetip:typing.Optional[bool] = False,
-                            background:typing.Optional[QtGui.QBrush]=None, 
-                            foreground:typing.Optional[QtGui.QBrush]=None) -> QtGui.QStandardItem:
+    def _gen_item_for_object_(self, propdict:dict, editable:typing.Optional[bool] = False, elidetip:typing.Optional[bool] = False, background:typing.Optional[QtGui.QBrush]=None, foreground:typing.Optional[QtGui.QBrush]=None):
         #print(propdict)
         item = QtGui.QStandardItem(propdict["display"])
         
@@ -694,8 +687,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         item.setStatusTip(propdict["tooltip"])
         item.setWhatsThis(propdict["tooltip"])
         item.setEditable(editable)
-        #if editable:
-            #item.setData(propdict["display"], role=QtCore.Qt.DisplayRole)
         
         if isinstance(background, QtGui.QBrush):
             item.setBackground(background)
@@ -706,15 +697,13 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return item
     
     @safeWrapper
-    def generateRowContents(self, dataname:str, data:object, namespace:str="Internal") -> typing.List[QtGui.QStandardItem]:
-        #print("generateRowContents", dataname, data, namespace)
+    def generateRowContents(self, dataname:str, data:object, namespace:str="Internal"):
+        print("generateRowContents", dataname, data, namespace)
         obj_props = summarize_object_properties(dataname, data, namespace=namespace)
         #print("generateRowContents obj_props", obj_props)
         return self.genRowFromPropDict(obj_props)
     
-    def genRowFromPropDict(self, obj_props:dict,
-                                      background:typing.Optional[QtGui.QBrush]=None,
-                                      foreground:typing.Optional[QtGui.QBrush]=None) -> typing.List[QtGui.QStandardItem]:
+    def genRowFromPropDict(self, obj_props:dict, background:typing.Optional[QtGui.QBrush]=None, foreground:typing.Optional[QtGui.QBrush]=None):
         """Returns a row of QStandardItems
         """
         return [self._gen_item_for_object_(obj_props[key], 
@@ -793,7 +782,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             ns = "Internal"
             
-        #print("updateRowForVariable", dataname, data, ns)
+        # print("updateRowForVariable", dataname, data, ns)
         
         row = self.rowIndexForItemsWithProps(Workspace=ns)
         
@@ -864,7 +853,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def addRowForVariable(self, dataname, data):
         """CAUTION Only use for data in the internal workspace, not in remote ones.
         """
-        #print("addRowForVariable: ", dataname, data)
+        # print("addRowForVariable: ", dataname, data)
         v_row = self.generateRowContents(dataname, data) # generate model view row contents
         self.appendRow(v_row) # append the row to the model
         
@@ -887,6 +876,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.observed_vars.remove_members(*del_vars)
         
         current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        
+        # print(f"current_vars {current_vars}")
         
         self.observed_vars.update(current_vars)
         
