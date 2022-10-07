@@ -1061,7 +1061,7 @@ def makeAttrDict(**kwargs):
     return ret
 
 def group2neoContainer(g, target_class):
-    # treats Segment, Block, Group
+    # treats Segment, Block, Group -- TODO
     pass
 
 def group2neoSignal(g, target_class):
@@ -1288,12 +1288,13 @@ def group2neoDataObject(g, target_class):
     • neo.SpikeTrain
     
     """
-    # delegate as needed
+    # delegate for signals 
     if neo.core.basesignal.BaseSignal in inspect.getmro(target_class):
         return group2neoSignal(g, target_class)
     
     # prepare defaults
     times = []
+    durations = []
     
     # NOTE: 2022-10-07 10:59:48
     # For these objects, 𝐚𝐱𝐢𝐬 𝟎 contains domain information, whereas
@@ -1338,7 +1339,7 @@ def group2neoDataObject(g, target_class):
     # axes_group_name = "".join([g.name.split('/')[-1], "_axes"])
     axes_group = g.get(axes_group_name, None)
     
-    # for Epoch, Event, DataMark, DataZone, TriggerEvent
+    # for Epoch, Event, DataMark, DataZone, TriggerEvent - are you sure?
     labels_set_name = f"{g.name.split('/')[-1]}_labels"
     labels_set = g.get(labels_set_name, None)
     
@@ -1369,13 +1370,16 @@ def group2neoDataObject(g, target_class):
             ax0g = axes_group.get("axis_0", None)
             
             if isinstance(ax0g, h5py.Dataset):
+                # for Epoch and DataZone the durations are contained in the axis_0 Dataset
                 ax0attrs = attrs2dict(ax0g.attrs)
+                if ax0g.shape is not None and len(ax0g.shape) > 0:
+                    durations = np.array(ax0g)
                 ax0["t_stop"] = ax0attrs.get("__end__", None)
                 ax0["t_start"] = ax0attrs.get("__origin__", 0.*units)
                 ax0["sampling_rate"] = ax0attrs.get("__sampling_rate__", 1.*pq.Hz)
                 ax0["left_sweep"] = ax0attrs.get("__left_sweep__", None)
                 ax0["array_annotations"] = ax0attrs.get("__array_annotations__", None)
-            
+                
             ax1g = axes_group.get("axis_1", None)
             
             if isinstance(ax1g, h5py.Group):
@@ -1403,15 +1407,17 @@ def group2neoDataObject(g, target_class):
         obj = target_class(times=times, labels=labels, units=units,
                            name=name, file_origin=file_origin,
                            description=description)
-        # return target_class # TODO
     
     elif target_class == neo.Epoch:
-        obj = target_class(times=times, durations=durations,labels=labels, units=units,
+        obj = target_class(times=times, durations=durations, labels=labels, units=units,
                            name=name, file_origin=file_origin,
                            description=description)
     
     elif target_class == DataZone:
-        return target_class # TODO
+        obj = target_class(times=times, durations=durations, labels=labels, units=units,
+                           name=name, file_origin=file_origin,
+                           description=description)
+    
     
     elif DataMark in inspect.getmro(target_class):
         mark_type = entity.name.split("/")[-1]
@@ -1600,6 +1606,9 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
             obj = group2neo(entity, target_class)
                 
         else:
+            # TODO:
+            # pandas DataFrame and pandas Series
+            # vigra.VigraArray (follow the model for neo DataObject)
             obj = target_class # for now
 
     return obj
@@ -2443,37 +2452,9 @@ def _(obj, axisindex:int):
 #    
 
     if isinstance(obj, neo.core.basesignal.BaseSignal):
-        # if axisindex == 1: 
-        #     # channels axis
-        #     #  NOTE: 2021-11-17 13:41:04
-        #     # array annotations SHOULD be empty for non-signals
-        #     # ImageSequence does NOT have array_annotations member
-        #     array_annotations = getattr(obj,"array_annotations", None)
-        #     arrann = None
-        #     if isinstance(array_annotations, ArrayDict) and len(array_annotations): # this is the number of fields NOT channels!
-        #         # NOTE: skip silently is length different for obj size on axis 1
-        #         # ATTENTION: the 'length' property of the ArrayDict seems to be the 
-        #         # same as the 2nd dimension of the signal's array (documentation
-        #         # is a bit misleading), and NOT the same as then number of fields
-        #         # in the ArrayDict !!! (each field is a numpy array)
-        #         # 
-        #         if array_annotations.length == obj.shape[1]:
-        #             arrann = dict()
-        #             for field, value in array_annotations.items():
-        #                 arrann[field] = value
-        #                 # seed[__mangle_name__(field)] = value
-        #     seed["__array_annotations__"] = arrann
-        
         ret = makeNeoSignalAxisDict(obj, axisindex)
         
     else: # data objects that are NOT base signals; these include SpikeTrain!!!
-        # array_annotations = getattr(obj,"array_annotations", None)
-        # if isinstance(array_annotations, ArrayDict) and len(array_annotations): # this is the number of fields NOT channels!
-        #     # NOTE: skip silently is length different for obj size on axis 1
-        #     if array_annotations.length == obj.shape[1]:
-        #         for field, value in array_annotations.items():
-        #             seed[__mangle_name__(field)] = value
-                    
         ret = makeNeoDataAxisDict(obj, axisindex)
         
     seed.update(ret)
@@ -2662,8 +2643,14 @@ def makeAxisScale(obj,dset:h5py.Dataset, axesgroup:h5py.Group,dimindex:int,axisd
     axis_dset_name = f"axis_{dimindex}"
     
     if isinstance(obj, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal,
-                        neo.Epoch, DataZone, neo.Event, DataMark)) and obj.size > 0:
+                        neo.Event, DataMark)) and obj.size > 0:
         axis_dset = makeHDF5Entity(obj.times, axesgroup,
+                                     name = axis_dset_name,
+                                     compression = compression, 
+                                     chunks = chunks,
+                                     track_order = track_order)
+    elif isinstance(obj, (neo.Epoch, DataZone)) and obj.size > 0:
+        axis_dset = makeHDF5Entity(obj.durations, axesgroup,
                                      name = axis_dset_name,
                                      compression = compression, 
                                      chunks = chunks,
@@ -3295,7 +3282,7 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
         return entity
     
     if isinstance(obj, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
-        # vigra Kernel types → straight to Dataset
+        # vigra Kernel types → straight to HDF5 Dataset
         cached_entity = getCachedEntity(entity_cache, obj)
         
         if isinstance(cached_entity, h5py.Dataset):
@@ -3315,7 +3302,7 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
         return entity
     
     elif isinstance(obj, (pd.DataFrame, pd.Series)):
-        # pandas types
+        # pandas types → HDF5 Group
         cached_entity = getCachedEntity(entity_cache, obj)
         
         if isinstance(cached_entity, h5py.Dataset):
