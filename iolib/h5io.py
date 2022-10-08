@@ -843,8 +843,25 @@ def __check_make_entity_args__(obj, oname, entity_cache):
     
     return target_name, obj_attrs, entity_cache
 
-def storeEntityInCache(s:dict, obj:typing.Any, 
-                        entity:typing.Union[h5py.Group, h5py.Dataset]):
+# def storeEntityInReadingCache(s:dict, obj:typing.Any, entity:typing.Union[h5py.Group, h5py.Dataset]):
+#     if not isinstance(s, dict):
+#         return
+#     
+#     if not isinstance(entity, (h5py.Group, h5py.Dataset)):
+#         return
+#     
+#     s[id(obj)] = (obj, entity)
+
+def storeEntityInCache(s:dict, obj:typing.Any, entity:typing.Union[h5py.Group, h5py.Dataset]):
+    """Keeps of cache of HDF5-endoced objects and their HDF5 entities.
+    
+    The cache maps the id of the object stored as HDF5 entity to the entity itself
+    
+    NOTE: It would have been enough to just store the object id (id(obj)) as a key
+    in the cache, but also storing a reference to the object helps on the reconstruction
+    
+    part of the 
+    """
     if not isinstance(s, dict):
         return
     
@@ -1060,11 +1077,17 @@ def makeAttrDict(**kwargs):
             
     return ret
 
-def group2neoContainer(g, target_class):
+def group2neoContainer(g:h5py.Group, target_class:type, cache:dict = {}):
     # treats Segment, Block, Group -- TODO
+    # neo.core.container.Containers are (as of neo 0.11.0):
+    # • Block
+    # • Segment
+    # • ChannelView
+    # • Group
+    
     pass
 
-def group2neoSignal(g, target_class):
+def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     """Reconstructs neo.core.basesignal.BaseSignal objects from their HDF5 Group.
 
     These object types are:
@@ -1442,7 +1465,7 @@ def group2neoDataObject(g, target_class):
     return obj
     
         
-def group2neo(g:h5py.Group, target_class:type):
+def group2neo(g:h5py.Group, target_class:type, cache:dict = {}):
     """Reconstructs BaseNeo objects
     """
     # TODO 2022-10-06 13:44:05 factoring out neo object reconstruction
@@ -1451,15 +1474,15 @@ def group2neo(g:h5py.Group, target_class:type):
     mro = inspect.getmro(target_class)
     
     if neo.core.dataobject.DataObject in mro:
-        return group2neoDataObject(g, target_class)
+        return group2neoDataObject(g, target_class, cache)
     elif neo.core.container.Container in mro:
-        return group2neoContainer(g, target_class)
+        return group2neoContainer(g, target_class, cache)
     elif target_class == neo.ChannelView:
         return target_class # TODO
     else:
         raise typeError(f"Don't know how to manage {target_class}")
             
-def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
+def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict={}):
     """attempt to round trip of makeHDF5Entity
     """
     # TODO 2022-10-06 11:02:41
@@ -1467,7 +1490,7 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
     # common package ancestor, such as all neo.DataObject, neo.Container)
     
     # NOTE: 2022-10-06 11:03:49
-    # Brief reminder of what makeHDF5Entity does (see also this module docstrin)
+    # Brief reminder of what makeHDF5Entity does (see also this module docstring)
     # 
     # Object type                       ->  Entity  Notes
     # ------------------------------------------------------------------------
@@ -1595,15 +1618,15 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset]):
         if dict in mro:
             obj = target_class()
             for k in entity.keys():
-                obj[k] = objectFromEntity(entity[k])
+                obj[k] = objectFromEntity(entity[k], cache)
                 
         elif list in mro:
             obj = target_class()
             for k in entity.keys():
-                obj.append(objectFromEntity(entity[k]))
+                obj.append(objectFromEntity(entity[k]), cache)
                 
         elif neo.core.baseneo.BaseNeo in inspect.getmro(target_class):
-            obj = group2neo(entity, target_class)
+            obj = group2neo(entity, target_class, cache)
                 
         else:
             # TODO:
@@ -3259,7 +3282,7 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
             
         cached_entity = getCachedEntity(entity_cache, obj)
         
-        if isinstance(cached_entity, h5py.Group):
+        if isinstance(cached_entity[1], h5py.Group):
             group[target_name] = cached_entity
             return cached_entity
         
@@ -3393,7 +3416,7 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
         
         # NOTE: 2021-11-21 12:50:51
         # index_entity stores the ChannelView.index property values
-        # this call here WiLL NEITHER check for cached index_entity NOR store new index_entity !
+        # this call here WILL NEITHER check for cached index_entity NOR store new index_entity !
         index_entity = makeHDF5Dataset(obj.index, entity, name=f"{target_name}_index",
                                        compression = compression, chunks = chunks, 
                                        track_order = track_order,
