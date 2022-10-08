@@ -414,27 +414,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     defaultCursorHoverColor = "red"
 
-    def __init__(self, 
-                 x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
-                 y: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
-                 parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 ID:(int, type(None)) = None,
-                 win_title: (str, type(None)) = None, 
-                 doc_title: (str, type(None)) = None,
-                 frameIndex:(int, tuple, list, range, slice, type(None)) = None, 
-                 frameAxis:(int, type(None)) = None,
-                 signalIndex:(str, int, tuple, list, range, slice, type(None)) = None,
-                 signalChannelAxis:(int, type(None)) = None,
-                 signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None,
-                 irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, 
-                 irregularSignalChannelAxis:(int, type(None)) = None,
-                 irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, 
-                 separateSignalChannels:bool = False, 
-                 interval:(tuple, list) = None,
-                 channelIndex:object = None,
-                 currentFrame:(int, type(None)) = None,
-                 plotStyle: str = "plot",
-                 *args, **kwargs):
+    def __init__(self, x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, y: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, frameAxis:(int, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelAxis:(int, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, interval:(tuple, list) = None, channelIndex:object = None, currentFrame:(int, type(None)) = None, plotStyle: str = "plot", *args, **kwargs):
         """SignalViewer constructor.
         """
         super(QMainWindow, self).__init__(parent)
@@ -675,7 +655,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     dw[k].setVisible(v is True) # just to make sure v is a bool
                     
     @property
-    def cursorLabelPrecision(self) -> int:
+    def cursorLabelPrecision(self):
         return self._cursorLabelPrecision_
     
     @markConfigurable("CursorLabelPrecision")
@@ -697,7 +677,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.configurable_traits["CursorLabelPrecision"] = self._cursorLabelPrecision_
             
     @property
-    def cursorsShowValue(self) -> bool:
+    def cursorsShowValue(self):
         return self._cursorsShowValue_
     
     @markConfigurable("CursorsShowValue")
@@ -738,88 +718,88 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.configurable_traits["CursorYWindow"] = self._cursorWindowSizeY_
             
     @property
-    def cursorColors(self)->dict:
+    def cursorColors(self):
         return self._cursorColors_
     
     @cursorColors.setter
-    def cursorColors(self, val:dict) -> None:
+    def cursorColors(self, val:dict):
         if isinstance(val, dict) and all((s in val for s in ("crosshair", "horizontal", "vertical"))):
             self.crosshairCursorColor = QtGui.QColor(val["crosshair"]).name(QtGui.QColor.HexArgb)
             self.horizontalCursorColor = QtGui.QColor(val["horizontal"]).name(QtGui.QColor.HexArgb)
             self.verticalCursorColor = QtGui.QColor(val["vertical"]).name(QtGui.QColor.HexArgb)
 
     @property
-    def crosshairCursorColor(self) -> str:
+    def crosshairCursorColor(self):
         return self._cursorColors_["crosshair"]
     
     @markConfigurable("CrosshairCursorColor", trait_notifier=True)
     @crosshairCursorColor.setter
-    def crosshairCursorColor(self, val:str) -> None:
+    def crosshairCursorColor(self, val:str):
         self._set_cursors_color(val, "crosshair")
                 
     @property
-    def horizontalCursorColor(self) -> str:
+    def horizontalCursorColor(self):
         return self._cursorColors_["horizontal"]
     
     @markConfigurable("HorizontalCursorColor")
     @horizontalCursorColor.setter
-    def horizontalCursorColor(self, val:str) -> None:
+    def horizontalCursorColor(self, val:str):
         self._set_cursors_color(val, "horizontal")
                 
     @property
-    def verticalCursorColor(self) -> str:
+    def verticalCursorColor(self):
         return self._cursorColors_["vertical"]
     
     @markConfigurable("VerticalCursorColor")
     @verticalCursorColor.setter
-    def verticalCursorColor(self, val:str) -> None:
+    def verticalCursorColor(self, val:str):
         self._set_cursors_color(val, "vertical")
         
     @property
-    def linkedCursorColors(self) -> dict:
+    def linkedCursorColors(self):
         return self._linkedCursorColors_
     
     @linkedCursorColors.setter
-    def linkedCursorColors(self, val:dict) -> None:
+    def linkedCursorColors(self, val:dict):
         if isinstance(val, dict) and all((s in val for s in ("crosshair", "horizontal", "vertical"))):
             self.linkedCrosshairCursorColor = QtGui.QColor(val["crosshair"]).name(QtGui.QColor.HexArgb)
             self.linkedHorizontalCursorColor = QtGui.QColor(val["horizontal"]).name(QtGui.QColor.HexArgb)
             self.linkedVerticalCursorColor = QtGui.QColor(val["vertical"]).name(QtGui.QColor.HexArgb)
             
     @property
-    def linkedCrosshairCursorColor(self) -> str:
+    def linkedCrosshairCursorColor(self):
         return self._linkedCursorColors_["crosshair"]
     
     @markConfigurable("LinkedCrosshairCursorColor", trait_notifier=True)
     @linkedCrosshairCursorColor.setter
-    def linkedCrosshairCursorColor(self, val:str) -> None:
+    def linkedCrosshairCursorColor(self, val:str):
         self._set_cursors_color(val, "crosshair", True)
             
     @property
-    def linkedHorizontalCursorColor(self) -> str:
+    def linkedHorizontalCursorColor(self):
         return self._linkedCursorColors_["horizontal"]
     
     @markConfigurable("LinkedHorizontalCursorColor", trait_notifier=True)
     @linkedHorizontalCursorColor.setter
-    def linkedHorizontalCursorColor(self, val:str) -> None:
+    def linkedHorizontalCursorColor(self, val:str):
         self._set_cursors_color(val, "horizontal", True)
     
     @property
-    def linkedVerticalCursorColor(self) -> str:
+    def linkedVerticalCursorColor(self):
         return self._linkedCursorColors_["vertical"]
     
     @markConfigurable("LinkedVerticalCursorColor", trait_notifier=True)
     @linkedVerticalCursorColor.setter
-    def linkedVerticalCursorColor(self, val:str) -> None:
+    def linkedVerticalCursorColor(self, val:str):
         self._set_cursors_color(val, "vertical", True)
 
     @property
-    def cursorHoverColor(self) -> str:
+    def cursorHoverColor(self):
         return self._cursorHoverColor_
     
     @markConfigurable("CursorHoverColor")
     @cursorHoverColor.setter
-    def cursorHoverColor(self, val:str) -> None:
+    def cursorHoverColor(self, val:str):
         self._set_cursors_color(val, "hover")
         
     # ### END properties
@@ -1169,8 +1149,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return entities
     
     @safeWrapper
-    def _plot_discrete_entities_(self, /, entities:dict, 
-                                 axis:typing.Optional[int]=None, **kwargs):
+    def _plot_discrete_entities_(self, /, entities:dict, axis:typing.Optional[int]=None, **kwargs):
         if len(entities) == 0:
             return
         
@@ -1802,17 +1781,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         label=labels, show_value = self.setCursorsShowValue.isChecked())
         
     
-    def addCursor(self, cursorType: typing.Union[str, SignalCursor.SignalCursorTypes] = "c", 
-                  x: typing.Optional[numbers.Number] = None,
-                  y: typing.Optional[numbers.Number] = None,
-                  xwindow: typing.Optional[numbers.Number] = None,
-                  ywindow: typing.Optional[numbers.Number] = None, 
-                  xBounds: typing.Optional[numbers.Number] = None,
-                  yBounds: typing.Optional[numbers.Number] = None, 
-                  label: typing.Optional[typing.Union[int, str, pg.PlotItem]] = None,
-                  follows_mouse: bool = False, 
-                  axis: typing.Optional[int] = None, 
-                  **kwargs):
+    def addCursor(self, cursorType: typing.Union[str, SignalCursor.SignalCursorTypes] = "c", x: typing.Optional[numbers.Number] = None, y: typing.Optional[numbers.Number] = None, xwindow: typing.Optional[numbers.Number] = None, ywindow: typing.Optional[numbers.Number] = None, xBounds: typing.Optional[numbers.Number] = None, yBounds: typing.Optional[numbers.Number] = None, label: typing.Optional[typing.Union[int, str, pg.PlotItem]] = None, follows_mouse: bool = False, axis: typing.Optional[int] = None, **kwargs):
         """ Add a cursor to the selected axes in the signal viewer window.
 
         When no data has been plotted, the cursor is created in the scene.
@@ -2564,18 +2533,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits[traitname] = name
         
-    def _addCursor_(self, cursor_type: typing.Union[str, SignalCursor.SignalCursorTypes], 
-                    x: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
-                    y: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
-                    xwindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
-                    ywindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
-                    xBounds: typing.Union[tuple, type(None)] = None,
-                    yBounds: typing.Union[tuple, type(None)] = None,
-                    axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None,
-                    label:typing.Optional[str] = None, 
-                    follows_mouse: bool = False, 
-                    precision:typing.Optional[int]=None,
-                    **kwargs) -> str:
+    def _addCursor_(self, cursor_type: typing.Union[str, SignalCursor.SignalCursorTypes], x: typing.Union[numbers.Number, pq.Quantity, type(None)] = None, y: typing.Union[numbers.Number, pq.Quantity, type(None)] = None, xwindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None, ywindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None, xBounds: typing.Union[tuple, type(None)] = None, yBounds: typing.Union[tuple, type(None)] = None, axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None, label:typing.Optional[str] = None, follows_mouse: bool = False, precision:typing.Optional[int]=None, **kwargs):
         """Creates a cursor.
         kwargs: var-keyword parameters for SignalCursor constructor (pen, etc)
         """
@@ -3898,8 +3856,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._scipyenWindow_._assignToWorkspace_(name, epoch)
         
     @safeWrapper
-    def cursorsToEpoch(self, *cursors, name:typing.Optional[str] = None, embed:bool = False, 
-                             current_seg_only:bool = False, overwrite:bool = False) -> neo.Epoch:
+    def cursorsToEpoch(self, *cursors, name:typing.Optional[str] = None, embed:bool = False, current_seg_only:bool = False, overwrite:bool = False):
         """Creates a neo.Epoch from a list of cursors
         
         Parameters:
@@ -4134,18 +4091,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 ax_dict["item"].setStyle(tickFont=value)
                 
     @safeWrapper
-    def _parse_data_new_(self, 
-                     x, 
-                     y,
-                     frameIndex,
-                     frameAxis,
-                     signalChannelAxis,
-                     signalIndex,
-                     signalChannelIndex,
-                     irregularSignalIndex,
-                     irregularSignalChannelAxis,
-                     irregularSignalChannelIndex,
-                     separateSignalChannels) -> bool:
+    def _parse_data_new_(self, x, y, frameIndex, frameAxis, signalChannelAxis, signalIndex, signalChannelIndex, irregularSignalIndex, irregularSignalChannelAxis, irregularSignalChannelIndex, separateSignalChannels):
         """Sets up the data model, essentially -- "interprets" the data 
         structure such that plotting of different types of objects containing
         numeric data sequences is made possible.
@@ -4356,18 +4302,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return True
 
     @safeWrapper
-    def _parse_data_old_(self, 
-                     x, 
-                     y,
-                     frameIndex,
-                     frameAxis,
-                     signalChannelAxis,
-                     signalIndex,
-                     signalChannelIndex,
-                     irregularSignalIndex,
-                     irregularSignalChannelAxis,
-                     irregularSignalChannelIndex,
-                     separateSignalChannels) -> bool:
+    def _parse_data_old_(self, x, y, frameIndex, frameAxis, signalChannelAxis, signalIndex, signalChannelIndex, irregularSignalIndex, irregularSignalChannelAxis, irregularSignalChannelIndex, separateSignalChannels):
         """Sets up the data model, essentially -- "interprets" the data 
         structure such that plotting of different types of objects containing
         numeric data sequences is made possible.
@@ -4925,23 +4860,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     _parse_data_ = _parse_data_old_
     
     @safeWrapper
-    def _set_data_(self,
-                   x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
-                   y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
-                   doc_title:(str, type(None)) = None, 
-                   frameAxis:(int, str, vigra.AxisInfo, type(None)) = None,
-                   signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None,
-                   frameIndex:(int, tuple, list, range, slice, type(None)) = None, 
-                   signalIndex:(str, int, tuple, list, range, slice, type(None)) = None,
-                   signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None,
-                   irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, 
-                   irregularSignalChannelAxis:(int, type(None)) = None,
-                   irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, 
-                   separateSignalChannels:bool = False, 
-                   interval:(tuple, list, neo.Epoch, type(None)) = None,
-                   plotStyle:str = "plot",
-                   showFrame:int = None,
-                   *args, **kwargs):
+    def _set_data_(self, x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)),  y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, doc_title:(str, type(None)) = None, frameAxis:(int, str, vigra.AxisInfo, type(None)) = None, signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, interval:(tuple, list, neo.Epoch, type(None)) = None, plotStyle:str = "plot", showFrame:int = None, *args, **kwargs):
     
         #self.train_plot_options["train_brush"] = kwargs.pop("train_brush", None)
         #self.train_plot_options["train_hoverPen"] = kwargs.pop("train_hoverPen", None)
@@ -5030,24 +4949,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             traceback.print_exc()
             
     @safeWrapper
-    def setData(self,
-                x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
-                y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
-                doc_title:(str, type(None)) = None, 
-                frameAxis:(int, str, vigra.AxisInfo, type(None)) = None,
-                signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None,
-                frameIndex:(int, tuple, list, range, slice, type(None)) = None, 
-                signalIndex:(str, int, tuple, list, range, slice, type(None)) = None,
-                signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None,
-                irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, 
-                irregularSignalChannelAxis:(int, type(None)) = None,
-                irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, 
-                separateSignalChannels:bool = False, 
-                interval:(tuple, list, neo.Epoch, type(None)) = None,
-                plotStyle:str = "plot",
-                get_focus:bool = False,
-                showFrame = None,
-                *args, **kwargs):
+    def setData(self, x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,doc_title:(str, type(None)) = None, frameAxis:(int, str, vigra.AxisInfo, type(None)) = None, signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, interval:(tuple, list, neo.Epoch, type(None)) = None, plotStyle:str = "plot", get_focus:bool = False, showFrame = None, *args, **kwargs):
         """ Sets up the plot data and updates the plot.
         
         Plotting is executed by displayFrame().
@@ -5294,7 +5196,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.frameChanged.emit(self._current_frame_index_)
 
     @property
-    def plotItemsWithLayoutPositions(self) -> typing.List:
+    def plotItemsWithLayoutPositions(self):
         """ A zipped list of tuples (PlotItem, grid coordinates).
         
         The structure is derived from the dictionary
@@ -5314,7 +5216,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return sorted(items, key=lambda x: x[1][0])
     
     @property
-    def plotItems(self) -> typing.List:
+    def plotItems(self):
         px = self.plotItemsWithLayoutPositions
         
         if len(px):
@@ -5332,14 +5234,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return self.plotItemsWithLayoutPositions
     
     @property
-    def axes(self) -> typing.List:
+    def axes(self):
         """The list of axes (PlotItem objects).
         
         Alias to self.plotItems property
         """
         return self.plotItems
     
-    def axis(self, index: int) -> pg.PlotItem:
+    def axis(self, index: int):
         """The axis (PlotItem) at the specified index.
         
         If index is not valid, returns None.
@@ -5354,7 +5256,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return plotitem
     
     @safeWrapper
-    def plotItem(self, index: int) -> pg.PlotItem:
+    def plotItem(self, index: int):
         """Returns the axis (PlotItem) at the specified index.
         
         Does the same thing as self.axis(index) but with the overhead of 
@@ -5370,7 +5272,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return self.plotItem(index)
         
     @property
-    def currentPlotItem(self) -> pg.PlotItem:
+    def currentPlotItem(self):
         """Reference to the selected (current) axis (PlotItem).
         
         The setter counterpart sets the current plot item to be a reference to
@@ -5596,9 +5498,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 neo.IrregularlySampledSignal, 
                 datatypes.DataSignal, 
                 np.ndarray
-                vigra.filters.Kernel1D          -> NOTE  this is converted to two numpy arrays in plot()
+                vigra.filters.Kernel1D  -> NOTE  this is converted to two numpy arrays in plot()
         
-        Anything else  (?)                 -> _plot_numeric_data_
+        Anything else  (?)              -> _plot_numeric_data_
         
         """
         if self.y is None:
@@ -5794,11 +5696,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._update_annotations_()
         
     @safeWrapper
-    def _plotSpikeTrains_(self, 
-                          trains:typing.Optional[typing.Union[neo.SpikeTrain, tuple, list]] = None, 
-                          clear:bool = False, 
-                          **kwargs):
-                          #from_cache: bool = False,
+    def _plotSpikeTrains_(self, trains:typing.Optional[typing.Union[neo.SpikeTrain, tuple, list]] = None, clear:bool = False, **kwargs):
         """Plots stand-alone spike trains.
         """
         if trains is None or clear:
@@ -5820,11 +5718,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._plot_discrete_entities_(trains_dict, **kwargs)
             
     @safeWrapper
-    def _plotEvents_(self,
-                     events: typing.Optional[typing.Union[neo.Event, DataMark, typing.Sequence]] = None, 
-                     clear: bool = True,
-                     from_cache: bool = False,
-                     **kwargs):
+    def _plotEvents_(self, events: typing.Optional[typing.Union[neo.Event, DataMark, typing.Sequence]] = None, clear: bool = True, from_cache: bool = False, **kwargs):
         
         if events is None or clear:
             self._clear_lris_()
@@ -5845,11 +5739,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._plot_discrete_entities_(events_dict, **kwargs)
         
     @safeWrapper
-    def _plotEpochs_(self, 
-                     epochs: typing.Optional[typing.Union[neo.Epoch, DataZone, typing.Sequence]] = None, 
-                     clear: bool = True,
-                     from_cache: bool = False,
-                     **kwargs):
+    def _plotEpochs_(self, epochs: typing.Optional[typing.Union[neo.Epoch, DataZone, typing.Sequence]] = None, clear: bool = True, from_cache: bool = False, **kwargs):
         """Plots epochs.
         A neo.Epoch contains time intervals each defined by time and duration.
         Epoch intervals are drawn using pyqtgraph.LinearRegionItem objects.
@@ -6013,6 +5903,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         lri.setVisible(x_visible[kl])
                         lri.setRegion(regions[kl])
             
+        print(f"SignalViewer _plotEpochs_ epochs: {epochs}; cached: {self._cached_epochs_}")
         # 1. clear existing LinearRegionItem objects.
         
         if from_cache:
@@ -6087,51 +5978,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             self._cached_epochs_.pop(self.currentFrame, None)
                     
-    #@safeWrapper
-    #def _plot_trains_dict_(self, trains_dict, **kwargs):
-        #if len(trains_dict) == 0:
-            #return
-        
-        #try:
-            #if len(self.axes) == 0:
-                #self._prepareAxes_(1)
-                
-            #spike_train_axis = self.signalsLayout.getItem(0,0)
-            
-            #height_interval = 1/len(trains_dict)
-            
-            #colors = cycle(self.defaultLineColorsList)
-            
-            #labelStyle = {"color": "#000000"}
-
-            #trains_x_list = list()
-            #trains_y_list = list()
-            
-            #for k_train, (tag, train) in enumerate(trains_dict.items()):
-                #data_name = tag if isinstance(tag, str) else "%d" % tag
-                
-                #x = train.times.magnitude.flatten()
-                #y = np.full(x.shape, height_interval * k_train + height_interval/2)
-                
-                #trains_x_list.append(x)
-                #trains_y_list.append(y)
-                
-            #tr_x = np.concatenate(trains_x_list, axis=np.newaxis)
-            #tr_y = np.concatenate(trains_y_list, axis=np.newaxis)
-            
-            #self._plot_numeric_data_(spike_train_axis,
-                                        #tr_x, tr_y, 
-                                        #symbol="spike",
-                                        #pen=None,
-                                        #name=data_name,
-                                        #symbolPen=QtGui.QPen(QtGui.QColor(next(colors))))
-                
-            #spike_train_axis.axes["left"]["item"].setPen(None)
-            #spike_train_axis.axes["left"]["item"].setLabel("Spike Trains", **labelStyle)
-            
-        #except Exception as e:
-            #traceback.print_exc()
-            
     @safeWrapper
     def _plotSegment_(self, seg, *args, **kwargs):
         """Plots a neo.Segment.
@@ -6167,6 +6013,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         selected_irregs = list()
         selected_irregs_names = list()
         
+        # BEGIN prepate to plot regular (analog) signals
         if self._plot_analogsignals_:
             # now try to get the signal selections from the combo boxes
             current_ndx = self.selectSignalComboBox.currentIndex() 
@@ -6204,7 +6051,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
                 else:
                     selected_analog_names = ["Analog signal %d" % (current_ndx-1, )]
-                
+        # END   prepate to plot regular (analog) signals
+          
+        # BEGIN prepate to plot irregular signals
         if self._plot_irregularsignals_:
             current_ndx = self.selectIrregularSignalComboBox.currentIndex()
             current_txt = self.selectIrregularSignalComboBox.currentText()
@@ -6241,14 +6090,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     selected_irregs_names = ["Irregularly sampled signal %d" % (current_ndx-1,)]
         
+        # END   prepate to plot irregular signals
+        
+        # BEGIN initial set up axes
         nAnalogAxes = len(selected_analogs) 
         
         nIrregAxes = len(selected_irregs)
         
         nAxes = nAnalogAxes + nIrregAxes
+        # END   initial set up axes
         
         signames = selected_analog_names + selected_irregs_names # required for prepare axes and caching of cursors (see comments in _prepareAxes_())
         
+        # BEGIN prepare to plot spike trains
         # NOTE: 2019-11-25 15:19:16
         # for segments we do not plot signals with their channels separate
         # if needed, then get a reference to the signal and plot it individually
@@ -6257,20 +6111,25 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if len(spiketrains):
             nAxes += 1
             signames += ["spike trains"]
+        # END   prepare to plot spike trains
         
+        # BEGIN prepare to plot events
         events = get_non_empty_events(seg.events)
         
         if isinstance(events, (tuple, list)) and len(events):
             nAxes += 1
             signames += ["events"]
-            
+        # END   prepare to plot events
+           
+        # BEGIN finalize set up axes
         self._prepareAxes_(nAxes, sigNames=signames)
         
         axes = self.plotItems
+        # END   finalize set up axes
         
         kAx = 0
         
-        #### BEGIN plot analog signals 
+        #### BEGIN plot regular (analog) signals 
         for k, signal in enumerate(selected_analogs):
             signal_axis = self.signalsLayout.getItem(kAx,0)
             if isinstance(signal, neo.AnalogSignal):
@@ -6326,7 +6185,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             kAx += 1
          
-        #### END plot analog signals
+        #### END   plot regular (analog) signals
         
         #### BEGIN plot irregularly sampled signals
         for k, signal in enumerate(selected_irregs):
@@ -6375,7 +6234,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             kAx += 1
         
-        #### END plot irregularly sampled signals
+        #### END   plot irregularly sampled signals
         
         #### BEGIN plot spike trains
         if len(spiketrains):
@@ -6600,42 +6459,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                         xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
                                         *args, **kwargs)
             
-    #def _make_sig_plot_dict_(self,plotItem: pg.PlotItem, 
-                            #x:np.ndarray, 
-                            #y:np.ndarray,
-                            #xlabel:(str, type(None))=None, 
-                            #xunits: (str, pq.Quantity, type(None))=None,
-                            #ylabel:(str, type(None))=None, 
-                            #yunits:(str, pq.Quantity, type(None))=None,
-                            #title:(str, type(None))=None, 
-                            #name:(str, type(None))=None,
-                            #symbolcolorcycle:(cycle, type(None))=None,
-                            #*args, **kwargs):
-        
-    def _make_sig_plot_dict_(self,plotItem: pg.PlotItem, 
-                            x:np.ndarray, 
-                            y:np.ndarray,
-                            xlabel:(str, type(None))=None, 
-                            ylabel:(str, type(None))=None, 
-                            title:(str, type(None))=None, 
-                            name:(str, type(None))=None,
-                            symbolcolorcycle:(cycle, type(None))=None,
-                            *args, **kwargs):
-        
+    def _make_sig_plot_dict_(self,plotItem: pg.PlotItem, x:np.ndarray, y:np.ndarray, xlabel:(str, type(None))=None,  ylabel:(str, type(None))=None, title:(str, type(None))=None, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
         return {"plotItem":plotItem, 
                 "x": x, "y": y, 
                 "xlabel": xlabel, "ylabel": ylabel,
                 "title": title, "name": name, 
                 "symbolcolorcycle": symbolcolorcycle,
                 "args": args, "kwargs": kwargs}
-                    
-        #return {"plotItem":plotItem, 
-                #"x": x, "y": y, 
-                #"xlabel": xlabel, "xunits": xunits, 
-                #"ylabel": ylabel, "yunits": yunits,
-                #"title": title, "name": name, 
-                #"symbolcolorcycle": symbolcolorcycle,
-                #"args": args, "kwargs": kwargs}
                     
     @safeWrapper
     @pyqtSlot(dict)
@@ -6667,7 +6497,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.statusBar().clearMessage()
         
     @safeWrapper
-    def _prepare_numeric_data_plot_(self, x:np.ndarray, y:np.ndarray) -> tuple:
+    def _prepare_numeric_data_plot_(self, x:np.ndarray, y:np.ndarray):
         
         xx = list()
         yy = list()
@@ -6737,35 +6567,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         return xx, yy
     
-    def _generate_plot_data_items_(self, x, y, name:(str, type(None))=None,
-                                   symbolcolorcycle:(cycle, type(None))=None,
-                                   *args, **kwargs):
+    def _generate_plot_data_items_(self, x, y, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
         pass
                     
-        
-    #def _plot_numeric_data_(self, 
-                            #plotItem: pg.PlotItem, 
-                            #x:np.ndarray, 
-                            #y:np.ndarray,
-                            #xlabel:(str, type(None))=None, 
-                            #xunits: (str, pq.Quantity, type(None))=None,
-                            #ylabel:(str, type(None))=None, 
-                            #yunits:(str, pq.Quantity, type(None))=None,
-                            #title:(str, type(None))=None, 
-                            #name:(str, type(None))=None,
-                            #symbolcolorcycle:(cycle, type(None))=None,
-                            #*args, **kwargs):
     @safeWrapper
-    def _plot_numeric_data_(self, 
-                            plotItem: pg.PlotItem, 
-                            x:np.ndarray, 
-                            y:np.ndarray,
-                            xlabel:(str, type(None))=None, 
-                            ylabel:(str, type(None))=None, 
-                            title:(str, type(None))=None, 
-                            name:(str, type(None))=None,
-                            symbolcolorcycle:(cycle, type(None))=None,
-                            *args, **kwargs):
+    def _plot_numeric_data_(self, plotItem: pg.PlotItem, x:np.ndarray, y:np.ndarray, xlabel:(str, type(None))=None, ylabel:(str, type(None))=None, title:(str, type(None))=None, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
         """ The workhorse that does the actual plotting of signals
         Parameters:
         ----------

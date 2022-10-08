@@ -587,7 +587,7 @@ def hashiterable(x:typing.Iterable[typing.Any]) -> Number:
     #return ( (hash(type(v)) if isinstance(v, (list, deque, dict)) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
 
 @safeWrapper
-def gethash(x:typing.Any) -> Number:
+def gethash(x:typing.Any):
     """Calculates a hash-like figure for objects (including of non-hashable types)
     To be used for object comparisons.
     
@@ -614,12 +614,9 @@ def gethash(x:typing.Any) -> Number:
     # data sets, just their ndim/shape/size/axistags, etc
     def _hasharr(_x):
         return hash((type(_x), _x.size, _x.shape))
-        #return sum((hash(_x.size), hash(_x.shape),))
-        #return sum((hash(_x.ndim), hash(_x.size), hash(_x.shape),))
         
     def _hasharrdtype(_x):
         return hash((type(x), _x.size, _x.shape, _x.dtype))
-        #return _hasharr(_x) + hash(_x.dtype)
 
     try:
         if is_hashable(x):
@@ -627,45 +624,30 @@ def gethash(x:typing.Any) -> Number:
         
         elif isinstance(x, pq.Quantity):
             return hash((type(x), x.size, x.shape, x.dtype, x.dimensionality))
-            #return hash(type(x)) + _hasharrdtype(x) + hash(x.dimensionality)
         
         elif isinstance(x, vigra.VigraArray):
             return hash((type(x), x.size, x.shape, x.dtype, x.axistags))
-            #return hash(type(x)) + _hasharrdtype(x) + hash(x.axistags)
-            #return hash(type(x)) + gethash(np.array(x)) + hash(x.axistags)
         
         elif isinstance(x, vigra.vigranumpycore.ChunkedArrayBase):
             return hash((type(x), x.chunk_array_shape, x.chunk_shape))
-            #return hash(type(x)) + _hasharrdtype(x) + sum((hash(x.chunk_array_shape), hash(x.chunk_shape), ))
         
         elif isinstance(x, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
             return hash(type(x), x)
-            #return hash(type(x)) + hash(x)
-            #return HASHRANDSEED + hash(x)
         
         elif isinstance(x, np.ndarray):
             return _hasharrdtype(x)
-            #return hash(type(x)) + _hasharrdtype(x)
-            #return HASHRANDSEED + sum([hash(x.shape), hash(x.size), hash(x.ndim) , hash(x.dtype)])
         
         elif isinstance(x, pd.DataFrame):
             return hash((type(x), x.size, x.shape, x.dtype, x.index, x.columns))
-            #return hash(type(x)) + _hasharr(x) + gethash(x.index) + gethash(x.columns) + sum((gethash(x[c]) for c in x.columns))
         
         elif isinstance(x, pd.Series):
             return hash(type(x), x.size, x.shape, x.dtype, x.index, x.name)
-            #return hash(type(x)) + _hasharrdtype(x) + hash(tuple(x.index)) + hash(tuple(x.name))
-            #return HASHRANDSEED + hash(tuple(x.index)) + hash(tuple(x.name)) + hash(tuple(x)) + hash(x.dtype)
         
         elif isinstance(x, pd.Index):
             return hash(type(x), tuple(x))
-            #return hash(type(x)) + _hasharrdtype(x)
-            #return HASHRANDSEED + hash(tuple(x)) 
             
         elif hasattr(x, "__iter__"):
             return hash((type(x),tuple(x)))
-            #return hashiterable(x)
-            #return hash(type(x)) + sum(hashiterable(x))
             
         elif isinstance(x, dict):
             return hash((type(x), tuple(x)))
@@ -673,11 +655,9 @@ def gethash(x:typing.Any) -> Number:
         elif not is_hashable(x):
             if hasattr(x, "__dict__"):
                 return hash((type(x), x.__dict__))
-                #return hash(type(x)) + gethash(x.__dict__)
-            
+
             else:
                 return hash(type(x)) # FIXME 2021-08-20 14:22:13
-                #return HASHRANDSEED + hash(type(x)) # FIXME 2021-08-20 14:22:13
         
         else:
             # NOTE: 2021-08-19 16:18:20
@@ -686,10 +666,8 @@ def gethash(x:typing.Any) -> Number:
             # All user-defined classes and objects of user-defined types are also
             # hashable
             return hash(type(x)) + hash(x)
-            #return HASHRANDSEED + hash(x)
     except:
         return hash(type(x))
-        #return HASHRANDSEED + hash(type(x))
         
 def get_index_for_seq(index:int, 
                       test:typing.Sequence[typing.Any], 
