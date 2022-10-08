@@ -1149,7 +1149,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return entities
     
     @safeWrapper
-    def _plot_discrete_entities_(self, /, entities:dict, axis:typing.Optional[int]=None, **kwargs):
+    def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list], axis:typing.Optional[int]=None, **kwargs):
         if len(entities) == 0:
             return
         
@@ -1365,10 +1365,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             return
 
     def _configureUI_ (self):
+        self.setupUi(self)
         # NOTE: 2021-11-13 23:24:12
         # signal/slot connections & UI for pg.PlotItem objects are configured in
         # self._prepareAxes_()
-        self.setupUi(self)
         
         self.sig_plot.connect(self._slot_plot_numeric_data_thr_, type = QtCore.Qt.QueuedConnection)
         
@@ -1383,10 +1383,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionPNG.triggered.connect(self.slot_export_png)
         
         self.cursorsMenu = QtWidgets.QMenu("Cursors", self)
+        self.epochsMenu = QtWidgets.QMenu("Epochs", self)
         
         self.menubar.setNativeMenuBar(True)
 
         self.menubar.addMenu(self.cursorsMenu)
+        self.menubar.addMenu(self.epochsMenu)
+        
         self.addCursorsMenu = QtWidgets.QMenu("Add Cursors", self)
         self.addMultiAxesCursorMenu = QtWidgets.QMenu("Multi-axis", self)
         
@@ -1473,35 +1476,35 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.cursorsMenu.addMenu(self.cursorsColorsMenu)
         
-        self.epochsMenu = QtWidgets.QMenu("Make Epochs")
+        self.makeEpochsMenu = QtWidgets.QMenu("Make Epochs")
         
-        self.epochsFromCursorsAction = self.epochsMenu.addAction("Cursors to Epochs")
+        self.epochsFromCursorsAction = self.makeEpochsMenu.addAction("Cursors to Epochs")
         self.epochsFromCursorsAction.triggered.connect(self.slot_cursorsToEpoch)
         self.epochsFromCursorsAction.setEnabled(self._scipyenWindow_ is not None)
         
-        self.epochFromSelectedCursorAction = self.epochsMenu.addAction("Selected SignalCursor to Epoch")
+        self.epochFromSelectedCursorAction = self.makeEpochsMenu.addAction("Selected SignalCursor to Epoch")
         self.epochFromSelectedCursorAction.triggered.connect(self.slot_cursorToEpoch)
         self.epochFromSelectedCursorAction.setEnabled(self._scipyenWindow_ is not None)
         
-        self.epochBetweenCursorsAction = self.epochsMenu.addAction("Epoch Between Two Cursors")
+        self.epochBetweenCursorsAction = self.makeEpochsMenu.addAction("Epoch Between Two Cursors")
         self.epochBetweenCursorsAction.triggered.connect(self.slot_epochBetweenCursors)
         self.epochBetweenCursorsAction.setEnabled(self._scipyenWindow_ is not None)
         
-        self.epochsInDataMenu = QtWidgets.QMenu("Make Epochs in Data")
+        self.makeEpochsInDataMenu = QtWidgets.QMenu("Make Epochs in Data")
         
-        self.epochsInDataFromCursorsAction = self.epochsInDataMenu.addAction("From All Cursors")
+        self.epochsInDataFromCursorsAction = self.makeEpochsInDataMenu.addAction("From All Cursors")
         self.epochsInDataFromCursorsAction.triggered.connect(self.slot_cursorsToEpochInData)
         
-        self.epochInDataFromSelectedCursorAction = self.epochsInDataMenu.addAction("From Selected SignalCursor")
+        self.epochInDataFromSelectedCursorAction = self.makeEpochsInDataMenu.addAction("From Selected SignalCursor")
         self.epochInDataFromSelectedCursorAction.triggered.connect(self.slot_cursorToEpochInData)
         
-        self.epochInDataBetweenCursors = self.epochsInDataMenu.addAction("Between Two Cursors")
+        self.epochInDataBetweenCursors = self.makeEpochsInDataMenu.addAction("Between Two Cursors")
         self.epochInDataBetweenCursors.triggered.connect(self.slot_epochInDataBetweenCursors)
         
-        self.cursorsMenu.addSeparator()
+        # self.cursorsMenu.addSeparator()
         
-        self.cursorsMenu.addMenu(self.epochsMenu)
-        self.cursorsMenu.addMenu(self.epochsInDataMenu)
+        self.epochsMenu.addMenu(self.makeEpochsMenu)
+        self.epochsMenu.addMenu(self.makeEpochsInDataMenu)
         
         # the actual layout of the plot items (pyqtgraph framework)
         self.signalsLayout = pg.GraphicsLayout()
@@ -1983,7 +1986,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             
                         if cursor.cursorTypeName in ("crosshair", "horizontal"):
                             #plot_item_cursor_pos_text.append("Y: %f" % y)
-                            plot_item_cursor_pos_text.append("Y: %f (window: %f)" % (y, cursors.ywindow))
+                            plot_item_cursor_pos_text.append("Y: %f (window: %f)" % (y, cursor.ywindow))
                             
                         plot_item_text.append("\n".join(plot_item_cursor_pos_text))
                         
@@ -4490,8 +4493,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             if self._docTitle_ is None or (isinstance(self._docTitle_, str) and len(self._docTitle_.strip()) == 0):
                 #because these may be plotted as an add-on so we don't want to mess up the title
-                if isinstance(title, str) and len(title.strip()) > 0:
-                    self._doctTitle_ = title
+                if isinstance(y.name, str) and len(y.name.strip()) > 0:
+                    self._doctTitle_ = y.name
                     
                 else:
                     self._docTitle_ = self.y.name
@@ -5508,6 +5511,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.currentFrameAnnotations = None
         
+        #### BEGIN self.y is a sequence
         if isinstance(self.y, (tuple, list)): 
             # a sequence of objects
             #
@@ -5541,8 +5545,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.currentFrameAnnotations = {type(self.y[self._current_frame_index_]).__name__: self.y[self._current_frame_index_].annotations}
                 
             elif all([isinstance(y_, (neo.core.Epoch, DataZone)) for y_ in self.y]): 
-                # plot an Epoch independently of data; there is a single frame
+                # plot Epoch(s) independently of data; there is a single frame
+                
+                epochs_start_end = np.array([(e[0], e[-1] + e.durations[-1]) for e in self.y])
+                x_min, x_max = (np.min(epochs_start_end[:,0]), np.max(epochs_start_end[:,1]))
+                self._prepareAxes_(1)
                 self._plotEpochs_(self.y, **self.epoch_plot_options)
+                self.axes[0].showAxis("bottom", True)
                 
             elif all([isinstance(y_, neo.Segment) for y_ in self.y]):
                 segment = self.y[self.frameIndex[self._current_frame_index_]]
@@ -5595,6 +5604,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     self._plotNumpyArray_(self.x, self.y[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
                     
+        #### END self.y is a sequence
+        #### BEGIN self.y is a single object
         else:
             if isinstance(self.y, neo.core.Block):
                 # NOTE: 2019-11-24 22:31:26
@@ -5628,7 +5639,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._plotSignal_(self.y, *self.plot_args, **self.plot_kwargs)
 
             elif isinstance(self.y, (neo.core.Epoch, DataZone)): # plot an Epoch independently of data
+                x_min, x_max = (self.y[0], self.y[-1] + self.y.durations[-1])
+                self._prepareAxes_(1)
                 self._plotEpochs_(self.y, **self.epoch_plot_options)
+                self.axes[0].showAxis("bottom", True)
                 
             elif isinstance(self.y, (neo.Event, DataMark)):
                 self._plotEvents_(self.y)
@@ -5651,6 +5665,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             else:
                 raise TypeError("Plotting of data of type %s not yet implemented" % str(type(self.y)))
+        #### END self.y is a single object
             
         # NOTE: 2020-03-10 22:09:51
         # reselect an axis according to its index (if one had been selected before)
@@ -5716,6 +5731,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 self._prepareAxes_(1)
                 self._plot_discrete_entities_(trains_dict, **kwargs)
+                
+            self.axes[-1].showAxis("bottom", True)
             
     @safeWrapper
     def _plotEvents_(self, events: typing.Optional[typing.Union[neo.Event, DataMark, typing.Sequence]] = None, clear: bool = True, from_cache: bool = False, **kwargs):
@@ -5737,6 +5754,159 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 self._prepareAxes_(1)
                 self._plot_discrete_entities_(events_dict, **kwargs)
+                
+            self.axes[-1].showAxis("bottom", True)
+        
+    def _plot_epochs_seq_(self, *args, **kwargs):
+        """Does the actual plotting of epoch data.
+        Epochs is always a non-empty sequence (tuple or list) of neo.Epochs
+        We keep this as a nested function to avoid calling it directly. Thus
+        there is no need to check if the epochs argument is the same as 
+        self.y (or contained within)
+        """
+        
+        # print(f"SignalViewer._plot_epochs_seq_ {args}")
+        
+        if len(args) == 0:
+            return
+        
+        epoch_pen = kwargs.pop("epoch_pen", self.epoch_plot_options["epoch_pen"])
+        epoch_brush = kwargs.pop("epoch_brush", self.epoch_plot_options["epoch_brush"])
+        epoch_hoverPen = kwargs.pop("epoch_hoverPen", self.epoch_plot_options["epoch_hoverPen"])
+        epoch_hoverBrush = kwargs.pop("epoch_hoverBrush", self.epoch_plot_options["epoch_hoverBrush"])
+        
+        # plot LRIs in a different colour for each epoch; 
+        # all LRIs that belong to the same epoch have the same colour.
+        if epoch_brush is None:
+            # no epoch brush specified
+            if len(args) > 1:
+                brushes = cycle([QtGui.QBrush(QtGui.QColor(*c)) for c in self.epoch_plot_options["epochs_color_set"]])
+                
+            else:
+                brushes = cycle([QtGui.QBrush(QtGui.QColor(0,0,255,50))]) # what seems to be the default in LinearRegionItem
+            
+        else: # epoch brushes have been specified in one of several ways:
+            if isinstance(epoch_brush, typing.Sequence):
+                # a tuple or list of brush specs
+                if all([isinstance(b, (QtGui.QColor, QtGui.QBrush, tuple, list)) for b in epoch_brush]):
+                    brushes = cycle([QtGui.QBrush(QtGui.QColor(c)) if isinstance(c, (QtGui.QColor, QtGui.QBrush)) else QtGui.QBrush(QtGui.QColor(*c)) for c in epoch_brush])
+                    
+                else:
+                    brushes = cycle([QtGui.QBrush(QtGui.QColor(*epoch_brush))])
+                    
+            elif isinstance(epoch_brush, QtGui.Color):
+                # a single Qt Color
+                brushes = cycle([QtGui.QBrush(epoch_brush)])
+                
+            elif isinstance(epoch_brush, QtGui.QBrush):
+                # a single Qt Brush
+                brushes = cycle([epoch_brush])
+                
+            else:
+                warnings.warn("Invalid brush specification %s" % epoch_brush)
+                brushes = cycle([None])
+                
+        # NOTE: 2020-03-09 12:09:40
+        # unlike the online documentation, pg.LinearRegionItem constructor 
+        # DOES NOT accept pen as argument
+        #if epoch_pen is None:
+            #if len(args) > 1:
+                #pens = cycle([QtGui.QPen(QtGui.QColor(*c).darker()) for c in self.epoch_plot_options["epochs_color_set"]])
+                
+            #else:
+                #pens = cycle([QtGui.QPen(QtGui.QColor(0,0,255,50).darker())])
+                
+        #else:
+            #if isinstance(epoch_pen, tying.Sequence):
+                #if all([isinstance(b, (QtGui.QColor, QtGui.QBrush, tuple, list)) for b in epoch_pen]):
+                    #pens = cycle([QtGui.QPen(QtGui.QColor(c)) if isinstance(c, (QtGui.QColor, QtGui.QBrush)) else QtGui.QPen(QtGui.QColor(*c) for c in epoch_pen)])
+                    
+                #else:
+                    #pens = cycle([QtGui.QPen(QtGui.QColor(*epoch_pen))])
+                    
+            #elif isinstance(epoch_pen, QtGui.QColor):
+                #pens = cycle([QtGui.QBrush(QtGui.QColor(epoch_pen))])
+                
+            #elif isinstance(epoch_pen, QtGui.QBrush):
+                #pens = cycle([epoch_pen])
+                
+            #elif isinstance(epoch_pen, QtGui.QPen):
+                #pens = cycle([epoch_pen])
+                
+            #else:
+                #warnings.warn("Invalid pen specification %s" % epoch_pen)
+                
+        # figure out the visible X range
+#         minX = list()
+#         maxX = list()
+#         
+#         visibleXRange = None
+        
+#         for ax in self.axes:
+#             if len(ax.dataItems):
+#                 ax.update() # to update its viewRange()
+#                 # print(f"SignalViewer._plot_epochs_seq_ axis {ax} viewRange {ax.viewRange()}")
+#                 # axViewRect = ax.viewRect()
+#                 # x_min = axViewRect.x()
+#                 # [x_min, x_max] = ax.viewRange()[0]
+#                 
+#                 x_min, x_max = (ax.viewRect().x(), ax.viewRect().x() + ax.viewRect().width())
+#                 
+#                 minX.append(x_min)
+#                 maxX.append(x_max)
+#                 
+#         if len(minX) and len(minX) == len(maxX):
+#             visibleXRange = [min(minX), max(maxX)]
+#             
+#         print(f"SignalViewer._plot_epochs_seq_ visibleXRange {visibleXRange}")
+        
+        for epoch in args:
+            # print(f"SignalViewer._plot_epochs_seq_ epoch {epoch}")
+            x0 = epoch.times.flatten().magnitude
+            x1 = x0 + epoch.durations.flatten().magnitude
+            
+#             if visibleXRange is not None:
+#                 x0_visible = (x0 >= visibleXRange[0]) & (x0 <  visibleXRange[1])
+#                 x1_visible = (x1 >  visibleXRange[0]) & (x1 <= visibleXRange[1])
+#                 
+#                 x_visible = x0_visible & x1_visible
+#                 
+#             else:
+#                 x_visible = np.full_like(x0, fill_value=True, dtype="bool")
+                
+            # print(f"SignalViewer._plot_epochs_seq_ epoch {epoch} x_visible {x_visible}")
+            
+            brush = next(brushes)
+            
+            # see NOTE: 2020-03-09 12:09:40
+            #pen = next(pens)
+            
+            for k in range(len(self.axes)):
+                self.axes[k].update() # to update its viewRange()
+                # data_x_min = list()
+                # data_x_max = list()
+                
+                regions = [v for v in zip(x0,x1)]
+                
+                # print(f"SignalViewer._plot_epochs_seq_ axis: {k}; regions: {regions}")
+                
+                lris = [pg.LinearRegionItem(values=value, 
+                                            brush=brush, 
+                                            orientation=pg.LinearRegionItem.Vertical, 
+                                            movable=False) for value in regions]
+                
+#                 lris = [pg.LinearRegionItem(values=value, 
+#                                             brush=brush, 
+#                                             orientation=pg.LinearRegionItem.Vertical, 
+#                                             movable=False, 
+#                                             bounds = visibleXRange) for value in regions]
+#                 
+                for kl, lri in enumerate(lris):
+                    self.axes[k].addItem(lri)
+                    lri.setZValue(10)
+                    # lri.setVisible(x_visible[kl])
+                    lri.setVisible(True)
+                    lri.setRegion(regions[kl])
         
     @safeWrapper
     def _plotEpochs_(self, epochs: typing.Optional[typing.Union[neo.Epoch, DataZone, typing.Sequence]] = None, clear: bool = True, from_cache: bool = False, **kwargs):
@@ -5754,12 +5924,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             was set to plot standalone epoch data (i.e. epoch data NOT associated
             with a neo Segment, or with anything else).
             
-            Standalone epoch data is an Epoch or sequence of Epoch objects
+            FIXME: Standalone epoch data is an Epoch or sequence of Epoch objects
             passed as the 'y' parameter to self.setData(...) function
             (NOTE that self.setData is aliased to 'self.plot' and 'self.view').
             
             When the 'epochs' parameter is None or an empty sequence, the 
-            function plots the standalone epoch data, is it exists, or clears
+            function plots the standalone epoch data, if it exists, or clears
             any representations of previous epoch data from all axes.
             
         clear: bool, default is True.
@@ -5773,162 +5943,42 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         """
         
-        def _plot_epochs_seq_(*args, **kwargs):
-            """Does the actual plotting of epoch data.
-            Epochs is always a non-empty sequence (tuple or list) of neo.Epochs
-            We keep this as a nested function to avoid calling it directly. Thus
-            there is no need to check if the epochs argument is the same as 
-            self.y (or contained within)
-            """
-            if len(args) == 0:
-                return
-            
-            epoch_pen = kwargs.pop("epoch_pen", self.epoch_plot_options["epoch_pen"])
-            epoch_brush = kwargs.pop("epoch_brush", self.epoch_plot_options["epoch_brush"])
-            epoch_hoverPen = kwargs.pop("epoch_hoverPen", self.epoch_plot_options["epoch_hoverPen"])
-            epoch_hoverBrush = kwargs.pop("epoch_hoverBrush", self.epoch_plot_options["epoch_hoverBrush"])
-            
-            # plot LRIs in a different colour for each epoch; 
-            # all LRIs that belong to the same epoch have the same colour.
-            if epoch_brush is None:
-                # no epoch brush specified
-                if len(args) > 1:
-                    brushes = cycle([QtGui.QBrush(QtGui.QColor(*c)) for c in self.epoch_plot_options["epochs_color_set"]])
-                    
-                else:
-                    brushes = cycle([QtGui.QBrush(QtGui.QColor(0,0,255,50))]) # what seems to be the default in LinearRegionItem
-                
-            else: # epoch brushes have been specified in one of several ways:
-                if isinstance(epoch_brush, typing.Sequence):
-                    # a tuple or list of brush specs
-                    if all([isinstance(b, (QtGui.QColor, QtGui.QBrush, tuple, list)) for b in epoch_brush]):
-                        brushes = cycle([QtGui.QBrush(QtGui.QColor(c)) if isinstance(c, (QtGui.QColor, QtGui.QBrush)) else QtGui.QBrush(QtGui.QColor(*c)) for c in epoch_brush])
-                        
-                    else:
-                        brushes = cycle([QtGui.QBrush(QtGui.QColor(*epoch_brush))])
-                        
-                elif isinstance(epoch_brush, QtGui.Color):
-                    # a single Qt Color
-                    brushes = cycle([QtGui.QBrush(epoch_brush)])
-                    
-                elif isinstance(epoch_brush, QtGui.QBrush):
-                    # a single Qt Brush
-                    brushes = cycle([epoch_brush])
-                    
-                else:
-                    warnings.warn("Invalid brush specification %s" % epoch_brush)
-                    brushes = cycle([None])
-                    
-            # NOTE: 2020-03-09 12:09:40
-            # unlike the online documentation, pg.LinearRegionItem constructor 
-            # DOES NOT accept pen as argument
-            #if epoch_pen is None:
-                #if len(args) > 1:
-                    #pens = cycle([QtGui.QPen(QtGui.QColor(*c).darker()) for c in self.epoch_plot_options["epochs_color_set"]])
-                    
-                #else:
-                    #pens = cycle([QtGui.QPen(QtGui.QColor(0,0,255,50).darker())])
-                    
-            #else:
-                #if isinstance(epoch_pen, tying.Sequence):
-                    #if all([isinstance(b, (QtGui.QColor, QtGui.QBrush, tuple, list)) for b in epoch_pen]):
-                        #pens = cycle([QtGui.QPen(QtGui.QColor(c)) if isinstance(c, (QtGui.QColor, QtGui.QBrush)) else QtGui.QPen(QtGui.QColor(*c) for c in epoch_pen)])
-                        
-                    #else:
-                        #pens = cycle([QtGui.QPen(QtGui.QColor(*epoch_pen))])
-                        
-                #elif isinstance(epoch_pen, QtGui.QColor):
-                    #pens = cycle([QtGui.QBrush(QtGui.QColor(epoch_pen))])
-                    
-                #elif isinstance(epoch_pen, QtGui.QBrush):
-                    #pens = cycle([epoch_pen])
-                    
-                #elif isinstance(epoch_pen, QtGui.QPen):
-                    #pens = cycle([epoch_pen])
-                    
-                #else:
-                    #warnings.warn("Invalid pen specification %s" % epoch_pen)
-                    
-            # figure out the visible X range
-            minX = list()
-            maxX = list()
-            
-            visibleXRange = None
-            
-            for ax in self.axes:
-                if len(ax.dataItems):
-                    [x_min, x_max] = ax.viewRange()[0]
-                    
-                    minX.append(x_min)
-                    maxX.append(x_max)
-                    
-            if len(minX) and len(minX) == len(maxX):
-                visibleXRange = [min(minX), max(maxX)]
-            
-            for epoch in args:
-                x0 = epoch.times.flatten().magnitude
-                x1 = x0 + epoch.durations.flatten().magnitude
-                
-                if visibleXRange is not None:
-                    x0_visible = (x0 >= visibleXRange[0]) & (x0 <  visibleXRange[1])
-                    x1_visible = (x1 >  visibleXRange[0]) & (x1 <= visibleXRange[1])
-                    
-                    x_visible = x0_visible & x1_visible
-                    
-                else:
-                    x_visible = np.full_like(x0, fill_value=True, dtype="bool")
-                    
-                #print("x_visible", x_visible)
-                
-                brush = next(brushes)
-                
-                # see NOTE: 2020-03-09 12:09:40
-                #pen = next(pens)
-                
-                for k in range(len(self.axes)):
-                    data_x_min = list()
-                    data_x_max = list()
-                    
-                    regions = [v for v in zip(x0,x1)]
-                    
-                    lris = [pg.LinearRegionItem(values=value, 
-                                                brush=brush, 
-                                                orientation=pg.LinearRegionItem.Vertical, 
-                                                movable=False, 
-                                                bounds = visibleXRange) for value in regions]
-                    
-                    for kl, lri in enumerate(lris):
-                        self.axes[k].addItem(lri)
-                        lri.setZValue(10)
-                        lri.setVisible(x_visible[kl])
-                        lri.setRegion(regions[kl])
-            
-        print(f"SignalViewer _plotEpochs_ epochs: {epochs}; cached: {self._cached_epochs_}")
-        # 1. clear existing LinearRegionItem objects.
+        # print(f"SignalViewer _plotEpochs_ epochs: {epochs}; cached: {self._cached_epochs_}")
+        
+        # BEGIN plot epochs from cache (containing standalone epoch data), if any and if requested
         
         if from_cache:
             epoch_seq = self._cached_epochs_.get(self.currentFrame, None)
             
-            if epoch_seq is not None:
+            # BEGIN plot epochs from cache: clear current displayed epoch if requested
+            # if epoch_seq is not None and clear:
+            if clear:
                 for k, ax in enumerate(self.axes):
                     lris = [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]
                     for l in lris:
                         ax.removeItem(l)
             
-                _plot_epochs_seq_(*epoch_seq, **kwargs)
+            # END plot epochs from cache: clear current displayed epoch if requested
+            
+            self._plot_epochs_seq_(*epoch_seq, **kwargs)
                 
             return
+        # END plot epochs from cache (containing standalone epoch data), if any and if requested
             
+        # BEGIN plot supplied epoch
+        # BEGIN clear current epoch display if requested
         if clear:
             for k, ax in enumerate(self.axes):
                 lris = [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]
                 for l in lris:
                     ax.removeItem(l)
+        # END clear current epoch display if requested
         
         epoch_seq = None
+        # END plot supplied epoch
         
         if epochs is None or len(epochs) == 0:
-            # None, an empty sequence or empty epoch
+            # None, an empty sequence of epochs or an empty epoch
             if isinstance(self.y, neo.Epoch):
                 self._prepareAxes_(1) # use a brand new single axis
                 epoch_seq = [self.y]
@@ -5946,7 +5996,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             else:
                 # NOTE: 2020-10-27 09:19:26
-                # some of therse may be relics from old API (i.e., neoepoch.Epoch)
+                # some of these may be relics from old API (i.e., neoepoch.Epoch)
                 # therefore we try to salvage them
                 epoch_seq = list()
                 
@@ -5965,7 +6015,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             raise TypeError("Expecting a neo.Epoch or a Sequence of neo.Epoch objects; got %s instead" % type(epochs).__name__)
         
         if epoch_seq is not None:
-            _plot_epochs_seq_(*epoch_seq, **kwargs)
+            self._plot_epochs_seq_(*epoch_seq, **kwargs)
             
             if self.currentFrame in self._cached_epochs_:
                 if len(self._cached_epochs_[self.currentFrame]):
@@ -5984,7 +6034,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         Plots the signals (optionally the selected ones) present in a segment, 
         and the associated epochs, events, and spike trains.
         """
-        # NOTE: 2021-10-03 12:55:21 ChannelIndex is OUT
+        # NOTE: 2021-10-03 12:55:21 ChannelIndex is OUT of neo
         
         # NOTE: 2021-01-02 11:54:50
         # allow custom plot title - handy e.g., for plotting segments from across
@@ -6182,7 +6232,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             signal_axis.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
                                                autoReduceTextSpace=False)
-            
+            signal_axis.update()
             kAx += 1
          
         #### END   plot regular (analog) signals
@@ -6231,7 +6281,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             signal_axis.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
                                                autoReduceTextSpace=False)
-            
+            signal_axis.update()
             kAx += 1
         
         #### END   plot irregularly sampled signals
@@ -6251,7 +6301,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             height_interval = 1/len(spiketrains) 
             
             self._plot_discrete_entities_(spiketrains, axis=kAx, **kwargs)
-
+            spike_train_axis.update()
             kAx +=1
                 
         #### END plot spike trains
@@ -6271,7 +6321,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             height_interval = 1/len(events)
             
             self._plot_discrete_entities_(events, axis=kAx, **kwargs)
-                
+            event_axis.update() 
             kAx +=1
             
         #### END plot events
@@ -6760,10 +6810,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         plotItem.replot()
         
-        if self.axis_tick_font is not None:
-            for ax in plotItem.axes.values():
-                if ax["item"].isVisible():
-                    pass
+        # FIXME: 2022-10-08 22:11:02 - what does this do ?!?
+        # if self.axis_tick_font is not None:
+        #     for ax in plotItem.axes.values():
+        #         if ax["item"].isVisible():
+        #             pass
         
         plotItemCursors = self.cursorsInAxis(plotItem)
         
