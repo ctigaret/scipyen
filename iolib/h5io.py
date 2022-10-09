@@ -1090,8 +1090,33 @@ def group2neoContainer(g:h5py.Group, target_class:type, cache:dict = {}):
     # neo.core.container.Containers are (as of neo 0.11.0):
     # • Block
     # • Segment
-    # • ChannelView
     # • Group
+    # • ChannelView
+    
+    attrs = attrs2dict(g.attrs)
+    name = attrs.get("name", None)
+    file_origin = attrs.get("file_origin", None)
+    description = attrs.get("description", None)
+    file_datetime = attrs.get("file_datetime", None)
+    rec_datetime = attrs.get("rec_datetime", None)
+    
+    
+    kwargs
+    
+    if target_class == neo.Block:
+        # NOTE: the defaults (empty lists) are created at construction
+        if "segments" in g:
+            segments = objectFromEntity(g["segments"], cache)
+            
+        if "groups" in g:
+            groups = objectFromEntity(g["groups"], cache)
+            
+        if "annotations" in g:
+            annotations = objectFromEntity(g["annotations"], cache)
+            
+        
+        
+        
     
     pass
 
@@ -1124,6 +1149,12 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     ax1["key"] = '?'
     ax1["array_annotations"] = None
     
+    # NOTE:2022-10-09 08:51:31
+    # this is a reference to the parent Segment; thic may have already been
+    # reconstructed, therefore we check the cache, 
+    # see NOTE: 2022-10-09 08:48:24
+    segment = None 
+    
     # now extract metadata info from the signal's HDF5 Group
     # these are (in no particular order):
     # • name
@@ -1146,9 +1177,19 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     # spike train on its owmn is actually LARGER than the pickle 
     #  containing the original segment, see the sxample files in 
     # analysis_Bruker_22i21)
-    segment = attrs.get("__segment__", None)
-    if segment in ["__ref__", "null"]:
-        segment = None
+    segment = None
+    segment_tag = attrs.get("__segment__", None)
+    if segment == ["__ref__"] and "segment" in g:
+        segment_entity = g.get("segment", None)
+        if isinstance(segment_entity, h5py.Group):
+            # NOTE: 2022-10-09 08:48:24 
+            # in the next call, objectFromEntity will either:
+            # • get the actual neo.Segment from cache (if this segment_entity is
+            #   in the cahche, which means the neo.Segment instance has been 
+            #   reconstructed already)
+            # • create a new neo.Segment from the segment_entity, rthen cache it
+            segment = objectFromEntity(segment_entity, cache) # this will get the segment if c
+    
     description = attrs.get("__description__", None)
     units = attrs.get("__units__", pq.s)
     name = attrs.get("__name__", "")
@@ -1883,12 +1924,17 @@ def makeObjAttrs(obj:typing.Any, oname:typing.Optional[str]=None):
     
     as_group = isinstance(obj, (collections.abc.Iterable, neo.core.container.Container)) and not isinstance(obj, (str, bytes, bytearray, np.ndarray))
     
-    if not as_group:
-        obj_attrs.update(makeDatasetAttrs(obj))
-    else:
+    if as_group:
         obj_attrs["__name__"] = makeAttr(oname)
+    else:
+        obj_attrs.update(makeDatasetAttrs(obj))
         
-    obj_attrs["__object_hash__"] = gethash(obj)
+    # if not as_group:
+    #     obj_attrs.update(makeDatasetAttrs(obj))
+    # else:
+        # obj_attrs["__name__"] = makeAttr(oname)
+        
+    obj_attrs["__object_hash__"] = gethash(obj) # TODO: REMOVE
         
     target_name = makeEntryName(obj)
     
@@ -3410,6 +3456,8 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
         # segment representations in the parent group
         #
         if hasattr(obj, "segment"): 
+            # NOTE: neo signals and signal-like objects have a "segment" attribute
+            # holding a reference to the segment that contains them;
             # we explicitly check for a 'segment' attribute first, because 
             # getattr(x,"segment", None) effectively bypasses this (i.e. it 
             # behaves as 'x' had this attribute albeit set to None
@@ -3752,6 +3800,10 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     return dset
 
 def makeHDF5Group(obj, group:h5py.Group, name:typing.Optional[str]=None, compression:typing.Optional[str]="gzip",  chunks:typing.Optional[bool]=None, track_order:typing.Optional[bool] = True, entity_cache:typing.Optional[dict] = None):# -> h5py.Group:
+    """Writes python iterable collection and neo containers to a HDF5 Group.
+        • iterable collections: tuple, list, dict (and subclasses)
+        • neo containers: Block, Segment, Group
+    """
     target_name, obj_attrs = makeObjAttrs(obj)
     if isinstance(name, str) and len(name.strip()):
         target_name = name
