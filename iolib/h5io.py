@@ -1101,8 +1101,13 @@ def group2neoContainer(g:h5py.Group, target_class:type, cache:dict = {}):
     rec_datetime = attrs.get("rec_datetime", None)
     
     
-    kwargs
-    
+    kwargs = dict()
+    kwargs["name"] = name
+    kwargs["file_origin"] = file_origin
+    kwargs["file_datetime"] = file_datetime
+    kwargs["rec_datetime"] = rec_datetime
+    kwargs["description"] = description
+
     if target_class == neo.Block:
         # NOTE: the defaults (empty lists) are created at construction
         if "segments" in g:
@@ -1114,7 +1119,8 @@ def group2neoContainer(g:h5py.Group, target_class:type, cache:dict = {}):
         if "annotations" in g:
             annotations = objectFromEntity(g["annotations"], cache)
             
-        
+    elif target_class == neo.Segment:
+        if "ana"
         
         
     
@@ -1135,7 +1141,9 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     signal = []
     times = []
     annotations = dict()
+    segment = None 
 
+    # domain axis
     ax0 = dict()
     ax0["t_start"] = 0.*pq.s
     ax0["name"] = "Time"
@@ -1143,17 +1151,25 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     ax0["key"] = "T"
     ax0["units"] = pq.s
     
-    ax1 = dict() # TODO 2022-10-06 23:50:44
+    # signal ("channels" axis)
+    # but NOTE that the channels are typically stored as fields of the 
+    # array_annotations property of the signal !
+    ax1 = dict() 
+    # FIXME/TODO: the signal units; these should be the same for ALL channels
+    # therefore if we store them here, we don;t neet to stored them in the 
+    # parent group's attrs!
+    ax1["units"] = pq.dimensionless 
     ax1["name"] = ""
-    ax1["units"] = pq.dimensionless
     ax1["key"] = '?'
     ax1["array_annotations"] = None
+    # FIXME/TODO same as for units, above; netter stored here than in the 
+    # parent group's attrs
+    ax1["dtype"] = attrs.get("__dtype__", np.dtype(float))
     
     # NOTE:2022-10-09 08:51:31
     # this is a reference to the parent Segment; thic may have already been
     # reconstructed, therefore we check the cache, 
     # see NOTE: 2022-10-09 08:48:24
-    segment = None 
     
     # now extract metadata info from the signal's HDF5 Group
     # these are (in no particular order):
@@ -1164,7 +1180,8 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     # • units
     # 
     attrs = attrs2dict(g.attrs)
-    name = attrs.get("__name__", None)
+    rec_attrs = dict((__mangle_name__(a[0]), attrs[__mangle_name__(a[0])]) for a in target_class._recommended_attrs)
+    # name = attrs.get("__name__", None)
     # TODO/FIXME: 2022-10-06 09:04:15
     # in this case the segment property is a reference to the neo.Segment
     # where the spike train was originally defined
@@ -1177,25 +1194,36 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     # spike train on its owmn is actually LARGER than the pickle 
     #  containing the original segment, see the sxample files in 
     # analysis_Bruker_22i21)
-    segment = None
-    segment_tag = attrs.get("__segment__", None)
-    if segment == ["__ref__"] and "segment" in g:
-        segment_entity = g.get("segment", None)
-        if isinstance(segment_entity, h5py.Group):
-            # NOTE: 2022-10-09 08:48:24 
-            # in the next call, objectFromEntity will either:
-            # • get the actual neo.Segment from cache (if this segment_entity is
-            #   in the cahche, which means the neo.Segment instance has been 
-            #   reconstructed already)
-            # • create a new neo.Segment from the segment_entity, rthen cache it
-            segment = objectFromEntity(segment_entity, cache) # this will get the segment if c
+    segment_entity = g.get("segment", None)
+    if isinstance(segment_entity, h5py.Group):
+        # NOTE: 2022-10-09 08:48:24 
+        # in the next call, objectFromEntity will either:
+        # • get the actual neo.Segment from cache (if this segment_entity is
+        #   in the cahche, which means the neo.Segment instance has been 
+        #   reconstructed already)
+        # • create a new neo.Segment from the segment_entity, rthen cache it
+        segment = objectFromEntity(segment_entity, cache)
+        
+    # segment_tag = attrs.get("__segment__", None)
+    # if segment == ["__ref__"] and "segment" in g:
+    #     segment_entity = g.get("segment", None)
+    #     if isinstance(segment_entity, h5py.Group):
+    #         # NOTE: 2022-10-09 08:48:24 
+    #         # in the next call, objectFromEntity will either:
+    #         # • get the actual neo.Segment from cache (if this segment_entity is
+    #         #   in the cahche, which means the neo.Segment instance has been 
+    #         #   reconstructed already)
+    #         # • create a new neo.Segment from the segment_entity, rthen cache it
+    #         segment = objectFromEntity(segment_entity, cache) # this will get the segment if c
     
-    description = attrs.get("__description__", None)
+    # NOTE: these below should be the same as in axis 1;
+    # TODO/FIXME: decide which ones to keep !!!
     units = attrs.get("__units__", pq.s)
-    name = attrs.get("__name__", "")
-    file_origin = attrs.get("__file_origin__", None)
     dtype = attrs.get("__dtype__", np.dtype(float))
-    
+    # NOTEL: these beloware collected in rec_attrs
+    # description = attrs.get("__description__", None)
+    # name = attrs.get("__name__", "")
+    # file_origin = attrs.get("__file_origin__", None)
     # now try to get data from the children entities of the signal's HDF5 Group:
     # • the signal's data ← child Dataset
     #
@@ -1224,7 +1252,7 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     #   
     #   ∘ the SECOND DOMAIN AXIS information for ImageSequence.
     #
-    #   Now, typically, the ImageSeqence is either a 3D numpy array, or a list
+    #   Now, typically, the ImageSequence is either a 3D numpy array, or a list
     #   of 2D numpy arrays, presumably with the same shape. Furthermore, it seems
     #   to assume a square sampling grid, therefore its 2nd and 3rd axes would 
     #   carry the same kind of information (for a square pixel) and would both
@@ -1241,7 +1269,7 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     #   in one HDF5 Group for 𝐚𝐱𝐢𝐬 𝟏.
     #
     #   (NOTE these limitations are the main reasons why Scipyen uses VIGRA arrays 
-    #   instead of ImageSeqence)
+    #   instead of ImageSequence)
     #
     #
     axes_group_name = f"{g.name.split('/')[-1]}_axes"
@@ -1294,35 +1322,67 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
                 ax1["name"] = ax1attrs.get("__name__", "")
                 ax1["units"] = ax1attrs.get("__units__", pq.dimensionless)
                 ax1["key"] = ax1attrs.get("__key__", '?')
-                ax1["spatial_scale"] = ax1attrs.get("__spatial_scale__", 1.0)
+                ax1["dtype"] = ax1attrs.get("dtype", np.dtype(float))
                 ax1["array_annotations"] = ax1attrs.get("__array_annotations__", None)
+                # NOTE: this none is only present in ImageSequence
+                ax1["spatial_scale"] = ax1attrs.get("__spatial_scale__", 1.0*pq.um)
                 
     if target_class == neo.ImageSequence:
-        obj = target_class(signal, units=units,dtype=dtype,t_start=ax0["t_start"],
-                           sampling_rate=ax0["sampling_rate"],
-                           spatial_scale=ax1["spatial_scale"],
-                           file_origin=file_origin,
-                           description=description)
+        kwargs = dict()
+        kwargs["units"] = units
+        kwargs["dtype"] = dtype
+        kwargs["t_start"] = ax0["t_start"]
+        kwargs["sampling_rate"] = ax0["sampling_rate"]
+        kwargs["spatial_scale"] = ax1["spatial_scale"]
+        kwargs.update(rec_attrs)
+        obj = target_class(signal, **kwargs)
+        # obj = target_class(signal, units=units,dtype=dtype,t_start=ax0["t_start"],
+        #                    sampling_rate=ax0["sampling_rate"],
+        #                    spatial_scale=ax1["spatial_scale"],
+        #                    file_origin=file_origin,
+        #                    description=description)
         
     elif target_class == IrregularlySampledDataSignal:
-        obj = target_class(times, signal, 
-                            units=units, 
-                            domain_units=ax0["units"],
-                            dtype=dtype, domain_dtype=ax0["dtype"],
-                            name=name, file_origin=file_origin, 
-                            description=description)
+        kwargs = dict()
+        kwargs["units"] = units
+        kwargs["domain_units"] = ax0["units"]
+        kwargs["dtype"] = dtype
+        kwargs["domain_dtype"] = ax0["dtype"]
+        kwargs.update(rec_attrs)
+        obj = target_class(times, signal, **kwargs)
+        # obj = target_class(times, signal, 
+        #                     units=units, 
+        #                     domain_units=ax0["units"],
+        #                     dtype=dtype, domain_dtype=ax0["dtype"],
+        #                     name=name, file_origin=file_origin, 
+        #                     description=description)
+        
     elif target_class == neo.IrregularlySampledSignal:
-        obj = target_class(times, signal, 
-                            units=units, time_units=ax0["units"],
-                            dtype=dtype,
-                            name=name, file_origin=file_origin, 
-                            description=description)
+        kwargs = dict()
+        kwargs["units"] = units
+        kwargs["time_units"] = ax0["units"]
+        kwargs["dtype"] = dtype
+        kwargs.update(rec_attrs)
+        obj = target_class(times, signal, **kwargs)
+        # obj = target_class(times, signal, 
+        #                     units=units, time_units=ax0["units"],
+        #                     dtype=dtype,
+        #                     name=name, file_origin=file_origin, 
+        #                     description=description)
 
     elif target_class == DataSignal:
-        obj = target_class(signal, units=units, time_units=ax0["units"],
-                            t_start=ax0["t_start"],sampling_rate=ax0["sampling_rate"],
-                            dtype=dtype, name=name,
-                            file_origin=file_origin,description=description)
+        kwargs = dict()
+        kwargs["units"] = units
+        kwargs["time_units"] = ax0["units"]
+        kwargs["t_start"] = ax0["t_start"]
+        kwargs["sampling_rate"] = ax0["sampling_rate"]
+        kwargs["dtype"] = dtype
+        kwargs.update(rec_attrs)
+        obj = target_class(signal, **kwargs)
+        # obj = target_class(signal, units=units, time_units=ax0["units"],
+        #                     t_start=ax0["t_start"],sampling_rate=ax0["sampling_rate"],
+        #                     dtype=dtype, name=name,
+        #                     file_origin=file_origin,description=description)
     elif target_class == neo.AnalogSignal:
         obj = target_class(signal, units=units, name=name, t_start=ax0["t_start"],
                             sampling_rate=ax0["sampling_rate"], dtype=dtype,
@@ -1395,11 +1455,12 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
     
     
     attrs = attrs2dict(g.attrs)
-    name = attrs.get("__name__", None)
-    units = attrs.get("__units__", pq.s)
-    segment = attrs.get("__segment__", None)
-    file_origin = attrs.get("__file_origin__", None)
-    description = attrs.get("__description__", None)
+    rec_attrs = dict((__mangle_name__(a[0]), attrs[__mangle_name__(a[0])]) for a in target_class._recommended_attrs)
+    # name = attrs.get("__name__", None)
+    # units = attrs.get("__units__", pq.s)
+    # segment = attrs.get("__segment__", None)
+    # file_origin = attrs.get("__file_origin__", None)
+    # description = attrs.get("__description__", None)
     
     data_set_name = f"{g.name.split('/')[-1]}_data"
     # data_set_name = "".join([g.name.split('/')[-1], "_data"])
@@ -1454,6 +1515,12 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
             
             if isinstance(ax1g, h5py.Group):
                 ax1attrs = attrs2dict(ax1g.attrs)
+                
+    # NOTE: 2022-10-09 13:36:56
+    # briefly:
+    # set up kwargs for the named arguments of the target_class
+    # c'tor
+    # update kwargs with a dict of recommended attrs (see neo API)
     
     if target_class == neo.SpikeTrain:
         waveforms_set_name = f"{g.name.split('/')[-1]}_waveforms"
@@ -1464,30 +1531,59 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
         else:
             waveforms = None
             
-        obj = target_class(times, units=units,  
-                           t_start = ax0["t_start"],
-                           t_stop = ax0["t_stop"],
-                           sampling_rate=ax0["sampling_rate"], 
-                           left_sweep=ax0["left_sweep"], 
-                           name=name, waveforms=waveforms, 
-                           file_origin=file_origin, 
-                           description = description)
+        kwargs = dict()
+        kwargs["units"] = units
+        kwargs["t_start"] = ax0["t_start"]
+        kwargs["t_stop"] = ax0["t_start"]
+        kwargs["sampling_rate"] = ax0["sampling_rate"]
+        kwargs["left_sweep"] = ax0["left_sweep"]
+        kwargs.update(rec_attrs)
+            
+        obj = target_class(times, **kwargs)
+        # obj = target_class(times, units=units,  
+        #                    t_start = ax0["t_start"],
+        #                    t_stop = ax0["t_stop"],
+        #                    sampling_rate=ax0["sampling_rate"], 
+        #                    left_sweep=ax0["left_sweep"], 
+        #                    name=name, waveforms=waveforms, 
+        #                    file_origin=file_origin, 
+        #                    description = description)
     
     elif target_class == neo.Event:
-        obj = target_class(times=times, labels=labels, units=units,
-                           name=name, file_origin=file_origin,
-                           description=description)
+        kwargs = dict()
+        kwargs["times"] = times
+        kwargs["labels"] = labels
+        kwargs["units"] = units
+        kwargs.update(rec_attrs)
+        obj = target_class(**kwargs)
+        # obj = target_class(times=times, labels=labels, units=units,
+        #                    name=name, file_origin=file_origin,
+        #                    description=description)
     
-    elif target_class == neo.Epoch:
-        # print(f"ax0 {ax0}")
-        obj = target_class(times=times, durations=durations, labels=labels, units=units,
-                           name=name, file_origin=file_origin,
-                           description=description)
+    elif target_class in (neo.Epoch, DataZone):
+        kwargs = dict()
+        kwargs["times"] = times
+        kwargs["durations"] = durations
+        kwargs["units"] = units
+        kwargs["labels"] = labels
+        kwargs.update(rec_attrs)
+        obj = target_class(**kwargs)
+#         obj = target_class(times=times, durations=durations, labels=labels, units=units,
+#                            name=name, file_origin=file_origin,
+#                            description=description)
+#     
     
-    elif target_class == DataZone:
-        obj = target_class(times=times, durations=durations, labels=labels, units=units,
-                           name=name, file_origin=file_origin,
-                           description=description)
+    # elif target_class == DataZone:
+    #     kwargs = dict()
+    #     kwargs["times"] = times
+    #     kwargs["durations"] = durations
+    #     kwargs["units"] = units
+    #     kwargs["labels"] = labels
+    #     kwargs.update(rec_attrs)
+    #     obj = target_class(**kwargs)
+    #     # obj = target_class(times=times, durations=durations, labels=labels, units=units,
+    #     #                    name=name, file_origin=file_origin,
+    #     #                    description=description)
     
     
     elif DataMark in inspect.getmro(target_class):
@@ -1497,9 +1593,16 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
         else:
             etype = MarkType[mark_type]
             
-        obj = target_class(times=times, labels=labels, units=units,name=name,
-                            description=description,file_origin=file_origin,
-                            event_type = etype)
+        kwargs = dict()
+        kwargs["times"] = times
+        kwargs["labels"] = labels
+        kwargs["units"] = units
+        kwargs.update(rec_attrs)
+        obj = target_class(**kwargs)
+#             
+#         obj = target_class(times=times, labels=labels, units=units,name=name,
+#                             description=description,file_origin=file_origin,
+#                             event_type = etype)
         
     else:
         raise NotImplementedError(f"{target_class} if not yet supported")
@@ -1922,10 +2025,20 @@ def makeObjAttrs(obj:typing.Any, oname:typing.Optional[str]=None):
         
     obj_attrs = makeDataTypeAttrs(obj)
     
+    if isinstance(obj, neo.core.baseneo.BaseNeo):
+        for a in obj._recommended_attrs:
+            # print(f"_recommended_attrs a: {a}")
+            obj_attrs[__mangle_name__(a[0])] = makeAttr(getattr(obj, a[0]))
+    
     as_group = isinstance(obj, (collections.abc.Iterable, neo.core.container.Container)) and not isinstance(obj, (str, bytes, bytearray, np.ndarray))
     
+    if not as_group:
+        obj_attrs.update(makeDatasetAttrs(obj))
+    
     if as_group:
-        obj_attrs["__name__"] = makeAttr(oname)
+        if "__name__" not in obj_attrs:
+            obj_attrs["__name__"] = makeAttr(oname)
+        
     else:
         obj_attrs.update(makeDatasetAttrs(obj))
         
@@ -1934,7 +2047,7 @@ def makeObjAttrs(obj:typing.Any, oname:typing.Optional[str]=None):
     # else:
         # obj_attrs["__name__"] = makeAttr(oname)
         
-    obj_attrs["__object_hash__"] = gethash(obj) # TODO: REMOVE
+    # obj_attrs["__object_hash__"] = gethash(obj) # TODO: REMOVE
         
     target_name = makeEntryName(obj)
     
