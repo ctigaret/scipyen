@@ -1,467 +1,4 @@
 """Collection of functions to read/write objects to HDF5 files.
-
-STORING SIGNALS AND IMAGES IN HDF5 OBJECT HIERARCHY:
-====================================================
-
-NOTE: HDF5 object hierarchy consists of:
-h5py.Group (this type is an ancestor of h5py.File which behavies like a 
-h5py.Group with IO functionality)
-    
-A Group is a container of:
-    
-h5py.Dataset - similar to a numpy array including having the 'ndim' and 'shape'
-    properties.
-
-Dimension scales:
-    A data set can associate a dimension scale with each axis (or dimension);
-    while these are opaque objects whuch are not supposed to be directly 
-    constructed by the user, they are managed by the Dataset accessed via its
-    'dims' property:
-    
-    dataset.dims[0] ... dataset.dims[k] for 0 <= k < len(dataset.dims))
-    
-    A dimension scale can be constructed from another data set (as a reference)
-    stored along the main data set preferably in the same group, but certainly in
-    the same file (although HDF5 allows external references, I will keep the code
-    simpler and avoid this strategy).
-    
-Both Group and Dataset objects associate attributes ('attr' property) which is a
-dict-like object (a 'mapping') with str keys mapped to any type of basic Python
-data type (numeric scalars and strings, but not Python containers)!
-
-
-NOTE: 1D signals are BY CONVENTION represented as column vectors.
-    
-    Representation of time-varying quantity (a 'signal') of N samples:
-    * with data recorded through a single recording channel:
-        - 1D numpy array -> just one axis - axis 0 - the 'domain axis' 
-            shape: (N, ), vector
-            
-        - 2D numpy array with the second axis (axis 1) being a singleton axis
-            shape: (N, 1), 'column vector'
-        
-        In either case, axis 0 is the domain axis with domain_name = "Time"
-        and axis_name "Time"; axis 1 (when it exists) is the channel axis.
-        
-    * with data recorded through more than one channel:
-        2D numpy array with shape (N,M) where M is the number of channels
-            axis 0 - the domain axis (as above)
-            axis 1 - channel axis
-            
-    The domain axis usually associates units of the quantity representing the 
-    domain of the signal: e.g. 's' for time, 'um' for space, etc.
-
-    All channels of a signal SHOULD have the same units, since they contain
-    values of the same physical measure (albeit possibly with different 
-    scaling or amplification factors). Furthermore, the sampling period (and 
-    obviously, rate) is identical for all the channels - hence the domain is
-    common.
-    
-    In electrophysiology, fortunately most acquisition systems usually manage
-    the channel calibration such that the data stored in a channel represents 
-    the values of the physical measure recorded by the system, instead of the
-    raw (uncalibrated) amplifier output.
-    
-    In imaging, however, as in the more general case, the concept of 
-    channels may be taken in a looser sense (unfortunately): most image 
-    acquisition system record pixel intensity data in each channel.
-    
-    In multiphoton imaging an "acquisition signal" can represent fluorescent
-    data from an indicator, or data obtained from a transmitted light detector
-    (sometimes dubbed the "DIC" channel in some acquisition software). 
-    
-    Even two fluorescent "channels" acquired from the same source or field 
-    of view can represent two different quantities, depending on what the
-    fluorescent indicator is used for.
-    
-    For this reason, each channel needs to associate its own calibration data
-    to account for the correspondence between the pixel intensity in that 
-    channel and the value of the imaged physical measure.
-    
-    Furthermore, from a numerical point of view, the pixel intensities can 
-    be represented as scalar values (in "gray-scale" images) or as sequences
-    of scalars (RGB, RGBAlpha, Luv, etc) in so-called multi-band images
-    (also loosely called multi-channel images).
-    
-    The distinction between a "pixel channel" and a data channel can be
-    further blurred when gray scale images (each form one "data" channel)
-    are merged into a multi-band image (mostly for display convenience).
-    
-    One thing that all the image channels have in common is the definition
-    domain of the physical measure (time, space, frequency, etc) and hence
-    their sampling period (or "resolution").
-    
-    
-    In a nutshell:
-    
-        domain axis, or axes: common to all signal/image channels
-            one axis for 1D arrays or for 2D arrays where second axis (axis 1)
-            is a singleton axis
-            
-            two axes for numpy arrays with at least two dimensions; these
-            can be any combination of (space, time, frequency, angle) axes 
-            as appropriate (see vigra.AxisType for details).
-            
-        channel axis: (for whatever a "channel" is taken to represent)
-            only exists for numpy arrays with at least two dimensions
-            typically is the highest-order axis (e.g, 2nd axis for a 1D signal
-            3rd axis for an image, 4th axis for a volume, etc).
-            
-        For imaging, vigra library saves the day through the AxisTags concepts
-        (see vigranumpy documentation). Acipyen add to this the concept of
-        CalibrationData: AxisCalibrationData and ChannelCalibrationData, with
-        the latter used to encapsulate calibrate the pixel intensities in a 
-        given image channel.
-        
-        For electrophysiology, the neo package considers all signals as
-        column vectors, with the domain given in the neo object metadata
-        ('times' attribute). Scipyen extents this for signals defined on 
-        domains other than time (see DataSignal, IrregularlySampledDataSignal,
-        DataZone, DataMark).
-        
-    Representation of signals and images as h5py Dataset objects ('signal datasets'):
-    
-    * Each dimension of the data set associates a dimension scale. The dimension
-    scales are made from h5py Dataset objects stored in a h5py.Group usually 
-    located in the same group as the dataset's parent, and named after the 
-    signal's dataset name suffixed with "_axes".
-    
-    The <dataset_name>_axes group contains the data sets that store axis 
-    information ('axis data sets'). With few exceptions, the axis information 
-    itself is stored as attributes of the axis data set (key/value pairs in the
-    axis data set 'attrs' property)
-    
-    The exceptions are for the domain axis of irregularly sampled signals, 
-    neo.Epoch and DataZone objects which associate additional array-like domain 
-    information:
-    * the actual "times" values for irregular signals
-    * the "durations" values for Epoch and DataZone objects
-    
-    Dimension scales are constructed from these 'axis data sets' using the 
-    'Dataset.make_scale()' method, then attached to the corresponding dimension of
-    the 'signal data set' using the Dimension scale's 'attach_scale()' method.
-    
-    The various combinations are described in the table below
-    
-Object      Signal  Data            Dimension   Comment Axis data   Axis data set
-type        data    set             cale               data        attrs keys:
-type        set     attrs                              set
-================================================================================  
-BaseSignal(1)
-
-* regularly sampled signals(2):
-
-            2D      metadata        dims[0]     domain  empty set   'units': str(4)          
-                    including       'label'             (3)         't_start' OR 'origin':  float scalar       
-                    annotations      =                               
-                                    signal.name                                              
-                                                                    'sampling_rate' OR        
-                                                                    'sampling_period': float scalar                  
-                                                                    
-                                                                    'sampling_rate_units': str
-                                                                    'sampling_period_units': str
-                                                            
-                                                                    'name': str = the domain name(5)
-                                                
-                                    dims[1]     signal  empty set   'units' : str(3)       
-                                                                    'name':str = signal name    
-                                                                    
-                                                                    << optional keys >>    
-                                                                    
-                                                                    'origin': float scalar                  
-                                                                    'resolution': float scalar    
-                                                                    'ADClevels': float scalar    
-                                                                    
-                                                channel empty set   'units':str    
-                                                (6)                 'name': str = signal.name_channel_k for kth channel 
-                                                                    
-                                                                    << optional keys >>    
-                                                                    
-                                                                    'origin': float scalar                  
-                                                                    'resolution': float scalar        
-                                                                    'ADClevels': float scalar  
-                                                                    'index': int = k
-                                                                    
-                                                                    other keys from  'array_annotations'    
-                                    
-                                    
-* irregularly sampled signals (7):
-
-            2D      metadata,       dims[0]     domain  'times'    'units' : str(4)      
-                    annotations     'label'             values     't_start' OR 'origin':float scalar     
-                                     =                          
-                                    signal.name                                          
-                                                            
-                                                                    'name':str = the domain name(5)
-                                                
-                                    dims[1]     signal  empty set   'units' : str(3)   
-                                                                    'name':str = signal name
-                                                                    
-                                                                    << optional keys >>
-                                                                    
-                                                                    'origin': float scalar              
-                                                                    'resolution': float scalar
-                                                                    'ADClevels': float scalar
-                                                                    
-                                                channel empty set   'units':str
-                                                (6)                 'name': str = signal.name_channel_k for kth channel
-                                                                
-                                                                    << optional keys >>
-                                                                    
-                                                                    'origin': float scalar              
-                                                                    'resolution': float scalar    
-                                                                    'ADClevels': float scalar
-                                                                    
-                                                                    other keys from 'array_annotations'
-                                        
-                                    
-* neo.ImageSequence:   by definition these are gray-scale (single-channel or
-                        single-band images) ; their units and signal name go 
-                        as attributes of the signal data set, in the metadata
-
-            3D      metadata,       dims[0]  frame axis             'sampling_rate': float scalar
-                    anotations                                      'sampling_rate_units' : str
-                    
-                                    dims[1]  height axis            'spatial_scale: float_scalar
-                                                                    'spatial_scale_units': str
-                                                                    
-                                    dims[2]  width axis             'spatial_scale'
-                                                                    'spatial_scale_units': str
-
-
-DataObject other than BaseSignal (8)
-        For these, the signal data set already contains their "times" values.
-        moreover, these are by defintion single-channel.
-
-neo.Event, DataMark (including TriggerEvent)
-
-            1D      metadata        dims[0]     domain  'labels'    'name':str = the domain name           
-                    annotations    'label'               values     
-                                    set to                                      
-                                    signal.name                                          
-                                                
-neo.Epoch, DataZone - the data set contains the 'times' or 'places' in column 0 
-                        and 'durations' or 'extents', respectively, in column 1
-
-            2D      metadata        dims[0]     domain  empty set   'name':str = the domain name           
-                    annotations     'label'                           
-                                    set to                                      
-                                    signal.name                                          
-                                                                                
-                                    dims[1]             'labels' 
-                                    'label'             (numpy dtype(U))
-                                    set to 'labels'
-                                    
-neo.SpikeTrain - the data set can be multi-channel (each channel from a different 
-                cell) with the 'times' for each channel in a column
-                
-    SpikeTrain objects also have a 'waveforms' propery which when not empty it is 
-    a pq.Quantity array (all waveforms are assumed to represent the same physical
-    measure, typically electrical potential, the "data" associated with each spike
-    "time stamp"). 
-    
-    This is stored as a h5py Dataset in the axes group is also added as dimension
-    scale to the dims[1] of the signal data set of the spike train.
-    
-    The waveforms data set has its own dimension scales (see below).
-                
-            2D      metadata        dims[0]     domain  empty set   'name': str = "Time"
-                    annotations
-                                    dims[1]     channel empty set   'name': str = channel_k
-                                               
-                                                waveforms (see below)
-                                               
-                                               
-neo.SpikeTrain.waveforms: neo API specifies a 3D pq.Quantity array:
-
-            3D     'name':str       dims[0]     spike    empty set   'name': str = 'spike #'
-    [spike_number, 'waveforms'                                       'units': str = 'dimensionless'
-     channel,      'units':str =  
-     time]         waveform.units                               
-                                    dims[1]     channel  empty set    'name': str = 'channel_k'
-                      
-                                    dims[2]     domain   empty set    'name': str ='Time' 
-                    
-                    
-    However, the 3D layout is not enforced and waveforms from a singleton channel
-    can be stored as a 2D array [spike, time]
-    
-            2D      'name':str      dims[0]     spike    empty set     'name': str = 'spike #'
-                    'waveforms'                                        'units' : str = 'dimensionless'
-                    'units' str =
-                    waveforms.units
-                    
-                                    dims[1]     domain   empty set     'name': str = domain's name, usually "Time"
-                                                                       'units': str = domain units e.g. 's'
-                                                                       
-vigra.VigraArray- N-dimensional numeric arrays
-    ND data set containing the VigraArray data transposed to numpy order
-                    
-            ND      metadata        dims[k]     kth axis empty set 
-                    'axistags'
-                                                constructed from corresponding 
-                                                AxisCalibrationData object and
-                                                has the following atrributes:
-                                                'key'
-                                                'name'
-                                                'units'
-                                                'origin'
-                                                'resolution'
-                                                
-        NOTE: when kth axis is a Channels axis (at most one) then dims[k]
-        associated dimension scales for each channel created in a 
-        group '<signal_name>_channels' alongside the axes group.
-        
-        A channel dimension scale is constructed from empty data sets
-        and has the following attributes:
-        'name', 
-        'units', 
-        'origin', 
-        'resolution', 
-        'maximum',
-        'index': int the channel's index along the channels axis
-        
-        The atttributes are populated from ChannelCalibrationData for the 
-        corresponding channel.
-        
-vigra.filters.Kernel1D: - stored as 2D array (column vectors) with the 
-        domain (kernel sample coordinates) on column 0 and
-        kernel sample values on column 1 (see vigrautils.kernel2array())
-        
-        ATTENTION: No dimension scales are attached to the data set
-    
-        NOTE: to reconstitute an 1D kernel:
-        k1d = vigra.filters.Kernel1D()
-        xy = group[dataset_name] => 2D array
-        left = int(xy[0,0])
-        right = int(xy[-1,0])
-        contents = xy[:,1]
-        k1d.initExplicitly(left, right, contents)
-        
-vigra.filters.Kernel2D: stored as 3D array with:
-        [x coordinates, y coordinates, sample values] slices where each 
-        slice if a 2D array (see vigrautils.kernel2array)
-    
-        ATTENTION: No dimension scales are attached to the data set
-                
-        NOTE: to reconstitute a 2D kernel:
-        k2d = vigra.filters.Kernel2D()
-        xy = group[dataset_name] => 3D array
-        upperLeft = (int(xy[-1,-1,0]), int(xy[-1,-1,1]))
-        lowerRight = (int(xy[0,0,0]), int(xy[0,0,1]))
-        contents = xy[:,:,2]
-        k2d.initExplicitly(upperLeft, lowerRight, contents)
-        
-Python quantities.Quantity arrays (pq.Quantity):
-        ND data set; attrs keys include
-        'units' : str = data.units.dimensionality.string
-              
-        ATTENTION: No dimension scales are attached to the data set
-        
-Pandas data structures (pd) TODO WORK IN PROGRESS
-
-pd.Series:
-
-pd.DataFrame
-        
-numpy array:
-        ND data set; attrs include only the generic data attributs ('metadata')
-        
-        ATTENTION: No dimension scales are attached to the data set
-        
-numpy chararray, string, numpy array with dtype.kind 'S' or 'U':
-    stored as datasets with dtype h5py.string_dtype() array (variable length strings)
-
-numpy structured arrays and recarrays: ATTENTION: NOT YET SUPPORTED
-        
-homogeneous lists of fundamental numeric python data types (numbers.Number,
-    bytes)
-        1D data set
-        
-        ATTENTION: No dimension scales are attached to the data set
-        
-homogeneous nested lists (that can be converted to plain ND numpy arrays)
-        ND data set
-        
-        ATTENTION: No dimension scales are attached to the data set
-
-
-        ATTENTION: No dimension scales are attached to the data set
-        
-basic Python scalars (numbers.Number, bytes, str) -> 1D data set
-
-NOTE: python strings can be stored directly as values to dataset attr keys!
-
-================================================================================
-(1) neo.core.basesignal.BaseSignal type of objects; these include:
-    neo's signals types:    neo.AnalogSignal, neo.IrregularlySampledSignal
-    Scipyen's signal types: DataSignal, IrregularlySampledDataSignal
-    
-(2): neo.AnalogSignal, DataSignal
-    
-(3) h5py.Empty("f") except for irregular signals and neo DataObject types that 
-    are NOT BaseSignal types: neo.Epoch, DataZone
-
-(4) This is the value of units.dimensionality.string where units is the domain's
-'units' property (a pq.Quantity object)
-
-(5) "Time" for neo signals or the signal's 'domain_name' property
-
-(6) in addition to the signal empty set; ONLY for multi-channel signals
-
-(7) These are irregularly sampled signals (neo.IrregularlySampledSignal and 
-    Scipyen's IrregularlySampledDataSignal) that inherit from neo's BaseSignal
-   
-(8) neo.Event, DataMark, neo.Epoch, DataZone
-
-=> 'signal data sets' are 2D data sets 
-        with len(dims) == 2:
-        dims[0]: the domain axis;
-            the dimension scale is constructed from an empty data set
-    
-    => 1D or 2D data sets, with
-    dims[0] = the domain axis (see above)
-    dims[1] = the "channels" axis;
-        
-    
-STORING PYTHON CONTAINER OBJECTS IN HDF5 OBJECT HIERARCHY
-================================================================================
-Inhomogeneous sequences/iterables (list, tuple, deque):
-
-    stored as a group with attrs populated from the object metadata 
-    
-    for each element, create a nested subgroup named after the index of the 
-    element in the sequence
-    
-        this subgroup will contain either:
-            a dataset (if the element is a data object type as in the table 
-            above, or a plain basic Python type such as number, bytes or str)
-            
-            a group (if the element is a inhomogeneous sequence or mapping)
-
-    
-Mappings (dict and all dict-like flavours except for DataBag): 
-    stored as a group with attrs populated from the object metadata 
-    
-    for each key/value pair:
-        create a nested subgroup named appropriately (see below); the subgroup's
-        'attrs' property contains metadata indicating the type of the key (str,
-        int, or any hashable object) and a way to construct it.
-        
-        the nested subgroup contains a dataset or a subgroup according to the
-        type of object mapped to the key (the 'value')
-        
-Specific Scipyen types (should) define their own toHDF5 and fromHDF5 methods 
-using function calls in this module.
-
-TriggerProtocol
-ModelExpression
-FitModel
-ScanData
-        
-
-================================================================================
-    
 """
 # TODO: 2022-10-06 11:24:20
 # • a LOT of code refactoring on the reading side
@@ -648,16 +185,11 @@ from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse,
 # 'if __DEBUG__:' clause
 __DEBUG__=False
 
-
 class HDFDataError(Exception):
     pass
 
 def dataset2string(d:h5py.Dataset):
     return np.atleast_1d(d)[0].decode("utf-8")
-
-def parseAxesGroup(g:h5py.Group):
-    # TODO
-    pass
 
 def pandasDtype2HF5Dtype(dtype, col, categorical_info:dict=None):
     """Helper function for pandas2Structarray.
@@ -817,20 +349,20 @@ def pandas2Structarray(obj):
     return sarr, categorical_info, original_obj_dtypes
     #return sarr, dtype, categorical_info
 
-def __mangle_name__(s):
-    return f"__{s}__"
+# def __mangle_name__(s):
+#     return f"__{s}__"
+# 
+# def __unmangle_name__(s):
+#     if s.startswith("__") and s.endswith("__"):
+#         s = s[2:-2]
+#         
+#     return s
 
-def __unmangle_name__(s):
-    if s.startswith("__") and s.endswith("__"):
-        s = s[2:-2]
-        
-    return s
-
-def __mangle_dict__(d):
-    return dict((f"__{k}__", v) for k,v in d.items())
-
-def __unmangle_dict__(d):
-    return dict((__unmangle_name__(k), v) for k,v in d.items())
+# def __mangle_dict__(d):
+#     return dict((f"__{k}__", v) for k,v in d.items())
+# 
+# def __unmangle_dict__(d):
+#     return dict((__unmangle_name__(k), v) for k,v in d.items())
 
 def __check_make_entity_args__(obj, oname, entity_cache):
     target_name, obj_attrs = makeObjAttrs(obj, oname=oname)
@@ -1006,7 +538,9 @@ def string2hdf(s):
     return np.array(s, dtype=h5py.string_dtype())
 
 def makeAttr(x:typing.Optional[typing.Union[str, list, tuple, dict, deque, np.ndarray]]=None):
-    """Returns a representation of 'x' as atttribute of a Group or Dataset
+    """Returns a representation of 'x' suitable as a HDF5 entity attribute.
+    
+    `x` is typically a basic Python type, and the representation is a JSON string.
     
     Parameters:
     -----------
@@ -1063,7 +597,7 @@ def makeAttr(x:typing.Optional[typing.Union[str, list, tuple, dict, deque, np.nd
     return x
 
 def makeAttrDict(**kwargs):
-    """Generates a dict with contents to be stored in a Group or Dataset 'attrs'.
+    """Generates a dict suitable for storage as 'attrs' property of a HDF5 entity.
     
     The returned dict object maps keys (str) to values that can be stored as
     attrs values into a h5py Group or Dataset.
@@ -1094,6 +628,7 @@ def group2neoContainer(g:h5py.Group, target_class:type, cache:dict = {}):
     # • ChannelView
     
     attrs = attrs2dict(g.attrs)
+    rec_attrs = dict((a[0], attrs[a[0]]) for a in target_class._recommended_attrs)
     name = attrs.get("name", None)
     file_origin = attrs.get("file_origin", None)
     description = attrs.get("description", None)
@@ -1120,7 +655,7 @@ def group2neoContainer(g:h5py.Group, target_class:type, cache:dict = {}):
             annotations = objectFromEntity(g["annotations"], cache)
             
     elif target_class == neo.Segment:
-        if "ana"
+        pass
         
         
     
@@ -1142,6 +677,12 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     times = []
     annotations = dict()
     segment = None 
+    
+    # NOTE: 2022-10-09 15:16:30
+    # Because neo Signals inherit from python Quantity, relevant object attributes
+    # like dtype and units are stored in the attrs of the child dataset and not
+    # in the attrs of the axis 1 dataset
+    # 
 
     # domain axis
     ax0 = dict()
@@ -1155,16 +696,16 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     # but NOTE that the channels are typically stored as fields of the 
     # array_annotations property of the signal !
     ax1 = dict() 
-    # FIXME/TODO: the signal units; these should be the same for ALL channels
-    # therefore if we store them here, we don;t neet to stored them in the 
+    # FIXME/TODO: DECIDE: the signal units; these should be the same for ALL channels
+    # therefore if we store them here, we dont neet to stored them in the 
     # parent group's attrs!
-    ax1["units"] = pq.dimensionless 
+    # ax1["units"] = pq.dimensionless → stored in the dataset attrs
     ax1["name"] = ""
     ax1["key"] = '?'
     ax1["array_annotations"] = None
-    # FIXME/TODO same as for units, above; netter stored here than in the 
-    # parent group's attrs
-    ax1["dtype"] = attrs.get("__dtype__", np.dtype(float))
+    # FIXME/TODO same as for units, above; stored in the dataset attrs (they inherit
+    # from Quantity)
+    # ax1["dtype"] = attrs.get("dtype", np.dtype(float))
     
     # NOTE:2022-10-09 08:51:31
     # this is a reference to the parent Segment; thic may have already been
@@ -1180,8 +721,8 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     # • units
     # 
     attrs = attrs2dict(g.attrs)
-    rec_attrs = dict((__mangle_name__(a[0]), attrs[__mangle_name__(a[0])]) for a in target_class._recommended_attrs)
-    # name = attrs.get("__name__", None)
+    rec_attrs = dict((a[0], attrs[a[0]]) for a in target_class._recommended_attrs)
+    # name = attrs.get("name", None)
     # TODO/FIXME: 2022-10-06 09:04:15
     # in this case the segment property is a reference to the neo.Segment
     # where the spike train was originally defined
@@ -1218,11 +759,11 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     
     # NOTE: these below should be the same as in axis 1;
     # TODO/FIXME: decide which ones to keep !!!
-    units = attrs.get("__units__", pq.s)
-    dtype = attrs.get("__dtype__", np.dtype(float))
+    units = attrs.get("units", pq.s)
+    dtype = attrs.get("dtype", np.dtype(float))
     # NOTEL: these beloware collected in rec_attrs
     # description = attrs.get("__description__", None)
-    # name = attrs.get("__name__", "")
+    # name = attrs.get("name", "")
     # file_origin = attrs.get("__file_origin__", None)
     # now try to get data from the children entities of the signal's HDF5 Group:
     # • the signal's data ← child Dataset
@@ -1289,8 +830,8 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     # NOTE: we don't return None because the Entity is not a 'null'
     if isinstance(data_set, h5py.Dataset):
         signal = np.array(data_set)
-        data_attrs = attrs2dict(data_set.attrs)
         # TODO: decide if we use the data set attrs at all or not
+        # data_attrs = attrs2dict(data_set.attrs)
         
         if isinstance(axes_group, h5py.Group):
             # NOTE: 2022-10-07 13:44:46 ATTENTION: ❗❗❗
@@ -1307,11 +848,11 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
                     times = np.array(ax0ds)
                 ax0attrs = attrs2dict(ax0ds.attrs)
                 ax0["t_start"] = ax0attrs.get("__origin__", 0.*units)
-                ax0["dtype"] = ax0attrs.get("__dtype__", np.dtype(float))
-                ax0["name"] = ax0attrs.get("__name__", None)
+                ax0["dtype"] = ax0attrs.get("dtype", np.dtype(float))
+                ax0["name"] = ax0attrs.get("name", None)
                 ax0["sampling_rate"] = ax0attrs.get("__sampling_rate__", 1.*pq.Hz)
                 ax0["key"] = ax0attrs.get("__key__", "")
-                ax0["units"] = ax0attrs.get("__units__", pq.s)
+                ax0["units"] = ax0attrs.get("units", pq.s)
                 
             # NOTE: 2022-10-07 13:45:37 ATTENTION: ❗❗❗
             # axis1 data set is ALWAYS empty i.e it has NO data !!!
@@ -1319,8 +860,8 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
             ax1ds = axes_group.get("axis_1", None)
             if isinstance(ax1ds, h5py.Dataset):
                 ax1attrs = attrs2dict(ax1ds.attrs)
-                ax1["name"] = ax1attrs.get("__name__", "")
-                ax1["units"] = ax1attrs.get("__units__", pq.dimensionless)
+                ax1["name"] = ax1attrs.get("name", "")
+                ax1["units"] = ax1attrs.get("units", pq.dimensionless)
                 ax1["key"] = ax1attrs.get("__key__", '?')
                 ax1["dtype"] = ax1attrs.get("dtype", np.dtype(float))
                 ax1["array_annotations"] = ax1attrs.get("__array_annotations__", None)
@@ -1389,7 +930,7 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
                             file_origin=file_origin,description=description)
         
     else:
-        raise RuntimeError(f"Reading {target_class.__name__} objects is not implemented")
+        raise RuntimeError(f"Reading {target_class.name} objects is not implemented")
             
     obj.segment=segment
     obj.annotations.update(annotations)
@@ -1455,9 +996,9 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
     
     
     attrs = attrs2dict(g.attrs)
-    rec_attrs = dict((__mangle_name__(a[0]), attrs[__mangle_name__(a[0])]) for a in target_class._recommended_attrs)
-    # name = attrs.get("__name__", None)
-    # units = attrs.get("__units__", pq.s)
+    rec_attrs = dict((a[0], attrs[a[0]]) for a in target_class._recommended_attrs)
+    # name = attrs.get("name", None)
+    # units = attrs.get("units", pq.s)
     # segment = attrs.get("__segment__", None)
     # file_origin = attrs.get("__file_origin__", None)
     # description = attrs.get("__description__", None)
@@ -1681,12 +1222,12 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict={
     attrs = attrs2dict(entity.attrs)
 
     try:
-        type_name = attrs.get("__type_name__", None)
+        type_name = attrs.get("type_name", None)
         if type_name is None:
             return None
-        python_class = attrs["__python_class__"]
+        python_class = attrs["python_class"]
         python_class_comps = python_class.split(".")
-        module_name = attrs["__module_name__"]
+        module_name = attrs["module_name"]
         module_name_comps = module_name.split(".")
         
         if module_name_comps[0] == "builtins":
@@ -1736,7 +1277,7 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict={
                 obj = target_class(entity[()])
                 
             elif target_class == pq.Quantity:
-                units = attrs.get("__units__", pq.dimensionless)
+                units = attrs.get("units", pq.dimensionless)
                 data = np.array(entity)
                 obj = data*units
                 
@@ -1749,7 +1290,7 @@ def objectFromEntity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict={
             
         else:
             if target_class == pq.Quantity:
-                units = attrs.get("__units__", pq.dimensionless)
+                units = attrs.get("units", pq.dimensionless)
                 data = np.array(entity)
                 obj = data*units
                 
@@ -1875,10 +1416,6 @@ def extract_array_annotations(obj):
         # 
         if array_annotations.length == obj.shape[1]:
             arrann = dict(array_annotations)
-            # arrann = dict()
-            # for field, value in array_annotations.items():
-            #     arrann[field] = value
-                # seed[__mangle_name__(field)] = value
                 
     return arrann
                 
@@ -1888,30 +1425,31 @@ def makeDataTypeAttrs(data):
 
     attrs = dict()
     
-    attrs["__type_name__"] = data.__name__
-    attrs["__module_name__"] = data.__module__
-    attrs["__python_class__"] = ".".join([data.__module__, data.__name__])
+    attrs["type_name"] = data.__name__
+    attrs["module_name"] = data.__module__
+    attrs["python_class"] = ".".join([data.__module__, data.__name__])
     
     #print("attrs", attrs)
     
-    if data.__module__ != "builtins":
-        if is_namedtuple(data):
-            fields_list = list(f for f in data._fields)
-            attrs["__python_class_def__"] = f"{data.__name__} = collections.namedtuple({data.__name__}, {list(fields_list)})"
-        else:
-            attrs["__python_class_def__"] = prog.class_def(data)
+    # NOTE: 2022-10-09 22:12:54
+    # neither of these are really needed
+    # if data.__module__ != "builtins":
+    #     if is_namedtuple(data):
+    #         fields_list = list(f for f in data._fields)
+    #         attrs["python_class_def"] = f"{data.name} = collections.namedtuple({data.name}, {list(fields_list)})"
+    #     else:
+    #         attrs["python_class_def"] = prog.class_def(data)
             
-            
-        if data not in (vigra.filters.Kernel1D, vigra.filters.Kernel2D):
-            # NOTE: 2022-10-07 23:23:01
-            # just skip the above types
-            if hasattr(data, "__new__"):
-                sig_dict = signature2Dict(getattr(data, "__new__"))
-                attrs["__python_new__"] = jsonio.dumps(sig_dict)
-                
-            if hasattr(data, "__init__"):
-                init_dict = signature2Dict(getattr(data, "__init__"))
-                attrs["__python_init__"] = jsonio.dumps(init_dict)
+#         if data not in (vigra.filters.Kernel1D, vigra.filters.Kernel2D):
+#             # NOTE: 2022-10-07 23:23:01
+#             # just skip the above types
+#             if hasattr(data, "__new__"):
+#                 sig_dict = signature2Dict(getattr(data, "__new__"))
+#                 attrs["python_new"] = jsonio.dumps(sig_dict)
+#                 
+#             if hasattr(data, "__init__"):
+#                 init_dict = signature2Dict(getattr(data, "__init__"))
+#                 attrs["python_init"] = jsonio.dumps(init_dict)
         
     return makeAttrDict(**attrs)
         
@@ -2015,7 +1553,11 @@ def makeObjAttrs(obj:typing.Any, oname:typing.Optional[str]=None):
     """
     #print(type(obj))
     if isinstance(obj, prog.CALLABLE_TYPES):
-        return makeAttrDict (__function_or_method__ = jsonio.dumps(prog.signature2Dict(obj)))
+        # FIXME: 2022-10-09 15:53:52
+        # this is contentious for functions provided by 3rd party libraries, 
+        # because there is no pythonic access to their signatures
+        # (e.g. Boost.python.functions)
+        return makeAttrDict (function_or_method = jsonio.dumps(prog.signature2Dict(obj)))
     
     if obj is None:
         return makeEntryName(obj), {}
@@ -2025,29 +1567,24 @@ def makeObjAttrs(obj:typing.Any, oname:typing.Optional[str]=None):
         
     obj_attrs = makeDataTypeAttrs(obj)
     
-    if isinstance(obj, neo.core.baseneo.BaseNeo):
+    if isinstance(obj, (neo.core.baseneo.BaseNeo)):
+        # NOTE: 2022-10-09 17:36:29
+        # these include ScanData, AnalysisUnit
         for a in obj._recommended_attrs:
-            # print(f"_recommended_attrs a: {a}")
-            obj_attrs[__mangle_name__(a[0])] = makeAttr(getattr(obj, a[0]))
+            obj_attrs[a[0]] = makeAttr(getattr(obj, a[0]))
     
-    as_group = isinstance(obj, (collections.abc.Iterable, neo.core.container.Container)) and not isinstance(obj, (str, bytes, bytearray, np.ndarray))
+    # as_group = isinstance(obj, (collections.abc.Iterable, neo.core.container.Container)) and not isinstance(obj, (str, bytes, bytearray, np.ndarray))
+    as_group = isinstance(obj, (collections.abc.Iterable, neo.core.baseneo.BaseNeo)) and not isinstance(obj, (str, bytes, bytearray, np.ndarray))
     
     if not as_group:
         obj_attrs.update(makeDatasetAttrs(obj))
     
-    if as_group:
-        if "__name__" not in obj_attrs:
-            obj_attrs["__name__"] = makeAttr(oname)
+    if as_group: # make sure there is a "name" attribute there
+        if "name" not in obj_attrs:
+            obj_attrs["name"] = makeAttr(oname)
         
     else:
         obj_attrs.update(makeDatasetAttrs(obj))
-        
-    # if not as_group:
-    #     obj_attrs.update(makeDatasetAttrs(obj))
-    # else:
-        # obj_attrs["__name__"] = makeAttr(oname)
-        
-    # obj_attrs["__object_hash__"] = gethash(obj) # TODO: REMOVE
         
     target_name = makeEntryName(obj)
     
@@ -2056,7 +1593,11 @@ def makeObjAttrs(obj:typing.Any, oname:typing.Optional[str]=None):
 @singledispatch
 def makeDatasetAttrs(obj):
     """Generates an attribute dict for HDF5 datasets.
-    The result is passed through makeAttrDict before mergins into a HDF5 
+    
+    This decorates Datasets that store directly an object, or is a child of the
+    Group that stores the object (e.g., neo objects, Vigra array).
+    
+    The result is passed through makeAttrDict before merging into a HDF5 
     Dataset attrs property.
     
     For array-like object types such as those in the neo hierarchy, VigraArrays,
@@ -2092,7 +1633,7 @@ def makeDatasetAttrs(obj):
     if isinstance(obj, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
         # NOTE: 2021-11-18 12:31:59
         # in vigranumpy all kernels are float ?
-        return makeAttrDict(__dtype__ = jsonio.dtype2JSON(np.dtype(float)))
+        return makeAttrDict(dtype = jsonio.dtype2JSON(np.dtype(float)))
         
     return dict()
 
@@ -2101,49 +1642,58 @@ def _(obj):
     attrs = dict()
     dtype = obj.dtype
     fields = dtype.fields
-    attrs["__dtype__"] = jsonio.dtype2JSON(obj.dtype)
+    attrs["dtype"] = jsonio.dtype2JSON(obj.dtype)
     if fields is not None: # structured array or recarray; type is in makeDataTypeAttrs
-        attrs["__dtype_fields__"] = list(f for f in obj.dtype.fields)
+        attrs["dtype_fields"] = list(f for f in obj.dtype.fields)
     
     return makeAttrDict(**attrs)
 
 @makeDatasetAttrs.register(pq.Quantity)
 def _(obj):
     attrs = dict()
-    attrs["__dtype__"] = jsonio.dtype2JSON(obj.dtype)
-    attrs["__units__"] = obj.units
+    attrs["dtype"] = jsonio.dtype2JSON(obj.dtype)
+    attrs["units"] = obj.units
     
     return makeAttrDict(**attrs)
 
 @makeDatasetAttrs.register(neo.core.dataobject.DataObject)
 def _(obj):
-    ret = {"__name__": obj.name,
-           "__units__":obj.units,
-           "__segment__": "__ref__" if obj.segment else None
-           }
+    # NOTE: flag for deprecation:
+    # these attributes are to be stored in the attrs of the parent entity
+    # except for the dtype and units
+    # moreover, segment needs to be stored as a separate child entity in the parent
+    # group
+    ret = {"name": obj.name, "units":obj.units} # thse shoud really go to the axis entity!
+           # "__segment__": "__ref__" if obj.segment else None
+           # }
     
-    if hasattr(obj, "rec_datetime"):
-        ret["__rec_datetime__"] = str(obj.rec_datetime)
-        
-    if isinstance(obj, (neo.core.basesignal.BaseSignal)):
-        ret.update(
-                    {"__file_origin__": obj.file_origin,
-                     "__description__": obj.description,
-                    }
-                    )
-    if isinstance(obj, neo.SpikeTrain):
-        ret["__unit__"] = obj.unit
+#     if hasattr(obj, "rec_datetime"): # recommendedattribute -> to the parent attrs
+#         ret["__rec_datetime__"] = str(obj.rec_datetime)
+#         
+#     # recommended attributes -> to the parent's attrs
+#     if isinstance(obj, (neo.core.basesignal.BaseSignal)):
+#         ret.update(
+#                     {"__file_origin__": obj.file_origin,
+#                      "__description__": obj.description,
+#                     }
+#                     )
+#     if isinstance(obj, neo.SpikeTrain): # this is obsolete
+#         ret["__unit__"] = obj.unit
     
     return makeAttrDict(**ret)
 
 @makeDatasetAttrs.register(vigra.VigraArray)
 def _(obj):
-   return makeAttrDict(__dtype__ = jsonio.dtype2JSON(obj.dtype), 
-                         __axistags__ = obj.axistags.toJSON())
+   return makeAttrDict(dtype = jsonio.dtype2JSON(obj.dtype), 
+                       axistags = obj.axistags.toJSON())
 
 @singledispatch
 def makeAxisDict(obj, axisindex:int):
     """Returns a dict with axis information for storage in HDF5 hierarchy.
+    
+    Attached to the 'attrs' attribute of the axis Dataset in 'makeAxisSale'.
+    
+    The axis informtion depends on the type of obj (singledispatch function) 
     
     Used to build dimension scales for a signal dataset and where necessary,
     additional datasets with data array associated with the axis.
@@ -2152,379 +1702,6 @@ def makeAxisDict(obj, axisindex:int):
     from an axis dataset (h5py.Dataset) stored in an axes group alongside the
     object's data set (i.e. in the same parent group as the object's data set).
     
-    Semantic interpretation of the array axes:
-    ------------------------------------------
-    * Axes for neo and neo-like objects
-    
-    Signals in neo package have up to two axes (except for ImageSequence and
-    SpikeTrain.waveforms property, which have up to three axes):
-    
-    axis 0 is the domain axis:
-        for objects in the neo package the domain is always time; 
-        
-        for Scipyen's own neo-like objects (DataSignal, IrregularlySampledDataSignal,
-        DataMark, DataZone) this domain can by anything that makes sense semantically,
-        for the signal (time, space, etc.).
-        
-        for SpikeTrain.waveforms data, this axis is the spike index axis
-        
-        for ImageSequence objects, this is the "frame index" axis
-    
-    axis 1: 
-        for "proper" signals - that inherit from neo's Basesignal type - this 
-            is the "channels" axis and always exists (signals are 2D arrays) 
-            even if the signal has only  one channel; 
-            
-            the channel information is typically stored in the 'array_annotations' 
-            property of the signal which, when present, contains fields (str) 
-            mapped to 1D numpy arrays of scalar dtypes (numbers or str) with as 
-            many elements as the number of channels in the signal.
-            
-        
-        for ImageSequence objects this is a spatial axis (vertical direction)
-        
-        for SpikeTrain.waveforms data, 
-            when the waveform data is a 3D array, this axis is the "channel" axis 
-            (in the sense of recording channel)
-            
-            when the waveform data is a 2D array, this axis is the "signal" axis
-            (in units of the signal, typically, electrical potential units)
-        
-        NOTE: absent in SpikeTrain, Event, Epoch, DataMark and DataZone objects 
-            because they are 1D arrays (of times or places, etc.).
-        
-    axis 2: present in ImageSequence and optionally in SpikeTrain.waveforms data
-        
-        for ImageSequence objects this is a spatial axis (orthogonal to axis 1, 
-            i.e. in the horizontal direction)
-        
-        for SpikeTrain.waveforms as 3D arrays, it is the "signal" axis itself
-            (see above)
-        
-        NOTE: absent in SpikeTrain, Event, Epoch, DataMark and DataZone objects 
-            because they are 1D arrays (of times or places, etc.).
-        
-    * VigraArrays benefit from the vigra's framework of objects that make
-        understanding the semantics of the array axes very easy.
-        
-        Each axis brings its own vigra.AxisInfo objects which encapsulate the 
-        axis' semantics. the AxisInfo objects are stored in the VigraArray
-        'axistags' property.
-        
-        Except for a Channels axis, all other axes represent a domain (time, 
-        space, angle, edge, frequency) such that the data array is defined on a
-        combination of domains indicated by their corresponding axes.
-        
-        For example:
-        space, or time, or frequency, etc   -> 1D signal (e.g, a single line scan or a point scan over time)
-        space x space                       -> image 
-        time x space                        -> time sequence of signals along space (e.g time series of line scans)
-        space x space x space               -> volume 
-        space x space x time                -> time sequence of images
-        space x space x space x time        -> time sequence of volumes
-        space frequency x space frequency   >  forward Fourier transform of an image
-
-        ... and so on ...
-        
-        The Channels axis may be absent in single-channel data (is a "virtual" axis).
-        
-        When present, the Channels axis is usually (or should be) on the highest 
-        dimension of the array  - although this is not strictly enforced. This
-        axis carries the information of the physical measure encoded in the 
-        data's 'pixels'.
-        
-        The semantic of each axis in a VigraArray is represented by the associated
-        vigra.AxisInfo objects, stored in the array's axis tags.
-        
-        The axes datasets for Vigra arrays are always empty. The information
-        associated with each axis is retrieved from the corresponding 
-        vigra.AxisInfo object contained in the array's 'axistags' property, 
-        using a Scipyen AxisCalibrationData object as intermediary.
-        
-        For a Channels axis, the AxisCalibrationData also contains information
-        for each of the channels in the image, when available.
-        
-    Contents of the axis dataset:
-    ------------------------------
-    With the exceptions described below, the axis dataset is an empty HDF5 
-    dataset (h5py.Empty("f")) where the 'attrs' property stores axis information 
-    of numeric scalar or string types, as key/value pairs.
-        
-    * Domain axis exceptions:
-        
-    1) For irregularly sampled signals, the axis data set for the signal's domain
-    (e.g. time or space) contains the actual time, or more generally, the domain,
-    values when (or where) each of the signal samples were recorded. 
-    
-    2) neo.Epoch, and Scipyen's own DataZone objects are array-like neo data 
-    objects, not to be treated as signals.
-    
-    Their main dataset already contains time (or domain) values where the epochs 
-    (or data zones) start. 
-    
-    The domain axis data sets contains additional domain values, namely, the 
-    'durations' of the epochs or the 'extents' of the data zones (for compatibility,
-    both objects store this information in their 'durations' property).
-    
-    Additional HDF5 data sets:
-    --------------------------
-    1) 'waveforms' data set for neo.SpikeTrain objects.
-    
-    neo.SpikeTrain objects associate a 2D or 3D numeric numpy array with the 
-    spike waveforms, with axes: [spike, channel, time]
-    
-    This array is stored as a 'waveforms' dataset in the same
-    group as the axis datasets of the spike train.
-    
-    NOTE: that a SpikeTrain itself is an array of time values, possibly with
-    multiple channels (as column vectors), all belonging to the same 'unit' or 
-    'cell' (the channels are recording channels). A neo.Segment can store
-    several spike trains in its 'spiketrains' property which is a 
-    neo.spiketrainlisyt.SpikeTrainList object; each spike train there comes from
-    a different 'unit' or 'cell'.
-    
-    Therefore the axis dataset for axis 0 (domain) of a SpikeTrain is empty; its
-    'attrs' property is expected to store the units information (time units).
-    
-    However, the waveforms dataset has its own dimension scales as follows:
-    
-    axis 0: spikes axis
-    axis 1: channel (3D waveforms array) or time (2D waveforms array)
-    axis 2: times (domain) only for 3D waveforms array)
-    
-    
-    2) 'labels' data set for Epoch, Event, DataMark and DataZone objects
-    
-    This sata set stores the 'labels' property of these objects.
-    
-    neo.Event, neo.Epoch, and Scipyen's own DataMark and DataZone objects are 
-    array-like neo objects where the main data is the domain itself (time, space,
-    etc) and the values (e.g. "time stamps") stored in the main HDF5 data set.
-    
-    In this respect, they are similar to the SpikeTrain objects.
-    
-    Each event, epoch, data mark or data zone associates a str label, stored in 
-    the 'labels' property - this is a 1D array of strings, with as many elements
-    as the number of events/epochs/marks/zones in the object.
-    
-    In most cases the axis dataset is an Empty dataset (h5py.Empty("f")).
-    
-    Exceptions are irregularly sampled signal types and the DataObject types 
-    Epoch and DataZone where the axis datasets contains:
-    
-    * the 'times' property of irregularly sampled signals
-    
-    * the 'durations' property of Epoch and DataZone
-    
-    3) 'channels' data sets: for each channel calibration in a VigraArray
-    Channels axis, and additional empty HDF5 data set is created in the axes
-    group, ONLY if channel calibration is provided in the Channels axis
-    axistag (i.e. "virtual"channel axes atre skipped)
-    
-    
-    As mentioned above, additional HDF5 data sets are created in the same 
-    axes group (h5py.Group object) as the axes data sets.
-    
-    Contents of the axis attrs dictionary:
-    --------------------------------------
-    NOTE 1: Below, 
-    neo.BaseSignal objects are:
-        neo.AnalogSignal, neo.IrregularlySampledSignal, neo.ImageSequence
-        core.datasignal.DataSignal, 
-        core.datasignal.IrregularlySampledDataSignal
-        
-    neo.DataObject objects are: BaseSignal objects AND:
-        neo.Epoch, neo.Event, neo.SpikeTrain
-        core.triggerevent.DataMark, 
-        core.datazone.DataZone
-        
-    For space reasons the modules there they are defined are omitted
-    from the type name.
-    
-    NOTE 2: 'waveforms' are python Quantity arrays
-    
-    NOTE 3: Key names are prefixed and suffixed with "__"
-    ============================================================================
-    Mandatory key/value pairs 
-    
-    Key name        Object type                     type: value
-                                                    semantics
-                                                    specific storage
-    ============================================================================
-    key             VigraArray                      str:                     
-                                                    AxisInfo.key   
-                                         
-                    vigra.filters.Kernel1D          str:
-                                                    "s" for axis 0
-                                                    "v" for axis 1
-    
-                    vigra.filters.Kernel2D          str:
-                                                    "s" for axis 0
-                                                    "c" for axis 1
-                                                    "v" for axis 2
-
-                    NOTE: vigra filters Kernel1D and 2D are converted to
-                    numpy arrays with 2 and 3 dimensions, respectively.
-                    See imaging.vigrautils.kernel2array() for details.
-    
-                    BaseSignal                      str: <1 or 2 chars>, 
-                                                    domain type name (axis 0)
-                                                    physical measure name (axis 1)
-                                                    applies heuristic in
-                                                    core.quantities.name_from_unit
-                                                
-                    ImageSequence                   str:                     
-                                                    "t" for axis 0           
-                                                    "y" for axis 1         
-                                                    "x" for axis 2         
-                                                
-    name            VigraArray                      str                      
-    
-                    ImageSequence                   str:                     
-                                                    "frames" for axis 0       
-                                                    "height" for axis 1         
-                                                    "width"  for axis 2         
-                                                
-                    BaseSignal                      str:                     
-                                                    domain name for axis 0   
-                                                    signal name for axis 1         
-                                                
-    units           VigraArray                      str:                     
-                                                    dimensionality of        
-                                                    asociated physical     
-                                                    measure     
-                                                
-                    BaseSignal                      str:                     
-                                                    axis 0: domain units     
-                                                    axis 1: signal units      
-                                                
-                    ImageSequence                   str:                     
-                                                    axis 0: time units       
-                                                    axs 1 & 2: space units     
-                                                
-    ============================================================================
-    
-    ============================================================================
-    Optional key/value pairs (present only for the specific object types below):
-    
-    Key name        Object type                     type: value
-                                                    semantics
-                                                    specific storage
-    ============================================================================
-    axinfo_description     
-                    VigraArray                      str:                        
-                                                    AxisInfo.description 
-                                                    
-    axinfo_key      VigraArray                      str:
-                                                    AxisInfo.key
-                                                    
-    axinfo_typeFlags
-                    VigraArray                      int: 
-                                                    AxisInfo.typeFlags
-                                                    
-    axinfo_resolution
-                    VigraArray                      float, int
-                                                    AxisInfo.resolution
-                    
-    
-    origin          VigraArray                      float:                      
-                                                    CalibrationData.origin      
-                                                    (default 0.0)
-    
-                    AnalogSignal,                   float: signal.t_start
-                    DataSignal,                     (only for axis 0)
-                    ImageSequence,
-                    SpikeTrain
-    
-    # NOTE: 2021-11-18 17:34:57
-    # not via axis_dict because of dtype mangling -> moved to makeDataset
-    domain          IrregularlySampledSignal,       1D ndarray float dtype:
-                    IrregularlySampledDataSignal    this is signal.times
-                                                    property 
-                                                    stored AS the axis dataset;
-                                                    only for axis 0
-                                                    
-                    Epoch                           1D ndarray, float dtype:
-                    DataZone                        this is signal.durations
-                                                    stored AS the axis dataset;
-                                                    only for axis 0
-                            
-    # NOTE: 2021-11-18 17:34:57
-    # NOTE: 2021-11-18 17:34:57
-    labels          Event,                          1d ndarray dtype <U
-                    DataMark                        signal.labels property
-                    Epoch                           stored as axis_labels
-                    DataZone                        dataset alongside the axis
-                                                    dataset;
-                                                    
-                                                    
-    # NOTE: 2021-11-18 17:34:57
-    # not via axis_dict because of dtype mangling -> moved to makeDataset
-    waweforms       SpikeTrain                      2D or 3D ndarray float dtype:
-                                                    'waveforms' property
-                                                    stored as separate dataset
-                                                    with its own dimension scales
-    
-    resolution      VigraArray                      float:
-                                                    CalibrationData.resolution
-                                                    (default: AxisInfo.resolution
-                                                    or 1.0)
-    
-    sampling_rate   AnalogSignal,                   float: signal.sampling_rate
-                    DataSignal,                     axis 0 only
-
-                    ImageSequence                   float: data.sampling_rate
-                                                    axis 0 only
-                                                    
-                    SpikeTrain                      float: sampling_rate of
-                                                    the train's waveforms
-                                                    stored as dimension scale
-                                                    in that data set;
-                                                    only when waveforms are 
-                                                    present
-                                                    NOTE: because waveforms are
-                                                    just a pq.Quantity, this 
-                                                    information is "grafted" to 
-                                                    the waveforms' axis '
-                                                    although it belongs to the 
-                                                    SpikeTrain itself
-                                                    
-    sampling_period 
-                    AnalogSignal,                   float: signal.sampling_period
-                    DataSignal                      axis 0 only
-                            
-                    ImageSequence                   float: 
-                                                    axis 0: data.frame_duration
-                                                    axes 1  2: data.spatial_scale
-                                                    NOTE: spatial_scale is not well
-                                                    documented and appears to be
-                                                    just a scalar float
-                                                    
-                            
-    left_sweep      SpikeTrain                      float
-                                                    axis 0 (domain) only
-                                                    assumed to have the times'
-                                                    units
-                                                    
-    end             SpikeTrain                      float: obj.t_stop
-                                                    axis 0 (domain) only
-                                                    assumed to have the times'
-                                                    units
-                                                    
-                                                    
-    <channel name
-    string>         VigraArray                      dict (only for Channels axes)
-                                                    this will be used to generate
-                                                    channel_axis datasets
-                                                    
-    <field name     DataObject                      numpy array
-     string>        EXCEPT                          only for axis 1 (channels)
-                    ImageSequence                   and only if array_annotations
-                                                    if present and conformant.
-    ============================================================================
-    
-    NOTE 3: axis units are pq.Quantities (including pq.UnitQuantities) and 
-    are stored in JSON format
     """
     raise NotImplementedError(f"makeAxisDict: {type(obj).__name__} objects are not yet supported")
 
@@ -2547,16 +1724,17 @@ def _(obj, axisindex:typing.Union[int, str]):
     
     axiscal = AxisCalibrationData(axisinfo)
     
-    data = dict((f"__{k}__", v) for k,v in axiscal.data.items()) # axiscal.data
+    data = dict((f"cal_{k}", v) for k,v in axiscal.data.items()) # axiscal.data
     
-    return makeAttrDict(__axinfo_key__            = axisinfo.key,
-                          __axinfo_typeFlags__      = axisinfo.typeFlags,
-                          __axinfo_description__    = axisinfo.description, 
-                          __axinfo_resolution__     = axisinfo.resolution, 
-                          **data)
+    return makeAttrDict(key          = axisinfo.key,
+                        typeFlags    = axisinfo.typeFlags,
+                        description  = axisinfo.description, 
+                        resolution   = axisinfo.resolution, 
+                        **data)
     
 @makeAxisDict.register(vigra.AxisTags)
 def _(obj, axisindex:typing.Union[int, str]):
+    # each dimenson has its own axistag
     from imaging import axisutils, axiscalibration
     from imaging.axiscalibration import (AxisCalibrationData, ChannelCalibrationData, AxesCalibration)
     if isinstance(axisindex, int):
@@ -2568,20 +1746,20 @@ def _(obj, axisindex:typing.Union[int, str]):
             raise ValueError(f"Invalid axisindex {axisindex}")
         
     else:
-        raise TypeError(f"Invalid axisindex type; expecting a str or int, got {tytpe(axisindex).__name__} instead.")
+        raise TypeError(f"Invalid axisindex type; expecting a str or int, got {tytpe(axisindex).name} instead.")
     
     
     axisinfo = obj[axisindex]
     
     axiscal = AxisCalibrationData(axisinfo)
     
-    data = dict((f"__{k}__", v) for k,v in axiscal.data.items()) # axiscal.data
+    data = dict((f"cal_{k}", v) for k,v in axiscal.data.items()) # axiscal.data
     
-    return makeAttrDict(__axinfo_key__            = axisinfo.key,
-                          __axinfo_typFlags__       = axisinfo.typeFlags,
-                          __axinfo_description__    = axisinfo.description, 
-                          __axinfo_resolution__     = axisinfo.resolution,
-                          **data)
+    return makeAttrDict(key            = axisinfo.key,
+                        typeFlags      = axisinfo.typeFlags,
+                        description    = axisinfo.description, 
+                        resolution     = axisinfo.resolution,
+                        **data)
 
 @makeAxisDict.register(neo.core.dataobject.DataObject)
 def _(obj, axisindex:int):
@@ -2595,10 +1773,10 @@ def _(obj, axisindex:int):
         raise TypeError(f"'axisindex' expected to be an int; got {type(axisindex).__name__} instead")
     
     seed = dict()
-    seed["__name__"] = name_from_unit(obj.times.units) if axisindex == 0 else name_from_unit(obj.units)
-    seed["__key__"] = name_from_unit(obj.times.units, True) if axisindex == 0 else name_from_unit(obj.units, True)
-    seed["__units__"] = obj.times.units if axisindex == 0 else obj.units
-    seed["__array_annotations__"] = None
+    seed["name"] = name_from_unit(obj.times.units) if axisindex == 0 else name_from_unit(obj.units)
+    seed["key"] = name_from_unit(obj.times.units, True) if axisindex == 0 else name_from_unit(obj.units, True)
+    # seed["units"] = obj.times.units if axisindex == 0 else obj.units # delegate to makeNeoDataAxisDict and makeNeoSignalAxisDict
+    # seed["array_annotations"] = None
     
     # NOTE: 2022-10-07 11:26:34
     # all dataobject seem to have array_annotations now, except for ImageSequence
@@ -2606,51 +1784,13 @@ def _(obj, axisindex:int):
     if axisindex == 1:
         if isinstance(obj, neo.core.basesignal.BaseSignal):
             # arann = extract_array_annotations(obj)
-            seed["__array_annotations__"] = extract_array_annotations(obj)
+            seed["array_annotations"] = extract_array_annotations(obj)
             
             
     elif axisindex == 0:
         if not isinstance(obj, neo.core.basesignal.BaseSignal):
-            seed["__array_annotations__"] = extract_array_annotations(obj)
+            seed["array_annotations"] = extract_array_annotations(obj)
         
-    # if isinstance(obj, neo.core.basesignal.BaseSignal) and axisindex == 1:
-    #     # channels axis
-    #     #  NOTE: 2021-11-17 13:41:04
-    #     # array annotations SHOULD be empty for non-signals
-    #     # ImageSequence does NOT have array_annotations member
-    #     arann = extract_array_annotations(obj)
-    # else:
-    #     arann = extract_array_annotations(obj)
-        
-    # seed["__array_annotations__"] = arrann
-    
-#     if axisindex == 1: 
-#         # channels axis
-#         #  NOTE: 2021-11-17 13:41:04
-#         # array annotations SHOULD be empty for non-signals
-#         # ImageSequence does NOT have array_annotations member
-#         #
-#         # NOTE: 2022-10-07 11:27:36
-#         # we don't store array_annotations directly (as an ArrayDict); instead,
-#         # we copy it into a regular dict then we re-apply it to the object at
-#         # reconstruction time
-#         array_annotations = getattr(obj,"array_annotations", None)
-#         arrann = None
-#         if isinstance(array_annotations, ArrayDict) and len(array_annotations): # this is the number of fields NOT channels!
-#             # NOTE: skip silently is length different for obj size on axis 1
-#             # ATTENTION: the 'length' property of the ArrayDict seems to be the 
-#             # same as the 2nd dimension of the signal's array (documentation
-#             # is a bit misleading), and NOT the same as then number of fields
-#             # in the ArrayDict !!! (each field is a numpy array)
-#             # 
-#             if array_annotations.length == obj.shape[1]:
-#                 arrann = dict()
-#                 for field, value in array_annotations.items():
-#                     arrann[field] = value
-#                     # seed[__mangle_name__(field)] = value
-#         seed["__array_annotations__"] = arrann
-#    
-
     if isinstance(obj, neo.core.basesignal.BaseSignal):
         ret = makeNeoSignalAxisDict(obj, axisindex)
         
@@ -2661,139 +1801,221 @@ def _(obj, axisindex:int):
     
     return makeAttrDict(**seed)
 
+# this below is not used ?!?
 @makeAxisDict.register(vigra.filters.Kernel1D)
 def _(obj, axisindex):
     if axisindex < 0 or axisindex >= 2:
-        raise ValueError(f"Invalid axis index {axisindex}")
+        raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")
     
     ret = dict()
-    ret["__key__"] = "x" if axisindex == 0 else "v"
-    ret["__name__"] = "x" if axisindex == 0 else "values"
+    ret["key"] = "x" if axisindex == 0 else "v"
+    ret["name"] = "x" if axisindex == 0 else "values"
     
     return ret
     
+# this below is not used ?!?
 @makeAxisDict.register(vigra.filters.Kernel2D)
 def _(obj, axisindex):
     if axisindex < 0 or axisindex >= 3:
-        raise ValueError(f"Invalid axis index {axisindex}")
+        raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")
     ret = dict()
-    ret["__key__"] = "x" if axisindex == 0 else "y" if axisindex == 1 else "v"
-    ret["__name__"] = "x" if axisindex == 0 else "y" if axisindex == 1 else "values"
+    ret["key"] = "x" if axisindex == 0 else "y" if axisindex == 1 else "v"
+    ret["name"] = "x" if axisindex == 0 else "y" if axisindex == 1 else "values"
     
-    return {"__key__": "s"} if axisindex == 0 else {"__key__":"c"} if axisindex == 1 else {"__key__":"v"}
+    return ret
+    
+    # return {"key": "s"} if axisindex == 0 else {"key":"c"} if axisindex == 1 else {"key":"v"}
         
 @singledispatch        
 def makeNeoSignalAxisDict(obj, axisindex:int):
-    """See make makeAxisDict for details
+    """Encode object type-specific information into an Axis entity.
+    
+    Supplements 'makeAxisDict'
+    
     """
     raise NotImplementedError(f"makeNeoSignalAxisDict: {type(obj).__name__} objects are not supported")
 
 @makeNeoSignalAxisDict.register(neo.AnalogSignal)
 def _(obj, axisindex):
+    # only two axes
     ret = dict()
     if axisindex == 0:
         # domain axis
-        ret["__origin__"]           = obj.t_start
-        ret["__sampling_rate__"]    = obj.sampling_rate
-        ret["__sampling_period__"]  = obj.sampling_period
+        ret["origin"]           = obj.t_start
+        ret["sampling_rate"]    = obj.sampling_rate
+        ret["sampling_period"]  = obj.sampling_period
+        
+#     elif axisindex == 1: # already done in makeAxisdict
+#         # data (channel) axis
+#         # NOTE: channel information is stored in array_annotations
+#         # hence encoded as a separate entity; data in all channels have the
+#         # same "units" as they represent the same kind of physical measure
+#         # (unlike VigraArray, where each channel MAY represent different
+#         # physical measures, e.g. phase & angle in a Fourier transform...)
+#         ret["units"] = obj.units
+#         
+#     else:
+#         raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")
 
     return ret
 
 @makeNeoSignalAxisDict.register(DataSignal)
 def _(obj, axisindex):
+    # only two axes
     ret = dict()
     if axisindex == 0:
         # domain axis
-        ret["__origin__"]           = obj.t_start
-        ret["__sampling_rate__"]    = obj.sampling_rate
-        ret["__sampling_period__"]  = obj.sampling_period
+        ret["origin"]           = obj.t_start
+        ret["sampling_rate"]    = obj.sampling_rate
+        ret["sampling_period"]  = obj.sampling_period
+        
+    elif axisindex == 1:
+        # NOTE: channel information is stored in array_annotations
+        # hence encoded as a separate entity; data in all channels have the
+        # same "units" as they represent the same kind of physical measure
+        # (unlike VigraArray, where each channel MAY represent different
+        # physical measures, e.g. phase & angle in a Fourier transform...)
+        # data (channel) axis
+        ret["units"] = obj.units
+
+    else:
+        raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")
 
     return ret
 
 @makeNeoSignalAxisDict.register(neo.IrregularlySampledSignal)
 def _(obj, axisindex):
+    # only two axes
     ret = dict()
     if axisindex == 0:
-        ret["__origin__"]           = obj.t_start
+        # domain axis
+        # NOTE: the times (irregular sampling) are stored as a separate
+        # Dataset 
+        ret["origin"]           = obj.t_start
         #ret["__domain__"] = obj.times
         
+    elif axisindex == 1:
+        ret["units"] = obj.units
+        
+    else:
+        raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")
+
     return ret
 
 @makeNeoSignalAxisDict.register(IrregularlySampledDataSignal)
 def _(obj, axisindex):
     ret = dict()
     if axisindex == 0:
-        ret["__origin__"]           = obj.t_start
+        ret["origin"]           = obj.t_start
         #ret["__domain__"] = obj.times
+
+    elif axisindex == 1:
+        ret["units"] = obj.units
         
+    else:
+        raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")
+
     return ret
 
 @makeNeoSignalAxisDict.register(neo.ImageSequence)
 def _(obj, axisindex):
+    # up to three axes but NOTE: there is not channel axis i.e.
+    # no information about the actual data values (what physical measure, etc)
     ret = dict()
     if axisindex == 0:
-        ret["__key__"] = "t"
-        ret["__name__"] = "frames"
-        ret["__units__"] = obj.t_start.units
-        ret["__origin__"] = obj.t_start
-        ret["__sampling_rate__"] = obj.sampling_rate
+        # time domain
+        ret["key"] = "t"
+        ret["name"] = "frames"
+        ret["units"] = obj.t_start.units
+        ret["origin"] = obj.t_start
+        ret["sampling_rate"] = obj.sampling_rate
         
-    else: # axis 1 or 2
-        ret["__key__"] = "s"
-        ret["__name__"] = "height" if axisindex == 1 else "width"
-        ret["__spatial_scale__"] = obj.spatial_scale
+    elif axisindex in (1,2): # axis 1 or 2
+        # space domain - same resolution & units
+        ret["key"] = "s"
+        ret["name"] = "height" if axisindex == 1 else "width"
+        ret["spatial_scale"] = obj.spatial_scale # this is a python Quantity (usually, pq.um for μm) but is not enforced?
         
+    else:
+        raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")
+
+    return ret
 
 @singledispatch
 def makeNeoDataAxisDict(obj, axisindex):
+    """Encode object type-specific information into an Axis entity.
+    
+    Supplements 'makeAxisDict'
+    
+    """
     raise NotImplementedError(f"makeNeoDataAxisDict: {type(obj).__name__} objects are not supported")
     
 @makeNeoDataAxisDict.register(neo.SpikeTrain)
 def _(obj, axisindex):
+    # just one axis
     ret = dict()
     if axisindex == 0:
-        ret["__origin__"] = obj.t_start
-        ret["__left_sweep__"] = obj.left_sweep
-        #ret["__waveforms__"] = obj.waveforms
-        ret["__end__"] = obj.t_stop
+        ret["origin"] = obj.t_start
+        ret["left_sweep"] = obj.left_sweep
+        #ret["__waveforms__"] = obj.waveforms # → as separate child Dataset
+        ret["end"] = obj.t_stop
         waveforms = getattr(obj, "waveforms", None)
         if isinstance(waveforms, np.ndarray) and waveforms.size > 0:
-            ret["__sampling_rate__"] = obj.sampling_rate
+            ret["sampling_rate"] = obj.sampling_rate
         
+    else:
+        raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")
+
     return ret
 
 @makeNeoDataAxisDict.register(neo.Event)
 def _(obj, axisindex):
     ret = dict()
     if axisindex == 0:
-        ret["__labels__"] = obj.labels
+        ret["labels"] = obj.labels
+        
+    else:
+        raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")
+
     return ret
 
 @makeNeoDataAxisDict.register(DataMark)
 def _(obj, axisindex):
     ret = dict()
     if axisindex == 0:
-        ret["__labels__"] = obj.labels
+        ret["labels"] = obj.labels
+
+    else:
+        raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")
+
     return ret
 
 @makeNeoDataAxisDict.register(neo.Epoch)
 def _(obj, axisindex):
     ret = dict()
     if axisindex == 0:
-        ret["__labels__"] = obj.labels
-        ret["__durations__"] = obj.durations
+        ret["labels"] = obj.labels
+        ret["durations"] = obj.durations
+
+    else:
+        raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")
+
     return ret
 
 @makeNeoDataAxisDict.register(DataZone)
 def _(obj, axisindex):
     ret = dict()
     if axisindex == 0:
-        ret["__labels__"] = obj.labels
-        ret["__durations__"] = obj.durations
+        ret["labels"] = obj.labels
+        ret["durations"] = obj.durations
+
+    else:
+        raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")
+
     return ret
 
 @safeWrapper
-def makeAxisScale(obj,dset:h5py.Dataset, axesgroup:h5py.Group,dimindex:int,axisdict:dict,compression:str="gzip",chunks:bool=None,track_order=True):
+def makeAxisScale(obj,dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,axisdict:dict,compression:str="gzip",chunks:bool=None,track_order=True):
     """
     Attaches a dimension scale for a specific dimension in a HDF5 Dataset.
     
@@ -2827,7 +2049,9 @@ def makeAxisScale(obj,dset:h5py.Dataset, axesgroup:h5py.Group,dimindex:int,axisd
         
     Returns:
     --------
-    HDF5 Dataset: The newly-created axis data set.
+    HDF5 Dataset: The newly-created axis data set. Its 'attrs' property contains
+    specific axis attributes (e.g. unit, make, key, origin, sampling rate etc)
+    depending on the type of obj (see 'makeAxisDict') 
         
     """
     
@@ -2859,9 +2083,9 @@ def makeAxisScale(obj,dset:h5py.Dataset, axesgroup:h5py.Group,dimindex:int,axisd
         axis_dset = axesgroup.create_dataset(axis_dset_name, data=h5py.Empty("f"))
         
     axis_dset.attrs.update(axis_dict)
-    axis_dset.make_scale(axis_dict["__name__"])
+    axis_dset.make_scale(axis_dict["name"])
     dset.dims[dimindex].attach_scale(axis_dset)
-    dset.dims[dimindex].label = axis_dict["__name__"]
+    dset.dims[dimindex].label = axis_dict["name"]
     
     return axis_dset
 
@@ -2992,7 +2216,7 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset], group:typing.Optional[h5p
                 
                 
         data = data.view(np.ndarray).transpose()
-        sigcal = {"units": pq.dimensionless, "name": klass.__name__}
+        sigcal = {"units": pq.dimensionless, "name": klass.name}
         domcal = {"units": pq.s if klass in (neo.AnalogSignal, neo.IrregularlySampledSignal) else pq.dimensionless,
                   "name": "",
                   "t_start": 0.,
@@ -3326,8 +2550,6 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset], group:typing.Optional[h5p
 def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:typing.Optional[str]=None,compression:typing.Optional[str]="gzip",chunks:typing.Optional[bool]=None,track_order:typing.Optional[bool] = True, entity_cache:typing.Optional[dict]=None,**kwargs):# -> typing.Union[h5py.Group, h5py.Dataset]:
     """
     HDF5 entity maker for Python objects.
-    Generates a HDF5 Group or Dataset (NOTE: a HDF5 File has overlapping API
-    with HDF5 Group).
     
     Parameters:
     -----------
@@ -3478,16 +2700,22 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
         entity_cache = dict()
     
     if obj is None:
+        # → straight to Dataset child of group
+        #
+        # don't bother with hard links here...
         entity = group.create_dataset(target_name, data = h5py.Empty("f"))
         
         return entity
     
     if isinstance(obj, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
-        # vigra Kernel types → straight to HDF5 Dataset
+        # vigra Kernel types → straight to HDF5 Dataset child of group
+        # TODO: 2022-10-09 23:29:28
+        # contemplate storing as h5py.Group with child Dataset and child
+        # axes Group (although this complicates things...)
         cached_entity = getCachedEntity(entity_cache, obj)
         
         if isinstance(cached_entity, h5py.Dataset):
-            group[target_name] = cached_entity
+            group[target_name] = cached_entity # hard link
             return cached_entity
             
         data = vu.kernel2array(obj, True) # need to pass compact=True to get an array!!!
@@ -3503,25 +2731,26 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
         return entity
     
     elif isinstance(obj, (pd.DataFrame, pd.Series)):
-        # pandas types → HDF5 Group
+        # pandas types → HDF5 Group child of group
+        # TODO/FIXME: pandas_dtypes?
         cached_entity = getCachedEntity(entity_cache, obj)
         
         if isinstance(cached_entity, h5py.Dataset):
-            group[target_name] = cached_entity
+            group[target_name] = cached_entity # hard link
             return cached_entity
 
         data, categorical_info, pandas_dtypes = pandas2Structarray(obj)
 
         entity = group.create_group(target_name,track_order=track_order)
         
-        obj_entity = makeHDF5Dataset(data, entity, name="PandasData",
+        obj_entity = makeHDF5Dataset(data, entity, name="data",
                                      compression=compression,
                                      chunks=chunks,
                                      track_order=track_order,
                                      entity_cache = entity_cache)
         
         if len(categorical_info):
-            catgrp = makeHDF5Group(categorical_info, entity, name="PandasCategoricalInfo",
+            catgrp = makeHDF5Group(categorical_info, entity, name="categories",
                                    compression=compression, chunks=chunks,
                                    track_order=track_order) # no entity cache here...
             
@@ -3533,11 +2762,27 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
     
     elif isinstance(obj, (vigra.VigraArray, neo.core.dataobject.DataObject)):
         # NOTE: 2021-11-19 11:34:38
+        # VigraArray and neo DataObjet are stored as a Group child of group.
+        #
+        # In turn the created group has  the following children:
+        # • a Dataset with the array data
+        # • a Group with axes Datasets:
+        #   ∘ one axis Dataset per array dimension, with attrs property containing
+        #       calibration data for the corresponding dimension (time, space, 
+        #       etc)
+        #   ∘ in particular, the channel axis Dataset attrs property contains 
+        #       calibration data for the array values in each channel (i.e., 
+        #       units, calibration factor: linear mapping between pixel value
+        #       and physcial quantity)
+        #   ∘ in turn, these axis datasets are used a s axis scales (dimscales)
+        #     attached to the child data Dataset (see first bullet point above)
+        
+        
         # make a sub-group and place the main data set and axes data set inside
         cached_entity = getCachedEntity(entity_cache, obj)
         
         if isinstance(cached_entity, h5py.Group):
-            group[target_name] = cached_entity
+            group[target_name] = cached_entity # hard link
             return cached_entity
                     
         # NOTE: 2022-10-08 12:10:27
@@ -3554,39 +2799,14 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
         # makeHDF5Dataset populates 'entity' (here, a Group) with a Dataset
         # and returns the Dataset.
         #
-        # The returned 'obj_entity' is the newly-crated Dataset, and is already
-        # contained by the parent HDF5 Group 'entity', so technically we don't
-        # need it here.
+        # The returned 'obj_entity' is the newly-crated Dataset as a child of 
+        # the newly-created Group 'entity', so technically we don't need it here.
         obj_entity = makeHDF5Dataset(obj, entity, name=target_name, 
                                        compression = compression,
                                        chunks = chunks, 
                                        track_order = track_order,
                                        entity_cache = entity_cache)
         
-        # NOTE: 2021-11-21 12:25:41
-        # neo DatObject objects also hold a reference to their parent segment
-        # we deal with these here, storing them as references to any existing
-        # segment representations in the parent group
-        #
-        if hasattr(obj, "segment"): 
-            # NOTE: neo signals and signal-like objects have a "segment" attribute
-            # holding a reference to the segment that contains them;
-            # we explicitly check for a 'segment' attribute first, because 
-            # getattr(x,"segment", None) effectively bypasses this (i.e. it 
-            # behaves as 'x' had this attribute albeit set to None
-            parent_segment = getattr(obj, "segment")
-            if isinstance(parent_segment, neo.Segment):
-                # this almost surely will fail: when we execute this code, the 
-                # parent segment's entity might not be there yet?
-                parent_segment_entity = getCachedEntity(entity_cache, parent_segment)
-                if isinstance(parent_segment_entity, (h5py.Group, h5py.Dataset)):
-                    entity["segment"] = parent_segment_entity
-                    
-                # NOTE: 2021-11-24 14:35:03
-                # Since segment is a reference to the containing segment it is OK
-                # if it doesn't show up in here; we just want to store a reference
-                # to it, if possible
-            
         entity.attrs.update(obj_attrs)
         
         storeEntityInCache(entity_cache, obj, entity)
@@ -3594,6 +2814,7 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
         return entity
     
     elif isinstance(obj, neo.ChannelView):
+        # ChannelView → h5py.Group child of group
         cached_entity = getCachedEntity(entity_cache, obj)
         
         if isinstance(cached_entity, h5py.Group):
@@ -3627,6 +2848,7 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
         return entity
     
     elif isinstance(obj, enum.Enum):
+        # → h5py.Dataset child of group,  with h5py.enum_dtype
         if isinstance(cached_entity, h5py.Dataset):
             group[target_name] = cached_entity
             return cached_entity
@@ -3661,9 +2883,11 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
     
     else:
         if isinstance(obj, (collections.abc.Iterable, neo.core.container.Container)) and not isinstance(obj, (str, bytes, bytearray, np.ndarray)):
+            # neo Container, tuple, list, dict → h5py.Group child fo group
             factory = makeHDF5Group
             
         else:
+            # everything else → h5py.Dataset child of group
             factory = makeHDF5Dataset
             
         # this call here WILL check for cached entities and WILL store entity if
@@ -3675,7 +2899,8 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
 def makeHDF5Dataset(obj, group: h5py.Group, name:typing.Optional[str]=None, compression:typing.Optional[str]="gzip", chunks:typing.Optional[bool] = None, track_order:typing.Optional[bool]=True, entity_cache:typing.Optional[dict] = None):
     """Creates a HDF5 Dataset in group based on obj.
     Delegates to makeDataset to create a data set then adorns its attrs 
-    with obj-specific information.
+    with obj-specific information via the singledispatch function 'makeDataset'.
+    
     Returns a HDF5 Dataset that has been created as a child of 'group'.
     Therefore, thechnically you don't need to do anything with the returned
     Dataset, because it has already been added to the parent HDF5 Group 'group'.
@@ -3704,6 +2929,7 @@ def makeDataset(obj, group:h5py.Group, attrs:dict, name:str, compression:typing.
         dset = group.create_dataset(name, data = h5py.Empty("f"))
     else:
         dset = group.create_dataset(name, data = obj)
+        
     dset.attrs.update(attrs)
     storeEntityInCache(entity_cache, obj, dset)
     return dset
@@ -3740,7 +2966,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     if data.size == 1:
         dset = group.create_dataset(name, data = data, compression=compression)
     else:
-        dset =  group.create_dataset(name, data = data, compression=compression,
+        dset = group.create_dataset(name, data = data, compression=compression,
                                     chunks = chunks)
         
     dset.attrs.update(attrs)
@@ -3776,8 +3002,8 @@ def _(obj, group:h5py.Group, attrs:dict, name:str,
         group[target_name] = cached_entity # make a hard link
         return cached_entity
     
-    dset_name = f"{name}_data"
-    axgrp_name = f"{name}_axes"
+    dset_name = "data"
+    axgrp_name = "axes"
     
     if obj.size == 0:
         dset = group.create_dataset(dset_name, data = h5py.Empty("f"))
@@ -3809,12 +3035,16 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     # 5) create an annotations group (NOT array annotations!!!)
     cached_entity = getCachedEntity(entity_cache, obj)
     if isinstance(cached_entity, h5py.Dataset):
-        group[target_name] = cached_entity # make a hard link
+        group[name] = cached_entity # make a hard link
         return cached_entity
     
-    dset_name = f"{name}_data"
-    axgrp_name = f"{name}_axes"
+    # dset_name = f"{name}_data"
+    # axgrp_name = f"{name}_axes"
     
+    dset_name = "data"
+    axgrp_name = "axes"
+    
+    # 1. create a child data Dataset in group
     if obj.size == 0:
         return group.create_dataset(dset_name, data = h5py.Empty("f"))
     
@@ -3823,45 +3053,83 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     else:
         dset = group.create_dataset(dset_name, data = obj.magnitude, compression = compression, chunks = chunks)
         
+    # 2. create a child axes Group in group
     axgroup = group.create_group(axgrp_name, track_order=track_order)
     
+    # 2.1 populate axes child group with axis Datasets and use these as axis 
+    # scales attached to the data Dataset child created in 1. above
     for k in range(obj.ndim):
         makeAxisScale(obj, dset, axgroup, k, compression, chunks)
         
+    # 3. make a labels Dataset child of group
     # NOTE: 2021-11-20 13:38:33
     # labels for data object types neo.Event, neo.Epoch, DataMark, DataZone, TriggerEvent
     # should go into a Dataset child of the main data object group 'group'
+    #
+    # Attach the labels Dataset as a axis scale to dim[0] of child data Dataset
+    # created at 1. above
     labels = getattr(obj, "labels", None)
     if isinstance(labels, np.ndarray) and labels.size:
-        labels_dset = makeHDF5Entity(labels, group, 
-                                       name =f"{name}_labels",
-                                       compression = compression,
-                                       chunks = chunks)
-        labels_dset.make_scale(f"{name}_labels")
-        dset.dims[0].attach_scale(labels_dset)
+        cached_entity = getCachedEntity(entity_cache, labels)
+        if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
+            group["labels"] = cached_entity
+        else:
+            labels_dset = makeHDF5Entity(labels, group, 
+                                        name ="labels",
+                                        compression = compression,
+                                        chunks = chunks)
+            labels_dset.make_scale("labels")
+            dset.dims[0].attach_scale(labels_dset)
     
+    # 4. Create a waveforms Dataset child of group; attach as axis scale to dim[0]
+    # of child data Dataset created at 1. above
+    #
     # NOTE: 2021-11-20 13:39:52
     # waveforms of the neo.SpikeTrain objects should go into the main data object
     # group
     #
     # NOTE: 2022-10-05 23:29:51
     # since just before neo 0.11.0 SpikeTrain also have a "left_sweep" attribute
-    # which is taken care of by makeAxisScale/makeNeoDataAxisDict
+    # which is taken care of by makeAxisScale/makeNeoDataAxisDict above (1.)
+    #
     waveforms = getattr(obj, "waveforms", None)
     if isinstance(waveforms, np.ndarray) and waveforms.size > 0:
-        waveforms_dset = makeHDF5Entity(waveforms, group, 
-                                          name = f"{name}_waveforms",
-                                          compression = compression,
-                                          chunks = chunks)
-        waveforms_dset.make_scale(f"{name}_waveforms")
-        dset.dims[0].attach_scale(waveforms_dset)
+        cached_entity = getCachedEntity(entity_cache, waveforms)
+        if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
+            group["waveforms"] = cached_entity # (hard link)
+        else:
+            waveforms_dset = makeHDF5Entity(waveforms, group, 
+                                            name = "waveforms",
+                                            compression = compression,
+                                            chunks = chunks)
+            waveforms_dset.make_scale("waveforms")
+            dset.dims[0].attach_scale(waveforms_dset)
         
+    # 5. Create annotations child Group in group
     annotations = getattr(obj, "annotations", None)
     if isinstance(annotations, dict) and len(annotations):
-        annot_group = makeHDF5Group(annotations, group, f"{name}_annotations", 
-                                      compression=compression, chunks=chunks,
-                                      track_order = track_order)
+        # use make HDF5Entity to store it in entity_cache
+        cached_entity = getCachedEntity(entity_cache, annotations)
+        if isinstance(cached_entity, h5py.Group):
+            group["annotations"] = cached_entity # hard link
+        else:
+            annot_group = makeHDF5Entity(annotations, group, "annotations", 
+                                        compression=compression, chunks=chunks,
+                                        track_order = track_order)
         
+    # 5. Create segment child entity (Group) in group
+    segment = getattr(obj, "segment", None)
+    if isinstance(segment, neo.Segment):
+        seg_id = id(segment)
+        if seg_id in entity_cache:
+            # group["segment"] = h5py.SoftLink(entity_cache[seg_id].name)
+            # NOTE: just use a reference (if you use HDFView you will see Obj Ref 
+            # is identical to the one used before)
+            group["segment"] = entity_cache[seg_id]
+        else:
+            makeHDF5Entity(segment, group, name="segment", 
+                           compression=compression, chunks=chunks,
+                           track_order=track_order)
     dset.attrs.update(attrs)
     storeEntityInCache(entity_cache, obj, dset)
     return dset
@@ -3916,6 +3184,7 @@ def makeHDF5Group(obj, group:h5py.Group, name:typing.Optional[str]=None, compres
     """Writes python iterable collection and neo containers to a HDF5 Group.
         • iterable collections: tuple, list, dict (and subclasses)
         • neo containers: Block, Segment, Group
+        • neo ChannelView
     """
     target_name, obj_attrs = makeObjAttrs(obj)
     if isinstance(name, str) and len(name.strip()):
@@ -3977,9 +3246,6 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     grp = group.create_group(name, track_order = track_order)
     grp.attrs.update(attrs)
     storeEntityInCache(entity_cache, obj, grp)
-    
-    #_, obj_attrs = makeObjAttrs(obj)
-    #grp.attrs.update(obj_attrs)
     
     for k, element in enumerate(obj):
         cached_entity = getCachedEntity(entity_cache, element)
