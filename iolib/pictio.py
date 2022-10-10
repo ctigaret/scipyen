@@ -220,9 +220,7 @@ def loadHDF5File(fName:str):
 # NOTE: 2017-09-21 16:34:21
 # BioFormats dumped mid 2017 because there are no good python ports to it
 # (it uses javabridge which is suboptimal)
-#def loadImageFile(fileName:str, asVolume:bool=False, axisspec:[collections.OrderedDict, None]=None) -> ([vigra.VigraArray, np.ndarray],):
-def loadImageFile(fileName:str, asVolume:bool=False, 
-                  suppress_cpp_warnings=False) -> vigra.VigraArray:
+def loadImageFile(fileName:str, asVolume:bool=False, suppress_cpp_warnings=False):
     ''' Reads pixel data from a raster image file
     Uses the vigra impex library.
     
@@ -305,7 +303,7 @@ def loadImageFile(fileName:str, asVolume:bool=False,
     return ret
         
 # TODO: diverge onto HDF5, and bioformats handling
-def saveImageFile(data, fileName:str, separateChannels:bool=True) -> None:
+def saveImageFile(data, fileName:str, separateChannels:bool=True):
     """
     Writes a vigra array to one of the image file formats supported by Vigra
     library
@@ -495,7 +493,7 @@ def loadMatlab(fileName:str, **kwargs) -> dict:
         traceback.print_exc()
         
     
-def loadCFSmatlab(fileName:str) -> neo.Block:
+def loadCFSmatlab(fileName:str):
     """Load CFS data exported from Signal5 as matlab
     CAUTION: under development
     Returns an analog signal (?)
@@ -672,7 +670,7 @@ def loadCFSmatlab(fileName:str) -> neo.Block:
         
         return ret
         
-def loadAxonTextFile(fileName:str) -> neo.Block:
+def loadAxonTextFile(fileName:str):
     """Reads the contents of an axon text file.
     
     Returns:
@@ -931,8 +929,7 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
     
     #return result
 
-def loadAxonFile(fileName:str, create_group_across_segment:typing.Union[bool, dict]=False,
-                 signal_group_mode:typing.Optional[str]="split-all") -> neo.Block:
+def loadAxonFile(fileName:str, create_group_across_segment:typing.Union[bool, dict]=False, signal_group_mode:typing.Optional[str]="split-all"):
     """Loads a binary Axon file (*.abf).
     
     Parameters:
@@ -1040,12 +1037,6 @@ def loadAxonFile(fileName:str, create_group_across_segment:typing.Union[bool, di
         data.annotate(**axon_info)
         
         return data
-        #return (data, axon_info, protocol_sweeps)
-    
-        #if readProtocols:
-            ##protocol_sweeps = neo.io.AxonIO(filename=fileName).read_protocol()
-        
-        #return data
     
     except Exception as e:
         traceback.print_exc()
@@ -1075,26 +1066,6 @@ def importDataFrame(fileName):
     else:
         warnings.warn("Unsupported file type: %s" % fileType)
         
-#def custom_unpickle(src:typing.Union[str, io.BufferedReader]):#, 
-                    ##exc_info:typing.Optional[typing.Tuple[typing.Any, ...]]=None) -> object:
-    #if isinstance(src, str):
-        #if os.path.isfile(src):
-            #with open(src, mode="rb") as fileSrc:
-                #return PatchUnpickler(fileSrc).load()
-                ##return PatchUnpickler(fileSrc, exc_info=exc_info).load()
-            
-        #else:
-            #raise FileNotFoundError()
-            
-    #elif isinstance(src, io.BufferedReader):
-        #return PatchUnpickler(src).load()
-        ##return PatchUnpickler(src, exc_info=exc_info).load()
-    
-    #else:
-        #raise TypeError("Expecting a str containing an exiting file name or a BufferedReader; got %s instead" % type(src).__name__)
-        
-    #return ret
-
 @safeWrapper
 def loadPickleFile(fileName):
     """Loads pickled data.
@@ -1225,12 +1196,7 @@ def signal_to_atf(data, fileName=None):
         traceback.print_exc()
         csvfile.close()
     
-def segment_to_atf(segment, fileName=None, 
-                   skipHeader=True,
-                   skipTimes=True,
-                   acquisition_mode="Episodic Stimulation",
-                   comment="",
-                   SyncTimeUnits=3.33333):
+def segment_to_atf(segment, fileName=None, skipHeader=True, skipTimes=True, acquisition_mode="Episodic Stimulation", comment="", SyncTimeUnits=3.33333):
     """
     """
     # NOTE: one segment => one sweep!
@@ -1759,112 +1725,6 @@ def loadFile(fName):
     value = fileLoader(fName)
     
     return value
-
-#@safeWrapper
-#def writeHDF5(obj, filenameOrGroup, pathInFile, compression=None, chunks=None, track_order=True):
-    #"""
-    #TODO Work in progress, do NOT use
-    #"""
-    #if not isinstance(obj, dict):
-        #raise TypeError("Expecting a dict; got %s instead" % type(obj).__name__)
-    
-    #group = None
-    
-    #if isinstance(filenameOrGroup, str):
-        #if len(filenameOrGroup.strip()) == 0:
-            #raise ValueError("when a str, 'filenameOrGroup' must not be empty")
-        
-        #else:
-            #filenameOrGroup = h5py.File(filenameOrGroup, "w")
-            
-    #elif not isinstance(filenameOrGroup, h5py.Group):
-        #raise TypeError("'filenameOrGroup' expected to be a str or a h5py.Group; got %s instead" % type(filenameOrGroup).__name__)
-    
-    #if isinstance(pathInFile, str):
-        #if len(pathInFile.strip()) == 0:
-            #raise ValueError("'pathInFile' must not be empty")
-        
-    #else:
-        #raise TypeError("'pathInFile' expected to be astr; got %s instead" % pathInFile)
-    
-    #group = filenameOrGroup.create_group(pathInFile, track_order=track_order)
-    
-    #if isinstance(obj. dict):
-        #for key, value in obj.items():
-            #key_group = writeHDF5(value, group, key, track_order = track_order)
-            
-    #elif isinstance(value, vigra.VigraArray):
-        #vigra.impex.writeHDF5(value, group, key,compression=compression, chunks=chunks)
-        
-    #elif isinstance(value, np.ndarray):
-        #group.create_dataset(key, shape=value.shape, dtype=value.dtype, data=data, 
-                            #chunks=chunks, compression=compression, track_order=track_order)
-        
-    #elif isinstance(value, (tuple, list)):
-        #array = np.array(value)
-        #group.create_dataset(key, shape=array.shape, dtype=array.dtype, data=array, 
-                            #chunks=chunks, compression=compression, track_order=track_order)
-        
-
-    ##if "/" in pathInFile:
-        ##group_path = [s for s in pathInFile.split("/") if len(s.strip())]
-        
-    #if isinstance(filenameOrGroup, h5py.File):
-        #filenameOrGroup.close()
-        
-    #return filenameOrGroup
-    
-#@safeWrapper
-#def export_to_hdf5(obj, filenameOrGroup, name=None):
-    #"""
-    #Parameters:
-    #----------
-    
-    #obj: Python object
-    
-    #file_name: str
-        #name of the hdf5 file written to disk
-        
-    #name: str or None (default)
-        #group name for storing the object inside the file
-        
-        #When None (default) or an empty string, the object is stored under a 
-        #group called "object" unless object is a dict in which case its members are
-        #stored at the top level in the file.
-        
-    #"""
-    ## TODO
-    #if not isinstance(filenameOrGroup, str):
-        #raise TypeError("file_name must be a str; got %s instead" % type(file_name).__name__)
-    
-    #if len(file_name.strip()) == 0:
-        #raise ValueError("file_name is empty")
-    
-    #fn, fext = os.path.splitext(file_name)
-    
-    #if len(fext.strip) <= 1:
-        #fext = ".hdf5"
-        
-        #file_name = "".join((fn, fext))
-
-    #f = h5py.File(file_name, "w")
-    
-    #if isinstance(obj, dict):
-        #if isinstance(name, str) and len(name.strip()):
-            #obj_group = f.create_group(name, track_order=True)
-            
-        #else:
-            #for k, v in obj.items():
-                #key_group = f.create_group("%s" % k, track_order=True)
-            
-    #else:
-        #if isinstance(name, str) and len(name.strip()):
-            #obj_group = f.create_group(name, track_order=True)
-            
-        #else:
-            #obj_group = f.create_group("object", track_order=True)
-            
-    #f.close()
     
 @safeWrapper
 def saveHDF5(data, fileName):
@@ -1876,8 +1736,7 @@ def saveHDF5(data, fileName):
         h5io.makeHDF5Entity(data, h5file, name=name)
     
 @safeWrapper
-def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None, 
-             ws:typing.Optional[dict]=None, mode:str="pkl", **kwargs):
+def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None, ws:typing.Optional[dict]=None, mode:str="pkl", **kwargs):
     """Saves variable(s) in the current working directory.
     WARNING Do not confuse with IPython %save line magic
     TODO adapt to other modes

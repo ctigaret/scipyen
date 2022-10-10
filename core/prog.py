@@ -433,10 +433,6 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                                 if vval != v:
                                     raise AttributeError(f"{self.private_name} expected to have {k} with value {v}; got {vval} instead")
 
-#class SignatureDict(Bunch):
-    #def __init__(self, / , *args, **kwargs):
-        #super().__init__(*args, **kwargs)
-        
 class ContextExecutor(ContextDecorator):
     def __enter__(self):
         return self
