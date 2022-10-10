@@ -629,34 +629,34 @@ def group2neoContainer(g:h5py.Group, target_class:type, cache:dict = {}):
     
     attrs = attrs2dict(g.attrs)
     rec_attrs = dict((a[0], attrs[a[0]]) for a in target_class._recommended_attrs)
-    name = attrs.get("name", None)
-    file_origin = attrs.get("file_origin", None)
-    description = attrs.get("description", None)
-    file_datetime = attrs.get("file_datetime", None)
-    rec_datetime = attrs.get("rec_datetime", None)
+    # name = attrs.get("name", None)
+    # file_origin = attrs.get("file_origin", None)
+    # description = attrs.get("description", None)
+    # file_datetime = attrs.get("file_datetime", None)
+    # rec_datetime = attrs.get("rec_datetime", None)
     
     
     kwargs = dict()
-    kwargs["name"] = name
-    kwargs["file_origin"] = file_origin
-    kwargs["file_datetime"] = file_datetime
-    kwargs["rec_datetime"] = rec_datetime
-    kwargs["description"] = description
+    kwargs.update(rec_attrs)
+    # kwargs["name"] = name
+    # kwargs["file_origin"] = file_origin
+    # kwargs["file_datetime"] = file_datetime
+    # kwargs["rec_datetime"] = rec_datetime
+    # kwargs["description"] = description
+    
+    obj = target_class(**kwargs)
 
     if target_class == neo.Block:
         # NOTE: the defaults (empty lists) are created at construction
         if "segments" in g:
-            segments = objectFromEntity(g["segments"], cache)
+            obj.segments = objectFromEntity(g["segments"], cache)
             
         if "groups" in g:
             groups = objectFromEntity(g["groups"], cache)
             
-        if "annotations" in g:
-            annotations = objectFromEntity(g["annotations"], cache)
-            
     elif target_class == neo.Segment:
-        pass
-        
+        if "analogsignals" in g:
+            analogsignals
         
     
     pass
