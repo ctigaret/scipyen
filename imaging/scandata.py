@@ -73,7 +73,7 @@ class ScanData(BaseScipyenData):
     """
     
 class ScanDataOptions(DataBag):
-    """Do not use
+    """Do not use ... yet
     """
     def __init__(self, detection_predicate=1.3, roi_width = 10, roi_auto_width=False,
                   reference="Ch1", indicator="Ch2", 
