@@ -258,6 +258,12 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], f
         or time intervals (when True).
         
         Optional, default is False (i.e. data is taken as a sequence of time stamps)
+        
+    Returns:
+    ========
+    A freuency Quantity (pq.Hz).
+    
+    If the data is empty or contains only one element, returns 0 Hz
     
     Example:
     ===========
@@ -286,6 +292,9 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], f
     Out: array(16.3441) * Hz
     
     """
+    if len(data) <= 1:
+        return 0*pq.Hz
+    
     if first < 0:
         raise ValueError(f"'first' must be >= 0; got {first} instead")
     

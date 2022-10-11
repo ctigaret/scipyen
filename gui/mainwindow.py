@@ -4876,7 +4876,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.loadDiskFile(fileNames[0], pio.importDataFrame)
             
         else:
-            progressDlg = QtWidgets.QProgressDialog("Opening files...", "Abort", 0, nItems, self)
+            progressDlg = QtWidgets.QProgressDialog("Loading data...", "Abort", 0, nItems, self)
             
             progressDlg.setWindowModality(QtCore.Qt.WindowModal)
             
@@ -4926,7 +4926,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.unsetCursor()
             
         else:
-            progressDlg = QtWidgets.QProgressDialog("Opening files...", "Abort", 0, nItems, self)
+            progressDlg = QtWidgets.QProgressDialog("Loading data...", "Abort", 0, nItems, self)
             
             progressDlg.setWindowModality(QtCore.Qt.WindowModal)
             
