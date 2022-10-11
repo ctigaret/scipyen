@@ -257,6 +257,7 @@ from . import colorwidgets
 from . import stylewidgets
 from . import gradientwidgets
 from . import interact
+from gui.interact import (getInput, getInputs, packInputs, selectWSData)
 
 from .triggerdetectgui import guiDetectTriggers
 

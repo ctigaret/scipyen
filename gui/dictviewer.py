@@ -373,9 +373,7 @@ class InteractiveTreeWidget(DataTreeWidget):
         
         return typeStr, desc, children, widget, typeTip
     
-    def buildTree(self, data:object, parent:QtWidgets.QTreeWidgetItem, 
-                  name:str="", nameTip:str="", hideRoot:bool=False, 
-                  path:tuple=()):
+    def buildTree(self, data:object, parent:QtWidgets.QTreeWidgetItem, name:str="", nameTip:str="", hideRoot:bool=False, path:tuple=()):
         """Overrides pyqtgraph.DataTreeWidget.buildTree
         
         Positional parameters:
@@ -543,10 +541,7 @@ class DataViewer(ScipyenViewer):
     
     view_action_name = "Object"
     
-    def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 ID:(int, type(None)) = None,  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
-                 useTableEditor:bool = True,
-                 *args, **kwargs) -> None:
+    def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None,  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, useTableEditor:bool = True, *args, **kwargs):
         self._useTableEditor_ = useTableEditor
         super().__init__(data=data, parent=parent, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs)
         
@@ -561,7 +556,7 @@ class DataViewer(ScipyenViewer):
         
         self.treeWidget.customContextMenuRequested[QtCore.QPoint].connect(self.slot_customContextMenuRequested)
         
-        self.treeWidget.itemDoubleClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_itemDoubleClicked)
+        self.treeWidget.itemDoubleClicked[QtWidgets.QTreeWidgetItem, int].connect(self.rk)
         
         self.setCentralWidget(self.treeWidget)
         
@@ -646,12 +641,9 @@ class DataViewer(ScipyenViewer):
         
         obj = get_nested_value(self._data_, item_path[1:]) # because 1st item is the insivible root name
         
-        #objname = strutils.str2symbol(item_path[-1])
         objname = " > ".join(item_path)
         
         newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
-        
-        #useSignalViewerForNdArrays = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
         
         self._scipyenWindow_.viewObject(obj, objname, 
                                        newWindow=newWindow)
@@ -690,35 +682,21 @@ class DataViewer(ScipyenViewer):
         viewItemData.setWhatsThis("View item in a separate window (SHIFT for a new window)")
         viewItemData.triggered.connect(self.slot_viewItemDataInNewWindow)
         
+        # TODO: 2022-10-11 13:45:44
+        # use itemAt (point) to get the index of the item, then if index is in
+        # the leaf column, check if the value is editable (and constraints)
+        # • editable values are, POD types (numeric scalars, strings, bool)
+        # if editable then enable this menu action
+        # • contemplate editing of other data (elements in expanded lists,
+        # expanded dicts, elements of numpy arrays and their subclasses)
+        # editItemData = cm.addAction("Edit")
+        # editItemData.setToolTip("Edit value")
+        # editItemData.setStatusTip("Edit value")
+        # editItemData.setWhatsThis("Edit value")
+        # editItemData.tiggered.connect(self.slot_editItemData)
+        
         cm.popup(self.treeWidget.mapToGlobal(point), copyItemData)
         
-    #@safeWrapper
-    #def getSelectedPathsExpr(self):
-        #items = self.treeWidget.selectedItems()
-        
-        #if len(items) == 0:
-            #return
-        
-        #item_paths = list()
-        
-        #if isinstance(self._data_, NestedFinder.nesting_types):
-            #finder = NestedFinder(self._data)
-            
-            #top_title = self.treeWidget.top_title
-            
-            ##if top_title in (os.path.sep, "/")
-            
-            #for item in items:
-                #item_path = self._get_path_for_item_(item)
-                
-                #path_element_strings = list() if item_path[0] in (os.path.sep, "/") else [item_path[0]]
-                
-                #for ipath in item_path[1:]:
-                    #path_element_strings.append("['"+ipath+"']")
-                    
-                #item_paths.append("".join(path_element_strings))
-                
-        #return item_paths
         
     @safeWrapper
     def getSelectedPaths(self):
@@ -838,6 +816,18 @@ class DataViewer(ScipyenViewer):
         
     @pyqtSlot()
     @safeWrapper
+    def slot_editItemData(self):
+        # TODO: 2022-10-11 13:45:35
+        from core.utilities import get_nested_value
+        pass
+        items = self.treeWidget.selectedItems()
+        
+        if len(items) != 1:
+            return
+        
+        
+    @pyqtSlot()
+    @safeWrapper
     def slot_viewItemDataInNewWindow(self):
         from core.utilities import get_nested_value
         if self._scipyenWindow_ is None:
@@ -901,22 +891,6 @@ class DataViewer(ScipyenViewer):
                         self._scipyenWindow_.viewObject(obj, objname, 
                                                        newWindow=True)
     
-    #@safeWrapper
-    #def _get_path_for_item_0_(self, item):
-        #"""WARNING: Result is not suitable as parameter to eval()
-        #"""
-        #item_path = list()
-        #item_path.append(item.text(0))
-        
-        #parent = item.parent()
-        
-        #while parent is not None:
-            #item_path.append(parent.text(0))
-            #parent = parent.parent()
-        
-        #item_path.reverse()
-        
-        #return item_path
     
     @safeWrapper
     def _parse_item(self, item):
@@ -1082,17 +1056,4 @@ class DataViewer(ScipyenViewer):
             
         if current:
             fn(item)
-        
-    #def _collapse_leaves(self, item, expand=False, current=True):
-        #if expand:
-            #fn = self.treeWidget.expandItem
-        #else:
-            #fn = self.treeWidget.collapseItem
-            
-        #for k in range(item.childCount()):
-            #if item.child(k).childCount() > 0:
-                #self._collapse_expand_Recursive(item.child(k), expand=expand)
-            
-        #if current:
-            #fn(item)
         

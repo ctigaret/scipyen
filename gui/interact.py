@@ -15,7 +15,7 @@ class _InputSpec():
     """
     __slots__ = ("_default", "_mytype")
     
-    def __init__(self, default = dataclasses.MISSING, mytype=type(dataclasses.MISSING)):
+    def __init__(self, mytype=type(dataclasses.MISSING), default = dataclasses.MISSING):
         if isinstance(mytype, type):
             if mytype in (type(dataclasses.MISSING), type(None)): # type not specified
                 if default not in (dataclasses.MISSING, None): # get it from default's type
@@ -28,8 +28,8 @@ class _InputSpec():
             elif not isinstance(default, mytype): # consistency/sanity check
                 raise TypeError(f"default expected to be a {type.__name__}; got {type(default).__name__} instead")
             
-        else:
-            mytype = type(default)
+        # else:
+        #     mytype = type(default)
 
         self._default=default
         self._mytype=mytype
@@ -81,7 +81,31 @@ def selectWSData(*args, title="", single=True, asDict=False, **kwargs):
         return tuple(ws[i] for i in dialog.selectedItemsText)
         
     return dict() if asDict else list()
+
+
+def getInputs(**kwargs):
+    """Calls 'getInput' with a prompt mapping created from key/value pairs
+    Returns a list.
     
+    Typical use:
+    
+    a, b, c = getInputs(a=1, b=2, c=3)
+    """
+    
+    return getInput(kwargs, mapping=False)
+
+def packInputs(**kwargs):
+    """Verison of getInputs that returns a dict
+    Typical use:
+    
+    result = getInputs(a=1, b=2, c=3)
+    
+    resut
+    {'a': 1, 'b': 2, 'c': 3}
+    
+    """
+    
+    return getInput(kwargs, mapping=True)
 
 def getInput(prompts:dict,
              mapping:bool=False):
@@ -125,14 +149,12 @@ def getInput(prompts:dict,
     
     for k,v in prompts.items():
         if isinstance(v, _InputSpec):
-            #if v.default not in (dataclasses.MISSING, None):
-                #if v.type in (type(dataclasses.MISSING), type(None)):
-                    #v.type = type(v.default)
-                #elif not isinstance(v.type, type(v.default)):
-                    #raise TypeError(f"Inconsistent input specification")
-                
             def_val  = v.default
             v_type = v.type
+            
+        elif isinstance(v, type):
+            v_type = type
+            def_val = _InputSpec(v).default
             
         else:
             def_val = v
@@ -181,6 +203,7 @@ def getInput(prompts:dict,
         if mapping:
             return dict(zip(prompts.keys(), ret))
         return ret
+    
     
     
     
