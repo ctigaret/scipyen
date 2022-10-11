@@ -739,8 +739,8 @@ def rheobase_latency(*args, **kwargs):
     -----------
     
     args: comma-separated sequence of python dictionaries as returned by 
-        analyse_AP_step_injection_series() function, or extract_AP_data_from_AP_train(), each 
-        containing the following mandatory items:
+        analyse_AP_step_injection_series() function, each containing the 
+        following mandatory items:
         
         "Injected_current" : a list with the values of injected current
         
@@ -2345,7 +2345,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
     
     return ap_results, report, ap_waves, ap_dvdt, ap_d2vdt2
 
-def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], parameter=str,min_APs:typing.Optional[int] = None):
+def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], parameter=str, min_APs:typing.Optional[int] = None):
     """
     Get AP parameter from an AP analysis data for each depolarising step.
     
@@ -6126,83 +6126,83 @@ def is_AP_spiketrain(x):
     
     return ret
     
-def extract_AP_data_from_AP_train(ap_train, ap_index=0):
-    """
-    DEPRECATED
-    """
-    warnings.warn("Deprecated", DeprecationWarning)
-    
-    if isinstance(ap_train, neo.Segment):
-        sptr = [t for t in ap_train.spiketrains if is_AP_spiketrain(t)]
-        
-        if len(sptr):
-            if len(sptr) > 1:
-                warnings.warn("The data segment appears to have %d putative AP spike trains out of %d spike trains; the last one (%dth) will be used" % (len(sptr), len(ap_train.spiketrains), len(sptr)-1))
-                              
-            ap_train = sptr[-1]
-    
-        else:
-            warnings.warn("The data Segment has no suitable spike trains")
-            return  None
-        
-    elif isinstance(ap_train, neo.SpikeTrain):
-        if not is_AP_spiketrain(ap_train):
-            raise ValueError("data does not seem to be an AP spike train")
-        
-    else:
-        raise TypeError("ap_train expected to be a neo.Segment or neo.SpikeTrain; got %s instead" % type(ap_train).__name__)
-    
-    if not isinstance(ap_index, int):
-        raise TypeError("ap_index expected to be an int; got %s instead" % type(ap_index).__name__)
-    
-    if ap_index < 0:
-        raise ValueError("ap_index expected to be >= 0; got %d instead" % ap_index)
-    
-    if ap_index >= len(ap_train):
-        warnings.warn("ap_index %d past the end of the AP train with %d APs" % (ap_index, len(sptr)))
-        return None
-    
-    result = collections.OrderedDict()
-    
-    result["Index"] = ap_index
-    
-    result["Duration_at_half_max"] = ap_train.annotations["AP_durations_V_half_max"][ap_index]
-
-    result["Duration_at_quarter_max"] = ap_train.annotations["AP_durations_V_quart_max"][ap_index]
-    
-    result["Duration_at_onset"] = ap_train.annotations["AP_durations_V_onset"][ap_index]
-    
-    result["Duration_at_0mV"] = ap_train.annotations["AP_durations_V_0"][ap_index]
-    
-    if all([v in ap_train.annotations.keys() for v in ("AP_durations_at_Ref_Vm", "Ref_Vm")]):
-        if ap_train.annotations["AP_durations_at_Ref_Vm"] is not None:
-            result["Duration_at_ref_Vm"] = ap_train.annotations["AP_durations_at_Ref_Vm"][ap_index]
-            
-        else:
-            result["Duration_at_ref_Vm"] = np.nan
-            
-        if ap_train.annotations["Ref_Vm"] is not None:
-            result["Vm_ref"] = ap_train.annotations["Ref_Vm"]
-            
-        else:
-            result["Vm_ref"] = np.nan
-    
-    result["Latency"]  =  np.array([ap_train[ap_index]-ap_train.t_start]) * ap_train.times.units
-    
-    result["Max_dV_dt"] = ap_train.annotations["AP_Maximum_dV_dt"][ap_index]
-    
-    result["Vm_amplitude"] = ap_train.annotations["AP_peak_amplitudes"][ap_index]
-    
-    result["Vm_half_max"] = ap_train.annotations["AP_half_max"][ap_index]
-    
-    result["Vm_quart_max"] = ap_train.annotations["AP_quart_max"][ap_index]
-
-    result["Vm_onset"] = ap_train.annotations["AP_onset_Vm"][ap_index]
-    
-    result["Vm_peak"] = ap_train.annotations["AP_peak_values"][ap_index]
-    
-    result["Waveform"] = ap_train.waveforms[ap_index,:]
-        
-    return result
-        
+# def extract_AP_data_from_AP_train(ap_train, ap_index=0):
+#     """
+#     DEPRECATED
+#     """
+#     warnings.warn("Deprecated", DeprecationWarning)
+#     
+#     if isinstance(ap_train, neo.Segment):
+#         sptr = [t for t in ap_train.spiketrains if is_AP_spiketrain(t)]
+#         
+#         if len(sptr):
+#             if len(sptr) > 1:
+#                 warnings.warn("The data segment appears to have %d putative AP spike trains out of %d spike trains; the last one (%dth) will be used" % (len(sptr), len(ap_train.spiketrains), len(sptr)-1))
+#                               
+#             ap_train = sptr[-1]
+#     
+#         else:
+#             warnings.warn("The data Segment has no suitable spike trains")
+#             return  None
+#         
+#     elif isinstance(ap_train, neo.SpikeTrain):
+#         if not is_AP_spiketrain(ap_train):
+#             raise ValueError("data does not seem to be an AP spike train")
+#         
+#     else:
+#         raise TypeError("ap_train expected to be a neo.Segment or neo.SpikeTrain; got %s instead" % type(ap_train).__name__)
+#     
+#     if not isinstance(ap_index, int):
+#         raise TypeError("ap_index expected to be an int; got %s instead" % type(ap_index).__name__)
+#     
+#     if ap_index < 0:
+#         raise ValueError("ap_index expected to be >= 0; got %d instead" % ap_index)
+#     
+#     if ap_index >= len(ap_train):
+#         warnings.warn("ap_index %d past the end of the AP train with %d APs" % (ap_index, len(sptr)))
+#         return None
+#     
+#     result = collections.OrderedDict()
+#     
+#     result["Index"] = ap_index
+#     
+#     result["Duration_at_half_max"] = ap_train.annotations["AP_durations_V_half_max"][ap_index]
+# 
+#     result["Duration_at_quarter_max"] = ap_train.annotations["AP_durations_V_quart_max"][ap_index]
+#     
+#     result["Duration_at_onset"] = ap_train.annotations["AP_durations_V_onset"][ap_index]
+#     
+#     result["Duration_at_0mV"] = ap_train.annotations["AP_durations_V_0"][ap_index]
+#     
+#     if all([v in ap_train.annotations.keys() for v in ("AP_durations_at_Ref_Vm", "Ref_Vm")]):
+#         if ap_train.annotations["AP_durations_at_Ref_Vm"] is not None:
+#             result["Duration_at_ref_Vm"] = ap_train.annotations["AP_durations_at_Ref_Vm"][ap_index]
+#             
+#         else:
+#             result["Duration_at_ref_Vm"] = np.nan
+#             
+#         if ap_train.annotations["Ref_Vm"] is not None:
+#             result["Vm_ref"] = ap_train.annotations["Ref_Vm"]
+#             
+#         else:
+#             result["Vm_ref"] = np.nan
+#     
+#     result["Latency"]  =  np.array([ap_train[ap_index]-ap_train.t_start]) * ap_train.times.units
+#     
+#     result["Max_dV_dt"] = ap_train.annotations["AP_Maximum_dV_dt"][ap_index]
+#     
+#     result["Vm_amplitude"] = ap_train.annotations["AP_peak_amplitudes"][ap_index]
+#     
+#     result["Vm_half_max"] = ap_train.annotations["AP_half_max"][ap_index]
+#     
+#     result["Vm_quart_max"] = ap_train.annotations["AP_quart_max"][ap_index]
+# 
+#     result["Vm_onset"] = ap_train.annotations["AP_onset_Vm"][ap_index]
+#     
+#     result["Vm_peak"] = ap_train.annotations["AP_peak_values"][ap_index]
+#     
+#     result["Waveform"] = ap_train.waveforms[ap_index,:]
+#         
+#     return result
+#         
         

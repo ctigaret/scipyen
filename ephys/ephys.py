@@ -239,6 +239,72 @@ if __debug__:
     global __debug_count__
 
     __debug_count__ = 0
+    
+def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], first:int = 0, nIntervals:int=1, isISI:bool=False):
+    """Calculates the reciprocal of inter-event intervals.
+    
+    Parameters:
+    ==========
+    data: sequence of time stamps OR time intervals (python Quantity values with time units)
+        The interpretation is dictated by the 'isISI' parameter described below
+        
+    first: int, the index of the first time stamp to take into consideration
+        optional, default is 0 (i.e. the first time stamps in the 'data' parameter)
+    
+    nIntervals: int, the number of events intervals across which the reciprocal is
+          calculates; optional, default is 1 i.e., one interval
+          
+    isISI:bool, flag to interpret the data as a sequence of time stamps (when False)
+        or time intervals (when True).
+        
+        Optional, default is False (i.e. data is taken as a sequence of time stamps)
+    
+    Example:
+    ===========
+    # Given a neo.SpikeTrain 'AP_train':
+    
+    In: AP_train.times
+    
+    Out: array([20.0971, 20.1261, 20.1582, ..., 20.2213, 20.261 , 20.3052]) * s
+    
+    # Find out the instantaneous frequency as the reciprocal of the interval 
+    # between the first and the third action potential:
+    
+    In: isiFrequency(AP_train.times, 0, 2)
+    Out: array(16.3441) * Hz
+    
+    # Suppose the time inter-AP intervals are collected as follows:
+    
+    In: Inter_AP_intervals = np.diff(AP_train.times)
+    
+    In: Inter_AP_intervals
+    Out: array([0.029 , 0.0322, 0.0327, 0.0304, 0.0396, 0.0442]) * s
+    
+    # To calculate the instantaneous frequency for the first two intervals:
+    
+    In: isifrequency(Inter_AP_intervals, 0, 2, True) # NOTE the third parameter
+    Out: array(16.3441) * Hz
+    
+    """
+    if first < 0:
+        raise ValueError(f"'first' must be >= 0; got {first} instead")
+    
+    if first >= len(data):
+        raise ValueError(f"'first' must be < {len(data)}; got {first} instead")
+    
+    if nIntervals < 1:
+        raise ValueError(f"'nIntervals' expected to be at least 1; got {nIntervals} instead")
+    
+    if first + nIntervals >= len(data):
+        raise ValueError(f"'nIntervals' cannot be larger than {len(data)-first}; got {nIntervals} instead")
+    
+    if isISI:
+        return (1/np.sum(data[first:(first+nIntervals)])).rescale(pq.Hz)
+    
+    else:
+        stamps = data[first:(first+nIntervals+1)]
+        return (1/(stamps[-1]-stamps[first])).rescale(pq.Hz)
+    
 
 def correlate(in1, in2, **kwargs):
     """Calls scipy.signal.correlate(in1, in2, **kwargs).
@@ -372,7 +438,7 @@ def correlate(in1, in2, **kwargs):
         return corr
     
 @safeWrapper
-def cursors2epoch(*args, **kwargs) -> typing.Union[neo.Epoch, typing.Sequence]:
+def cursors2epoch(*args, **kwargs):
     """Constructs a neo.Epoch from a sequence of SignalCursor objects.
     
     Each cursor contributes an interval in the Epoch.
@@ -618,7 +684,7 @@ def cursors2epoch(*args, **kwargs) -> typing.Union[neo.Epoch, typing.Sequence]:
         
         return neo.Epoch(times=t, durations=d, labels=i, units=units, name=name)
     
-def cursors2intervals(*args, **kwargs) -> typing.Union[typing.Sequence, np.ndarray]:
+def cursors2intervals(*args, **kwargs):
     """Calls cursors2epochs with intervals set to True
     
     Additional var-keyword parameters:
@@ -696,9 +762,7 @@ def signal2epoch(sig, name=None, labels=None):
     return ret
 
 @safeWrapper
-def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal],
-               cursor: typing.Union[SignalCursor, tuple],
-               channel: typing.Optional[int] = None) -> pq.Quantity:
+def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
     """The maximum value of the signal across the cursor's window.
     
     Parameters:
@@ -734,9 +798,7 @@ def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal],
     return ret
 
 @safeWrapper
-def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                  cursor: typing.Union[SignalCursor, tuple],
-                  channel: typing.Optional[int] = None) -> np.ndarray:
+def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
     """The index of maximum value of the signal across the cursor's window.
 
     Parameters:
@@ -774,9 +836,7 @@ def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
         return ret
 
 @safeWrapper
-def cursor_min(signal: typing.Union[neo.AnalogSignal, DataSignal],
-               cursor: typing.Union[tuple, SignalCursor],
-               channel: typing.Optional[int] = None) -> pq.Quantity:
+def cursor_min(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int] = None):
     """The minimum value of the signal across the cursor's window.
     
     Parameters:
@@ -810,9 +870,7 @@ def cursor_min(signal: typing.Union[neo.AnalogSignal, DataSignal],
     return ret
 
 @safeWrapper
-def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                  cursor: typing.Union[tuple, SignalCursor],
-                  channel: typing.Optional[int] = None) -> np.ndarray:
+def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int] = None):
     """The index of minimum value of the signal across the cursor's window.
 
     Parameters:
@@ -850,9 +908,7 @@ def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
         return ret
 
 @safeWrapper
-def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                  cursor: typing.Union[tuple, SignalCursor],
-                  channel: typing.Optional[int] = None) -> tuple:
+def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int] = None):
     """The maximum and minimum value of the signal across the cursor's window.
 
     Parameters:
@@ -901,9 +957,7 @@ def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
         return (mx, mn)
 
 @safeWrapper
-def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                     cursor: typing.Union[tuple, SignalCursor],
-                     channel: typing.Optional[int] = None) -> tuple:
+def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int] = None):
     """The indices of signal maximum and minimum across the cursor's window.
     """
     from gui.signalviewer import SignalCursor as SignalCursor
@@ -930,9 +984,7 @@ def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
         return (mx, mn)
 
 @safeWrapper
-def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                   cursor: typing.Union[tuple, SignalCursor],
-                   channel: typing.Optional[int]=None) -> pq.Quantity:
+def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int]=None):
     """Average of signal samples across the window of a vertical cursor.
     
     Parameters:
@@ -976,9 +1028,7 @@ def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
     return ret
 
 @safeWrapper
-def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal],
-                 cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple],
-                 channel: typing.Optional[int] = None) -> pq.Quantity:
+def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple], channel: typing.Optional[int] = None):
     """Value of signal at the vertical cursor's time coordinate.
     
     Signal sample values are NOT averaged across the cursor's window.
@@ -1024,8 +1074,7 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal],
     return ret[channel].flatten() # so that it can be indexed
 
 @safeWrapper
-def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
-                 cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple]) -> int:
+def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple]):
     """Index of signal sample at the vertical cursor's time coordinate.
     
     Parameters:
@@ -1091,11 +1140,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
     return data_index
 
 @safeWrapper
-def cursors_measure(func, data, *cursors, 
-                    segment_index: int = None, 
-                    analog: typing.Optional[typing.Union[int, str]] = None, 
-                    irregular: typing.Optional[typing.Union[int, str]] = None,
-                    **kwargs) -> pq.Quantity:
+def cursors_measure(func, data, *cursors, segment_index: int = None, analog: typing.Optional[typing.Union[int, str]] = None, irregular: typing.Optional[typing.Union[int, str]] = None, **kwargs):
     """
     data: a neo.AnalogSignal or datatypes.DataSignal
     """
@@ -1155,10 +1200,7 @@ def cursors_measure(func, data, *cursors,
 
     
 @safeWrapper
-def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                       cursor0: typing.Union[SignalCursor, tuple], 
-                       cursor1: typing.Union[SignalCursor, tuple],
-                       channel: typing.Optional[int] = None) -> pq.Quantity:
+def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor0: typing.Union[SignalCursor, tuple], cursor1: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
     """Calculates the signal amplitude between two notional vertical cursors.
     
     amplitude = y1 - y0
@@ -1188,10 +1230,7 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
     return y1-y0
 
 @safeWrapper
-def cursors_distance(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                     cursor0: typing.Union[SignalCursor, tuple], 
-                     cursor1: typing.Union[SignalCursor, tuple],
-                     channel: typing.Optional[int] = None) -> pq.Quantity:
+def cursors_distance(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor0: typing.Union[SignalCursor, tuple], cursor1: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
     """Distance between two cursors, in signal samples.
     
     NOTE: The distance between two cursors in the signal domain can be
@@ -1203,12 +1242,7 @@ def cursors_distance(signal: typing.Union[neo.AnalogSignal, DataSignal],
     return abs(ret[1]-ret[0])
 
 @safeWrapper
-def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                t0: typing.Union[float, pq.Quantity], 
-                t1: typing.Union[float, pq.Quantity],
-                w0: typing.Optional[typing.Union[float,  pq.Quantity]]=0.001*pq.s,
-                w1: typing.Optional[typing.Union[float, pq.Quantity]] = None,
-                channel: typing.Optional[int] = None) -> pq.Quantity:
+def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], t0: typing.Union[float, pq.Quantity], t1: typing.Union[float, pq.Quantity], w0: typing.Optional[typing.Union[float, pq.Quantity]]=0.001*pq.s, w1: typing.Optional[typing.Union[float, pq.Quantity]] = None, channel: typing.Optional[int] = None):
     """Calculates the chord slope of a signal between two time points t0 and t1.
     
                     slope = (y1 - y0) / (t1 - t0)
@@ -1292,10 +1326,7 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
     #pass
     
 @safeWrapper
-def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                        cursor0: typing.Union[SignalCursor, tuple],
-                        cursor1: typing.Union[SignalCursor, tuple],
-                        channel: typing.Optional[int] = None) -> pq.Quantity:
+def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor0: typing.Union[SignalCursor, tuple], cursor1: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
     """Signal chord slope between two vertical cursors.
     
     The function calculates the slope of a straight line connecting the 
@@ -1334,9 +1365,7 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
     return (y1-y0)/(t1-t0)
     
 @safeWrapper
-def epoch2cursors(epoch: neo.Epoch, 
-                  axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None,
-                  **kwargs) -> typing.Sequence:
+def epoch2cursors(epoch: neo.Epoch, axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None, **kwargs):
     """Creates vertical signal cursors from a neo.Epoch.
     
     Parameters:
@@ -1403,7 +1432,7 @@ def epoch2cursors(epoch: neo.Epoch,
     return ret
 
 @safeWrapper
-def epoch2intervals(epoch: neo.Epoch, keep_units:bool = False) -> typing.Sequence:
+def epoch2intervals(epoch: neo.Epoch, keep_units:bool = False):
     """Generates a sequence of intervals as triplets (t_start, t_stop, label).
     
     Each interval coresponds to the epoch's interval.
@@ -1424,7 +1453,7 @@ def epoch2intervals(epoch: neo.Epoch, keep_units:bool = False) -> typing.Sequenc
         return [(t, t+d, l) for (t,d,l) in zip(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels)]
     
 @safeWrapper
-def intervals2epoch(*args, **kwargs) -> neo.Epoch:
+def intervals2epoch(*args, **kwargs):
     """Construct a neo.Epoch from a sequence of interval tuples or triplets.
     
     Variadic parameters:
@@ -1544,7 +1573,7 @@ def intervals2epoch(*args, **kwargs) -> neo.Epoch:
         return ret
 
 @safeWrapper
-def intervals2cursors(*args, **kwargs) -> typing.Sequence:
+def intervals2cursors(*args, **kwargs):
     """Construct a neo.Epoch from a sequence of interval tuples or triplets.
     
     Variadic parameters:
@@ -1651,9 +1680,7 @@ def intervals2cursors(*args, **kwargs) -> typing.Sequence:
         return xwl
 
 @safeWrapper
-def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                  epoch: neo.Epoch,
-                  channel: typing.Optional[int] = None) -> list:
+def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal], epoch: neo.Epoch, channel: typing.Optional[int] = None):
     """Signal average across an epoch's intervals.
     
     Parameters:
@@ -1686,8 +1713,7 @@ def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
     return ret
 
 @safeWrapper
-def plot_signal_vs_signal(x: typing.Union[neo.AnalogSignal, neo.Segment, neo.Block],
-                          *args, **kwargs):
+def plot_signal_vs_signal(x: typing.Union[neo.AnalogSignal, neo.Segment, neo.Block], *args, **kwargs):
     from plots import plots
     
     if isinstance(x, neo.Block):
@@ -1712,10 +1738,7 @@ def plot_signal_vs_signal(x: typing.Union[neo.AnalogSignal, neo.Segment, neo.Blo
 
 
 @safeWrapper
-def plot_spike_waveforms(x: neo.SpikeTrain, 
-                         figure: typing.Union[mpl.figure.Figure, type(None)] = None, 
-                         new: bool = True, 
-                         legend: bool = False):
+def plot_spike_waveforms(x: neo.SpikeTrain, figure: typing.Union[mpl.figure.Figure, type(None)] = None, new: bool = True, legend: bool = False):
     import matplotlib.pyplot as plt
     
     if not isinstance(x, neo.SpikeTrain):
@@ -2597,8 +2620,7 @@ def average_signals(*args, fun=np.mean):
     return ret
 
 @safeWrapper
-def aggregate_signals(*args, name_prefix:str, 
-                      collectSD:bool=True, collectSEM:bool=True) -> dict:
+def aggregate_signals(*args, name_prefix:str, collectSD:bool=True, collectSEM:bool=True):
     """Returns signal mean, SD, SEM, and number of signals in args.
     All signals must be single-channel.
     
@@ -3055,9 +3077,7 @@ def diff(sig, n=1, axis=-1, prepend=False, append=True):
     return ret
 
 @safeWrapper
-def gradient(sig:[neo.AnalogSignal, DataSignal, np.ndarray], 
-             n:int=1, 
-             axis:int=0) -> neo.AnalogSignal:
+def gradient(sig:[neo.AnalogSignal, DataSignal, np.ndarray], n:int=1, axis:int=0):
     """ First order gradient through central differences.
     
     Parameters:
@@ -3118,13 +3138,9 @@ def gradient(sig:[neo.AnalogSignal, DataSignal, np.ndarray],
     ret.annotations.update(sig.annotations)
     
     return ret
-
-    
     
 @safeWrapper
-def ediff1d(sig:[neo.AnalogSignal, DataSignal, np.ndarray],
-            to_end:numbers.Number=0, 
-            to_begin:[numbers.Number, type(None)]=None) -> neo.AnalogSignal:
+def ediff1d(sig:[neo.AnalogSignal, DataSignal, np.ndarray], to_end:numbers.Number=0, to_begin:[numbers.Number, type(None)]=None):
     """Differentiates each channel of an analogsignal with respect to its time basis.
     
     Parameters:
@@ -3181,10 +3197,7 @@ def ediff1d(sig:[neo.AnalogSignal, DataSignal, np.ndarray],
     return ret
 
 @safeWrapper
-def forward_difference(sig:[neo.AnalogSignal, DataSignal, np.ndarray], 
-                       n:int=1, 
-                       to_end:numbers.Number=0,
-                       to_begin:[numbers.Number, type(None)]=None) -> neo.AnalogSignal:
+def forward_difference(sig:[neo.AnalogSignal, DataSignal, np.ndarray], n:int=1, to_end:numbers.Number=0, to_begin:[numbers.Number, type(None)]=None):
     """Calculates the forward difference along the time axis.
     
     Parameters:
@@ -3448,21 +3461,14 @@ def signal_to_noise(x, axis=None, ddof=None, db=True):
     
     return ret
     
-def generate_text_stimulus_file(spike_times, start, duration, sampling_frequency, 
-                         spike_duration, spike_value, filename,
-                         atol=1e-12, rtol=1e-12, skipInvalidTimes=True,
-                         maxSweepDuration=None):
+def generate_text_stimulus_file(spike_times, start, duration, sampling_frequency, spike_duration, spike_value, filename, atol=1e-12, rtol=1e-12, skipInvalidTimes=True, maxSweepDuration=None):
     
     spike_trace = generate_spike_trace(spike_times, start, duration, sampling_frequency, 
                          spike_duration, spike_value, asNeoSignal=False)
     
     np.savetxt(filename, spike_trace)
     
-def generate_ripple_trace(ripple_times, start, duration, sampling_frequency,
-                          spike_duration=0.001, spike_value=5000, 
-                          spike_count=5, spike_isi=0.01,
-                          filename=None, atol=1e-12, rtol=1e-12, 
-                          skipInvalidTimes=True):
+def generate_ripple_trace(ripple_times, start, duration, sampling_frequency, spike_duration=0.001, spike_value=5000, spike_count=5, spike_isi=0.01, filename=None, atol=1e-12, rtol=1e-12, skipInvalidTimes=True):
     """Similar as generate_spike_trace and generate_text_stimulus_file combined.
     
     However, ripple times are the t_start values for ripple events. In turn,
@@ -3498,8 +3504,7 @@ def generate_ripple_trace(ripple_times, start, duration, sampling_frequency,
     
     """
     
-    def __inner_generate_ripples__(t_array, sp_times, t0, t_duration, 
-                                 s_freq, skip_invalid, atol_, rtol_):
+    def __inner_generate_ripples__(t_array, sp_times, t0, t_duration, s_freq, skip_invalid, atol_, rtol_):
         
         #print(sp_times)
         #print("t_duration", t_duration)
@@ -3588,14 +3593,7 @@ def generate_ripple_trace(ripple_times, start, duration, sampling_frequency,
     
             
 @safeWrapper
-def generate_spike_trace(spike_times, start, duration, sampling_frequency, 
-                         spike_duration=0.001, spike_value=5000,
-                         atol=1e-12, rtol=1e-12, skipInvalidTimes=True,
-                         maxSweepDuration=None,
-                         asNeoSignal=True, 
-                         time_units = pq.s, spike_units=pq.mV,
-                         name="Spike trace", description="Synthetic spike trace",
-                         **annotations):
+def generate_spike_trace(spike_times, start, duration, sampling_frequency, spike_duration=0.001, spike_value=5000, atol=1e-12, rtol=1e-12, skipInvalidTimes=True, maxSweepDuration=None, asNeoSignal=True, time_units = pq.s, spike_units=pq.mV, name="Spike trace", description="Synthetic spike trace", **annotations):
     """
     Converts a spike times array file to an AnalogSignal.
     
@@ -3662,8 +3660,7 @@ def generate_spike_trace(spike_times, start, duration, sampling_frequency,
         
     """
     
-    def __inner_trace_generate__(t_array, sp_times, t0, t_duration, 
-                                 s_freq, skip_invalid, atol_, rtol_):
+    def __inner_trace_generate__(t_array, sp_times, t0, t_duration, s_freq, skip_invalid, atol_, rtol_):
         
         spike_trace = np.full_like(t_array, 0.0)
         
@@ -3799,8 +3796,6 @@ def generate_spike_trace(spike_times, start, duration, sampling_frequency,
     
     else:
         return result
-    
-    
 
 def sampling_rate_or_period(rate, period):
     """
@@ -4016,7 +4011,7 @@ class ElectrophysiologyDataParser(object):
         self._alternative_DAC_command_output_ = False
         self._alternative_digital_outputs_ = False
     
-    def parse_data(self, data:neo.Block, metadata:dict=None) -> None:
+    def parse_data(self, data:neo.Block, metadata:dict=None):
         if hasattr(data, "annotations"):
             self._data_source_ = data.annotations.get("software", "unknown")
             if self._data_source_ == "Axon":
@@ -4027,7 +4022,7 @@ class ElectrophysiologyDataParser(object):
                 # parse CEDSignal, CEDSpike, EPhus, unknown
                 pass
             
-    def _parse_axon_data_(self, data:neo.Block, metadata:dict=None) -> None:
+    def _parse_axon_data_(self, data:neo.Block, metadata:dict=None):
         data_protocol = data.annotations.get("protocol", None)
         
         self._averaged_runs_ = data_protocol.get("lRunsPerTrial",1) > 1
