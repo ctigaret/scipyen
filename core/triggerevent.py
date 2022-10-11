@@ -1135,6 +1135,7 @@ class TriggerEvent(DataMark):
         else:
             if isinstance(labels, str):
                 labels = np.array([labels] * times.size)
+                
             elif isinstance(labels, (tuple, list)):
                 if not all([isinstance(l, str) for l in labels]):
                     raise TypeError("When ''labels' is a sequence, all elements must be str")
