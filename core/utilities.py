@@ -3156,8 +3156,8 @@ def get_nested_value(src, path):
             NOTE: the path represents depth-first traversal of src.
     
     """
-    if not isinstance(src, NestedFinder.supported_collection_types):
-        raise TypeError("First parameter (%s) expected to be a %s; got %s instead" % (src, NestedFinder.supported_collection_types, type(src).__name__))
+    # if not isinstance(src, NestedFinder.supported_collection_types):
+    #     raise TypeError("First parameter (%s) expected to be a %s; got %s instead" % (src, NestedFinder.supported_collection_types, type(src).__name__))
     
     if isinstance(path, (tuple, list, deque)):
         try:
