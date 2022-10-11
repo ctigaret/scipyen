@@ -636,6 +636,256 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             plotStyle = plotStyle,
                             *args, **kwargs)
         
+    def _configureUI_ (self):
+        """"""
+        self.setupUi(self)
+        
+        # NOTE: 2021-11-13 23:24:12
+        # signal/slot connections & UI for pg.PlotItem objects are configured in
+        # self._prepareAxes_()
+        
+        self.sig_plot.connect(self._slot_plot_numeric_data_thr_, type = QtCore.Qt.QueuedConnection)
+        
+        if self.viewerWidgetContainer.layout() is None:
+            self.viewerWidgetContainer.setLayout(QtWidgets.QGridLayout(self.viewerWidgetContainer))
+            
+        self.viewerWidgetContainer.layout().setSpacing(0)
+        self.viewerWidgetContainer.layout().setContentsMargins(0,0,0,0)
+        
+        self.actionSVG.triggered.connect(self.slot_export_svg)
+        self.actionTIFF.triggered.connect(self.slot_export_tiff)
+        self.actionPNG.triggered.connect(self.slot_export_png)
+        
+        self.cursorsMenu = QtWidgets.QMenu("Cursors", self)
+        self.epochsMenu = QtWidgets.QMenu("Epochs", self)
+        
+        self.menubar.setNativeMenuBar(True)
+
+        self.menubar.addMenu(self.cursorsMenu)
+        self.menubar.addMenu(self.epochsMenu)
+        
+        self.addCursorsMenu = QtWidgets.QMenu("Add Cursors", self)
+        self.addMultiAxesCursorMenu = QtWidgets.QMenu("Multi-axis", self)
+        
+        self.cursorsMenu.addMenu(self.addCursorsMenu)
+        
+        self.addCursorsMenu.addMenu(self.addMultiAxesCursorMenu)
+        
+        self.addVerticalCursorAction = self.addCursorsMenu.addAction("Vertical")
+        self.addVerticalCursorAction.triggered.connect(self.slot_addVerticalCursor)
+        
+        self.addHorizontalCursorAction = self.addCursorsMenu.addAction("Horizontal")
+        self.addHorizontalCursorAction.triggered.connect(self.slot_addHorizontalCursor)
+        
+        self.addCrosshairCursorAction = self.addCursorsMenu.addAction("Crosshair")
+        self.addCrosshairCursorAction.triggered.connect(self.slot_addCrosshairCursor)
+        
+        self.addCursorsMenu.addSeparator()
+        
+        self.addDynamicVerticalCursorAction = self.addCursorsMenu.addAction("Dynamic Vertical")
+        self.addDynamicVerticalCursorAction.triggered.connect(self.slot_addDynamicVerticalCursor)
+        
+        self.addDynamicHorizontalCursorAction = self.addCursorsMenu.addAction("Dynamic Horizontal")
+        self.addDynamicHorizontalCursorAction.triggered.connect(self.slot_addDynamicHorizontalCursor)
+        
+        self.addDynamicCrosshairCursorAction = self.addCursorsMenu.addAction("Dynamic Crosshair")
+        self.addDynamicCrosshairCursorAction.triggered.connect(self.slot_addDynamicCrosshairCursor)
+        
+        self.addMultiAxisVCursorAction = self.addMultiAxesCursorMenu.addAction("Vertical")
+        self.addMultiAxisVCursorAction.triggered.connect(self.slot_addMultiAxisVerticalCursor)
+        
+        self.addMultiAxisCCursorAction = self.addMultiAxesCursorMenu.addAction("Crosshair")
+        self.addMultiAxisCCursorAction.triggered.connect(self.slot_addMultiAxisCrosshairCursor)
+        
+        self.addMultiAxesCursorMenu.addSeparator()
+        
+        self.addDynamicMultiAxisVCursorAction = self.addMultiAxesCursorMenu.addAction("Dynamic Vertical")
+        self.addDynamicMultiAxisVCursorAction.triggered.connect(self.slot_addDynamicMultiAxisVerticalCursor)
+        
+        self.addDynamicMultiAxisCCursorAction = self.addMultiAxesCursorMenu.addAction("Dynamic Crosshair")
+        self.addDynamicMultiAxisCCursorAction.triggered.connect(self.slot_addDynamicMultiAxisCrosshairCursor)
+        
+        self.editCursorsMenu = QtWidgets.QMenu("Edit Cursor", self)
+        
+        self.editAnyCursorAction = self.editCursorsMenu.addAction("Choose...")
+        self.editAnyCursorAction.triggered.connect(self.slot_editCursor)
+        
+        self.editCursorAction = self.editCursorsMenu.addAction("Selected...")
+        self.editCursorAction.triggered.connect(self.slot_editSelectedCursor)
+        
+        self.cursorsMenu.addMenu(self.editCursorsMenu)
+        
+        self.removeCursorsMenu = QtWidgets.QMenu("Remove cursors", self)
+        
+        self.removeCursorAction = self.removeCursorsMenu.addAction("Remove a cursor...")
+        self.removeCursorAction.triggered.connect(self.slot_removeCursor)
+        
+        self.removeSelectedCursorAction = self.removeCursorsMenu.addAction("Remove selected cursor")
+        self.removeSelectedCursorAction.triggered.connect(self.slot_removeSelectedCursor)
+        
+        self.removeAllCursorsAction = self.removeCursorsMenu.addAction("Remove all cursors")
+        self.removeAllCursorsAction.triggered.connect(self.slot_removeCursors)
+        
+        self.cursorsMenu.addMenu(self.removeCursorsMenu)
+        
+        self.cursorsMenu.addSeparator()
+        
+        self.setCursorsShowValue = self.cursorsMenu.addAction("Cursors show value")
+        self.setCursorsShowValue.setCheckable(True)
+        self.setCursorsShowValue.setChecked(self._cursorsShowValue_)
+        self.setCursorsShowValue.toggled.connect(self._slot_setCursorsShowValue)
+        
+        self.setCursorsLabelPrecision = self.cursorsMenu.addAction("Cursor label precision...")
+        self.setCursorsLabelPrecision.triggered.connect(self._slot_setCursorLabelPrecision)
+        
+        self.cursorsColorsMenu = QtWidgets.QMenu("Cursor colors")
+        self.verticalCursorColorsAction = self.cursorsColorsMenu.addAction("Vertical cursor colors")
+        self.verticalCursorColorsAction.triggered.connect(self._slot_setVerticalCursorColors)
+        self.horizontalCursorColorsAction = self.cursorsColorsMenu.addAction("Horizontal cursor colors")
+        self.horizontalCursorColorsAction.triggered.connect(self._slot_setHorizontalCursorColors)
+        self.crosshairCursorColorsAction = self.cursorsColorsMenu.addAction("Crosshair cursor colors")
+        self.crosshairCursorColorsAction.triggered.connect(self._slot_setCrosshairCursorColors)
+        self.cursorHoverColorAction = self.cursorsColorsMenu.addAction("Cursors hover color")
+        self.cursorHoverColorAction.triggered.connect(self._slot_setCursorHoverColor)
+        
+        self.cursorsMenu.addMenu(self.cursorsColorsMenu)
+        
+        self.makeEpochsMenu = QtWidgets.QMenu("Make Epochs")
+        
+        self.epochsFromCursorsAction = self.makeEpochsMenu.addAction("Cursors to Epochs")
+        self.epochsFromCursorsAction.triggered.connect(self.slot_cursorsToEpoch)
+        self.epochsFromCursorsAction.setEnabled(self._scipyenWindow_ is not None)
+        
+        self.epochFromSelectedCursorAction = self.makeEpochsMenu.addAction("Selected SignalCursor to Epoch")
+        self.epochFromSelectedCursorAction.triggered.connect(self.slot_cursorToEpoch)
+        self.epochFromSelectedCursorAction.setEnabled(self._scipyenWindow_ is not None)
+        
+        self.epochBetweenCursorsAction = self.makeEpochsMenu.addAction("Epoch Between Two Cursors")
+        self.epochBetweenCursorsAction.triggered.connect(self.slot_epochBetweenCursors)
+        self.epochBetweenCursorsAction.setEnabled(self._scipyenWindow_ is not None)
+        
+        self.makeEpochsInDataMenu = QtWidgets.QMenu("Make Epochs in Data")
+        
+        self.epochsInDataFromCursorsAction = self.makeEpochsInDataMenu.addAction("From All Cursors")
+        self.epochsInDataFromCursorsAction.triggered.connect(self.slot_cursorsToEpochInData)
+        
+        self.epochInDataFromSelectedCursorAction = self.makeEpochsInDataMenu.addAction("From Selected SignalCursor")
+        self.epochInDataFromSelectedCursorAction.triggered.connect(self.slot_cursorToEpochInData)
+        
+        self.epochInDataBetweenCursors = self.makeEpochsInDataMenu.addAction("Between Two Cursors")
+        self.epochInDataBetweenCursors.triggered.connect(self.slot_epochInDataBetweenCursors)
+        
+        # self.cursorsMenu.addSeparator()
+        
+        self.epochsMenu.addMenu(self.makeEpochsMenu)
+        self.epochsMenu.addMenu(self.makeEpochsInDataMenu)
+        
+        # the actual layout of the plot items (pyqtgraph framework)
+        self.signalsLayout = pg.GraphicsLayout()
+        self.signalsLayout.layout.setVerticalSpacing(0)
+
+        self.fig = pg.GraphicsLayoutWidget(parent = self.viewerWidgetContainer) 
+        styleHint = QtWidgets.QStyle.SH_DitherDisabledText
+        self.fig.style().styleHint(styleHint)
+        
+        #self.viewerWidgetLayout.addWidget(self.fig)
+        self.viewerWidget = self.fig
+        self.viewerWidgetContainer.layout().setHorizontalSpacing(0)
+        self.viewerWidgetContainer.layout().setVerticalSpacing(0)
+        self.viewerWidgetContainer.layout().contentsMargins().setLeft(0)
+        self.viewerWidgetContainer.layout().contentsMargins().setRight(0)
+        self.viewerWidgetContainer.layout().contentsMargins().setTop(0)
+        self.viewerWidgetContainer.layout().contentsMargins().setBottom(0)
+        self.viewerWidgetContainer.layout().addWidget(self.viewerWidget, 0,0)
+    
+        self.mainLayout = self.fig.ci
+        self.mainLayout.layout.setVerticalSpacing(0)
+        self.mainLayout.layout.setHorizontalSpacing(0)
+        
+        self.plotTitleLabel = self.mainLayout.addLabel("", col=0, colspan=1)
+        
+        self.mainLayout.nextRow()
+        self.mainLayout.addItem(self.signalsLayout)
+        
+        self.framesQSlider.setMinimum(0)
+        self.framesQSlider.setMaximum(0)
+        self.framesQSlider.valueChanged.connect(self.slot_setFrameNumber)
+        
+        self._frames_slider_ = self.framesQSlider
+        
+        self.framesQSpinBox.setKeyboardTracking(False)
+        self.framesQSpinBox.setMinimum(0)
+        self.framesQSpinBox.setMaximum(0)
+        self.framesQSpinBox.valueChanged.connect(self.slot_setFrameNumber)
+        
+        self._frames_spinner_ = self.framesQSpinBox
+        
+        self.signalsMenu = QtWidgets.QMenu("Signals", self)
+        
+        self.selectSignalComboBox.clear()
+        self.selectSignalComboBox.setCurrentIndex(0)
+        self.selectSignalComboBox.currentIndexChanged[int].connect(self.slot_analogSignalsComboBoxIndexChanged)
+        
+        self.plotAnalogSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
+        self.plotAnalogSignalsCheckBox.stateChanged[int].connect(self.slot_plotAnalogSignalsCheckStateChanged)
+        
+        self.selectIrregularSignalComboBox.clear()
+        self.selectIrregularSignalComboBox.setCurrentIndex(0)
+        self.selectIrregularSignalComboBox.currentIndexChanged[int].connect(self.slot_irregularSignalsComboBoxIndexChanged)
+        
+        self.plotIrregularSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
+        self.plotIrregularSignalsCheckBox.stateChanged[int].connect(self.slot_plotIrregularSignalsCheckStateChanged)
+        
+        #### BEGIN set up annotations dock widget
+        #print("_configureUI_ sets up annotations dock widget")
+        self.annotationsDockWidget = QtWidgets.QDockWidget("Annotations", self, objectName="annotationsDockWidget")
+        self.annotationsDockWidget.setWindowTitle("Annotations")
+        self.annotationsDockWidget.setFeatures(QtWidgets.QDockWidget.DockWidgetClosable | QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
+        
+        self.annotationsViewer = InteractiveTreeWidget(self.annotationsDockWidget)
+        self.annotationsViewer.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.annotationsViewer.setDragDropMode(QtWidgets.QAbstractItemView.DragOnly)
+        self.annotationsViewer.setDragEnabled(True)
+        
+        # NOTE: 2022-03-04 10:14:09 FIXME/TODO code to actually export to workspace
+        # items selected in the annotations viewer
+        #self.annotationsViewer.customContextMenuRequested[QtCore.QPoint].connect(self.slot_annotationsContextMenuRequested)
+        
+        self.annotationsDockWidget.setWidget(self.annotationsViewer)
+        
+        #print("_configureUI_ sets up annotations dock widget action")
+        #### END set up annotations dock widget
+        
+        #### BEGIN set up coordinates dock widget
+        #print("_configureUI_ sets up coordinates dock widget")
+        self.coordinatesDockWidget.setWindowTitle("Cursors")
+        
+        #print("_configureUI_ sets up coordinates dock widget action")
+        
+        #self.coordinatesDockWidget.visibilityChanged[bool].connect(self._slot_dock_visibility_changed_)
+        #### END set up coordinates dock widget
+        
+        #print("_configureUI_ sets up dock widget actions menu")
+        self.docksMenu = QtWidgets.QMenu("Panels", self)
+        
+        self.showAnnotationsDockWidgetAction = self.docksMenu.addAction("Annotations")
+        self.showAnnotationsDockWidgetAction.setObjectName("action_%s" % self.annotationsDockWidget.objectName())
+        self.showAnnotationsDockWidgetAction.triggered.connect(self.slot_showAnnotationsDock)
+        
+        self.showCoordinatesDockWidgetAction = self.docksMenu.addAction("Cursors")
+        self.showCoordinatesDockWidgetAction.setObjectName("action_%s" % self.coordinatesDockWidget.objectName())
+        self.showCoordinatesDockWidgetAction.triggered.connect(self.slot_showCoordinatesDock)
+        
+        self.menubar.addMenu(self.docksMenu)
+        
+        self.actionDetect_Triggers.triggered.connect(self.slot_detectTriggers)
+        self.actionDetect_Triggers.setEnabled(False)
+        
+        self.actionRefresh.triggered.connect(self.slot_refreshDataDisplay)
+        
+        if isinstance(self._scipyenWindow_, QtWidgets.QMainWindow) and hasattr(self._scipyenWindow_, "workspaceModel"):
+            self._scipyenWindow_.workspaceModel.varModified.connect(self.slot_varModified)
+            
     # ### BEGIN properties
     @property
     def dockWidgets(self):
@@ -1295,8 +1545,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if self.annotationsViewer.topLevelItemCount() == 1:
             self.annotationsViewer.topLevelItem(0).setText(0, "Data")
         
-    def _setup_signal_choosers_(self, analog:(tuple, list, type(None)) = None, irregular:(tuple, list, type(None)) = None):
-        """
+    def _setup_signal_choosers_(self, analog = None, irregular = None):
+        """TODO/FIXME
         """
         from core.utilities import unique
         sigBlock = [QtCore.QSignalBlocker(widget) for widget in (self.selectSignalComboBox, self.selectIrregularSignalComboBox)]
@@ -1361,252 +1611,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.selectIrregularSignalComboBox.addItems(sig_names)
             self.selectIrregularSignalComboBox.setCurrentIndex(new_ndx)
             
-        if all([seq is None or (isinstance(seq, (tuple, list)) and len(seq)==0) for seq in (analog, irregular)]):
-            return
+        # if all([seq is None or (isinstance(seq, (tuple, list)) and len(seq)==0) for seq in (analog, irregular)]):
+        #     return
+        
 
-    def _configureUI_ (self):
-        self.setupUi(self)
-        # NOTE: 2021-11-13 23:24:12
-        # signal/slot connections & UI for pg.PlotItem objects are configured in
-        # self._prepareAxes_()
-        
-        self.sig_plot.connect(self._slot_plot_numeric_data_thr_, type = QtCore.Qt.QueuedConnection)
-        
-        if self.viewerWidgetContainer.layout() is None:
-            self.viewerWidgetContainer.setLayout(QtWidgets.QGridLayout(self.viewerWidgetContainer))
-            
-        self.viewerWidgetContainer.layout().setSpacing(0)
-        self.viewerWidgetContainer.layout().setContentsMargins(0,0,0,0)
-        
-        self.actionSVG.triggered.connect(self.slot_export_svg)
-        self.actionTIFF.triggered.connect(self.slot_export_tiff)
-        self.actionPNG.triggered.connect(self.slot_export_png)
-        
-        self.cursorsMenu = QtWidgets.QMenu("Cursors", self)
-        self.epochsMenu = QtWidgets.QMenu("Epochs", self)
-        
-        self.menubar.setNativeMenuBar(True)
-
-        self.menubar.addMenu(self.cursorsMenu)
-        self.menubar.addMenu(self.epochsMenu)
-        
-        self.addCursorsMenu = QtWidgets.QMenu("Add Cursors", self)
-        self.addMultiAxesCursorMenu = QtWidgets.QMenu("Multi-axis", self)
-        
-        self.cursorsMenu.addMenu(self.addCursorsMenu)
-        
-        self.addCursorsMenu.addMenu(self.addMultiAxesCursorMenu)
-        
-        self.addVerticalCursorAction = self.addCursorsMenu.addAction("Vertical")
-        self.addVerticalCursorAction.triggered.connect(self.slot_addVerticalCursor)
-        
-        self.addHorizontalCursorAction = self.addCursorsMenu.addAction("Horizontal")
-        self.addHorizontalCursorAction.triggered.connect(self.slot_addHorizontalCursor)
-        
-        self.addCrosshairCursorAction = self.addCursorsMenu.addAction("Crosshair")
-        self.addCrosshairCursorAction.triggered.connect(self.slot_addCrosshairCursor)
-        
-        self.addCursorsMenu.addSeparator()
-        
-        self.addDynamicVerticalCursorAction = self.addCursorsMenu.addAction("Dynamic Vertical")
-        self.addDynamicVerticalCursorAction.triggered.connect(self.slot_addDynamicVerticalCursor)
-        
-        self.addDynamicHorizontalCursorAction = self.addCursorsMenu.addAction("Dynamic Horizontal")
-        self.addDynamicHorizontalCursorAction.triggered.connect(self.slot_addDynamicHorizontalCursor)
-        
-        self.addDynamicCrosshairCursorAction = self.addCursorsMenu.addAction("Dynamic Crosshair")
-        self.addDynamicCrosshairCursorAction.triggered.connect(self.slot_addDynamicCrosshairCursor)
-        
-        self.addMultiAxisVCursorAction = self.addMultiAxesCursorMenu.addAction("Vertical")
-        self.addMultiAxisVCursorAction.triggered.connect(self.slot_addMultiAxisVerticalCursor)
-        
-        self.addMultiAxisCCursorAction = self.addMultiAxesCursorMenu.addAction("Crosshair")
-        self.addMultiAxisCCursorAction.triggered.connect(self.slot_addMultiAxisCrosshairCursor)
-        
-        self.addMultiAxesCursorMenu.addSeparator()
-        
-        self.addDynamicMultiAxisVCursorAction = self.addMultiAxesCursorMenu.addAction("Dynamic Vertical")
-        self.addDynamicMultiAxisVCursorAction.triggered.connect(self.slot_addDynamicMultiAxisVerticalCursor)
-        
-        self.addDynamicMultiAxisCCursorAction = self.addMultiAxesCursorMenu.addAction("Dynamic Crosshair")
-        self.addDynamicMultiAxisCCursorAction.triggered.connect(self.slot_addDynamicMultiAxisCrosshairCursor)
-        
-        self.editCursorsMenu = QtWidgets.QMenu("Edit Cursor", self)
-        
-        self.editAnyCursorAction = self.editCursorsMenu.addAction("Choose...")
-        self.editAnyCursorAction.triggered.connect(self.slot_editCursor)
-        
-        self.editCursorAction = self.editCursorsMenu.addAction("Selected...")
-        self.editCursorAction.triggered.connect(self.slot_editSelectedCursor)
-        
-        self.cursorsMenu.addMenu(self.editCursorsMenu)
-        
-        self.removeCursorsMenu = QtWidgets.QMenu("Remove cursors", self)
-        
-        self.removeCursorAction = self.removeCursorsMenu.addAction("Remove a cursor...")
-        self.removeCursorAction.triggered.connect(self.slot_removeCursor)
-        
-        self.removeSelectedCursorAction = self.removeCursorsMenu.addAction("Remove selected cursor")
-        self.removeSelectedCursorAction.triggered.connect(self.slot_removeSelectedCursor)
-        
-        self.removeAllCursorsAction = self.removeCursorsMenu.addAction("Remove all cursors")
-        self.removeAllCursorsAction.triggered.connect(self.slot_removeCursors)
-        
-        self.cursorsMenu.addMenu(self.removeCursorsMenu)
-        
-        self.cursorsMenu.addSeparator()
-        
-        self.setCursorsShowValue = self.cursorsMenu.addAction("Cursors show value")
-        self.setCursorsShowValue.setCheckable(True)
-        self.setCursorsShowValue.setChecked(self._cursorsShowValue_)
-        self.setCursorsShowValue.toggled.connect(self._slot_setCursorsShowValue)
-        
-        self.setCursorsLabelPrecision = self.cursorsMenu.addAction("Cursor label precision...")
-        self.setCursorsLabelPrecision.triggered.connect(self._slot_setCursorLabelPrecision)
-        
-        self.cursorsColorsMenu = QtWidgets.QMenu("Cursor colors")
-        self.verticalCursorColorsAction = self.cursorsColorsMenu.addAction("Vertical cursor colors")
-        self.verticalCursorColorsAction.triggered.connect(self._slot_setVerticalCursorColors)
-        self.horizontalCursorColorsAction = self.cursorsColorsMenu.addAction("Horizontal cursor colors")
-        self.horizontalCursorColorsAction.triggered.connect(self._slot_setHorizontalCursorColors)
-        self.crosshairCursorColorsAction = self.cursorsColorsMenu.addAction("Crosshair cursor colors")
-        self.crosshairCursorColorsAction.triggered.connect(self._slot_setCrosshairCursorColors)
-        self.cursorHoverColorAction = self.cursorsColorsMenu.addAction("Cursors hover color")
-        self.cursorHoverColorAction.triggered.connect(self._slot_setCursorHoverColor)
-        
-        self.cursorsMenu.addMenu(self.cursorsColorsMenu)
-        
-        self.makeEpochsMenu = QtWidgets.QMenu("Make Epochs")
-        
-        self.epochsFromCursorsAction = self.makeEpochsMenu.addAction("Cursors to Epochs")
-        self.epochsFromCursorsAction.triggered.connect(self.slot_cursorsToEpoch)
-        self.epochsFromCursorsAction.setEnabled(self._scipyenWindow_ is not None)
-        
-        self.epochFromSelectedCursorAction = self.makeEpochsMenu.addAction("Selected SignalCursor to Epoch")
-        self.epochFromSelectedCursorAction.triggered.connect(self.slot_cursorToEpoch)
-        self.epochFromSelectedCursorAction.setEnabled(self._scipyenWindow_ is not None)
-        
-        self.epochBetweenCursorsAction = self.makeEpochsMenu.addAction("Epoch Between Two Cursors")
-        self.epochBetweenCursorsAction.triggered.connect(self.slot_epochBetweenCursors)
-        self.epochBetweenCursorsAction.setEnabled(self._scipyenWindow_ is not None)
-        
-        self.makeEpochsInDataMenu = QtWidgets.QMenu("Make Epochs in Data")
-        
-        self.epochsInDataFromCursorsAction = self.makeEpochsInDataMenu.addAction("From All Cursors")
-        self.epochsInDataFromCursorsAction.triggered.connect(self.slot_cursorsToEpochInData)
-        
-        self.epochInDataFromSelectedCursorAction = self.makeEpochsInDataMenu.addAction("From Selected SignalCursor")
-        self.epochInDataFromSelectedCursorAction.triggered.connect(self.slot_cursorToEpochInData)
-        
-        self.epochInDataBetweenCursors = self.makeEpochsInDataMenu.addAction("Between Two Cursors")
-        self.epochInDataBetweenCursors.triggered.connect(self.slot_epochInDataBetweenCursors)
-        
-        # self.cursorsMenu.addSeparator()
-        
-        self.epochsMenu.addMenu(self.makeEpochsMenu)
-        self.epochsMenu.addMenu(self.makeEpochsInDataMenu)
-        
-        # the actual layout of the plot items (pyqtgraph framework)
-        self.signalsLayout = pg.GraphicsLayout()
-        self.signalsLayout.layout.setVerticalSpacing(0)
-
-        self.fig = pg.GraphicsLayoutWidget(parent = self.viewerWidgetContainer) 
-        styleHint = QtWidgets.QStyle.SH_DitherDisabledText
-        self.fig.style().styleHint(styleHint)
-        
-        #self.viewerWidgetLayout.addWidget(self.fig)
-        self.viewerWidget = self.fig
-        self.viewerWidgetContainer.layout().setHorizontalSpacing(0)
-        self.viewerWidgetContainer.layout().setVerticalSpacing(0)
-        self.viewerWidgetContainer.layout().contentsMargins().setLeft(0)
-        self.viewerWidgetContainer.layout().contentsMargins().setRight(0)
-        self.viewerWidgetContainer.layout().contentsMargins().setTop(0)
-        self.viewerWidgetContainer.layout().contentsMargins().setBottom(0)
-        self.viewerWidgetContainer.layout().addWidget(self.viewerWidget, 0,0)
-    
-        self.mainLayout = self.fig.ci
-        self.mainLayout.layout.setVerticalSpacing(0)
-        self.mainLayout.layout.setHorizontalSpacing(0)
-        
-        self.plotTitleLabel = self.mainLayout.addLabel("", col=0, colspan=1)
-        
-        self.mainLayout.nextRow()
-        self.mainLayout.addItem(self.signalsLayout)
-        
-        self.framesQSlider.setMinimum(0)
-        self.framesQSlider.setMaximum(0)
-        self.framesQSlider.valueChanged.connect(self.slot_setFrameNumber)
-        
-        self._frames_slider_ = self.framesQSlider
-        
-        self.framesQSpinBox.setKeyboardTracking(False)
-        self.framesQSpinBox.setMinimum(0)
-        self.framesQSpinBox.setMaximum(0)
-        self.framesQSpinBox.valueChanged.connect(self.slot_setFrameNumber)
-        
-        self._frames_spinner_ = self.framesQSpinBox
-        
-        self.signalsMenu = QtWidgets.QMenu("Signals", self)
-        
-        self.selectSignalComboBox.clear()
-        self.selectSignalComboBox.setCurrentIndex(0)
-        self.selectSignalComboBox.currentIndexChanged[int].connect(self.slot_analogSignalsComboBoxIndexChanged)
-        
-        self.plotAnalogSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
-        self.plotAnalogSignalsCheckBox.stateChanged[int].connect(self.slot_plotAnalogSignalsCheckStateChanged)
-        
-        self.selectIrregularSignalComboBox.clear()
-        self.selectIrregularSignalComboBox.setCurrentIndex(0)
-        self.selectIrregularSignalComboBox.currentIndexChanged[int].connect(self.slot_irregularSignalsComboBoxIndexChanged)
-        
-        self.plotIrregularSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
-        self.plotIrregularSignalsCheckBox.stateChanged[int].connect(self.slot_plotIrregularSignalsCheckStateChanged)
-        
-        #### BEGIN set up annotations dock widget
-        #print("_configureUI_ sets up annotations dock widget")
-        self.annotationsDockWidget = QtWidgets.QDockWidget("Annotations", self, objectName="annotationsDockWidget")
-        self.annotationsDockWidget.setWindowTitle("Annotations")
-        self.annotationsDockWidget.setFeatures(QtWidgets.QDockWidget.DockWidgetClosable | QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
-        
-        self.annotationsViewer = InteractiveTreeWidget(self.annotationsDockWidget)
-        self.annotationsViewer.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        self.annotationsViewer.setDragDropMode(QtWidgets.QAbstractItemView.DragOnly)
-        self.annotationsViewer.setDragEnabled(True)
-        
-        # NOTE: 2022-03-04 10:14:09 FIXME/TODO code to actually export to workspace
-        # items selected in the annotations viewer
-        #self.annotationsViewer.customContextMenuRequested[QtCore.QPoint].connect(self.slot_annotationsContextMenuRequested)
-        
-        self.annotationsDockWidget.setWidget(self.annotationsViewer)
-        
-        #print("_configureUI_ sets up annotations dock widget action")
-        #### END set up annotations dock widget
-        
-        #### BEGIN set up coordinates dock widget
-        #print("_configureUI_ sets up coordinates dock widget")
-        self.coordinatesDockWidget.setWindowTitle("Cursors")
-        
-        #print("_configureUI_ sets up coordinates dock widget action")
-        
-        #self.coordinatesDockWidget.visibilityChanged[bool].connect(self._slot_dock_visibility_changed_)
-        #### END set up coordinates dock widget
-        
-        #print("_configureUI_ sets up dock widget actions menu")
-        self.docksMenu = QtWidgets.QMenu("Panels", self)
-        
-        self.showAnnotationsDockWidgetAction = self.docksMenu.addAction("Annotations")
-        self.showAnnotationsDockWidgetAction.setObjectName("action_%s" % self.annotationsDockWidget.objectName())
-        self.showAnnotationsDockWidgetAction.triggered.connect(self.slot_showAnnotationsDock)
-        
-        self.showCoordinatesDockWidgetAction = self.docksMenu.addAction("Cursors")
-        self.showCoordinatesDockWidgetAction.setObjectName("action_%s" % self.coordinatesDockWidget.objectName())
-        self.showCoordinatesDockWidgetAction.triggered.connect(self.slot_showCoordinatesDock)
-        
-        self.menubar.addMenu(self.docksMenu)
-        
-        self.actionDetect_Triggers.triggered.connect(self.slot_detectTriggers)
-        self.actionDetect_Triggers.setEnabled(False)
-        
     # ### END private methods
     
     def setDataDisplayEnabled(self, value):
@@ -2438,14 +2446,26 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     #"def" selectCursor(self, ID):
         #self.slot_selectCursor(ID)
         
+    @pyqtSlot(object)
+    def slot_varModified(self, obj):
+        """Connected to _scipyenWindow_.workspaceModel.varModified signal
+        """
+        self.displayFrame()
+        
     @pyqtSlot()
     @safeWrapper
     def slot_refreshDataDisplay(self):
         if self._scipyenWindow_ is None:
             return
         
-        if self._data_var_name_ is not None and self._data_var_name_ in self._scipyenWindow_.workspace.keys():
-            self.setData(self._scipyenWindow_.workspace[self._data_var_name_], self._data_var_name_)
+        self.displayFrame()
+        
+        # if self._data_var_name_ is not None and self._data_var_name_ in self._scipyenWindow_.workspace.keys():
+        #     self.setData(self._scipyenWindow_.workspace[self._data_var_name_], self._data_var_name_)
+            
+        # if self.y in self._scipyenWindow_.workspace.values():
+        #     self.setData(self._scipyenWindow_.workspace[self._data_var_name_], self._data_var_name_)
+            
 
     def _hasCursor_(self, crsID): #  syntactic sugar
         if len(self._data_cursors_) == 0:

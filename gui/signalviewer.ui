@@ -185,8 +185,10 @@
      <addaction name="actionPNG"/>
     </widget>
     <addaction name="actionOpen"/>
-    <addaction name="actionClose"/>
     <addaction name="menuExport"/>
+    <addaction name="actionClose"/>
+    <addaction name="separator"/>
+    <addaction name="actionRefresh"/>
    </widget>
    <widget class="QMenu" name="menuTools">
     <property name="title">
@@ -295,6 +297,11 @@
   <action name="actionDetect_Triggers">
    <property name="text">
     <string>Detect Triggers</string>
+   </property>
+  </action>
+  <action name="actionRefresh">
+   <property name="text">
+    <string>Refresh</string>
    </property>
   </action>
  </widget>

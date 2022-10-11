@@ -58,6 +58,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     modelContentsChanged = pyqtSignal(name = "modelContentsChanged")
     workingDir=pyqtSignal(str, name="workingDir")
     varsChanged = pyqtSignal(dict, name="varsChanged")
+    varModified = pyqtSignal(object, name="varModified")
     
     def __init__(self, shell, user_ns_hidden=dict(), parent=None, mpl_figure_close_callback=None, mpl_figure_click_callback=None, mpl_figure_enter_callback=None):
         super(WorkspaceModel, self).__init__(parent)
@@ -574,20 +575,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     
     def var_observer(self, change):
         self.varsChanged.emit(change)
-        # print(f"WorkspaceModel.var_observer: change {change}")
-        #asyncio.create_task(self._observe_coro, name="Observe_variables")
-        #self.loop.run_until_complete(self._observe_coro)
-        
-        #name = change.name
-        #displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
-        
-        #if name in self.shell.user_ns:
-            #if name not in displayed_vars_types:
-                #self.addRowForVariable(name, self.shell.user_ns[name])
-            #else:
-                #self.updateRowForVariable(name, self.shell.user_ns[name])
-                
-            #self.modelContentsChanged.emit()
         
     @pyqtSlot(dict)
     def slot_observe(self, change):
@@ -599,6 +586,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 self.addRowForVariable(name, self.shell.user_ns[name])
             else:
                 self.updateRowForVariable(name, self.shell.user_ns[name])
+                self.varModified.emit(self.shell.user_ns[name])
                 
             self.modelContentsChanged.emit()
             

@@ -556,7 +556,7 @@ class DataViewer(ScipyenViewer):
         
         self.treeWidget.customContextMenuRequested[QtCore.QPoint].connect(self.slot_customContextMenuRequested)
         
-        self.treeWidget.itemDoubleClicked[QtWidgets.QTreeWidgetItem, int].connect(self.rk)
+        self.treeWidget.itemDoubleClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_itemDoubleClicked)
         
         self.setCentralWidget(self.treeWidget)
         
