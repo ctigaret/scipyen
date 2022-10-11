@@ -2476,7 +2476,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
         dset = group.create_dataset(name, data = h5py.Empty(f))
     
     if data.size == 1:
-        dset = group.create_dataset(name, data = data, compression=compression)
+        dset = group.create_dataset(name, data = data)
     else:
         dset = group.create_dataset(name, data = data, compression=compression,
                                     chunks = chunks)
@@ -2497,6 +2497,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
         dset = group.create_dataset(name, data = h5py.Empty("f"))
     else:
         dset = group.create_dataset(name, data = np.array(obj, dtype = h5py.string_dtype()))
+        
     dset.attrs.update(attrs)
     storeEntityInCache(entity_cache, obj, dset)
     return dset
@@ -2523,7 +2524,7 @@ def _(obj, group:h5py.Group, attrs:dict, name:str,
     data = obj.transposeToNumpyOrder()
     
     if data.size == 1:
-        dset = group.create_dataset(dset_name, data = data, compression = compression)
+        dset = group.create_dataset(dset_name, data = data)
     else:
         dset = group.create_dataset(dset_name, data = data, compression = compression, chunks=chunks)
     
@@ -2560,7 +2561,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
         return group.create_dataset(dset_name, data = h5py.Empty("f"))
     
     if obj.size == 1:
-        dset = group.create_dataset(dset_name, data = obj.magnitude, compression = compression)
+        dset = group.create_dataset(dset_name, data = obj.magnitude)
     else:
         dset = group.create_dataset(dset_name, data = obj.magnitude, compression = compression, chunks = chunks)
         
