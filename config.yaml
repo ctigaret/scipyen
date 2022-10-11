@@ -1,10 +1,10 @@
 ScipyenWindow:
     RecentScripts: []
 SignalViewer:
-    VerticalCursorColor: teal
-    CursorHoverColor: tomato
-    LinkedVerticalCursorColor: violet
     CursorsShowValue: yes
+    LinkedVerticalCursorColor: violet
+    CursorHoverColor: tomato
+    VerticalCursorColor: teal
 ImageViewer:
     ColorMap: GreenFireBlue
 Fconf:
