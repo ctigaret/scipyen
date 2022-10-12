@@ -849,7 +849,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         #print(f"WorkspaceModel.update observed_vars: {list(self.observed_vars.keys())}")
         del_vars = [name for name in self.observed_vars.keys() if name not in self.shell.user_ns.keys()]
-
+        
+        # with self.observed_vars.hold_trait_notifications:
         self.observed_vars.remove_members(*del_vars)
         
         current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
@@ -858,6 +859,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         self.observed_vars.update(current_vars)
         
+#         if len(del_vars) == 1:
+#             self.removeRowForVariable(del_vars[0])
+#             
+#         elif len(del_vars) > 1:
+#             self.clear()
+#             for item in self.observed_vars.items():
+#                 self.addRowForVariable(*item)
+            
         #print(f"WorkspaceModel.update del_vars = {del_vars}")
         
         #obsolete_displayed_vars = [n for n in self.getDisplayedVariableNames() if n not in self.shell.user_ns.keys()] # in the internal ws

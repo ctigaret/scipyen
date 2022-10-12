@@ -2818,8 +2818,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         if isinstance(value, str) and by_name:
             # print(f"---\nScipyenWindow.removeFromWorkspace {value}")
-            self.workspace.pop(value, None)
-            self.workspaceModel.removeRowForVariable(value)
+            r = self.workspace.pop(value, None)
+            if r is not None:
+                self.workspaceModel.removeRowForVariable(value)
         else:
             # inverse lookup the key mapped to this value - will remove ALL
             # references to value that exist in the workspace
