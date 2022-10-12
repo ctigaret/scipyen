@@ -1248,14 +1248,21 @@ class IrregularlySampledDataSignal(BaseSignal):
         '''
         #super_repr = super().__repr__()
         
+        if self.size == 0:
+            return "\n".join(["%s       %s" % ("Domain", "Signal"),
+                              "",
+                              "* %s       * %s" % (self.times.units, self.units)])
+        
         with np.printoptions(precision=2, linewidth=1000):
             values_str_list = self.as_array().__repr__().replace("array(", "").replace(")", "").replace("[[", "[").replace("]]", "]").replace(",", "").split("\n")
             
             times_str_list = np.array(self.times).__repr__().replace("array(", "").replace(")", "").replace("[", "").replace("]", "").replace(",", "").split()
-            
-            max_len = max([len(s) for s in times_str_list])
-            
-            repr_str_list = ["%s       %s" % (times_str_list[k].rjust(max_len), values_str_list[k].lstrip()) for k in range(len(times_str_list))]
+            if len(times_str_list) == 0:
+                reps_str_list = [""]
+            else:
+                max_len = max([len(s) for s in times_str_list])
+                
+                repr_str_list = ["%s       %s" % (times_str_list[k].rjust(max_len), values_str_list[k].lstrip()) for k in range(len(times_str_list))]
             
         repr_str_list.insert(0, "%s       %s" % ("Domain", "Signal"))
         repr_str_list.append("* %s       * %s" % (self.times.units, self.units))
@@ -1736,42 +1743,51 @@ class IrregularlySampledDataSignal(BaseSignal):
             
     def interval(self, start, stop):
         '''The equivalent of neo.AnalogSignal.time_slice.
-        
+        Except that when start == stop it returns the value at start (if found)
         '''
+        
 
-        # checking start and transforming to start index
+        u = self.domain.units
+
+        if not isinstance(start, pq.Quantity):
+            start *= u
+        else:
+            start = start.rescale(u)
+            
+        if not isinstance(stop, pq.Quantity):
+            stop *= u
+        else:
+            stop = stop.rescale(u)
+            
+        start, stop = (np.min([start, stop])*u, np.max([start,stop])*u)
+        
+        # get index of start
         if start is None:
             i = 0
-            
         else:
-            start = start.rescale(self.domain.units)
-            i = np.where(np.isclose(self.domain, start))[0]
+            i = np.where(np.isclose(self.domain.magnitude, start.magnitude))[0]
             if len(i):
                 i = i[0]
-                
             else:
                 raise ValueError("domain value %s not found" % start)
 
-        # checking stop and transforming to stop index
+        # get index of stop
         if stop is None:
             j = len(self)
-            
         else:
-            stop = stop.rescale(self.sampling_period.units)
-            j = np.where(np.isclose(self.domain, stop))[0]
+            j = np.where(np.isclose(self.domain.magnitude, stop.magnitude))[0]
             if len(j):
                 j = j[-1]
-                
             else:
                 raise ValueError("domain value %s not found" % stop)
 
         if (i < 0) or (j > len(self)):
-            raise ValueError('Expecting start and stop to be within the analog \
-                              signal extent')
+            raise ValueError('Expecting start and stop to be within the signal extent')
 
-        # we're going to send the list of indicies so that we get *copy* of the
-        # sliced data
-        obj = super(IrregularlySampledDataSignal, self).__getitem__(np.arange(i, j, 1))
+        if i == j:
+            obj = self[i]
+        else:
+            obj = super(IrregularlySampledDataSignal, self).__getitem__(np.arange(i, j, 1))
         
         return obj
     

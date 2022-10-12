@@ -493,8 +493,7 @@ def invert_time_ranges(time_ranges):
         
     return new_ranges
     
-def get_member_collections(container:typing.Union[type, neo.core.container.Container],
-                           membertype:typing.Union[type, tuple, list]) -> list:
+def get_member_collections(container:typing.Union[type, neo.core.container.Container], membertype:typing.Union[type, tuple, list]):
     if isinstance(container, type):
         if not neo.core.container.Container in inspect.getmro(container):
             raise TypeError("Cannot handle %s" % container)
@@ -520,13 +519,12 @@ def get_member_collections(container:typing.Union[type, neo.core.container.Conta
         
     #elif isinstance(membertype, type) and membertype in 
 
-def get_neo_version() -> tuple:
+def get_neo_version():
     major, minor, dot = neo.version.version.split(".")
     return eval(major), eval(minor), eval(dot)
 
 @safeWrapper
-def assign_to_signal(dest:neo.AnalogSignal, src:[neo.AnalogSignal, pq.Quantity], 
-                     channel:[int, type(None)]=None):
+def assign_to_signal(dest:neo.AnalogSignal, src:[neo.AnalogSignal, pq.Quantity], channel:[int, type(None)]=None):
     """Assigns values in src to values in dest, for the specified channel, or all channels
     
     Parameters:
@@ -581,10 +579,7 @@ def assign_to_signal(dest:neo.AnalogSignal, src:[neo.AnalogSignal, pq.Quantity],
         raise TypeError("source expected to be an AnalogSignal or a scalar python quantity of same units as destination")
         
 @safeWrapper
-def assign_to_signal_in_epoch(dest:neo.AnalogSignal, 
-                              src:[neo.AnalogSignal, pq.Quantity], 
-                              epoch:neo.Epoch, 
-                              channel:[int, type(None)] = None):
+def assign_to_signal_in_epoch(dest:neo.AnalogSignal, src:[neo.AnalogSignal, pq.Quantity], epoch:neo.Epoch, channel:[int, type(None)] = None):
     """Assigns values in src to values in dest, within an epoch, for the specified channel, or all channels
     """
     
@@ -651,8 +646,7 @@ def assign_to_signal_in_epoch(dest:neo.AnalogSignal,
     
     
 @safeWrapper
-def get_signal_names_indices(data: typing.Union[neo.Segment, typing.Sequence],
-                             analog: bool = True) -> typing.List[str]:
+def get_signal_names_indices(data: typing.Union[neo.Segment, typing.Sequence], analog: bool = True):
     """Returns a list of analog signal names in data.
     
     Produces a list of signal names in the data; for signals that do not have a
@@ -715,8 +709,7 @@ def get_signal_names_indices(data: typing.Union[neo.Segment, typing.Sequence],
             
     return [item[1] for item in sig_indices_names]
     
-def normalized_segment_index(src: neo.Block,
-                             index: typing.Union[int, str, range, slice, typing.Sequence]):
+def normalized_segment_index(src: neo.Block, index: typing.Union[int, str, range, slice, typing.Sequence]):
     """Returns integral indices of a Segment in a neo.Block or list of Segments.
     """
     
@@ -761,12 +754,6 @@ def normalized_segment_index(src: neo.Block,
     else:
         raise TypeError("Invalid indexing: %s" % index)
     
-#def neo_child_property_name(type_or_obj):
-    #"""Provisional.OBSOLETE
-    #As of neo 0.8.0 this only works for neo.Unit, in neo.Block
-    #"""    
-    #return "list_%s" % neo_child_container_name(type_or_obj)
-
 def neo_child_container_name(type_or_obj):
     """Provisional: name of member collection.
     Returns a valid child container name; doesn't tell is a container actually
@@ -794,9 +781,7 @@ def neo_child_container_name(type_or_obj):
             return _container_name(type(type_or_obj).__name__)
             
         
-def __get_container_collection_attribute__(container, attrname,
-                                           container_index=None,
-                                           multiple=True):
+def __get_container_collection_attribute__(container, attrname, container_index=None, multiple=True):
     
     ret = getattr(container, attrname, None)
     
@@ -806,12 +791,7 @@ def __get_container_collection_attribute__(container, attrname,
     else:
         return [(k, ret[k]) for k in normalized_index(len(ret), container_index, multiple=multiple)]
             
-def __container_lookup__(container: neo.container.Container, 
-                         index_obj: typing.Union[str, int, tuple, list, np.ndarray, range, slice],
-                         contained_type: neo.baseneo.BaseNeo,
-                         multiple:bool = True, 
-                         return_objects:bool = False,
-                         **kwargs) -> dict:
+def __container_lookup__(container: neo.container.Container, index_obj: typing.Union[str, int, tuple, list, np.ndarray, range, slice], contained_type: neo.baseneo.BaseNeo, multiple:bool = True, return_objects:bool = False, **kwargs):
     """
     Lookup and optionally return children of specified contained_type 
     inside a neo.container.Container.
@@ -892,13 +872,7 @@ def __container_lookup__(container: neo.container.Container,
 
     raise TypeError(f"Expecting a neo.Container; got {type(container).__name__} instead.")
         
-def __collection_lookup__(seq: typing.Sequence, 
-                          index_obj: typing.Union[str, int, tuple, list, np.ndarray, range, slice],
-                          contained_type: neo.baseneo.BaseNeo,
-                          seq_index: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None,
-                          multiple:bool = True, 
-                          return_objects:bool = False,
-                          **kwargs) -> dict:
+def __collection_lookup__(seq: typing.Sequence, index_obj: typing.Union[str, int, tuple, list, np.ndarray, range, slice], contained_type: neo.baseneo.BaseNeo, seq_index: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None, multiple:bool = True, return_objects:bool = False, **kwargs):
     """ Case 3
     """
     if seq is None:
@@ -928,9 +902,7 @@ def __collection_lookup__(seq: typing.Sequence,
     else:
         return dict()
     
-def is_empty(x:typing.Union[neo.core.container.Container, neo.core.dataobject.DataObject, 
-                            typing.Sequence[typing.Union[neo.core.container.Container,neo.core.dataobject.DataObject]]],
-            ignore:typing.Optional[typing.Union[typing.Sequence[type], type]]=None):
+def is_empty(x:typing.Union[neo.core.container.Container, neo.core.dataobject.DataObject, typing.Sequence[typing.Union[neo.core.container.Container,neo.core.dataobject.DataObject]]], ignore:typing.Optional[typing.Union[typing.Sequence[type], type]]=None):
     """Checks whether x contains any data.
     Parameters:
     ==========
@@ -979,13 +951,7 @@ def is_empty(x:typing.Union[neo.core.container.Container, neo.core.dataobject.Da
     
 
         
-def neo_lookup(*args: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]],
-               data_obj_type: typing.Union[typing.Sequence[type], type] = neo.AnalogSignal,
-               op = operator.and_, 
-               indices:bool = False, 
-               indices_only:bool = False,
-               exclude: bool = False,
-               **kwargs):
+def neo_lookup(*args: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]], data_obj_type: typing.Union[typing.Sequence[type], type] = neo.AnalogSignal, op = operator.and_, indices:bool = False, indices_only:bool = False, exclude: bool = False, **kwargs):
     """Enhanced filtering of child data objects inside neo containers.
     
     Looks up data objects by type and any combination of data object attributes
@@ -1280,8 +1246,7 @@ def neo_lookup(*args: typing.Union[neo.core.container.Container, typing.Sequence
                 
     # ### END blueprint code - it actually works!
     
-def neo_use_lookup_index(*args: typing.Union[neo.container.Container, typing.Sequence],
-                    ndx: dict) -> tuple:
+def neo_use_lookup_index(*args: typing.Union[neo.container.Container, typing.Sequence], ndx: dict):
     """Access data objects using an indexing dictionary returned by neo_lookup.
     neo_lookup must have been called with indices_onlt set to True.
     
@@ -1382,10 +1347,7 @@ def neo_use_lookup_index(*args: typing.Union[neo.container.Container, typing.Seq
         
     return tuple(ret)
             
-def normalized_signal_index(src: neo.core.container.Container,
-                            index: typing.Union[int, str, range, slice, typing.Sequence],
-                            ctype: type = neo.AnalogSignal, 
-                            silent: bool = False) -> typing.Union[range, list]:
+def normalized_signal_index(src: neo.core.container.Container, index: typing.Union[int, str, range, slice, typing.Sequence], ctype: type = neo.AnalogSignal, silent: bool = False):
     """Returns the integral index of a signal in its container.
     
     Useful to get the index of data by its name. 
@@ -1528,29 +1490,6 @@ def normalized_signal_index(src: neo.core.container.Container,
     else:
         raise TypeError("Invalid indexing: %s" % index)
     
-#def get_segments_in_channel_index(channelIndex:neo.ChannelIndex) -> tuple:
-    #"""Query the segments linked to the channel index.
-    
-    #Parameters:
-    #----------
-    #channelIndex: neo.ChannelIndex
-    
-    #Returns:
-    #-------
-    #a tuple of segments that contain the signals linkes to this channel index
-
-    #NOTE: the segments may or may not belong to the same Block; this can be 
-    #queried by testing the identity of segment.block attribute
-    
-    #"""
-    #if not isinstance(channelIndex, neo.ChannelIndex):
-        #raise TypeError("Expecting a neo.ChannelIndex; got %s instead" % type(channelIndex).__name__)
-    
-    ## use generator expression
-    #genex = (x.segment for x in channelIndex.analogsignals + channelIndex.irregularlysampledsignals if isinstance(x.segment, neo.Segment))
-    
-    #return tuple(set(genex))
-    
 #@safeWrapper
 def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
     """Returns a list of indices of signals named as specified by 'names', 
@@ -1676,8 +1615,7 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
         raise TypeError("First argument must be a neo.Block object, a list of neo.Segment objects, or a neo.Segment object; got %s instead" % type(src).__name__)
 
 @safeWrapper
-def get_epoch_named_interval(epoch: neo.Epoch, label: typing.Union[str, bytes], 
-                             duration:bool=False) -> tuple:
+def get_epoch_named_interval(epoch: neo.Epoch, label: typing.Union[str, bytes], duration:bool=False):
     """Returns a tuple of time quantities for the epoch interval having a specific label.
     
     Parameters:
@@ -1733,16 +1671,65 @@ def get_epoch_named_interval(epoch: neo.Epoch, label: typing.Union[str, bytes],
     
     return (epoch.times[ndx], epoch.durations[ndx]) if duration else (epoch.times[ndx], epoch.times[ndx]+epoch.durations[ndx])
     
+def get_sample_at_time(data, t):
+    """Returns the signal sample value at (or around) time t.
+    If a value is not found, returns np.nan * data.units.
     
+    NOTE: Unlike BaseSignal.time_slice, this function returns a scalar
+    python Quantity, not a slice view of the signal!
+    
+    Parameters:
+    ==========
+    
+    data: neo.core.basesignal.BaseSignal
+    t: scalar, or numpy array or Quantity with size of 1
+    """
+    u = data.times.units
+    
+    if isinstance(t, float):
+        t *= u
+        
+    elif isinstance(t, np.ndarray):
+        if t.size > 1:
+            raise ValueError(f"Expecting a scalar")
+        
+        if isinstance(t, pq.Quantity):
+            t = t.rescale(u)
+        else:
+            t *= u
+            
+    if isinstance(data, IrregularlySampledDataSignal):
+        try:
+            ret = data.time_slice(t,t)
+        except:
+            ret = np.nan * data.units
+    else:
+        i = np.where(np.isclose(data.times.magnitude, t.magnitude))[0]
+        if len(i):
+            i = i[-1]
+            ret = data[i]
+        else:
+            ret = np.nan*data.units
+            # raise ValueError(f"domain value {t} not found")
+        
+    return ret
+
+def get_sample_at_domain_value(data, x):
+    """Returns the signal sample value at (or around) domain value x
+    Calls get_sample_at_time(data, x).
+    If a value is not found, returns np.nan * data.units
+    
+    Parameters:
+    ==========
+    
+    data: neo.core.basesignal.BaseSignal
+    x: scalar, or numpy array or Quantity with size of 1
+    
+    """
+    return get_sample_at_time(data, x)
 
 @safeWrapper
-def get_time_slice(data, t0, t1=None, window=0, \
-                    segment_index=None, \
-                    analog_index=None, \
-                    irregular_index=None,\
-                    spiketrain_index=None, \
-                    epoch_index=None,\
-                    event_index=None):
+def get_time_slice(data, t0, t1=None, window=0, segment_index=None, analog_index=None, irregular_index=None, spiketrain_index=None, epoch_index=None, event_index=None):
     """Returns a time slice from a neo.Block or neo.Segment object.
     
     The time slice is a Block or a Segment (depending on the type of "data"
@@ -2093,14 +2080,7 @@ def get_time_slice(data, t0, t1=None, window=0, \
     return ret
 
 @safeWrapper
-def concatenate_signals(*args, axis:int = 1, 
-                        ignore_domain:bool = False, 
-                        ignore_units:bool = False,
-                        set_domain_start:typing.Optional[float] = None, 
-                        force_contiguous:bool=True,
-                        padding:typing.Optional[typing.Union[bool, pq.Quantity]]=False,
-                        overwrite:bool=False,
-                        ):
+def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_units:bool = False, set_domain_start:typing.Optional[float] = None, force_contiguous:bool=True, padding:typing.Optional[typing.Union[bool, pq.Quantity]]=False, overwrite:bool=False):
     """Concatenates regularly sampled signals.
     
     Implements the functionality of neo.AnalogSignal's merge() and concatenate()
@@ -2351,7 +2331,7 @@ def concatenate_signals(*args, axis:int = 1,
         raise TypeError("Expecting a sequence of neo.AnalogSignal or datatypes.DataSignal objects")
                 
 @singledispatch
-def copy_with_data_subset(obj, **kwargs) -> typing.Union[neo.Block, neo.Segment]:
+def copy_with_data_subset(obj, **kwargs):
     """Copy a container's data to another container of the same type.
     
     The container's children are copied by creating new instances (as in 
@@ -2554,7 +2534,7 @@ def _(obj, **kwargs) -> neo.Block:
     return ret
     
 @copy_with_data_subset.register(neo.Segment)
-def _(obj, **kwargs) -> neo.Segment:
+def _(obj, **kwargs):
     from neo.core.spiketrainlist import SpikeTrainList
     
     name = kwargs.pop("name", obj.name)
@@ -2828,10 +2808,7 @@ def concatenate_blocks(*args, **kwargs):
     return ret
 
 @safeWrapper
-def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
-               as_dict:bool=False, flat:bool=False,
-               triggers:typing.Optional[typing.Union[bool, str, int, type, typing.Sequence]]=None,
-               match:str="==", clear:bool=False) -> list:
+def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence], as_dict:bool=False, flat:bool=False, triggers:typing.Optional[typing.Union[bool, str, int, type, typing.Sequence]]=None, match:str="==", clear:bool=False):
     """ Returns a collection of neo.Events embedded in data.
     
     Useful as a cache of events in neo data.
@@ -3286,9 +3263,7 @@ def check_ephys_data(x:typing.Any, mix:bool=False):
     
     return False
         
-def clear_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence], 
-                 triggers:typing.Optional[typing.Union[bool, str, int, type, typing.Sequence]]=None,
-                 match:str="=="):
+def clear_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence], triggers:typing.Optional[typing.Union[bool, str, int, type, typing.Sequence]]=None, match:str="=="):
                  #triggersOnly:bool=False, triggerType=None):
     """Shorthand for clearing neo.Event objects embedded in src.
     
@@ -3709,13 +3684,11 @@ def remove_events(event, segment, byLabel=True):
         raise TypeError("event expected to be a neo.Event, an int, a str or a datatypes.TriggerEventType; got %s instead" % type(event).__name__)
     
 @singledispatch
-def is_same_as(a, b, rtol = 1e-4, atol =  1e-4, 
-               equal_nan = True, use_math=False, comparator=operator.eq):
+def is_same_as(a, b, rtol = 1e-4, atol =  1e-4, equal_nan = True, use_math=False, comparator=operator.eq):
     raise NotImplementedError(f"{type(a).__name__} objects are not supported")
 
 @is_same_as.register(neo.core.dataobject.DataObject)
-def _(a, b, rtol = 1e-4, atol =  1e-4, 
-      equal_nan = True, use_math=False, comparator=operator.eq):
+def _(a, b, rtol = 1e-4, atol =  1e-4, equal_nan = True, use_math=False, comparator=operator.eq):
     if comparator not in (operator.eq, isclose):
         raise TypeError(f"'comparator' expected to be operator.eq or utilties.isclose; got {comparator} instead")
 
@@ -3750,8 +3723,7 @@ def _(a, b, rtol = 1e-4, atol =  1e-4,
     return ret
        
 @is_same_as.register(neo.core.container.Container)
-def _(a, b, rtol = 1e-4, atol =  1e-4, 
-      equal_nan = True, use_math=False, comparator=operator.eq):
+def _(a, b, rtol = 1e-4, atol =  1e-4, equal_nan = True, use_math=False, comparator=operator.eq):
     
     sim_func = partial(utilities.is_same_as, rtol=rtol, atol=atol, 
                        use_math=use_math, equal_nan=equal_nan,
@@ -3782,8 +3754,7 @@ def _(a, b, rtol = 1e-4, atol =  1e-4,
     return ret
 
 @is_same_as.register(neo.ChannelView)
-def _(a, b, rtol = 1e-4, atol =  1e-4, 
-      equal_nan = True, use_math=False, comparator=operator.eq):
+def _(a, b, rtol = 1e-4, atol =  1e-4, equal_nan = True, use_math=False, comparator=operator.eq):
     
     sim_func = partial(utilities.is_same_as, rtol=rtol, atol=atol, 
                        use_math=use_math, equal_nan=equal_nan,
@@ -3806,8 +3777,7 @@ def _(a, b, rtol = 1e-4, atol =  1e-4,
 
     return ret
 
-def is_in(x:neo.core.dataobject.DataObject, 
-          container:collections.abc.Sequence):
+def is_in(x:neo.core.dataobject.DataObject, container:collections.abc.Sequence):
     """Testing for the existence of a neo DataObject in a Python Sequence.
     
     Calls is_same_as using operator.eq as comparator
@@ -3821,8 +3791,7 @@ def is_in(x:neo.core.dataobject.DataObject,
     
     return all((is_same_as(x,y) for y in container))
 
-def is_likely_in(x:neo.core.dataobject.DataObject, 
-          container:collections.abc.Sequence):
+def is_likely_in(x:neo.core.dataobject.DataObject, container:collections.abc.Sequence):
     if not isinstance(x, neo.core.dataobject.DataObject):
         raise TypeError(f"Expecting a DataObject; got {type(x).__name__} instead")
     

@@ -312,6 +312,9 @@ def pandas2Structarray(obj):
     although this it not 100% guaranteed.
     
     """
+    # TODO/FIXME: 2022-10-12 15:11:09
+    # do we deal with multi-index and groupings at all ?!?
+    # if not, then we must FIXME this
     
     categorical_info = dict()
     
@@ -321,18 +324,18 @@ def pandas2Structarray(obj):
     obj_rndx = obj.reset_index() # pd.DataFrame
 
     v = obj_rndx.values # np.ndarray
+    
     obj_dtypes = obj_rndx.dtypes # pd.Series
+    
     #numpy_struct_array_dtypes = [pandasDtype2HF5Dtype(obj_dtypes[col], obj_rndx.loc[:, col], categorical_info) for col in obj_rndx.columns]
     original_obj_dtypes, numpy_struct_array_dtypes = zip(*list((obj_dtypes[col], pandasDtype2HF5Dtype(obj_dtypes[col], obj_rndx.loc[:, col], categorical_info)) for col in obj_rndx.columns))
 
-    #print("numpy_struct_array_dtypes", numpy_struct_array_dtypes)
     dtype = np.dtype(list(numpy_struct_array_dtypes))
     
     sarr = np.zeros(v.shape[0], dtype)
     
     for (i, k) in enumerate(sarr.dtype.names):
         try:
-            #print(f"{i}: {k} {obj_dtypes[k]} -> {dtype[k]}")
             if h5py.check_string_dtype(dtype[k]):
                 sarr[k] = [str(x) for x in v[:, i]]
             else:
@@ -1265,6 +1268,16 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
                 
             obj = target_class(items = tuple(items))
             
+        elif target_class in (pd.DataFrame, pd.Series):
+            # TODO/FIXME multi-index types, groupings ?!?
+            data = np.array(entity["data"]) # a structarray
+            
+            # names of the data fields; 
+            #"index" should aleready be there and represents the original
+            # index of the original DataFrame stored here...
+            names = [n for n in data.dtype.names if n != "index"]
+            
+            obj = target_class(data[names], index = data["index"])
                 
         else:
             # TODO:

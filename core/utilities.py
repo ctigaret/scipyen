@@ -149,10 +149,7 @@ class SafeComparator(object):
             #print("y:", y)
             return False
         
-def __check_isclose_args__(rtol:typing.Optional[Number]=None, 
-      atol:typing.Optional[Number]=None, 
-      use_math:bool=True,
-      equal_nan:bool=True) -> tuple: # (func, rtol, atol)
+def __check_isclose_args__(rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=True):
     
     if not isinstance(rtol, Number):
         rtol = inspect.signature(math.isclose).parameters["rel_tol"].default if use_math else inspect.signature(np.isclose).parameters["rtol"].default
@@ -165,12 +162,7 @@ def __check_isclose_args__(rtol:typing.Optional[Number]=None,
     return f_isclose, rtol, atol
         
 @singledispatch
-def is_same_as(x, y, 
-               rtol:typing.Optional[Number]=None, 
-               atol:typing.Optional[Number]=None, 
-               use_math:bool=True, 
-               equal_nan:bool=False,
-               comparator = operator.eq):
+def is_same_as(x, y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
     """Compares two objects.
     
     Parameters:
@@ -199,19 +191,11 @@ def is_same_as(x, y,
     return operator.eq(x,y)
 
 @is_same_as.register(str)
-def _(x, y, rtol:typing.Optional[Number]=None, 
-            atol:typing.Optional[Number]=None, 
-            use_math:bool=True, 
-            equal_nan:bool=False,
-            comparator = operator.eq):
+def _(x, y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
     return comparator(x,y)
 
 @is_same_as.register(np.ndarray)
-def _(x,y,  rtol:typing.Optional[Number]=None, 
-            atol:typing.Optional[Number]=None, 
-            use_math:bool=True, 
-            equal_nan:bool=False,
-            comparator = operator.eq):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
     
     if comparator not in (operator.eq, isclose):
         raise TypeError(f"'comparator' expected one of operator.eq or isclose;; got {comparator} instead")
@@ -236,11 +220,7 @@ def _(x,y,  rtol:typing.Optional[Number]=None,
     return ret
 
 @is_same_as.register(pq.Quantity)
-def _(x,y,  rtol:typing.Optional[Number]=None, 
-            atol:typing.Optional[Number]=None, 
-            use_math:bool=True, 
-            equal_nan:bool=False,
-            comparator = operator.eq):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
     
     if comparator not in (operator.eq, isclose):
         raise TypeError(f"'comparator' expected one of operator.eq or isclose; got {comparator} instead")
@@ -275,12 +255,7 @@ def _(x,y,  rtol:typing.Optional[Number]=None,
     return ret
 
 @is_same_as.register(collections.abc.Sequence)
-def _(x,y,
-            rtol:typing.Optional[Number]=None, 
-            atol:typing.Optional[Number]=None, 
-            use_math:bool=True, 
-            equal_nan:bool=False,
-            comparator = operator.eq):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
     
     if comparator is isclose:
         comparator = partial(comparator, 
@@ -295,12 +270,7 @@ def _(x,y,
     return ret
 
 @is_same_as.register(collections.abc.Mapping)
-def _(x,y,
-            rtol:typing.Optional[Number]=None, 
-            atol:typing.Optional[Number]=None, 
-            use_math:bool=True, 
-            equal_nan:bool=False,
-            comparator = operator.eq):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
     
     # use for comparisons between mapping values
     simp_fun = partial(is_same_as, rtol=rtol, atol=atol, 
@@ -324,11 +294,7 @@ def ideq(x,y):
     return id(x) == id(y)
 
 @singledispatch
-def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarray, pq.Quantity], 
-            rtol:typing.Optional[Number]=None, 
-            atol:typing.Optional[Number]=None, 
-            use_math:bool=True, 
-            equal_nan:bool=False) -> typing.Union[bool, np.ndarray]:
+def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarray, pq.Quantity], rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
     """Generalized isclose.
     
     Parameters:
@@ -394,19 +360,11 @@ def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarra
     raise NotImplementedError(f"{type(x).__name__} objects are not supported")
 
 @isclose.register(str)
-def _(x,y,
-      rtol:typing.Optional[Number]=None, 
-      atol:typing.Optional[Number]=None, 
-      use_math:bool=True, 
-      equal_nan:bool=False):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
     return x.lower() == y.lower()
 
 @isclose.register(np.ndarray)
-def _(x,y,
-      rtol:typing.Optional[Number]=None, 
-      atol:typing.Optional[Number]=None, 
-      use_math:bool=True, 
-      equal_nan:bool=False):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
     
     if any(v.size > 1 for v in (x,y)):
         use_math = False
@@ -426,11 +384,7 @@ def _(x,y,
     return f_isclose(x,y)
 
 @isclose.register(pq.Quantity)
-def _(x,y,
-      rtol:typing.Optional[Number]=None, 
-      atol:typing.Optional[Number]=None, 
-      use_math:bool=True, 
-      equal_nan:bool=False):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
     
     if any(v.size > 1 for v in (x,y)):
         # use math only on scalars
@@ -462,21 +416,14 @@ def _(x,y,
     return f_isclose(x,y)
 
 @isclose.register(Number)
-def _(x,y,
-      rtol:typing.Optional[Number]=None, 
-      atol:typing.Optional[Number]=None, 
-      use_math:bool=True, 
-      equal_nan:bool=False):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
     
     f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
     
     return f_isclose(x,y)
 
 @isclose.register(complex)
-def _(x,y, rtol:typing.Optional[Number]=None, 
-            atol:typing.Optional[Number]=None, 
-            use_math:bool=True, 
-            equal_nan:bool=False):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
     
     f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
     
@@ -487,7 +434,7 @@ def all_or_not_all(*args):
     """
     return all(args) or all(not(arg) for arg in args)
 
-def hashiterable(x:typing.Iterable[typing.Any]) -> Number:
+def hashiterable(x:typing.Iterable[typing.Any]):
     """Takes into account the order of the elements.
     
     NOTE: This works when the type of the elements contained in the iterable are
@@ -669,10 +616,7 @@ def gethash(x:typing.Any):
     except:
         return hash(type(x))
         
-def get_index_for_seq(index:int, 
-                      test:typing.Sequence[typing.Any], 
-                      target:typing.Sequence[typing.Any], 
-                      mapping:typing.Optional[dict]=None) -> int:
+def get_index_for_seq(index:int, test:typing.Sequence[typing.Any], target:typing.Sequence[typing.Any], mapping:typing.Optional[dict]=None):
     """Heuristic for computing an index into the target sequence.
     
     Returns an index into the `target` sequence given `index`:int index into
@@ -1005,8 +949,7 @@ class NestedFinder(object):
     supported_hierarchical_types = (dict, list, tuple, deque)
     nesting_types = supported_hierarchical_types
     
-    def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None,
-                 comparator:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=safe_identity_test):
+    def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None, comparator:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=safe_identity_test):
         """NestedFinder initializer.
         
         Parameters:
@@ -1248,9 +1191,7 @@ class NestedFinder(object):
 
         return ""
             
-    def _gen_elem(self, 
-                  src:typing.Any, ndx:typing.Any, 
-                  report:bool=False) -> typing.Generator[typing.Any, None, None]:
+    def _gen_elem(self, src:typing.Any, ndx:typing.Any, report:bool=False):
         """Element retrieval from collection given key or index
         Parameters:
         -----------
@@ -1315,8 +1256,7 @@ class NestedFinder(object):
             if report:
                 traceback.print_exc()
             
-    def _gen_nested_value(self, src:typing.Any, 
-                          path:typing.Optional[typing.List[typing.Any]]=None) -> typing.Generator[typing.Any, None, None]:
+    def _gen_nested_value(self, src:typing.Any, path:typing.Optional[typing.List[typing.Any]]=None):
         #print("_gen_nested_value, path", path)
         if path is None or (isinstance(path , list) and len(path) == 0):
             #print("\tnot path")
@@ -2515,7 +2455,7 @@ class NestedFinder(object):
         #return list(finder._gen_nested_value(data, paths))
         
     
-def reverse_dict(x:dict)->dict:
+def reverse_dict(x:dict):
     """Returns a reverse mapping (values->keys) from x
     
     Parameters:
@@ -2543,7 +2483,7 @@ def reverse_dict(x:dict)->dict:
         
     return ret
 
-def reverse_mapping_lookup(x:dict, y:typing.Any)->typing.Optional[typing.Any]:
+def reverse_mapping_lookup(x:dict, y:typing.Any):
     """Looks up the key mapped to value y in the x mapping (dict)
     Parameters:
     ===========
@@ -2891,7 +2831,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
 
     return result
     
-def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True) -> typing.Union[tuple, int]:
+def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True):
     """Alternative to list.index(), such that a missing value returns None
     of raising an Exception.
     DEPRECATED
@@ -3350,11 +3290,7 @@ def gen_unique(seq, key=None):
         else:
             yield from (x for x in seq if key not in seen and not seen.add(key))
             
-            
-
-
-def name_lookup(container: typing.Sequence, name:str, 
-                multiple: bool = True) -> typing.Union[tuple, int]:
+def name_lookup(container: typing.Sequence, name:str, multiple: bool = True):
     """Get indices of container elements with attribute 'name' of given value(s).
     """
     
@@ -3374,9 +3310,7 @@ def name_lookup(container: typing.Sequence, name:str,
         
     return names.index(name)
 
-def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series]],
-                     index: typing.Optional[typing.Union[str, int, collections.abc.Sequence, np.ndarray, range, slice]] = None,
-                     silent:bool=False) -> typing.Union[range, tuple]:
+def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series]], index: typing.Optional[typing.Union[str, int, collections.abc.Sequence, np.ndarray, range, slice]] = None, silent:bool=False):
     """Transform various indexing objects to a range or iterable of int indices.
     
     Also checks the validity of the index for an iterable of data_len samples.
@@ -3572,9 +3506,7 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
     else:
         raise TypeError("Unsupported data type for index: %s" % type(index).__name__)
     
-def normalized_sample_index(data:np.ndarray, 
-                            axis: typing.Union[int, str, vigra.AxisInfo], 
-                            index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None) -> typing.Union[range, list]:
+def normalized_sample_index(data:np.ndarray, axis: typing.Union[int, str, vigra.AxisInfo], index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None):
     """Calls normalized_index on a specific array axis.
     Also checks index validity along a numpy array axis.
     
@@ -3611,7 +3543,7 @@ def normalized_sample_index(data:np.ndarray,
     except Exception as exc:
         raise RuntimeError("For data axis %d with size %d:" % (axis, data_len)) from exc
 
-def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)) -> int:
+def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)):
     """Returns an integer index for a specific array axis
     """
     if not isinstance(data, np.ndarray):
@@ -3825,3 +3757,26 @@ def sp_get_loc(x, index, columns):
             ret[c] = ret[c].astype(spdtypes[c])
     
     return ret
+
+def truncate_to_10_power(x):
+    if isinstance(x, np.ndarray):
+        u = None
+        if isinstance(x, pq.Quantity):
+            u = x.units
+            x = x.magnitude
+        
+        pw10 = 10**np.trunc(np.log10(np.abs(x)))
+        
+        ret = np.trunc(x/pw10) * pw10
+        
+        if isinstance(u,pq.Quantity):
+            return ret * u
+        
+        return ret
+    
+    elif isinstance(x, (float, int)):
+        pw10 = 10**math.trunc(math.log(math.abs(x),10))
+        return math.trunc(x/pw10) * pw10
+        
+            
+            

@@ -356,23 +356,6 @@ def array_slice(data:np.ndarray, slicing:(dict, type(None))):
     
     return tuple(indexobj)
 
-#def is_hashable(x):
-    #ret = bool(getattr(x, "__hash__", None) is not None)
-    #if ret:
-        #try:
-            ## because some 3rd party packages 'get smart' and override __hash__()
-            ## to raise Exception 
-            #hash(x) 
-            #return True
-        #except:
-            #return False
-        
-#def is_type_or_subclass(x, y):
-    #if isinstance(x, type):
-        #return issubclass(x, y)
-    
-    #return isinstance(x, y)
-    
 def is_unavailable(x):
     return x is pd.NA or x is np.nan or x is math.nan or x is dataclasses.MISSING
     
@@ -406,7 +389,6 @@ def is_numeric_string(array):
         array = [array]
         
     return is_string(array) and not np.isnan(np.genfromtxt(array)).any()
-        
 
 def is_numeric(array):
     """Determine whether the argument has a numeric datatype, when
@@ -431,8 +413,6 @@ def is_numeric(array):
     """
     return np.asarray(array).dtype.kind in NUMPY_NUMERIC_KINDS
 
-
-
 def __default_none__():
     return None
 
@@ -441,8 +421,6 @@ def __default_units__():
 
 def __default_undimensioned__():
     return pq.dimensionless
-
-
 
 def categorize_data_frame_columns(data, *column_names, inplace=True):
     """"""
@@ -680,7 +658,6 @@ class TypeEnum(IntEnum):
         
         return [_t for _t in filter(lambda x: x & t, cls) if not _t.is_primitive() and _t is not t and _t.value > t.value]# _t.value > t.value]
         
-    
     def is_derived(self):
         """Return True if this TypeEnum object is a composite (i.e., derived) type.
         """
