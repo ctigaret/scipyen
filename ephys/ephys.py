@@ -240,19 +240,22 @@ if __debug__:
 
     __debug_count__ = 0
     
-def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], first:int = 0, nIntervals:int=1, isISI:bool=False):
-    """Calculates the reciprocal of inter-event intervals.
+def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], start:int = 0, span:int=1, isISI:bool=False):
+    """Calculates the reciprocal of an inter-event interval.
+    
+    This can be the time interval between any two events with indices "start" &
+    "start" + "span".
     
     Parameters:
     ==========
     data: sequence of time stamps OR time intervals (python Quantity values with time units)
         The interpretation is dictated by the 'isISI' parameter described below
         
-    first: int, the index of the first time stamp to take into consideration
+    start: int, the index of the first time stamp to take into consideration
         optional, default is 0 (i.e. the first time stamps in the 'data' parameter)
     
-    nIntervals: int, the number of events intervals across which the reciprocal is
-          calculates; optional, default is 1 i.e., one interval
+    span: int, the number of inter-event intervals (or "span");
+        optional, default is 1 i.e., one interval
           
     isISI:bool, flag to interpret the data as a sequence of time stamps (when False)
         or time intervals (when True).
@@ -261,7 +264,8 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], f
         
     Returns:
     ========
-    A freuency Quantity (pq.Hz).
+    The frequency (reciprocal of the interval's duration) as a scalar Quantity 
+    in pq.Hz.
     
     If the data is empty or contains only one element, returns 0 Hz
     
@@ -295,24 +299,24 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], f
     if len(data) <= 1:
         return 0*pq.Hz
     
-    if first < 0:
-        raise ValueError(f"'first' must be >= 0; got {first} instead")
+    if start < 0:
+        raise ValueError(f"'start' must be >= 0; got {start} instead")
     
-    if first >= len(data):
-        raise ValueError(f"'first' must be < {len(data)}; got {first} instead")
+    if start >= len(data):
+        raise ValueError(f"'start' must be < {len(data)}; got {start} instead")
     
-    if nIntervals < 1:
-        raise ValueError(f"'nIntervals' expected to be at least 1; got {nIntervals} instead")
+    if span < 1:
+        raise ValueError(f"'span' expected to be at least 1; got {span} instead")
     
-    if first + nIntervals >= len(data):
-        raise ValueError(f"'nIntervals' cannot be larger than {len(data)-first}; got {nIntervals} instead")
+    if start + span >= len(data):
+        raise ValueError(f"'span' cannot be larger than {len(data)-start}; got {span} instead")
     
     if isISI:
-        return (1/np.sum(data[first:(first+nIntervals)])).rescale(pq.Hz)
+        return (1/np.sum(data[start:(start+span)])).rescale(pq.Hz)
     
     else:
-        stamps = data[first:(first+nIntervals+1)]
-        return (1/(stamps[-1]-stamps[first])).rescale(pq.Hz)
+        stamps = data[start:(start+span+1)]
+        return (1/(stamps[-1]-stamps[start])).rescale(pq.Hz)
     
 
 def correlate(in1, in2, **kwargs):
