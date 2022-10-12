@@ -621,6 +621,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         super().__init__(data=None, parent=parent, ID=ID, win_title=win_title, 
                          doc_title=doc_title, *args, **kwargs)
         
+        self.observed_vars = DataBag(allow_none=True, mutable_types=True)
+        
+        self.observed_vars.verbose = True
+        self.observed_vars.observe(self.var_observer)
+        
         if isinstance(y, self.supported_types) or any([t in type(y).mro() for t in self.supported_types]):
             self.setData(x, y, frameIndex=frameIndex, 
                             frameAxis=frameAxis, signalIndex=signalIndex,
@@ -636,7 +641,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             plotStyle = plotStyle,
                             *args, **kwargs)
         
-    def _configureUI_ (self):
+    def _configureUI_(self):
         """"""
         self.setupUi(self)
         
@@ -883,9 +888,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.actionRefresh.triggered.connect(self.slot_refreshDataDisplay)
         
-        if isinstance(self._scipyenWindow_, QtWidgets.QMainWindow) and hasattr(self._scipyenWindow_, "workspaceModel"):
-            self._scipyenWindow_.workspaceModel.varModified.connect(self.slot_varModified)
-            
     # ### BEGIN properties
     @property
     def dockWidgets(self):
@@ -2350,6 +2352,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.displayFrame()
          
     # ### END PyQt slots
+    
+    def var_observer(self, change):
+        self.displayFrame()
+        
 
     def linkCursors(self, id1, *ids):
         """ Bidirectionally links cursors of the same type.
@@ -4877,6 +4883,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             raise TypeError("Plotting is not implemented for %s data types" % type(self.y).__name__)
 
+        with self.observed_vars.hold_trait_notifications():
+            self.observed_vars["x"] = self.x
+            self.observed_vars["y"] = self.y
             
         return True
     
@@ -4892,11 +4901,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.plot_start = None
         self.plot_stop = None
         
+            
         self.epoch_plot_options["epoch_pen"] = kwargs.pop("epoch_pen", None)
         self.epoch_plot_options["epoch_brush"] = kwargs.pop("epoch_brush", None)
         self.epoch_plot_options["epoch_hoverPen"] = kwargs.pop("epoch_hoverPen", None)
         self.epoch_plot_options["epoch_hoverBrush"] = kwargs.pop("epoch_hoverBrush", None)
         
+        self.plot_args = args
+        self.plot_kwargs = kwargs
+
         #self.train_plot_options["train_pen"] = kwargs.pop("train_pen", None)
         
         if isinstance(interval, neo.Epoch):
@@ -4928,9 +4941,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self.y))
                         
-            self.plot_args = args
-            self.plot_kwargs = kwargs
-            
             if isinstance(showFrame, int):
                 if showFrame < 0:
                     showFrame = 0
@@ -5531,6 +5541,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.currentFrameAnnotations = None
         
+        # print(f"SignalViewer.displayFrame {self.y}")
+        
         #### BEGIN self.y is a sequence
         if isinstance(self.y, (tuple, list)): 
             # a sequence of objects
@@ -5683,8 +5695,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             elif self.y is None:
                 pass
                 
-            else:
-                raise TypeError("Plotting of data of type %s not yet implemented" % str(type(self.y)))
+            # else:
+            #     raise TypeError("Plotting of data of type %s not yet implemented" % str(type(self.y)))
         #### END self.y is a single object
             
         # NOTE: 2020-03-10 22:09:51

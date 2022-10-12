@@ -611,17 +611,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             for var in observed_not_cached:
                 self.observed_vars.pop(var, None)
                 
-            #self.observed_vars.update(self.cached_vars)
-            #cached_not_observed = cached_set - observed_set
-            
-            #for var in cached_not_observed:
-                #self.observed_vars[var] = self.cached_vars[var]
-                    
-                    
-            #self.observed_vars.clear()
-            
-            #self.observed_vars.update(self.cached_vars)
-        
     #@timefunc
     def post_execute(self):
         """Updates workspace model AFTER kernel execution.

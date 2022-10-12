@@ -2377,13 +2377,18 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         super().__init__(data=None, parent=parent, ID=ID, win_title=win_title, 
                          doc_title=doc_title, frameIndex=frame, **kwargs)
         
+        self.observed_vars = DataBag(allow_none=True, mutable_types=True)
+        self.observed_vars.verbose=True
+        self.observed_vars.observe(self.var_observer)
+        
         # NOTE: 2022-01-17 16:29:57
         # call super.setData() directly, as we don't need to treat 'data' 
-        # speacially (unlike in SignalViewer's case)
+        # specially (unlike in SignalViewer's case)
         #
         # in turn, super.setData() calls self._set_data_(...)
         if isinstance(data, ImageViewer.supported_types) or any([t in type(data).mro() for t in ImageViewer.supported_types]):
             self.setData(data, doc_title=self._docTitle_)
+            
         
     ####
     # properties
@@ -3491,6 +3496,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.widthAxis  = layout.horizontalAxis
             self.heightAxis = layout.verticalAxis
             
+            with self.observed_vars.hold_trait_notifications():
+                self.observed_vars["data"] = self._data_
+            
             return True
                 
         except Exception as e:
@@ -4007,10 +4015,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
 
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.zoomToolBar)
         
-        if isinstance(self._scipyenWindow_, QtWidgets.QMainWindow) and hasattr(self._scipyenWindow_, "workspaceModel"):
-            self._scipyenWindow_.workspaceModel.varModified.connect(self.slot_varModified)
-            
-    
     def _editColorMap(self):
         pass
     
@@ -4575,6 +4579,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         self.displayFrame("all")
         self._displayedChannel_ = "all"
+        
+    def var_observer(self, change):
+        self.displayFrame()
+        
         
     def view(self, image, doc_title=None, normalize=True, colormap=None, gamma=None, frameAxis=None, displayChannel=None, asAlphaChannel=False, frameIndex=None, get_focus=True):
         # NOTE: 2020-09-24 14:19:57
