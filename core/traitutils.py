@@ -739,6 +739,7 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
         except:
             # if there is an error in comparing, default to notify
             silent = False
+            
         if silent is not True:
             # we explicitly compare silent to True just in case the equality
             # comparison above returns something other than True/False

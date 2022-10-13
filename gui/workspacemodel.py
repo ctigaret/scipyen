@@ -704,6 +704,24 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return [self.item(row, col).text() if asStrings else self.item(row, col) for col in range(self.columnCount())]
 
     def getRowIndexForVarname(self, varname, regVarNames=None):
+        """Returns the row index for the variable symbol 'varname'
+        
+        Parameters:
+        ==========
+        
+        varname: str; a symbol in the user namespace (get_ipython().user_ns)
+        
+        regVarNames: list of str or None (default); a list of symbols;
+        
+            When None, (default ) then 'varname' is looked up in the list of
+            the symbol currently shown in the "User Variables" tab of the 
+            Scipyen's main window.
+            
+            In this case, this function simply returns the row index in the 
+            workspace model
+        
+        
+        """
         if regVarNames is None:
             regVarNames = self.getDisplayedVariableNames()
             
@@ -849,6 +867,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         #print(f"WorkspaceModel.update observed_vars: {list(self.observed_vars.keys())}")
         del_vars = [name for name in self.observed_vars.keys() if name not in self.shell.user_ns.keys()]
+        
+        # print(f"WorkspaceModel.update: {len(del_vars)} del_vars")
         
         # with self.observed_vars.hold_trait_notifications:
         self.observed_vars.remove_members(*del_vars)

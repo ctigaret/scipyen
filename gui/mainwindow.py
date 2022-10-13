@@ -2778,6 +2778,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         return varnames
     
+    def removeWorkspaceSymbol(self, name:str):
+        """Remove a binding from the workspace.
+        
+        Given 'name' a symbol bound to a variable in the workspace, this method
+        removes that binding (and its representation in the "User Variables"
+        tab of Scipyen's main window).
+        
+        Equivalent of removing that binding by calling `del` at the console.
+        
+        """
+        r = self.workspace.pop(name, None)
+        if r is not None,
+        self.workspaceModel.removeRowForVariable(name)
+    
     def removeFromWorkspace(self, value:typing.Any, by_name:bool=True, update:bool=True):
         """Removes an object from the workspace via GUI operations.
         
@@ -2822,13 +2836,18 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if r is not None:
                 self.workspaceModel.removeRowForVariable(value)
         else:
+            # NOTE: 2022-10-13 18:33:44
+            # the approach below is WRONG - why remove ALL references (symbol)
+            # to a variable?
             # inverse lookup the key mapped to this value - will remove ALL
             # references to value that exist in the workspace
             objects = [(name, obj) for (name, obj) in self.workspace.items() if obj is value]
             if len(objects):
+                rowIndices = [self.workspacemodel.getRowIndexForVarname(o[0]) for o in objects]
                 for o in objects:
-                    self.workspace.pop(o[0], None)
-                    self.workspaceModel.removeRowForVariable(o[0])
+                    r = self.workspace.pop(o[0], None)
+                    if r is not None:
+                        self.workspaceModel.removeRowForVariable(o[0])
                     
         if update:
             self.workspaceModel.update()
@@ -3521,6 +3540,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         #print(f"***\nScipyenWindow.slot_deleteSelectedVars varNames = {varNames}")
         
+        # FIXME: 2022-10-13 18:40:01
+        # this is still too slow and cumbersome - possibly overheads in 
+        # WorkspaceModel 
         for n in varNames:
             obj = self.workspace[n]
             if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
@@ -3533,7 +3555,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     #obj.closeEvent(QtGui.QCloseEvent())
                 self.deRegisterViewer(obj) # does not remove its symbol for workspace - this has already been removed by delete action
                 
-            self.removeFromWorkspace(n, by_name=True, update=True)
+            self.removeWorkspaceSymbol(n)
+            # self.removeFromWorkspace(n, by_name=True, update=True)
             # self.removeFromWorkspace(n, by_name=True, update=False)
             #self.workspace.pop(n, None)
             
