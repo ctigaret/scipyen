@@ -579,8 +579,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     @pyqtSlot(dict)
     def slot_observe(self, change):
         name = change.name
-        displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
-        # print(f"WorkspaceModel.slot_observe({change.name}, change: {change})")
+        displayed_vars_types = self.getDisplayedVariableNames()
+        # displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
+        # print(f"WorkspaceModel.slot_observe({change.name}, change.new: {change.new})")
         if name in self.shell.user_ns:
             if name not in displayed_vars_types:
                 self.addRowForVariable(name, self.shell.user_ns[name])
@@ -734,6 +735,15 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             ndx = regVarNames.index(varname)
             
         return ndx
+    
+    def getVarName(self, index:QtCore.QModelIndex):
+        """Returns the symbol of a variable in the model, for a given model index.
+        
+        Returns none it if the symbol does not exist in the user workspace
+        """
+        v = self.item(index.row(), 0).text()
+        
+        return v if v in self.shell.user_ns else None # <- this is the workspace
 
     def getCurrentVarName(self):
         """DEPRECATED

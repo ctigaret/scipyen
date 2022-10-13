@@ -2789,8 +2789,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         """
         r = self.workspace.pop(name, None)
-        if r is not None,
-        self.workspaceModel.removeRowForVariable(name)
+        if r is not None:
+            self.workspaceModel.removeRowForVariable(name)
     
     def removeFromWorkspace(self, value:typing.Any, by_name:bool=True, update:bool=True):
         """Removes an object from the workspace via GUI operations.
@@ -2843,7 +2843,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # references to value that exist in the workspace
             objects = [(name, obj) for (name, obj) in self.workspace.items() if obj is value]
             if len(objects):
-                rowIndices = [self.workspacemodel.getRowIndexForVarname(o[0]) for o in objects]
+                rowIndices = [self.workspaceModel.getRowIndexForVarname(o[0]) for o in objects]
                 for o in objects:
                     r = self.workspace.pop(o[0], None)
                     if r is not None:
@@ -3486,11 +3486,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             #QtWidgets.QApplication.restoreOverrideCursor()
             self.unsetCursor()
             
-    def _workspaceItem_to_varName(self, index:QtCore.QModelIndex):
-        v = self.workspaceModel.item(index.row(), 0).text()
-        
-        return v if v in self.workspace.keys() else None
-            
     @pyqtSlot()
     @safeWrapper
     def slot_deleteSelectedVars(self):
@@ -3506,7 +3501,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         varNames = list()
         
-        varSet = set((self._workspaceItem_to_varName(i) for i in indexList))
+        varSet = set((self.workspaceModel.getVarName(i) for i in indexList))
         
         #for i in indexList:
             #varSet.add(self.workspaceModel.item(i.row(),0).text())
