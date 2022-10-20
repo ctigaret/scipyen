@@ -1,5 +1,10 @@
 """ Collection of 1D and nD functions and helper functions, for use in model fitting.
 
+WARNING: This module is on its way to deprecation, and it wil be superseded by
+modelfitting.py in the (hopefully not too distant) future.
+
+For now, stick with THIS module.
+
 """
 import numpy as np
 import quantities as pq
@@ -31,6 +36,111 @@ def generic_exp_decay(x, y0, α, x0, τ):
     """
     
     return α * np.exp(-(x-x0)/τ) + y0
+
+def alphaFunction(x, parameters):
+    """
+    The Alpha function: a single exponential rise and decay, both with the same 
+    time-constant (τ):
+    
+    y = a + b⋅(x-x₀)⋅exp(-(x-x₀)/τ)/τ if x-x₀ >= 0 and a elsewhere
+    
+    where:
+        a  is the offset;
+    
+        b  is the scale;
+    
+        x₀ is the delay ("onset");
+    
+        τ  is the time constant
+    
+    
+    Parameters:
+    ===========
+    x: predictor (independent variable) - 1D numpy ndarray
+    
+    parameters: 1D numeric sequence (tuple, list, numpy array) of four elements:
+    
+                a, b, x₀, τ
+    
+    Returns:
+    ========
+    1D numpy array (vector)
+    
+    Example: (run in Scipyen's console)
+    ========
+    
+    from core import models
+    
+    x = np.linspace(0.0,1.0, 1000);
+    
+    parameters = [0, -1, 0.05, 0.01];
+    
+    y = alphaFunction(x, parameters)
+    
+    plt.plot(x,y)
+    
+    """
+    
+    # make sure x is a 1D array (vector)
+    x = x.flatten()
+    
+    # unpack parameters
+    a, b, x0, tau = parameters
+    
+    xt = (x-x0)/tau
+    
+    y = np.full_like(x, a)
+    
+    y[xt>=0] = a + b * xt[xt>=0] * np.exp(-xt[xt>=0])
+    
+    return y
+
+def Clements_Bekkers_97(x, parameters):
+    """
+    Clements & Bekkers 1997 mEPSC waveform.
+
+    This approximates a single exponential rise and decay each with their own 
+    time constant:
+    
+    y = a + b * (1 - exp(-(x-x₀)/τ₁)) ⋅ exp(-(x-x₀)/τ₂) for x-x₀ >= 0, or a elsewhere
+    
+    where:
+        a  = offset;
+    
+        b  = scale;
+    
+        x₀ = delay ("onset");
+    
+        τ₁, τ₂ = time constants, respectively, for rise and decay
+    
+    
+    Parameters:
+    ============
+    x: predictor (independent variable) - 1D numpy ndarray
+
+    parameters: 1D sequence (tuple, list, numpy array) of five elements:
+                a, b, x₀, τ₁ and τ₂
+    
+    Returns:
+    ========
+    1D numpy array (vector)
+    
+    
+    """
+    x = x.flatten()
+    
+    a, b, x0, t1, t2 = parameters
+    
+    xx = x-x0
+    
+    y = np.full_like(xx, a)
+    
+    y[xx>=0] = a + b * (1 - np.exp(-xx[xx>=0]/t1)) * np.exp(-xx[xx>=0]/t2)
+    
+    return y
+    
+    # y(tpos)=(1-exp(t(tpos).*-1/tau1)).*exp(t(tpos).*-1/tau2)
+    
 
 def exp_rise_multi_decay(x, parameters, returnDecays = False):
     """ Realization of a transient signal with a single exponential rise (r) and
