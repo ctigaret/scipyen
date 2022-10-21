@@ -213,7 +213,8 @@ import pyqtgraph as pg
 #### BEGIN pict.core modules
 from core.prog import safeWrapper
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
-from core.triggerevent import (TriggerEvent, TriggerEventType, )
+from core.datazone import DataZone
+from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import TriggerProtocol
 
 from core import datatypes as dt
@@ -454,65 +455,74 @@ def correlate(in1, in2, **kwargs):
 def cursors2epoch(*args, **kwargs):
     """Constructs a neo.Epoch from a sequence of SignalCursor objects.
     
-    Each cursor contributes an interval in the Epoch.
+    Each cursor contributes an interval in the Epoch, corresponding to the 
+    cursor's horizontal (x) window. In other words, the interval's (start) time
+    equals the cursor's x coordinate - ½ cursor's x window, and the duration of
+    the interval equals the cursor's x window.
+    
+    NOTE: For DataSignals, the result is a DataZone.
     
     SignalCursor objects are defined in the signalviewer module; this function
     expects vertical and crosshair cursors (i.e., with cursorType one of
     SignalCursor.SignalCursorTypes.vertical, 
     SignalCursor.SignalCursorTypes.horizontal). 
     
-    SignalCursors can be represented by tuples of cursor 
-    "parameters" (see below), although tuples and cursor objects cannot be mixed.
+    SignalCursors can also be represented by tuples of cursor  "parameters" 
+    (see below), although tuples and cursor objects cannot be mixed.
     
     Variadic parameters:
     --------------------
-    *args: One or more SignalCursor object(s) (comma-separated list) or a  
-        sequence (tuple, list) of SignalCursor objects.
+    *args: One or more SignalCursor object(s) (comma-separated list), a sequnence
+        (tuple, list) of EITHER:
+    
+        • SignalCursor objects - all of either 'vertical' or 'crosshair' type.
         
-        SignalCursor objects must all be of type vertical or crosshair.
+        • SignalCursor tuples (2, 3 or 5 elements) of cursor parameters:
         
-        Alternatively, the function accepts tuples (2, 3 or 5 elements) of
-        cursor parameters, instead of actual SignalCursor objects, as follows:
-        
-        a) 2-tuples are interpreted as (time, window) pairs of coordinates
-            for a notional vertical cursor
+            ∘ 2-tuples are interpreted as (time, window) pairs of coordinates
+                for a notional vertical cursor
             
-        b) 3-tuples are interpreted as (time, window, label) triples of 
-            parameters of a notional vertical cursor
+            ∘ 3-tuples are interpreted as (time, window, label) triplets of 
+                parameters for a notional vertical cursor
             
-        c) 5-tuples are interpreted as (x, xwindow, y, ywindow, label) tuples of
-            a notional crosshair cursor. In this case only the x, xwindow and
-            label elements are used.
+            ∘ 5-tuples are interpreted as (x, xwindow, y, ywindow, label) tuples
+                 of parameters for a notional crosshair cursor; only the x, 
+                xwindow and label elements are used.
             
-        NOTE 1: the cases (a) and (b) are the value of the 'parameters' property
-        of a vertical and crosshair cursor, respectively. This means that such
-        a tuple can be obtained by referencing cursor.parameters property.
-        
-        NOTE 2: Mixing SignalCursor objects with parameter tuples is NOT allowed.
+        NOTE: the following are NOT allowed:
+            □ Mixing SignalCursor objects with parameter tuples.
+            □ Mixing parameter 2- 3- or 5- tuples is NOT allowed.
         
     Var-keyword parameters:
     ----------------------
     
     units: python Quantity or None (default)
-        By default, the epoch's units are seconds (pq.s) but in a neo.Epoch can
-        support any units
+        When not specified (i.e. units = None) the function assumes units of
+        quantities.s and will return a neo.Epoch object(*). 
+
+        When the specified units are NOT temporal, the result is a DataZone(*).
     
-    name: str, default is" Epoch"; not used when intervals is True (see below)
+        (*) assuming `intervals` is False
+        
+    name: str, default is "Epoch" or "Zone" (depending on `units`).
+         When `intervals` is True, this parameter is not used (see below).
     
-    sort: bool, default if True
-        When True, the cursors are sorted by their x coordinate
+    sort: bool, default is True
+        When True, the cursors, or their specifications, in *args are sorted by 
+        their x coordinate.
         
     intervals: bool, default is False.
     
-        When True, the function returns triplets of (start, stop, label)
+        When True, the function returns triplets of (start, stop, label) quantities.
         
-        Otherwise returns a neo.Epoch
+        Otherwise returns a neo.Epoch if `units` is quantities.s, or DataZone.
+        
         
     Returns:
     -------
     
-    When intervals is False (default), returns a neo.Epoch with intervals 
-        generated from the cursor x coordinates and horizontal windows:
+    When intervals is False (default), returns a neo.Epoch (or DataZone) with 
+        intervals generated from the cursor x coordinates and horizontal windows:
         
             times = cursor.x - cursor.xwindow/2
             durations = cursor.xwindow
@@ -634,8 +644,6 @@ def cursors2epoch(*args, **kwargs):
         else:
             return [(v[0]-v[1]/2., v[1],         "%d"%k) if len(v) == 2 else (v[0]-v[1]/2., v[1],         v[2]) if len(v) == 3 else (v[0]-v[1]/2., v[1],         v[4]) for k,v in enumerate(values)]
         
-    #cursors = None
-    
     if len(args) == 0:
         raise ValueError("Expecting at least one argument")
     
@@ -646,7 +654,6 @@ def cursors2epoch(*args, **kwargs):
                     t_d_i = __parse_cursors_tuples__(*[c.parameters for c in args[0]])                    
                 else:
                     raise TypeError("Expecting only vertical or crosshair cursors")
-                #t_d_i = [(c.x - c.xwindow/2., c.xwindow, c.ID) for c in args[0]]
                 
             elif all([isinstance(c, (tuple, list)) for c in args[0]]):
                 if all([len(c) in (2,3,5) for c in args[0]]):
@@ -684,7 +691,6 @@ def cursors2epoch(*args, **kwargs):
     if sort:
         t_d_i = sorted(t_d_i, key=lambda x: x[0])
 
-    
     if intervals:
         return t_d_i
     
@@ -694,6 +700,9 @@ def cursors2epoch(*args, **kwargs):
         
         if isinstance(t[0], pq.Quantity):
             units = t[0].units
+            
+        if not check_time_units(units):
+            return DataZone(times=t, durations=d, labels=i, units=units, name=name)
         
         return neo.Epoch(times=t, durations=d, labels=i, units=units, name=name)
     
@@ -3853,6 +3862,21 @@ def sampling_rate_or_period(rate, period):
         raise TypeError("Sampling rate or period must have units")
     
     return rate
+
+def segment_start(data:neo.Segment):
+    """Returns the minimum of t_start for all signals and spiketrains in a segment.
+    
+    Avoids any events and epochs that fall outside the signals' time domain.
+    
+    NOTE: The segment's analogsignals and irregularlysampledsignals collections
+    must be homogeneous (i.e., they MUST NOT contain mixtures of AnalogSignal 
+    and DataSignal, or IrregularlySampledSignal and IrregularlySampledDataSignal)
+    
+    """
+    
+    return min([s.t_start for s in data.analogsignals] + 
+               [s.t_start for s in data.spiketrains] +
+               [min(s.times) for s in data.irregularlysampledsignals])
         
 
 def set_relative_time_start(data, t = 0 * pq.s):

@@ -84,18 +84,20 @@ import ephys.ephys as ephys
 
 
 @safeWrapper
-def segment_Rs_Rin(segment: neo.Segment,Im: typing.Union[str, int],Vm: typing.Union[str, int, pq.Quantity, float],regions: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None,channel: typing.Optional[int] = None):
+def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.Union[str, int, pq.Quantity, float], regions: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None,channel: typing.Optional[int] = None):
     """Calculates the series (Rs) and input (Rin) resistances in voltage-clamp.
     
     Parameters:
     ----------
     segment: neo.Segment:
     
-        A recorded "sweep" containing at least one analog signal for the
-        recorded membrane current (Im).
+        A recorded "sweep" containing at least one analog signal containing 
+        recorded membrane current (`Im`) with membrane capacitive currents used
+        for the measurement of the series and input resistances (Rs and Rin).
         
-        Ideally the segment would also contain a signal with the command voltage 
-        for the rectangular membrane voltage waveform.
+        Ideally the segment would also contain a signal containing the command
+        voltage (`Vm`) for the rectangular membrane voltage waveform used to 
+        generate the capacitive membrane currents recorded in `Im`.
         
     Im: int, str.
     
@@ -120,23 +122,25 @@ def segment_Rs_Rin(segment: neo.Segment,Im: typing.Union[str, int],Vm: typing.Un
         signal) are used to calculate Rs and Rin.
         
         When a neo.Epoch: this is expected to contain three intervals
-        (i.e., len(epoch) == 3 is True), with label attribute being, 
-        respectively, "baseline", "Rs" and "Rin".
+        (i.e., len(epoch) == 3 is True), with the following labels (NOTE, these
+        are CASE-SENSITIVE):
+
+             "baseline", "Rs" and "Rin".
         
-        The intervals define a baseline region, a region containing the peak of
-        the outward capacitance transient, and a reigon of steady-state current
-        during the step membrane voltage change.
+        These intervals define a baseline region, a region containing the peak 
+        of the outward capacitance transient curent, and a region in the
+        steady-state current during the step membrane voltage change.
         
         When a tuple, it expected to have three elements, each a vertical 
-        SignalCursor with names (IDs) respectively, "baseline", "Rs" and "Rin".
+        SignalCursor with names (IDs) respectively, "baseline", "Rs" and "Rin"
+        (also case-sensitive).
         
         When None (default), the segment is expected to contain an epoch named
-        "Rm" (for membrane resistance) with the structure as described above.
+        "Rm" (for membrane resistance) with the intervals as described above.
         
-        NOTE: In the case of neo.Epoch or SignalCursor tuple, the order of the 
-        epoch intervals or cursors is irrelevant: the interval or cursor that is
-        appropriate for the baseline, Rs or Rin region will be selected by its
-        label (or cursor ID).
+        ATTENTION: The order of the epoch intervals or cursors is irrelevant: 
+        the interval or cursor for the baseline, Rs and Rin are selected 
+        according to their labels or cursor ID.
         
     channel: int or None (default)
     
