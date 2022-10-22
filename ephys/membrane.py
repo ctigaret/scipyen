@@ -210,8 +210,8 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
         
         region_labels = list(rm_epoch.labels)
         
-        if len(region_labels) == 0 or any ([s not in region_labels for s in ["baseline", "Rs", "Rin"]]):
-            raise ValueError("Cannot use Rm epoch with inappropriate interval labels")
+        if len(region_labels) == 0 or not all([s in region_labels for s in ["baseline", "Rs", "Rin"]]):
+            raise ValueError(f"Cannot use epoch {rm_epoch.name} with inappropriate interval labels {region_labels}")
         
         base_ndx = region_labels.index("baseline")
         irs_ndx = region_labels.index("Rs")

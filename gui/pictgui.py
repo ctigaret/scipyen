@@ -319,9 +319,7 @@ class MouseEventSink(QtCore.QObject):
 class ItemsListDialog(QDialog, Ui_ItemsListDialog):
     itemSelected = QtCore.pyqtSignal(str)
 
-    def __init__(self, parent = None, itemsList=None, title=None, 
-                 preSelected=None, modal=False, 
-                 selectmode=QtWidgets.QAbstractItemView.SingleSelection):
+    def __init__(self, parent = None, itemsList=None, title=None, preSelected=None, modal=False, selectmode=QtWidgets.QAbstractItemView.SingleSelection):
         super(ItemsListDialog, self).__init__(parent)
         self.setupUi(self)
         self.setModal(modal)
@@ -332,6 +330,23 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         self.searchLineEdit.setClearButtonEnabled(True)
         
         self.searchLineEdit.textEdited.connect(self.slot_locateSelectName)
+        
+        if isinstance(selectmode, str):
+            if selectmode.lower == "single":
+                selectmode = QtWidgets.QAbstractItemView.SingleSelection
+            elif selectmode.lower == "contiguous":
+                selectmode = QtWidgets.QAbstractItemView.ContiguousSelection
+            elif selectmode.lower == "extended":
+                selectmode = QtWidgets.QAbstractItemView.ExtendedSelection
+            elif selectmode.lower == "multi":
+                selectmode = QtWidgets.QAbstractItemView.MultiSelection
+            else:
+                warnings.warn(f"I don't know what '{selectmode}' selection means...")
+                selectmode = QtWidgets.QAbstractItemView.SingleSelection
+                
+            
+        if not isinstance(selectmode, QtWidgets.QAbstractItemView.SelectionMode):
+            selectmode = QtWidgets.QAbstractItemView.SingleSelection
         
         self.listWidget.setSelectionMode(selectmode)
     

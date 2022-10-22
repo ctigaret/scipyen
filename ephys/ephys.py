@@ -491,7 +491,7 @@ def cursors2epoch(*args, **kwargs):
             
         NOTE: the following are NOT allowed:
             □ Mixing SignalCursor objects with parameter tuples.
-            □ Mixing parameter 2- 3- or 5- tuples is NOT allowed.
+            □ Mixing parameter 2- 3- or 5-tuples is NOT allowed.
         
     Var-keyword parameters:
     ----------------------
@@ -696,7 +696,9 @@ def cursors2epoch(*args, **kwargs):
     
     else:
         # transpose t_d_i and unpack:
+        # print("cursors2epoch", t_d_i)
         t, d, i = [v for v in zip(*t_d_i)]
+        
         
         if isinstance(t[0], pq.Quantity):
             units = t[0].units

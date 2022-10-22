@@ -757,7 +757,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.makeEpochsMenu = QtWidgets.QMenu("Make Epochs")
         
-        self.epochsFromCursorsAction = self.makeEpochsMenu.addAction("Cursors to Epochs")
+        self.epochsFromCursorsAction = self.makeEpochsMenu.addAction("From Cursors")
         self.epochsFromCursorsAction.triggered.connect(self.slot_cursorsToEpoch)
         self.epochsFromCursorsAction.setEnabled(self._scipyenWindow_ is not None)
         
@@ -771,7 +771,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.makeEpochsInDataMenu = QtWidgets.QMenu("Make Epochs in Data")
         
-        self.epochsInDataFromCursorsAction = self.makeEpochsInDataMenu.addAction("From All Cursors")
+        self.epochsInDataFromCursorsAction = self.makeEpochsInDataMenu.addAction("From Cursors")
         self.epochsInDataFromCursorsAction.triggered.connect(self.slot_cursorsToEpochInData)
         
         self.epochInDataFromSelectedCursorAction = self.makeEpochsInDataMenu.addAction("From Selected SignalCursor")
@@ -3526,8 +3526,40 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         vertAndCrossCursors = collections.ChainMap(self.crosshairSignalCursors, self.verticalSignalCursors)
         
         if len(vertAndCrossCursors) == 0:
+            QtWidgets.QMessageBox.warning(self,"Attach epoch to data",
+                                          "No vertical or croshair cursors found")
             return
         
+        elif len(vertAndCrossCursors) > 1:
+            # dialog to select cursors
+            if isinstance(self.selectedDataCursor, SignalCursor) and self.selectedDataCursor in vertAndCrossCursors.values():
+                cseldlg = pgui.ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
+                                            title="Select cursors", 
+                                            selectmode = QtWidgets.QAbstractItemView.ExtendedSelection,
+                                            preSelected=self.selectedDataCursor.name)
+            else:
+                cseldlg = pgui.ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
+                                            title="Select cursors",
+                                            selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
+            ans = cseldlg.exec_()
+            
+            if ans != QtWidgets.QDialog.Accepted:
+                return
+            
+            selItems = cseldlg.selectedItemsText
+            
+            if len(selItems) == 0:
+                return
+            
+            cursors = [self.dataCursor(name) for name in selItems]
+            
+            if len(cursors) == 0:
+                return
+            
+        
+        else:
+            cursors = [c for c in vertAndCrossCursors.values()]
+            
         if self._scipyenWindow_ is not None:
             if hasattr(self.y, "name") and isinstance(self.y.name, str) and len(self.y.name.strip()):
                 name = "%s_Epoch" % self.y.name
@@ -3549,15 +3581,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if isinstance(txt, str) and len(txt.strip()):
                     name=txt
                     
-        
-            cursors = [c for c in vertAndCrossCursors.values()]
-            
             cursors.sort(key=attrgetter('x')) # or key = lambda x: x.x
 
-            epoch = self.cursorsToEpoch(*cursors, name=name)
+            epoch = self.cursorsToEpoch(*cursors, name=name, embed=False)
             
             if epoch is not None:
-                self._scipyenWindow_._assignToWorkspace_(name, epoch)
+                self._scipyenWindow_.assignToWorkspace(name, epoch)
                 
     @pyqtSlot()
     @safeWrapper
@@ -3572,6 +3601,35 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                           "No vertical or croshair cursors found")
             return
         
+        elif len(vertAndCrossCursors) > 1:
+            # dialog to select cursors
+            if isinstance(self.selectedDataCursor, SignalCursor) and self.selectedDataCursor in vertAndCrossCursors.values():
+                cseldlg = pgui.ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
+                                               title="Select cursors", 
+                                               selectmode = QtWidgets.QAbstractItemView.ExtendedSelection,
+                                               preSelected=self.selectedDataCursor.name)
+            else:
+                cseldlg = pgui.ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
+                                                title="Select cursors",
+                                                selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
+            ans = cseldlg.exec_()
+            
+            if ans != QtWidgets.QDialog.Accepted:
+                return
+            
+            selItems = cseldlg.selectedItemsText
+            
+            if len(selItems) == 0:
+                return
+            
+            cursors = [self.dataCursor(name) for name in selItems]
+            
+            if len(cursors) == 0:
+                return
+            
+            else:
+                cursors = [c for c in vertAndCrossCursors.values()]
+                    
         if hasattr(self.y, "name") and isinstance(self.y.name, str) and len(self.y.name.strip()):
             name = "%s_Epoch" % self.y.name
             
@@ -3604,7 +3662,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if isinstance(txt, str) and len(txt.strip()):
                     name = txt
 
-                toAllSegments = d.toAllSegmentsCheckBox.isChecked()
+                toAllSegments    = d.toAllSegmentsCheckBox.isChecked()
                 relativeSweep    = d.sweepRelativeCheckBox.isChecked()
                 overwriteEpoch   = d.overwriteEpochCheckBox.isChecked()
                 
@@ -3619,7 +3677,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         else:
             QtWidgets.QMessageBox.warning(self,"Attach epoch to data", 
-                                          "Epochs can only be embedded in neo.Block and neo.Segment data.\n\nPlease use actions in 'Make epochs' sub-menu")
+                                          "Epochs can only be embedded in neo.Block and neo.Segment data.")
             
     @pyqtSlot()
     @safeWrapper
@@ -3840,7 +3898,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             epoch = self.cursorsToEpoch(self.selectedDataCursor, name=name)
             
             if epoch is not None:
-                self._scipyenWindow_._assignToWorkspace_(name, epoch)
+                self._scipyenWindow_.assignToWorkspace(name, epoch)
                 
     
     @pyqtSlot()
@@ -3892,7 +3950,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if name is None:
                     name = "epoch"
                     
-                self._scipyenWindow_._assignToWorkspace_(name, epoch)
+                self._scipyenWindow_.assignToWorkspace(name, epoch)
         
     @safeWrapper
     def cursorsToEpoch(self, *cursors, name:typing.Optional[str] = None, embed:bool = False, all_segments:bool = True, relative_to_segment_start:bool=False, overwrite:bool = False):
@@ -3985,6 +4043,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 name = "Epoch"
             
         if all_segments and relative_to_segment_start:
+            # NOTE: 2022-10-22 22:02:50 - NO WE DON'T !!!'
+            # we need this to figure out the units of the cursor's x coordinate, 
+            # taken ad the units of the signal plotted in the cursor's host axis 
+            # (PlotItem)
+            #
+            # For multi-axes cursors, we use the currently-selected axis !!!
+            # cursor_axes = [self.axes.index(c.hostItem) if isinstance(c.hostItem, pg.PlotItem) else self.axes.index(self.currentAxis) for c in cursors]
+            
             # NOTE 2022-10-21 23:13:36
             # when calculating segment t_start we use the minimum of `t_start` 
             # of signals and spiketrains ONLY, to avoid any existing events or
@@ -3995,11 +4061,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     epochs = list()
                     current_seg_start = segment_start(self.y.segments[self.currentFrame])
                     
-                    rel_starts = [c.x - c.xwindow/2 - current_seg_start for c in cursors]
+                    rel_starts = [c.x * current_seg_start.units - c.xwindow/2*current_seg_start.units - current_seg_start for c in cursors]
                     
                     for seg in self.y.segments:
                         s_start = segment_start(seg)
-                        epoch_tuples = [(s_start + rel_starts[i], cursors[i].xwindow) for i in range(len(cursors))]
+                        epoch_tuples = [(s_start + rel_starts[i], cursors[i].xwindow*s_start.units, cursors[i].name) for i in range(len(cursors))]
                         seg_epoch = cursors2epoch(*epoch_tuples, name=name)
                         epochs.append(seg_epoch)
                         if embed:
@@ -4007,6 +4073,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 seg.epochs = [seg_epoch]
                             else:
                                 seg.epochs.append(seg_epoch)
+                                
+                    self.displayFrame()
                     
                     return epochs
                 
@@ -4016,11 +4084,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     epochs = list()
                     current_seg_start = segment_start(self.y[self.currentFrame])
                     
-                    rel_starts = [c.x - c.xwindow/2 - current_seg_start for c in cursors]
+                    rel_starts = [c.x*current_seg_start.units - c.xwindow/2*current_seg_start.units - current_seg_start for c in cursors]
                     
                     for seg in self.y:
                         s_start = segment_start(seg)
-                        epoch_tuples = [(s_start + rel_starts[i], cursors[i].xwindow) for i in range(len(cursors))]
+                        epoch_tuples = [(s_start + rel_starts[i], cursors[i].xwindow*s_start.units, cursors[i].name) for i in range(len(cursors))]
                         seg_epoch = cursors2epoch(*epoch_tuples, name=name)
                         epochs.append(seg_epoch)
                         if embed:
@@ -4028,9 +4096,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 seg.epochs = [seg_epoch]
                             else:
                                 seg.epochs.append(seg_epoch)
+                                
+                    
+                    self.displayFrame()
                     
                     return epochs
-                
         
         epoch = cursors2epoch(*cursors, name=name, sort=True)
         
@@ -4061,24 +4131,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         else:
                             self.y.segments[self.frameIndex[self._current_frame_index_]].epochs.append(epoch)
                             
-#                     if current_seg_only:
-#                         if overwrite:
-#                             self.y.segments[self.frameIndex[self._current_frame_index_]].epochs = [epoch]
-#                         else:
-#                             self.y.segments[self.frameIndex[self._current_frame_index_]].epochs.append(epoch)
-#                             
-#                     else:
-#                         for ndx in self.frameIndex:
-#                             if overwrite:
-#                                 self.y.segments[ndx].epochs = [epoch]
-#                                 
-#                             else:
-#                                 self.y.segments[ndx].epochs.append(epoch)
-                            
             elif isinstance(self.y, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self.y]):
                 if len(self.y) == 0:
                     warnings.warn("Plotted data is an empty sequence!")
-                    #return epoch
                 
                 elif len(self.y) == 1:
                     if overwrite:
@@ -4101,20 +4156,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         else:
                             self.y[self.rameIndex[self._current_frame_index_]].epochs.append(epoch)
                             
-#                     if current_seg_only:
-#                         if overwrite:
-#                             self.y[self.rameIndex[self._current_frame_index_]].epochs = [epoch]
-#                         else:
-#                             self.y[self.rameIndex[self._current_frame_index_]].epochs.append(epoch)
-#                             
-#                     else:
-#                         for ndx in self.frameIndex:
-#                             if overwrite:
-#                                 self.y[ndx].epochs = [epoch]
-#                                 
-#                             else:
-#                                 self.y[ndx].epochs.append(epoch)
-#                             
             elif isinstance(self.y, neo.Segment):
                 if overwrite:
                     self.y.epochs = [epoch]
@@ -4151,7 +4192,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         if name is None:
             d = qd.QuickDialog(self, "Make Epoch From SignalCursor:")
-            #d = vigra.pyqt.qd.QuickDialog(self, "Make Epoch From SignalCursor:")
             d.promptWidgets = list()
             d.promptWidgets.append(qd.StringInput(d, "Name:"))
             #d.promptWidgets.append(vigra.pyqt.qd.StringInput(d, "Name:"))
@@ -5395,6 +5435,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """Calls self.plotItem(index) -- syntactic sugar
         """
         return self.plotItem(index)
+    
+    @property
+    def selectedPlotItem(self):
+        """Alias to currentPlotItem"""
+        return self.currentPlotItem
+    
+    @selectedPlotItem.setter
+    def selectedPlotItem(self, index):
+        self.selectedPlotItem = index
         
     @property
     def currentPlotItem(self):
@@ -5458,6 +5507,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @currentAxis.setter
     def currentAxis(self, index):
         self.currentPlotItem = index
+        
+    @property
+    def selectedAxis(self):
+        """Alias to currentAxis"""
+        return self.currentAxis
+    
+    @selectedAxis.setter
+    def selectedAxis(self, index):
+        self.currentAxis = index
     
     def dataCursor(self, ID):
         """Not to be confused with the Qt method self.cursor() !!!
@@ -5930,105 +5988,26 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 warnings.warn("Invalid brush specification %s" % epoch_brush)
                 brushes = cycle([None])
                 
-        # NOTE: 2020-03-09 12:09:40
-        # unlike the online documentation, pg.LinearRegionItem constructor 
-        # DOES NOT accept pen as argument
-        #if epoch_pen is None:
-            #if len(args) > 1:
-                #pens = cycle([QtGui.QPen(QtGui.QColor(*c).darker()) for c in self.epoch_plot_options["epochs_color_set"]])
-                
-            #else:
-                #pens = cycle([QtGui.QPen(QtGui.QColor(0,0,255,50).darker())])
-                
-        #else:
-            #if isinstance(epoch_pen, tying.Sequence):
-                #if all([isinstance(b, (QtGui.QColor, QtGui.QBrush, tuple, list)) for b in epoch_pen]):
-                    #pens = cycle([QtGui.QPen(QtGui.QColor(c)) if isinstance(c, (QtGui.QColor, QtGui.QBrush)) else QtGui.QPen(QtGui.QColor(*c) for c in epoch_pen)])
-                    
-                #else:
-                    #pens = cycle([QtGui.QPen(QtGui.QColor(*epoch_pen))])
-                    
-            #elif isinstance(epoch_pen, QtGui.QColor):
-                #pens = cycle([QtGui.QBrush(QtGui.QColor(epoch_pen))])
-                
-            #elif isinstance(epoch_pen, QtGui.QBrush):
-                #pens = cycle([epoch_pen])
-                
-            #elif isinstance(epoch_pen, QtGui.QPen):
-                #pens = cycle([epoch_pen])
-                
-            #else:
-                #warnings.warn("Invalid pen specification %s" % epoch_pen)
-                
-        # figure out the visible X range
-#         minX = list()
-#         maxX = list()
-#         
-#         visibleXRange = None
-        
-#         for ax in self.axes:
-#             if len(ax.dataItems):
-#                 ax.update() # to update its viewRange()
-#                 # print(f"SignalViewer._plot_epochs_seq_ axis {ax} viewRange {ax.viewRange()}")
-#                 # axViewRect = ax.viewRect()
-#                 # x_min = axViewRect.x()
-#                 # [x_min, x_max] = ax.viewRange()[0]
-#                 
-#                 x_min, x_max = (ax.viewRect().x(), ax.viewRect().x() + ax.viewRect().width())
-#                 
-#                 minX.append(x_min)
-#                 maxX.append(x_max)
-#                 
-#         if len(minX) and len(minX) == len(maxX):
-#             visibleXRange = [min(minX), max(maxX)]
-#             
-#         print(f"SignalViewer._plot_epochs_seq_ visibleXRange {visibleXRange}")
-        
         for epoch in args:
             # print(f"SignalViewer._plot_epochs_seq_ epoch {epoch}")
             x0 = epoch.times.flatten().magnitude
             x1 = x0 + epoch.durations.flatten().magnitude
             
-#             if visibleXRange is not None:
-#                 x0_visible = (x0 >= visibleXRange[0]) & (x0 <  visibleXRange[1])
-#                 x1_visible = (x1 >  visibleXRange[0]) & (x1 <= visibleXRange[1])
-#                 
-#                 x_visible = x0_visible & x1_visible
-#                 
-#             else:
-#                 x_visible = np.full_like(x0, fill_value=True, dtype="bool")
-                
-            # print(f"SignalViewer._plot_epochs_seq_ epoch {epoch} x_visible {x_visible}")
-            
             brush = next(brushes)
-            
-            # see NOTE: 2020-03-09 12:09:40
-            #pen = next(pens)
             
             for k in range(len(self.axes)):
                 self.axes[k].update() # to update its viewRange()
-                # data_x_min = list()
-                # data_x_max = list()
                 
                 regions = [v for v in zip(x0,x1)]
-                
-                # print(f"SignalViewer._plot_epochs_seq_ axis: {k}; regions: {regions}")
                 
                 lris = [pg.LinearRegionItem(values=value, 
                                             brush=brush, 
                                             orientation=pg.LinearRegionItem.Vertical, 
                                             movable=False) for value in regions]
                 
-#                 lris = [pg.LinearRegionItem(values=value, 
-#                                             brush=brush, 
-#                                             orientation=pg.LinearRegionItem.Vertical, 
-#                                             movable=False, 
-#                                             bounds = visibleXRange) for value in regions]
-#                 
                 for kl, lri in enumerate(lris):
                     self.axes[k].addItem(lri)
                     lri.setZValue(10)
-                    # lri.setVisible(x_visible[kl])
                     lri.setVisible(True)
                     lri.setRegion(regions[kl])
         
