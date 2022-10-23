@@ -1650,14 +1650,27 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     and are defined along the horizontal and vertical axis, respectively
                     
         Var-keyword arguments ("name=value" pairs):
-        =============================================
-        
+        ===========================================
         xwindow = 1D sequence of floats with the horizontal extent of the cursor window
             (for crosshair and vertical cursors); must have as many elements as 
             coordinates supplied in the *where argument
+        
         ywindow   = as above, for crosshair and horizontal cursors
-        labels         = 1D sequence of str for cursor IDs; must have as many
+        
+        labels    = 1D sequence of str for cursor IDs; must have as many
             elements as supplied through the *where argument
+        
+        axis: int, or str, pyqtgraph.PlotItem, or None (default)
+            ∘   When an int this is a valid axis index in the current instance 
+                of ScipyenViewer (from top to bottom, 0 -> number of axes - 1)
+            
+            ∘   When a str, this can only be "all" or "a", meaning that the new 
+                cursors will span all axes (multi-axis cursors)
+        
+            ∘   When None (default) the cursors will be created in the axis that
+                is currently selected, or axis 0 is no axis is selected.
+        
+            This parameter is passed directly to the self.addCursor() method.
         """
         
         def _addCursors_parse_coords_(coords):
@@ -4062,7 +4075,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     current_seg_start = segment_start(self.y.segments[self.currentFrame])
                     
                     rel_starts = [c.x * current_seg_start.units - c.xwindow/2*current_seg_start.units - current_seg_start for c in cursors]
-                    
+                    print(f"SignalViewer.cursorsToEpoch: rel_starts: {rel_starts}")
                     for seg in self.y.segments:
                         s_start = segment_start(seg)
                         epoch_tuples = [(s_start + rel_starts[i], cursors[i].xwindow*s_start.units, cursors[i].name) for i in range(len(cursors))]
