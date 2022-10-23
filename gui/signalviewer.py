@@ -1670,7 +1670,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             ∘   When None (default) the cursors will be created in the axis that
                 is currently selected, or axis 0 is no axis is selected.
         
-            This parameter is passed directly to the self.addCursor() method.
+        NOTE: the display of cursor values is controlled by self.setCursorsShowValue
+        check box
         """
         
         def _addCursors_parse_coords_(coords):
@@ -1746,7 +1747,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             return x,y
         
         
-        def _use_coords_sequence_(seq, xw, yw, lbls):
+        def _use_coords_sequence_(seq, xw, yw, lbls, ax):
             """Adds cursors based on a sequence of cursor coordinates
             """
             for (k, coords) in enumerate(seq):
@@ -1782,29 +1783,47 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 elif isinstance(lbls, str):
                     lbl = lbls
                     
-                self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
-                               label=lbl, show_value = self.setCursorsShowValue.isChecked())
+                if isinstance(ax, (int, pg.PlotItem, str)):
+                    self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
+                                label=lbl, show_value = self.setCursorsShowValue.isChecked(),
+                                axis=ax)
+                    
+                elif isinstance(ax, (tuple, list)) and all(isinstance(a, (int, pg.PlotItem)) for a in ax):
+                    if len(ax) != len(seq):
+                        raise ValueError(f"number of axes ({len(ax)}) should be the same as the number of cursors ({len(seq)})")
+                    
+                    self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
+                                label=lbl, show_value = self.setCursorsShowValue.isChecked(),
+                                axis=ax[k])
+                    
+                    
+                    
                 
         xwindow = kwargs.pop("xwindow", self.defaultCursorWindowSizeX)
         ywindow = kwargs.pop("ywindow", self.defaultCursorWindowSizeY)
-        labels = kwargs.pop("labels", None)
+        labels  = kwargs.pop("labels",  None)
+        axis    = kwargs.pop("axis",    None)
+        
                
         if len(where) == 0: # no coordinates given
             x = y = None
             
         elif len(where) == 1: # a single object passed - figure it out
             if isinstance(where[0], np.ndarray):
-                _use_coords_sequence_(where[0], xwindow, ywindow, labels)
+                _use_coords_sequence_(where[0], xwindow, ywindow, labels, axis)
                 return
                 
-            x,y = _addCursors_parse_coords_(where[0])
+            x, y = _addCursors_parse_coords_(where[0])
             
         elif isinstance(where, (tuple, list, np.ndarray)):
-            _use_coords_sequence_(where, xwindow, ywindow, labels)
+            _use_coords_sequence_(where, xwindow, ywindow, labels, axis)
             return
 
-        self.addCursor(cursorType=cursorType, x=where, xwindow=xwindow, ywindow=ywindow,
-                        label=labels, show_value = self.setCursorsShowValue.isChecked())
+        self.addCursor(cursorType=cursorType, x=x, y=y, 
+                       xwindow=xwindow, ywindow=ywindow,
+                       label=labels, 
+                       show_value = self.setCursorsShowValue.isChecked(),
+                       axis = axis)
         
     
     def addCursor(self, cursorType: typing.Union[str, SignalCursor.SignalCursorTypes] = "c", x: typing.Optional[numbers.Number] = None, y: typing.Optional[numbers.Number] = None, xwindow: typing.Optional[numbers.Number] = None, ywindow: typing.Optional[numbers.Number] = None, xBounds: typing.Optional[numbers.Number] = None, yBounds: typing.Optional[numbers.Number] = None, label: typing.Optional[typing.Union[int, str, pg.PlotItem]] = None, follows_mouse: bool = False, axis: typing.Optional[int] = None, **kwargs):
@@ -4074,8 +4093,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     epochs = list()
                     current_seg_start = segment_start(self.y.segments[self.currentFrame])
                     
-                    rel_starts = [c.x * current_seg_start.units - c.xwindow/2*current_seg_start.units - current_seg_start for c in cursors]
-                    print(f"SignalViewer.cursorsToEpoch: rel_starts: {rel_starts}")
+                    rel_starts = [c.x * current_seg_start.units - current_seg_start for c in cursors]
+                    # print(f"SignalViewer.cursorsToEpoch: rel_starts: {rel_starts}")
                     for seg in self.y.segments:
                         s_start = segment_start(seg)
                         epoch_tuples = [(s_start + rel_starts[i], cursors[i].xwindow*s_start.units, cursors[i].name) for i in range(len(cursors))]

@@ -217,15 +217,24 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
         irs_ndx = region_labels.index("Rs")
         irin_ndx = region_labels.index("Rin")
         
-        baseline_interval = [rm_epoch[base_ndx].times,
-                             rm_epoch[base_ndx].times + rm_epoch[base_ndx].duration]
+        baseline_interval = [rm_epoch.times[base_ndx],
+                             rm_epoch.times[base_ndx] + rm_epoch.durations[base_ndx]]
         
-        irs_interval = [rm_epoch[irs_ndx].times,
-                        rm_epoch[irs_ndx].times + rm_epoch[irs_ndx].duration]
+        irs_interval = [rm_epoch.times[irs_ndx],
+                        rm_epoch.times[irs_ndx] + rm_epoch.durations[irs_ndx]]
         
-        irin_interval = [rm_epoch[irin_ndx].times,
-                         rm_epoch[irin_ndx].times + rm_epoch[irin_ndx].duration]
+        irin_interval = [rm_epoch.times[irin_ndx],
+                         rm_epoch.times[irin_ndx] + rm_epoch.durations[irin_ndx]]
         
+#         baseline_interval = [rm_epoch[base_ndx].times,
+#                              rm_epoch[base_ndx].times + rm_epoch[base_ndx].duration]
+#         
+#         irs_interval = [rm_epoch[irs_ndx].times,
+#                         rm_epoch[irs_ndx].times + rm_epoch[irs_ndx].duration]
+#         
+#         irin_interval = [rm_epoch[irin_ndx].times,
+#                          rm_epoch[irin_ndx].times + rm_epoch[irin_ndx].duration]
+#         
         
     if any([i is None for i in [baseline_interval, irs_interval, irin_interval]]):
         raise RuntimeError("Cannot determine signal interval boundaries")
@@ -275,7 +284,8 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
             
     Ibase = Im_signal.time_slice(baseline_interval[0], baseline_interval[1]).mean(axis=0)
     
-    Irs = Im_signal.time_slice(irs_interval[0], irs_interval[1]).mean(axis=0)
+    # Irs = Im_signal.time_slice(irs_interval[0], irs_interval[1]).mean(axis=0)
+    Irs = Im_signal.time_slice(irs_interval[0], irs_interval[1]).max(axis=0)
     
     Irin = Im_signal.time_slice(irin_interval[0], irin_interval[1]).mean(axis=0)
     
@@ -284,9 +294,9 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
         Irs = Irs[channel].flatten()
         Irin = Irin[channel].flatten()
         
-    Rs = vstep / (Irs - Ibase)
-    
     Rin = vstep / (Irin - Ibase)
+    
+    Rs = vstep / (Irs - Ibase)
     
     return np.array([Rs, Rin]) * Rin.units
     

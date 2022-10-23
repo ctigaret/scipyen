@@ -472,8 +472,7 @@ def cursors2epoch(*args, **kwargs):
     
     Variadic parameters:
     --------------------
-    *args: One or more SignalCursor object(s) (comma-separated list), a sequnence
-        (tuple, list) of EITHER:
+    *args: comma-separated list of EITHER:
     
         • SignalCursor objects - all of either 'vertical' or 'crosshair' type.
         
@@ -522,7 +521,8 @@ def cursors2epoch(*args, **kwargs):
     -------
     
     When intervals is False (default), returns a neo.Epoch (or DataZone) with 
-        intervals generated from the cursor x coordinates and horizontal windows:
+        intervals generated from the cursors' x coordinates and horizontal 
+        windows (`xwindow` properties):
         
             times = cursor.x - cursor.xwindow/2
             durations = cursor.xwindow
@@ -534,6 +534,10 @@ def cursors2epoch(*args, **kwargs):
             
             If units are provided, start and stop are python Quantity scalars,
             otherwise they are floating point scalars.
+    
+    ATTENTION: The numeric parameters are treated as cursor parameters; do NOT
+    calculate new time 'start' from these values! This function takes care of 
+    that!!!
             
     Examples:
     ========
@@ -541,7 +545,7 @@ def cursors2epoch(*args, **kwargs):
     Given "cursors" a list of vertical SignalCursors, and "params" the 
     corresponding list of cursor parameters:
     
-    >>> params = [c.params for c in cursors]
+    >>> params = [c.parameters for c in cursors]
     
     >>> params
         [(0.20573370205046024, 0.001, 'v2'),
@@ -596,6 +600,7 @@ def cursors2epoch(*args, **kwargs):
         raise TypeError("Units expected to be a python Quantity; got %s instead" % type(units).__name__)
         
     name = kwargs.get("name", "Epoch")
+    
     if not isinstance(name, str):
         raise TypeError("name expected to be a string")
     
