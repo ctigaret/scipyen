@@ -14,7 +14,7 @@ import quantities as pq
 from . import curvefitting as crvf
 #### END pict.core modules
 
-def simplify_2d_shape(xy:np.ndarray, max_points:int = 5, k:int = 3) -> (np.ndarray, list):
+def simplify_2d_shape(xy:np.ndarray, max_points:int = 5, k:int = 3):
     """Creates an simplified version of a 2D shape defined by x,y coordinate array
     
     Parameters:
@@ -186,13 +186,20 @@ def simplify_2d_shape(xy:np.ndarray, max_points:int = 5, k:int = 3) -> (np.ndarr
         
     return ret, splines
     
-def zero_crossings(x:np.ndarray) -> np.ndarray:
+def zero_crossings(x:np.ndarray):
     """Returns the zero crossings of x waveform, with grid accuracy.
     
     For good results "x" should be filtered first (e.g. smoothed with a boxcar)
     
-    Arguments:
+    Parameters:
+    ==========
         x: 1D numpy array or sequence;
+    
+    Returns:
+    ========
+    
+    A sequence of indices where x crosses 0.
+    
     """
     #from scipy import where
     
@@ -205,7 +212,12 @@ def zero_crossings(x:np.ndarray) -> np.ndarray:
     return np.where(x[:-1] * x[1:] < 0)[0] # because where() returns a tuple which
                                            # for 1D data has only one element
                                         
-def value_crossings(x:np.ndarray, value:float) -> np.ndarray:
+def value_crossings(x:np.ndarray, value:float):
+    """Returns the sample indices, in a waveform, that cross an arbitrary value.
+    
+    Similar to zero_crossings, for a value != zero
+    
+    """
     if isinstance(x, np.ndarray) and len(x.shape) > 1:
         if x.ndim > 2 or x.shape[1] > 1:
             raise TypeError("Expecting a vector")
@@ -216,7 +228,7 @@ def value_crossings(x:np.ndarray, value:float) -> np.ndarray:
     
     return zero_crossings(x_)
                                         
-def generate_bin_width(adcres:float=15, adcrange:float=10, adcscale:float=1) -> float:
+def generate_bin_width(adcres:float=15, adcrange:float=10, adcscale:float=1):
     """Define a histogram bin width according to the ADC used to collect the data.
     
     adcres = integer, optional: 
@@ -239,7 +251,9 @@ def generate_bin_width(adcres:float=15, adcrange:float=10, adcscale:float=1) -> 
     
     return adcscale * adcrange/(2**adcres)
 
-def is_positive_waveform(x:np.ndarray) -> bool:
+def is_positive_waveform(x:np.ndarray):
+    """A positive waveform has the majority of its samples >= 0
+    """
     if not isinstance(x, np.ndarray):
         raise TypeError("Expecting a np.ndarray object or a derived type; got %s instead" % type(x).__name__)
     
@@ -250,17 +264,25 @@ def is_positive_waveform(x:np.ndarray) -> bool:
         x = np.squeeze(x)
         
     xPos = np.where(x >= 0)[0]
-    xNeg = np.where(x <= 0)[0]
+    xNeg = np.where(x <  0)[0]
     
     return len(xPos) > len(xNeg)
 
-def normalise_waveform(x:np.ndarray) -> np.ndarray:
-    """No-frills waveform normalization of a signal
+def normalise_waveform(x:np.ndarray, **kwargs):
+    """No-frills waveform normalization of a 1D signal
+    Returns (x-x_min)/(x_max - x_min)
     """
+    axis = kwargs.pop("axis", None)
     
-    return (x-np.min(x))/(np.max(x)-np.min(x))
+    return (x-np.min(x, axis=axis))/(np.max(x, axis=axis)-np.min(x, axis=axis))
 
-def waveform_amplitude(x:np.ndarray, method:str="direct") -> np.ndarray:
+def data_range(x:np.ndarray, **kwargs):
+    """The difference between a 1D signal max and min values.
+    """
+    axis = kwargs.pop("axis", None)
+    return np.max(x, axis=axis) - np.min(x, axis=axis)
+
+def waveform_amplitude(x:np.ndarray, method:str="direct", axis=None):
     """Calculates the amplitude of a waveform.
     
     Parameters:
@@ -277,18 +299,19 @@ def waveform_amplitude(x:np.ndarray, method:str="direct") -> np.ndarray:
         "levels": amplitude if the ansolute difference between two state levels
             of the signal x (see state_levels() function in this module)
     
-    """
-    #print("waveform_amplitude x:", x)
+    axis: None or a valid axis index (for 0 to x.ndim)
     
+    """
     if not isinstance(x, np.ndarray):
         raise TypeError("Expecting a np.ndarray object or a derived type; got %s instead" % type(x).__name__)
     
-    
-    if len(x.shape)> 1:
-        if x.ndim > 2 or x.shape[1] > 1:
-            raise TypeError("Expecting a vector; got an array with shape %s" % x.shape)
-        
-        x = np.squeeze(x)
+    # NOTE: 2022-10-23 16:49:59
+    # might want to do this, below
+#     if len(x.shape)> 1:
+#         if x.ndim > 2 or x.shape[1] > 1:
+#             raise TypeError("Expecting a vector; got an array with shape %s" % x.shape)
+#         
+#         x = np.squeeze(x)
         
     if not isinstance(method, str):
         return TypeError("method expected to be a str; got %s instead" % type(method).__name__)
@@ -303,10 +326,12 @@ def waveform_amplitude(x:np.ndarray, method:str="direct") -> np.ndarray:
         return 0.
     
     if method.lower() == "direct":
-        return np.abs(np.nanmax(x) - np.nanmin(x))
+        return np.abs(np.nanmax(x, axis=axis) - np.nanmin(x, axis=axis))
         
     else:
-        sl = state_levels(x)
+        # FIXME/TODO 2022-10-23 16:56:59
+        # CAUTION is we preserve the shape of the array, sl will be we'll get 
+        sl = state_levels(x, axis=axis)
         
         return np.abs(np.diff(sl))
         
@@ -441,7 +466,7 @@ def split_histogram(counts, f):
         
     return ranges
     
-def state_levels(x:np.ndarray, **kwargs) -> list:
+def state_levels(x:np.ndarray, **kwargs):
     """Calculate states from a 1D waveform.
     See IEEE Std 181-2011: 
         IEEE Standard for Transitions, Pulses, and Related Waveforms
@@ -449,7 +474,8 @@ def state_levels(x:np.ndarray, **kwargs) -> list:
     Parameters:
     -----------
     
-    x = np.ndarray (column vector)
+    x = np.ndarray (usually, a column vector; when a 2D array, then the function
+        is applied on the given `axis` (or on flattened array if `axis` is None))
     
     Var-keyword parameters:
     ----------------------
@@ -483,11 +509,14 @@ def state_levels(x:np.ndarray, **kwargs) -> list:
             default is 0.5
             
     moment: str
-            the statistical moment used to calculate the state level:
+            The statistical moment used to calculate the state level:
             "mean" or "mode" or a function that takes a 1D sequence of numbers
             and returns a scalar; 
             
             default is "mean"
+    
+    axis:   int or None 
+            The axis of the array (when x.ndim > 1); default is None
             
     Returns:
     ========
@@ -514,15 +543,28 @@ def state_levels(x:np.ndarray, **kwargs) -> list:
     adcscale = kwargs.get("adcscale", None)
     levels   = kwargs.get("levels", 0.5)
     moment   = kwargs.get("moment", "mean")
+    axis     = kwargs.pop("axis", None)
     
-    notNaNndx = np.squeeze(~np.isnan(x))
+    # TODO/FIXME: 2022-10-23 16:54:42
+    # might want to preserve their shape, because as of now, we use the `axis`
+    # parameter
+    # notNaNndx = np.squeeze(~np.isnan(x))
+    notNaNndx = ~np.isnan(x)
     #print(notNaNndx.shape)
 
     real_x = x[notNaNndx]
     #print(real_x.shape)
     
-    x_min = real_x.min()
-    x_max = real_x.max()
+    # FIXME/TODO: 2022-10-23 16:59:19
+    # this was originlly intended to work on 1D, or flattened nD, arrays
+    # 
+    # now, since we use the `axis` parameter, x_min, x_max and x_range are not 
+    # scalars any more, unless `axis` is None!
+    # 
+    # in faxt x_min, x_max, and x_range will each be a (n-1)D array !!!
+    
+    x_min = real_x.min(axis=axis)
+    x_max = real_x.max(axis=axis)
     
     x_range = x_max-x_min
     
@@ -578,7 +620,7 @@ def state_levels(x:np.ndarray, **kwargs) -> list:
     
     return sLevels#, counts, edges
 
-def nansize(x, **kwargs) -> int:
+def nansize(x, **kwargs):
     """
     Sample size for data containing np.nan
     """
@@ -591,8 +633,15 @@ def nansize(x, **kwargs) -> int:
         #return (int(ret))
     
     return ret
+
+def maxmin(x:np.ndarray, **kwargs):
+    axis = kwargs.pop("axis", None)
     
-def sem(x:np.ndarray, **kwargs) -> np.ndarray:
+    mx, mn = np.nanmax(x, axis=axis), np.nanmin(x, axis=axis)
+    
+    return (mx, mn)
+    
+def sem(x:np.ndarray, **kwargs):
     ddof = kwargs.pop("ddof", 1)
     axis = kwargs.pop("axis", None)
     keepdims = kwargs.pop("keepdims", True)
@@ -613,7 +662,7 @@ def sem(x:np.ndarray, **kwargs) -> np.ndarray:
     
     #return np.std(x, ddof=ddof, axis=axis, out=None, keepdims=keepdims) / np.sqrt(sz-ddof)
 
-def nansem(x:np.ndarray, **kwargs) -> np.ndarray:
+def nansem(x:np.ndarray, **kwargs):
     """SEM for data containing np.nan
     """
     ddof = kwargs.pop("ddof", 1)

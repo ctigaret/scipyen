@@ -198,7 +198,7 @@ import inspect
 import itertools
 import functools
 import warnings
-import typing
+import typing, types
 from enum import Enum, IntEnum
 #### END core python modules
 
@@ -791,37 +791,52 @@ def signal2epoch(sig, name=None, labels=None):
     return ret
 
 @safeWrapper
-def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
-    """The maximum value of the signal across the cursor's window.
+def epoch_reduce(func:types.FunctionType, signal: typing.Union[neo.AnalogSignal, DataSignal], epoch: typing.Union[neo.Epoch, tuple], channel: typing.Optional[int] = None):
+    """
+    The maximum value of a signal across an Epoch or a (t0, duration) interval.
+    
+    CAUTION: For an epoch with more than one interval, this returns the maximum
+    signal value across ALL the intervals in the Epoch.
+    
+    If this is not what you want, then call this function passing the desired
+    interval coordinates (t0, duration) of the Epoch.
+    
+    Example:
+    epoch_max(signal, (epoch.times[0], epoch.durations[0]))
     
     Parameters:
     ----------
     signal: neo.AnalogSignal, DataSignal
-    cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
+    epoch: tuple (t0, duration) or neo.Epoch
     channel: int or None (default)
         For multi-channel signal, specified which channel is used:
         0 <= channel < signal.shape[1]
     
-    Returns:
-    --------
-    Python Quantity array of shape (signal.shape[1], ) with the signal maximum
-    in the interval defined by the cursor's window, or the signal's sample value
-    at the cursor's x coordinate if cursor window is zero.
-    
-    NOTE: to get the signal extremes (and their sample indices) between two 
-    cursors, just call max(), min(), argmax() argmin() on a signal time slice 
-    obtained using the two cursor's x values.
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
     
-    # NOTE: 2022-10-23 12:24:58
-    # Why calling this here ?!? There is a single cursor, so cursors2intervals
-    # returns None!
-    # Just go for the cursor's coordinates
-    # t0,t1, _ = cursors2intervals(cursor, signal.times.units)
+    if isinstance(epoch, tuple) and len(epoch) == 2:
+        t0, duration = epoch
+        if not isinstance(t0, pq.Quantity):
+            t0 *= signal.times.units
+            
+        else:
+            if not units_convertible(t0, signal.times.units):
+                raise ValueError(f"epoch start units ({t0.units}) are incompatible with the signal's domain ({signal.times.units})")
+            
+        if not isinstance(duration, pq.Quantity):
+            duration *= signal.times.units
+        else:
+            if not units_convertible(duration, signal.times.units):
+                raise ValueError(f"epoch duration units ({duration.units}) are incompatible with the signal's domain ({signal.times.units})")
+
+    elif isinstance(epoch, neo.Epoch):
+        t0 = epochs.times.min()
+        duration = np.sum(epoch.durations)
+        
+    else:
+        raise TypeError(f"epoch expected to be a tuple (t0, duration) or a neo.Epoch; got {epoch} instead")
     
-    t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
-    t1 = t0 + cursor.xwindow/2 * signal.times.units
+    t1 = t0 + duration
     
     if t0 == t1:
         ret = signal[signal.time_index(t0),:]
@@ -833,6 +848,102 @@ def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typin
         return ret[channel].flatten()
     
     return ret
+
+def cursor_reduce(func:types.FunctionType, signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
+    """Reduced signal value (e.g. min, max, median etc) across a cursor's window.
+    
+    The reduced signal value is the value calculated by the `func` parameter
+    from a signal region defined by the cursor.
+    
+    If the window is 0, the function returns the signal value at the cursor's 
+    position in the signal domain.
+    
+    Parameters:
+    ----------
+    func:   types.FunctionType. A function which takes a numpy array and returns 
+            a scalar (e.g., `np.min`, `np.max`, `np.mean`, `np.median`, `np.std`,
+            `np.var`, and their 'nan' versions,etc), including functions defined
+            in Scipyen's core.signalprocessing module (e.g., `sem`, `nansem`, 
+            `nansize`, `data_range`, `is_positive_waveform`, `waveform_amplitude`,
+            etc.)
+    
+            NOTE: The core.signalprocessing module is already imported in a 
+                    Scipyen session under the `sigp` alias.
+            
+    signal: neo.AnalogSignal, DataSignal
+    
+    cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
+    
+    channel: int or None (default)
+        For multi-channel signal, specified which channel is used:
+        0 <= channel < signal.shape[1]
+    
+    Returns:
+    --------
+    Python Quantity array of shape (signal.shape[1], ) with the reduced value
+    calculated from the signal region in the interval defined by the cursor's 
+    window, or the signal's sample value at the cursor's x coordinate if cursor 
+    window is zero.
+    
+    NOTE: To get the signal extremes (and their sample indices) between two 
+    cursors, just call max(), min(), argmax() argmin() on a signal time slice 
+    obtained using the two cursor's x values.
+    """
+    from gui.signalviewer import SignalCursor as SignalCursor
+    
+    if not isinstance(func, types.FunctionType):
+        raise TypeError(f"Expecting a function as first argument; got {type(func).__name__} instead")
+    
+    if isinstance(cursor, SignalCursor):
+        t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
+        t1 = (cursor.x + cursor.xwindow/2) * signal.times.units
+        
+    elif isinstance(cursor, tuple) and len(cursor) == 2:
+        t0, t1 = cursor
+        
+        if not isinstance(t0, pq.Quantity):
+            t0 *= signal.times.units
+            
+        else:
+            if not units_convertible(t0, signal.times.units):
+                raise ValueError(f"t0 units ({t0.units}) are not compatible with the signal's time units {signal.times.units}")
+    
+        if not isinstance(t1, pq.Quantity):
+            t1 *= signal.times.units
+    
+        else:
+            if not units_convertible(t1, signal.times.units):
+                raise ValueError(f"t1 units ({t1.units}) are not compatible with the signal's time units {signal.times.units}")
+        
+    else:
+        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor or a 2-tuple of scalars; got {cursors} instead")
+    
+    if t0 == t1:
+        ret = signal[signal.time_index(t0),:]
+        
+    else:
+        # ret = signal.time_slice(t0,t1).max(axis=0).flatten()
+        ret = func(signal.time_slice(t0,t1), axis=0).flatten()
+    
+    if isinstance(channel, int):
+        return ret[channel].flatten()
+    
+    return ret
+
+@safeWrapper
+def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
+    """The maximum value of the signal across the cursor's window.
+    Calls cursor_reduce with np.max as `func` parameter.
+    """
+    return cursor_reduce(np.max, signal, cursor, channel)
+
+@safeWrapper
+def cursor_min(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
+    """The maximum value of the signal across the cursor's window.
+    Calls cursor_reduce with np.min as `func` parameter.
+    """
+    return cursor_reduce(np.min, signal, cursor, channel)
+
 
 @safeWrapper
 def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
@@ -855,57 +966,9 @@ def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: ty
     the sample index of the cursor's x coordinate relative to the beginning of
     the signal.
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
-
-    t0,t1,_ = cursors2intervals(cursor, units=signal.times.units)
     
-    t0_ndx = np.array(signal.time_index(t0)).flatten()
+    return cursor_reduce(np.argmax, signal, cursor, channel)
     
-    if t0 == t1:
-        return t0_ndx
-        
-    else:
-        ret = signal.time_slice(t0,t1).argmax(axis=0).flatten() + t0_ndx
-    
-        if isinstance(channel, int):
-            return ret[channel].flatten()
-        
-        return ret
-
-@safeWrapper
-def cursor_min(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int] = None):
-    """The minimum value of the signal across the cursor's window.
-    
-    Parameters:
-    ----------
-    signal: neo.AnalogSignal, DataSignal
-    cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
-    channel: int or None (default)
-        For multi-channel signal, specified which channel is used:
-        0 <= channel < signal.shape[1]
-    
-    Returns:
-    --------
-    Python Quantity array of shape (1, signal.shape[1]) with the signal minimum
-    in the interval defined by the cursor's window, or the signal's sample value
-    at the cursor's x coordinate if cursor window is zero.
-    
-    """
-    from gui.signalviewer import SignalCursor as SignalCursor
-
-    t0,t1,_ = cursors2intervals(cursor, units=signal.times.units)
-    
-    if t0 == t1:
-        ret = signal[signal.time_index(t0),:]
-        
-    else:
-        ret = signal.time_slice(t0,t1).min(axis=0).flatten()
-    
-    if isinstance(channel, int):
-        return ret[channel].flatten()
-    
-    return ret
-
 @safeWrapper
 def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int] = None):
     """The index of minimum value of the signal across the cursor's window.
@@ -927,22 +990,8 @@ def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: ty
     the sample index of the cursor's x coordinate relative to the beginning of
     the signal.
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
-
-    t0,t1, _ = cursors2intervals(cursor, units=signal.times.units)
     
-    t0_ndx = np.array(signal.time_index(t0)).flatten()
-    
-    if t0 == t1:
-        return t0_ndx
-        
-    else:
-        ret = signal.time_slice(t0,t1).argmin(axis=0).flatten() + t0_ndx
-        
-        if isinstance(channel, int):
-            return ret[channel].flatten()
-        
-        return ret
+    return cursor_reduce(np.argmin, signal, cursor, channel)
 
 @safeWrapper
 def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int] = None):
@@ -1019,10 +1068,11 @@ def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor:
             mn = mn[channel].flatten()
         
         return (mx, mn)
-
+    
 @safeWrapper
 def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int]=None):
     """Average of signal samples across the window of a vertical cursor.
+    Calls cursor_reduce with np.mean as `func` parameter
     
     Parameters:
     -----------
@@ -1048,21 +1098,24 @@ def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: t
     A python Quantity with the same units as the signal.
     
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
+    return cursor_reduce(signal, np.mean, cursor, channel)
+#     from gui.signalviewer import SignalCursor as SignalCursor
+# 
+#     
+#     t0, t1, _ = cursors2intervals(cursor, units=signal.times.units)
+#     if t0 == t1:
+#         ret = cursor_value(signal, cursor, channel=channel)
+#         
+#     else:
+#         ret = signal.time_slice(t0,t1).mean(axis=0)
+#         
+#     
+#     if isinstance(channel, int):
+#         return ret[channel].flatten() # so that it can accept array indexing
+#     
+#     return ret
 
-    
-    t0, t1, _ = cursors2intervals(cursor, units=signal.times.units)
-    if t0 == t1:
-        ret = cursor_value(signal, cursor, channel=channel)
-        
-    else:
-        ret = signal.time_slice(t0,t1).mean(axis=0)
-        
-    
-    if isinstance(channel, int):
-        return ret[channel].flatten() # so that it can accept array indexing
-    
-    return ret
+cursor_mean = cursor_average
 
 @safeWrapper
 def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple], channel: typing.Optional[int] = None):

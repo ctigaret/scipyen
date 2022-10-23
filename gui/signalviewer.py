@@ -1693,7 +1693,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     x,y = coords # distribute coordinates to individual values
                 
                 else:
-                    raise ValueError("Invalid coordinates specified: %s" % coords)
+                    raise ValueError(f"Invalid coordinates specified: {coords}")
                 
             elif isinstance(coords, (pq.Quantity, np.ndarray)):
                 if coords.size == 1:
@@ -1723,7 +1723,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     x,y = coords # distribute to individual values
                     
                 else:
-                    raise ValueError("Invalid coordinates specified: %s" % coords)
+                    raise ValueError(f"Invalid coordinates specified: {coords}")
                         
             elif isinstance(coords, numbers.Number):
                 if cursorType in ("v", "vertical", "Vertical", 
@@ -1742,7 +1742,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         
                 
             else:
-                raise ValueError("Invalid coordinates specification: %s" % coords)
+                raise ValueError(f"Invalid coordinates specification: {coords}")
             
             return x,y
         
@@ -1795,10 +1795,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
                                 label=lbl, show_value = self.setCursorsShowValue.isChecked(),
                                 axis=ax[k])
-                    
-                    
-                    
-                
+
         xwindow = kwargs.pop("xwindow", self.defaultCursorWindowSizeX)
         ywindow = kwargs.pop("ywindow", self.defaultCursorWindowSizeY)
         labels  = kwargs.pop("labels",  None)
