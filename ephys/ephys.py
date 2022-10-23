@@ -861,14 +861,17 @@ def cursor_reduce(func:types.FunctionType, signal: typing.Union[neo.AnalogSignal
     Parameters:
     ----------
     func:   types.FunctionType. A function which takes a numpy array and returns 
-            a scalar (e.g., `np.min`, `np.max`, `np.mean`, `np.median`, `np.std`,
-            `np.var`, and their 'nan' versions,etc), including functions defined
-            in Scipyen's core.signalprocessing module (e.g., `sem`, `nansem`, 
-            `nansize`, `data_range`, `is_positive_waveform`, `waveform_amplitude`,
-            etc.)
+            a value(*).
+            Such functions include those in the numpy package `np.min`, `np.max`,
+            `np.mean`, `np.median`, `np.std`, `np.var`, (and their 'nan' versions),
+            and functions defined in Scipyen's core.signalprocessing module (e.g.,
+            `sem`, `nansem`, `nansize`, `data_range`, `is_positive_waveform`, 
+            `waveform_amplitude`, `minmax`, etc.)
     
             NOTE: The core.signalprocessing module is already imported in a 
                     Scipyen session under the `sigp` alias.
+    
+            (*) This value can be a scalar, or a tuple of scalars (e.g. sigp.maxmin)
             
     signal: neo.AnalogSignal, DataSignal
     
@@ -1016,31 +1019,33 @@ def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: ty
     object is still a two-element tuple).
     
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
-
-    t0,t1, _ = cursors2intervals(cursor, units = signal.times.units)
     
-    if t0==t1:
-        ret = signal[signal.time_index(t0),:]
-        
-        if isinstance(channel, int):
-            ret = ret[channel].flatten()
-            
-        return (ret, ret)
-        
-    else:
-    
-        mx = signal.time_slice(t0,t1).max(axis=0).flatten()
-        
-        if isinstance(channel, int):
-            mx = mx[channel].flatten()
-        
-        mn = signal.time_slice(t0,t1).min(axis=0).flatten()
-        
-        if isinstance(channel, int):
-            mn = mn[channel].flatten()
-        
-        return (mx, mn)
+    return cursor_reduce(sigp.maxmin, signal, cursor, channel)
+#     from gui.signalviewer import SignalCursor as SignalCursor
+# 
+#     t0,t1, _ = cursors2intervals(cursor, units = signal.times.units)
+#     
+#     if t0==t1:
+#         ret = signal[signal.time_index(t0),:]
+#         
+#         if isinstance(channel, int):
+#             ret = ret[channel].flatten()
+#             
+#         return (ret, ret)
+#         
+#     else:
+#     
+#         mx = signal.time_slice(t0,t1).max(axis=0).flatten()
+#         
+#         if isinstance(channel, int):
+#             mx = mx[channel].flatten()
+#         
+#         mn = signal.time_slice(t0,t1).min(axis=0).flatten()
+#         
+#         if isinstance(channel, int):
+#             mn = mn[channel].flatten()
+#         
+#         return (mx, mn)
 
 @safeWrapper
 def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int] = None):

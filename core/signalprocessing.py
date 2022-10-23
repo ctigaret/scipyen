@@ -635,11 +635,64 @@ def nansize(x, **kwargs):
     return ret
 
 def maxmin(x:np.ndarray, **kwargs):
+    """
+    Var-keyword parameters:
+    =======================
+    axis: int in [0, x.ndim) or None (default)
+        In this case x is flattened before min/max finding
+    
+    max_first:bool, default is True
+        When Talse, return np.min(x), np.max(x)
+    
+    Returns:
+    ========
+    A tuple (min, max) when max_first is False , else (max, min), where:
+        min if the result of np.nanmin along the specified axis
+        max is the result of np.nanmax along the specified axis
+    
+    NOTE: These are scalars when:
+            • x.shape is (n,1) and `axis` is 0, or None 
+            • x.shape is (1,n) and `axis` is 1, or None
+            • x.shape is (n,)  and `axis` is 0 or None
+            • x.shape is () or () (i.e. x is a numpy scalar with x.ndim == 0) 
+                               and `axis` is 0 or None
+    """
     axis = kwargs.pop("axis", None)
+    
+    max_first = kwargs.pop("max_first", True)
+    
+    if not isinstance(max_first, bool): # avoid ambiguities
+        max_first = False
     
     mx, mn = np.nanmax(x, axis=axis), np.nanmin(x, axis=axis)
     
-    return (mx, mn)
+    return (mx, mn) if max_first else (mn, mx)
+
+def minmax(x:np.ndarray, **kwargs):
+    axis = kwargs.pop("axis", None)
+    return maxmin(x, axis = axis, max_first = False)
+
+def argmaxmin(x:np.ndarray, **kwargs):
+    """CAUTION: x must not contain NaNs.
+    
+    Var-keyword parameters:
+    =======================
+    axis: int in [0, x.ndim) or None (default)
+        In this case x is flattened before min/max finding
+    
+    max_first:bool, default is True
+        When Talse, return np.min(x), np.max(x)
+    
+    """
+    axis = kwargs.pop("axis", None)
+    max_first = kwargs.op("max_first", True)
+    
+    amx, amn = np.argmax(x, axis=axis), np.argmin(x, axis=axis)
+    return (amx, amn) if max_first else (amn, amx)
+
+def argminmax(x:np.ndarray, **kwargs):
+    axis = kwargs.pop("axis", None)
+    return argmaxmin(x, axis=axis, max_first=False)
     
 def sem(x:np.ndarray, **kwargs):
     ddof = kwargs.pop("ddof", 1)
