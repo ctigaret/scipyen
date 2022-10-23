@@ -226,16 +226,6 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
         irin_interval = [rm_epoch.times[irin_ndx],
                          rm_epoch.times[irin_ndx] + rm_epoch.durations[irin_ndx]]
         
-#         baseline_interval = [rm_epoch[base_ndx].times,
-#                              rm_epoch[base_ndx].times + rm_epoch[base_ndx].duration]
-#         
-#         irs_interval = [rm_epoch[irs_ndx].times,
-#                         rm_epoch[irs_ndx].times + rm_epoch[irs_ndx].duration]
-#         
-#         irin_interval = [rm_epoch[irin_ndx].times,
-#                          rm_epoch[irin_ndx].times + rm_epoch[irin_ndx].duration]
-#         
-        
     if any([i is None for i in [baseline_interval, irs_interval, irin_interval]]):
         raise RuntimeError("Cannot determine signal interval boundaries")
         
@@ -277,7 +267,6 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
         vbase= Vm_signal.time_slice(baseline_interval[0], baseline_interval[1]).mean(axis=0)
         
         vstep = vrin - vbase
-                
                 
         if isinstance(channel, int):
             vstep = vstep[channel].flatten()
@@ -370,13 +359,13 @@ def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],epoch: typin
     epoch: neo.Epoch defining three time intervals: baseline region, 
     
     """
-    if not isinstance(signal, (neo.Analogsignal, DataSignal)):
+    if not isinstance(signal, (neo.AnalogSignal, DataSignal)):
         raise TypeError("signal expected to be a neo.AnalogSignal or DataSignal; got %s instead" % type(signal).__name__)
     
     if not isinstance(epoch, neo.Epoch):
         raise TypeError("epoch expected to be a neo.Epoch; got %s instead" % type(epoch).__name__)
     
-    if len(epoch != 3):
+    if len(epoch) != 3:
         raise TypeError("epoch must have three intervals; got %d instead" % len(epoch))
     
     if isinstance(vstep, float):

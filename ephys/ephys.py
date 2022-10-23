@@ -813,7 +813,15 @@ def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typin
     obtained using the two cursor's x values.
     """
     from gui.signalviewer import SignalCursor as SignalCursor
-    t0,t1, _ = cursors2intervals(cursor, signal.times.units)
+    
+    # NOTE: 2022-10-23 12:24:58
+    # Why calling this here ?!? There is a single cursor, so cursors2intervals
+    # returns None!
+    # Just go for the cursor's coordinates
+    # t0,t1, _ = cursors2intervals(cursor, signal.times.units)
+    
+    t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
+    t1 = t0 + cursor.xwindow/2 * signal.times.units
     
     if t0 == t1:
         ret = signal[signal.time_index(t0),:]
