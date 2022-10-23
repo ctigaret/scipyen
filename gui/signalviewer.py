@@ -3653,11 +3653,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             cursors = [self.dataCursor(name) for name in selItems]
             
+#             print(cursors)
+#             
             if len(cursors) == 0:
                 return
             
-            else:
-                cursors = [c for c in vertAndCrossCursors.values()]
+            cursors.sort(key=attrgetter('x'))
+            
+            # else:
+            #     cursors = [c for c in vertAndCrossCursors.values()]
                     
         if hasattr(self.y, "name") and isinstance(self.y.name, str) and len(self.y.name.strip()):
             name = "%s_Epoch" % self.y.name
@@ -3680,11 +3684,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             d.toAllSegmentsCheckBox.setChecked(True)
             
             d.sweepRelativeCheckBox = qd.CheckBox(d, "Relative to each segment start")
-            d.sweepRelativeCheckBox.setChecked(False)
+            d.sweepRelativeCheckBox.setChecked(True)
             
             d.overwriteEpochCheckBox = qd.CheckBox(d, "Overwrite existing epochs")
-            d.overwriteEpochCheckBox.setChecked(True);
-            
+            d.overwriteEpochCheckBox.setChecked(False);
             
             if d.exec() == QtWidgets.QDialog.Accepted:
                 txt = d.epochNamePrompt.text()
@@ -3694,10 +3697,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 toAllSegments    = d.toAllSegmentsCheckBox.isChecked()
                 relativeSweep    = d.sweepRelativeCheckBox.isChecked()
                 overwriteEpoch   = d.overwriteEpochCheckBox.isChecked()
-                
-                cursors = [c for c in vertAndCrossCursors.values()]
-                
-                cursors.sort(key=attrgetter('x'))
                 
                 self.cursorsToEpoch(*cursors, name=name, embed=True,
                                     all_segments = toAllSegments,
@@ -3770,52 +3769,55 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def slot_epochInDataBetweenCursors(self):
         vertAndCrossCursors = collections.ChainMap(self.crosshairSignalCursors, self.verticalSignalCursors)
         
-        if len(vertAndCrossCursors) == 0:
+        if len(vertAndCrossCursors) < 2:
+            QtWidgets.QMessageBox.warning(self,"Attach epoch to data",
+                                          "There must be at least two vertical or croshair cursors")
             return
         
         if isinstance(self.y, (neo.Block, neo.Segment)):
             d = qd.QuickDialog(self, "Make Epoch From Interval Between Cursors:")
             #d = vigra.pyqt.qd.QuickDialog(self, "Make Epoch From Interval Between Cursors:")
-            d.promptWidgets = list()
+            # d.promptWidgets = list()
             
-            namePrompt=qd.StringInput(d, "Name:")
-            #namePrompt=vigra.pyqt.qd.StringInput(d, "Name:")
-            namePrompt.setText("Epoch")
+            d.namePrompt=qd.StringInput(d, "Name:")
+            d.namePrompt.setText("Epoch")
             
-            c1Prompt = qd.StringInput(d, "SignalCursor 1:")
-            c2Prompt = qd.StringInput(d, "SignalCursor 2:")
+            d.c1Prompt = qd.StringInput(d, "SignalCursor 1:")
+            d.c2Prompt = qd.StringInput(d, "SignalCursor 2:")
             
             #c1Prompt = vigra.pyqt.qd.StringInput(d, "SignalCursor 1:")
             #c2Prompt = vigra.pyqt.qd.StringInput(d, "SignalCursor 2:")
             
-            d.promptWidgets.append(namePrompt)
-            d.promptWidgets.append(c1Prompt)
-            d.promptWidgets.append(c2Prompt)
+            # d.promptWidgets.append(namePrompt)
+            # d.promptWidgets.append(c1Prompt)
+            # d.promptWidgets.append(c2Prompt)
             
-            toAllSegmentsCheckBox = qd.CheckBox(d, "Current segment only")
-            #toAllSegmentsCheckBox = vigra.pyqt.qd.CheckBox(d, "Current segment only")
-            toAllSegmentsCheckBox.setChecked(False)
+            d.toAllSegmentsCheckBox = qd.CheckBox(d, "Embed in all segments")
+            d.toAllSegmentsCheckBox.setChecked(True)
             
-            d.promptWidgets.append(toAllSegmentsCheckBox)
+            d.sweepRelativeCheckBox = qd.CheckBox(d, "Relative to each segment start")
+            d.sweepRelativeCheckBox.setChecked(True)
             
-            overwriteEpochCheckBox = qd.CheckBox(d, "Overwrite existing epochs")
+            # d.promptWidgets.append(toAllSegmentsCheckBox)
+            
+            d.overwriteEpochCheckBox = qd.CheckBox(d, "Overwrite existing epochs")
             #overwriteEpochCheckBox = vigra.pyqt.qd.CheckBox(d, "Overwrite existing epochs")
-            overwriteEpochCheckBox.setChecked(True);
+            d.overwriteEpochCheckBox.setChecked(False);
             
-            d.promptWidgets.append(overwriteEpochCheckBox)
+            # d.promptWidgets.append(overwriteEpochCheckBox)
             
             if d.exec() == QtWidgets.QDialog.Accepted:
-                name = namePrompt.text()
+                name = d.namePrompt.text()
                 
                 if name is None or len(name) == 0:
                     return
                 
-                c1ID = c1Prompt.text()
+                c1ID = d.c1Prompt.text()
                 
                 if c1ID is None or len(c1ID) == 0:
                     return
                 
-                c2ID = c2Prompt.text()
+                c2ID = d.c2Prompt.text()
                 
                 if c2ID is None or len(c2ID) == 0:
                     return
@@ -3826,36 +3828,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if c1 is None or c2 is None:
                     return
                 
-                toAllSegments = toAllSegmentsCheckBox.isChecked()
-                overwriteEpoch   = overwriteEpochCheckBox.isChecked()
+                toAllSegments   = d.toAllSegmentsCheckBox.isChecked()
+                relativeSweep   = d.sweepRelativeCheckBox.isChecked()
+                overwriteEpoch  = d.overwriteEpochCheckBox.isChecked()
                 
-                epoch = self.epochBetweenCursors(c1, c2, name)
+                epoch = self.epochBetweenCursors(c1, c2, name=name, embed=True, 
+                                                 all_segments = toAllSegments,
+                                                 relative_to_segment_start = relativeSweep,
+                                                 overwrite = overwriteEpoch)
                 
-                if epoch is not None:
-                    name=epoch.name
-                    if name is None:
-                        name = "epoch"
-                
-                if isinstance(self.y, neo.Block):
-                    if toAllSegments:
-                        if overwriteEpoch:
-                            self.y.segments[self.frameIndex[self._current_frame_index_]].epochs = [epoch]
-                            
-                        else:
-                            self.y.segments[self.frameIndex[self._current_frame_index_]].epochs.append(epoch)
-                    else:
-                        if overwriteEpoch:
-                            for ndx in self.frameIndex:
-                                self.y.segments[ndx].epochs = [epoch]
-                        else:
-                            for ndx in self.frameIndex:
-                                self.y.segments[ndx].epochs.append(epoch)
-                else:
-                    if overwriteEpoch:
-                        self.y.epochs = [epoch]
-                    else:
-                        self.y.epochs.append(epoch)
-                    
                 self.displayFrame()
                 
     @pyqtSlot()
@@ -4085,53 +4066,63 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # of signals and spiketrains ONLY, to avoid any existing events or
             # epochs that are out of the signal domain, in each segment
             if isinstance(self.y, neo.Block):
-                seg_starts = [segment_start(s) for s in self.y.segments]
-                if not all(ss == seg_starts[0] for ss in seg_starts):
-                    epochs = list()
-                    current_seg_start = segment_start(self.y.segments[self.currentFrame])
-                    
-                    rel_starts = [c.x * current_seg_start.units - current_seg_start for c in cursors]
-                    # print(f"SignalViewer.cursorsToEpoch: rel_starts: {rel_starts}")
-                    for seg in self.y.segments:
-                        s_start = segment_start(seg)
-                        epoch_tuples = [(s_start + rel_starts[i], cursors[i].xwindow*s_start.units, cursors[i].name) for i in range(len(cursors))]
-                        seg_epoch = cursors2epoch(*epoch_tuples, name=name)
-                        epochs.append(seg_epoch)
-                        if embed:
-                            if overwrite:
-                                seg.epochs = [seg_epoch]
-                            else:
-                                seg.epochs.append(seg_epoch)
-                                
-                    self.displayFrame()
-                    
-                    return epochs
-                
+                segments = self.y.segments
             elif isinstance(self.y, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self.y):
-                seg_starts = [segment_start(s) for s in self.y]
-                if not all(ss == seg_starts[0] for ss in seg_starts):
-                    epochs = list()
-                    current_seg_start = segment_start(self.y[self.currentFrame])
-                    
-                    rel_starts = [c.x*current_seg_start.units - c.xwindow/2*current_seg_start.units - current_seg_start for c in cursors]
-                    
-                    for seg in self.y:
-                        s_start = segment_start(seg)
-                        epoch_tuples = [(s_start + rel_starts[i], cursors[i].xwindow*s_start.units, cursors[i].name) for i in range(len(cursors))]
-                        seg_epoch = cursors2epoch(*epoch_tuples, name=name)
-                        epochs.append(seg_epoch)
-                        if embed:
-                            if overwrite:
-                                seg.epochs = [seg_epoch]
-                            else:
-                                seg.epochs.append(seg_epoch)
-                                
-                    
-                    self.displayFrame()
-                    
-                    return epochs
+                segments = self.y
+            elif isinstance(self.y, neo.Segment):
+                segments = [self.y]
+                
+            elif isinstance(self.y, neo.core.basesignal.BaseSignal):
+                if self.y.segment is None:
+                    return
+                
+                segments = [self.y.segment]
+                
+            else:
+                return
+            
+            if len(segments) == 0:
+                return
+                
+            seg_starts = [segment_start(s) for s in segments]
+            if not all(ss == seg_starts[0] for ss in seg_starts):
+                epochs = list()
+                current_seg_start = segment_start(segments[self.currentFrame])
+                
+                rel_starts = [c.x * current_seg_start.units - current_seg_start for c in cursors]
+                # print(f"SignalViewer.cursorsToEpoch: rel_starts: {rel_starts}")
+                for k, seg in enumerate(segments):
+                    s_start = seg_starts[k]
+                    epoch_tuples = [(s_start + rel_starts[i], cursors[i].xwindow*s_start.units, cursors[i].name) for i in range(len(cursors))]
+                    seg_epoch = cursors2epoch(*epoch_tuples, name=name)
+                    epochs.append(seg_epoch)
+                    if embed:
+                        if overwrite:
+                            seg.epochs = [seg_epoch]
+                        else:
+                            seg.epochs.append(seg_epoch)
+                            
+                self.displayFrame()
+                
+                return epochs
+                
+        # FIXME/TODO: 2022-10-23 23:57:00
+        # use self.FrameIndex[self.currentFrame] instead (that is because we'd
+        # be adapting this to multi-frame indices as in LSCaT !!!)
+        if isinstance(self.y, neo.Block):
+            t_units = self.y.segments[self.currentFrame].t_start.units
+        elif isinstance(self.y, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self.y):
+            t_units = self.y[self.currentFrame].t_start.units
+        elif isinstance(self.y, neo.Segment):
+            t_units = self.y.t_start.units
+        elif isinstance(self.y, neo.core.basesignal.BaseSignal):
+            if self.y.segment is None:
+                return
+            t_units = self.y.times[0].units
+        else:
+            t_units = pq.s # reasonable default (although not necessarily always applicable !!!)
         
-        epoch = cursors2epoch(*cursors, name=name, sort=True)
+        epoch = cursors2epoch(*cursors, name=name, sort=True, units = t_units)
         
         if embed:
             if isinstance(self.y, neo.Block):
@@ -4191,6 +4182,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
                 else:
                     self.y.epochs.append(epoch)
+                    
+            elif isinstance(self.y, neo.core.basesignal.BaseSignal):
+                if hasattr(self.y, "segment") and isinstance(self.y.segment, neo.Segment):
+                    if overwrite:
+                        self.y.segment.epochs = [epoch]
+                    else:
+                        self.y.segment.epocha.append(epoch)
                         
             else:
                 warnings.warn("Epochs can only be embeded in neo.Segment objects (either stand-alone, collected in a tuple or list, or inside a neo.Block)")
@@ -4199,16 +4197,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
         return epoch
     
-    #@safeWrapper
-    #def _gen_epoch_from_cursors_(self, *cursors, name):
-        #x = np.array([c.x for c in cursors]) * pq.s
-        #d = np.array([c.xwindow for c in cursors]) * pq.s
-        #labels = np.array([c.ID for c in cursors], dtype="S")
-        
-        #t = x - d/2
-        
-        #return neo.Epoch(times=t, durations=d, labels=labels, units=pq.s, name=name)
-        
     def cursorToEpoch(self, crs=None, name=None):
         """Creates a neo.Epoch from a single cursor
         DEPRECATED superceded by the new cursorsToEpoch
@@ -4236,32 +4224,164 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         return cursors2epoch(crs, name=name)
         
-    def epochBetweenCursors(self, c0, c1, name=None):
+    def epochBetweenCursors(self, c0:SignalCursor, c1:SignalCursor, name:typing.Optional[str]=None, embed:bool = False, all_segments:bool = True, relative_to_segment_start:bool=False, overwrite:bool = False):
         if c0.isHorizontal or c1.isHorizontal:
             return
         
-        clist = sorted([c0, c1], key=attrgetter('x'))
+        cursors = sorted([c0, c1], key=attrgetter('x'))
         
-        if name is None:
-            d = qd.QuickDialog(self, "Make Epoch From The Interval Between Two Cursors:")
-            #d = vigra.pyqt.qd.QuickDialog(self, "Make Epoch From Interval Between Two Cursors:")
-            d.promptWidgets = list()
-            d.promptWidgets.append(qd.StringInput(d, "Name:"))
-            #d.promptWidgets.append(vigra.pyqt.qd.StringInput(d, "Name:"))
-            d.promptWidgets[0].setText("Epoch")
-            
-            if d.exec() == QtWidgets.QDialog.Accepted:
-                txt = d.promptWidgets[0].text()
-                if txt is not None and len(txt)>0:
-                    name=txt
-                    
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            if hasattr(self.y, "name") and isinstance(self.y.name, str) and len(self.y.name.strip()):
+                name = f"{self.y.name}_Epoch"
+            else:
+                name = "Epoch"
+                
+        if all_segments and relative_to_segment_start:
+            if isinstance(self.y, neo.Block):
+                segments = self.y.segments
+            elif isinstance(self.y, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self.y):
+                segments = self.y
             else:
                 return
+            
+            seg_starts = [segment_start(s) for s in segments]
+            if not all(ss == seg_starts[0] for ss in seg_starts):
+                current_seg_start = segment_start(segments[self.currentFrame])
+                
+                rel_starts = [c.x * current_seg_start.units - current_seg_start for c in cursors]
+                
+                epochs = list()
+                for k, seg in enumerate(segments):
+                    s_start = seg_starts[k]
+                    times = [s_start + rel_starts[i] for i in range(len(cursors))]
+                    duration = times[1]-times[0]
+                    seg_epoch = neo.Epoch(times = np.array([times[0]]), durations=np.array([duration]),
+                                            units = times[0].units,
+                                            labels = np.array([f"From {cursors[0].name} to {cursors[1].name}"]),
+                                            name=name)
+                    epochs.append(seg_epoch)
+                    if embed:
+                        if overwrite:
+                            seg.epochs = [seg_epoch]
+                        else:
+                            seg.epochs.append(seg_epoch)
+                            
+                self.displayFrame()
+                return epochs
+            
+        # FIXME/TODO: 2022-10-23 23:58:06
+        # see FIXME/TODO: 2022-10-23 23:57:00
+        if isinstance(self.y, neo.Block):
+            t_units = self.y.segments[self.currentFrame].t_start.units
+        elif isinstance(self.y, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self.y):
+            t_units = self.y[self.currentFrame].t_start.units
+        elif isinstance(self.y, neo.Segment):
+            t_units = self.y.t_start.units
+        elif isinstance(self.y, neo.core.basesignal.BaseSignal):
+            if self.y.segment is None:
+                return
+            t_units = self.y.times[0].units
+        else:
+            t_units = pq.s # reasonable default (although not necessarily always applicable !!!)
         
-        return neo.Epoch(times = np.array([clist[0].x])*pq.s,
-                         durations = np.array([clist[1].x - clist[0].x]) * pq.s,
-                         units = pq.s, labels=np.array(["From %s to %s" % (clist[0].ID, clist[1].ID)], dtype="S"), \
-                         name=name)
+        epoch = neo.Epoch(times = np.array([cursors[0].x]), durations = np.array([cursors[1].x - cursors[0].x]),
+                          units = t_units, labels = np.array([f"From {cursors[0].name} to {cursors[1].name}"]),
+                          name = name)
+        
+        if embed:
+            if isinstance(self.y, neo.Block):
+                if len(self.y.segments) == 0:
+                    warnings.warn("Plotted data is a neo.Block without segments")
+                    #return epoch
+                
+                elif len(self.y.segments) == 1:
+                    if overwrite:
+                        self.y.segments[0].epochs = [epoch]
+                    else:
+                        self.y.segments[0].epochs.append(epoch)
+                    
+                else:
+                    if all_segments:
+                        for ndx in self.frameIndex:
+                            if overwrite:
+                                self.y.segments[ndx].epochs = [epoch]
+                                
+                            else:
+                                self.y.segments[ndx].epochs.append(epoch)
+                            
+                    else:
+                        if overwrite:
+                            self.y.segments[self.frameIndex[self._current_frame_index_]].epochs = [epoch]
+                        else:
+                            self.y.segments[self.frameIndex[self._current_frame_index_]].epochs.append(epoch)
+                            
+            elif isinstance(self.y, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self.y]):
+                if len(self.y) == 0:
+                    warnings.warn("Plotted data is an empty sequence!")
+                
+                elif len(self.y) == 1:
+                    if overwrite:
+                        self.y[0].epochs = [epoch]
+                    else:
+                        self.y[0].epochs.append(epoch)
+                    
+                else:
+                    if all_segments:
+                        for ndx in self.frameIndex:
+                            if overwrite:
+                                self.y[ndx].epochs = [epoch]
+                                
+                            else:
+                                self.y[ndx].epochs.append(epoch)
+                            
+                    else:
+                        if overwrite:
+                            self.y[self.rameIndex[self._current_frame_index_]].epochs = [epoch]
+                        else:
+                            self.y[self.rameIndex[self._current_frame_index_]].epochs.append(epoch)
+                            
+            elif isinstance(self.y, neo.Segment):
+                if overwrite:
+                    self.y.epochs = [epoch]
+                    
+                else:
+                    self.y.epochs.append(epoch)
+                    
+            elif isinstance(self.y, neo.core.basesignal.BaseSignal):
+                if hasattr(self.y, "segment") and isinstance(self.y.segment, neo.Segment):
+                    if overwrite:
+                        self.y.segment.epochs = [epoch]
+                    else:
+                        self.y.segment.epocha.append(epoch)
+                        
+            else:
+                warnings.warn("Epochs can only be embeded in neo.Segment objects (either stand-alone, collected in a tuple or list, or inside a neo.Block)")
+                
+            self.displayFrame()
+                
+        return epoch
+    
+        
+#         if name is None:
+#             d = qd.QuickDialog(self, "Make Epoch From The Interval Between Two Cursors:")
+#             #d = vigra.pyqt.qd.QuickDialog(self, "Make Epoch From Interval Between Two Cursors:")
+#             d.promptWidgets = list()
+#             d.promptWidgets.append(qd.StringInput(d, "Name:"))
+#             #d.promptWidgets.append(vigra.pyqt.qd.StringInput(d, "Name:"))
+#             d.promptWidgets[0].setText("Epoch")
+#             
+#             if d.exec() == QtWidgets.QDialog.Accepted:
+#                 txt = d.promptWidgets[0].text()
+#                 if txt is not None and len(txt)>0:
+#                     name=txt
+#                     
+#             else:
+#                 return
+        
+        # return neo.Epoch(times = np.array([cursors[0].x])*pq.s,
+        #                  durations = np.array([cursors[1].x - cursors[0].x]) * pq.s,
+        #                  units = pq.s, labels=np.array(["From %s to %s" % (cursors[0].ID, cursors[1].ID)], dtype="S"),
+        #                  name=name)
     
     def setPlotStyle(self, val):
         if val is None:
@@ -6018,7 +6138,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 brushes = cycle([None])
                 
         for epoch in args:
-            # print(f"SignalViewer._plot_epochs_seq_ epoch {epoch}")
+            # print(f"SignalViewer._plot_epochs_seq_ epoch times {epoch.times} durations {epoch.durations}")
             x0 = epoch.times.flatten().magnitude
             x1 = x0 + epoch.durations.flatten().magnitude
             

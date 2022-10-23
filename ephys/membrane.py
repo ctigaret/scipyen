@@ -84,7 +84,7 @@ import ephys.ephys as ephys
 
 
 @safeWrapper
-def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.Union[str, int, pq.Quantity, float], regions: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None,channel: typing.Optional[int] = None):
+def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.Union[str, int, pq.Quantity, float], regions: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None, channel: typing.Optional[int] = None):
     """Calculates the series (Rs) and input (Rin) resistances in voltage-clamp.
     
     Parameters:
@@ -287,11 +287,63 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
     
     Rs = vstep / (Irs - Ibase)
     
-    return np.array([Rs, Rin]) * Rin.units
-    
+    return (np.array([Rs, Rin]) * Rin.units).rescale(pq.MOhm)
 
 @safeWrapper
-def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],baseline: typing.Union[SignalCursor, tuple],rs: typing.Union[SignalCursor, tuple],rin: typing.Union[SignalCursor, tuple], vstep: typing.Union[float, pq.Quantity],channel: typing.Optional[int] = None):
+def block_Rs_Rin(data:typing.Union[neo.Block,typing.Sequence[neo.Segment]], Im:typing.Union[str, int], Vm:typing.Union[str, int, pq.Quantity, float], regions:typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None, channel: typing.Optional[int] = None, name:typing.Optional[str] = None):
+    """Calls segment_Rs_Rin for all segments in data.
+    
+    Parameters:
+    ===========
+    data: neo.Block or a sequence (tuple, list) of neo.Segments
+    
+    Im, Vm, regions, channel - same as for segment_Rs_Rin()
+    
+    name: str or None (default) - the name prefix of the resulting signals (see
+        below)
+    
+        When None or an empty str, the name will be the name of the block else
+        the string "data".
+    
+    ATTENTION: See the requirement for `regions` in the help for segment_Rs_Rin.
+    
+    When `regions` is None (the default) each segment in the data is expected to 
+    contain an Epoch named "Rm" with three intervals labelled "baseline", "Rs",
+    and "Rin". Since each segment MAY have a different start time, the Epochs 
+    should be distinct in each segment.
+    
+    Returns:
+    ========
+    
+    Two neo.IrregularlySampledSignal objects with the time-course of the series
+    resistance (Rs) and input resistance (Rin)
+    
+    """
+    if isinstance(data, neo.Block):
+        segments = data.segments
+        
+    elif isinstance(data, (tuple, list) and all(isinstance(d, neo.Segment) for d in data)):
+        segments = data
+    else:
+        raise TypeError(f"Expecting a neo.Block, or a sequence of neo.Segments; got {type(data).__name__} instead")
+    
+    trsrin = [(s.t_start, segment_Rs_Rin(s, Im=Im, Vm=Vm, regions=regions, channel=channel)) for s in segments]
+    
+    times, rsrin = zip(*trsrin) # split into a times and a RsRin tuple
+    
+    t_vec = np.array(times) * times[0].units
+    rarray = np.concatenate(rsrin, axis=1) * rsrin[0].units
+    
+    if not isinstance(name, str) or len(name.strip())==0:
+        name = data.name if isinstance(data, neo.Block) and len(data.name.strip()) else "data"
+        
+    Rs  = neo.IrregularlySampledSignal(times=t_vec, signal = rarray[0,:], units = rarray.units, time_units = t_vec.units, name=f"{name}_Rs")
+    Rin = neo.IrregularlySampledSignal(times=t_vec, signal = rarray[1,:], units = rarray.units, time_units = t_vec.units, name=f"{name}_Rin")
+    
+    return Rs, Rin
+    
+@safeWrapper
+def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal], baseline: typing.Union[SignalCursor, tuple], rs: typing.Union[SignalCursor, tuple], rin: typing.Union[SignalCursor, tuple], vstep: typing.Union[float, pq.Quantity], channel: typing.Optional[int] = None):
     """Calculates series and input resistance from voltage-clamp recording.
     
     Applies to voltage-clamp recordings (membrane current signal)
@@ -320,6 +372,12 @@ def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],baseline: 
         
         When a Quantity it must be in units convertible to mV.
         
+    channel: int or None (default)
+    
+        For multi-channel signals, the index of the signal's channel. When None
+        (default) the values returned will be arrays with size equal to the 
+        number of channels in the signals.
+        
     Returns:
     -------
     
@@ -346,17 +404,41 @@ def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],baseline: 
     return np.array([Rs, Rin]) * Rin.units
 
 @safeWrapper
-def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],epoch: typing.Union[neo.Epoch, tuple],vstep: typing.Union[float, pq.Quantity],channel: typing.Optional[int] = None):
+def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal], epoch: typing.Union[neo.Epoch, tuple], vstep: typing.Union[float, pq.Quantity], channel: typing.Optional[int] = None):
     """Calculates series and input resistance based on epochs.
     
-    The baseline, Rs and Rin are calculated across the time intervals
-    defined in the Epoch.
+    The baseline, Rs and Rin are calculated across the time intervals defined in
+    the Epoch, which is expected to contain three intervals each with its own
+    time and duration (see neo.Epoch for details about Epoch objects)
     
     Parameters:
     -----------
     signal: neo.AnalogSignal or DataSignal
     
-    epoch: neo.Epoch defining three time intervals: baseline region, 
+    epoch: neo.Epoch with three time intervals with the following roles:
+        1) baseline → the baseline current BEFORE the depolarizing test voltage
+    
+        2) Rs       → contains the peak of the first capacitive transient 
+                        (at start of depolarizing test)
+    
+        3) Rin      → contains a region of the steady-state current during the 
+                        depolarizing text voltage, AND just before the repolarizing
+                        capacitive transient
+    
+    vstep: scalar float or Quantity in mV, the size (amplitude) of the depolarizing
+            test voltage
+    
+    channel: int or None (default). When given, it is the index of the signal
+        channel (for multi-channel signals).
+    
+        NOTE: AnalogSignal objects typically have just ONE channel (i.e., they 
+                are numpy array-like with shape (n,1) where n is the number of 
+                samples). Therefore, passing the default value for `channel`
+                (None) will result in just two scalars (Rs and Rin).
+    
+                If the signal has more than one channel, then passing the default
+                `channel` will result in two arrays (Rs and Rin) with as many
+                elements as channels.
     
     """
     if not isinstance(signal, (neo.AnalogSignal, DataSignal)):

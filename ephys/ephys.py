@@ -704,7 +704,6 @@ def cursors2epoch(*args, **kwargs):
         # print("cursors2epoch", t_d_i)
         t, d, i = [v for v in zip(*t_d_i)]
         
-        
         if isinstance(t[0], pq.Quantity):
             units = t[0].units
             
@@ -1021,59 +1020,21 @@ def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: ty
     """
     
     return cursor_reduce(sigp.maxmin, signal, cursor, channel)
-#     from gui.signalviewer import SignalCursor as SignalCursor
-# 
-#     t0,t1, _ = cursors2intervals(cursor, units = signal.times.units)
-#     
-#     if t0==t1:
-#         ret = signal[signal.time_index(t0),:]
-#         
-#         if isinstance(channel, int):
-#             ret = ret[channel].flatten()
-#             
-#         return (ret, ret)
-#         
-#     else:
-#     
-#         mx = signal.time_slice(t0,t1).max(axis=0).flatten()
-#         
-#         if isinstance(channel, int):
-#             mx = mx[channel].flatten()
-#         
-#         mn = signal.time_slice(t0,t1).min(axis=0).flatten()
-#         
-#         if isinstance(channel, int):
-#             mn = mn[channel].flatten()
-#         
-#         return (mx, mn)
+
+@safeWrapper
+def cursor_minmax(signal, cursor, channel):
+    return cursor_reduce(sigp.minmax, signal, cursor, channel)
 
 @safeWrapper
 def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int] = None):
     """The indices of signal maximum and minimum across the cursor's window.
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
+    return cursor_reduce(sigp.argmaxmin, signal, cursor, channel)
 
-    t0,t1,_ = cursors2intervals(cursor, units=signal.times.units)
-    
-    t0_ndx = np.array(signal.time_index(t0)).flatten()
-    
-    if t0==t1:
-        return (t0_ndx, t0_ndx)
-        
-    else:
-    
-        mx = signal.time_slice(t0,t1).argmax(axis=0).flatten() + t0_ndx
-        
-        if isinstance(channel, int):
-            mx = mx[channel].flatten()
-        
-        mn = signal.time_slice(t0,t1).argmin(axis=0).flatten() + t0_ndx
-        
-        if isinstance(channel, int):
-            mn = mn[channel].flatten()
-        
-        return (mx, mn)
-    
+@safeWrapper
+def cursor_argminmax(signal, cursor, channel):
+    return cursor_reduce(sigp.argminmax, signal, cursor, channel)
+
 @safeWrapper
 def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int]=None):
     """Average of signal samples across the window of a vertical cursor.
@@ -1103,22 +1064,7 @@ def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: t
     A python Quantity with the same units as the signal.
     
     """
-    return cursor_reduce(signal, np.mean, cursor, channel)
-#     from gui.signalviewer import SignalCursor as SignalCursor
-# 
-#     
-#     t0, t1, _ = cursors2intervals(cursor, units=signal.times.units)
-#     if t0 == t1:
-#         ret = cursor_value(signal, cursor, channel=channel)
-#         
-#     else:
-#         ret = signal.time_slice(t0,t1).mean(axis=0)
-#         
-#     
-#     if isinstance(channel, int):
-#         return ret[channel].flatten() # so that it can accept array indexing
-#     
-#     return ret
+    return cursor_reduce(np.mean, signal, cursor, channel)
 
 cursor_mean = cursor_average
 
@@ -1157,7 +1103,6 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal], cursor: typi
     
     """
     from gui.signalviewer import SignalCursor as SignalCursor
-
     
     data_index = cursor_index(signal, cursor)
     
@@ -1328,8 +1273,8 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal], curso
 def cursors_distance(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor0: typing.Union[SignalCursor, tuple], cursor1: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
     """Distance between two cursors, in signal samples.
     
-    NOTE: The distance between two cursors in the signal domain can be
-    calculated directly as the difference between the cursors' x coordinates
+    NOTE: The distance between two cursors in the signal domain is simply the
+            difference between the cursors' x coordinates!.
     
     """
     ret = [cursor_index(signal, c) for c in (cursor0, cursor1)]
