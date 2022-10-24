@@ -109,7 +109,7 @@ def Clements_Bekkers_97(x, parameters):
     
         b  = scale;
     
-        x₀ = delay ("onset");
+        x₀ = delay ("onset") (ms);
     
         τ₁, τ₂ = time constants, respectively, for rise and decay
     
@@ -118,8 +118,13 @@ def Clements_Bekkers_97(x, parameters):
     ============
     x: predictor (independent variable) - 1D numpy ndarray
 
-    parameters: 1D sequence (tuple, list, numpy array) of five elements:
+    parameters: 1D sequence (tuple, list, numpy array) of five float scalars:
                 a, b, x₀, τ₁ and τ₂
+    
+                where:
+                    a is considered in pA,
+                    b is dimensionless,
+                    x₀, τ₁ and τ₂ are considered in s
     
     Returns:
     ========

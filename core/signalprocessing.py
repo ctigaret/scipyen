@@ -618,7 +618,7 @@ def state_levels(x:np.ndarray, **kwargs):
     else:
         raise TypeError("Moment must be specified by a string ('mean' or 'mode') or a unary function; got %s instead" % type(moment).__name__)
     
-    return sLevels#, counts, edges
+    return sLevels, counts, edges
 
 def nansize(x, **kwargs):
     """

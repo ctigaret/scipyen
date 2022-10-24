@@ -2866,16 +2866,10 @@ def parse_step_waveform_signal(sig, method="state_levels", **kwargs):
         adcrange = kwargs.pop("adcrange", 10)
         adcscale = kwargs.pop("adcrange", 1e3)
     
-        centroids = sigp.state_levels(sig_flt.magnitude, levels = levels, 
+        centroids, cnt, edg = sigp.state_levels(sig_flt.magnitude, levels = levels, 
                                     adcres = adcres, 
                                     adcrange = adcrange, 
                                     adcscale = adcscale)
-        
-        #centroids = sigp.state_levels(sig_flt.magnitude, levels = 0.5, 
-                                    #adcres = adcres, 
-                                    #adcrange = adcrange, 
-                                    #adcscale = adcscale)
-        
         
         centroids = np.array(centroids).T[:,np.newaxis]
         

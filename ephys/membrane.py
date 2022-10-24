@@ -1329,7 +1329,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None, steadyStateDuratio
         #
         #   the high state is the actual pulse
         #
-        centroids = sigp.state_levels(im, levels = 0.5)
+        centroids, cnt, edg = sigp.state_levels(im, levels = 0.5)
         centroids = np.array(centroids).T[:,np.newaxis]
         
         #[low, high]
