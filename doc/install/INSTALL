@@ -212,14 +212,12 @@ given further below, for Python 3.9.7, boost 1.77.0
         Boost.Graph, 
         Boost.Graph parallel
         
-        NOTE: Boost can (and should) be built inside the virtual Python 
-        environment, see below.
+        NOTE: Boost can be built inside the virtual Python environment, see below.
     
     
         Qt5                                 Scipyen GUI
 
         cmake3, cmake3-full                 Build VIGRA and NEURON
-        Devel packages NOT necessary.
     
 
         zlib                                Build VIGRA
@@ -227,8 +225,7 @@ given further below, for Python 3.9.7, boost 1.77.0
         openexr                             Build VIGRA
         openssl >= 1.11                     Build VIGRA
         fftw3                               Build VIGRA
-        (optionally, but recomended
-        with MPI bindings)
+        (including with MPI bindings and threads support)
         mpich                               Build NEURON
         tiff                                Build VIGRA
         jpeg                                Build VIGRA
@@ -313,6 +310,9 @@ wheel, then enable the installation of PyQt5 in pip_requirements_Linux.txt first
 by "un-commenting" the line (remove the "#" and any spaces at the beginning of 
 the line containing PyQt5).
 
+The disadvantage of this is that the PyQt5 elements in Scipyen do not follow, or
+integrate with, the Qt GUI settings of your desktop (especially when using KDE).
+
 =================================================================
 5. BUILD DEPENDENCIES(*)
 =================================================================
@@ -394,6 +394,14 @@ For each of these, cd into their source tree and run:
     make install
     
     pip list (should indicate PyQt5, sip)
+    
+    or, better (NOTE everything is case-sensitive):
+        
+        pip list | grep sip
+        
+        pip list | grep PyQt5
+        
+        
 ................................
 5.1.3 PyQt5.sip extension module:
 ................................
@@ -405,12 +413,16 @@ For each of these, cd into their source tree and run:
     
     NOTE: You may have to rebuild Pyt5.sip after rebuilding PyQt5 itself
     
+    Also, pip list | grep PyQt5 shoudl now report both PyQt5 and PyQt5-sip
+    packages.
+    
+    
 After installing pip requirements below, test that PyQt5  was installed OK
 by launching 'jupyter qtconsole' - Qt widgets should have the style used by your
 desktop.
     
 --------------------------------------------------------------------------------
-5.2 BUILD AND INSTALL BOOST LIBRARIES (OPTIONAL)
+5.2 BUILD AND INSTALL BOOST LIBRARIES (OPTIONAL; you can use system's software management)
 --------------------------------------------------------------------------------
 
 NOTE: Optional, ONLY IF if the system-wide boost libraries are not available for the
@@ -440,6 +452,8 @@ On Linux :
   (OPTIONAL, required to use bokeh with NEURON and jupyterlab; however, 
    installing nodejs via pip might just be enough)
   
+  NOTE: this is independnet of, and not require for, Vigra - it can be built later
+  
   Download source archive node-v15.6.0.tar.gz 
   NOTE: to use with Python 3.10 you need node-v16.14.0.tar.gz
   
@@ -467,7 +481,7 @@ create an out-of-source build tree, also in src:
 mkdir vigra-build && cd vigra-build
 
 ....................................
-5.4.2 If needed, patch vigra sources
+5.4.2 Patch vigra sources - NOTE: THIS IS NECESSARY with the latest hdf5 libraries
 ....................................
 
 See scipyen/doc/install/vigra_patches/README for details. 

@@ -17,7 +17,7 @@ Python >= 3.9   vigra/vigranumpy/lib/__init__.py
 For both Linux and Windows 10:
     if builing against a HDF5 libraries stack with version >= 1.11
         replace: 
-            vigra/impex/hdf5impex.cxx 
+            vigra/src/impex/hdf5impex.cxx 
             
         with:
             vigra_patches/hdf5_gt_1.11/vigra/impex/hdf5impex.cxx
@@ -48,7 +48,7 @@ before building "doc"
         with:
             vigra_patches/python39/vigra-build/vigranumpy/docsrc/conf.py
             
-For windows 10:
+For windows 10 ONLY:
     if building with VisualStudio 2019 or later:
         replace:
             vigra/vigranumpy/src/core/segmentation.cxx
