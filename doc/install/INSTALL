@@ -300,7 +300,7 @@ reflects the use of Python-3.9)
 
 4.3 install pip requirements
 
-call pip install -r $HOME/scipyen/doc/installation/pip_requirements_Linux.txt
+call pip install -r $HOME/scipyen/doc/install/pip_requirements_Linux.txt
 
 WARNING: The installation of PyQt5 wheel using pip is, by default, disabled in
 pip_requirements_Linux.txt (the line is simply commented-out) for the reasons
