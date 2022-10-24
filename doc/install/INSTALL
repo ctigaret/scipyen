@@ -287,7 +287,7 @@ In short (example using sistem-wide Python 3.9):
 4.1 Create Scipyen configuration scripts - $HOME/.scipyenrc
 
     user@site:~> cd scipyen/doc/install
-    user@site:~/scipyen/doc/install> ./make_script_links.sh <path-where-environment-is>
+    user@site:~/scipyen/doc/install> ./make_script_links.sh <path-where-environment-is> <path-to-scipyen-diretory>
     
 4.2 activate the environment:
     start a new terminal the call 'scipyact'
