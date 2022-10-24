@@ -529,6 +529,9 @@ cmake-gui ../vigra
 ....................................
 5.4.4 make & install
 ....................................
+    <patch hdf5impex, vigranumpy, as per scipyen/doc/install/vigra-patches/README
+    section "For both Linux and Windows 10, subsection (1)>
+    
     make
     
     !!! NOTE !!!
@@ -541,6 +544,9 @@ cmake-gui ../vigra
         (NOTE: this corrects deprecated syntax)
     NOTE: 2022-02-20 22:26:47 the above issue did not come up on Tumbleweed and
         Python 3.10
+        
+    <patch vigranumpy as per scipyen/doc/install/vigra-patches/README
+    section "For both Linux and Windows 10, subsection (2)>
         
     make doc 
     make install (--> installs in $VIRTUAL_ENV/doc/vigra and $VIRTUAL_ENV/doc/vigranumpy)
@@ -560,6 +566,9 @@ cmake-gui ../vigra
     
     The '.scipyenrc' bash script, which is sourced by Scipyen launch bash 
     script, takes care of that (see make_script_links.sh in this directory)
+    
+    NOTE 3: vigra will NOT be listed in pip list, although it will be available
+    to `import vigra` in a Python or Juyter session
     
 -------------------------------------------------------------------------------
 5.5. BUILD AND INSTALL PyTables (tables)
@@ -642,6 +651,9 @@ Example (as of 2022-02-16 12:25:17 on Tumbleweed 20220213)
         IV_ENABLE_SHARED=true
         IV_ENABLE_X11_DYNAMIC=false # NOTE: 2022-02-16 12:50:18 setting to True prevents the GUI from showing!
         MOD2C_ENABLE_LEGACY_UNITS=false
+    
+    NOTE: for more recent nrn repos make sure all INSTALL variables in cmake point to
+    $VIRTUAL_ENV/xxx instead of /usr/local/xxx
         
 5.6.4 build & install
 

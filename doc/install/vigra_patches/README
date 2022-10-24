@@ -13,8 +13,26 @@ Python >= 3.9   vigra/vigranumpy/lib/__init__.py
                                             
                 
 
-
+For windows 10 ONLY:
+====================
+    if building with VisualStudio 2019 or later:
+        replace:
+            vigra/vigranumpy/src/core/segmentation.cxx
+            
+            with:
+                vigra_patches/windows/windows/VisualStudio_2019/vigra/vigranumpy/src/segmentation.cxx
+                
+                in addition, if using CMake 3.2 or newer (specifically CMake 3.22.1):
+                    replace:
+                        vigra.CMakeLists.txt
+                        
+                        with:
+                            vigra_patches/windows/CMake_3.22.1/vigra/CMakeLists.txt
+                            
 For both Linux and Windows 10:
+==============================
+1) Before building (ie., calling `make`):
+    
     if builing against a HDF5 libraries stack with version >= 1.11
         replace: 
             vigra/src/impex/hdf5impex.cxx 
@@ -35,7 +53,8 @@ For both Linux and Windows 10:
         with:
             vigra_patches/python39/vigra/vigranumpy/docsrc/conf.py.in
             
-before building "doc"
+2) Before building "doc" (i.e., before calling `make doc`) - can be skipped if
+    already done in (1)
         replace:
             vigra-build/vigranumpy/docsrc/conf.py.in
             
@@ -48,19 +67,4 @@ before building "doc"
         with:
             vigra_patches/python39/vigra-build/vigranumpy/docsrc/conf.py
             
-For windows 10 ONLY:
-    if building with VisualStudio 2019 or later:
-        replace:
-            vigra/vigranumpy/src/core/segmentation.cxx
-            
-        with:
-            vigra_patches/windows/windows/VisualStudio_2019/vigra/vigranumpy/src/segmentation.cxx
-            
-    in addition, if using CMake 3.2 or newer (specifically CMake 3.22.1):
-        replace:
-            vigra.CMakeLists.txt
-            
-        with:
-            vigra_patches/windows/CMake_3.22.1/vigra/CMakeLists.txt
-
-        
+       
