@@ -747,16 +747,6 @@ Finally the $VIRTUAL_ENV directory tree should look like this:
 
 
 ================================================================================
-7.Optional: Install h5pyViewer
-NOTE: This does not seem to be maintained anymore: pip install h5pyViewer fails
-================================================================================
-
-Grab the git repo:
-    git clone https://github.com/ganymede42/h5pyViewer.git
-    
-Get your fingers dirty...
-
-================================================================================
                                 
                                 !!! DONE !!!
                                 
