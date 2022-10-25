@@ -141,6 +141,7 @@ from core.neoutils import (get_non_empty_spike_trains,
                            normalized_signal_index,
                            check_ephys_data, 
                            check_ephys_data_collection,
+                           set_relative_time_start,
                            )
 
 from core.prog import safeWrapper

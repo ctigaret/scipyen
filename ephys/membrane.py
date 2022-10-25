@@ -1185,7 +1185,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
         raise TypeError("'ImSignal' expected to be an int or str; got %s instead" % type(ImSignal).__name__)
     
 
-    data = ephys.set_relative_time_start(data)
+    data = neoutils.set_relative_time_start(data)
     
     if t_start is not None and t_stop is not None:
         data = ephys.get_time_slice(data, t0=t_start, t1=t_stop)
@@ -6071,7 +6071,7 @@ def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
     """
     averaged_block = ephys.average_blocks(*data_blocks, step_index = step_index, signal_index = [Vm_index, Iinj_index], name=name_prefix)
     
-    ephys.set_relative_time_start(averaged_block)
+    neoutils.set_relative_time_start(averaged_block)
     
     ephys.auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = True, label = "Ion", append=False)
     ephys.auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
@@ -6089,7 +6089,7 @@ def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
     AHP = (averaged_block.segments[0].analogsignals[Vm_index] - Base).time_slice(Ioff, averaged_block.segments[0].analogsignals[Vm_index].t_stop)
     
     AHP.name = "%s_AHP" % name_prefix
-    ephys.set_relative_time_start(AHP)
+    neoutils.set_relative_time_start(AHP)
 
     params = dict()
     params["name"] = name_prefix
@@ -6117,7 +6117,7 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
         bb = deepcopy(b)
         #bb = ephys.neo_copy(b)
         
-        ephys.set_relative_time_start(bb)
+        neoutils.set_relative_time_start(bb)
         
         ephys.auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = True, label="Ion", append=False)
         ephys.auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
@@ -6158,7 +6158,7 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
     
     AHP.name = "%s_AHP_%d_%s" % (name_prefix, Iinj.magnitude, Iinj.units.dimensionality)
     
-    ephys.set_relative_time_start(AHP)
+    neoutils.set_relative_time_start(AHP)
 
     params = dict()
     params["name"] = name_prefix
@@ -6379,16 +6379,28 @@ def detect_mEPSC(x:neo.AnalogSignal, waveform:np.ndarray):
     
     mini_peaks = x.times[peaks]
     
-    minis = [x.time_slice(t0,t1).magnitude for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
+    minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
     
     # FIXME/TODO: 2022-10-25 18:25:48
     # a neo.SpikeTrain is defined in the time domain only !!!
     # MUST create a SpikeTrain-like signal object type for anything else
     
-    ret = neo.SpikeTrain(mini_starts, t_stop = x.t_stop, units = x.times.units,
-                         t_start = x.t_start, sampling_rate = x.sampling_rate)
+    dstring = f"mEPSC detected in {x.name}"
     
-    return ret, minis, mini_peaks
+    if isinstance(waveform, neo.core.basesignal.BaseSignal) and len(waveform.description.strip()):
+        dstring += f" using {waveform.description}"
+        
+    waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
+    
+    ret = neo.SpikeTrain(mini_starts, t_stop = x.t_stop, units = x.times.units,
+                         t_start = x.t_start, sampling_rate = x.sampling_rate,
+                         name=f"{x.name}_mEPSCs", description=dstring)
+    
+    ret.waveforms = waves
+    
+    
+    
+    return ret, mini_peaks, minis
         
     
     

@@ -5441,8 +5441,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                                                      defaultButton = QtWidgets.QMessageBox.Yes)
                 
                 if btn == QtWidgets.QMessageBox.Yes:
-                    ephysData = ephys.set_relative_time_start(deepcopy(ephysData), start_times[0])
-                    #ephysData = ephys.set_relative_time_start(neoutils.neo_copy(ephysData), start_times[0])
+                    ephysData = neoutils.set_relative_time_start(deepcopy(ephysData), start_times[0])
+                    #ephysData = neoutils.set_relative_time_start(neoutils.neo_copy(ephysData), start_times[0])
                     
                 else:
                     return
@@ -5732,8 +5732,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                                                      defaultButton = QtWidgets.QMessageBox.Yes)
                 
                 if btn == QtWidgets.QMessageBox.Yes:
-                    ephysData = ephys.set_relative_time_start(deepcopy(ephysData), start_times[0])
-                    #ephysData = ephys.set_relative_time_start(neoutils.neo_copy(ephysData), start_times[0])
+                    ephysData = neoutils.set_relative_time_start(deepcopy(ephysData), start_times[0])
+                    #ephysData = neoutils.set_relative_time_start(neoutils.neo_copy(ephysData), start_times[0])
                     
                 else:
                     ephysData = None
