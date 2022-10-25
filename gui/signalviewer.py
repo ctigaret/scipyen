@@ -142,6 +142,7 @@ from core.neoutils import (get_non_empty_spike_trains,
                            check_ephys_data, 
                            check_ephys_data_collection,
                            set_relative_time_start,
+                           segment_start,
                            )
 
 from core.prog import safeWrapper
@@ -163,7 +164,7 @@ from core.traitcontainers import DataBag
 from imaging.vigrautils import kernel2array
 
 from ephys import ephys as ephys
-from ephys.ephys import (cursors2epoch, segment_start)
+from ephys.ephys import cursors2epoch
 
 #from core.patchneo import *
 
