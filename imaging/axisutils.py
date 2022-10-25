@@ -649,7 +649,7 @@ def hasChannelAxis(data):
         raise TypeError("Expected a VigraArray or AxisTags object; instead, I've got a %s" % type(data).__name__)
     
 def dimIter(data, key):
-    """Generates an interator along the dimension of the given axis key.
+    """Iterator along the dimension of the given axis key for Vigra arrays.
     
     Rationale:
     ==========

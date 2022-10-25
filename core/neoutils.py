@@ -156,6 +156,7 @@ from enum import (Enum, IntEnum,)
 #### BEGIN 3rd party modules
 from IPython.lib.pretty import pprint as prp
 import numpy as np
+import scipy
 import quantities as pq
 import neo
 from neo.core.baseneo import (MergeError, merge_annotations, intersect_annotations,
@@ -2429,7 +2430,7 @@ def copy_with_data_subset(obj, **kwargs):
     raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
 
 @copy_with_data_subset.register(neo.Block)
-def _(obj, **kwargs) -> neo.Block:
+def _(obj, **kwargs):
     """Deep copy for a subset of data & containers in Block.
     """     
     # TODO: 2021-11-23 14:56:21
@@ -4119,3 +4120,102 @@ def inverse_lookup(signal, value, channel=0, rtol=1e-05, atol=1e-08, equal_nan =
     
     return ret, index, sigvals
 
+def detrend(x:typing.Union[neo.AnalogSignal, DataSignal], **kwargs):
+    """Detrend a signal.
+    
+    Delegates to scipy.signal.detrend
+    
+    Parameters:
+    ===========
+    x: neo.AnalogSignal or DataSignal
+    
+    Var-keyword parameters (see also scipy.signal.detrend)
+    ======================================================
+    axis: int, default is 0 (unlike scipy.signal.detrend qhere the default is the last axis, -1)
+    
+    type: str "linear" or "constant"; optional, default is "constant"
+        The default ("constant") subtracts x.mean(axis=axis) from `x`; "linear"
+        subtracts from `x` a linear least-squares fit to `x`.
+    
+    bp: array-like of int, or a scalar Quantity in signals' units; optional, 
+        default is None.
+    
+        When bd is a sequence of int, it represents the break points (given in 
+            sample numbers, or indices into `x`, NOT domain axis coordinates) 
+            between which a piecewise linear interpolation will be performed on
+            `x`. This pieceqise linear interpolation will be subtracted from `x`
+            when the `type` parameter(see above) is "linear".
+    
+        When bs is a scalar quantity (in signal units) AND `type` is "constant"
+            then the value of bp will be subtracted from `x` instead of its 
+            mean.
+    
+    
+    In a nutshell:
+        
+    `type`          `bp`                Result:
+    --------------------------------------------
+    "linear"        <sequence of int>  `x` after suubtracting a piecewise linear
+                                        interpolation between samples with indices
+                                        in bp
+                    
+                    <anything else>    `x` after subtracting a linear 
+                                        interpolation along the specified axis
+    
+    "constant"      <scalar quantity    `x` after subtracting bp value
+                    in signal's units>     
+    
+                    <anything else>     `x` after subtracting its mean
+    
+                    
+            When given, and `type` is "linear" an piecewise linear fit is 
+            performed on `x` between each break points.
+    
+    Returns:
+    =======
+    A detrended copy of the signal.
+        
+    NOTE: unlike scipy.signal.detrend, which ONLY works on plain numpy arrays, 
+    this function does NOT modify the signal in-place.
+    
+    """
+    axis = kwargs.pop("axis", 0)
+    detrend_type = kwargs.pop("type", "constant")
+    bp = kwargs.pop("bp", None)
+    # overwrite_data = kwargs.pop("overwrite_data", True)
+    
+    func = partial(scipy.signal.detrend, axis=axis, bp=bp,
+                             type=detrend_type, overwrite_data=False)
+    
+    if detrend_type.lower() == "linear":
+        if bp is None or isinstance(bp, typing.Sequence) and all(isinstance(v, int) for v in bp):
+            ret = func(x.magnitude)
+            
+        else:
+            raise TypeError(f"Unexpected 'bp' value ({bp}) for {detrend_type} detrending")
+        
+    elif detrend_type.lower() == "constant":
+        if isinstance(bp, pq.Quantity):
+            if bp.size == 1 and units_convertible(bp, x):
+                return x-bp
+            else:
+                raise TypeError(f"Wrong constant value in bp: {bp} for {detrend_type} detrending")
+            
+        elif bp is not None:
+            raise TypeError(f"Unexpected 'bp' value ({bp}) for {detrend_type} detrending")
+            
+        ret = func(x.magnitude)
+                
+    ret = type(x)(ret, t_start = x.t_start, units = x.units, 
+                    sampling_rate = x.sampling_rate, 
+                    file_origin = x.file_origin, 
+                    name=x.name, description = x.description)
+    
+    ret.array_annotations = x.array_annotations
+    ret.annotations.update(x.annotations)
+    
+    return ret
+    
+    
+    
+    

@@ -19,7 +19,8 @@ import quantities as pq
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-from scipy import optimize, cluster#, where
+import scipy
+from scipy import optimize, cluster
 
 # TODO/FIXME 2019-07-29 13:08:29
 # -- move to pict.gui package
@@ -6210,84 +6211,191 @@ def is_AP_spiketrain(x):
         ret &= (isinstance(x.name, str) and x.name.endswith("AP_train")) or (all([k.startswith("AP_") for k in x.annotations]))
     
     return ret
+
+def mEPSCwaveform(model_parameters, units, t_start=0*pq.s, duration=0.05*pq.s, sampling_rate=1e4*pq.Hz):
+    """Helper function to generate a synthetic miniEPSC as a neo.AnalogSignal
     
-# def extract_AP_data_from_AP_train(ap_train, ap_index=0):
-#     """
-#     DEPRECATED
-#     """
-#     warnings.warn("Deprecated", DeprecationWarning)
-#     
-#     if isinstance(ap_train, neo.Segment):
-#         sptr = [t for t in ap_train.spiketrains if is_AP_spiketrain(t)]
-#         
-#         if len(sptr):
-#             if len(sptr) > 1:
-#                 warnings.warn("The data segment appears to have %d putative AP spike trains out of %d spike trains; the last one (%dth) will be used" % (len(sptr), len(ap_train.spiketrains), len(sptr)-1))
-#                               
-#             ap_train = sptr[-1]
-#     
-#         else:
-#             warnings.warn("The data Segment has no suitable spike trains")
-#             return  None
-#         
-#     elif isinstance(ap_train, neo.SpikeTrain):
-#         if not is_AP_spiketrain(ap_train):
-#             raise ValueError("data does not seem to be an AP spike train")
-#         
-#     else:
-#         raise TypeError("ap_train expected to be a neo.Segment or neo.SpikeTrain; got %s instead" % type(ap_train).__name__)
-#     
-#     if not isinstance(ap_index, int):
-#         raise TypeError("ap_index expected to be an int; got %s instead" % type(ap_index).__name__)
-#     
-#     if ap_index < 0:
-#         raise ValueError("ap_index expected to be >= 0; got %d instead" % ap_index)
-#     
-#     if ap_index >= len(ap_train):
-#         warnings.warn("ap_index %d past the end of the AP train with %d APs" % (ap_index, len(sptr)))
-#         return None
-#     
-#     result = collections.OrderedDict()
-#     
-#     result["Index"] = ap_index
-#     
-#     result["Duration_at_half_max"] = ap_train.annotations["AP_durations_V_half_max"][ap_index]
-# 
-#     result["Duration_at_quarter_max"] = ap_train.annotations["AP_durations_V_quart_max"][ap_index]
-#     
-#     result["Duration_at_onset"] = ap_train.annotations["AP_durations_V_onset"][ap_index]
-#     
-#     result["Duration_at_0mV"] = ap_train.annotations["AP_durations_V_0"][ap_index]
-#     
-#     if all([v in ap_train.annotations.keys() for v in ("AP_durations_at_Ref_Vm", "Ref_Vm")]):
-#         if ap_train.annotations["AP_durations_at_Ref_Vm"] is not None:
-#             result["Duration_at_ref_Vm"] = ap_train.annotations["AP_durations_at_Ref_Vm"][ap_index]
-#             
-#         else:
-#             result["Duration_at_ref_Vm"] = np.nan
-#             
-#         if ap_train.annotations["Ref_Vm"] is not None:
-#             result["Vm_ref"] = ap_train.annotations["Ref_Vm"]
-#             
-#         else:
-#             result["Vm_ref"] = np.nan
-#     
-#     result["Latency"]  =  np.array([ap_train[ap_index]-ap_train.t_start]) * ap_train.times.units
-#     
-#     result["Max_dV_dt"] = ap_train.annotations["AP_Maximum_dV_dt"][ap_index]
-#     
-#     result["Vm_amplitude"] = ap_train.annotations["AP_peak_amplitudes"][ap_index]
-#     
-#     result["Vm_half_max"] = ap_train.annotations["AP_half_max"][ap_index]
-#     
-#     result["Vm_quart_max"] = ap_train.annotations["AP_quart_max"][ap_index]
-# 
-#     result["Vm_onset"] = ap_train.annotations["AP_onset_Vm"][ap_index]
-#     
-#     result["Vm_peak"] = ap_train.annotations["AP_peak_values"][ap_index]
-#     
-#     result["Waveform"] = ap_train.waveforms[ap_index,:]
-#         
-#     return result
-#         
+    Parameters:
+    ===========
+    model_parameters: a sequence of floating point numbers with the parameters
+        for the Clements & Bekkers 97 mEPSC model (see core.models.Clements_Bekkers_97(...))
+    
+    units: a quantities.UnitQuantity, or quantities.Quantity
+    
+    Named parameters:
+    =================
+    t_start, duration: scalar quantities, typically in quantities.s (for 
+        AnalogSignals) although one can imagine a similar waveform in other 
+        domains (e.g., space) hence usable with DataSignal objects as well.
+    
+        Defaults are 0*pq.s and 0.05*pq.s (50 ms) for t_start and duration, respectively.
+    
+    NOTE: make sure both t_start and duration have the same (or-interconvertible)
+    units
+    
+    
+    sampling_rate: scalar quantity in units reciprocal of duration.units; for
+        example, in the case where domain.units == quantities.s this is expected
+        to be in quantities.Hz
+    
+        Default is 1e4 Hz.
+    
+    """
+    
+    from core import models, quantities # not to be confused with pq!!!
+    
+    x = np.linspace(t_start, t_start + duration, num=int(sampling_rate * duration))
+    
+    y = models.Clements_Bekkers_97(x.magnitude, model_parameters)
+    
+    dstring = f"Clements_Bekkers_97 a={model_parameters[0]}, b={model_parameters[1]}, x₀={model_parameters[2]}, τ₁={model_parameters[3]}, τ₂={model_parameters[4]}"
+    
+    if quantities.check_time_units(x):
+        klass = neo.AnalogSignal
+    else:
+        klass = DataSignal
         
+    return klass(y, units = units, t_start=t_start, 
+                            sampling_rate=sampling_rate,
+                            name="Clements & Bekkers '97 model",
+                            description=dstring)
+    
+def detect_mEPSC(x:neo.AnalogSignal, waveform:np.ndarray):
+    """Detects mEPSCs by cross-correlation with a model waveform.
+    
+    Parameters:
+    ==========
+    
+    x: neo.AnalogSignal containing the recorded membrane current that 
+        will be scanned for mEPSCs. Typically this is single-channel, meaning it
+        is a 2D array with a singleton 2nd axis (e.g., x.shape = (n,1) where `n`
+        is the number of samples in `x`)
+    
+    waveform: neo.AnalogSignal or 1D numpy array (vector, i.e., 
+        waveform.shape = (m,) where `m` is the number of samples in `waveform`).
+    
+        Contains a model mEPSC (ie. a "synthetic" waveform) or a "template" 
+        mEPSC waveform extracted from a signal.
+    
+    ATTENTION: Make sure this model waveform has the SAME SAMPLING RATE as the 
+        signal!!!
+    
+    For example, if creating the waveform as a plain numpy array:
+    
+    t_start     = 0     # [s]
+    duration    = 0.2   # [s]
+    sr          = 1e4   # [Hz]
+    
+    t = np.linspace(0, duration, num = sr * duration)
+    model = models.Clements_Bekkers_97(x, parameters)
+    
+    As a convenience, you can use mEPSCwaveform(...) function in this module to
+    generate a synthetic mEPSC waveform as a neo.AnalogSignal.
+    
+    """
+    if not dt.is_vector(waveform):
+        raise TypeError("waveform expected to be a vector")
+    
+    # 1) normalize the model waveform
+    mdl = sigp.normalise_waveform(waveform)
+    
+    mdl = np.atleast_2d(mdl)
+    
+    if mdl.shape[1] > 1:
+        mdl = mdl.T
+        
+    
+    # 2) cross-correlate the signal with the normalized model waveform
+    
+    xc = scipy.signal.correlate(x, mdl, mode="valid")
+    
+    # 3) de-trend the cross-correlation signal (so that noise is almost about 0)
+    dxc = scipy.signal.detrend(xc, type="constant", axis=0)
+    
+    # 4) find out where cross-correlation is largers than its noise (root-mean-square)
+    flags = dxc > sigp.rms(dxc)
+    
+    # 5) find out starts and stops of those regions
+    # NOTE: 2022-10-25 16:44:58
+    # Putative peak regions start where flag_bounds are > 0 and end where 
+    # flag_bounds < 0 (we'd expect each +1 bound ie. a BEGIN to be FOLLOWED by 
+    # a -1 bound ie. and END).
+    #
+    flag_bounds = np.ediff1d(flags.astype(np.dtype(float)))
+    
+    # NOTE: 2022-10-25 16:46:10
+    # The only exception to NOTE: 2022-10-25 16:44:58 is when the cross-correlation
+    # signal ends with an upwards deflection (unlikely, but we can still check)
+    peak_begins = np.where(flag_bounds > 0)[0] # sample indices
+    peak_ends   = np.where(flag_bounds < 0)[0] # sample indices
+    
+    if len(peak_begins) == 0:
+        return # nothing detected ?!?
+    
+    if len(peak_begins) > len(peak_ends):
+        if peak_begins[-1] > peak_ends[-1]:
+            peak_begins = peak_begins[0:-1]
+        elif peak_begins[-1] < peak_ends[-1]:
+            peak_begins = peak_begins[1:]
+            
+    elif len(peak_begins) < len(peak_ends):
+        if peak_begins[0] < peak_ends[0]:
+            peak_ends = peak_ends[1:]
+            
+        elif peak_begins[-1] > peak_ends[-1]:
+            peak_ends = peak_ends[0:-1]
+            
+        
+    # 6) find the location of the local maxima in the cross-correlation signal 
+    # location is given in sample indices
+    # ATTENTION: these maxima correspond to samples where the model or template 
+    # fits best with the signal data; theo DO NOT correspond to the "peak" (or
+    # trough) of the actual mini EPSC!!!
+    xcmaxima = [np.argmax(xc[v[0]:v[1]]) + v[0] for v in zip(peak_begins, peak_ends) if len(xc[v[0]:v[1]]) > 0]
+    
+    # 7) locate the actual peaks (for positive waveform) or troughs (negative waveforms)
+    if sigp.is_positive_waveform(waveform):
+        peakfunc = np.argmax
+    else:
+        peakfunc = np.argmin
+    
+    peaks = [peakfunc(x.magnitude[v[0]:v[1]]) + v[0] for v in zip(peak_begins, peak_ends) if len(x.magnitude[v[0]:v[1]]) > 0]
+
+    # 8) get the start & end of the signal's regions where putative minis were found
+    
+    if isinstance(waveform, neo.core.basesignal.BaseSignal):
+        mini_duration = waveform.duration
+    else:
+        # NOTE: 2022-10-25 18:16:26
+        # you need to make sure the waveform (if a plain numpy array) has the
+        # same "sampling rate" as the signal
+        mini_duration = len(waveform) / x.sampling_rate
+    
+    mini_starts = x.times[xcmaxima]
+    
+    mini_ends = mini_starts + mini_duration
+    
+    # trim away past the end
+    
+    mini_peaks = x.times[peaks]
+    
+    minis = [x.time_slice(t0,t1).magnitude for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
+    
+    # FIXME/TODO: 2022-10-25 18:25:48
+    # a neo.SpikeTrain is defined in the time domain only !!!
+    # MUST create a SpikeTrain-like signal object type for anything else
+    
+    ret = neo.SpikeTrain(mini_starts, t_stop = x.t_stop, units = x.times.units,
+                         t_start = x.t_start, sampling_rate = x.sampling_rate)
+    
+    return ret, minis, mini_peaks
+        
+    
+    
+    
+    
+    
+    
+    
+    
+    

@@ -4880,6 +4880,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         else:
                             signalChannelAxis = self.y.channelIndex
                     else:
+                        
                         raise TypeError("signalChannelAxis must be specified when plotting numpy arrays")
                     
                 else:
