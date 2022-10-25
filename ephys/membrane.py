@@ -6212,7 +6212,7 @@ def is_AP_spiketrain(x):
     
     return ret
 
-def mEPSCwaveform(model_parameters, units, t_start=0*pq.s, duration=0.05*pq.s, sampling_rate=1e4*pq.Hz):
+def mEPSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.05*pq.s, sampling_rate=1e4*pq.Hz):
     """Helper function to generate a synthetic miniEPSC as a neo.AnalogSignal
     
     Parameters:
@@ -6220,10 +6220,10 @@ def mEPSCwaveform(model_parameters, units, t_start=0*pq.s, duration=0.05*pq.s, s
     model_parameters: a sequence of floating point numbers with the parameters
         for the Clements & Bekkers 97 mEPSC model (see core.models.Clements_Bekkers_97(...))
     
-    units: a quantities.UnitQuantity, or quantities.Quantity
-    
     Named parameters:
     =================
+    units: a quantities.UnitQuantity, or quantities.Quantity; default is quantities.pA
+    
     t_start, duration: scalar quantities, typically in quantities.s (for 
         AnalogSignals) although one can imagine a similar waveform in other 
         domains (e.g., space) hence usable with DataSignal objects as well.
