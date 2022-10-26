@@ -141,6 +141,8 @@ from core.neoutils import (get_non_empty_spike_trains,
                            normalized_signal_index,
                            check_ephys_data, 
                            check_ephys_data_collection,
+                           set_relative_time_start,
+                           segment_start,
                            )
 
 from core.prog import safeWrapper
@@ -162,7 +164,7 @@ from core.traitcontainers import DataBag
 from imaging.vigrautils import kernel2array
 
 from ephys import ephys as ephys
-from ephys.ephys import (cursors2epoch, segment_start)
+from ephys.ephys import cursors2epoch
 
 #from core.patchneo import *
 
@@ -4110,9 +4112,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # use self.FrameIndex[self.currentFrame] instead (that is because we'd
         # be adapting this to multi-frame indices as in LSCaT !!!)
         if isinstance(self.y, neo.Block):
-            t_units = self.y.segments[self.currentFrame].t_start.units
+            # t_units = self.y.segments[self.currentFrame].t_start.units
+            t_units = self.y.segments[self.frameIndex[self._current_frame_index_]].t_start.units
         elif isinstance(self.y, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self.y):
-            t_units = self.y[self.currentFrame].t_start.units
+            # t_units = self.y[self.currentFrame].t_start.units
+            t_units = self.y[self.frameIndex[self._current_frame_index_]].t_start.units
         elif isinstance(self.y, neo.Segment):
             t_units = self.y.t_start.units
         elif isinstance(self.y, neo.core.basesignal.BaseSignal):
@@ -4272,9 +4276,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # FIXME/TODO: 2022-10-23 23:58:06
         # see FIXME/TODO: 2022-10-23 23:57:00
         if isinstance(self.y, neo.Block):
-            t_units = self.y.segments[self.currentFrame].t_start.units
+            # t_units = self.y.segments[self.currentFrame].t_start.units
+            t_units = self.y.segments[self.frameIndex[self._current_frame_index_]].t_start.units
         elif isinstance(self.y, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self.y):
-            t_units = self.y[self.currentFrame].t_start.units
+            # t_units = self.y[self.currentFrame].t_start.units
+            t_units = self.y[self.frameIndex[self._current_frame_index_]].t_start.units
         elif isinstance(self.y, neo.Segment):
             t_units = self.y.t_start.units
         elif isinstance(self.y, neo.core.basesignal.BaseSignal):
@@ -4880,6 +4886,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         else:
                             signalChannelAxis = self.y.channelIndex
                     else:
+                        
                         raise TypeError("signalChannelAxis must be specified when plotting numpy arrays")
                     
                 else:
@@ -5872,8 +5879,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                     neo.core.AnalogSignal, 
                                     neo.core.IrregularlySampledSignal,
                                     IrregularlySampledDataSignal)) for y_ in self.y]):
-                self._plotSignal_(self.y[self._current_frame_index_], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
-                self.currentFrameAnnotations = {type(self.y[self._current_frame_index_]).__name__: self.y[self._current_frame_index_].annotations}
+                if self._current_frame_index_ in self.frameIndex:
+                    ndx = self.frameIndex[self._current_frame_index_]
+                else:
+                    self._current_frame_index_ = 0
+                    ndx = self._current_frame_index_
+                    
+                self._plotSignal_(self.y[ndx], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
+                self.currentFrameAnnotations = {type(self.y[ndx]).__name__: self.y[ndx].annotations}
                 
             elif all([isinstance(y_, (neo.core.Epoch, DataZone)) for y_ in self.y]): 
                 # plot Epoch(s) independently of data; there is a single frame

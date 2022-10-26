@@ -19,7 +19,8 @@ import quantities as pq
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-from scipy import optimize, cluster#, where
+import scipy
+from scipy import optimize, cluster
 
 # TODO/FIXME 2019-07-29 13:08:29
 # -- move to pict.gui package
@@ -1184,7 +1185,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
         raise TypeError("'ImSignal' expected to be an int or str; got %s instead" % type(ImSignal).__name__)
     
 
-    data = ephys.set_relative_time_start(data)
+    data = neoutils.set_relative_time_start(data)
     
     if t_start is not None and t_stop is not None:
         data = ephys.get_time_slice(data, t0=t_start, t1=t_stop)
@@ -1329,7 +1330,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None, steadyStateDuratio
         #
         #   the high state is the actual pulse
         #
-        centroids = sigp.state_levels(im, levels = 0.5)
+        centroids, cnt, edg = sigp.state_levels(im, levels = 0.5)
         centroids = np.array(centroids).T[:,np.newaxis]
         
         #[low, high]
@@ -6070,7 +6071,7 @@ def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
     """
     averaged_block = ephys.average_blocks(*data_blocks, step_index = step_index, signal_index = [Vm_index, Iinj_index], name=name_prefix)
     
-    ephys.set_relative_time_start(averaged_block)
+    neoutils.set_relative_time_start(averaged_block)
     
     ephys.auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = True, label = "Ion", append=False)
     ephys.auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
@@ -6088,7 +6089,7 @@ def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
     AHP = (averaged_block.segments[0].analogsignals[Vm_index] - Base).time_slice(Ioff, averaged_block.segments[0].analogsignals[Vm_index].t_stop)
     
     AHP.name = "%s_AHP" % name_prefix
-    ephys.set_relative_time_start(AHP)
+    neoutils.set_relative_time_start(AHP)
 
     params = dict()
     params["name"] = name_prefix
@@ -6116,7 +6117,7 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
         bb = deepcopy(b)
         #bb = ephys.neo_copy(b)
         
-        ephys.set_relative_time_start(bb)
+        neoutils.set_relative_time_start(bb)
         
         ephys.auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = True, label="Ion", append=False)
         ephys.auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
@@ -6157,7 +6158,7 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
     
     AHP.name = "%s_AHP_%d_%s" % (name_prefix, Iinj.magnitude, Iinj.units.dimensionality)
     
-    ephys.set_relative_time_start(AHP)
+    neoutils.set_relative_time_start(AHP)
 
     params = dict()
     params["name"] = name_prefix
@@ -6210,84 +6211,330 @@ def is_AP_spiketrain(x):
         ret &= (isinstance(x.name, str) and x.name.endswith("AP_train")) or (all([k.startswith("AP_") for k in x.annotations]))
     
     return ret
+
+def mEPSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.05*pq.s, sampling_rate=1e4*pq.Hz):
+    """Helper function to generate a synthetic miniEPSC as a neo.AnalogSignal
     
-# def extract_AP_data_from_AP_train(ap_train, ap_index=0):
-#     """
-#     DEPRECATED
-#     """
-#     warnings.warn("Deprecated", DeprecationWarning)
-#     
-#     if isinstance(ap_train, neo.Segment):
-#         sptr = [t for t in ap_train.spiketrains if is_AP_spiketrain(t)]
-#         
-#         if len(sptr):
-#             if len(sptr) > 1:
-#                 warnings.warn("The data segment appears to have %d putative AP spike trains out of %d spike trains; the last one (%dth) will be used" % (len(sptr), len(ap_train.spiketrains), len(sptr)-1))
-#                               
-#             ap_train = sptr[-1]
-#     
-#         else:
-#             warnings.warn("The data Segment has no suitable spike trains")
-#             return  None
-#         
-#     elif isinstance(ap_train, neo.SpikeTrain):
-#         if not is_AP_spiketrain(ap_train):
-#             raise ValueError("data does not seem to be an AP spike train")
-#         
-#     else:
-#         raise TypeError("ap_train expected to be a neo.Segment or neo.SpikeTrain; got %s instead" % type(ap_train).__name__)
-#     
-#     if not isinstance(ap_index, int):
-#         raise TypeError("ap_index expected to be an int; got %s instead" % type(ap_index).__name__)
-#     
-#     if ap_index < 0:
-#         raise ValueError("ap_index expected to be >= 0; got %d instead" % ap_index)
-#     
-#     if ap_index >= len(ap_train):
-#         warnings.warn("ap_index %d past the end of the AP train with %d APs" % (ap_index, len(sptr)))
-#         return None
-#     
-#     result = collections.OrderedDict()
-#     
-#     result["Index"] = ap_index
-#     
-#     result["Duration_at_half_max"] = ap_train.annotations["AP_durations_V_half_max"][ap_index]
-# 
-#     result["Duration_at_quarter_max"] = ap_train.annotations["AP_durations_V_quart_max"][ap_index]
-#     
-#     result["Duration_at_onset"] = ap_train.annotations["AP_durations_V_onset"][ap_index]
-#     
-#     result["Duration_at_0mV"] = ap_train.annotations["AP_durations_V_0"][ap_index]
-#     
-#     if all([v in ap_train.annotations.keys() for v in ("AP_durations_at_Ref_Vm", "Ref_Vm")]):
-#         if ap_train.annotations["AP_durations_at_Ref_Vm"] is not None:
-#             result["Duration_at_ref_Vm"] = ap_train.annotations["AP_durations_at_Ref_Vm"][ap_index]
-#             
-#         else:
-#             result["Duration_at_ref_Vm"] = np.nan
-#             
-#         if ap_train.annotations["Ref_Vm"] is not None:
-#             result["Vm_ref"] = ap_train.annotations["Ref_Vm"]
-#             
-#         else:
-#             result["Vm_ref"] = np.nan
-#     
-#     result["Latency"]  =  np.array([ap_train[ap_index]-ap_train.t_start]) * ap_train.times.units
-#     
-#     result["Max_dV_dt"] = ap_train.annotations["AP_Maximum_dV_dt"][ap_index]
-#     
-#     result["Vm_amplitude"] = ap_train.annotations["AP_peak_amplitudes"][ap_index]
-#     
-#     result["Vm_half_max"] = ap_train.annotations["AP_half_max"][ap_index]
-#     
-#     result["Vm_quart_max"] = ap_train.annotations["AP_quart_max"][ap_index]
-# 
-#     result["Vm_onset"] = ap_train.annotations["AP_onset_Vm"][ap_index]
-#     
-#     result["Vm_peak"] = ap_train.annotations["AP_peak_values"][ap_index]
-#     
-#     result["Waveform"] = ap_train.waveforms[ap_index,:]
-#         
-#     return result
-#         
+    Parameters:
+    ===========
+    model_parameters: a sequence of floating point numbers with the parameters
+        for the Clements & Bekkers 97 mEPSC model (see core.models.Clements_Bekkers_97(...))
+    
+    Named parameters:
+    =================
+    units: a quantities.UnitQuantity, or quantities.Quantity; default is quantities.pA
+    
+    t_start, duration: scalar quantities, typically in quantities.s (for 
+        AnalogSignals) although one can imagine a similar waveform in other 
+        domains (e.g., space) hence usable with DataSignal objects as well.
+    
+        Defaults are 0*pq.s and 0.05*pq.s (50 ms) for t_start and duration, respectively.
+    
+    NOTE: make sure both t_start and duration have the same (or-interconvertible)
+    units
+    
+    
+    sampling_rate: scalar quantity in units reciprocal of duration.units; for
+        example, in the case where domain.units == quantities.s this is expected
+        to be in quantities.Hz
+    
+        Default is 1e4 Hz.
+    
+    """
+    
+    from core import models, quantities # not to be confused with pq!!!
+    
+    x = np.linspace(t_start, t_start + duration, num=int(sampling_rate * duration))
+    
+    y = models.Clements_Bekkers_97(x.magnitude, model_parameters)
+    
+    dstring = f"Clements_Bekkers_97 α={model_parameters[0]}, β={model_parameters[1]}, x₀={model_parameters[2]}, τ₁={model_parameters[3]}, τ₂={model_parameters[4]}"
+    
+    if quantities.check_time_units(x):
+        klass = neo.AnalogSignal
+    else:
+        klass = DataSignal
         
+    ret = klass(y, units = units, t_start=t_start, 
+                            sampling_rate=sampling_rate,
+                            name="Clements & Bekkers '97 model",
+                            description=dstring)
+    
+    ret.annotations["parameters"] = model_parameters
+    
+    return ret
+    
+def detect_mEPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.05)):
+    """Detects mEPSCs by cross-correlation with a model waveform.
+    
+    Parameters:
+    ==========
+    
+    x: neo.AnalogSignal containing the recorded membrane current that 
+        will be scanned for mEPSCs. Typically this is single-channel, meaning it
+        is a 2D array with a singleton 2nd axis (e.g., x.shape = (n,1) where `n`
+        is the number of samples in `x`)
+    
+    waveform: neo.AnalogSignal or 1D numpy array (vector, i.e., 
+        waveform.shape = (m,) where `m` is the number of samples in `waveform`).
+    
+        Contains a model mEPSC (ie. a "synthetic" waveform) or a "template" 
+        mEPSC waveform extracted from a signal.
+    
+        ATTENTION: Make sure this model waveform has the SAME SAMPLING RATE as 
+        the signal!!!
+    
+        ALTERNATIVELY, the waveform can be specified by a sequence of six scalars, 
+        where the first five are the Clements & Bekkers 1997 model parameters:
+        α, β, x₀, τ₁ and τ₂ (see models.Clements_Bekkers_97 for details)
+        and the 6ᵗʰ element is the duration of the model waveform (which will
+        be generated ad-hoc); this last element is assumed to be in the units of
+        the domain of x.
+    
+        By default, waveform is (0., -1., 0.01, 0.001, 0.01, 0.05) which means,
+        for a membrane current signal `x` in pA:
+    
+        α  =  0.0 pA (ie. no offset)
+        β  = -1.0 (i.e. downward deflection)
+        x₀ =  0.01 (i.e. 10 ms from the start of the waveform)
+        τ₁ =  0.001 (i.e., rising time constant of 1 ms)
+        τ₂ =  0.01  (i.e., decay time constant of 10 ms)
+        
+        and 50 ms duration of the model waveform
+    
+        NOTE: When specified in this way the waveform will be generated ad-hoc
+        using the sampling rate of the signal `x`.
+        
+    
+    For example, if creating the waveform as a plain numpy array:
+    
+    t_start     = 0     # [s]
+    duration    = 0.2   # [s]
+    sr          = 1e4   # [Hz]
+    
+    t = np.linspace(0, duration, num = sr * duration)
+    model = models.Clements_Bekkers_97(x, parameters)
+    
+    As a convenience, you can use mEPSCwaveform(...) function in this module to
+    generate a synthetic mEPSC waveform as a neo.AnalogSignal.
+    
+    """
+    if isinstance(waveform, np.ndarray) and not dt.is_vector(waveform):
+        raise TypeError("waveform expected to be a vector")
+    
+    elif isinstance(waveform, (tuple, list)):
+        if len(waveform) == 6:
+            waveduration = waveform[-1] * x.times.units
+            
+            waveform = mEPSCwaveform(waveform[0:-1], units = x.units,
+                                     t_start = 0*x.times.units,
+                                     duration = waveform[-1]*x.times.units,
+                                     sampling_rate = x.sampling_rate)
+    else:
+        raise ValueError("Incorrect waveform specification")
+    
+    # 1) normalize the model waveform
+    mdl = sigp.normalise_waveform(waveform)
+    
+    mdl = np.atleast_2d(mdl)
+    
+    if mdl.shape[1] > 1:
+        mdl = mdl.T
+        
+    
+    # 2) cross-correlate the signal with the normalized model waveform
+    
+    xc = scipy.signal.correlate(x, mdl, mode="valid")
+    
+    # 3) de-trend the cross-correlation signal (so that noise is almost about 0)
+    dxc = scipy.signal.detrend(xc, type="constant", axis=0)
+    
+    # 4) find out where cross-correlation is largers than its noise (root-mean-square)
+    flags = dxc > sigp.rms(dxc)
+    
+    # 5) find out starts and stops of those regions
+    # NOTE: 2022-10-25 16:44:58
+    # Putative peak regions start where flag_bounds are > 0 and end where 
+    # flag_bounds < 0 (we'd expect each +1 bound ie. a BEGIN to be FOLLOWED by 
+    # a -1 bound ie. and END).
+    #
+    flag_bounds = np.ediff1d(flags.astype(np.dtype(float)))
+    
+    # NOTE: 2022-10-25 16:46:10
+    # The only exception to NOTE: 2022-10-25 16:44:58 is when the cross-correlation
+    # signal ends with an upwards deflection (unlikely, but we can still check)
+    peak_begins = np.where(flag_bounds > 0)[0] # sample indices
+    peak_ends   = np.where(flag_bounds < 0)[0] # sample indices
+    
+    if len(peak_begins) == 0:
+        return # nothing detected ?!?
+    
+    if len(peak_begins) > len(peak_ends):
+        if peak_begins[-1] > peak_ends[-1]:
+            peak_begins = peak_begins[0:-1]
+        elif peak_begins[-1] < peak_ends[-1]:
+            peak_begins = peak_begins[1:]
+            
+    elif len(peak_begins) < len(peak_ends):
+        if peak_begins[0] < peak_ends[0]:
+            peak_ends = peak_ends[1:]
+            
+        elif peak_begins[-1] > peak_ends[-1]:
+            peak_ends = peak_ends[0:-1]
+            
+        
+    # 6) find the location of the local maxima in the cross-correlation signal 
+    # location is given in sample indices
+    # ATTENTION: these maxima correspond to samples where the model or template 
+    # fits best with the signal data; theo DO NOT correspond to the "peak" (or
+    # trough) of the actual mini EPSC!!!
+    xcmaxima = [np.argmax(xc[v[0]:v[1]]) + v[0] for v in zip(peak_begins, peak_ends) if len(xc[v[0]:v[1]]) > 0]
+    
+    # 7) locate the actual peaks (for positive waveform) or troughs (negative waveforms)
+    if sigp.is_positive_waveform(waveform):
+        peakfunc = np.argmax
+    else:
+        peakfunc = np.argmin
+    
+    peaks = [peakfunc(x.magnitude[v[0]:v[1]]) + v[0] for v in zip(peak_begins, peak_ends) if len(x.magnitude[v[0]:v[1]]) > 0]
+
+    # 8) get the start & end of the signal's regions where putative minis were found
+    
+    if isinstance(waveform, neo.core.basesignal.BaseSignal):
+        mini_duration = waveform.duration
+    else:
+        # NOTE: 2022-10-25 18:16:26
+        # you need to make sure the waveform (if a plain numpy array) has the
+        # same "sampling rate" as the signal
+        mini_duration = len(waveform) / x.sampling_rate
+    
+    mini_starts = x.times[xcmaxima]
+    
+    mini_ends = mini_starts + mini_duration
+    
+    # trim away past the end
+    
+    mini_peaks = x.times[peaks]
+    
+    minis = neoutils.set_relative_time_start([x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop])
+    
+    # FIXME/TODO: 2022-10-25 18:25:48
+    # a neo.SpikeTrain is defined in the time domain only !!!
+    # MUST create a SpikeTrain-like signal object type for anything else
+    
+    dstring = f"mEPSC detected in {x.name}"
+    
+    if isinstance(waveform, neo.core.basesignal.BaseSignal) and len(waveform.description.strip()):
+        dstring += f" using {waveform.description}"
+        
+    waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
+    
+    ret = neo.SpikeTrain(mini_starts, t_stop = x.t_stop, units = x.times.units,
+                         t_start = x.t_start, sampling_rate = x.sampling_rate,
+                         name=f"{x.name}_mEPSCs", description=dstring)
+    
+    ret.waveforms = waves
+    ret.annotations["peak_times"] = mini_peaks
+    ret.annotations["mEPSC_parameters"] = waveform.annotations["parameters"]
+    
+    return ret, mini_peaks, minis
+
+def batch_mEPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.05), Im:typing.Union[int, str] = "IN0"):
+    """Batch mEPSC analysis in a neo.Block
+    The block's segments (sweeps) are expected to contain a signal with the 
+    recorded membrane current for mini EPSCs.
+    
+    The signal is identified by its name or index in the segment; these are 
+    specified by the parameter "Im".
+    
+    Furthermore, each segment MUST have an epoch, named "mEPSC", which sets the
+    region in the signal, where minis are going to be detected and analysed.
+    
+    Segmenst without such an epoch will be skipped.
+    
+    The results are returned as a list of pairs (SpikeTrain, list of AnalogSignal)
+    with one pair per segment in the Block.
+    
+    In each pair, the SpikeTrain contains the time stamps of the detected minis,
+    and the list of AnalogSignal object contains the detected mEPSC waveforms.
+    
+    Individual rejection of mEPSC rejection must be done manually for now.
+    
+    """
+    
+    result = list()
+    
+    for k, s in enumerate(x.segments):
+        if len(s.epochs) == 0:
+            continue
+        mEPSCepoch = [e for e in s.epochs if e.name == "mEPSC"]
+        
+        if len(mEPSCepoch) == 0:
+            continue
+        
+        mEPSCepoch = mEPSCepoch[0]
+        
+        try:
+            if isinstance(Im, str):
+                im = s.analogsignals[ephys.get_index_of_named_signal(s, Im)].copy()
+                
+            elif isinstance(Im, int):
+                im = s.analogsignals[Im].copy()
+                
+            else:
+                continue
+        except:
+            warnings.warn(f"No membrane current signal with index or name {Im} is found in segment {k}")
+            continue
+        
+        sig = im.time_slice(mEPSCepoch.times[0], mEPSCepoch.times[0] +  mEPSCepoch.durations[0])
+        
+        train, peaks, minis = detect_mEPSC(sig, waveform)
+        result.append(train, minis)
+        
+        
+    return result
+        
+    
+def fit_mini(x, params):
+    """Convenience wrapper to curvefitting.fit_mEPSC with suitable lower & upper bounds
+    
+    Parameters:
+    ===========
+    x: neo.AnalogSignal or DataSignal) with a miniEPSC (i.e. fragment of a signal)
+    params: initial parameter values for the Clements & Bekkers '97 model
+    """
+    
+    if not isinstance(x, (neo.AnalogSignal, DataSignal)):
+        raise TypeError(f"Data in 'x' expected to be a neo.AnalogSignal or DataSignal; got {type(x).__name__} instead")
+    
+    l, c, e = sigp.state_levels(x)
+    
+    params = list(params)
+    params[0] = l[1] # adapt the offset to the DC components in the waveform
+    
+    if params[1] < 0: # downward mEPSC
+        lo = (0., -np.inf, 0., 1e-4, 1e-4)
+        hi = (np.inf, 0., np.inf, 0.1, 0.1) # fix upper bounds for the time constants to 0.1.
+    else: # upward mEPSC (e.g. NMDARs, etc)
+        lo = (0., 0, 0., 1e-4, 1e-4)
+        hi = (np.inf, np.inf, np.inf, 0.1, 0.1) # fix upper bounds for the time constants to 0.1.
+    
+    
+    fitresult = crvf.fit_mEPSC(x, params, bounds = [lo, hi])
+    
+    fitted_x = type(x)(fitresult[0], units = x.units, t_start = x.t_start, sampling_rate = x.sampling_rate)
+    
+    x = x.merge(fitted_x)
+    x.annotations["mEPSC_fit"] = fitresult[1]
+    
+    return x
+    
+    
+    
+    
+    
+    
+    
+    
+    

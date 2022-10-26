@@ -18,12 +18,14 @@ batch_remove_offset
 concatenate_blocks
 concatenate_signals
 set_relative_time_start
-clear_events
+segment_start
 
 II. Management of events, epochs, spike trains
 ===========================================================
 clear_events
 remove_events
+clear_spiketrains
+remove_spiketrain
 get_epoch_named_interval
 get_non_empty_epochs
 get_non_empty_events
@@ -40,6 +42,8 @@ get_segments_in_channel_index -> removed 2021-10-03 12:52:25
 get_signal_names_indices
 get_time_slice
 inverse_lookup
+neo_lookup
+neo_child_container_name
 is_same_as
 lookup
 normalized_signal_index
@@ -156,6 +160,7 @@ from enum import (Enum, IntEnum,)
 #### BEGIN 3rd party modules
 from IPython.lib.pretty import pprint as prp
 import numpy as np
+import scipy
 import quantities as pq
 import neo
 from neo.core.baseneo import (MergeError, merge_annotations, intersect_annotations,
@@ -277,6 +282,171 @@ def copy_to_segment(obj:neo.core.dataobject.DataObject, new_seg:neo.Segment):
     
     return new_obj
     
+def segment_start(data:neo.Segment):
+    """Returns the minimum of t_start for all signals and spiketrains in a segment.
+    
+    Avoids any events and epochs that fall outside the signals' time domain.
+    
+    NOTE: The segment's analogsignals and irregularlysampledsignals collections
+    must be homogeneous (i.e., they MUST NOT contain mixtures of AnalogSignal 
+    and DataSignal, or IrregularlySampledSignal and IrregularlySampledDataSignal)
+    
+    """
+    
+    return min([s.t_start for s in data.analogsignals] + 
+               [s.t_start for s in data.spiketrains] +
+               [min(s.times) for s in data.irregularlysampledsignals])
+        
+
+def set_relative_time_start(data, t = 0 * pq.s):
+    """
+    TODO: propagate to other members of a segment as well 
+    (IrregularlySampledSignal, epochs, spike trains, etc)
+    """
+    from neo.core.spiketrainlist import SpikeTrainList
+    if isinstance(data, neo.Block):
+        for segment in data.segments:
+            for isig in segment.irregularlysampledsignals:
+                isig.times = isig.times-segment.analogsignals[0].t_start + t
+                
+            for signal in segment.analogsignals:
+                signal.t_start = t
+                
+            try:
+                new_epochs = list()
+                
+                for epoch in segment.epochs:
+                    if epoch.times.size > 0:
+                        new_times = epoch.times - epoch.times[0] + t
+                        
+                    else:
+                        new_times = epoch.times
+                        
+                    new_epoch = neo.Epoch(new_times,
+                                          durations = epoch.durations,
+                                          labels = epoch.labels,
+                                          units = epoch.units,
+                                          name=epoch.name)
+                    
+                    new_epoch.annotations.update(epoch.annotations)
+                    
+                    new_epochs.append(new_epoch)
+                    
+                segment.epochs[:] = new_epochs
+                    
+                new_trains = list()
+                
+                for spiketrain in segment.spiketrains:
+                    if spiketrain.times.size > 0:
+                        new_times = spiketrain.times - spiketrain.times[0] + t
+                        
+                    else:
+                        new_times = spiketrain.times
+                        
+                    new_spiketrain = neo.SpikeTrain(new_times, 
+                                                    t_start = spiketrain.t_start - spiketrain.times[0] + t,
+                                                    t_stop = spiketrain.t_stop - spiketrain.times[0] + t,
+                                                    units = spiketrain.units,
+                                                    waveforms = spiketrain.waveforms,
+                                                    sampling_rate = spiketrain.sampling_rate,
+                                                    name=spiketrain.name,
+                                                    description=spiketrain.description)
+                    
+                    new_spiketrain.annotations.update(spiketrain.annotations)
+                        
+                    new_trains.append(spiketrain)
+                        
+                segment.spiketrains = SpikeTrainList(items=new_trains)
+                    
+                new_events = list()
+                
+                for event in segment.events:
+                    new_times = event.times - event.times[0] + t if event.times.size > 0 else event.times
+                    
+                    if isinstance(event, TriggerEvent):
+                        new_event = TriggerEvent(times = new_times,
+                                                    labels = event.labels,
+                                                    units = event.units,
+                                                    name = event.name,
+                                                    description = event.description,
+                                                    event_type = event.event_type)
+                    else:
+                        new_event = neo.Event(times = new_times,
+                                              labels = event.labels,
+                                              units = event.units,
+                                              name=event.name,
+                                              description=event.description)
+                        
+                        new_event.annotations.update(event.annotations)
+                        
+                    new_events.append(new_event)
+
+                segment.events[:] = new_events
+            
+            except Exception as e:
+                traceback.print_exc()
+                
+    elif isinstance(data, (tuple, list)):
+        if all([isinstance(x, neo.Segment) for x in data]):
+            for s in data:
+                for isig in s.irregularlysampledsignals:
+                    isig.times = isig.times-segment.analogsignals[0].t_start + t
+                    
+                for signal in s.analogsignals:
+                    signal.t_start = t
+                    
+                for epoch in s.epochs:
+                    epoch.times = epoch.times - epoch.times[0] + t
+                    
+                for strain in s.spiketrains:
+                    strain.times = strain.times - strain.times[0] + t
+                    
+                for event in s.events:
+                    event.times = event.times - event.times[0] + t
+                
+        elif all([isinstance(x, (neo.AnalogSignal, DataSignal)) for x in data]):
+            for s in data:
+                s.t_start = t
+                
+        elif all([isinstance(x, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal))]):
+            for s in data:
+                s.times = s.times - s.times[0] + t
+                
+        elif all([isinstance(x, (neo.SpikeTrain, neo.Event, neo.Epoch))]):
+            for s in data:
+                s.times = s.times - s.times[0] + t
+                    
+                
+    elif isinstance(data, neo.Segment):
+        for isig in data.irregularlysampledsignals:
+            isig.times = isig.times-data.analogsignals[0].t_start + t
+            
+        for signal in data.analogsignals:
+            signal.t_start = t
+            
+        for epoch in data.epochs:
+            epoch.times = epoch.times - epoch.times[0] + t
+            
+        for strain in data.spiketrains:
+            strain.times = strain.times - strain.times[0] + t
+            
+        for event in data.events:
+            event.times = event.times - event.times[0] + t
+                
+    elif isinstance(data, (neo.AnalogSignal, DataSignal)):
+        data.t_start = t
+        
+    elif isinstance(data, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
+        data.times = data.times - data.times[0] + t
+        
+    elif isinstance(data, (neo.SpikeTrain, neo.Event, neo.Epoch)):
+        data.times = data.times = data.times[0] + t
+        
+    else:
+        raise TypeError("Expecting a neo.Block, neo.Segment, neo.AnalogSignal or datatypes.DataSignal; got %s instead" % type(data).__name__)
+        
+        
+    return data
 def merge_array_annotations(a0:ArrayDict, a1:ArrayDict):
     if not all(isinstance(a, (ArrayDict, dict)) for a in (a0,a1)):
         raise TypeError("Expecting two neo.core.dataobject.ArrayDict objects")
@@ -817,7 +987,6 @@ def __container_lookup__(container: neo.container.Container, index_obj: typing.U
         pfun0 = partial(normalized_index, index=index_obj, multiple=multiple)
         
         signal_collection_name = neo_child_container_name(contained_type)
-        #member_collection_names = [neo_child_container_name(contained_type), neo_child_property_name(contained_type)]
         
         collection = getattr(container, signal_collection_name, None)
         
@@ -825,10 +994,6 @@ def __container_lookup__(container: neo.container.Container, index_obj: typing.U
             container_children = container.container_children
             ret = dict((type(c).__name, list()) for c in container_children)
             
-            
-            
-            
-        
         if collection is not None:
             t = pfun0(collection)
             if len(t):
@@ -840,11 +1005,6 @@ def __container_lookup__(container: neo.container.Container, index_obj: typing.U
             else:
                 return dict()
             
-        
-    
-        
-        #member_collections = [getattr(container, cname, None) for cname in member_collection_names]
-            
         ret = dict((cname, t) for cname, t in zip(member_collection_names, map(pfun0, member_collections)) if len(t) > 0)
         
         if len(ret) == 0:
@@ -852,7 +1012,6 @@ def __container_lookup__(container: neo.container.Container, index_obj: typing.U
             # this is where additional index objects for collection of data that may be in kwargs should be applied
             
             direct_containers = contained_type._parent_containers
-            #direct_containers = contained_type._single_parent_objects # removed in neo 0.10.0
             
             child_container_names = [neo_child_container_name(c) for c in direct_containers]
             
@@ -2429,7 +2588,7 @@ def copy_with_data_subset(obj, **kwargs):
     raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
 
 @copy_with_data_subset.register(neo.Block)
-def _(obj, **kwargs) -> neo.Block:
+def _(obj, **kwargs):
     """Deep copy for a subset of data & containers in Block.
     """     
     # TODO: 2021-11-23 14:56:21
@@ -3588,6 +3747,81 @@ def get_non_empty_epochs(sequence:(tuple, list)):
         raise TypeError("Expecting a sequence containing only neo.Epoch objects")
     
     return [e for e in sequence if len(e)]
+
+def clear_spiketrains(segment:neo.Segment):
+    """Clears the spike train list in the segment
+    """
+    
+    # segment.spiketrains = neo.core.spiketrainlist.SpikeTrainList(segment=segment)
+    stl = segment.spiketrains[0:1:-1] # empty slice clears
+    stl.segment = segment
+    segment.spiketrains = stl
+    
+def remove_spiketrain(segment:neo.Segment, index:typing.Union[int, typing.Sequence[int]]):
+    """Remove the SpikeTrain at specified index from the segment's spiketrains.
+    Raises an IndexError if the index is not appropriate.
+    
+    Parameters:
+    ==========
+    segment: neo.Segment
+    
+    index: int or a sequence (tuple, list) of int
+        Any negative value will be normalized (i.e. incremented with len(segment.spiketrains))
+    
+    NOTE: The `spiketrains` property of a segment is a SpikeTrainList which is 
+    typically invisible to the general user of the neo package (by design).
+    
+    Nevertheless, a SpikeTrainList does support a limited functionality of a 
+    Python sequence, in that it supports:
+    • indexing and slicing as any Python sequence
+    • `append`-ing spike trains
+    • `extend`-wing with an iterable (e.g. sequence) of spike trains
+    
+    but is DOES NOT support item assignment, e.g.:
+    stl[:] = [] → illegal !
+    
+    In particular, slicing a SpikeTrainList returns a SpikeTrainList, therefore
+    one can directly call e.g.:
+    
+    stl[0:1:-1] to obtain an empty spike train list.
+    
+    However, the new spike train list has lost its link to the original segment.
+    
+    """
+    
+    stl = segment.spiketrains
+    
+    trains = list()
+    
+    # NOTE: 2022-10-25 22:42:41
+    # less elegant than the slicing hack as in clear_spiketrains(...) but this
+    # allows leaving out spike trains at arbitrary indices, AND updates the
+    # `all_channel_ids` property.
+    
+    # WARNING: appending a SpikeTrain to a SpikeTrainList, or extending a
+    # SpikeTrainList with another (or a sequence of SpikeTrain objects) does NOT
+    # automatically create (and add) new channel IDs for the added trains!
+    #
+    # On the other hand, slicing a SpiketrainList does seem to update the 
+    # `all_channel_ids` property
+    
+    
+    if isinstance(index, int):
+        if index < 0:
+            index += len(stl)
+            
+        trains = [s for k, s in enumerate(stl) if k != index]
+        
+    elif isinstance(index, (tuple, list)) and all(isinstance(i, int) for i in index):
+        ndx = [i + len(stl) if i < 0 else i for i in index]
+        
+        trains = [s for k, s in enumerate(stl) if k not in ndx]
+        
+    
+    if len(trains):
+        stl2 = neo.core.spiketrainlist.SpikeTrainList(items=trains) # will set up channel ids
+        segment.spiketrains = stl2
+    
     
 def remove_events(event, segment, byLabel=True):
     """Removes a specific event from the neo.Segment "segment"
@@ -4119,3 +4353,102 @@ def inverse_lookup(signal, value, channel=0, rtol=1e-05, atol=1e-08, equal_nan =
     
     return ret, index, sigvals
 
+def detrend(x:typing.Union[neo.AnalogSignal, DataSignal], **kwargs):
+    """Detrend a signal.
+    
+    Delegates to scipy.signal.detrend
+    
+    Parameters:
+    ===========
+    x: neo.AnalogSignal or DataSignal
+    
+    Var-keyword parameters (see also scipy.signal.detrend)
+    ======================================================
+    axis: int, default is 0 (unlike scipy.signal.detrend qhere the default is the last axis, -1)
+    
+    type: str "linear" or "constant"; optional, default is "constant"
+        The default ("constant") subtracts x.mean(axis=axis) from `x`; "linear"
+        subtracts from `x` a linear least-squares fit to `x`.
+    
+    bp: array-like of int, or a scalar Quantity in signals' units; optional, 
+        default is None.
+    
+        When bd is a sequence of int, it represents the break points (given in 
+            sample numbers, or indices into `x`, NOT domain axis coordinates) 
+            between which a piecewise linear interpolation will be performed on
+            `x`. This pieceqise linear interpolation will be subtracted from `x`
+            when the `type` parameter(see above) is "linear".
+    
+        When bs is a scalar quantity (in signal units) AND `type` is "constant"
+            then the value of bp will be subtracted from `x` instead of its 
+            mean.
+    
+    
+    In a nutshell:
+        
+    `type`          `bp`                Result:
+    --------------------------------------------
+    "linear"        <sequence of int>  `x` after suubtracting a piecewise linear
+                                        interpolation between samples with indices
+                                        in bp
+                    
+                    <anything else>    `x` after subtracting a linear 
+                                        interpolation along the specified axis
+    
+    "constant"      <scalar quantity    `x` after subtracting bp value
+                    in signal's units>     
+    
+                    <anything else>     `x` after subtracting its mean
+    
+                    
+            When given, and `type` is "linear" an piecewise linear fit is 
+            performed on `x` between each break points.
+    
+    Returns:
+    =======
+    A detrended copy of the signal.
+        
+    NOTE: unlike scipy.signal.detrend, which ONLY works on plain numpy arrays, 
+    this function does NOT modify the signal in-place.
+    
+    """
+    axis = kwargs.pop("axis", 0)
+    detrend_type = kwargs.pop("type", "constant")
+    bp = kwargs.pop("bp", None)
+    # overwrite_data = kwargs.pop("overwrite_data", True)
+    
+    func = partial(scipy.signal.detrend, axis=axis, bp=bp,
+                             type=detrend_type, overwrite_data=False)
+    
+    if detrend_type.lower() == "linear":
+        if bp is None or isinstance(bp, typing.Sequence) and all(isinstance(v, int) for v in bp):
+            ret = func(x.magnitude)
+            
+        else:
+            raise TypeError(f"Unexpected 'bp' value ({bp}) for {detrend_type} detrending")
+        
+    elif detrend_type.lower() == "constant":
+        if isinstance(bp, pq.Quantity):
+            if bp.size == 1 and units_convertible(bp, x):
+                return x-bp
+            else:
+                raise TypeError(f"Wrong constant value in bp: {bp} for {detrend_type} detrending")
+            
+        elif bp is not None:
+            raise TypeError(f"Unexpected 'bp' value ({bp}) for {detrend_type} detrending")
+            
+        ret = func(x.magnitude)
+                
+    ret = type(x)(ret, t_start = x.t_start, units = x.units, 
+                    sampling_rate = x.sampling_rate, 
+                    file_origin = x.file_origin, 
+                    name=x.name, description = x.description)
+    
+    ret.array_annotations = x.array_annotations
+    ret.annotations.update(x.annotations)
+    
+    return ret
+    
+    
+    
+    
