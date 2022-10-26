@@ -6212,8 +6212,14 @@ def is_AP_spiketrain(x):
     
     return ret
 
-def mEPSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.05*pq.s, sampling_rate=1e4*pq.Hz):
-    """Helper function to generate a synthetic miniEPSC as a neo.AnalogSignal
+def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.05*pq.s, sampling_rate=1e4*pq.Hz):
+    """Helper function to generate a synthetic post-synaptic current waveform.
+
+    The waveform realizes the Clements & Bekkers 1997 model as a neo.AnalogSignal.
+    
+    The model has a fast mono-exponential rise and a somewhat slower mono-exponential
+    decay ("Alpha-function") that mimics a post-synaptic current (e.g. a miniature
+    or spontaneous E/I PSC, henceforth dubbed a "mini-PSC")
     
     Parameters:
     ===========
@@ -6240,6 +6246,11 @@ def mEPSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.05*p
     
         Default is 1e4 Hz.
     
+    Returns:
+    ========
+    
+    A neo.AnalogSignal containing the synthetic waveform of a "mini-PSC".
+    
     """
     
     from core import models, quantities # not to be confused with pq!!!
@@ -6264,8 +6275,8 @@ def mEPSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.05*p
     
     return ret
     
-def detect_mEPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.05)):
-    """Detects mEPSCs by cross-correlation with a model waveform.
+def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.05)):
+    """Detect miniature or spontaneous PSCs by cross-correlation with a waveform.
     
     Parameters:
     ==========
@@ -6304,7 +6315,6 @@ def detect_mEPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.U
     
         NOTE: When specified in this way the waveform will be generated ad-hoc
         using the sampling rate of the signal `x`.
-        
     
     For example, if creating the waveform as a plain numpy array:
     
@@ -6315,8 +6325,29 @@ def detect_mEPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.U
     t = np.linspace(0, duration, num = sr * duration)
     model = models.Clements_Bekkers_97(x, parameters)
     
-    As a convenience, you can use mEPSCwaveform(...) function in this module to
-    generate a synthetic mEPSC waveform as a neo.AnalogSignal.
+    As a convenience, you can use PSCwaveform(...) function in this module to
+    generate a synthetic  waveform as a neo.AnalogSignal.
+    
+    Returns:
+    ========
+    A dict with keys:
+    "mini_starts": a quantity array with the start times of the detected waveforms
+    
+    "mini_peaks": a quantity array with the times of the "mini's" peak (or trough)
+    
+    "minis": a list of AnalogSignal objects with the detected "mini" waveforms.
+    
+    "waveform": the actual waveform used as model or "template". 
+    
+        This is either:
+    
+        • the realization of the synthetic mPSC (when the `waveform` parameter 
+            is the sequence of model parameters)
+    
+        • the `waveform` parameters itself, when it is a template (synthetic or
+            otherwise)
+        
+    ATTENTION: When detection has failed, returns None
     
     """
     if isinstance(waveform, np.ndarray) and not dt.is_vector(waveform):
@@ -6326,7 +6357,7 @@ def detect_mEPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.U
         if len(waveform) == 6:
             waveduration = waveform[-1] * x.times.units
             
-            waveform = mEPSCwaveform(waveform[0:-1], units = x.units,
+            waveform = PSCwaveform(waveform[0:-1], units = x.units,
                                      t_start = 0*x.times.units,
                                      duration = waveform[-1]*x.times.units,
                                      sampling_rate = x.sampling_rate)
@@ -6341,7 +6372,6 @@ def detect_mEPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.U
     if mdl.shape[1] > 1:
         mdl = mdl.T
         
-    
     # 2) cross-correlate the signal with the normalized model waveform
     
     xc = scipy.signal.correlate(x, mdl, mode="valid")
@@ -6366,7 +6396,7 @@ def detect_mEPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.U
     peak_begins = np.where(flag_bounds > 0)[0] # sample indices
     peak_ends   = np.where(flag_bounds < 0)[0] # sample indices
     
-    if len(peak_begins) == 0:
+    if len(peak_begins) == 0 or len(peak_ends) == 0:
         return # nothing detected ?!?
     
     if len(peak_begins) > len(peak_ends):
@@ -6376,7 +6406,7 @@ def detect_mEPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.U
             peak_begins = peak_begins[1:]
             
     elif len(peak_begins) < len(peak_ends):
-        if peak_begins[0] < peak_ends[0]:
+        if peak_begins[0] > peak_ends[0]:
             peak_ends = peak_ends[1:]
             
         elif peak_begins[-1] > peak_ends[-1]:
@@ -6412,40 +6442,45 @@ def detect_mEPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.U
     
     mini_ends = mini_starts + mini_duration
     
-    # trim away past the end
-    
     mini_peaks = x.times[peaks]
     
     minis = neoutils.set_relative_time_start([x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop])
     
+    for m in minis:
+        m.annotations["Accept"] = True
+    
+    # NOTE: 2022-10-26 22:22:37
+    # reconstruct this in the caller so that we can use several epochs on the
+    # same signal/segment
     # FIXME/TODO: 2022-10-25 18:25:48
     # a neo.SpikeTrain is defined in the time domain only !!!
     # MUST create a SpikeTrain-like signal object type for anything else
     
-    dstring = f"mEPSC detected in {x.name}"
-    
-    if isinstance(waveform, neo.core.basesignal.BaseSignal) and len(waveform.description.strip()):
-        dstring += f" using {waveform.description}"
+#     dstring = f"mEPSC detected in {x.name}"
+#     
+#     if isinstance(waveform, neo.core.basesignal.BaseSignal) and len(waveform.description.strip()):
+#         dstring += f" using {waveform.description}"
         
-    waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
+#     waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
+#     
+#     ret = neo.SpikeTrain(mini_starts, t_stop = x.t_stop, units = x.times.units,
+#                          t_start = x.t_start, sampling_rate = x.sampling_rate,
+#                          name=f"{x.name}_mEPSCs", description=dstring)
+#     
+#     ret.waveforms = waves
+#     ret.annotations["peak_times"] = mini_peaks
+#     ret.annotations["mEPSC_parameters"] = waveform.annotations["parameters"]
     
-    ret = neo.SpikeTrain(mini_starts, t_stop = x.t_stop, units = x.times.units,
-                         t_start = x.t_start, sampling_rate = x.sampling_rate,
-                         name=f"{x.name}_mEPSCs", description=dstring)
-    
-    ret.waveforms = waves
-    ret.annotations["peak_times"] = mini_peaks
-    ret.annotations["mEPSC_parameters"] = waveform.annotations["parameters"]
-    
-    return ret, mini_peaks, minis
+    # return ret, mini_peaks, minis
+    return {"mini_starts":mini_starts, "mini_peaks":mini_peaks, "minis":minis,
+            "waveform":waveform}
 
-def batch_mEPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.05), Im:typing.Union[int, str] = "IN0"):
-    """Batch mEPSC analysis in a neo.Block
+def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.05), Im:typing.Union[int, str] = "IN0", epoch=None):
+    """Batch m(E/I)PSC analysis in a neo.Block
     The block's segments (sweeps) are expected to contain a signal with the 
     recorded membrane current for mini EPSCs.
     
-    The signal is identified by its name or index in the segment; these are 
-    specified by the parameter "Im".
+    The signal is identified by the "Im" parameter to this function (see below).
     
     Furthermore, each segment MUST have an epoch, named "mEPSC", which sets the
     region in the signal, where minis are going to be detected and analysed.
@@ -6460,19 +6495,80 @@ def batch_mEPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0.,
     
     Individual rejection of mEPSC rejection must be done manually for now.
     
+    Parameters:
+    ==========
+    x: neo.Block where each segment contains:
+
+        • an analog signal identified by the `Im` parameter below, which 
+        represents the recorded membrane current with putative miniature or 
+        spontaneous post-synaptic currents (mEPSCs or mIPSCs) 
+    
+        • an Epoch named "mPSC" or any name specified in the `epoh_name` parameter
+    
+    waveform: numpy array (1D), or a sequence of six float scalars
+        
+        • when a numpy array, this is a "template" waveform: usually, a synthetic
+            mPSC generated by the `models.Clements_Bekkers_97` function, or a
+            'real-life' mPSC waveform (usually averaged from several records, for
+            a better signal/noise ratio). You probably want to use the former, 
+            created with some default parameters.
+    
+        • when a sequence of floats, it contains the five parameters for the
+            Clements & Bekkers 1997 waveform model, AND the duration of the
+            synthetic waveform whcih will be generated ad hoc (see also the 
+            `detect_mPSC` function in this module).
+    
+    Im: str or int. The identifier of the membrane current signal contained in
+        the segments of `x`.
+    
+        When a str, its Im is the name of the signal (e.g., "IN0", "Im_prim_0", 
+        etc., as set in the configuration of the acquisition software and/or 
+        protocol).
+    
+        When an int, Im is the index of the signal in the segment's `analogsignals`
+        attribute.
+    
+        ATTENTION: 
+        • when Im is a str, the signal where mPSC detection is performed
+        can be at any index in the segment's analogsignals collection (a very
+        unusual situation), but MUST be present in ALL segments of `x`.
+    
+        • when Im is an int, it must be a valid index for the segment's
+        analogsignals collection.
+    
+    epoch:str, int, sequence of str or int, or None; default is None
+        Optional specification of an epoch (or epochs) where mPSC detection will
+        occur.
+    
+        NOTE: This will retrict mPSC detection to a selected region (or regions)
+        of the signal without interference from other tests (e.g. seal test, etc)
+        
+        • when a str, this is the name of the epoch where mPSC detection will be 
+        performed.
+    
+        • when an int, this is the index of the epoch, in the segment's epochs
+    
+        • when a sequence of str or int: the names, or indices, of the epochs for
+        mPSC detection
+    
+        NOTE: if the speification points to a non-existent epoch, this will be 
+        ignored and no detection will take place
+    
+        • when None (the default), the detection will be performed on the ENTIRE
+        signal (almost surely not what you want in most cases)
+    
+    Returns:
+    =======
+    A list (mPSC train, mPSC waveforms) pairs, one for each segment in `x`.
+    
+    When no mPSCs are detected, the pair is (None, None)
+    
     """
     
     result = list()
     
     for k, s in enumerate(x.segments):
-        if len(s.epochs) == 0:
-            continue
-        mEPSCepoch = [e for e in s.epochs if e.name == "mEPSC"]
-        
-        if len(mEPSCepoch) == 0:
-            continue
-        
-        mEPSCepoch = mEPSCepoch[0]
+        dstring = f"mEPSC detected in {x.name} segment {s.name}"
         
         try:
             if isinstance(Im, str):
@@ -6482,16 +6578,129 @@ def batch_mEPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0.,
                 im = s.analogsignals[Im].copy()
                 
             else:
+                result.append((None, None))
                 continue
         except:
             warnings.warn(f"No membrane current signal with index or name {Im} is found in segment {k}")
+            result.append((None, None))
             continue
         
-        sig = im.time_slice(mEPSCepoch.times[0], mEPSCepoch.times[0] +  mEPSCepoch.durations[0])
+        # print(s.epochs)
+        start_times = list()
         
-        train, peaks, minis = detect_mEPSC(sig, waveform)
-        result.append(train, minis)
+        # NOTE: 2022-10-26 23:35:36
+        # We use the same template across all segments; to avoid repeated function
+        # calls, we cache the template waveform here, once it has been generated
+        # as needed
+        template = None 
         
+        if epoch is None:
+            if template is None:
+                detection = detect_mPSC(im, waveform)
+            else:
+                detection = detect_mPSC(im, template)
+            
+            if detection is None:
+                result.append((None, None))
+                continue
+            
+            if template is None:
+                template = detection["waveform"]
+                
+        else:
+            if len(s.epochs) == 0:
+                warnings.warn(f"The {k}-th segment of {x.name} Block has no epochs!")
+                result.append((None, None))
+                continue
+            
+            if isinstance(epoch, str):
+                mPSCdetectepochs = [e for e in s.epochs if e.name == epoch]
+                if len(mPSCdetectepochs) == 0:
+                    warnings.warn(f"The {k}-th segment of {x.name} Block does not have epoch(s) named {epoch}")
+                    result.append((None, None))
+                    continue
+                
+            elif isinstance(epoch, int):
+                if epoch in range(-1*len(s.epochs), len(s.epochs)):
+                    mPSCdetectepochs = [s.epochs[epoch]]
+                    
+                else:
+                    warnings.warn(f"Epoch index {epoch} is not valid for the {k}-th segment of {x.name} Block with {len(s.epochs)} epochs")
+                    result.append((None, None))
+                    continue
+                
+            elif isinstance(epoch, (tuple, list)) and all(isinstance(e, (str, int)) for e in epoch):
+                mPSCdetectepochs = list()
+                
+                for e in epoch:
+                    if isinstance(e, str):
+                        me_ = [e_ for e_ in s.epochs if e_.name == e]
+                        if len(me_) == 0:
+                            warnings.warn(f"The {k}-th segment of {x.name} Block has no epoch named {e}")
+                        mPSCdetectepochs.extend(me_)
+                        
+                    elif isinstance(e, int):
+                        if e in range(-1*len(s.epochs), len(s.epochs)):
+                            mPSCdetectepochs.append(s.epochs[e])
+                        else:
+                            warnings.warn(f"Epoch index {e} is not valid for the {k}-th segment of {x.name} Block with {len(s.epochs)} epochs")
+                            
+            
+            if len(mPSCdetectepochs) == 0:
+                warnings.warn(f"No epochs with specified name or index wwere found in the {k}-th segment of {x.name} Block")
+                result.append((None, None))
+                continue
+            
+            # mPSCdetectepochs = mPSCdetectepochs[0]
+            mini_waves = list()
+            mini_starts = list()
+            mini_peaks = list()
+            
+            
+            for detect_epoch in mPSCdetectepochs:
+                sig = im.time_slice(detect_epoch.times[0], detect_epoch.times[0] + detect_epoch.durations[0])
+                if template is None:
+                    detection = detect_mPSC(sig, waveform) # only generate template ONCE
+                else:
+                    detection = detect_mPSC(sig, template) 
+                    # starts, peaks, epoch_minis, template = detect_mPSC(sig, template) 
+                if detection is None:
+                    continue
+                
+                template = detection["waveform"]
+                
+                mini_waves.extend(detection["minis"])
+                mini_starts.append(detection["mini_starts"])
+                mini_peaks.append(detection["mini_peaks"])
+                
+            if len(mini_starts) and len(mini_peaks):
+                start_times = np.hstack(mini_starts) * mini_starts[0].units
+                peak_times = np.hstack(mini_peaks) * mini_peaks[0].units
+            
+        if len(start_times) > 0:
+            if isinstance(template, neo.core.basesignal.BaseSignal) and len(template.description.strip()):
+                dstring += f" using {template.description}"
+                
+            train = neo.SpikeTrain(start_times, t_stop = im.t_stop, units = im.times.units,
+                                    t_start = im.t_start, sampling_rate = im.sampling_rate,
+                                    name = f"{x.name}_{s.name}_PSCs", description=dstring)
+            
+            waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
+            train.waveforms = waves
+            train.annotations["peak_times"] = peak_times
+            
+            if isinstance(template, neo.core.basesignal.BaseSignal):
+                train.annotations["mPSC_parameters"] = template.annotations["parameters"]
+            elif isinstance(waveform, neo.core.basesignal.BaseSignal):
+                train.annotations["mPSC_parameters"] = waveform.annotations["parameters"]
+            elif isinstance(waveform, (tuple, list)) and len(waveform)==6:
+                train.annotations["mPSC_parameters"] = waveform[:-1]
+                # CAUTION here 2022-10-26 23:09:15 possible BUG
+                
+            result.append((train, mini_waves))
+            s.spiketrains.append(train)
+        else:
+            result.append((None, None))
         
     return result
         
