@@ -6439,7 +6439,7 @@ def detect_mEPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.U
     
     return ret, mini_peaks, minis
 
-def batch_mEPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.05)), Im:typing.Union[int, str] = "IN0":
+def batch_mEPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.05), Im:typing.Union[int, str] = "IN0"):
     """Batch mEPSC analysis in a neo.Block
     The block's segments (sweeps) are expected to contain a signal with the 
     recorded membrane current for mini EPSCs.
