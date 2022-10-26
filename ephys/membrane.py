@@ -6437,9 +6437,63 @@ def detect_mEPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.U
     ret.annotations["peak_times"] = mini_peaks
     ret.annotations["mEPSC_parameters"] = waveform.annotations["parameters"]
     
-    
-    
     return ret, mini_peaks, minis
+
+def batch_mEPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.05)), Im:typing.Union[int, str] = "IN0":
+    """Batch mEPSC analysis in a neo.Block
+    The block's segments (sweeps) are expected to contain a signal with the 
+    recorded membrane current for mini EPSCs.
+    
+    The signal is identified by its name or index in the segment; these are 
+    specified by the parameter "Im".
+    
+    Furthermore, each segment MUST have an epoch, named "mEPSC", which sets the
+    region in the signal, where minis are going to be detected and analysed.
+    
+    Segmenst without such an epoch will be skipped.
+    
+    The results are returned as a list of pairs (SpikeTrain, list of AnalogSignal)
+    with one pair per segment in the Block.
+    
+    In each pair, the SpikeTrain contains the time stamps of the detected minis,
+    and the list of AnalogSignal object contains the detected mEPSC waveforms.
+    
+    Individual rejection of mEPSC rejection must be done manually for now.
+    
+    """
+    
+    result = list()
+    
+    for k, s in enumerate(x.segments):
+        if len(s.epochs) == 0:
+            continue
+        mEPSCepoch = [e for e in s.epochs if e.name == "mEPSC"]
+        
+        if len(mEPSCepoch) == 0:
+            continue
+        
+        mEPSCepoch = mEPSCepoch[0]
+        
+        try:
+            if isinstance(Im, str):
+                im = s.analogsignals[ephys.get_index_of_named_signal(s, Im)].copy()
+                
+            elif isinstance(Im, int):
+                im = s.analogsignals[Im].copy()
+                
+            else:
+                continue
+        except:
+            warnings.warn(f"No membrane current signal with index or name {Im} is found in segment {k}")
+            continue
+        
+        sig = im.time_slice(mEPSCepoch.times[0], mEPSCepoch.times[0] +  mEPSCepoch.durations[0])
+        
+        train, peaks, minis = detect_mEPSC(sig, waveform)
+        result.append(train, minis)
+        
+        
+    return result
         
     
 def fit_mini(x, params):
@@ -6459,8 +6513,13 @@ def fit_mini(x, params):
     params = list(params)
     params[0] = l[1] # adapt the offset to the DC components in the waveform
     
-    lo = (0., -np.inf, 0., 1e-4, 1e-4)
-    hi = (np.inf, 0., np.inf, 0.1, 0.1) # fix upper bounds for the time constants to 1.
+    if params[1] < 0: # downward mEPSC
+        lo = (0., -np.inf, 0., 1e-4, 1e-4)
+        hi = (np.inf, 0., np.inf, 0.1, 0.1) # fix upper bounds for the time constants to 0.1.
+    else: # upward mEPSC (e.g. NMDARs, etc)
+        lo = (0., 0, 0., 1e-4, 1e-4)
+        hi = (np.inf, np.inf, np.inf, 0.1, 0.1) # fix upper bounds for the time constants to 0.1.
+    
     
     fitresult = crvf.fit_mEPSC(x, params, bounds = [lo, hi])
     
