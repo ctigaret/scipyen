@@ -102,12 +102,12 @@ def Clements_Bekkers_97(x, parameters):
     This approximates a single exponential rise and decay each with their own 
     time constant:
     
-    y = a + b * (1 - exp(-(x-x₀)/τ₁)) ⋅ exp(-(x-x₀)/τ₂) for x-x₀ >= 0, or a elsewhere
+    y = α + β * (1 - exp(-(x-x₀)/τ₁)) ⋅ exp(-(x-x₀)/τ₂) for x-x₀ >= 0, or α elsewhere
     
     where:
-        a  = offset;
+        α  = offset (usually, 0.);
     
-        b  = scale;
+        β  = scale;
     
         x₀ = delay ("onset") (ms);
     
@@ -119,11 +119,11 @@ def Clements_Bekkers_97(x, parameters):
     x: predictor (independent variable) - 1D numpy ndarray
 
     parameters: 1D sequence (tuple, list, numpy array) of five float scalars:
-                a, b, x₀, τ₁ and τ₂
+                α, β, x₀, τ₁ and τ₂
     
                 where:
-                    a is considered in pA,
-                    b is dimensionless,
+                    α is considered in pA,
+                    β is dimensionless,
                     x₀, τ₁ and τ₂ are considered in s
     
     Returns:

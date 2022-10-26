@@ -6248,19 +6248,23 @@ def mEPSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.05*p
     
     y = models.Clements_Bekkers_97(x.magnitude, model_parameters)
     
-    dstring = f"Clements_Bekkers_97 a={model_parameters[0]}, b={model_parameters[1]}, x₀={model_parameters[2]}, τ₁={model_parameters[3]}, τ₂={model_parameters[4]}"
+    dstring = f"Clements_Bekkers_97 α={model_parameters[0]}, β={model_parameters[1]}, x₀={model_parameters[2]}, τ₁={model_parameters[3]}, τ₂={model_parameters[4]}"
     
     if quantities.check_time_units(x):
         klass = neo.AnalogSignal
     else:
         klass = DataSignal
         
-    return klass(y, units = units, t_start=t_start, 
+    ret = klass(y, units = units, t_start=t_start, 
                             sampling_rate=sampling_rate,
                             name="Clements & Bekkers '97 model",
                             description=dstring)
     
-def detect_mEPSC(x:neo.AnalogSignal, waveform:np.ndarray):
+    ret.annotations["parameters"] = model_parameters
+    
+    return ret
+    
+def detect_mEPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.05)):
     """Detects mEPSCs by cross-correlation with a model waveform.
     
     Parameters:
@@ -6277,8 +6281,30 @@ def detect_mEPSC(x:neo.AnalogSignal, waveform:np.ndarray):
         Contains a model mEPSC (ie. a "synthetic" waveform) or a "template" 
         mEPSC waveform extracted from a signal.
     
-    ATTENTION: Make sure this model waveform has the SAME SAMPLING RATE as the 
-        signal!!!
+        ATTENTION: Make sure this model waveform has the SAME SAMPLING RATE as 
+        the signal!!!
+    
+        ALTERNATIVELY, the waveform can be specified by a sequence of six scalars, 
+        where the first five are the Clements & Bekkers 1997 model parameters:
+        α, β, x₀, τ₁ and τ₂ (see models.Clements_Bekkers_97 for details)
+        and the 6ᵗʰ element is the duration of the model waveform (which will
+        be generated ad-hoc); this last element is assumed to be in the units of
+        the domain of x.
+    
+        By default, waveform is (0., -1., 0.01, 0.001, 0.01, 0.05) which means,
+        for a membrane current signal `x` in pA:
+    
+        α  =  0.0 pA (ie. no offset)
+        β  = -1.0 (i.e. downward deflection)
+        x₀ =  0.01 (i.e. 10 ms from the start of the waveform)
+        τ₁ =  0.001 (i.e., rising time constant of 1 ms)
+        τ₂ =  0.01  (i.e., decay time constant of 10 ms)
+        
+        and 50 ms duration of the model waveform
+    
+        NOTE: When specified in this way the waveform will be generated ad-hoc
+        using the sampling rate of the signal `x`.
+        
     
     For example, if creating the waveform as a plain numpy array:
     
@@ -6293,8 +6319,19 @@ def detect_mEPSC(x:neo.AnalogSignal, waveform:np.ndarray):
     generate a synthetic mEPSC waveform as a neo.AnalogSignal.
     
     """
-    if not dt.is_vector(waveform):
+    if isinstance(waveform, np.ndarray) and not dt.is_vector(waveform):
         raise TypeError("waveform expected to be a vector")
+    
+    elif isinstance(waveform, (tuple, list)):
+        if len(waveform) == 6:
+            waveduration = waveform[-1] * x.times.units
+            
+            waveform = mEPSCwaveform(waveform[0:-1], units = x.units,
+                                     t_start = 0*x.times.units,
+                                     duration = waveform[-1]*x.times.units,
+                                     sampling_rate = x.sampling_rate)
+    else:
+        raise ValueError("Incorrect waveform specification")
     
     # 1) normalize the model waveform
     mdl = sigp.normalise_waveform(waveform)
@@ -6379,7 +6416,7 @@ def detect_mEPSC(x:neo.AnalogSignal, waveform:np.ndarray):
     
     mini_peaks = x.times[peaks]
     
-    minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
+    minis = neoutils.set_relative_time_start([x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop])
     
     # FIXME/TODO: 2022-10-25 18:25:48
     # a neo.SpikeTrain is defined in the time domain only !!!
@@ -6397,11 +6434,42 @@ def detect_mEPSC(x:neo.AnalogSignal, waveform:np.ndarray):
                          name=f"{x.name}_mEPSCs", description=dstring)
     
     ret.waveforms = waves
+    ret.annotations["peak_times"] = mini_peaks
+    ret.annotations["mEPSC_parameters"] = waveform.annotations["parameters"]
     
     
     
     return ret, mini_peaks, minis
         
+    
+def fit_mini(x, params):
+    """Convenience wrapper to curvefitting.fit_mEPSC with suitable lower & upper bounds
+    
+    Parameters:
+    ===========
+    x: neo.AnalogSignal or DataSignal) with a miniEPSC (i.e. fragment of a signal)
+    params: initial parameter values for the Clements & Bekkers '97 model
+    """
+    
+    if not isinstance(x, (neo.AnalogSignal, DataSignal)):
+        raise TypeError(f"Data in 'x' expected to be a neo.AnalogSignal or DataSignal; got {type(x).__name__} instead")
+    
+    l, c, e = sigp.state_levels(x)
+    
+    params = list(params)
+    params[0] = l[1] # adapt the offset to the DC components in the waveform
+    
+    lo = (0., -np.inf, 0., 1e-4, 1e-4)
+    hi = (np.inf, 0., np.inf, 0.1, 0.1) # fix upper bounds for the time constants to 1.
+    
+    fitresult = crvf.fit_mEPSC(x, params, bounds = [lo, hi])
+    
+    fitted_x = type(x)(fitresult[0], units = x.units, t_start = x.t_start, sampling_rate = x.sampling_rate)
+    
+    x = x.merge(fitted_x)
+    x.annotations["mEPSC_fit"] = fitresult[1]
+    
+    return x
     
     
     
