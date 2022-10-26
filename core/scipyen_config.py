@@ -1016,7 +1016,7 @@ class ScipyenConfigurable(object):
         self.configurable_traits.observe(self._observe_configurables_)
         self._tag = configTag
         #print(f"ScipyenConfigurable.__init__ qsettings {self.qsettings.fileName()}")
-        print(f"ScipyenConfigurable.__init__ _scipyen_settings_ {scipyen_config}, _user_settings_src_ {scipyen_user_config_source}, _user_settings_file_ {self._user_settings_src_.filename}")
+        # print(f"ScipyenConfigurable.__init__ _scipyen_settings_ {scipyen_config}, _user_settings_src_ {scipyen_user_config_source}, _user_settings_file_ {self._user_settings_src_.filename}")
         
     def _get_parent_(self):
         parent = None

@@ -173,11 +173,11 @@ class ScipyenInProcessKernel(InProcessKernel):
     """Workaround the following exception when using InProcessKernel (see below).
     
     Traceback (most recent call last):
-    File "/home/cezar/scipyenv39/lib64/python3.9/site-packages/tornado/ioloop.py", line 741, in _run_callback
+    File "/home/.../scipyenv39/lib64/python3.9/site-packages/tornado/ioloop.py", line 741, in _run_callback
         ret = callback()
-    File "/home/cezar/scipyenv39/lib/python3.9/site-packages/ipykernel/kernelbase.py", line 419, in enter_eventloop
+    File "/home/.../scipyenv39/lib/python3.9/site-packages/ipykernel/kernelbase.py", line 419, in enter_eventloop
         schedule_next()
-    File "/home/cezar/scipyenv39/lib/python3.9/site-packages/ipykernel/kernelbase.py", line 416, in schedule_next
+    File "/home/.../scipyenv39/lib/python3.9/site-packages/ipykernel/kernelbase.py", line 416, in schedule_next
         self.io_loop.call_later(0.001, advance_eventloop)
     AttributeError: 'InProcessKernel' object has no attribute 'io_loop'
     
