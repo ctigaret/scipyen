@@ -3748,14 +3748,24 @@ def get_non_empty_epochs(sequence:(tuple, list)):
     
     return [e for e in sequence if len(e)]
 
-def clear_spiketrains(segment:neo.Segment):
-    """Clears the spike train list in the segment
+def clear_spiketrains(data:typing.Union[neo.Segment, neo.Block, typing.Sequence[typing.Union[neo.Segment, neo.Block]]]):
+    """Removes ALL SpikeTrain objects from the data
     """
     
     # segment.spiketrains = neo.core.spiketrainlist.SpikeTrainList(segment=segment)
-    stl = segment.spiketrains[0:1:-1] # empty slice clears
-    stl.segment = segment
-    segment.spiketrains = stl
+    if isinstance(data, neo.Segment):
+        stl = data.spiketrains[0:1:-1] # empty slice clears
+        stl.data = data
+        data.spiketrains = stl
+        
+    elif isinstance(data, neo.Block):
+        for s in data.segments:
+            clear_spiketrains(s)
+            
+    elif isinstance(data, (tuple, list)):
+        for d in data:
+            if isinstance(d, (neo.Segment, neo.Block)):
+                clear_spiketrains(d)
     
 def remove_spiketrain(segment:neo.Segment, index:typing.Union[int, typing.Sequence[int]]):
     """Remove the SpikeTrain at specified index from the segment's spiketrains.
