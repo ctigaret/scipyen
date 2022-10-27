@@ -299,9 +299,7 @@ def segment_start(data:neo.Segment):
         
 
 def set_relative_time_start(data, t = 0 * pq.s):
-    """
-    TODO: propagate to other members of a segment as well 
-    (IrregularlySampledSignal, epochs, spike trains, etc)
+    """Returns a copy of the data where each signal starts at a specified time.
     """
     from neo.core.spiketrainlist import SpikeTrainList
     if isinstance(data, neo.Block):
@@ -447,6 +445,8 @@ def set_relative_time_start(data, t = 0 * pq.s):
         
         
     return data
+
+
 def merge_array_annotations(a0:ArrayDict, a1:ArrayDict):
     if not all(isinstance(a, (ArrayDict, dict)) for a in (a0,a1)):
         raise TypeError("Expecting two neo.core.dataobject.ArrayDict objects")

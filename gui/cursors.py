@@ -665,9 +665,7 @@ class SignalCursor(QtCore.QObject):
             else:
                 self._is_selected_ = val
             
-    def setBounds(self, host:typing.Optional[pg.GraphicsItem]=None, 
-                  xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
-                  yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None) -> None:
+    def setBounds(self, host:typing.Optional[pg.GraphicsItem]=None, xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None):
         if host is None:
             host = self._host_graphics_item_
             

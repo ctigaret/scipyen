@@ -3784,15 +3784,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             d.namePrompt=qd.StringInput(d, "Name:")
             d.namePrompt.setText("Epoch")
             
-            d.c1Prompt = qd.StringInput(d, "SignalCursor 1:")
-            d.c2Prompt = qd.StringInput(d, "SignalCursor 2:")
+            # d.c1Prompt = qd.StringInput(d, "SignalCursor 1:")
+            # d.c2Prompt = qd.StringInput(d, "SignalCursor 2:")
             
-            #c1Prompt = vigra.pyqt.qd.StringInput(d, "SignalCursor 1:")
-            #c2Prompt = vigra.pyqt.qd.StringInput(d, "SignalCursor 2:")
+            d.c1Combo = qd.QuickDialogComboBox(d, "Select first cursor:")
+            d.c1Combo.setItems([c for c in vertAndCrossCursors])
+            d.c1Combo.setValue(0)
             
-            # d.promptWidgets.append(namePrompt)
-            # d.promptWidgets.append(c1Prompt)
-            # d.promptWidgets.append(c2Prompt)
+            d.c2Combo = qd.QuickDialogComboBox(d, "Select second cursor")
+            d.c2Combo.setItems([c for c in vertAndCrossCursors])
+            d.c1Combo.setValue(1)
             
             d.toAllSegmentsCheckBox = qd.CheckBox(d, "Embed in all segments")
             d.toAllSegmentsCheckBox.setChecked(True)
@@ -3800,13 +3801,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             d.sweepRelativeCheckBox = qd.CheckBox(d, "Relative to each segment start")
             d.sweepRelativeCheckBox.setChecked(True)
             
-            # d.promptWidgets.append(toAllSegmentsCheckBox)
             
             d.overwriteEpochCheckBox = qd.CheckBox(d, "Overwrite existing epochs")
-            #overwriteEpochCheckBox = vigra.pyqt.qd.CheckBox(d, "Overwrite existing epochs")
             d.overwriteEpochCheckBox.setChecked(False);
-            
-            # d.promptWidgets.append(overwriteEpochCheckBox)
             
             if d.exec() == QtWidgets.QDialog.Accepted:
                 name = d.namePrompt.text()
@@ -3814,12 +3811,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if name is None or len(name) == 0:
                     return
                 
-                c1ID = d.c1Prompt.text()
+                # c1ID = d.c1Prompt.text()
+                c1ID = d.c1Combo.text()
                 
                 if c1ID is None or len(c1ID) == 0:
                     return
                 
-                c2ID = d.c2Prompt.text()
+                # c2ID = d.c2Prompt.text()
+                c2ID = d.c2Combo.text()
                 
                 if c2ID is None or len(c2ID) == 0:
                     return
@@ -5723,6 +5722,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             else:
                 hostitem = self.currentPlotItem
+                
+        elif isinstance(index, str) and index == "all":
+            hostitem = self.signalsLayout.scene()
             
         elif isinstance(index, int):
             if index >=0:
@@ -5734,6 +5736,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 hostitem = self.signalsLayout.scene()
                 
+        elif isinstance(index, pg.PlotItem):
+            hostitem = index
+            
         if hostitem is not None: # may be None if there is no scene, i.e. no plot item
             ret =  [c for c in self._data_cursors_.values() if c.hostItem is hostitem]
         
@@ -6053,6 +6058,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._current_plot_item_index_ = -1
                     
         self._update_annotations_()
+        
+        # finally, reset the curors bound for all axes
+        for k in range(len(self.axes)):
+            for c in self.cursorsInAxis(k):
+                c.setBounds()
+            
         
     @safeWrapper
     def _plotSpikeTrains_(self, trains:typing.Optional[typing.Union[neo.SpikeTrain, tuple, list]] = None, clear:bool = False, **kwargs):
@@ -7075,16 +7086,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         plotItem.replot()
         
-        # FIXME: 2022-10-08 22:11:02 - what does this do ?!?
-        # if self.axis_tick_font is not None:
-        #     for ax in plotItem.axes.values():
-        #         if ax["item"].isVisible():
-        #             pass
-        
-        plotItemCursors = self.cursorsInAxis(plotItem)
-        
-        for c in plotItemCursors:
-            c.setBounds()
+#         plotItemCursors = self.cursorsInAxis(plotItem)
+#         
+#         for c in plotItemCursors:
+#             c.setBounds()
             
         if plotItem is self._current_plot_item_:
             lbl = "<B>%s</B>" % self._current_plot_item_.axes["left"]["item"].labelText

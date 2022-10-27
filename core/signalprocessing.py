@@ -582,11 +582,11 @@ def state_levels(x:np.ndarray, **kwargs):
     from scipy import where
     
     if not isinstance(x, np.ndarray):
-        raise TypeError("Numpy array expected; instead, got a %d" % (type(x).__name__))
+        raise TypeError(f"Numpy array expected; instead, got a {type(x).__name__}")
     
     if x.ndim > 1:
         if x.shape[1] > 1:
-            raise ValueError("1D data expected; got data with %s shape" % (str(x.shape)))
+            raise ValueError(f"1D data expected; got data with shape {x.shape}")
         
         else:
             x = np.squeeze(x)

@@ -6272,6 +6272,9 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
                             description=dstring)
     
     ret.annotations["parameters"] = model_parameters
+    ret.array_annotations["channel_name"] = ["CB97"]
+    ret.array_annotations["channel_ids"] = ["0"]
+    
     
     return ret
     
@@ -6444,7 +6447,9 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     
     mini_peaks = x.times[peaks]
     
-    minis = neoutils.set_relative_time_start([x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop])
+    # minis = neoutils.set_relative_time_start([x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop])
+    minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
+    
     
     for m in minis:
         m.annotations["Accept"] = True
@@ -6475,7 +6480,7 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     return {"mini_starts":mini_starts, "mini_peaks":mini_peaks, "minis":minis,
             "waveform":waveform}
 
-def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), Im:typing.Union[int, str] = "IN0", epoch=None):
+def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), Im:typing.Union[int, str] = "IN0", epoch=None, clear_spiketrains:bool=True, fit_waves:bool=False):
     """Batch m(E/I)PSC analysis in a neo.Block
     The block's segments (sweeps) are expected to contain a signal with the 
     recorded membrane current for mini EPSCs.
@@ -6557,12 +6562,35 @@ def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., 
         • when None (the default), the detection will be performed on the ENTIRE
         signal (almost surely not what you want in most cases)
     
+    clear_spiketrains:bool, optional, default is True
+        When True, all SpikeTrain objects in the segments of `x` are removed.
+        Typically, this is to allow a "clean" rerun of the mPSC detection. 
+
+        As  explained below (see "Side effects") the time stamps of any detected
+        mPSCs in each segment are stored in a SpikeTrain embedded in the segment,
+        in `x`.
+    
+        The `clear_spiketrains = True` flag allows re-running the detection 
+        without accumulating SpikeTrain from previous runs.
+    
+    fit_waves:bool, optional, default is False
+        When True, the Clements & Bekkers 1997 model will be fitted to the 
+        each of the detected mPSC waveforms, using the waveform's parameters as
+        initial values for the model. 
+        
+        CAUTION: Fitting each mPSC waveform will significantly increase the
+        execution time of this function.
+    
     Returns:
     =======
     A tuple with :
-        • a list where each element is a list of detected mPSC waveforms or None, for 
-            each segment in `x`.
-        • the template waveform as an AnalogSignal
+        • A list where each element is a list of detected mPSC waveforms (as 
+            AnalogSignals) or None, for each segment in `x`. 
+            If `fit_wave` is True, then each mPSC waveform will have an additional
+            channel containing the fitted curve, and the fit result will be
+            embedded in its annotations.
+    
+        • The template waveform as an AnalogSignal
     
     Side effects:
     =============
@@ -6570,7 +6598,14 @@ def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., 
     starts) are embedded as a SpikeTrain in the segments where mPSC detection was
     successful.
     
+    The waveforms of the detected mPSCs are attached to the embedded SpikeTrain 
+    object.
+    
+    
     """
+    
+    if clear_spiketrains:
+        neoutils.clear_spiketrains(x)
     
     result = list()
     
@@ -6594,6 +6629,8 @@ def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., 
         
         # print(s.epochs)
         start_times = list()
+        peak_times  = list()
+        mini_waves  = list()
         
         # NOTE: 2022-10-26 23:35:36
         # We use the same template across all segments; to avoid repeated function
@@ -6610,6 +6647,10 @@ def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., 
             if detection is None:
                 result.append(None)
                 continue
+            
+            start_times = detection["mini_starts"]
+            peak_times  = detection["mini_peaks"]
+            mini_waves  = detection["minis"]
             
             if template is None:
                 template = detection["waveform"]
@@ -6693,7 +6734,6 @@ def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., 
                                     name = f"{x.name}_{s.name}_PSCs", description=dstring)
             
             # # waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
-            # waves = np.concatenate([w.magnitude[np.newaxis,:,:] for w in mini_waves], axis=2)
             # train.waveforms = waves
             train.annotations["peak_times"] = peak_times
             
@@ -6705,7 +6745,22 @@ def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., 
             #     train.annotations["mPSC_parameters"] = waveform[:-1]
                 # CAUTION here 2022-10-26 23:09:15 possible BUG
                 
+            # NOTE: 2022-10-27 23:14:18
+            # fit mPSC waves if asked
+            if fit_waves:
+                for k,w in enumerate(mini_waves):
+                    fw = fit_mPSC(w, template.annotations["parameters"])
+                    
+                    mini_waves[k] = fw
+                
+            # this below is (time, channel, spike)
+            train_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
+            
+            # a SpikeTrain expects (spike, channel, time) hence train_waves.T
+            train.waveforms = train_waves.T # 
+            
             s.spiketrains.append(train)
+            
             result.append(mini_waves)
         else:
             result.append(None)
@@ -6713,37 +6768,118 @@ def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., 
     return result, template
         
     
-def fit_mini(x, params):
+def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Optional[typing.Sequence]=None):
     """Convenience wrapper to curvefitting.fit_mEPSC with suitable lower & upper bounds
     
     Parameters:
     ===========
     x: neo.AnalogSignal or DataSignal) with a miniEPSC (i.e. fragment of a signal)
-    params: initial parameter values for the Clements & Bekkers '97 model
+    
+    params: sequence of float scalars; these are the initial parameter values for
+            the Clements & Bekkers '97 model:
+            
+            α, β, x₀, τ₁ and τ₂, where:
+    
+            α  = offset (usually, 0.) in signal units, usually [pA];
+        
+            β  = scale (-1. for downward waveform; 1. for upward waveform);
+                 dimensionless
+        
+            x₀ = delay ("onset") [ms];
+        
+            τ₁, τ₂ = the "rise" and "decay" time constants, respectively, in [ms]
+    
+    lo, up: None, or a sequence of floats of the same length as params, with the
+            the lower and upper bounds, respectively, for the model parameters.
+    
+            When None they will assume the following default values:
+    
+            • for downward waveform (params[1] < 0):
+                        α,         β,        x₀,     τ₁        τ₂:
+                lo  = ( 0.,       -np.inf,   0.,     1.0e-4,   1.0e-4)
+                hi  = ( np.inf,    0.,       np.inf, 0.01,     0.01)
+    
+            • for upward waveform (params[1] >=0 ):
+                        α,         β,        x₀,     τ₁        τ₂:
+                lo  = ( 0.,        0,        0.,     1.0e-4,   1.0e-4)
+                hi  = ( np.inf,    np.inf,   np.inf, 0.01,     0.01)
+    
+    ATTENTION: the structure of the params lo and up sequences is NOT checked.  
+        If you feed garbage the function will either throw an exception, or will
+        fail to give you what you want.
     """
     
     if not isinstance(x, (neo.AnalogSignal, DataSignal)):
         raise TypeError(f"Data in 'x' expected to be a neo.AnalogSignal or DataSignal; got {type(x).__name__} instead")
     
-    l, c, e = sigp.state_levels(x)
     
+    # NOTE: 2022-10-27 22:44:40
+    # For fitting, waveform domain must start at 0, therefore we shift is needed,
+    # but cache the original t_start to restore afterwards
+    t_start = x.t_start
+    if x.t_start.magnitude != 0:
+        x = neoutils.set_relative_time_start(x)
+    
+    l, c, e = sigp.state_levels(x[:,0])
+    
+    # NOTE: 2022-10-27 22:53:50
+    # FYI these are:
+    # α, β, x₀, τ₁ and τ₂
+    # same structure for lower & upper bounds (respectively, lo & up)
     params = list(params)
     params[0] = l[1] # adapt the offset to the DC components in the waveform
     
-    if params[1] < 0: # downward mEPSC
-        lo = (0., -np.inf, 0., 1e-4, 1e-4)
-        hi = (np.inf, 0., np.inf, 0.1, 0.1) # fix upper bounds for the time constants to 0.1.
-    else: # upward mEPSC (e.g. NMDARs, etc)
-        lo = (0., 0, 0., 1e-4, 1e-4)
-        hi = (np.inf, np.inf, np.inf, 0.1, 0.1) # fix upper bounds for the time constants to 0.1.
+    if lo is None:
+        if params[1] < 0:   # downward mPSC
+            lo = (0., -np.inf, 0., 1e-4, 1e-4)
+        else:               # upward mPSC
+            lo = (0., 0, 0., 1e-4, 1e-4)
+            
+    if up is None:
+        if params[1] < 0:   # downward mPSC
+            up = (np.inf, 0., np.inf, 0.01, 0.01) # fix upper bounds for the time constants to 0.1.
+        else:
+            up = (np.inf, np.inf, np.inf, 0.01, 0.01) # fix upper bounds for the time constants to 0.1.
+            
     
+    # NOTE: 2022-10-27 22:45:23
+    # Normally, the waveform has just one channel: the mPSC "cropped" out from 
+    # the signal it was detected in
+    #
+    # However, if the waveform was fitted before, the fitted curve is in the 2nd
+    # channel. To avoid appending further curves upon re-fitting, we use the 1st
+    # channel as data to fit, and overwrite the 2nd channel with the fitted curve
+    # if a 2nd channel exists, else we just append the newly fit curve as 2nd 
+    # channel
     
-    fitresult = crvf.fit_mEPSC(x, params, bounds = [lo, hi])
+    xx = x[:,0] # this always works even if there is only one channel, 
+                # and returns an AnalogSignal
+                
+    fitresult = crvf.fit_mEPSC(xx, params, bounds = [lo, up])
     
-    fitted_x = type(x)(fitresult[0], units = x.units, t_start = x.t_start, sampling_rate = x.sampling_rate)
+    fitted_x = type(x)(fitresult[0], units = x.units, t_start = x.t_start, sampling_rate = x.sampling_rate, name="mPSCfit")
     
-    x = x.merge(fitted_x)
-    x.annotations["mEPSC_fit"] = fitresult[1]
+    if x.shape[1] > 1:
+        x[:,1] = fitted_x # modifies x in-place
+    else:
+        for annkey in x.array_annotations:
+            if annkey == "channel_names":
+                fitted_x.array_annotations[annkey] = ["mPSCfit"]
+            elif annkey == "channel_ids":
+                fitted_x.array_annotations[annkey] = x.array_annotations[annkey][0] + "_fit"
+            else:
+                fitted_x.array_annotations[annkey] = x.array_annotations[annkey]
+                
+        
+        x = x.merge(fitted_x) # returns a new x
+    
+    # NOTE: 2022-10-27 22:44:50
+    # Restore the domain start of the waveform (see NOTE: 2022-10-27 22:44:40)
+    x.t_start = t_start
+    
+    x.annotations["mPSC_fit"] = fitresult[1]
+    x.annotations["amplitude"] = sigp.waveform_amplitude(x[:,0])
+    x.annotations["fit_amplitude"] = sigp.waveform_amplitude(x[:,1])
     
     return x
     
