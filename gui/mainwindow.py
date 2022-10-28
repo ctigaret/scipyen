@@ -1016,16 +1016,27 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
     @safeWrapper
     def slot_addScript(self):
         targetDir = os.getcwd()
+        fileFilter = "Python script (*.py)"
         fileName = self.chooseFile(caption=u"Add python script", 
                                  fileFilter="Python script (*.py)", 
                                  targetDir = targetDir)
         
+        # print(f"ScriptManager.slot_addScript fileName: { fileName}" )
+        
         if isinstance(fileName, tuple):
-            fileName = fileName[0] # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
+            fileName, fileFilter = fileName # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
+
         if pio.checkFileReadAccess(fileName):
             mime_file_type = pio.getMimeAndFileType(fileName)
-            if any("python" in s for s in mime_file_type):
+            # print(f"ScriptManager.slot_addScript {mime_file_type}")
+            # for s in mime_file_type:
+                # print(f"ScriptManager.slot_addScript s: {s}, type: {type(s).__name__}")
+            if any("python" in s for s in mime_file_type if isinstance(s, str)):
                 self.signal_pythonFileAdded.emit(fileName)
+                
+            elif any("text"  in s for s in mime_file_type if isinstance(s, str)) and os.path.splitext(fileName)[-1] == ".py":
+                self.signal_pythonFileAdded.emit(fileName)
+                
             
     @pyqtSlot()
     @safeWrapper
@@ -3162,11 +3173,22 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             varName = self.workspaceModel.item(indexList[0].row(),0).text()
             
             varType = type(self.workspace[varName])
+            # print(varType, inspect.getmro(varType))
             
-            actionNames = VTH.get_actionNames(varType)
-            
-            if actionNames is None:
+            if QtWidgets.QWidget in inspect.getmro(varType):
+                delVars = cm.addAction("Delete")
+                delVars.setToolTip("Delete selected variables")
+                delVars.setStatusTip("Delete selected variables")
+                delVars.setWhatsThis("Delete selected variables")
+                delVars.triggered.connect(self.slot_deleteSelectedVars)
+                delVars.hovered.connect(self._slot_showActionStatusMessage_)
                 return
+                
+            
+#             actionNames = VTH.get_actionNames(varType)
+#             
+#             if actionNames is None:
+#                 return
             
             #cm.addSeparator()
             
@@ -5316,89 +5338,19 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if fileReader is None:
                 fileReader = pio.getLoaderForFile(fName)
                 
-            #print("fileReader", fileReader)
+            # print("fileReader", fileReader)
             
             if fileReader is None:
                 return False
             
-#             reader_signature = inspect.signature(fileReader)
-#             
-#             # NOTE: 2020-02-18 12:24:38
-#             # return_types is inspect.Signature.empty when the function has no
-#             # annotated return signature; otherwise, is a:
-#             # a) type - when the function returns a variable of determined type 
-#             #   (this includes NoneType)
-#             # b) sequence
-#             #   all elements are types when the function returns either:
-#             #   b.1) a sequence of variables, each with a determined type
-#             #   b.2) a single variable with one of several possible types
-#             #   SOME of its elements are sequences of types => the function
-#             #   returns a sequence of variables, SOME of which can have one of
-#             #   several possible types (contained in the sequence elements of the
-#             #   return_types)
-#             return_types = reader_signature.return_annotation
+            try:
+                data = fileReader(fName)
+                # self.workspace[bName] = data
+                if data is not None:
+                    self.workspace[bName] = data
+            except:
+                return False
             
-            #print("return_types", return_types)
-            
-            data = fileReader(fName)
-            
-            # print(f"loaded data {data} for binding to variable name {bName}")
-            
-            self.workspace[bName] = data
-            
-#             if return_types is inspect.Signature.empty:
-#                 # no return annotation
-#                 self.workspace[bName] = data
-#                 
-#             else:
-#                 # see NOTE: 2020-02-18 12:24:38
-#                 if isinstance(return_types, type): 
-#                     # case (a) in NOTE: 2020-02-18 12:24:38
-#                     if type(data) != return_types:
-#                         warnings.warn("Unexpected return type (%s); expecting %s from %s" % (type(data).__name__, type(return_types).__name__, fileReader))
-#                         
-#                     self.workspace[bName] = data
-#                     
-#                 else:
-#                     if isinstance(return_types, (tuple, list)):
-#                         if isinstance(data, (tuple, list)):
-#                             # case (b) in NOTE: 2020-02-18 12:24:38
-#                             if len(return_types) != len(data):
-#                                 warnings.warn("Unexpected number of return variables (%d); expecting %d from %s" % (len(data), len(return_types), fileReader))
-#                                 self.workspace[bName] = data
-#                                 
-#                             else:
-#                                 for k,d in enumerate(data):
-#                                     if isinstance(return_types[k], type):
-#                                         if type(data[k]) != return_types[k]:
-#                                             warnings.warn("Unexpected return type (%s) for %dth variable; expecting %s, in %s" % (type(data[k]).__name__, k, type(return_types[k]).__name__, fileReader))
-#                                             self.workspace[bName] = data
-#                                             break
-#                                             
-#                                     elif isinstance(return_types[k], (tuple, list)) and all([isinstance(rt, type) for rt in return_types[k]]):
-#                                         if type(data[k]) not in return_types[k]:
-#                                             warnings.warn("Unexpected return type (%s) for %dth variable; expecting %s, in %s" % (type(data[k]).__name__, k, str(return_types[k]), fileReader))
-#                                             self.workspace[bName] = data
-#                                             break
-#                                             
-#                                     else:
-#                                         warnings.warn("Cannot interpret the return signature of %s" % fileReader)
-#                                         self.workspace[bName] = data
-#                                         break
-#                                         
-#                                     if k == 0:
-#                                         self.workspace[bName] = data[k]
-#                                     else:
-#                                         name = "%s_%s_%d" % (bName, "var", k)
-#                                         self.workspace[name] = data[k]
-#                                         
-#                         else:
-#                             if type(data) not in return_types[0]:
-#                                 # TODO / FIXME
-#                                 warnings.warn("Data type %s is not listed in the return signature of %s" % (type(data), fileReader))
-#                                 
-#                             self.workspace[bName] = data
-#                                         
             if addToRecent:
                 self._addRecentFile_(fName, fileReader)
             

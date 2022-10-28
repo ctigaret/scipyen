@@ -877,17 +877,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         #print(f"WorkspaceModel.update observed_vars: {list(self.observed_vars.keys())}")
         del_vars = [name for name in self.observed_vars.keys() if name not in self.shell.user_ns.keys()]
-        
-        # print(f"WorkspaceModel.update: {len(del_vars)} del_vars")
+
+        # print(f"WorkspaceModel.update: {len(del_vars)} del_vars {del_vars}")
         
         # with self.observed_vars.hold_trait_notifications:
         self.observed_vars.remove_members(*del_vars)
         
-        current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
-        
-        # print(f"current_vars {current_vars}")
-        
-        self.observed_vars.update(current_vars)
+        for vname in del_vars:
+            self.removeRowForVariable(vname)
         
 #         if len(del_vars) == 1:
 #             self.removeRowForVariable(del_vars[0])
@@ -897,14 +894,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 #             for item in self.observed_vars.items():
 #                 self.addRowForVariable(*item)
             
-        #print(f"WorkspaceModel.update del_vars = {del_vars}")
+        current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         
-        #obsolete_displayed_vars = [n for n in self.getDisplayedVariableNames() if n not in self.shell.user_ns.keys()] # in the internal ws
+        self.observed_vars.update(current_vars)
         
-        #names_to_remove = set(del_vars) | set(obsolete_displayed_vars)
-        
-        #for name in names_to_remove:
-            #self.removeRowForVariable(name)
 
     def updateFromExternal(self, prop_dicts):
         """prop_dicts: {name: nested properties dict}
@@ -992,26 +985,45 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #from core.utilities import standard_obj_summary_headers
         
         if len(kwargs) == 0:
+            # return all row indices here
+            # if used froma  deleting function, thso shoudl result in the removal
+            # of all items in the model
             return range(self.rowCount())
 
         else:
             if self.rowCount() == 0:
                 return -1
             
+            # auxiliary vector for setting up logical indexin, see for loop below
             allrows = np.arange(self.rowCount())
+            
+            # set up logical indexing vector
             allndx = np.array([True] * self.rowCount())
             
+            # NOTE: 2022-10-28 13:41:36
+            # kwargs keys are column names in the workspace viewer (but with " "
+            #   replaced by "_")
+            # so, below, for each of the column names GIVEN in kwargs:
             for key, value in kwargs.items():
+                # find the column's index  - this is the index of the column name
+                # in the summary header
                 key_column = standard_obj_summary_headers.index(key.replace("_", " "))
-                
+                # now, find the viewer item based on the value mapped to the kwarg
+                # key, given the index of the key column; the value must be a str
+                # NOTE: findItems is a method of QAbstractItemModel
                 items_by_key = self.findItems(value, column=key_column)
                 
+                # once items are found, we get their row indices
                 rows_by_key = [i.index().row() for i in items_by_key]
                 
+                # key_ndx is an intermediate logical vector flagging True wherever
+                # a row index from the current model contents is in rows_by_key
                 key_ndx = np.array([allrows[k] in rows_by_key for k in range(len(allrows))])
                 
+                # update the logical vector
                 allndx = allndx & key_ndx
                 
+            # use the logial indexing to create a list of row indices
             ret = [int(v) for v in allrows[allndx]]
             #print("rowIndexForItemsWithProps ret", ret)
             #ret = list(allrows[allndx])
@@ -1024,6 +1036,18 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
             else:
                 return ret
+            
+    @safeWrapper
+    def rowIndexForItemInWorkspace(self, name, Workspace="internal"):
+        """Variant of rowIndexForItemsWithProps selecting row indices for variables
+            in the internal workspace
+        
+        Accepts a list of names !
+        
+        TODO!
+        """
+        
+        pass
             
     @safeWrapper
     def rowIndexForNamedItemsWithProps(self, name, **kwargs):

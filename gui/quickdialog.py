@@ -39,7 +39,8 @@ Useful to have even when vigranumpy is not installed.
 # Adaptation for use with PyQt5
 # Copyright 209-2021 by Cezar M. Tigaret (cezar.tigaret@gmail.com, TigaretC@cardiff.ac.uk)
 #########################################################################
-import os, typing
+import os, typing, inspect, math
+import numpy as np
 import PyQt5.QtCore as QtCore
 import PyQt5.QtGui as QtGui
 import PyQt5.QtWidgets as QtWidgets
@@ -128,7 +129,7 @@ class _OptionalValueInput(QtWidgets.QFrame):
         parent.addWidget(self)
         self.label = QtWidgets.QLabel(label)
         self.variable = QtWidgets.QLineEdit()
-        self.variable.setValidator(self._QValidator(self.variable))
+        self.variable.setValidator(self._QValidator(parent=self.variable))
 
         self._layout = QtWidgets.QHBoxLayout()
         self._layout.setSpacing(5)
@@ -188,9 +189,30 @@ class OptionalIntegerInput(_OptionalValueInput):
 class IntegerInput(OptionalIntegerInput):
     def value(self):
         return int(self.text())
+    
+class InftyDoubleValidator(QtGui.QDoubleValidator):
+    def __init__(self, bottom:float=-math.inf, top:float=math.inf, decimals:int=4, parent=None):
+        QtGui.QDoubleValidator.__init__(self,parent)
+        self.setBottom(bottom)
+        self.setTop(top)
+        self.setDecimals(decimals)
+        
+    def validate(self, s:str, pos:int):
+        valid = super().validate(s, pos)
+        # print(f"InftyDoubleValidator.validate s: {s}, pos: {pos}, valid {valid}, type: {type(valid).__name__}")
+        if valid[0] not in (QtGui.QValidator.Intermediate, QtGui.QValidator.Acceptable):
+            if s.lower() in ("-i", "i", "-in", "in"):
+                return (QtGui.QValidator.Intermediate, s, pos)
+            elif s.lower() in ("-inf", "inf"):
+                return (QtGui.QValidator.Acceptable, s, pos)
+            else:
+                return (QtGui.QValidator.Invalid, s, pos)
+            
+        return valid
 
 class OptionalFloatInput(_OptionalValueInput):
-    _QValidator = QtGui.QDoubleValidator
+    # _QValidator = QtGui.QDoubleValidator
+    _QValidator = InftyDoubleValidator
     _text2Value = float
     _mustContain = "a float"
 
@@ -472,10 +494,10 @@ class QuickWidget(QtWidgets.QWidget):
     """Quick creation of a custom widget
     TODO: 2022-10-28 11:27:24
     """
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, layout:QtWidgets.QLayout=None):
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, layoutType:type=QtWidgets.QVBoxLayout):
         QtWidgets.QWidget.__init__(self, parent)
-        if isinstance(layout, QtWidgets.QLayout):
-            self.layout = layout
+        if QtWidgets.QLayout in inspect.getmro(layoutType):
+            self.layout = layoutType(self)
         else:
             self.layout = QtWidgets.QVBoxLayout(self)
         self.layout.addStretch(5)
@@ -486,8 +508,9 @@ class QuickWidget(QtWidgets.QWidget):
     def addWidget(self, widget, stretch = 0, alignment = None):
         if alignment is None:
             alignment = QtCore.Qt.AlignTop
-            self.layout.insertWidget(len(self.widgets), widget, stretch, alignment)
-            self.widgets.append(widget)
+        self.layout.insertWidget(len(self.widgets), widget, stretch, alignment)
+        self.widgets.append(widget)
+        
             
     def addSpacing(self, spacing):
         self.layout.insertWidget(len(self.widgets), spacing)
@@ -527,8 +550,6 @@ class QuickDialog(QtWidgets.QDialog):
         self.buttons.OK.setDefault(1)
         self.buttons.Cancel.clicked.connect(self.reject)
         self.buttons.OK.clicked.connect(self.tryAccept)
-        #self.connect(self.buttons.Cancel, SIGNAL("clicked()"), self.reject)
-        #self.connect(self.buttons.OK, SIGNAL("clicked()"), self.tryAccept)
         
         self.buttons.layout = QtWidgets.QHBoxLayout(self.buttons)
         self.buttons.layout.addStretch(5)
