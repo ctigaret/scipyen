@@ -456,8 +456,7 @@ class TriggerDetectDialog(qd.QuickDialog):
     sig_detectTriggers = pyqtSignal(name="sig_detectTriggers")
     sig_undoDetectTriggers = pyqtSignal(name="sig_undoDetectTriggers")
     
-    def __init__(self, ephysdata=None, title="Detect Trigger Events", clearEvents=False,
-                 parent=None, ephysViewer=None, **kwargs):
+    def __init__(self, ephysdata=None, title="Detect Trigger Events", clearEvents=False, parent=None, ephysViewer=None, **kwargs):
         super().__init__(parent=parent, title=title) # calls ancestor's setupUi()
             
         self.eventDetectionWidget = TriggerDetectWidget(parent = self) 
@@ -555,7 +554,7 @@ class TriggerDetectDialog(qd.QuickDialog):
     def closeEvent(self, evt):
         """for when the dialog is closed from the window's close button
         """
-        print("closeEvent owns viewer", self._owns_viewer_)
+        # print("closeEvent owns viewer", self._owns_viewer_)
         if self._ephysViewer_.isVisible():
             if self._owns_viewer_:
                 self._ephysViewer_.close()
@@ -683,21 +682,6 @@ class TriggerDetectDialog(qd.QuickDialog):
     @ephysdata.setter
     def ephysdata(self, value):
         self._set_ephys_data_(value)
-        ##if not isinstance(value, (Block, Segment, tuple, list)):
-        #if not check_ephys_data_collection(value, mix=False):
-            #return
-        
-        #self._ephys_ = value
-        #self._cached_events_ = get_events(self._ephys_)
-        #flat_events = get_events(self._ephys_, flat=True)
-        #nEvents = len(flat_events)
-        #nTriggers = len([t for t in flat_events is isinstance(t, TriggerEvent)])
-        #self.statusBar.showMessage("Data has %d events, of which %d are trigger events" % (nEvents, nTriggers))
-        
-        #if self.isVisible():
-            #self._ephysViewer_.plot(self._ephys_)
-        
-        #self._update_trigger_detect_ranges_(0)
         
     @property
     def presyn(self):

@@ -6480,9 +6480,16 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     return {"mini_starts":mini_starts, "mini_peaks":mini_peaks, "minis":minis,
             "waveform":waveform}
 
-def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), Im:typing.Union[int, str] = "IN0", epoch=None, clear_spiketrains:bool=True, fit_waves:bool=False):
-    """Batch m(E/I)PSC analysis in a neo.Block
-    The block's segments (sweeps) are expected to contain a signal with the 
+def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), Im:typing.Union[int, str] = "IN0", epoch=None, clear_spiketrains:bool=True, fit_waves:bool=False):
+    """Batch m(E/I)PSC analysis.
+    Detects and analyses mPSCs in a neo.Block, neo.Segment, or a sequence of 
+    neo.Segment objects.
+    
+    NOTE: a neo.Block already contains a collection of segments, see 
+    neo API reference:
+    https://neo.readthedocs.io/en/stable/api_reference.html
+    
+    The segments (sweeps) are expected to contain a signal with the 
     recorded membrane current for mini EPSCs.
     
     The signal is identified by the "Im" parameter to this function (see below).
@@ -6502,7 +6509,8 @@ def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., 
     
     Parameters:
     ==========
-    x: neo.Block where each segment contains:
+    x: neo.Block or a sequence (tuple, list) of neo.Segments, where each segment
+        contains:
 
         • an analog signal identified by the `Im` parameter below, which 
         represents the recorded membrane current with putative miniature or 
@@ -6609,8 +6617,24 @@ def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., 
     
     result = list()
     
-    for k, s in enumerate(x.segments):
-        dstring = f"mEPSC detected in {x.name} segment {s.name}"
+    if isinstance(x, neo.Block):
+        segments = x.segments
+        data_name = x.name
+    elif isinstance(x, neo.Segment):
+        segments = [x]
+        data_name = x.name
+    elif isinstance(x, (tuple, list)) and all(isinstance(s, neo.Segment) for s in x):
+        segments = x
+        data_name = "Segments"
+    else:
+        raise TypeError(f"Expecting a neo.Block, a neo.Segment, or a sequence of neo.Segments; got {type(x).__name__} instead")
+    
+    if len(segments) == 0:
+        warnings.warn("No data to analyse")
+        return None, None
+    
+    for k, s in enumerate(segments):
+        dstring = f"mEPSC detected in {data_name} segment {s.name}"
         
         try:
             if isinstance(Im, str):
@@ -6657,14 +6681,14 @@ def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., 
                 
         else:
             if len(s.epochs) == 0:
-                warnings.warn(f"The {k}-th segment of {x.name} Block has no epochs!")
+                warnings.warn(f"The {k}-th segment of {data_name} Block has no epochs!")
                 result.append(None)
                 continue
             
             if isinstance(epoch, str):
                 mPSCdetectepochs = [e for e in s.epochs if e.name == epoch]
                 if len(mPSCdetectepochs) == 0:
-                    warnings.warn(f"The {k}-th segment of {x.name} Block does not have epoch(s) named {epoch}")
+                    warnings.warn(f"The {k}-th segment of {data_name} Block does not have epoch(s) named {epoch}")
                     result.append(None)
                     continue
                 
@@ -6673,7 +6697,7 @@ def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., 
                     mPSCdetectepochs = [s.epochs[epoch]]
                     
                 else:
-                    warnings.warn(f"Epoch index {epoch} is not valid for the {k}-th segment of {x.name} Block with {len(s.epochs)} epochs")
+                    warnings.warn(f"Epoch index {epoch} is not valid for the {k}-th segment of {data_name} Block with {len(s.epochs)} epochs")
                     result.append(None)
                     continue
                 
@@ -6684,18 +6708,18 @@ def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., 
                     if isinstance(e, str):
                         me_ = [e_ for e_ in s.epochs if e_.name == e]
                         if len(me_) == 0:
-                            warnings.warn(f"The {k}-th segment of {x.name} Block has no epoch named {e}")
+                            warnings.warn(f"The {k}-th segment of {data_name} Block has no epoch named {e}")
                         mPSCdetectepochs.extend(me_)
                         
                     elif isinstance(e, int):
                         if e in range(-1*len(s.epochs), len(s.epochs)):
                             mPSCdetectepochs.append(s.epochs[e])
                         else:
-                            warnings.warn(f"Epoch index {e} is not valid for the {k}-th segment of {x.name} Block with {len(s.epochs)} epochs")
+                            warnings.warn(f"Epoch index {e} is not valid for the {k}-th segment of {data_name} Block with {len(s.epochs)} epochs")
                             
             
             if len(mPSCdetectepochs) == 0:
-                warnings.warn(f"No epochs with specified name or index wwere found in the {k}-th segment of {x.name} Block")
+                warnings.warn(f"No epochs with specified name or index wwere found in the {k}-th segment of {data_name} Block")
                 result.append(None)
                 continue
             
@@ -6731,11 +6755,12 @@ def batch_mPSC(x:neo.Block, waveform:typing.Union[np.ndarray, tuple, list]=(0., 
                 
             train = neo.SpikeTrain(start_times, t_stop = im.t_stop, units = im.times.units,
                                     t_start = im.t_start, sampling_rate = im.sampling_rate,
-                                    name = f"{x.name}_{s.name}_PSCs", description=dstring)
+                                    name = f"{data_name}_{s.name}_PSCs", description=dstring)
             
             # # waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
             # train.waveforms = waves
             train.annotations["peak_times"] = peak_times
+            train.annotations["source"] = "mPSC_detection"
             
             if isinstance(template, neo.core.basesignal.BaseSignal):
                 train.annotations["mPSC_parameters"] = template.annotations["parameters"]

@@ -3493,11 +3493,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
     defaultBinomialFilterOptions.scans.ind = DataBag()
     defaultBinomialFilterOptions.scans.ind.radius = 10
 
-    def __init__(self, *args, parent:(QtWidgets.QMainWindow, type(None)) = None,
-                 win_title="LSCaT", **kwargs):
-        
-        #self.qsettings = QtCore.QSettings() # dealt with by ScipyenViewer superclass
-        
+    def __init__(self, *args, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="LSCaT", **kwargs):
         self.threadpool = QtCore.QThreadPool()
         #self.timer = QtCore.QTimer()
         #self.timer.setInterval(1000)

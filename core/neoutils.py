@@ -211,8 +211,7 @@ ephys_data = (neo.Block, neo.Segment, neo.AnalogSignal, neo.IrregularlySampledSi
 
 ancillary_neo_data = (neo.ImageSequence, neo.Event, neo.Epoch)
 
-ephys_data_collection = (neo.Block, neo.Segment)#, neo.Unit)
-#ephys_data_collection = (neo.Block, neo.Segment, neo.Unit)
+ephys_data_collection = (neo.Block, neo.Segment)
 
 # NOTE: 2021-10-13 12:44:51
 # the below is on its way out!

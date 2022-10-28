@@ -468,7 +468,41 @@ class VariableNameStringInput(StringInput):
             self.variable.setText(validate_varname(self.text()))
         return True
     
+class QuickWidget(QtWidgets.QWidget):
+    """Quick creation of a custom widget
+    TODO: 2022-10-28 11:27:24
+    """
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, layout:QtWidgets.QLayout=None):
+        QtWidgets.QWidget.__init__(self, parent)
+        if isinstance(layout, QtWidgets.QLayout):
+            self.layout = layout
+        else:
+            self.layout = QtWidgets.QVBoxLayout(self)
+        self.layout.addStretch(5)
+        self.layout.addSpacing(20)
+        self.widgets = list()
+        self.resize(500, -1)
+        
+    def addWidget(self, widget, stretch = 0, alignment = None):
+        if alignment is None:
+            alignment = QtCore.Qt.AlignTop
+            self.layout.insertWidget(len(self.widgets), widget, stretch, alignment)
+            self.widgets.append(widget)
+            
+    def addSpacing(self, spacing):
+        self.layout.insertWidget(len(self.widgets), spacing)
+        self.widgets.append(None)
+        
+    def addStretch(self, stretch):
+        self.layout.insertStretch(len(self.widgets), stretch)
+        self.widgets.append(None)
+
+    def addLabel(self, labelString):
+        label = QtWidgets.QLabel(labelString, self)
+        self.addWidget(label, 0, QtCore.Qt.AlignLeft)
+    
 class QuickDialog(QtWidgets.QDialog):
+    """From vigranumpy.pyqt.quickdialog"""
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, title:typing.Optional[str]=None):
         QtWidgets.QDialog.__init__(self, parent)
 
