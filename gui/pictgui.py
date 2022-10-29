@@ -1,6 +1,6 @@
 """
     This module contains:
-    
+
     1) PlanarGraphics objects:
         Move (aliased to Point and Start)
         Line
