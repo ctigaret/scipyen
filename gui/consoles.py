@@ -301,6 +301,9 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_K), self)
         
         self.clear_shortcut.activated.connect(self.slot_clearConsole)
+        
+        self.reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.ALT + QtCore.Qt.Key_K), self)
+        self.reset_shortcut.activated.connect(self.slot_resetConsole)
 
         ScipyenConfigurable.__init__(self)
         
@@ -323,9 +326,17 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
                                                  int(time.time()-t)*1000)) # see NOTE: 2022-03-14 21:47:39 CMT
 
     @safeWrapper
+    @pyqtSlot()
     def slot_clearConsole(self):
         self.clear()
+        # self.flush_clearoutput()
+        # self._show_interpreter_prompt()
         #self.ipkernel.shell.run_line_magic("clear", "", 2)
+        
+    @safeWrapper
+    @pyqtSlot()
+    def slot_resetConsole(self):
+        self.reset(clear=True)
         
     @property
     def scrollBarPosition(self):
@@ -361,53 +372,53 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self._control.setLayoutDirection(value)
         
     @property
-    def fontFamily(self) -> str:
+    def fontFamily(self):
         return self.font.family()
     
     @markConfigurable("FontFamily", "qt")
     @fontFamily.setter
-    def fontFamily(self, val:str) -> None:
+    def fontFamily(self, val:str):
         font = self.font
         font.setFamily(val)
         self.font = font
         
     @property
-    def fontSize(self) -> int:
+    def fontSize(self):
         return self.font.pointSize()
     
     @markConfigurable("FontPointSize", "qt")
     @fontSize.setter
-    def fontSize(self, val:int) -> None:
+    def fontSize(self, val:int):
         font = self.font
         font.setPointSize(int(val))
         self.font = font
         
     @property
-    def fontStyle(self) -> typing.Union[int, QtGui.QFont.Style]:
+    def fontStyle(self):
         return self.font.style()
         
     @markConfigurable("FontStyle", "qt")
     @fontStyle.setter
-    def fontStyle(self, val:typing.Union[int, QtGui.QFont.Style, str]) -> None:
+    def fontStyle(self, val:typing.Union[int, QtGui.QFont.Style, str]):
         style = get_font_style(val) 
         font  = self.font
         font.setStyle(style)
         self.font = font
         
     @property
-    def fontWeight(self) -> typing.Union[int, QtGui.QFont.Weight]:
+    def fontWeight(self):
         return self.font.weight()
     
     @markConfigurable("FontWeight", "qt")
     @fontWeight.setter
-    def fontWeight(self, val:typing.Union[int, QtGui.QFont.Weight, str]) -> None:
+    def fontWeight(self, val:typing.Union[int, QtGui.QFont.Weight, str]):
         weight = get_font_weight(val)
         font = self.font
         font.setWeight(weight)
         self.font = font
         
     @property
-    def colors(self) -> str:
+    def colors(self):
         return self._console_colors
     
     @markConfigurable("ConsoleColors", "qt")
@@ -449,7 +460,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self.set_pygment(style, colors)
         
     @property
-    def isTopLevel(self) -> bool:
+    def isTopLevel(self):
         """Overrides WorkspaceGuiMixin.isToplevel; always True for ScipyenConsole.
         This is because console inherits from RichJupyterWidget where 'parent'
         is a traitlets.Instance property, and for ScipyenConsole is None.
@@ -463,8 +474,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         ## located in $HOME/.config/Scipyen/Scipyen.conf
         #gname, pfx = loadWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
 
-    def set_pygment(self, scheme:typing.Optional[str]="", 
-                    colors:typing.Optional[str]=None):
+    def set_pygment(self, scheme:typing.Optional[str]="", colors:typing.Optional[str]=None):
         """Sets up style sheet for console colors and syntax highlighting style.
         
         The console widget (a RichJupyterWidget) takes:
@@ -602,13 +612,14 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
     
     # NOTE: 2021-08-29 19:09:24
     # all widget factories currently generate a RichJupyterWidget
-    def __init__(self, app, consoleapp,
-                    confirm_exit=True,
-                    new_frontend_factory=None,                  # ExternalIPython.new_frontend_master
-                    slave_frontend_factory=None,                # ExternalIPython.new_frontend_slave
-                    connection_frontend_factory=None,           # ExternalIPython.new_frontend_connection
-                    new_frontend_orphan_kernel_factory=None,    # ExternalIPython.new_frontend_master_with_orphan_kernel
-                ):
+    def __init__(self, app, consoleapp, confirm_exit=True, new_frontend_factory=None, slave_frontend_factory=None, connection_frontend_factory=None, new_frontend_orphan_kernel_factory=None):
+        """
+    """
+    # ExternalIPython.new_frontend_master → new_frontend_factory
+    # ExternalIPython.new_frontend_slave → slave_frontend_factory
+    # ExternalIPython.new_frontend_connection → connection_frontend_factory
+    # ExternalIPython.new_frontend_master_with_orphan_kernel → new_frontend_orphan_kernel_factory
+
         super().__init__(app, confirm_exit = confirm_exit,
                          new_frontend_factory = new_frontend_factory,
                          slave_frontend_factory = slave_frontend_factory,
@@ -828,7 +839,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         self.active_frontend.font = val
                 
     @property
-    def isTopLevel(self) -> bool:
+    def isTopLevel(self):
         """Overrides WorkspaceGuiMixin.isToplevel; always True for ScipyenConsole.
         This is because console inherits from RichJupyterWidget where 'parent'
         is a traitlets.Instance property, and for ScipyenConsole is None.
@@ -1034,8 +1045,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         else:
             return [self.tab_widget.indexOf(w) for w in filtered_widget_list]
         
-    def find_widget_for_client_sessionID(self, sessionID:str, 
-                                        as_widget_list:bool=True, alive_only:bool=True):
+    def find_widget_for_client_sessionID(self, sessionID:str, as_widget_list:bool=True, alive_only:bool=True):
         widget_list = [self.tab_widget.widget(i) for i in range(self.tab_widget.count())]
         
         if alive_only:
@@ -1053,8 +1063,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         else:
             return [self.tab_widget.indexOf(w) for w in filtered_widget_list]
         
-    def find_widgets_for_manager_sessionID(self, sessionID:str, 
-                                        as_widget_list:bool=True, alive_only:bool=True):
+    def find_widgets_for_manager_sessionID(self, sessionID:str, as_widget_list:bool=True, alive_only:bool=True):
         widget_list = [self.tab_widget.widget(i) for i in range(self.tab_widget.count())]
         
         if alive_only:
@@ -1072,8 +1081,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         else:
             return [self.tab_widget.indexOf(w) for w in filtered_widget_list]
         
-    def find_widgets_for_connection_file(self, connection_file:str, 
-                                      as_widget_list:bool=True, alive_only=True):
+    def find_widgets_for_connection_file(self, connection_file:str, as_widget_list:bool=True, alive_only=True):
         widget_list = [self.tab_widget.widget(i) for i in range(self.tab_widget.count())]
         
         if alive_only:
@@ -1261,7 +1269,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         return old_title
             
         
-    def add_tab_with_frontend(self,frontend,name=None):
+    def add_tab_with_frontend(self, frontend, name=None):
         """ Insert a tab with a given frontend in the tab bar, and give it a name
 
         """
@@ -1543,7 +1551,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                 self.close_tab(widget)
             event.accept()
             
-    def close_tab(self,current_tab):
+    def close_tab(self, current_tab):
         """ Called when you need to try to close a tab.
 
         It takes the number of the tab to be closed as argument, or a reference
@@ -1804,7 +1812,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                     self._connections_.pop(cfile)
                     self.sig_kernel_disconnect.emit(session_dict)
                     
-    def close_tab_original(self,current_tab):
+    def close_tab_original(self, current_tab):
         """ Called when you need to try to close a tab.
 
         It takes the number of the tab to be closed as argument, or a reference
@@ -2578,10 +2586,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
     #### END some useful properties
     
     @safeWrapper
-    def execute(self, *code:typing.Union[str, dict, tuple, list, ForeignCall], 
-                where : typing.Optional[typing.Union[int, str, RichJupyterWidget, QtKernelClient]]=None,
-                redirect:typing.Optional[dict]=None,
-                **kwargs) -> typing.Union[str, list]:
+    def execute(self, *code:typing.Union[str, dict, tuple, list, ForeignCall], where : typing.Optional[typing.Union[int, str, RichJupyterWidget, QtKernelClient]]=None, redirect:typing.Optional[dict]=None, **kwargs):
         """Execute code asynchronously, in a kernel.
         By default, code is executed in the kernel behind the active frontend.
         
@@ -2841,11 +2846,11 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
                     
             return ret
                     
-    def get_connection_file(self) -> str:
+    def get_connection_file(self):
         fcall = ForeignCall(user_expressions={"connection_file":"get_connection_file()"})
         self.execute(fcall)
         
-    def get_connection_info(self) -> str:
+    def get_connection_info(self):
         fcall = ForeignCall(user_expressions={"connection_info":"get_connection_info()"})
         self.execute(fcall)
         
@@ -3035,21 +3040,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
     @safeWrapper
     def dropEvent(self, evt):
         from textwrap import dedent
-        #print("ScipyenConsole.dropEvent: evt", evt)
-        #data = evt.mimeData().data(evt.mimeData().formats()[0])
         src = evt.source()
-        #print("ScipyenConsole.dropEvent: evt.source:", src)
-        
-        #print("ScipyenConsole.dropEvent: evt.mimeData()", evt.mimeData())
-        
-        #print("ScipyenConsole.dropEvent: evt.proposedAction()", evt.proposedAction())
-        
-        #print("ScipyenConsole.dropEvent: evt.mimeData().hasText()", evt.mimeData().hasText())
-        #print(dir(evt.keyboardModifiers()))
-        #print("ScipyenConsole.dropEvent: event source: %s" % src)
-        
-        #print("ScipyenConsole.dropEvent: \nevt mimeData %s" % evt.mimeData())
-        #print("ScipyenConsole.dropEvent: \ndata: %s \nsrc: %s" % (text, src))
         
         # NOTE: 2019-08-10 00:23:42
         # for drop events issued by mainWindow's workspace viewer and command
@@ -3063,50 +3054,16 @@ class ScipyenConsoleWidget(ConsoleWidget):
         # this works fine, with the added bonus that the drag/dropped commands 
         # are also available on the system clipboard to paste onto some text 
         # editor
-        #if isinstance(self.mainWindow, ScipyenWindow):
-        #if isinstance(self.mainWindow, ScipyenWindow) and src is self.mainWindow.workspaceView:
         if type(self.mainWindow).__name__ == "ScipyenWindow" and src is self.mainWindow.workspaceView:
-            #print("ScipyenConsole.dropEvent mime data has text:",  evt.mimeData().hasText())
-            #if evt.mimeData().hasText():
-                #print(evt.mimeData().text())
-            #print("ScipyenConsole.dropEvent mime data has urls:", evt.mimeData().hasUrls())
-            #print("ScipyenConsole.dropEvent possible actions:", evt.possibleActions())
-            #print("ScipyenConsole.dropEvent proposed action:", evt.proposedAction())
-            #print("ScipyenConsole.dropEvent actual drop action:",  evt.dropAction())
-            
-            #print(evt.keyboardModifiers() & QtCore.Qt.ShiftModifier)
-            
-            #quoted = evt.keyboardModifiers() & QtCore.Qt.ShiftModifier
-            
-            #linesep = evt.keyboardModifiers() & QtCore.Qt.ControlModifier
-            
-            #self.mainWindow.slot_pasteWorkspaceSelection()
-            # NOTE: 2019-08-10 00:29:04
-            # do the above asynchronously
-            #self.workspaceItemsDropped.emit(bool(quoted))
             self.workspaceItemsDropped.emit()
             
-        #elif isinstance(self.mainWindow, ScipyenWindow) and src is self.mainWindow.historyTreeWidget:
         elif type(self.mainWindow).__name__ == "ScipyenWindow" and src is self.mainWindow.historyTreeWidget:
-            #print(evt.mimeData().hasText())
-            #print(evt.mimeData().hasUrls())
-            #print(evt.possibleActions())
-            #print(evt.proposedAction())
-            #print(evt.dropAction())
-            
-            #self.mainWindow.slot_pasteHistorySelection()
-            # NOTE: 2019-08-10 00:29:27
-            # do the above asynchronously
             self.historyItemsDropped.emit()
             
-        #elif isinstance(self.mainWindow, ScipyenWindow) and src is self.mainWindow.fileSystemTreeView:
         elif type(self.mainWindow).__name__ == "ScipyenWindow" and src is self.mainWindow.fileSystemTreeView:
             # NOTE: 2019-08-10 00:54:40
             # TODO: load data from disk
             pass
-                
-                
-            #evt.accept()
                 
         else:
             #NOTE: 2019-08-02 13:35:52
@@ -3114,14 +3071,6 @@ class ScipyenConsoleWidget(ConsoleWidget):
             # useful for drag&drop python code directly from a python source file
             # opened in a text editor (that also supports drag&drop)
             # event source is from outside the Pict application (i.e. it is None)
-            #print("ScipyenConsole.dropEvent: \nproposed action: %s" % evt.proposedAction())
-            
-            #print("ScipyenConsole.dropEvent source:",  src)
-            #print("ScipyenConsole.dropEvent mime data has text:",  evt.mimeData().hasText())
-            #print("ScipyenConsole.dropEvent mime data has urls:",  evt.mimeData().hasUrls())
-            #print("ScipyenConsole.dropEvent possible actions:",  evt.possibleActions())
-            #print("ScipyenConsole.dropEvent proposed action:",  evt.proposedAction())
-            #print("ScipyenConsole.dropEvent actual drop action:",  evt.dropAction())
             
             if evt.mimeData().hasUrls():
                 urls = evt.mimeData().urls()
@@ -3145,12 +3094,8 @@ class ScipyenConsoleWidget(ConsoleWidget):
                 # just write at the console whatever text has been dropped
                 if evt.proposedAction() in (QtCore.Qt.CopyAction, QtCore.Qt.MoveAction):
                     text = evt.mimeData().text()
-                    #print("ScipyenConsole.dropEvent: text", text)
-                    #print("ScipyenConsole.dropEvent: mimeData.formats()", evt.mimeData().formats())
                     echoing = not bool(evt.keyboardModifiers() & QtCore.Qt.ShiftModifier)
                     store = bool(evt.keyboardModifiers() & QtCore.Qt.ControlModifier)
-                    
-                    #print(echoing)
                     
                     # NOTE: 2019-08-13 11:08:14
                     # TODO: allow for running the code without writing it in console
@@ -3170,14 +3115,12 @@ class ScipyenConsoleWidget(ConsoleWidget):
                         wintitle = self.windowTitle()
                         self.setWindowTitle("%s #executing..." % wintitle)
                         self.ipkernel.shell.run_cell(text, store_history = store, silent=True, shell_futures=True)
-                        #self.ipkernel.shell.run_cell(text, store_history = False, silent=True, shell_futures=True)
                         self.setWindowTitle(wintitle)
                         
             else:
                 # mime data formats contains text/plain but data is QByteArray
                 # (which wraps a Python bytes object)
                 if "text/plain" in evt.mimeData().formats():
-                    #print("mime data text:\n", evt.mimeData().text())
                     text = evt.mimeData().text()
                     if len(text) == 0:
                         text = evt.mimeData().data("text/plain").data().decode()
@@ -3189,28 +3132,6 @@ class ScipyenConsoleWidget(ConsoleWidget):
                 
         evt.accept()
         
-        #NOTE:
-        #NOTE: Other considered options:
-        #NOTE: 2017-03-21 22:41:53 connect this sigal to the _rerunCommand slot of ScipyenWindow:
-        #NOTE: half-baked approach that does not actually
-        #NOTE: paste the commands as input, but instead executes them directly
-        #NOTE: FIXME NOT REALLY WHAT IS INTENDED
-        #NOTE: TODO either use the paste mechanism of the ControlWidget superclass 
-        #NOTE: (tricky, because that accesses private member of that superclass)
-        #NOTE: TODO or completely customize the item model of the history tree such that 
-        #NOTE: upon drag event, the items DATA (specifically the command string(s)) 
-        #NOTE: are encoded as text mime format and thus decoded here
-        #NOTE: TODO FIXME this last suggestion would leave me again with the issue
-        #NOTE: of pasting them directly onto underlying text widget of the console, 
-        #NOTE: which is a private member
-        
-        #print("dropEvent")
-        #print("Event: ",evt)
-        #print("proposed action: ",evt.proposedAction())
-        #print("Event mime data formats: ", evt.mimeData().formats())
-        #print("Event data: ", data, " ", repr(data))
-        #print("Event source: ", repr(evt.source()))
-
     @safeWrapper
     def __write_text_in_console_buffer__(self, text):
         from textwrap import dedent
@@ -3232,8 +3153,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
             self.__write_text_in_console_buffer__("\n".join(text))
         
         
-    def set_pygment(self, scheme:typing.Optional[str]="", 
-                    colors:typing.Optional[str]=None):
+    def set_pygment(self, scheme:typing.Optional[str]="", colors:typing.Optional[str]=None):
         """Sets up style sheet for console colors and syntax highlighting style.
         
         The console widget (a RichJupyterWidget) takes:
@@ -3491,7 +3411,6 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
     def execute(self, *args, **kwargs):
         self.consoleWidget.execute(*args, **kwargs)
-        
         
     def writeText(self, text):
         self.consoleWidget.writeText(text)

@@ -1,6 +1,7 @@
 """Various helpers for GUI
 """
-import typing, warnings
+import typing, warnings, math
+from core.utilities import get_least_pwr10
 from PyQt5 import (QtCore, QtWidgets, QtGui)
 from gui.painting_shared import (FontStyleType, standardQtFontStyles, 
                                  FontWeightType, standardQtFontWeights)
@@ -19,19 +20,31 @@ class UnitsStringValidator(QtGui.QValidator):
         except:
             return QtGui.QValidator.Invalid
         
+def get_decimals_step_size_dbDpinBox(x:typing.Sequence):
+    dd = get_least_pwr10(x)
+    if dd < 0:
+        return (abs(dd), 10**dd)
+    return (0, 1)
+    
 def csqueeze(s:str, w:int):
+    """Returns text elided to the right
+    """
     if len(s) > w and w > 3:
         part = (w-3)/2
         return s[0:part] + "..."
     return s
 
 def rsqueeze(s:str, w:int):
+    """Returns text elided to the right
+    """
     if len(s) > w:
         part = w - 3
         return s[0:part] + "..."
     return s
 
 def lsqueeze(s:str, w:int):
+    """Returns text elided to the left
+    """
     if len(s) > w:
         part = w - 3
         return "..." + s[part:]

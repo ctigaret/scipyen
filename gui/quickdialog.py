@@ -314,8 +314,9 @@ class VChoice(Choice):
         Choice.__init__(self, parent, label, 1)
         
 class DialogGroup(QtWidgets.QFrame):
-    def __init__(self, parent, vertical = 0):
+    def __init__(self, parent, vertical = 0, validate=True):
         QtWidgets.QFrame.__init__(self, parent)
+        self.bypassValidation = not validate
         parent.addWidget(self)
         if vertical:
             self.layout = QtWidgets.QVBoxLayout(self)
@@ -342,21 +343,27 @@ class DialogGroup(QtWidgets.QFrame):
         self.addWidget(label, 0, QtCore.Qt.AlignLeft)
         
     def validate(self):
+        if self.bypassValidation:
+            # allow the use of stock Qt widgets which have their own validator
+            # (abd their validate() method takes extra mandatory arguments)
+            return True
+        
         for i in self.widgets:
             try:
                 if i.validate() == 0:
                     return False
             except AttributeError:
                 continue
+            
         return True
 
 class HDialogGroup(DialogGroup):
-    def __init__(self, parent):
-        DialogGroup.__init__(self, parent, 0)
+    def __init__(self, parent, validate=True):
+        DialogGroup.__init__(self, parent, 0, validate=validate)
         
 class VDialogGroup(DialogGroup):
-    def __init__(self, parent):
-        DialogGroup.__init__(self, parent, 1)
+    def __init__(self, parent, validate=True):
+        DialogGroup.__init__(self, parent, 1, validate=validate)
         
 
        
@@ -500,8 +507,16 @@ class QuickWidget(QtWidgets.QWidget):
             self.layout = layoutType(self)
         else:
             self.layout = QtWidgets.QVBoxLayout(self)
-        self.layout.addStretch(5)
-        self.layout.addSpacing(20)
+            
+        if isinstance(self.layout, QtWidgets.QGridLayout):
+            self.layout.setColumnStretch(5)
+            self.layout.setRowStretch(5)
+            self.layout.setVerticalSpacing(20)
+            self.layout.setHorizontalSpacing(20)
+        else:
+            self.layout.addStretch(5)
+            self.layout.addSpacing(20)
+            
         self.widgets = list()
         self.resize(500, -1)
         

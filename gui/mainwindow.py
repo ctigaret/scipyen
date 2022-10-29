@@ -3182,6 +3182,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 delVars.setWhatsThis("Delete selected variables")
                 delVars.triggered.connect(self.slot_deleteSelectedVars)
                 delVars.hovered.connect(self._slot_showActionStatusMessage_)
+                cm.addSeparator()
+                clearWs = cm.addAction("Clear Workspace")
+                clearWs.setToolTip("Remove all variables from the internal workspace")
+                clearWs.setStatusTip("Remove all variables from the internal workspace")
+                clearWs.setWhatsThis("Remove all variables from the internal workspace")
+                clearWs.triggered.connect(self._slot_clear_internal_workspace)
+                clearWs.hovered.connect(self._slot_showActionStatusMessage_)
                 return
                 
             
@@ -3261,6 +3268,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             copyVarToActiveExternalNamespace.setStatusTip("Copies selected variable to the namespace of the active external kernel namespace (currently %s)" % ns)
             copyVarToActiveExternalNamespace.setWhatsThis("Copies selected variable to the namespace of the active external kernel namespace (currently %s)" % ns)
             copyVarToActiveExternalNamespace.triggered.connect(self._slot_copyToExternalWS)
+            
+        cm.addSeparator()
+        clearWs = cm.addAction("Clear Workspace")
+        clearWs.setToolTip("Remove all variables from the internal workspace")
+        clearWs.setStatusTip("Remove all variables from the internal workspace")
+        clearWs.setWhatsThis("Remove all variables from the internal workspace")
+        clearWs.triggered.connect(self._slot_clear_internal_workspace)
+        clearWs.hovered.connect(self._slot_showActionStatusMessage_)
+        
+
         
     @pyqtSlot("QPoint")
     @safeWrapper
@@ -3271,6 +3288,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         indexList = self.workspaceView.selectedIndexes()
         
         if len(indexList) == 0:
+            cm = QtWidgets.QMenu("Workspace", self)
+            cm.setToolTipsVisible(True)
+            clearWs = cm.addAction("Clear Workspace")
+            clearWs.setToolTip("Remove all variables from the internal workspace")
+            clearWs.setStatusTip("Remove all variables from the internal workspace")
+            clearWs.setWhatsThis("Remove all variables from the internal workspace")
+            clearWs.triggered.connect(self._slot_clear_internal_workspace)
+            clearWs.hovered.connect(self._slot_showActionStatusMessage_)
+            
+            cm.popup(self.workspaceView.mapToGlobal(point))
+            
             return
         
         internal_var_indices = [ndx for ndx in indexList \
@@ -3287,8 +3315,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if len(external_var_indices):
             self._genExternalVarContextMenu(external_var_indices, cm)
         
-        cm.popup(self.workspaceView.mapToGlobal(point))#, copyVarNames)
-        #cm.popup(self.workspaceView.mapToGlobal(point), cm.actions()[0])
+        cm.popup(self.workspaceView.mapToGlobal(point))
         
     @pyqtSlot(QtCore.QItemSelection, QtCore.QItemSelection)
     @safeWrapper
@@ -5933,6 +5960,46 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._slot_registerPythonSource_()
         
     @pyqtSlot()
+    def _slot_clear_internal_workspace(self):
+        varNames = self.workspaceModel.getDisplayedVariableNames()
+        prompt = "Remove all variables from the workspace?"
+        wintitle = "Delete variables"
+        msgBox = QtWidgets.QMessageBox()
+        
+        msgBox.setWindowTitle(wintitle)
+        msgBox.setIcon(QtWidgets.QMessageBox.Warning)
+        msgBox.setText(prompt)
+        msgBox.setInformativeText("This operation cannot be undone!")
+        msgBox.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        msgBox.setDefaultButton(QtWidgets.QMessageBox.No)
+        
+        ret = msgBox.exec()
+        if ret == QtWidgets.QMessageBox.No:
+            return
+        
+        for n in varNames:
+            obj = self.workspace[n]
+            if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+                #print("%s.slot_deleteSelectedVars %s: %s" % (self.__class__.__name__, n, obj.__class__.__name__))
+                if isinstance(obj, mpl.figure.Figure):
+                    plt.close(obj) # also removes obj.number from plt.get_fignums()
+                    
+                else:
+                    obj.close()
+                    #obj.closeEvent(QtGui.QCloseEvent())
+                self.deRegisterViewer(obj) # does not remove its symbol for workspace - this has already been removed by delete action
+                
+            self.removeWorkspaceSymbol(n)
+            # self.removeFromWorkspace(n, by_name=True, update=True)
+            # self.removeFromWorkspace(n, by_name=True, update=False)
+            #self.workspace.pop(n, None)
+            
+        self.workspaceModel.currentItem = None
+        
+        self.workspaceModel.update()
+        
+        
+    @pyqtSlot()
     def _slot_cm_AddPythonScriptToManager(self):
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes() \
                          if item.column() == 0 and not self.fileSystemModel.isDir(item)]# list of QModelIndex
@@ -6014,6 +6081,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if os.path.isfile(fileName):
             if paste:
                 text = pio.loadFile(fileName)
+                # NOTE: 2022-10-29 14:05:19
+                # code is pasted on the console, so you need to press <Enter>
                 self.console.writeText(text)
                 
             else:
@@ -6021,10 +6090,19 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 cmd = "run -i -n -t '%s'" % fname
             
                 try:
+                    self.console.centralWidget()._flush_pending_stream()
                     self.console.execute(cmd, hidden=True, interactive=True)
                 
                 except:
                     traceback.print_exc()
+                    
+                # NOTE: 2022-10-29 13:59:16
+                # This is required so that we have an input prompt ready at the console,
+                # after execution, bypassing the need to press <Esc> key to get back to
+                # the input prompt. The side effect is that we can see any console output
+                # issued during the execution of code, which would have dissapeared after
+                # <Esc> key press - and THAT'S A GOOD THING
+                self.console.centralWidget()._show_interpreter_prompt()
                     
         self.statusbar.showMessage("Done!")
         

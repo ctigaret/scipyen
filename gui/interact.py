@@ -107,8 +107,7 @@ def packInputs(**kwargs):
     
     return getInput(kwargs, mapping=True)
 
-def getInput(prompts:dict,
-             mapping:bool=False):
+def getInput(prompts:dict, mapping:bool=False):
     """Opens a quick dialog to prompt user input for integer, float and string values
     
     Parameters:

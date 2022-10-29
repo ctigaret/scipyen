@@ -3660,6 +3660,10 @@ def sp_set_loc(x, index, columns, val):
     
     return x    
 
+def get_least_pwr10(x:typing.Sequence):
+    fr = [abs(math.fmod(v, 10)) for v in x]
+    return min(int(math.log10(v)) if v > 0 else 0 for v in fr)
+
 def sp_get_loc(x, index, columns):
     """Retrieve values to pandas.SparseArray
     Work around .loc idiom when fill value is pd.NA
