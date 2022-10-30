@@ -196,8 +196,6 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     w.setAccelerated(True)
                     # w.setGroupSeparator(True)
                     w.setSuffix(" ")
-                    w.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
-                    # w.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
                     
                     
                     # TODO/FIXME
@@ -212,12 +210,15 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     #     elif i == "Upper Bound:":
                     #         w.valueChanged.connect(self._slot_setSpinMaximum)
                     
+                w.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+                # w.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
                 self.layout().addWidget(w, layout_row, layout_col, QtCore.Qt.AlignLeft)
                 
-        for c in range(self.layout().columnCount()):
-            if c > 0:
-                self.layout().setColumnStretch(c, 1)
-        self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
+        # for c in range(self.layout().columnCount()):
+        #     if c > 0:
+        #         self.layout().setColumnStretch(c, 1)
+                
+        # self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
                     
     @property
     def widgets(self):
