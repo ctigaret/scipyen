@@ -157,7 +157,12 @@ class ModelParametersWidget(QtWidgets.QWidget):
         header = ["Parameters:"] + [c for c in self._parameters_.columns]
         for layout_col, c in enumerate(header):    
             w = QtWidgets.QLabel(c, self)
-            w.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
+            # w.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+            sp = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+            sp.setHorizontalStretch(3)
+            sp.setVerticalStretch(0)
+            sp.setHeightForWidth(w.sizePolicy().hasHeightForWidth())
+            w.setSizePolicy(sp)
             self.layout().addWidget(w, 0, layout_col, QtCore.Qt.AlignHCenter)
 
             for ki, i in enumerate(self._parameters_.index): # row index into the DataFrame
@@ -196,8 +201,6 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     w.setAccelerated(True)
                     # w.setGroupSeparator(True)
                     w.setSuffix(" ")
-                    
-                    
                     # TODO/FIXME
                     # if self._verticalLayout_:
                     #     if c == "Lower Bound:":
@@ -210,7 +213,12 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     #     elif i == "Upper Bound:":
                     #         w.valueChanged.connect(self._slot_setSpinMaximum)
                     
-                w.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+                sp = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+                sp.setHorizontalStretch(0)
+                sp.setVerticalStretch(0)
+                sp.setHeightForWidth(w.sizePolicy().hasHeightForWidth())
+                w.setSizePolicy(sp)
+                # w.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
                 # w.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
                 self.layout().addWidget(w, layout_row, layout_col, QtCore.Qt.AlignLeft)
                 
