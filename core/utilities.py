@@ -3661,6 +3661,12 @@ def sp_set_loc(x, index, columns, val):
     return x    
 
 def get_least_pwr10(x:typing.Sequence):
+    if not all(isinstance(v, Number) for v in x):
+        raise TypeError("Expecting a sequence of scalars")
+    
+    if any (math.isinf(v) for v in x):
+        x = [v for v in x if not math.isinf(v)]
+    
     fr = [abs(math.fmod(v, 10)) for v in x]
     return min(int(math.log10(v)) if v > 0 else 0 for v in fr)
 

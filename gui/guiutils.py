@@ -20,7 +20,11 @@ class UnitsStringValidator(QtGui.QValidator):
         except:
             return QtGui.QValidator.Invalid
         
-def get_decimals_step_size_dbDpinBox(x:typing.Sequence):
+def get_QDoubleSpinBox_params(x:typing.Sequence):
+    """Return stepSize and decimals for a QDoubleSpinBox given x.
+
+    x is a sequence of numbers
+    """
     dd = get_least_pwr10(x)
     if dd < 0:
         return (abs(dd), 10**dd)
@@ -31,7 +35,7 @@ def csqueeze(s:str, w:int):
     """
     if len(s) > w and w > 3:
         part = (w-3)/2
-        return s[0:part] + "..."
+        return s[0:part] + "get_QDoubleSpinBox_params..."
     return s
 
 def rsqueeze(s:str, w:int):

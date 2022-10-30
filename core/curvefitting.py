@@ -505,11 +505,45 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), method
     
     return fittedCurve, fittedComponentCurves, result
 
-def fit_mEPSC(data, p0, bounds = (-np.inf, np.inf), method="trf", loss = "linear"):
+def fit_mEPSC(data, p0, **kwargs):
     """Fits a Clements & Bekkers '97 waveform through the data.
     
-    p0: initial parameters for the Clements & Bekkers '97 waveform model:
-        a, b, x₀, τ₁, τ₂ (all float scalars)
+    Parameters:
+    ==========
+    data: 1D array-like; the data to be fitted
+    
+    p0: 1D array-like (or sequence) with the initial values for the waveform 
+        model parameters (a.k.a the independent variables)
+    
+        The model parameters are a, b, x₀, τ₁, τ₂ (all float scalars). Hence p0
+        must contain five scalars in the same order as shown here.
+    
+    Var-keyword parameters
+    ======================
+    
+    These collect the named parameters and the args and kwargs passed directly
+    to scipy.optimize.least_squares(). For a complete description please see the 
+    documentation of scipy.optimize.least_squares()
+    
+    jac
+    bounds
+    method
+    ftol
+    xtol
+    gtol
+    x_scale
+    loss
+    f_scale
+    max_nfev
+    diff_step
+    tr_solver
+    tr_options
+    jac_sparsity
+    verbose
+    args
+    
+    The var-keyword parameters not listed above are passed as `kwargs` parameter
+    to the least_squares() function.
     
     Returns:
     ========
@@ -546,6 +580,27 @@ def fit_mEPSC(data, p0, bounds = (-np.inf, np.inf), method="trf", loss = "linear
         
         return ret
     
+    jac         = kwargs.pop("jac",         "2-point")
+    bounds      = kwargs.pop("bounds",      (-np.inf, np.inf))
+    method      = kwargs.pop("method",      "trf")
+    ftol        = kwargs.pop("ftol",        1e-8)
+    xtol        = kwargs.pop("xtol",        1e-8)
+    gtol        = kwargs.pop("gtol",        1e-8)
+    x_scale     = kwargs.pop("x_scale",     1.0)
+    loss        = kwargs.pop("loss",        "linear")
+    f_scale     = kwargs.pop("f_scale",     1.0)
+    max_nfev    = kwargs.pop("max_nfev",    None)
+    diff_step   = kwargs.pop("diff_step",   None)
+    tr_solver   = kwargs.pop("tr_solver",   None)
+    tr_options  = kwargs.pop("tr_options",  {})
+    jac_sparsity= kwargs.pop("jac_sparsity",None)
+    verbose     = kwargs.pop("verbose",     0)
+    
+    # not used here, but remove it from kwargs anyway
+    args        = kwargs.pop("args",        ()) 
+    
+    
+    
     # find out where NaNs are in data
     realDataNdx = ~np.isnan(data)
     
@@ -573,30 +628,40 @@ def fit_mEPSC(data, p0, bounds = (-np.inf, np.inf), method="trf", loss = "linear
     
 
     x0 = p0
-    lo = list()
-    up = list()
+#     lo = list()
+#     up = list()
+#     
+#     l0 = bounds[0]
+#     u0 = bounds[1]
+#     
+#     if isinstance(l0, numbers.Real):
+#         lo = [l0] * len(p0)
+#         
+#     elif isinstance(l0, (tuple, list)) and len(l0) == len(x0) and all(isinstance(l, numbers.Real) for l in l0):
+#         lo = [l for l in l0]
+#     else:
+#         raise ValueError(f"Incorrect lower bounds specified {l0}")
+#     
+#     if isinstance(u0, numbers.Real):
+#         up = [u0] * len(p0)
+#     elif isinstance(u0, (tuple, list)) and len(u0) == len(x0) and all(isinstance(l, numbers.Real) for l in u0):
+#         up = [l for l in u0]
+#     else:
+#         raise ValueError(f"Incorrect upper bounds specified {l0}")
+#     
+#     bnds = (lo, up)
     
-    l0 = bounds[0]
-    u0 = bounds[1]
-    
-    if isinstance(l0, numbers.Real):
-        lo = [l0] * len(p0)
-    elif isinstance(l0, (tuple, list)) and len(l0) == len(x0) and all(isinstance(l, numbers.Real) for l in l0):
-        lo = [l for l in l0]
-    else:
-        raise ValueError(f"Incorrect lower bounds specified {l0}")
-    
-    if isinstance(u0, numbers.Real):
-        up = [u0] * len(p0)
-    elif isinstance(u0, (tuple, list)) and len(u0) == len(x0) and all(isinstance(l, numbers.Real) for l in u0):
-        up = [l for l in u0]
-    else:
-        raise ValueError(f"Incorrect upper bounds specified {l0}")
-    
-    bnds = (lo, up)
-    
-    res = optimize.least_squares(__cost_fun__, x0, args = (xdata, ydata),
-                                 method=method, loss=loss, bounds=bnds)
+    # NOTE: 2022-10-30 14:39:57
+    # solve a non-linear least-squares problem with bounds on the variables
+    # x0 is the initial "guess" (initial values for model parameters, a.k.a the 
+    # independent variables)
+    res = optimize.least_squares(__cost_fun__, x0, args=(xdata, ydata), jac=jac,
+                                 bounds = bounds, method=method, loss=loss,
+                                 ftol=ftol, xtol=xtol, gtol=gtol, x_scale=x_scale,
+                                 f_scale=f_scale, max_nfev=max_nfev, 
+                                 diff_step=diff_step, tr_solver=tr_solver,
+                                 tr_options=tr_options, jac_sparsity=jac_sparsity,
+                                 verbose=verbose, kwargs=kwargs)
     
     res_x = list(res.x.flatten())
     
