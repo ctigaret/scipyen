@@ -2,6 +2,7 @@
 """
 import math, numbers, typing, os
 import pandas as pd
+import quantities as pq
 from core.strutils import str2symbol
 from . import guiutils
 import gui.quickdialog as qd
@@ -12,12 +13,12 @@ from PyQt5.uic import loadUiType
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-Ui_TestParamsWidgets2, QWidget = loadUiType(os.path.join(__module_path__, "TestParamsWidget2.ui"), from_imports=True, import_from="gui")
-
-class TestParamsWidgets2(QWidget, Ui_TestParamsWidgets2):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setupUi(self)
+# Ui_TestParamsWidgets2, QWidget = loadUiType(os.path.join(__module_path__, "TestParamsWidget2.ui"), from_imports=True, import_from="gui")
+# 
+# class TestParamsWidgets2(QWidget, Ui_TestParamsWidgets2):
+#     def __init__(self, parent=None):
+#         super().__init__(parent)
+#         self.setupUi(self)
 
 class ModelParametersWidget(QtWidgets.QWidget):
     """A widget composed of labels and spin boxes for input of numeric values
@@ -88,6 +89,12 @@ class ModelParametersWidget(QtWidgets.QWidget):
         """
         QtWidgets.QWidget.__init__(self, parent=parent)
         
+        if all(isinstance(p, pq.Quantity) for p in parameters):
+            units = [p.units for p in parameters]
+        else:
+            units = []
+            
+        
         if parameterNames is None:
             parameterNames  = [f"parameter_{k}" for k in range(len(parameters))]
             
@@ -105,27 +112,39 @@ class ModelParametersWidget(QtWidgets.QWidget):
             raise TypeError(f"'parameterNames' must be a sequence or None; got {type(parameterNames).__name__} instead")
                 
         if isinstance(lower, numbers.Number):
-            lower = [lower] * len(parameters)
-            
+            if len(units):
+                lower = [lower * u for u in units]
+            else:
+                lower = [lower] * len(parameters)
+                
         elif isinstance(lower, (tuple, list)):
             if len(lower) != len(parameters):
                 raise TypeError(f"'lower' expected to be a sequence of {len(parameters)} elements")
             
-            if not all(isinstance(v, numbers.Number) for v in lower):
-                raise TypeError(f"'lower' expected to contain numbers")
+            if not all(isinstance(v, (numbers.Number, pq.Quantity)) for v in lower):
+                raise TypeError(f"'lower' expected to contain scalars or scalar Quantity")
+            
+            if all(isinstance(v, pq.Quantity) for v in lower) and any(v.size != 1 for v in lower):
+                raise TypeError(f"'lower' expected to contain scalars or scalar Quantity")
             
         else:
             raise TypeError(f"'lower' expected to be a scalar or a sequence of {len(parameters)} elements")
         
         if isinstance(upper, numbers.Number):
-            upper = [upper] * len(parameters)
+            if len(units):
+                upper = [upper *u for u in units]
+            else:
+                upper = [upper] * len(parameters)
             
         elif isinstance(upper, (tuple, list)):
             if len(upper) != len(parameters):
                 raise TypeError(f"'upper' expected to be a sequence of {len(parameters)} elements")
             
-            if not all(isinstance(v, numbers.Number) for v in upper):
-                raise TypeError(f"'upper' expected to contain numbers")
+            if not all(isinstance(v, (numbers.Number, pq.Quantity)) for v in upper):
+                raise TypeError(f"'upper' expected to contain scalars or scalar Quantities")
+            
+            if all(isinstance(v, pq.Quantity) for v in upper) and any(v.size !=1 for v in upper):
+                raise TypeError(f"'upper' expected to contain scalars or scalar Quantities")
             
         else:
             raise TypeError(f"'upper' expected to be a scalar or a sequence of {len(parameters)} elements")
@@ -134,8 +153,6 @@ class ModelParametersWidget(QtWidgets.QWidget):
         self._spinStep_ = spinStep
         
         spinD, spinS = guiutils.get_QDoubleSpinBox_params(parameters + lower) 
-        
-        # print(f"spinS {spinS}, spinD {spinD}")
         
         if self._spinDecimals_ is None:
             self._spinDecimals_ = spinD
@@ -159,15 +176,11 @@ class ModelParametersWidget(QtWidgets.QWidget):
         if not self._verticalLayout_:
             self._parameters_ = self._parameters_.T
         
-        # self.setLayout(QtWidgets.QGridLayout(self))
-        
         self._configureUI_()
         
     def _configureUI_(self):
         if not self.objectName():
             self.setObjectName("ModelParametersWidget")
-            
-        # self.resize(300, 100)
         
         self.gridLayout = QtWidgets.QGridLayout(self)
         self.gridLayout.setObjectName(u"gridLayout")
@@ -175,6 +188,9 @@ class ModelParametersWidget(QtWidgets.QWidget):
         self.widgetsLayout.setObjectName(u"widgetsLayout")
         
         header = ["Parameters:"] + [c for c in self._parameters_.columns]
+        
+        minSpinWidth = list()
+        spinBoxes = list()
 
         for layout_col, c in enumerate(header):   
             # NOTE: 2022-10-31 09:31:48
@@ -182,7 +198,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
             w = QtWidgets.QLabel(c, self)
             w.setObjectName(f"label_{str2symbol(c)}_header")
 
-            self.widgetsLayout.addWidget(w, 0, layout_col, 1, 1, QtCore.Qt.AlignLeft)
+            self.widgetsLayout.addWidget(w, 0, layout_col, 1, 1)
 
             for ki, i in enumerate(self._parameters_.index): # row index into the DataFrame
                 layout_row = ki + 1
@@ -217,11 +233,27 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     
                     w.setDecimals(self.spinDecimals)
                     w.setSingleStep(self.spinStep)
-                    w.setValue(p)
                     w.valueChanged[float].connect(self._slot_newvalue)
                     w.setAccelerated(True)
-                    w.setSuffix(" ")
+                    
+                    if isinstance(p, pq.Quantity):
+                        w.setValue(p.magnitude)
+                        
+                        if p.units != pq.dimensionless:
+                            w.setSuffix(f" {p.units.dimensionality}")
+                        else:
+                            w.setSuffix(" ")
+                            
+                    else:
+                        w.setValue(p)
+                        w.setSuffix(" ")
+                            
+                    t = w.text()
+                    minSpinWidth.append(guiutils.get_text_width(t))
+                    # print(f"minWidth {minWidth}")
+                    # w.setMinimumWidth(minWidth)
                     w.setObjectName(f"{str2symbol(i)}_{str2symbol(c)}_spinBox")
+                    spinBoxes.append(w)
                     
                     # TODO/FIXME - MAYBE
                     # if self._verticalLayout_:
@@ -238,6 +270,15 @@ class ModelParametersWidget(QtWidgets.QWidget):
                 self.widgetsLayout.addWidget(w, layout_row, layout_col, 1, 1)
         
         self.gridLayout.addLayout(self.widgetsLayout, 0, 0, 1, 1)
+        
+        sp = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sp.setHorizontalStretch(1)
+        sp.setVerticalStretch(0)
+        minWidth = max(minSpinWidth)
+        for w in spinBoxes:
+            w.setMinimumWidth(minWidth + 3*minWidth//10)
+            w.setSizePolicy(sp)
+            
         
     @property
     def widgets(self):
@@ -285,7 +326,11 @@ class ModelParametersWidget(QtWidgets.QWidget):
 
             # print(f"ModelParametersWidget._slot_newvalue widget {widget} value {value} index {index}, layout row {layout_row}, layout col {layout_col}")
             
-            self._parameters_.iloc[layout_row-1, layout_col-1] = value
+            old_val = self._parameters_.iloc[layout_row-1, layout_col-1]
+            if isinstance(old_val, pq.Quantity):
+                self._parameters_.iloc[layout_row-1, layout_col-1] = value * old_val.units
+            else:
+                self._parameters_.iloc[layout_row-1, layout_col-1] = value
             
     @pyqtSlot(float)
     def _slot_setSpinMaximum(self, value:float):

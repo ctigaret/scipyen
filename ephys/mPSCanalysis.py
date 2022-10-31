@@ -16,9 +16,10 @@ import core.workspacefunctions as wf
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.models as models
+from core.scipyen_config import markConfigurable
 
 from core.quantities import (arbitrary_unit, check_time_units, units_convertible,
-                            unit_quantity_from_name_or_symbol,quantity2str,)
+                            unit_quantity_from_name_or_symbol, quantity2str,)
 from core.datatypes import UnitTypes
 from core.strutils import numbers2str
 from core.ephys import membrane
@@ -31,16 +32,44 @@ from gui import quickdialog as qd
 import gui.signalviewer as sv
 from gui.signalviewer import SignalCursor as SignalCursor
 import gui.pictgui as pgui
-from gui.workspacegui import GuiMessages
+from gui.workspacegui import (GuiMessages, WorkspaceGuiMixin)
+from gui.modelfittingui import ModelParametersWidget
 
 import iolib.pictio as pio
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-class MPSCAnalysis(qd.QuickDialog, GuiMessages):
+class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     """Mini-PSC analysis window ("app")
     Most of the GUI logic as in triggerdetectgui.TriggerDetectDialog
     """
+    
+    # NOTE: 2022-10-31 14:59:15
+    # Fall-back defaults for mPSC parameters.
+    #
+    _default_model_units_  = pq.pA
+    _default_time_units_   = pq.s
+    
+    _default_params_names_ = ("α", "β", "x₀", "τ₁", "τ₂")
+    
+    _default_params_initl_ = (0.*_default_model_units_, 
+                              -1.*pq.dimensionless, 
+                              0.01*_default_time_units_, 
+                              0.001*_default_time_units_, 
+                              0.01*_default_time_units_)
+    
+    _default_params_lower_ = (0.*_default_model_units_, 
+                              -math.inf*pq.dimensionless, 
+                              0.*_default_time_units_, 
+                              1.0e-4*_default_time_units_, 
+                              1.0e-4*_default_time_units_)
+    _default_params_upper_ = (math.inf*_default_model_units_, 
+                              0.*pq.dimensionless,  
+                              math.inf*_default_time_units_,
+                              0.01*_default_time_units_, 
+                              0.01*_default_time_units_)
+    _default_duration_ = 0.02*_default_time_units_
+    
     def __init__(self, ephysdata=None, title:str="mPSC Detect", clearEvents=False, parent=None, ephysViewer=None, **kwargs):
         self._dialog_title_ = title if len(title.strip()) else "mPSC Detect"
         super().__init__(parent=parent, title=self._dialog_title_)
@@ -69,9 +98,12 @@ class MPSCAnalysis(qd.QuickDialog, GuiMessages):
         # TODO: 2022-10-28 11:47:43
         # save/restore parameters , lower & upper in user_config, under model name
         # needs modelfitting.py done & dusted
-        self._model_initial_parameters_ = list()
-        self._model_lower_bounds_ = list()
-        self._model_upper_bounds_ = list()
+        
+        self._params_names_ = self._default_params_names_
+        self._params_initl_ = self._default_params_initl_
+        self._params_lower_ = self._default_params_lower_
+        self._params_upper_ = self._default_params_upper_
+        self._mPSCduration_ = self._default_duration_
         
         if not isinstance(ephysViewer, sv.SignalViewer):
             self._ephysViewer_ = sv.SignalViewer(win_title=self._dialog_title_)
@@ -109,7 +141,7 @@ class MPSCAnalysis(qd.QuickDialog, GuiMessages):
         self.modelParametersPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("configure"),
                                                                "Model Parameters", parent=self.buttons)
         
-        self.modelParametersPushButton.clicked.connect(self.slot_edit_parameters)
+        self.modelParametersPushButton.clicked.connect(self.slot_edit_mPSCparameters)
         
         for k, button in enumerate(self.modelParametersPushButton,
                                    self.clearEventsCheckBox,
@@ -119,12 +151,6 @@ class MPSCAnalysis(qd.QuickDialog, GuiMessages):
                                    self.undoFramePushButton):
             self.buttons.layout.insertWidget(k, button)
 
-        # self.buttons.layout.insertWidget(0, self.modelParametersPushButton)
-        # self.buttons.layout.insertWidget(1, self.clearEventsCheckBox)
-        # self.buttons.layout.insertWidget(2, self.detectTriggersPushButton)
-        # self.buttons.layout.insertWidget(3, self.undoTriggersPushButton)
-        # self.buttons.layout.insertWidget(4, self.detectmPSCInFramePushButton)
-        # self.buttons.layout.insertWidget(5, self.undoFramePushButton)
         self.buttons.layout.insertStretch(3)
         
         self.buttons.OK.setIcon(QtGui.QIcon.fromTheme("dialog-ok-apply"))
@@ -286,7 +312,7 @@ class MPSCAnalysis(qd.QuickDialog, GuiMessages):
                 self._ephysViewer_.plot(self._ehys_)
                 
     @pyqtSlot()
-    def slot_edit_parameters(self):
+    def slot_edit_mPSCparameters(self):
         dlg = qd.QuickDialog(self, title="mPSC parameters")
         # α, β, x₀, τ₁ and τ₂ AND WAVEFORM_DURATION !!! 
         
@@ -317,6 +343,75 @@ class MPSCAnalysis(qd.QuickDialog, GuiMessages):
     @ephysdata.setter
     def ephysdata(self, value):
         self._set_ephys_data_(value)
+        
+    @property
+    def mPSCParametersNames(self):
+        return self._params_names_
+    
+    @markConfigurable("mPSCParametersNames")
+    @mPSCParametersNames.setter()
+    def mPSCParametersNames(self, val):
+        if isinstance(val, (tuple, list)) and all(isinstance(s, str) for s in val):
+            self._params_names_ = val
+
+            if isinstance(getattr(self, "configurable_traits", None), DataBag):
+                self.configurable_traits["mPSCParametersNames"] = self._params_names_
+            
+    @property
+    def mPSCParametersInitial(self):
+        return self._params_initl_
+    
+    @markConfigurable("mPSCParametersInitial")
+    @mPSCParametersInitial.setter
+    def mPSCParametersInitial(self, val):
+        if isinstance(val, (tuple, list)) and all(isinstance(s, str) for s in val):
+            self._params_initl_ = val
+
+            if isinstance(getattr(self, "configurable_traits", None), DataBag):
+                self.configurable_traits["mPSCParametersInitial"] = self._params_initl_
+                
+    @property
+    def mPSCParametersLowerBounds(self):
+        return self._params_lower_
+    
+    @markConfigurable("mPSCParametersLowerBounds")
+    @mPSCParametersLowerBounds.setter
+    def mPSCParametersLowerBounds(self, val):
+        if isinstance(val, (tuple, list)) and all(isinstance(s, str) for s in val):
+            self._params_lower_ = val
+
+            if isinstance(getattr(self, "configurable_traits", None), DataBag):
+                self.configurable_traits["mPSCParametersLowerBounds"] = self._params_lower_
+        else:
+            raise TypeError("Expecting a sequence of scalar numbers for upper bounds")
+                
+                
+    @property
+    def mPSCParametersUpperBounds(self):
+        return self._params_upper_
+    
+    @markConfigurable("mPSCParametersUpperBounds")
+    @mPSCParametersUpperBounds.setter
+    def mPSCParametersUpperBounds(self, val):
+        if isinstance(val, (tuple, list)) and all(isinstance(s, Number) for s in val):
+            self._params_upper_ = val
+            
+        elif val is None:
+            self._params_upper_ = val
+
+            if isinstance(getattr(self, "configurable_traits", None), DataBag):
+                self.configurable_traits["mPSCParametersUpperBounds"] = self._params_upper_
+                
+        else:
+            raise TypeError("Expecting a sequence of scalar numbers for upper bounds")
+                
+    @property
+    def mPSCDuration(self):
+        return self._mPSCduration_
+    
+    @markConfigurable("mPSCDuration")
+    @mPSCDuration.setter
+    def mPSCDuration(self, val):
             
     def detect_mPSCs_inFrame(self):
         if self._ephys_ is None:

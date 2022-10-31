@@ -177,10 +177,7 @@ def configsrc2bunch(src:typing.Union[confuse.ConfigSource, Bunch]):
     """
     return Bunch(((k, configsrc2bunch(v)) if isinstance(v, (confuse.ConfigSource, Bunch)) else (k,v) for k,v in src.items()))
 
-def markConfigurable(confname:str, conftype:str="", 
-                     setter:bool=True, 
-                     default:typing.Optional[typing.Any]=None,
-                     trait_notifier:typing.Optional[typing.Union[bool, DataBag]] = None):
+def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:typing.Optional[typing.Any]=None, trait_notifier:typing.Optional[typing.Union[bool, DataBag]] = None):
     """Decorator for instance methods & properties.
     
     Decorates instance properties and methods that access instance attributes 
@@ -504,7 +501,7 @@ def markConfigurable(confname:str, conftype:str="",
     return partial(wrapper, trn = trait_notifier)
     
 @safeWrapper
-def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]) -> typing.Tuple[str, str]:
+def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]):
     """Generates a QSettings group name and, optionally, a prefix for a window.
     
     Parameters:
@@ -586,8 +583,7 @@ def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]) -> typing.
     return gname, pfx
 
 #@safeWrapper
-def saveQSettingsKey(qsettings:QSettings, 
-                    gname:str, pfx:str, key:str, val:typing.Any) -> None:
+def saveQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, val:typing.Any):
     if len(gname.strip()) == 0:
         gname = "General"
     key_name = "%s%s" % (pfx, key)
@@ -597,8 +593,7 @@ def saveQSettingsKey(qsettings:QSettings,
     qsettings.endGroup()
     
 #@safeWrapper
-def loadQSettingsKey(qsettings:QSettings,
-                     gname:str, pfx:str, key:str, default:typing.Any) -> typing.Any:
+def loadQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, default:typing.Any):
     if len(gname.strip()) == 0:
         gname = "General"
     key_name = "%s%s" % (pfx, key)
@@ -608,11 +603,7 @@ def loadQSettingsKey(qsettings:QSettings,
     qsettings.endGroup()
     return ret
 
-def syncQtSettings(qsettings:QSettings, 
-                    win:typing.Union[QMainWindow, QWidget, Figure], 
-                    group_name:typing.Optional[str]=None,
-                    prefix:typing.Optional[str]=None,
-                    save:bool=True)-> typing.Tuple[str, str]:
+def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, Figure], group_name:typing.Optional[str]=None, prefix:typing.Optional[str]=None, save:bool=True):
     """Synchronize user-specifc settings with the Scipyen's Qt configuration file.
     
     The Scipyen's configuration file is in native format, and on Linux it usually
@@ -776,7 +767,7 @@ def syncQtSettings(qsettings:QSettings,
         group_name is the qsettings group name under which the win's settings 
             were saved
             
-        prefix is th prefix prepended to each setting name
+        prefix is the prefix prepended to each setting name
         
         These are useful to append settings later
     
@@ -979,44 +970,38 @@ class ScipyenConfigurable(object):
     Scipyen sessions.
     
     Qt-based GUI settings (where appropriate) are dealt with separately, by either
-    inheriting from gui.workspacegui.WorkspaceGuiMixin, or by directly using
+    inheriting from gui.workspacegui.WorkspaceGuiMixin, or directly by using
     the loadWindowSettings and saveWindowSettings in the gui.workspacegui module,
-    or the syncQtSettings defined in this module.
+    or using the syncQtSettings function defined in this module.
     
-    Inherited directly by:
-        gui.workspacegui.WorkspaceGuiMixin
-        gui.consoles.ConsoleWidget
+    ScipyenConfigurable is inherited directly by:
+        • gui.workspacegui.WorkspaceGuiMixin
+        • gui.consoles.ConsoleWidget
         
-    and indirectly by the following classes:
-        via WorkspaceGuiMixin:
-            gui.mainwindow.ScipyenWindow
-            gui.consoles.ExternalConsoleWindow
-            gui.scipyenviewer.ScipyenViewer
-            gui.scipyenviewer.ScipyenFrameViewer (via ScipyenViewer)
-            all viewer classes in gui subpackage (via either ScipyenViewer or
-            ScipyenFrameViewer)
+    and indirectly (via WorkspaceGuiMixin) by:
+        • gui.mainwindow.ScipyenWindow
+        • gui.consoles.ExternalConsoleWindow
+        • gui.consoles.ScipyenConsole,
+        • gui.consoles.ScipyenConsoleWidget ← gui.consoles.ConsoleWidget
+        • gui.scipyenviewer.ScipyenViewer
+        • gui.scipyenviewer.ScipyenFrameViewer ← gui.scipyenviewer.ScipyenViewer
+        • all viewer classes in gui subpackage, indirectly via either 
+        gui.scipyenviewer.ScipyenViewer or gui.scipyenviewer.ScipyenFrameViewer.
             
-            
-        via ConsoleWidget:
-            gui.consoles.ScipyenConsole
-    
     """
     # NOTE: 2021-09-23 11:39:57
     # added self._tag and tag property getter/setter
     # to be used for configurables of non-top level windows 
     qsettings = QtCore.QSettings(organization_name, application_name)
-    #qsettings = QtCore.QSettings("Scipyen", "Scipyen")
+
     _scipyen_settings_  = scipyen_config
     _user_settings_src_ = scipyen_user_config_source
     _user_settings_file_ = _user_settings_src_.filename
     
     def __init__(self, configTag:typing.Optional[str]=None):
-        #super().__init__()
         self.configurable_traits = DataBag()
         self.configurable_traits.observe(self._observe_configurables_)
         self._tag = configTag
-        #print(f"ScipyenConfigurable.__init__ qsettings {self.qsettings.fileName()}")
-        # print(f"ScipyenConfigurable.__init__ _scipyen_settings_ {scipyen_config}, _user_settings_src_ {scipyen_user_config_source}, _user_settings_file_ {self._user_settings_src_.filename}")
         
     def _get_parent_(self):
         parent = None
@@ -1036,8 +1021,6 @@ class ScipyenConfigurable(object):
         
         cfg = self._make_confuse_config_data_(change, isTop, parent, tag)
         
-        #print("_observe_configurable_ cfg", dict(cfg))
-            
         if isinstance(cfg, Bunch):
             for k,v in cfg.items():
                 scipyen_config[k].set(v)
@@ -1056,16 +1039,6 @@ class ScipyenConfigurable(object):
             v = []
         else:
             v = change.new
-            
-        #if isinstance(change.new, (collections.deque, tuple, list)):
-            #v = str(tuple(change.new)) if len(change.new) else ""
-        #elif isinstance(change.new, type):
-            #v = ""
-        #else:
-            #v = change.new
-            
-        #print("change.new", change.new, "v", v, isinstance(change.new, type))
-        #v = str(tuple(change.new)) if isinstance(change.new, (collections.deque, tuple, list)) else change.new
         
         if isTop:
             return Bunch({self.__class__.__name__:Bunch({change.name:v})})
@@ -1413,8 +1386,7 @@ class FunctionConfiguration(ScipyenConfiguration):
         
         super().__init__(name=fname, args=fargs, kwargs=fkwargs)
         
-def get_config_file(configuration:confuse.Configuration=scipyen_config,
-                    default:bool=False) -> str:
+def get_config_file(configuration:confuse.Configuration=scipyen_config, default:bool=False):
     if not configuration._materialized:
         configuration.read()
         
@@ -1425,17 +1397,14 @@ def get_config_file(configuration:confuse.Configuration=scipyen_config,
         
     return configuration.user_config_path()
     
-def get_config_dir(configuration:confuse.Configuration=scipyen_config) -> str:
+def get_config_dir(configuration:confuse.Configuration=scipyen_config):
     if not configuration._materialized:
         configuration.read()
             
     return configuration.config_dir()
 
 @safeWrapper
-def write_config(config:typing.Optional[confuse.Configuration]=scipyen_config, 
-                filename:typing.Optional[str]=None, 
-                full:bool=True, redact:bool=False, as_default:bool=False,
-                default_only:bool=False) -> bool:
+def write_config(config:typing.Optional[confuse.Configuration]=scipyen_config, filename:typing.Optional[str]=None, full:bool=True, redact:bool=False, as_default:bool=False, default_only:bool=False):
     """Saves Scipyen non-gui configuration options to an yaml file.
     Settings are saved implicitly to the config.yaml file located in the 
     application configuration directory and stored in the 'filename' attribute
@@ -1541,10 +1510,7 @@ def write_config(config:typing.Optional[confuse.Configuration]=scipyen_config,
         
     return True
     
-def saveWindowSettings(qsettings:QtCore.QSettings, 
-                       win:typing.Union[QtWidgets.QMainWindow, Figure], 
-                       group_name:typing.Optional[str]=None,
-                       prefix:typing.Optional[str]=None) -> typing.Tuple[str, str]:
+def saveWindowSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QMainWindow, Figure], group_name:typing.Optional[str]=None, prefix:typing.Optional[str]=None):
     """Saves window settings to the Scipyen's Qt configuration file.
     
     On recent Linux distributions this is $HOME/.config/Scipyen/Scipyen.conf 
@@ -1634,10 +1600,7 @@ def saveWindowSettings(qsettings:QtCore.QSettings,
     #print("saveWindowSettings %s" % win.__class__.__name__)
     return syncQtSettings(qsettings, win, group_name, prefix, True)
     
-def loadWindowSettings(qsettings:QtCore.QSettings, 
-                       win:typing.Union[QtWidgets.QMainWindow, Figure], 
-                       group_name:typing.Optional[str]=None,
-                       prefix:typing.Optional[str]=None) -> typing.Tuple[str, str]:
+def loadWindowSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QMainWindow, Figure], group_name:typing.Optional[str]=None, prefix:typing.Optional[str]=None):
     """Loads window settings from the Scipyen's Qt configuration file.
     
     On recent Linux distributions this is $HOME/.config/Scipyen/Scipyen.conf 

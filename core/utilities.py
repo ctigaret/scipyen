@@ -3661,8 +3661,8 @@ def sp_set_loc(x, index, columns, val):
     return x    
 
 def get_least_pwr10(x:typing.Sequence):
-    if not all(isinstance(v, Number) for v in x):
-        raise TypeError("Expecting a sequence of scalars")
+    if not all(isinstance(v, Number) or (isinstance(v, pq.Quantity) and v.size == 1) for v in x):
+        raise TypeError("Expecting a sequence of scalars or scalar Quantity objects")
     
     if any (math.isinf(v) for v in x):
         x = [v for v in x if not math.isinf(v)]
