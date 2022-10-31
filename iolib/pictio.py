@@ -1715,15 +1715,21 @@ def getMimeAndFileType(fileName):
             mime_type = _mime_type
         
     return mime_type, file_type, encoding
-        
-def loadFile(fName):
 
+def is_python_source(fileName:str):
+    mime_type, file_type, encoding = getMimeAndFileType(fileName)
+    
+    return any("python" in s.lower() for s in (mime_type, file_type)) or os.path.splitext(fileName)[-1] == ".py"
+
+def is_spreadsheet(fileName:str):
+    mime_type, file_type, encoding = getMimeAndFileType(fileName)
+    
+    return any(any(m in s.lower() for m in ("spreadsheet", "excel", "csv", "tab-separated-values")) for s in (mime_type, file_type)) or os.path.splitext(fileName)[-1] in (".csv", ".tsv", ".xls", ".xlsx")
+    
+def loadFile(fName):
     value = None
-    
     fileLoader = getLoaderForFile(fName)
-    
     value = fileLoader(fName)
-    
     return value
     
 @safeWrapper

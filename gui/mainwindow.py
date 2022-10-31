@@ -4468,12 +4468,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if not all(pio.checkFileReadAccess(f) for f in fileNames):
                 return
                 
-            mime_types = [pio.getMimeAndFileType(f) for f in fileNames]
-            
-            #print("mime_types", mime_types)
-            
-            spreads = set([f for f in fileNames if any(s in mime_types[0] for s in ("spreadsheet", "excel", "csv", "tab-separated-values"))])
-            scripts = set([f for f in fileNames if any("python" in s for s in mime_types)])
+            spreads = set([f for f in fileNames if pio.is_spreadsheet(f)])
+            scripts = set([f for f in fileNames if pio.is_python_source(f)])
             
             if len(fileNames - spreads) == 0:
                 importAsDataFrame = cm.addAction("Open as DataFrame")
@@ -4483,11 +4479,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 addToScriptManager = cm.addAction("Add to Script Manager")
                 addToScriptManager.triggered.connect(self._slot_cm_AddPythonScriptToManager)
                 
-                
-            #if all([pio.checkFileReadAccess(f) and any([s in pio.getMimeAndFileType(f)[0] for s in ("spreadsheet", "excel", "csv", "tab-separated-values")]) for f in fileNames]):
-                
-            #if all(pio.checkFileReadAccess(f) and any("python" in s for s in pio.getMimeAndFileType(f)) for f in fileNames):
-            
             fileNamesToConsole = cm.addAction("Send Name(s) to Console")
             fileNamesToConsole.triggered.connect(self._sendFileNamesToConsole_)
             
