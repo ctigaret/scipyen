@@ -1,4 +1,4 @@
-import os, typing
+import os, typing, math
 from numbers import (Number, Real,)
 from itertools import chain
 
@@ -22,7 +22,7 @@ from core.quantities import (arbitrary_unit, check_time_units, units_convertible
                             unit_quantity_from_name_or_symbol, quantity2str,)
 from core.datatypes import UnitTypes
 from core.strutils import numbers2str
-from core.ephys import membrane
+from ephys import membrane
 
 import ephys.ephys as ephys
 
@@ -68,13 +68,14 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                               math.inf*_default_time_units_,
                               0.01*_default_time_units_, 
                               0.01*_default_time_units_)
+    
     _default_duration_ = 0.02*_default_time_units_
     
-    def __init__(self, ephysdata=None, title:str="mPSC Detect", clearEvents=False, parent=None, ephysViewer=None, **kwargs):
+    def __init__(self, ephysdata=None, title:str="mPSC Detect", clearOldPSCs=False, parent=None, ephysViewer=None, **kwargs):
         self._dialog_title_ = title if len(title.strip()) else "mPSC Detect"
         super().__init__(parent=parent, title=self._dialog_title_)
         
-        self._clear_events_flag_ = clearEvents
+        self._clear_events_flag_ = clearOldPSCs == True
         
         self._mPSC_detected_ = False
         
@@ -131,7 +132,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self.detectmPSCInFramePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-find"),
                                                                  "Detect in frame", parent=self.buttons)
         
-        self.detectmPSCInFramePushButton.clicked.conenct(self.slot_detect_in_frame)
+        self.detectmPSCInFramePushButton.clicked.connect(self.slot_detect_in_frame)
         
         self.undoFramePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-undo"),
                                                          "Undo Frame", parent = self.buttons)
@@ -143,12 +144,12 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         
         self.modelParametersPushButton.clicked.connect(self.slot_edit_mPSCparameters)
         
-        for k, button in enumerate(self.modelParametersPushButton,
-                                   self.clearEventsCheckBox,
-                                   self.detectTriggersPushButton,
-                                   self.undoTriggersPushButton,
+        for k, button in enumerate((self.modelParametersPushButton,
+                                   self.clearDetectionCheckBox,
+                                   self.detectmPSCPushButton,
+                                   self.undoDetectionPushButton,
                                    self.detectmPSCInFramePushButton,
-                                   self.undoFramePushButton):
+                                   self.undoFramePushButton)):
             self.buttons.layout.insertWidget(k, button)
 
         self.buttons.layout.insertStretch(3)
@@ -173,7 +174,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             if isinstance(value, neo.Block):
                 for s in value.segments:
                     if len(s.spiketrains):
-                        trains = [st in s.spiketrains if st.annotations.get("source", None)=="mPSC_detection"]
+                        trains = [st for st in s.spiketrains if st.annotations.get("source", None)=="mPSC_detection"]
                         if len(trains):
                             self._cached_detection_.append(trains[0])
                         else:
@@ -183,7 +184,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                             
             elif isinstance(value, neo.Segment):
                 if len(value.spiketrains):
-                    trains = [st in value.spiketrains if st.annotations.get("source", None)=="mPSC_detection"]
+                    trains = [st for st in value.spiketrains if st.annotations.get("source", None)=="mPSC_detection"]
                     if len(trains):
                         self._cached_detection_.append(trains[0])
                     else:
@@ -194,7 +195,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             elif isinstance(value, (tuple, list)) and all(isinstance(v, neo.Segment) for v in value):
                 for s in value.segments:
                     if len(s.spiketrains):
-                        trains = [st in s.spiketrains if st.annotations.get("source", None)=="mPSC_detection"]
+                        trains = [st for st in s.spiketrains if st.annotations.get("source", None)=="mPSC_detection"]
                         if len(trains):
                             self._cached_detection_.append(trains[0])
                         else:
@@ -206,10 +207,16 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                 self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects; got {type(value).__name__} instead")
                 return
             
-        else:
-            self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects; got {type(value).__name__} instead")
+        elif value is None:
+            self._cached_detection_.clear()
+            self._ephysViewer_.clear()
+            self._ephysViewer_.setVisible(False)
             return
-                
+            
+        else:
+            self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects, or None; got {type(value).__name__} instead")
+            return
+        
     def open(self):
         if self._ephys_:
             self._ephysViewer_.plot(self.ephysdata)
@@ -243,7 +250,9 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         
     @pyqtSlot(int)
     def done(self, value):
-        """Not sure about the utility of this one, here..."""
+        if value == QtWidgets.QDialog.Accepted and not self.detected:
+            self.detect_mPSC()
+            
         if self._ephysViewer_.isVisible():
             if self._owns_viewer_:
                 self._ephysViewer_.close()
@@ -255,7 +264,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         
     @pyqtSlot()
     def _slot_clearDetectionChanged(self):
-        self._clear_events_flag_ = self.clearDetectionCheckBox.selection()
+        self.clearOldPSCs = self.clearDetectionCheckBox.selection()
         
     @pyqtSlot(int)
     def _slot_ephysFrameChanged(self, value):
@@ -275,7 +284,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             else:
                 self._ephysViewer_.plot(self.ephysdata)
                 
-    @pystSlot()
+    @pyqtSlot()
     def slot_detect_in_frame(self):
         if self._ephys_ is None:
             return
@@ -313,9 +322,39 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                 
     @pyqtSlot()
     def slot_edit_mPSCparameters(self):
-        dlg = qd.QuickDialog(self, title="mPSC parameters")
         # α, β, x₀, τ₁ and τ₂ AND WAVEFORM_DURATION !!! 
+        dlg = qd.QuickDialog(self, title="mPSC parameters")
+        orientation = "vertical"
+        paramsWidget = ModelParametersWidget(self.mPSCParametersInitial, 
+                                             parameterNames = self.mPSCParametersNames,
+                                             lower = self.mPSCParametersLowerBounds,
+                                             upper = self.mPSCParametersUpperBounds,
+                                             orientation=orientation, parent=dlg)
         
+        vgroup = qd.VDialogGroup(dlg, validate=False)
+        dgroup = qd.HDialogGroup(dlg, validate=False)
+
+        w = QtWidgets.QLabel("Duration:", dgroup)
+        dgroup.addWidget(w, alignment = QtCore.Qt.Alignment())
+        wd = QtWidgets.QDoubleSpinBox(dgroup)
+        wd.setMinimum(-math.inf)
+        wd.setMaximum(math.inf)
+        wd.setDecimals(paramsWidget.spinDecimals)
+        wd.setSingleStep(paramsWidget.spinStep)
+        wd.setValue(self.mPSCDuration.magnitude)
+        dgroup.addWidget(wd, alignment=QtCore.Qt.Alignment())
+        dgroup.addStretch(20)
+        vgroup.addWidget(dgroup)
+        dlg.addWidget(vgroup, alginment=QtCore.Qt.AlignTop)
+        dlg.resize(-1,-1)
+        
+        dlg_result = dlg.exec()
+        
+        if dlg_result == QtWidgets.QDialog.Accepted:
+            self.mPSCParametersInitial = paramsWidget.parameters["Initial Value:"]
+            self.mPSCParametersLowerBounds = paramsWidget.parameters["Lower Bound:"]
+            self.mPSCParametersUpperBounds = paramsWidget.parameters["Upper Bound:"]
+            self.mPSCDuration = wd.value() * self._default_time_units_
                 
     @property
     def currentFrame(self):
@@ -345,11 +384,22 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self._set_ephys_data_(value)
         
     @property
+    def clearOldPSCs(self):
+        return self._clear_events_flag_
+    
+    @markConfigurable("ClearOldPSCsOnDetection")
+    @clearOldPSCs.setter
+    def clearOldPSCs(self, val):
+        self._clear_events_flag_ = val == True
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["ClearOldPSCsOnDetection"] = self._clear_events_flag_
+            
+    @property
     def mPSCParametersNames(self):
         return self._params_names_
     
     @markConfigurable("mPSCParametersNames")
-    @mPSCParametersNames.setter()
+    @mPSCParametersNames.setter
     def mPSCParametersNames(self, val):
         if isinstance(val, (tuple, list)) and all(isinstance(s, str) for s in val):
             self._params_names_ = val
@@ -412,10 +462,13 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @markConfigurable("mPSCDuration")
     @mPSCDuration.setter
     def mPSCDuration(self, val):
+        self._mPSCduration_ = val
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["mPSCDuration"] = self._mPSCduration_
             
     def detect_mPSCs_inFrame(self):
+        self.detected = False
         if self._ephys_ is None:
-            self.detected = False
             return
         
     def detect_mPSC(self):
@@ -424,24 +477,43 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             return
         
         
-    def _restore_(self): # TODO/FIXME 2022-10-28 10:49:30
-        if len(self._cached_events_):
-            if isinstance(self._ephys_, Block):
-                for k, s in enumerate(self._ephys_.segments):
-                    s.events[:] = self._cached_events_[k][:]
+    def _restore_(self):
+        if isinstance(self._ephys_, neo.Block):
+            segments = self._ephys_.segments
+        elif isinstance(self._ephys_, (tuple, list)) and all(isinstance(v, neo.Segment) for v in self._ephys_):
+            segments = self._ephys_
+        elif isinstance(self._ephys_, neo.Segment):
+            segments = [self._ephys_]
+        else:
+            return
+        
+        if len(self._cached_detection_) == len(segments):
+            for k, s in enumerate(segments):
+                stt = [ks for ks,st in enumerate(s.spiketrains) if s.name.endswith("_PSC")]
+                if len(stt):
+                    neoutils.remove_spiketrain(s, stt)
                     
-            elif isinstance(self._ephys_, Segment):
-                self._ephys_.events[:] = self._cached_events_[0][:]
-                
-            elif isinstance(self._ephys_, (tuple, list)):
-                if all([isinstance(v, Block) for v in self._ephys_]):
-                    for k, b in enumerate(self._ephys_):
-                        for ks, s in enumerate(b.segments):
-                            s.events[:] = self._cached_events_[k][ks][:]
-                            
-                elif all([isinstance(v, Segment) for v in self._ephys_]):
-                    for k, s in enumerate(self._ephys_):
-                        s.events[:] = self._cached_events_[k][:]
+                if isinstance(self._cached_detection_[k], neo.SpikeTrain):
+                    s.spiketrains.append(self._cached_detection_[k])
+                    
+            self.detected = False
                         
-    def _restore_frame_(self): # TODO 2022-10-28 11:13:37
-        pass
+    def _restore_frame_(self):
+        if isinstance(self._ephys_, neo.Block):
+            segments = self._ephys_.segments
+        elif isinstance(self._ephys_, (tuple, list)) and all(isinstance(v, neo.Segment) for v in self._ephys):
+            segments = self._ephys_
+        elif isinstance(self._ephys_, neo.Segment):
+            segments = [self._ephys_]
+        else:
+            return
+        
+        if len(self._cached_detection_) == len(segments) and self._currentFrame_ in range(len(segments)):
+            segment = segments[self._currentFrame_]
+            stt = [k for k,st in enumerate(segment.spiketrains) if s.name.endswith("_PSCs")]
+            if len(stt):
+                neoutils.remove_spiketrain(segment, stt)
+
+            if isinstance(self._cached_detection_[self._currentFrame_], neo.SpikeTrain):
+                segment.spiketrains.append(self._cached_detection_[self._currentFrame_])
+                
