@@ -1,13 +1,23 @@
 """Widgets for parameter inputs
 """
-import math, numbers, typing
+import math, numbers, typing, os
 import pandas as pd
+from core.strutils import str2symbol
 from . import guiutils
 import gui.quickdialog as qd
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from PyQt5.uic import loadUiType
+
+__module_path__ = os.path.abspath(os.path.dirname(__file__))
+
+Ui_TestParamsWidgets2, QWidget = loadUiType(os.path.join(__module_path__, "TestParamsWidget2.ui"), from_imports=True, import_from="gui")
+
+class TestParamsWidgets2(QWidget, Ui_TestParamsWidgets2):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setupUi(self)
 
 class ModelParametersWidget(QtWidgets.QWidget):
     """A widget composed of labels and spin boxes for input of numeric values
@@ -149,27 +159,37 @@ class ModelParametersWidget(QtWidgets.QWidget):
         if not self._verticalLayout_:
             self._parameters_ = self._parameters_.T
         
-        self.setLayout(QtWidgets.QGridLayout(self))
+        # self.setLayout(QtWidgets.QGridLayout(self))
         
         self._configureUI_()
         
     def _configureUI_(self):
+        if not self.objectName():
+            self.setObjectName("ModelParametersWidget")
+            
+        # self.resize(300, 100)
+        
+        self.gridLayout = QtWidgets.QGridLayout(self)
+        self.gridLayout.setObjectName(u"gridLayout")
+        self.widgetsLayout = QtWidgets.QGridLayout()
+        self.widgetsLayout.setObjectName(u"widgetsLayout")
+        
         header = ["Parameters:"] + [c for c in self._parameters_.columns]
-        for layout_col, c in enumerate(header):    
+
+        for layout_col, c in enumerate(header):   
+            # NOTE: 2022-10-31 09:31:48
+            # top row is the header → the first widget in ANY column is a QLabel
             w = QtWidgets.QLabel(c, self)
-            # w.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-            sp = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-            sp.setHorizontalStretch(3)
-            sp.setVerticalStretch(0)
-            sp.setHeightForWidth(w.sizePolicy().hasHeightForWidth())
-            w.setSizePolicy(sp)
-            self.layout().addWidget(w, 0, layout_col, QtCore.Qt.AlignHCenter)
+            w.setObjectName(f"label_{str2symbol(c)}_header")
+
+            self.widgetsLayout.addWidget(w, 0, layout_col, 1, 1, QtCore.Qt.AlignLeft)
 
             for ki, i in enumerate(self._parameters_.index): # row index into the DataFrame
                 layout_row = ki + 1
 
                 if layout_col == 0:
                     w = QtWidgets.QLabel(i, self)
+                    w.setObjectName(f"label_{str2symbol(i)}")
                     
                 else:
                     p = self._parameters_.loc[i,c]
@@ -194,14 +214,16 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     #         up = math.inf
                     # w.setMinimum(max(-math.inf, lo))
                     # w.setMaximum(min(math.inf, up))
+                    
                     w.setDecimals(self.spinDecimals)
                     w.setSingleStep(self.spinStep)
                     w.setValue(p)
-                    w.valueChanged.connect(self._slot_newvalue)
+                    w.valueChanged[float].connect(self._slot_newvalue)
                     w.setAccelerated(True)
-                    # w.setGroupSeparator(True)
                     w.setSuffix(" ")
-                    # TODO/FIXME
+                    w.setObjectName(f"{str2symbol(i)}_{str2symbol(c)}_spinBox")
+                    
+                    # TODO/FIXME - MAYBE
                     # if self._verticalLayout_:
                     #     if c == "Lower Bound:":
                     #         w.valueChanged.connect(self._slot_setSpinMinimum)
@@ -213,21 +235,10 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     #     elif i == "Upper Bound:":
                     #         w.valueChanged.connect(self._slot_setSpinMaximum)
                     
-                sp = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-                sp.setHorizontalStretch(0)
-                sp.setVerticalStretch(0)
-                sp.setHeightForWidth(w.sizePolicy().hasHeightForWidth())
-                w.setSizePolicy(sp)
-                # w.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-                # w.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
-                self.layout().addWidget(w, layout_row, layout_col, QtCore.Qt.AlignLeft)
-                
-        # for c in range(self.layout().columnCount()):
-        #     if c > 0:
-        #         self.layout().setColumnStretch(c, 1)
-                
-        # self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
-                    
+                self.widgetsLayout.addWidget(w, layout_row, layout_col, 1, 1)
+        
+        self.gridLayout.addLayout(self.widgetsLayout, 0, 0, 1, 1)
+        
     @property
     def widgets(self):
         return self._widgets_
@@ -254,9 +265,10 @@ class ModelParametersWidget(QtWidgets.QWidget):
     
     @pyqtSlot(float)
     def _slot_newvalue(self, value):
+        # print(f"ModelParametersWidget._slot_newvalue value {value}")
         widget = self.sender()
         if isinstance(widget, QtWidgets.QDoubleSpinBox):
-            index = self.layout().indexOf(widget)
+            index = self.widgetsLayout.indexOf(widget)
             if index == -1: # this should never happen
                 return
             
@@ -264,12 +276,12 @@ class ModelParametersWidget(QtWidgets.QWidget):
             # linear indexing in the grid layout → column varies faster
             # 
             # Furthermore:
-            # self.layout().rowCount()      → self._parameters_.shape[0] + 1
-            # self.layout().columnCount()   → self._parameters_.shape[1] + 1 
+            # self.widgetsLayout.rowCount()      → self._parameters_.shape[0] + 1
+            # self.widgetsLayout.columnCount()   → self._parameters_.shape[1] + 1 
             #
             
-            layout_col = index // self.layout().rowCount()
-            layout_row = index % self.layout().rowCount()
+            layout_col = index // self.widgetsLayout.rowCount()
+            layout_row = index % self.widgetsLayout.rowCount()
 
             # print(f"ModelParametersWidget._slot_newvalue widget {widget} value {value} index {index}, layout row {layout_row}, layout col {layout_col}")
             
@@ -280,17 +292,17 @@ class ModelParametersWidget(QtWidgets.QWidget):
         # TODO/FIXME 2022-10-30 21:09:27
         w = self.sender()
         if isinstance(w, QtWidgets.QDoubleSpinBox):
-            index = self.layout().indexOf(w)
+            index = self.widgetsLayout.indexOf(w)
             if index == -1:
                 return
             
-            col = index // self.layout().rowCount()
-            row = index % self.layout().rowCount()
+            col = index // self.widgetsLayout.rowCount()
+            row = index % self.widgetsLayout.owCount()
             
             if self._verticalLayout_:
-                target = self.layout().itemAtPosition(row, 1).widget()
+                target = self.widgetsLayout.itemAtPosition(row, 1).widget()
             else:
-                target = self.layout().itemAtPosition(1, col).widget()
+                target = self.widgetsLayout.itemAtPosition(1, col).widget()
                 
             # print(target.value())
             
@@ -302,17 +314,17 @@ class ModelParametersWidget(QtWidgets.QWidget):
         # TODO/FIXME 2022-10-30 21:09:27
         w = self.sender()
         if isinstance(w, QtWidgets.QDoubleSpinBox):
-            index = self.layout().indexOf(w)
+            index = self.widgetsLayout.indexOf(w)
             if index == -1:
                 return
             
-            col = index // self.layout().rowCount()
-            row = index % self.layout().rowCount()
+            col = index // self.widgetsLayout.rowCount()
+            row = index % self.widgetsLayout.rowCount()
             
             if self._verticalLayout_:
-                target = self.layout().itemAtPosition(row, 1).widget()
+                target = self.widgetsLayout.itemAtPosition(row, 1).widget()
             else:
-                target = self.layout().itemAtPosition(1, col).widget()
+                target = self.widgetsLayout.itemAtPosition(1, col).widget()
                 
             if isinstance(target, QtWidgets.QDoubleSpinBox):
                 target.setMaximum(value)
