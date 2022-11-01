@@ -63,6 +63,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                               0.*_default_time_units_, 
                               1.0e-4*_default_time_units_, 
                               1.0e-4*_default_time_units_)
+    
     _default_params_upper_ = (math.inf*_default_model_units_, 
                               0.*pq.dimensionless,  
                               math.inf*_default_time_units_,
@@ -289,7 +290,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         if self._ephys_ is None:
             return
         
-        self.detect_mPSC_inFrame()
+        self.detect_mPSCs_inFrame()
         
         if self.isVisible():
             if self._ephysViewer_.isVisible() and  self._ephysViewer_.y:
@@ -332,10 +333,11 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                                              orientation=orientation, parent=dlg)
         
         vgroup = qd.VDialogGroup(dlg, validate=False)
+        
         dgroup = qd.HDialogGroup(dlg, validate=False)
 
-        w = QtWidgets.QLabel("Duration:", dgroup)
-        dgroup.addWidget(w, alignment = QtCore.Qt.Alignment())
+        wl = QtWidgets.QLabel("Duration:", dgroup)
+        dgroup.addWidget(wl, alignment = QtCore.Qt.Alignment())
         wd = QtWidgets.QDoubleSpinBox(dgroup)
         wd.setMinimum(-math.inf)
         wd.setMaximum(math.inf)
@@ -344,8 +346,9 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         wd.setValue(self.mPSCDuration.magnitude)
         dgroup.addWidget(wd, alignment=QtCore.Qt.Alignment())
         dgroup.addStretch(20)
+        vgroup.addWidget(paramsWidget, stretch=1,alignment = QtCore.Qt.Alignment())
         vgroup.addWidget(dgroup)
-        dlg.addWidget(vgroup, alginment=QtCore.Qt.AlignTop)
+        dlg.addWidget(vgroup, alignment=QtCore.Qt.AlignTop)
         dlg.resize(-1,-1)
         
         dlg_result = dlg.exec()
@@ -406,6 +409,8 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
 
             if isinstance(getattr(self, "configurable_traits", None), DataBag):
                 self.configurable_traits["mPSCParametersNames"] = self._params_names_
+        else:
+            raise TypeError("Expecting a sequence of str for parameter names")
             
     @property
     def mPSCParametersInitial(self):
@@ -414,11 +419,14 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @markConfigurable("mPSCParametersInitial")
     @mPSCParametersInitial.setter
     def mPSCParametersInitial(self, val):
-        if isinstance(val, (tuple, list)) and all(isinstance(s, str) for s in val):
+        if isinstance(val, (tuple, list)) and all(isinstance(s, pq.Quantity) for s in val):
             self._params_initl_ = val
 
             if isinstance(getattr(self, "configurable_traits", None), DataBag):
                 self.configurable_traits["mPSCParametersInitial"] = self._params_initl_
+                
+        else:
+            raise TypeError(f"Expecting a sequence of scalar quantities for initial values; instead, got {type(val).__name__}:\n {val}")
                 
     @property
     def mPSCParametersLowerBounds(self):
@@ -427,13 +435,14 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @markConfigurable("mPSCParametersLowerBounds")
     @mPSCParametersLowerBounds.setter
     def mPSCParametersLowerBounds(self, val):
-        if isinstance(val, (tuple, list)) and all(isinstance(s, str) for s in val):
+        if isinstance(val, (tuple, list)) and all(isinstance(s, pq.Quantity) for s in val):
             self._params_lower_ = val
-
+            
             if isinstance(getattr(self, "configurable_traits", None), DataBag):
                 self.configurable_traits["mPSCParametersLowerBounds"] = self._params_lower_
+       
         else:
-            raise TypeError("Expecting a sequence of scalar numbers for upper bounds")
+            raise TypeError(f"Expecting a sequence of scalar quantities for lower bounds; instead, got {type(val).__name__}:\n{val}")
                 
                 
     @property
@@ -443,7 +452,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @markConfigurable("mPSCParametersUpperBounds")
     @mPSCParametersUpperBounds.setter
     def mPSCParametersUpperBounds(self, val):
-        if isinstance(val, (tuple, list)) and all(isinstance(s, Number) for s in val):
+        if isinstance(val, (tuple, list)) and all(isinstance(s, pq.Quantity) for s in val):
             self._params_upper_ = val
             
         elif val is None:
@@ -453,7 +462,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                 self.configurable_traits["mPSCParametersUpperBounds"] = self._params_upper_
                 
         else:
-            raise TypeError("Expecting a sequence of scalar numbers for upper bounds")
+            raise TypeError(f"Expecting a sequence of scalar quantities for upper bounds; instead, got {type(val).__name__}:\n {val}")
                 
     @property
     def mPSCDuration(self):
@@ -461,8 +470,12 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     
     @markConfigurable("mPSCDuration")
     @mPSCDuration.setter
-    def mPSCDuration(self, val):
+    def mPSCDuration(self, val:pq.Quantity):
+        if not isinstance(val, pq.Quantity):
+            raise TypeError("Expecting a Quantity for mPSCDuration")
+        
         self._mPSCduration_ = val
+        
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits["mPSCDuration"] = self._mPSCduration_
             
