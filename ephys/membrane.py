@@ -6257,6 +6257,9 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     
     x = np.linspace(t_start, t_start + duration, num=int(sampling_rate * duration))
     
+    if all(isinstance(p, pq.Quantity) for p in model_parameters):
+        model_parameters = tuple(p.magnitude for p in model_parameters)
+    
     y = models.Clements_Bekkers_97(x.magnitude, model_parameters)
     
     dstring = f"Clements_Bekkers_97 α={model_parameters[0]}, β={model_parameters[1]}, x₀={model_parameters[2]}, τ₁={model_parameters[3]}, τ₂={model_parameters[4]}"
@@ -6794,7 +6797,7 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
         
     
 def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Optional[typing.Sequence]=None):
-    """Convenience wrapper to curvefitting.fit_mEPSC with suitable lower & upper bounds
+    """Convenience wrapper to curvefitting.fit_mPSC_model with suitable lower & upper bounds
     
     Parameters:
     ===========
@@ -6880,7 +6883,7 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
     xx = x[:,0] # this always works even if there is only one channel, 
                 # and returns an AnalogSignal
                 
-    fitresult = crvf.fit_mEPSC(xx, params, bounds = [lo, up])
+    fitresult = crvf.fit_mPSC_model(xx, params, bounds = [lo, up])
     
     fitted_x = type(x)(fitresult[0], units = x.units, t_start = x.t_start, sampling_rate = x.sampling_rate, name="mPSCfit")
     

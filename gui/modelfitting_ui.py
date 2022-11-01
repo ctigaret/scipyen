@@ -47,6 +47,8 @@ class ModelParametersWidget(QtWidgets.QWidget):
     
     
     """
+    sig_dataChanged = pyqtSignal()
+    
     def __init__(self, parameters:typing.Sequence, parameterNames:typing.Optional[typing.Sequence]=None, spinStep:typing.Optional[float]=None, spinDecimals:typing.Optional[int]=None, lower:typing.Optional[typing.Sequence]=None, upper:typing.Optional[typing.Sequence]=None, orientation:str ="vertical", parent:QtWidgets.QWidget=None):
         """ Constructor of ModelParametersWidget.
     
@@ -331,6 +333,8 @@ class ModelParametersWidget(QtWidgets.QWidget):
                 self._parameters_.iloc[layout_row-1, layout_col-1] = value * old_val.units
             else:
                 self._parameters_.iloc[layout_row-1, layout_col-1] = value
+                
+            self.sig_dataChanged.emit()
             
     @pyqtSlot(float)
     def _slot_setSpinMaximum(self, value:float):

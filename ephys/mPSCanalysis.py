@@ -38,6 +38,7 @@ from gui.signalviewer import SignalCursor as SignalCursor
 import gui.pictgui as pgui
 from gui.workspacegui import (GuiMessages, WorkspaceGuiMixin)
 from gui.modelfitting_ui import ModelParametersWidget
+from gui import guiutils
 
 import iolib.pictio as pio
 
@@ -58,7 +59,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     
     _default_params_initl_ = (0.*_default_model_units_, 
                               -1.*pq.dimensionless, 
-                              0.01*_default_time_units_, 
+                              0.005*_default_time_units_, 
                               0.001*_default_time_units_, 
                               0.01*_default_time_units_)
     
@@ -101,16 +102,21 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         
         self._template_ = None
         
+        self._model_waveform_ = None
+        
+        # TODO: 2022-11-01 17:46:50
+        # replace this with the one from ephysdata
+        # this requires the following settings:
+        # • ID or index of the signal whwere detection takes place
+        # • name (or index) of the epoch (if any) where detection is being made
+        self._waveform_sampling_rate = 1e4*pq.Hz # to be replaced with the one from data
+        
         # TODO: 2022-10-28 11:47:43
         # save/restore parameters , lower & upper in user_config, under model name
         # needs modelfitting.py done & dusted
         
-        self._params_names_ = self._default_params_names_
-        self._params_initl_ = self._default_params_initl_
-        self._params_lower_ = self._default_params_lower_
-        self._params_upper_ = self._default_params_upper_
-        self._mPSCduration_ = self._default_duration_
         # self._params_units_ = tuple(x.units.dimensionality for x in self._params_initl_)
+        self.waveFormDisplay = sv.SignalViewer(win_title="mPSC waveform", parent=self)#.mainGroup)
         
         if not isinstance(ephysViewer, sv.SignalViewer):
             self._ephysViewer_ = sv.SignalViewer(win_title=self._dialog_title_)
@@ -122,43 +128,145 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             
         self._ephysViewer_.frameChanged[int].connect(self._slot_ephysFrameChanged)
         
-        self.clearDetectionCheckBox = qd.CheckBox(self, "Clear previous detection")
+        self._params_names_ = self._default_params_names_
+        self._params_initl_ = self._default_params_initl_
+        self._params_lower_ = self._default_params_lower_
+        self._params_upper_ = self._default_params_upper_
+        self._mPSCduration_ = self._default_duration_
+        
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["mPSCParametersInitial"] = tuple(quantity2str(v, precision=4) for v in self._params_initl_)
+            self.configurable_traits["mPSCParametersLowerBounds"] = tuple(quantity2str(v, precision=4) for v in self._params_lower_)
+            self.configurable_traits["mPSCParametersUpperBounds"] = tuple(quantity2str(v, precision=4) for v in self._params_upper_)
+            self.configurable_traits["mPSCDuration"] = quantity2str(self._mPSCduration_, precision=4)
+        
+        self.loadSettings()
+        
+                
+        # parse ephysdata parameter
+        self._set_ephys_data_(ephysdata)
+        
+        self._configureUI_()
+        
+        self.resize(-1,-1)
+        
+        
+    def _configureUI_(self):
+        self.mainGroup = qd.VDialogGroup(self)
+        
+        self.paramsGroup = qd.VDialogGroup(self.mainGroup)
+        self.paramsGroupBox = QtWidgets.QGroupBox("mPSC Model", self.paramsGroup)
+        self.paramsGroupLayout = QtWidgets.QGridLayout(self.paramsGroupBox)
+        
+        self.paramsWidget = ModelParametersWidget(self.mPSCParametersInitial, 
+                                        parameterNames = self.mPSCParametersNames,
+                                        lower = self.mPSCParametersLowerBounds,
+                                        upper = self.mPSCParametersUpperBounds,
+                                        orientation="vertical", parent=self.paramsGroupBox)
+        
+        self.paramsWidget.sig_dataChanged.connect(self._slot_modelParametersChanged)
+        
+        self.paramsGroupLayout.addWidget(self.paramsWidget, 0, 0, 4, 4)
+        
+        
+        # self.durationGroup = qd.HDialogGroup(self.paramsGroup)
+        self.durationLabel = QtWidgets.QLabel("Duration:", parent=self.paramsGroupBox)
+        self.durationSpinBox = QtWidgets.QDoubleSpinBox(self.paramsGroupBox)
+        self.durationSpinBox.setMinimum(-math.inf)
+        self.durationSpinBox.setMaximum(math.inf)
+        self.durationSpinBox.setDecimals(self.paramsWidget.spinDecimals)
+        self.durationSpinBox.setSingleStep(self.paramsWidget.spinStep)
+        self.durationSpinBox.setValue(self.mPSCDuration.magnitude)
+        self.durationSpinBox.valueChanged.connect(self._slot_duration_changed)
+        if isinstance(self.mPSCDuration, pq.Quantity):
+            self.durationSpinBox.setSuffix(f" {self.mPSCDuration.dimensionality}")
+        else:
+            self.durationSpinBox.setSuffix(" ")
+            
+        t = self.durationSpinBox.text()
+        mWidth = guiutils.get_text_width(t)
+        self.durationSpinBox.setMinimumWidth(mWidth + 3*mWidth//10)
+        
+        self.plotWaveFormButton = QtWidgets.QPushButton("Plot model")
+        self.plotWaveFormButton.clicked.connect(self._slot_plot_model)
+        
+        self.paramsGroupLayout.addWidget(self.durationLabel,4, 0, 1, 1)
+        self.paramsGroupLayout.addWidget(self.durationSpinBox,4, 1, 1, 2)
+        self.paramsGroupLayout.addWidget(self.plotWaveFormButton, 4, 3, 1, 1)
+        
+        # self.durationGroup.addWidget(self.durationLabel, alignment = QtCore.Qt.Alignment())
+        # self.durationGroup.addWidget(self.durationSpinBox, alignment=QtCore.Qt.Alignment())
+        # self.durationGroup.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        
+        self.paramsGroup.addWidget(self.paramsGroupBox)
+        # self.paramsGroup.addWidget(self.durationGroup)
+        
+        self.mainGroup.addWidget(self.paramsGroup)
+
+        
+        #### BEGIN settings widgets group: contains settings widgets (buttons & checkboxes)
+        self.settingsWidgetsGroup = qd.HDialogGroup(self.mainGroup)
+        
+        self.clearDetectionCheckBox = qd.CheckBox(self.settingsWidgetsGroup, "Clear previous detection")
         self.clearDetectionCheckBox.setIcon(QtGui.QIcon.fromTheme("edit-clear-history"))
         self.clearDetectionCheckBox.stateChanged.connect(self._slot_clearDetectionChanged)
         
-        self.detectmPSCPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-find"),
-                                                          "Detect", parent=self.buttons)
-        self.detectmPSCPushButton.clicked.connect(self.slot_detect)
+        self.useTemplateWaveFormCheckBox = qd.CheckBox(self.settingsWidgetsGroup, "Use mPSC template")
+        self.useTemplateWaveFormCheckBox.setIcon(QtGui.QIcon.fromTheme("template"))
+        self.useTemplateWaveFormCheckBox.stateChanged.connect(self._slot_useTemplateWaveForm)
         
-        self.undoDetectionPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-undo"),
-                                                             "Undo", parent=self.buttons)
+        self.settingsWidgetsGroup.addWidget(self.clearDetectionCheckBox)
+        self.settingsWidgetsGroup.addWidget(self.useTemplateWaveFormCheckBox)
         
-        self.undoDetectionPushButton.clicked.connect(self.slot_undo)
+        self.mainGroup.addWidget(self.settingsWidgetsGroup)
+        #### END settings widgets group: contains settings widgets (buttons & checkboxes)
         
+        #### BEGIN group for detection in frame: detect in frame & undo frame detection
+        self.frameDetectionGroup = qd.HDialogGroup(self.mainGroup)
+        self.frameDetectionGroupBox = QtWidgets.QGroupBox("Detect in sweep", self.frameDetectionGroup)
+        
+        self.frameDetectionLayout = QtWidgets.QHBoxLayout(self.frameDetectionGroupBox)
         self.detectmPSCInFramePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-find"),
-                                                                 "Detect in frame", parent=self.buttons)
-        
+                                                                 "Detect in frame", parent=self.frameDetectionGroupBox)
         self.detectmPSCInFramePushButton.clicked.connect(self.slot_detect_in_frame)
         
         self.undoFramePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-undo"),
-                                                         "Undo Frame", parent = self.buttons)
-        
+                                                         "Undo Frame", parent = self.frameDetectionGroupBox)
         self.undoFramePushButton.clicked.connect(self.slot_undo_frame)
         
-        self.modelParametersPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("configure"),
-                                                               "Model Parameters", parent=self.buttons)
+        self.frameDetectionLayout.addWidget(self.detectmPSCInFramePushButton)
+        self.frameDetectionLayout.addWidget(self.undoFramePushButton)
+        self.frameDetectionGroup.addWidget(self.frameDetectionGroupBox)
         
-        self.modelParametersPushButton.clicked.connect(self.slot_edit_mPSCparameters)
+        self.mainGroup.addWidget(self.frameDetectionGroup)
+        #### END group for detection in frame: detect in frame & undo frame detection
+            
+        #### BEGIN Group for mPSC detection in whole data
+        self.detectionGroup = qd.HDialogGroup(self.mainGroup)
+        self.detectionGroupBox = QtWidgets.QGroupBox("Detect in data", self.detectionGroup)
+        self.detectionGroupLayout = QtWidgets.QHBoxLayout(self.detectionGroupBox)
+        self.detectmPSCPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-find"),
+                                                          "Detect", parent=self.detectionGroupBox)
+        self.detectmPSCPushButton.clicked.connect(self.slot_detect)
         
-        for k, button in enumerate((self.modelParametersPushButton,
-                                   self.clearDetectionCheckBox,
-                                   self.detectmPSCPushButton,
-                                   self.undoDetectionPushButton,
-                                   self.detectmPSCInFramePushButton,
-                                   self.undoFramePushButton)):
-            self.buttons.layout.insertWidget(k, button)
-
-        self.buttons.layout.insertStretch(3)
+        self.undoDetectionPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-undo"),
+                                                             "Undo", parent=self.detectionGroupBox)
+        self.undoDetectionPushButton.clicked.connect(self.slot_undo)
+        
+        self.detectionGroupLayout.addWidget(self.detectmPSCPushButton)
+        self.detectionGroupLayout.addWidget(self.undoDetectionPushButton)
+        
+        self.detectionGroup.addWidget(self.detectionGroupBox)
+        
+        
+        self.mainGroup.addWidget(self.detectionGroup)
+        #### END Group for mPSC detection in whole data
+        
+        self.addWidget(self.mainGroup)
+        
+        # self.addWidget(self.waveFormDisplay)
+        
+        # self.buttons.layout.insertStretch(3)
         
         self.buttons.OK.setIcon(QtGui.QIcon.fromTheme("dialog-ok-apply"))
         self.buttons.Cancel.setIcon(QtGui.QIcon.fromTheme("dialog-cancel"))
@@ -167,18 +275,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self.addWidget(self.statusBar)
         
         self.setWindowModality(QtCore.Qt.NonModal)
-        
-        # parse ephysdata parameter
-        self._set_ephys_data_(ephysdata)
         self.setSizeGripEnabled(True)
-        
-        self.loadSettings()
-        
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["mPSCParametersInitial"] = tuple(quantity2str(v) for v in self._params_initl_)
-            self.configurable_traits["mPSCParametersLowerBounds"] = tuple(quantity2str(v) for v in self._params_lower_)
-            self.configurable_traits["mPSCParametersUpperBounds"] = tuple(quantity2str(v) for v in self._params_upper_)
-            self.configurable_traits["mPSCDuration"] = quantity2str(self._mPSCduration_)
         
         
     def _set_ephys_data_(self, value):
@@ -231,8 +328,14 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects, or None; got {type(value).__name__} instead")
             return
         
-        # self._ephysViewer_.clear()
-        # self._ephysViewer_.plot(self._ephys_)
+    def _load_template(self):
+        tpl = self.importWorkspaceData(neo.AnalogSignal,
+                                        title="Import mPSC Template",
+                                        single=True)
+        
+        if len(tpl):
+            self._template_ = tpl[0]
+            self._plot_template_()
         
     def open(self):
         if self._ephys_:
@@ -257,6 +360,20 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                 
         super().closeEvent(evt)
         
+    def _plot_template_(self):
+        if isinstance(self._template_, neo.AnalogSignal):
+            self.waveFormDisplay.plot(self._template_)
+            
+    def _plot_model_(self):
+        self._model_waveform_ = membrane.PSCwaveform(self.mPSCParametersInitial,
+                                                        duration = self.mPSCDuration,
+                                                        sampling_rate = self._waveform_sampling_rate)
+        self.waveFormDisplay.plot(self._model_waveform_)
+            
+    @pyqtSlot()
+    def _slot_plot_model(self):
+        self._plot_model_()
+        
     @pyqtSlot()
     def accept(self):
         super().accept()
@@ -277,8 +394,19 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             else:
                 self._ephysViewer_.refresh()
                 
+        if self.waveFormDisplay.isVisible():
+            self.waveFormDisplay.close()
+                
         super().done(value)
         
+    @pyqtSlot()
+    def _slot_useTemplateWaveForm(self):
+        val = self.useTemplateWaveFormCheckBox.selection()
+        if val == true:
+            if self._template_ is none:
+                self._load_template()
+                    
+                    
     @pyqtSlot()
     def _slot_clearDetectionChanged(self):
         self.clearOldPSCs = self.clearDetectionCheckBox.selection()
@@ -337,43 +465,19 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             else:
                 self._ephysViewer_.plot(self._ehys_)
                 
+    @pyqtSlot(float)
+    def _slot_duration_changed(self, value):
+        self.mPSCDuration = self.durationSpinBox.value() * self._default_time_units_
+        self._plot_model_()
+        
     @pyqtSlot()
-    def slot_edit_mPSCparameters(self):
+    def _slot_modelParametersChanged(self):
         # α, β, x₀, τ₁ and τ₂ AND WAVEFORM_DURATION !!! 
-        dlg = qd.QuickDialog(self, title="mPSC parameters")
-        orientation = "vertical"
-        paramsWidget = ModelParametersWidget(self.mPSCParametersInitial, 
-                                             parameterNames = self.mPSCParametersNames,
-                                             lower = self.mPSCParametersLowerBounds,
-                                             upper = self.mPSCParametersUpperBounds,
-                                             orientation=orientation, parent=dlg)
-        
-        vgroup = qd.VDialogGroup(dlg, validate=False)
-        
-        dgroup = qd.HDialogGroup(dlg, validate=False)
-
-        wl = QtWidgets.QLabel("Duration:", dgroup)
-        dgroup.addWidget(wl, alignment = QtCore.Qt.Alignment())
-        wd = QtWidgets.QDoubleSpinBox(dgroup)
-        wd.setMinimum(-math.inf)
-        wd.setMaximum(math.inf)
-        wd.setDecimals(paramsWidget.spinDecimals)
-        wd.setSingleStep(paramsWidget.spinStep)
-        wd.setValue(self.mPSCDuration.magnitude)
-        dgroup.addWidget(wd, alignment=QtCore.Qt.Alignment())
-        dgroup.addStretch(20)
-        vgroup.addWidget(paramsWidget, stretch=1,alignment = QtCore.Qt.Alignment())
-        vgroup.addWidget(dgroup)
-        dlg.addWidget(vgroup, alignment=QtCore.Qt.AlignTop)
-        dlg.resize(-1,-1)
-        
-        dlg_result = dlg.exec()
-        
-        if dlg_result == QtWidgets.QDialog.Accepted:
-            self.mPSCParametersInitial = paramsWidget.parameters["Initial Value:"]
-            self.mPSCParametersLowerBounds = paramsWidget.parameters["Lower Bound:"]
-            self.mPSCParametersUpperBounds = paramsWidget.parameters["Upper Bound:"]
-            self.mPSCDuration = wd.value() * self._default_time_units_
+        self.mPSCParametersInitial = self.paramsWidget.parameters["Initial Value:"]
+        self.mPSCParametersLowerBounds = self.paramsWidget.parameters["Lower Bound:"]
+        self.mPSCParametersUpperBounds = self.paramsWidget.parameters["Upper Bound:"]
+        self.mPSCDuration = self.durationSpinBox.value() * self._default_time_units_
+        self._plot_model_()
                 
     @property
     def currentFrame(self):
@@ -391,8 +495,26 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     def detected(self, value):
         self._mPSC_detected_ = value
         # NOTE: 2022-10-28 10:48:10
-        # alloe rerun detection
+        # allow rerun detection
         # self.detectmPSCPushButton.setEnabled(not self._mPSC_detected_)
+        
+    @property
+    def mPSCTemplate(self):
+        return self._template_
+    
+    @mPSCTemplate.setter
+    def mPSCTemplate(self, value:typing.Optional[typing.Union[neo.AnalogSignal, typing.Sequence[neo.AnalogSignal]]]=None):
+        if isinstance(value, neo.AnalogSignal):
+            self._template_ = value
+            self._plot_template_(self._template_)
+            
+        elif isinstance(value, (tuple, list)) and all(isinstance(v, neo.AnalogSignal) for v in value):
+            self._template_ = value
+            self._plot_template_(self._template_)
+            
+        elif value is None:
+            self._template_ = value
+            self.waveFormDisplay.clear()
         
     @property
     def ephysdata(self):
@@ -435,6 +557,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @markConfigurable("mPSCParametersInitial")
     @mPSCParametersInitial.setter
     def mPSCParametersInitial(self, val):
+        # print(f"@mPSCParametersInitial.setter {val}")
         if isinstance(val, pd.Series):
             val = tuple(val)
             
@@ -464,7 +587,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @markConfigurable("mPSCParametersLowerBounds")
     @mPSCParametersLowerBounds.setter
     def mPSCParametersLowerBounds(self, val):
-        print(f"@mPSCParametersLowerBounds.setter {val}")
+        # print(f"@mPSCParametersLowerBounds.setter {val}")
         if isinstance(val, pd.Series):
             val = tuple(val)
         
@@ -497,7 +620,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @markConfigurable("mPSCParametersUpperBounds")
     @mPSCParametersUpperBounds.setter
     def mPSCParametersUpperBounds(self, val):
-        print(f"@mPSCParametersUpperBounds.setter {val}")
+        # print(f"@mPSCParametersUpperBounds.setter {val}")
         if isinstance(val, pd.Series):
             val = tuple(val)
         

@@ -318,8 +318,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     
     _owncfg = Bunch()
     
-    def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
-                 title="", *args, **kwargs):
+    def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None, title="", *args, **kwargs):
         #print("WorkspaceGuiMixin __init__ %s" % self.__class__.__name__)
         ScipyenConfigurable.__init__(self, *args, **kwargs)
         #ScipyenConfigurable.__init__(self, settings = settings)
@@ -379,11 +378,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         return self._scipyenWindow_
     
     @safeWrapper
-    def importWorkspaceData(self, dataTypes:typing.Union[typing.Type[typing.Any], typing.Sequence[typing.Type[typing.Any]]],
-                            title:str="Import from workspace",
-                            single:bool=True, 
-                            preSelected:typing.Optional[str]=None,
-                            with_varName:bool=False) -> list:
+    def importWorkspaceData(self, dataTypes:typing.Union[typing.Type[typing.Any], typing.Sequence[typing.Type[typing.Any]]], title:str="Import from workspace", single:bool=True, preSelected:typing.Optional[str]=None, with_varName:bool=False):
         """Launches ItemsListDialog to import on or several workspace variables.
         
         Parameters:
@@ -423,10 +418,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         return list()
     
     @safeWrapper
-    def exportDataToWorkspace(self, 
-                              data:typing.Any,
-                              var_name:str, 
-                              title:str="Export data to workspace"):
+    def exportDataToWorkspace(self, data:typing.Any, var_name:str, title:str="Export data to workspace"):
             
         newVarName = validate_varname(var_name)
         
