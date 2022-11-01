@@ -1,5 +1,6 @@
 import inspect, typing
-from math import log
+from math import (log, inf, nan)
+from pandas import NA
 from numpy import log10
 import numpy as np
 import quantities as pq
@@ -23,31 +24,6 @@ def make_prefix_symbol(pfx):
     
     return pfx[0]
 
-#def prefix_dict(name, value):
-    #symbol = make_prefix_symbol(name)
-    
-    #exponent = int(log(value, 2)) if name.endswith("bi") else int(log10(value))
-    
-    
-    
-
-#sipfx = ("yotta", "zetta", "exa", "peta", "tera", 
-         #"giga", "mega", "kilo", "hecto", "deka", 
-         #"deci", "centi", "milli", "micro", "nano",
-         #"pico", "femto", "atto", "zepto", "yotto",)
-
-#SI_prefix = sipfx
-
-#sisymb = ("Y", "Z", "E", "P", "T", "G", "M", "k", "h", "da",
-          #"d", "c", "m", "mu", "n", "p", "f", "a", "z", "y",)
-
-#SI_symbols = sisymb
-
-#exps = tuple([k for k in range(24,2,-3)] + [2,1,-1,-2] + [k for k in range(-3, -37, -3)])
-#exponents_of_10 = exps
-
-#DecimalPrefixes = dict([(p, dict([("exponent", e), ("symbol", s)])) for (p,e,s) in zip(sipfx, exps, sisymb)])
-
 AllPrefixes = dict(((p[0], dict((("symbol", make_prefix_symbol(p[0])), ("mantissa", 2 if p[0].endswith("bi") else 10), ("exponent", int(log(p[1], 2) if p[0].endswith("bi") else int(log10(p[1])))), ("value", p[1])))) for p in _pqpfx))
 
 DecimalPrefixes = dict((k,v) for k,v in AllPrefixes.items() if v["mantissa"] == 10)
@@ -59,7 +35,7 @@ BinaryPrefixes = dict((k,v) for k,v in AllPrefixes.items() if v["mantissa"] == 2
 BinaryPowers = dict((v["exponent"], {("name", k), ("symbol", v["symbol"])}) for k,v in BinaryPrefixes.items())
 
 
-def make_scaled_unit_quantity(quantity:pq.Quantity, power:typing.Union[int, str], base:int=10) -> pq.Quantity:
+def make_scaled_unit_quantity(quantity:pq.Quantity, power:typing.Union[int, str], base:int=10):
     if base not in (2, 10):
         raise ValueError(f"Incorrect base {base}; expecting 2 or 10")
     
@@ -240,9 +216,82 @@ def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]
     
     raise TypeError(f"Expecting a scalar int float, complex, numpy array or Pyhon quantities.Quantity; got {type(x).__name__} instead")
 
-def quantity2str(x:typing.Union[pq.Quantity, pq.UnitQuantity, pq.dimensionality.Dimensionality], 
-                 precision:int = 2, 
-                 format:str="f"):
+def str2quantity(x:str):
+    """Reconstruct a scalar quantity or dimensionality from a str.
+    Performs the reverse of quantity2str.
+    
+    Parameters:
+    ==========
+    x: str of the format "<[number][space]>[unit symbol]" where the part between
+        angle brackets is optional
+    
+    Example 1. Converting a scalar quantity:
+    ========================================
+    a = 1 * pq.pA
+    
+    b = quantity2str(a, precision=4, format="f") → "1.0000 pA"
+    
+    The round-trip is completed (with loss of precision) by str2quantity:
+    
+    str2quantity(b) → array(1.)*pA
+    
+    Example 2: Converting a dimensionality:
+    =======================================
+    
+    b1 = quantity2str(a.dimensionality) → "pA"
+    
+    Round-trip:
+    
+    str2quantity(b1) → UnitCurrent('picoampere', 0.001 * nA, 'pA')
+    
+    """
+    if not isinstance(x, str):
+        raise TypeError(f"Expecting a str; got {type(x).__name__} instead")
+    parts = x.split()
+    if len(parts) == 1:
+        # just a dimensionality str
+        # NOTE: will raise if str is incorrect
+        return unit_quantity_from_name_or_symbol(parts[0])
+    elif len(parts) == 2:
+        # will raise if x is wrong
+        val = eval(parts[0])
+        unit = unit_quantity_from_name_or_symbol(parts[1])
+        return val * unit
+    else:
+        raise ValueError(f"Expecting a str of the form '<number><space><UnitQuantity symbol>'; indtead, got {x}")
+
+def quantity2str(x:typing.Union[pq.Quantity, pq.UnitQuantity, pq.dimensionality.Dimensionality], precision:int = 2, format:str="f"):
+    """Returns a str representation of a scalar Quantity or Dimensionality.
+    Useful to store quantities via json/yaml etc.
+    WARNING: There will be loss of precision!
+    
+    The returned string has the form:
+    
+    <[number][space]>[unit symbol] where the part between angle brackets is optional
+    
+    Parameters:
+    ===========
+    x: scalar Quantity or Dimensionality
+    
+    Example 1. Converting a scalar quantity:
+    ========================================
+    a = 1 * pq.pA
+    
+    b = quantity2str(a, precision=4, format="f") → "1.0000 pA"
+    
+    The round-trip is completed (with loss of precision) by str2quantity:
+    
+    str2quantity(b) → array(1.)*pA
+    
+    Example 2: Converting a dimensionality:
+    =======================================
+    
+    b1 = quantity2str(a.dimensionality) → "pA"
+    
+    Round-trip:
+    str2quantity(b1) → UnitCurrent('picoampere', 0.001 * nA, 'pA')
+    
+    """
     if not isinstance(x, (pq.Quantity, pq.UnitQuantity, pq.dimensionality.Dimensionality)):
         raise TypeError("Expecting a python Quantity or UnitQuantity; got %s instead" % type(x).__name__)
     if isinstance(x, pq.dimensionality.Dimensionality):
@@ -452,14 +501,6 @@ def conversion_factor(x:pq.Quantity, y:pq.Quantity):
     else:
         return 1.0
     
-#def symbol_from_quantity(q):
-    #"""Symbols of the physical quantity (NOT Python quantity symbol)
-    #"""
-    #if not isinstance(q, pq.Quantity):
-        #raise TypeError(f"Expecting a python Quantity; got {type(q).__name__} instead")
-    
-    
-
 def units_convertible(x, y):
     """Checks that the units of python Quantities x and y are identical or convertible to each other.
     NOTE: To check that x and y have IDENTICAL units simply call 'x.units == y.units'

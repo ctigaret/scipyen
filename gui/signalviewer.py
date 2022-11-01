@@ -4645,6 +4645,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(y, neo.core.Block):
             self.x = None # domain is contained in the signals inside the block
             self.y = y
+            self.docTitle = getattr(y, "name", None)
             
             # NOTE : 2022-01-17 14:17:23
             # if frameIndex was passed, then self._number_of_frames_ might turn
@@ -4697,6 +4698,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         elif isinstance(y, neo.core.Segment):
             #self.x = None # NOTE: x can still be supplied externally
             self.y = y
+            self.docTitle = getattr(y, "name", None)
             self._plotEpochs_(clear=True)
             
             # one segment is one frame
@@ -4720,6 +4722,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         elif isinstance(y, (neo.core.AnalogSignal, DataSignal)):
             self.y = y
+            self.docTitle = getattr(y, "name", None)
             
             # NOTE: no need for these as there is only one signal
             self.signalIndex = None
@@ -4761,6 +4764,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
         elif isinstance(y, (neo.core.IrregularlySampledSignal,  IrregularlySampledDataSignal)):
             self.y = y
+            self.docTitle = getattr(y, "name", None)
             self.frameIndex = range(1)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
@@ -4778,6 +4782,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         elif isinstance(y, neo.core.SpikeTrain): # plot a SpikeTrain independently of data
             self.y = y
+            self.docTitle = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
             self.frameIndex = range(1)
@@ -4786,6 +4791,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         elif isinstance(y, (neo.core.Event, DataMark )): # plot an event independently of data
             self.y = y
+            self.docTitle = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
             self.frameIndex = range(1)
@@ -4797,6 +4803,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             #self.dataAnnotations.append({"Epoch %s" % y.name: y.annotations})
             #pass # delegated to displayFrame()
             self.y = y
+            self.docTitle = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
             self.frameIndex = range(1)
@@ -4813,6 +4820,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         elif isinstance(y, vigra.filters.Kernel1D):
             self.x, self.y = kernel2array(y)
+            self.docTitle = "Vigra Kernel 1D"
             self._plotEpochs_(clear=True)
             
             self.dataAxis = 0 # data as column vectors
@@ -4855,6 +4863,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 raise ValueError('\nCannot plot data with more than 3 dimensions\n')
             
             self.y = y
+            self.docTitle = "Numpy array"
             
             if self.y.ndim == 1: # one frame, one channel
                 self.dataAxis = 0 # data as column vectors
@@ -5046,6 +5055,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.x = x
                     
                 self.y = yy
+                self.docTitle = "Vigra Kernel1D objects"
                 
             elif all([isinstance(i, neo.Segment) for i in y]):
                 # NOTE: 2019-11-30 09:35:42 
@@ -5067,6 +5077,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 self.x = None
                 self.y = y
+                self.docTitle = "Neo segments"
                 
                 self.signalIndex                    = signalIndex
                 self.irregularSignalIndex           = irregularSignalIndex
@@ -5089,6 +5100,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._number_of_frames_ = len(self.frameIndex)
                 self.signalIndex                    = signalIndex
                 self.irregularSignalIndex           = irregularSignalIndex
+                self.docTitle = "Neo blocks"
                 
             elif all([isinstance(i, (neo.core.AnalogSignal, neo.core.IrregularlySampledSignal,  
                                      DataSignal, IrregularlySampledDataSignal)) for i in y]):
@@ -5111,10 +5123,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 self.x = None
                 self.y = y
+                self.docTitle = "Neo signals"
                 
             elif all([isinstance(i, (neo.Epoch, DataZone, neo.Event, DataMark)) for i in y]):
                 #self.dataAnnotations = [{s.name: s.annotations} for s in y]
                 self.y = y
+                self.docTitle = "Epochs and zones"
                 self.dataAxis = 0
                 self.signalChannelAxis = 1
                 self.frameIndex = range(1)
@@ -5163,6 +5177,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
                 self.x = x
                 self.y = y
+                self.docTitle = "Numpy arrays"
             
             else:
                 raise TypeError("Can only plot a list of 1D vigra filter kernels, 1D/2D numpy arrays, or neo-like signals")
@@ -5180,11 +5195,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     @safeWrapper
     def _set_data_(self, x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)),  y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, doc_title:(str, type(None)) = None, frameAxis:(int, str, vigra.AxisInfo, type(None)) = None, signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, interval:(tuple, list, neo.Epoch, type(None)) = None, plotStyle:str = "plot", showFrame:int = None, *args, **kwargs):
-    
-        #self.train_plot_options["train_brush"] = kwargs.pop("train_brush", None)
-        #self.train_plot_options["train_hoverPen"] = kwargs.pop("train_hoverPen", None)
-        #self.train_plot_options["train_hoverBrush"] = kwargs.pop("train_hoverBrush", None)
-        
         self.plot_start = None
         self.plot_stop = None
         
@@ -5197,8 +5207,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.plot_args = args
         self.plot_kwargs = kwargs
 
-        #self.train_plot_options["train_pen"] = kwargs.pop("train_pen", None)
-        
         if isinstance(interval, neo.Epoch):
             # NOTE: 2019-01-24 21:05:34
             # use only the first epoch in an Epoch array (if there are several elements)
@@ -5260,8 +5268,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             self._update_annotations_()
             
+            # NOTE: 2022-11-01 10:37:06
+            # overwrites self.docTitle set by self._parse_data_
             if isinstance(doc_title, str) and len(doc_title.strip()):
                 self.docTitle = doc_title
+                
             
             self.frameChanged.emit(self._current_frame_index_)
 

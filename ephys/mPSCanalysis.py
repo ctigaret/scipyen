@@ -10,16 +10,20 @@ import numpy as np
 import quantities as pq
 import neo
 import pyqtgraph as pg
+import pandas as pd
 
 import core.neoutils as neoutils
 import core.workspacefunctions as wf
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.models as models
+from core.traitcontainers import DataBag
 from core.scipyen_config import markConfigurable
 
 from core.quantities import (arbitrary_unit, check_time_units, units_convertible,
-                            unit_quantity_from_name_or_symbol, quantity2str,)
+                            unit_quantity_from_name_or_symbol, quantity2str,
+                            str2quantity)
+
 from core.datatypes import UnitTypes
 from core.strutils import numbers2str
 from ephys import membrane
@@ -33,7 +37,7 @@ import gui.signalviewer as sv
 from gui.signalviewer import SignalCursor as SignalCursor
 import gui.pictgui as pgui
 from gui.workspacegui import (GuiMessages, WorkspaceGuiMixin)
-from gui.modelfittingui import ModelParametersWidget
+from gui.modelfitting_ui import ModelParametersWidget
 
 import iolib.pictio as pio
 
@@ -106,6 +110,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self._params_lower_ = self._default_params_lower_
         self._params_upper_ = self._default_params_upper_
         self._mPSCduration_ = self._default_duration_
+        # self._params_units_ = tuple(x.units.dimensionality for x in self._params_initl_)
         
         if not isinstance(ephysViewer, sv.SignalViewer):
             self._ephysViewer_ = sv.SignalViewer(win_title=self._dialog_title_)
@@ -167,6 +172,14 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self._set_ephys_data_(ephysdata)
         self.setSizeGripEnabled(True)
         
+        self.loadSettings()
+        
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["mPSCParametersInitial"] = tuple(quantity2str(v) for v in self._params_initl_)
+            self.configurable_traits["mPSCParametersLowerBounds"] = tuple(quantity2str(v) for v in self._params_lower_)
+            self.configurable_traits["mPSCParametersUpperBounds"] = tuple(quantity2str(v) for v in self._params_upper_)
+            self.configurable_traits["mPSCDuration"] = quantity2str(self._mPSCduration_)
+        
         
     def _set_ephys_data_(self, value):
         if neoutils.check_ephys_data_collection(value, mix=False):
@@ -218,6 +231,9 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects, or None; got {type(value).__name__} instead")
             return
         
+        # self._ephysViewer_.clear()
+        # self._ephysViewer_.plot(self._ephys_)
+        
     def open(self):
         if self._ephys_:
             self._ephysViewer_.plot(self.ephysdata)
@@ -252,7 +268,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @pyqtSlot(int)
     def done(self, value):
         if value == QtWidgets.QDialog.Accepted and not self.detected:
-            self.detect_mPSC()
+            self.detect_mPSCs()
             
         if self._ephysViewer_.isVisible():
             if self._owns_viewer_:
@@ -411,7 +427,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                 self.configurable_traits["mPSCParametersNames"] = self._params_names_
         else:
             raise TypeError("Expecting a sequence of str for parameter names")
-            
+        
     @property
     def mPSCParametersInitial(self):
         return self._params_initl_
@@ -419,14 +435,27 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @markConfigurable("mPSCParametersInitial")
     @mPSCParametersInitial.setter
     def mPSCParametersInitial(self, val):
-        if isinstance(val, (tuple, list)) and all(isinstance(s, pq.Quantity) for s in val):
-            self._params_initl_ = val
-
-            if isinstance(getattr(self, "configurable_traits", None), DataBag):
-                self.configurable_traits["mPSCParametersInitial"] = self._params_initl_
+        if isinstance(val, pd.Series):
+            val = tuple(val)
+            
+        if isinstance(val, (tuple, list)):
+            if all(isinstance(s, pq.Quantity) for s in val):
+                self._params_initl_ = val
                 
+            elif all(isinstance(v, str) for v in val):
+                self._params_initl_ = tuple(str2quantity(v) for v in val)
+
+            else:
+                raise TypeError("Expecting a sequence of scalar quantities or their str representations")
+            
+        elif val in (None, np.nan, math.nan):
+            raise TypeError(f"Initial parameter values cannot be {val}")
+        
         else:
-            raise TypeError(f"Expecting a sequence of scalar quantities for initial values; instead, got {type(val).__name__}:\n {val}")
+            raise TypeError(f"Expecting a sequence of scalar quantities (or their str representations) for initial values; instead, got {type(val).__name__}:\n {val}")
+
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["mPSCParametersInitial"] = tuple(quantity2str(v) for v in self._params_initl_)
                 
     @property
     def mPSCParametersLowerBounds(self):
@@ -435,15 +464,31 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @markConfigurable("mPSCParametersLowerBounds")
     @mPSCParametersLowerBounds.setter
     def mPSCParametersLowerBounds(self, val):
-        if isinstance(val, (tuple, list)) and all(isinstance(s, pq.Quantity) for s in val):
+        print(f"@mPSCParametersLowerBounds.setter {val}")
+        if isinstance(val, pd.Series):
+            val = tuple(val)
+        
+        if isinstance(val, (tuple, list)):
+            if all(isinstance(v, pq.Quantity) for v in val):
+                self._params_lower_ = val
+                
+            elif all(isinstance(v, str) for v in val):
+                self._params_lower_ = (str2quantity(v) for v in val)
+                
+            else:
+                raise TypeError("Expecting a sequence of scalar quantities or their str representations")
+            
+        elif val in (None, np.nan, math.nan):
             self._params_lower_ = val
             
-            if isinstance(getattr(self, "configurable_traits", None), DataBag):
-                self.configurable_traits["mPSCParametersLowerBounds"] = self._params_lower_
-       
         else:
-            raise TypeError(f"Expecting a sequence of scalar quantities for lower bounds; instead, got {type(val).__name__}:\n{val}")
+            raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the lower bounds; instead, got {type(val).__name__}:\n {val}")
                 
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            if self._params_lower_ in (None, np.nan, math.nan):
+                self.configurable_traits["mPSCParametersLowerBounds"] = self._params_lower_
+            else:
+                self.configurable_traits["mPSCParametersLowerBounds"] = tuple(quantity2str(v) for v in self._params_lower_)
                 
     @property
     def mPSCParametersUpperBounds(self):
@@ -452,17 +497,31 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @markConfigurable("mPSCParametersUpperBounds")
     @mPSCParametersUpperBounds.setter
     def mPSCParametersUpperBounds(self, val):
-        if isinstance(val, (tuple, list)) and all(isinstance(s, pq.Quantity) for s in val):
-            self._params_upper_ = val
+        print(f"@mPSCParametersUpperBounds.setter {val}")
+        if isinstance(val, pd.Series):
+            val = tuple(val)
+        
+        if isinstance(val, (tuple, list)):
+            if all(isinstance(v, pq.Quantity) for v in val):
+                self._params_upper_ = val
+                
+            elif all(isinstance(v, str) for v in val):
+                self._params_upper_ = (str2quantity(v) for v in val)
+                
+            else:
+                raise TypeError("Expecting a sequence of scalar quantities or their str representations")
             
-        elif val is None:
+        elif val in (None, np.nan, math.nan):
             self._params_upper_ = val
 
-            if isinstance(getattr(self, "configurable_traits", None), DataBag):
-                self.configurable_traits["mPSCParametersUpperBounds"] = self._params_upper_
-                
         else:
-            raise TypeError(f"Expecting a sequence of scalar quantities for upper bounds; instead, got {type(val).__name__}:\n {val}")
+            raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the upper bounds; instead, got {type(val).__name__}:\n {val}")
+                
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            if self._params_upper_ in (None, np.nan, math.nan):
+                self.configurable_traits["mPSCParametersUpperBounds"] = self._params_upper_
+            else:
+                self.configurable_traits["mPSCParametersUpperBounds"] = tuple(quantity2str(v) for v in self._params_upper_)
                 
     @property
     def mPSCDuration(self):
@@ -470,21 +529,23 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     
     @markConfigurable("mPSCDuration")
     @mPSCDuration.setter
-    def mPSCDuration(self, val:pq.Quantity):
-        if not isinstance(val, pq.Quantity):
-            raise TypeError("Expecting a Quantity for mPSCDuration")
-        
-        self._mPSCduration_ = val
+    def mPSCDuration(self, val:typing.Union[str, pq.Quantity]):
+        if isinstance(val, pq.Quantity):
+            self._mPSCduration_ = val
+        elif isinstance(val, str):
+            self._mPSCduration_ = str2quantity(val)
+        else:
+            raise TypeError("Expecting a scalar quantity, or a str representation of a scalar quantity, for mPSCDuration")
         
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["mPSCDuration"] = self._mPSCduration_
+            self.configurable_traits["mPSCDuration"] = quantity2str(self._mPSCduration_)
             
     def detect_mPSCs_inFrame(self):
         self.detected = False
         if self._ephys_ is None:
             return
         
-    def detect_mPSC(self):
+    def detect_mPSCs(self):
         if self._ephys_ is None:
             self.detected = False
             return

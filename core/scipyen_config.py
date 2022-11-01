@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 """ Scipyen configuration module
 
@@ -1033,8 +1032,25 @@ class ScipyenConfigurable(object):
         write_config()
         
     def _make_confuse_config_data_(self, change, isTop=True, parent=None, tag=None):
+        """Wraps change.new data to a structure storable with confuse library
+        `change` is a dict sent via the traits notification mechanism
+    
+        Prepares data for the `write` side of the confuse framework
+    
+        WARNING: Curently the confuse library (via pyyaml) only supports plain
+        Python (basic) data types: numeric scalars, strings and basic collections
+        (tuple, list, dict)
+    
+        TODO/FIXME: 2022-11-01 13:33:44
+        Fancy data types (like numpy array, quantities, etc) are NOT supported,
+        although is MIGHT be possible to implement support for these using 
+        Scipyen's iolib.jsonio
+    
+        
+        """
         if isinstance(change.new, (collections.deque, tuple)):
-            v = [v_ for v_ in v] if len(change.new) else []
+            v = [v_ for v_ in change.new] if len(change.new) else []
+            
         elif isinstance(change.new, type):
             v = []
         else:

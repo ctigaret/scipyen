@@ -106,10 +106,10 @@ class ModelParametersWidget(QtWidgets.QWidget):
                 raise TypeError("Cannot accept empty string for parameter names")
             
             if len(parameterNames) != len(parameters):
-                raise ValueError(f"When a sequence, parameterNames must have the same number of elements as parameters {len(parameters)}; got {len(parameterNames)} instead")
+                raise ValueError(f"When a sequence, parameterNames must have the same number of elements as parameters {len(parameters)}; instead, got {parameterNames}")
             
         else:
-            raise TypeError(f"'parameterNames' must be a sequence or None; got {type(parameterNames).__name__} instead")
+            raise TypeError(f"'parameterNames' must be a sequence or None; instead, got {parameterNames}")
                 
         if isinstance(lower, numbers.Number):
             if len(units):
@@ -119,16 +119,16 @@ class ModelParametersWidget(QtWidgets.QWidget):
                 
         elif isinstance(lower, (tuple, list)):
             if len(lower) != len(parameters):
-                raise TypeError(f"'lower' expected to be a sequence of {len(parameters)} elements")
+                raise TypeError(f"'lower' expected to be a sequence of {len(parameters)} elements; instead, got {lower}")
             
             if not all(isinstance(v, (numbers.Number, pq.Quantity)) for v in lower):
-                raise TypeError(f"'lower' expected to contain scalars or scalar Quantity")
+                raise TypeError(f"'lower' expected to contain scalars or scalar Quantity; instead, got {lower}")
             
             if all(isinstance(v, pq.Quantity) for v in lower) and any(v.size != 1 for v in lower):
-                raise TypeError(f"'lower' expected to contain scalars or scalar Quantity")
+                raise TypeError(f"'lower' expected to contain scalars or scalar Quantity; instead, got {lower}")
             
         else:
-            raise TypeError(f"'lower' expected to be a scalar or a sequence of {len(parameters)} elements")
+            raise TypeError(f"'lower' expected to be a scalar or a sequence of {len(parameters)} elements; instead, got {lower}")
         
         if isinstance(upper, numbers.Number):
             if len(units):
@@ -138,16 +138,16 @@ class ModelParametersWidget(QtWidgets.QWidget):
             
         elif isinstance(upper, (tuple, list)):
             if len(upper) != len(parameters):
-                raise TypeError(f"'upper' expected to be a sequence of {len(parameters)} elements")
+                raise TypeError(f"'upper' expected to be a sequence of {len(parameters)} elements; instead, got {upper}")
             
             if not all(isinstance(v, (numbers.Number, pq.Quantity)) for v in upper):
-                raise TypeError(f"'upper' expected to contain scalars or scalar Quantities")
+                raise TypeError(f"'upper' expected to contain scalars or scalar Quantities; instead, got {upper}")
             
             if all(isinstance(v, pq.Quantity) for v in upper) and any(v.size !=1 for v in upper):
-                raise TypeError(f"'upper' expected to contain scalars or scalar Quantities")
+                raise TypeError(f"'upper' expected to contain scalars or scalar Quantities; instead, got {upper}")
             
         else:
-            raise TypeError(f"'upper' expected to be a scalar or a sequence of {len(parameters)} elements")
+            raise TypeError(f"'upper' expected to be a scalar or a sequence of {len(parameters)} elements; instead, got {upper}")
         
         self._spinDecimals_ = spinDecimals
         self._spinStep_ = spinStep
