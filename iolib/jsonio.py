@@ -167,7 +167,7 @@ import h5py
 import vigra
 from traitlets.utils.importstring import import_item
 from traitlets import Bunch
-from core import quantities as cq
+from core import quantities as scq
 from core import prog
 from core.prog import (signature2Dict, resolveObject, ArgumentError, CALLABLE_TYPES)
 
@@ -680,8 +680,6 @@ def _(o: pq.UnitQuantity):
 def _(o:pq.Quantity):
     hdr, ret = makeJSONStub(o)
     factory = makeFuncStub()
-    # FIXME/TODO 2021-12-27 23:41:45
-    # disentagle this from cq module so that jsonio can be stand alone 
     factory["signature"] = None
     factory["posonly"] = (o.magnitude.tolist(), )
     # NOTE: 2021-12-27 23:45:51
@@ -1011,7 +1009,7 @@ def decode_hook(dct):
                 return val
             
         elif key == "unitquantity":
-            return cq.unit_quantity_from_name_or_symbol(val)
+            return scq.unit_quantity_from_name_or_symbol(val)
         
         elif key.endswith("SignatureDict"):
             return prog.SignatureDict(**val)
@@ -1042,7 +1040,7 @@ def decode_hook(dct):
                 return ret.view(artype)
             
             if key == "quantityarray":
-                units = cq.unit_quantity_from_name_or_symbol(data["__units__"])
+                units = scq.unit_quantity_from_name_or_symbol(data["__units__"])
                 return ret * units
             
             if entry == "vigraarray":

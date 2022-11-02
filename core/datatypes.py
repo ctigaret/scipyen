@@ -43,7 +43,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 #### END 3rd party modules
 
 #### BEGIN pict.core.modules
-from core import quantities as cq
+from core import quantities as scq
 from . import xmlutils
 from . import strutils
 from .prog import safeWrapper, is_hashable, is_type_or_subclass

@@ -595,6 +595,9 @@ class TriggerDetectDialog(qd.QuickDialog):
         
     @pyqtSlot(int)
     def done(self, value):
+        """PyQt slot called by self.accept() and self.reject() (see QDialog).
+        In turn it closes the dialog (equivalent of QWidget.close()).
+        """
         if value == QtWidgets.QDialog.Accepted and not self.detected:
             self.detect_triggers()
             

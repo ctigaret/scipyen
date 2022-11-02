@@ -48,13 +48,18 @@ Qt5 settings framework.
 
 #import base64
 import os
-import inspect, typing, types
+import inspect, typing, types, math, numbers
+import yaml
+import dataclasses
 from copy import (copy, deepcopy,)
 import confuse
 from types import new_class
 from functools import (partial, wraps,)
 from pprint import pprint
 import collections
+import numpy as np
+import pandas as pd
+import quantities as pq
 
 import matplotlib as mpl # needed to expose the mro of Figure.canvas
 from matplotlib.figure import Figure
@@ -69,9 +74,18 @@ from .traitcontainers import DataBag
 from core import traitutils
 from core.prog import safeWrapper
 from core.workspacefunctions import user_workspace
+from core.quantities import(quantity2str, str2quantity)
+from iolib.jsonio import (object2JSON, json2python)
 
-#from iolib.pictio import save_settings as write_config
+def quantity_representer(dumper, data):
+    return dumper.represent_scalar("tag:pq.Quantity", quantity2str(data))
 
+def quantity_constructor(loader, node):
+    value = loader.construct_scalar(node)
+    return str2quantity(value)
+
+confuse.yaml_util.Dumper.add_representer(pq.Quantity, quantity_representer)
+confuse.yaml_util.Loader.add_constructor("tag:pq.Quantity", quantity_constructor)
 
 # BEGIN NOTE: 2021-01-10 13:17:58
 # LazyConfig inherits form confuse.Configuration, but its read() method must be 
@@ -277,7 +291,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
     1) For read/write properties, decorate the setter's definition, e.g.:
     
     @property
-    def someprop(self):
+    :def: someprop(self):
         return self._my_prop_
         
     # below, the property is a configurable that will be synchronized with the
@@ -286,12 +300,12 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
     
     @markConfigurable("MyProperty", trait_notifier=True)
     @someprop.setter(self, val)
-    def someprop(self, val):
+    :def: someprop(self, val):
         self._my_prop_ = val
         
         
     @property
-    def someQtProp(self):
+    :def: someQtProp(self):
         return self._my_qt_thing_
     
     # below, the property is a configurable that will be synchronized with the
@@ -299,17 +313,17 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
     # '$HOME/.config/Scipyen/Scipyen.conf'
     @markConfigurable("MyQtThing", "qt")
     @someQtProp.setter
-    def someQtProp(self, val):
+    :def: someQtProp(self, val):
         self._my_qt_thing_ = val
         
     2) For getter and setter methods, BOTH must be decorated, e.g.:
     
     @markConfigurable("MyProperty", setter=False, trait_notifier=True)
-    def get_my_prop(self):
+    :def: get_my_prop(self):
         return self._my_prop_
         
     @markConfigurable("MyProperty", setter=True, trait_notifier=True)
-    def set_my_prop(self, val):
+    :def: set_my_prop(self, val):
         self._my_prop_ = val
         
     3) Call directly:
@@ -1143,6 +1157,7 @@ class ScipyenConfigurable(object):
         saveWindowSettings(self.qsettings, self, group_name=group_name, prefix=prefix)
     
     def __load_config_key_val__(self, settername, val):
+        print(f"ScipyenConfigurable<{self.__class__.__name__}>. __load_config_key_val__ settername {settername}, val {val}")
         #print("ScipyenConfigurable.__load_config_key_val__")
         #print("\tsettername: %s, val: %s" % (settername, val))
         setter = inspect.getattr_static(self, settername, None)
@@ -1180,7 +1195,8 @@ class ScipyenConfigurable(object):
             tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
             
             user_conf = self._get_config_view_(isTop, parent, tag)
-            
+            print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings() user_conf {user_conf}")
+
             if isinstance(user_conf, dict):
                 for k, v in user_conf.items():
                     getset = cfg.get(k, {})
@@ -1196,11 +1212,17 @@ class ScipyenConfigurable(object):
             
     def saveSettings(self):
         """ Must be called with super() if overridden in subclasses
-        NOTE: 2021-05-04 21:53:04
-        This saveSettings has access to all the subclass attributes (which is
-        fully initialized by the time this is called).
-        see NOTE: 2019-11-09 09:30:38 for details
+        
+        NOTE: 2022-11-01 22:13:57 Does not support mapping collections as
+        configuration settings. In other words, an individual setting cannot be
+        an object of type that inherits from dict.
+        
+        On the other hand, individual settings can be organized hierarchically
+        by collecting them in a dict (or dict-like) object.
         """
+        # NOTE: 2021-05-04 21:53:04
+        # This saveSettings has access to all the subclass attributes (with the
+        # subclass being  fully initialized by the time this is called).
         #print("ScipyenConfigurable <%s>.saveSettings" % self.__class__.__name__)
         cfg = self.clsconfigurables
         
@@ -1216,7 +1238,7 @@ class ScipyenConfigurable(object):
             
             user_conf = self._get_config_view_(isTop, parent, tag)
             
-            #print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() user_conf", user_conf)
+            print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf {user_conf}")
             
             changed = False
             
@@ -1237,12 +1259,19 @@ class ScipyenConfigurable(object):
                         getter = getattr(self, gettername)
                         val  = getter()
 
+                    print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() user_conf {user_conf}, val {val}, v {v}")
                     if val != v:
+                        # NOTE: 2022-11-01 21:54:34
+                        # must convert value to something digestible by 
+                        # confuse.yaml framework
+                        
+                        # val_ = data2confuse(x)
+                        
                         if hasattr(user_conf[k], "set"):
                             user_conf[k].set(val)
                         else:
                             user_conf[k] = val
-                        #user_conf[k] = val
+
                         changed = True
                         
             if changed:
@@ -1710,3 +1739,14 @@ def loadWindowSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QM
     
     """
     return syncQtSettings(qsettings, win, group_name, prefix, False)
+
+
+# def data2confuse(x):
+#     """Filter to convert some special data to str for yaml representation.
+#     Uses iolib.jonsio to enable storage of more specialized /complex data types
+#     with the confuse framework.
+#     """
+#     return object2JSON(x)
+
+# Some yaml representers and constructors for special object types
+

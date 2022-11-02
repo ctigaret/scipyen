@@ -21,8 +21,7 @@ from core.traitcontainers import DataBag
 from core.scipyen_config import markConfigurable
 
 from core.quantities import (arbitrary_unit, check_time_units, units_convertible,
-                            unit_quantity_from_name_or_symbol, quantity2str,
-                            str2quantity)
+                            unit_quantity_from_name_or_symbol, str2quantity)
 
 from core.datatypes import UnitTypes
 from core.strutils import numbers2str
@@ -135,11 +134,16 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self._mPSCduration_ = self._default_duration_
         
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["mPSCParametersInitial"] = tuple(quantity2str(v, precision=4) for v in self._params_initl_)
-            self.configurable_traits["mPSCParametersLowerBounds"] = tuple(quantity2str(v, precision=4) for v in self._params_lower_)
-            self.configurable_traits["mPSCParametersUpperBounds"] = tuple(quantity2str(v, precision=4) for v in self._params_upper_)
-            self.configurable_traits["mPSCDuration"] = quantity2str(self._mPSCduration_, precision=4)
+            self.configurable_traits["mPSCParametersInitial"] = self._params_initl_
+            self.configurable_traits["mPSCParametersLowerBounds"] = self._params_lower_
+            self.configurable_traits["mPSCParametersUpperBounds"] = self._params_upper_
+            self.configurable_traits["mPSCDuration"] = self._mPSCduration_
         
+#             self.configurable_traits["mPSCParametersInitial"] = tuple(quantity2str(v, precision=4) for v in self._params_initl_)
+#             self.configurable_traits["mPSCParametersLowerBounds"] = tuple(quantity2str(v, precision=4) for v in self._params_lower_)
+#             self.configurable_traits["mPSCParametersUpperBounds"] = tuple(quantity2str(v, precision=4) for v in self._params_upper_)
+#             self.configurable_traits["mPSCDuration"] = quantity2str(self._mPSCduration_, precision=4)
+#         
         self.loadSettings()
         
                 
@@ -384,6 +388,9 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         
     @pyqtSlot(int)
     def done(self, value):
+        """PyQt slot called by self.accept() and self.reject() (see QDialog).
+        Also closes the dialog (equivalent of QWidget.close()).
+        """
         if value == QtWidgets.QDialog.Accepted and not self.detected:
             self.detect_mPSCs()
             
@@ -396,6 +403,8 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                 
         if self.waveFormDisplay.isVisible():
             self.waveFormDisplay.close()
+            
+        self.saveSettings()
                 
         super().done(value)
         
@@ -473,10 +482,10 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @pyqtSlot()
     def _slot_modelParametersChanged(self):
         # α, β, x₀, τ₁ and τ₂ AND WAVEFORM_DURATION !!! 
-        self.mPSCParametersInitial = self.paramsWidget.parameters["Initial Value:"]
-        self.mPSCParametersLowerBounds = self.paramsWidget.parameters["Lower Bound:"]
-        self.mPSCParametersUpperBounds = self.paramsWidget.parameters["Upper Bound:"]
-        self.mPSCDuration = self.durationSpinBox.value() * self._default_time_units_
+        self.mPSCParametersInitial      = self.paramsWidget.parameters["Initial Value:"]
+        self.mPSCParametersLowerBounds  = self.paramsWidget.parameters["Lower Bound:"]
+        self.mPSCParametersUpperBounds  = self.paramsWidget.parameters["Upper Bound:"]
+        self.mPSCDuration               = self.durationSpinBox.value() * self._default_time_units_
         self._plot_model_()
                 
     @property
@@ -552,6 +561,8 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         
     @property
     def mPSCParametersInitial(self):
+        """Initial parameter values
+        """
         return self._params_initl_
     
     @markConfigurable("mPSCParametersInitial")
@@ -559,7 +570,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     def mPSCParametersInitial(self, val):
         # print(f"@mPSCParametersInitial.setter {val}")
         if isinstance(val, pd.Series):
-            val = tuple(val)
+            val = list(val)
             
         if isinstance(val, (tuple, list)):
             if all(isinstance(s, pq.Quantity) for s in val):
@@ -578,7 +589,8 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             raise TypeError(f"Expecting a sequence of scalar quantities (or their str representations) for initial values; instead, got {type(val).__name__}:\n {val}")
 
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["mPSCParametersInitial"] = tuple(quantity2str(v) for v in self._params_initl_)
+            self.configurable_traits["mPSCParametersInitial"] = self._params_initl_
+            # self.configurable_traits["mPSCParametersInitial"] = tuple(quantity2str(v) for v in self._params_initl_)
                 
     @property
     def mPSCParametersLowerBounds(self):
@@ -589,7 +601,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     def mPSCParametersLowerBounds(self, val):
         # print(f"@mPSCParametersLowerBounds.setter {val}")
         if isinstance(val, pd.Series):
-            val = tuple(val)
+            val = list(val)
         
         if isinstance(val, (tuple, list)):
             if all(isinstance(v, pq.Quantity) for v in val):
@@ -608,10 +620,11 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the lower bounds; instead, got {type(val).__name__}:\n {val}")
                 
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            if self._params_lower_ in (None, np.nan, math.nan):
-                self.configurable_traits["mPSCParametersLowerBounds"] = self._params_lower_
-            else:
-                self.configurable_traits["mPSCParametersLowerBounds"] = tuple(quantity2str(v) for v in self._params_lower_)
+            self.configurable_traits["mPSCParametersLowerBounds"] = self._params_lower_
+            # if self._params_lower_ in (None, np.nan, math.nan):
+            #     self.configurable_traits["mPSCParametersLowerBounds"] = self._params_lower_
+            # else:
+            #     self.configurable_traits["mPSCParametersLowerBounds"] = tuple(quantity2str(v) for v in self._params_lower_)
                 
     @property
     def mPSCParametersUpperBounds(self):
@@ -622,7 +635,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     def mPSCParametersUpperBounds(self, val):
         # print(f"@mPSCParametersUpperBounds.setter {val}")
         if isinstance(val, pd.Series):
-            val = tuple(val)
+            val = list(val)
         
         if isinstance(val, (tuple, list)):
             if all(isinstance(v, pq.Quantity) for v in val):
@@ -641,10 +654,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the upper bounds; instead, got {type(val).__name__}:\n {val}")
                 
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            if self._params_upper_ in (None, np.nan, math.nan):
-                self.configurable_traits["mPSCParametersUpperBounds"] = self._params_upper_
-            else:
-                self.configurable_traits["mPSCParametersUpperBounds"] = tuple(quantity2str(v) for v in self._params_upper_)
+            self.configurable_traits["mPSCParametersUpperBounds"] = self._params_upper_
                 
     @property
     def mPSCDuration(self):
@@ -655,13 +665,16 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     def mPSCDuration(self, val:typing.Union[str, pq.Quantity]):
         if isinstance(val, pq.Quantity):
             self._mPSCduration_ = val
+            
         elif isinstance(val, str):
             self._mPSCduration_ = str2quantity(val)
+            
         else:
             raise TypeError("Expecting a scalar quantity, or a str representation of a scalar quantity, for mPSCDuration")
         
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["mPSCDuration"] = quantity2str(self._mPSCduration_)
+            self.configurable_traits["mPSCDuration"] = self._mPSCduration_
+            # self.configurable_traits["mPSCDuration"] = quantity2str(self._mPSCduration_)
             
     def detect_mPSCs_inFrame(self):
         self.detected = False
