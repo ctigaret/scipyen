@@ -134,10 +134,14 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self._mPSCduration_ = self._default_duration_
         
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            print(f"{self.__class__.__name__} setting initial state for parameters...")
+            # NOTE: these DIRECTLY assign to the configurable traits
+            # FIXME: 2022-11-02 21:58:18 these should be list not tuple ?!?
             self.configurable_traits["mPSCParametersInitial"] = self._params_initl_
             self.configurable_traits["mPSCParametersLowerBounds"] = self._params_lower_
             self.configurable_traits["mPSCParametersUpperBounds"] = self._params_upper_
             self.configurable_traits["mPSCDuration"] = self._mPSCduration_
+            print(f"DONE {self.__class__.__name__} setting initial state for parameters\n\n")
         
 #             self.configurable_traits["mPSCParametersInitial"] = tuple(quantity2str(v, precision=4) for v in self._params_initl_)
 #             self.configurable_traits["mPSCParametersLowerBounds"] = tuple(quantity2str(v, precision=4) for v in self._params_lower_)
@@ -482,11 +486,16 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @pyqtSlot()
     def _slot_modelParametersChanged(self):
         # α, β, x₀, τ₁ and τ₂ AND WAVEFORM_DURATION !!! 
+        print(f"{self.__class__.__name__}._slot_modelParametersChanged ...")
+        # NOTE / FIXME: 2022-11-02 22:00:22 these are pd.Series, neither list, nor tuple
+        # They will be converted to lists by their corresponding setter methods
+        # e.g.0@ mPSCParametersInitial.setter, etc
         self.mPSCParametersInitial      = self.paramsWidget.parameters["Initial Value:"]
         self.mPSCParametersLowerBounds  = self.paramsWidget.parameters["Lower Bound:"]
         self.mPSCParametersUpperBounds  = self.paramsWidget.parameters["Upper Bound:"]
         self.mPSCDuration               = self.durationSpinBox.value() * self._default_time_units_
         self._plot_model_()
+        print(f"DONE {self.__class__.__name__}._slot_modelParametersChanged\n\n")
                 
     @property
     def currentFrame(self):
@@ -589,8 +598,9 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             raise TypeError(f"Expecting a sequence of scalar quantities (or their str representations) for initial values; instead, got {type(val).__name__}:\n {val}")
 
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            # print(f"{self.__class__.__name__}@mPSCParametersInitial.setter val = {self._params_initl_}")
+            print(f"{self.__class__.__name__}@mPSCParametersInitial.setter val = {self._params_initl_} ({type(val).__name__})")
             self.configurable_traits["mPSCParametersInitial"] = self._params_initl_
+            print(f"DONE {self.__class__.__name__}@mPSCParametersInitial.setter\n\n")
             # self.configurable_traits["mPSCParametersInitial"] = tuple(quantity2str(v) for v in self._params_initl_)
                 
     @property
@@ -621,8 +631,9 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the lower bounds; instead, got {type(val).__name__}:\n {val}")
                 
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            # print(f"{self.__class__.__name__}@mSCParametersLowerBounds.setter val = {self._params_lower_}")
+            print(f"{self.__class__.__name__}@mPSCarametersLowerBounds.setter val = {self._params_lower_} ({type(val).__name__})")
             self.configurable_traits["mPSCParametersLowerBounds"] = self._params_lower_
+            print(f"DONE {self.__class__.__name__}@mPSCarametersLowerBounds.setter\n\n")
             # if self._params_lower_ in (None, np.nan, math.nan):
             #     self.configurable_traits["mPSCParametersLowerBounds"] = self._params_lower_
             # else:
@@ -656,8 +667,9 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the upper bounds; instead, got {type(val).__name__}:\n {val}")
                 
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            # print(f"{self.__class__.__name__}@mPSCParametersUpperBounds.setter val = {self._params_upper_}")
+            print(f"{self.__class__.__name__}@mPSCParametersUpperBounds.setter val = {self._params_upper_} ({type(val).__name__})")
             self.configurable_traits["mPSCParametersUpperBounds"] = self._params_upper_
+            print(f"DONE {self.__class__.__name__}@mPSCParametersUpperBounds.setter\n\n")
                 
     @property
     def mPSCDuration(self):

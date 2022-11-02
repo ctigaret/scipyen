@@ -665,7 +665,6 @@ class transform_link(traitlets.link):
         self.target[0].unobserve(self._update_source, names=self.target[1])
         self.source, self.target = None, None
         
-# class ListTrait(Instance): 
 class ListTrait(List): # inheritance chain: List <- Container <- Instance
     """TraitType that ideally should notify:
     a) when a list contents has changed (i.e., gained/lost members)
@@ -680,48 +679,55 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
     default_value = []
     klass = list
     _valid_defaults = (list,tuple)
-    _cast_types = (list, tuple)
+    # _cast_types = (list, tuple)
     
     info_text = "Trait for lists that is sensitive to changes in content"
     
     # def __init__(self, trait=None, traits=None, default_value=None, **kwargs):
-    def __init__(self, trait=typing.Any, traits=None, default_value=None, **kwargs):
-        
-        # self._traits = traits # a list of traits, one per element
+    # def __init__(self, trait=typing.Any, traits=None, default_value=None, **kwargs):
+    def __init__(self, trait=None, traits=None, default_value=Undefined, **kwargs):
+        """
+        trait: in the super() List traitype, `traits` restricts the type of elements
+                in the container to that TraitType -- i.e. all must be of the same type
+    
+                this is OK for homogeneous sequences
+    
+        traits: when specified, is a sequence of TypeTrais, so that the instance 
+                is valid when the list's elements are of these types - the intention
+                is to accomodate heterogeneous sequences
+    
+            FIXME/TODO: there are two options:
+                • we pass a list of traitlets with the same number of elements as the
+                instance of ListTrait - meaning that it will be valid if 
+                traitlet[k] validates the kth element in the ListTrait
+                 - a bit of overkill: for large lists we effectively pass a second
+                list as large as the list 
+    
+                • we pass a list of traitlets such that an element in the ListTrait
+                is valid IF it can be validated by at least one of the traitlets
+                in here - question is, how to do that?
+                WARNING this may introduce a BUG by casting a value to another
+                type, depending on thhe _cast_types of the particular trait used
+                to validate
+    
+        default_value: list, tuple, set 
+        """
+        self._traits = traits # a list of traits, one per element
         self._length = 0
         
         self.hashed = 0
         
+        allow_none = kwargs.pop("allow_none", True) # make this True by default
+        
+        
         # initialize the List (<- Container <- Instance) NOW
+        # NOTE: 2022-11-02 22:45:46
+        # this will also set the super() defaults:
+        # self._minlen = tratielts.Int(0), 
+        # self._maxlen = traitlets.Int(sys.maxsize)
         super(ListTrait, self).__init__(trait=trait, default_value=default_value, **kwargs)
         
-#         if default_value is None and not kwargs.get("allow_none", False):
-#             default_value = Undefined
-#             
-#         if default_value is Undefined:
-#             if trait is not None:
-#                 if not is_trait(trait):
-#                     default_value = trait
-#                     # trait = None
-#             
-#             else:
-#                 default_value = list()
-#                 args = ()
-#         
-#         # if default_value is not None or default_value is not Undefined:
-#         if isinstance(default_value, self._valid_defaults):
-#             args = (default_value, )
-#             self._length = len(default_value)
-#             self.hashed = gethash(default_value)
-#             
-#         if is_trait(trait):
-#             self._trait = trait() if isinstance(trait, type) else trait
-#             
-#         if isinstance(traits, (list, tuple)):
-#             self._traits = [t() if isinstance(t, type) else t for t in traits]
-#         else:
-#             self._traits = None
-            
+        # NOTE: for our purposes we don't really need the validation logic!
             
     def validate_elements(self, obj, value):
         # NOTE: 2021-08-19 11:28:10 do the inherited validation first
@@ -736,16 +742,28 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
             return value
         
         for k,v in enumerate(value):
-            if k < len(self._traits):
+            vv = list()
+            for t in self._traits:
+                # FIXME: 2022-11-02 23:18:08 potential BUG
                 try:
-                    v = self._traits[k]._validate(obj, v)
+                    v_ = self._traits[k]._validate(obj, v)
+                    vv.append(v_)
                 except TraitError:
-                    self.element_error(obj, v, self._traits[k])
-                else:
-                    validated.append(v)
+                    pass
+            if len(vv):
+                validated.append(vv[0])
                     
-            else:
-                validated.append(v)
+#             if k < len(self._traits):
+#                 try:
+#                     v = self._traits[k]._validate(obj, v)
+#                 except TraitError:
+#                     pass
+#                     self.element_error(obj, v, self._traits[k])
+#                 else:
+#                     validated.append(v)
+#                     
+#             else:
+#                 validated.append(v)
 
         return self.klass(validated)
 

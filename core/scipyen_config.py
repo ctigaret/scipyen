@@ -1030,8 +1030,10 @@ class ScipyenConfigurable(object):
     def _observe_configurables_(self, change):
         if self.__class__.__name__ == "MPSCAnalysis":
             print(f"ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_():")
-            print(f"\tchange.old {change.old} ({type(change.old).__name__})")
-            print(f"\tchange.new {change.new} ({type(change.new).__name__})")
+            print(f"\tchange.name = {change.name}")
+            print(f"\tchange.type = {change.type}")
+            print(f"\tchange.old = {change.old} ({type(change.old).__name__})")
+            print(f"\tchange.new = {change.new} ({type(change.new).__name__})")
         isTop = hasattr(self, "isTopLevel") and self.isTopLevel
         parent = self._get_parent_()
         tag = self.configTag
@@ -1046,8 +1048,14 @@ class ScipyenConfigurable(object):
             for k,v in cfg.items():
                 for kk,vv in v.items():
                     scipyen_config[k][kk].set(vv)
+                    
+#         if self.__class__.__name__ == "MPSCAnalysis":
+#             print(f"\twriting configuration file")
+#             
+#         write_config(scipyen_config)
+        if self.__class__.__name__ == "MPSCAnalysis":
+            print(f"DONE ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_()\n\n")
             
-        write_config(scipyen_config)
         
     def _make_confuse_config_data_(self, change, isTop=True, parent=None, tag=None):
         """Wraps change.new data to a structure storable with confuse library
@@ -1268,7 +1276,7 @@ class ScipyenConfigurable(object):
                         val  = getter()
 
                 if self.__class__.__name__ == "MPSCAnalysis":
-                    print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() user_conf {user_conf}, val {val}, v {v}")
+                    print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() user_conf {user_conf}, val {val} ({type(val).__name__}), v {v} ({type(v).__name__})")
                     if val != v:
                         # NOTE: 2022-11-01 21:54:34
                         # must convert value to something digestible by 
@@ -1284,8 +1292,12 @@ class ScipyenConfigurable(object):
                         changed = True
                         
             if changed:
+                if self.__class__.__name__ == "MPSCAnalysis":
+                    print(f"\twriting configuration file")
                 #self._update_config_view(user_conf, isTop, parent, tag)
                 write_config(scipyen_config)
+                if self.__class__.__name__ == "MPSCAnalysis":
+                    print(f"DONE ScipyenConfigurable<{self.__class__.__name__}>.saveSettings()\n\n")
                 
         if issubclass(self.__class__, (QtWidgets.QWidget, Figure)):
             self.saveWindowSettings()
