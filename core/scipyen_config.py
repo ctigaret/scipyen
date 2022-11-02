@@ -78,7 +78,7 @@ from core.quantities import(quantity2str, str2quantity)
 from iolib.jsonio import (object2JSON, json2python)
 
 def quantity_representer(dumper, data):
-    return dumper.represent_scalar("tag:pq.Quantity", quantity2str(data))
+    return dumper.represent_scalar("tag:pq.Quantity", quantity2str(data, precision=8))
 
 def quantity_constructor(loader, node):
     value = loader.construct_scalar(node)
@@ -1028,6 +1028,10 @@ class ScipyenConfigurable(object):
         return parent
 
     def _observe_configurables_(self, change):
+        if self.__class__.__name__ == "MPSCAnalysis":
+            print(f"ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_():")
+            print(f"\tchange.old {change.old} ({type(change.old).__name__})")
+            print(f"\tchange.new {change.new} ({type(change.new).__name__})")
         isTop = hasattr(self, "isTopLevel") and self.isTopLevel
         parent = self._get_parent_()
         tag = self.configTag
@@ -1043,7 +1047,7 @@ class ScipyenConfigurable(object):
                 for kk,vv in v.items():
                     scipyen_config[k][kk].set(vv)
             
-        write_config()
+        write_config(scipyen_config)
         
     def _make_confuse_config_data_(self, change, isTop=True, parent=None, tag=None):
         """Wraps change.new data to a structure storable with confuse library
@@ -1157,9 +1161,10 @@ class ScipyenConfigurable(object):
         saveWindowSettings(self.qsettings, self, group_name=group_name, prefix=prefix)
     
     def __load_config_key_val__(self, settername, val):
-        print(f"ScipyenConfigurable<{self.__class__.__name__}>. __load_config_key_val__ settername {settername}, val {val}")
-        #print("ScipyenConfigurable.__load_config_key_val__")
-        #print("\tsettername: %s, val: %s" % (settername, val))
+        if self.__class__.__name__ == "MPSCAnalysis":
+            print(f"ScipyenConfigurable<{self.__class__.__name__}>. __load_config_key_val__ settername {settername}, val {val}")
+            #print("ScipyenConfigurable.__load_config_key_val__")
+            #print("\tsettername: %s, val: %s" % (settername, val))
         setter = inspect.getattr_static(self, settername, None)
         
         if isinstance(val, str) and any(c in val for c in ("()")):
@@ -1195,7 +1200,9 @@ class ScipyenConfigurable(object):
             tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
             
             user_conf = self._get_config_view_(isTop, parent, tag)
-            print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings() user_conf {user_conf}")
+            
+            if self.__class__.__name__ == "MPSCAnalysis":
+                print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings() user_conf {user_conf}")
 
             if isinstance(user_conf, dict):
                 for k, v in user_conf.items():
@@ -1238,7 +1245,8 @@ class ScipyenConfigurable(object):
             
             user_conf = self._get_config_view_(isTop, parent, tag)
             
-            print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf {user_conf}")
+            if self.__class__.__name__ == "MPSCAnalysis":
+                print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf {user_conf}")
             
             changed = False
             
@@ -1259,6 +1267,7 @@ class ScipyenConfigurable(object):
                         getter = getattr(self, gettername)
                         val  = getter()
 
+                if self.__class__.__name__ == "MPSCAnalysis":
                     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() user_conf {user_conf}, val {val}, v {v}")
                     if val != v:
                         # NOTE: 2022-11-01 21:54:34
@@ -1276,7 +1285,7 @@ class ScipyenConfigurable(object):
                         
             if changed:
                 #self._update_config_view(user_conf, isTop, parent, tag)
-                write_config()
+                write_config(scipyen_config)
                 
         if issubclass(self.__class__, (QtWidgets.QWidget, Figure)):
             self.saveWindowSettings()

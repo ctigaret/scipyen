@@ -574,10 +574,10 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             
         if isinstance(val, (tuple, list)):
             if all(isinstance(s, pq.Quantity) for s in val):
-                self._params_initl_ = val
+                self._params_initl_ = [v for v in val]
                 
             elif all(isinstance(v, str) for v in val):
-                self._params_initl_ = tuple(str2quantity(v) for v in val)
+                self._params_initl_ = list(str2quantity(v) for v in val)
 
             else:
                 raise TypeError("Expecting a sequence of scalar quantities or their str representations")
@@ -589,6 +589,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             raise TypeError(f"Expecting a sequence of scalar quantities (or their str representations) for initial values; instead, got {type(val).__name__}:\n {val}")
 
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            # print(f"{self.__class__.__name__}@mPSCParametersInitial.setter val = {self._params_initl_}")
             self.configurable_traits["mPSCParametersInitial"] = self._params_initl_
             # self.configurable_traits["mPSCParametersInitial"] = tuple(quantity2str(v) for v in self._params_initl_)
                 
@@ -605,10 +606,10 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         
         if isinstance(val, (tuple, list)):
             if all(isinstance(v, pq.Quantity) for v in val):
-                self._params_lower_ = val
+                self._params_lower_ = [v for v in val]
                 
             elif all(isinstance(v, str) for v in val):
-                self._params_lower_ = (str2quantity(v) for v in val)
+                self._params_lower_ = list(str2quantity(v) for v in val)
                 
             else:
                 raise TypeError("Expecting a sequence of scalar quantities or their str representations")
@@ -620,6 +621,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the lower bounds; instead, got {type(val).__name__}:\n {val}")
                 
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            # print(f"{self.__class__.__name__}@mSCParametersLowerBounds.setter val = {self._params_lower_}")
             self.configurable_traits["mPSCParametersLowerBounds"] = self._params_lower_
             # if self._params_lower_ in (None, np.nan, math.nan):
             #     self.configurable_traits["mPSCParametersLowerBounds"] = self._params_lower_
@@ -639,10 +641,10 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         
         if isinstance(val, (tuple, list)):
             if all(isinstance(v, pq.Quantity) for v in val):
-                self._params_upper_ = val
+                self._params_upper_ = [v for v in val]
                 
             elif all(isinstance(v, str) for v in val):
-                self._params_upper_ = (str2quantity(v) for v in val)
+                self._params_upper_ = list(str2quantity(v) for v in val)
                 
             else:
                 raise TypeError("Expecting a sequence of scalar quantities or their str representations")
@@ -654,6 +656,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the upper bounds; instead, got {type(val).__name__}:\n {val}")
                 
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            # print(f"{self.__class__.__name__}@mPSCParametersUpperBounds.setter val = {self._params_upper_}")
             self.configurable_traits["mPSCParametersUpperBounds"] = self._params_upper_
                 
     @property

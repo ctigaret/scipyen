@@ -13,6 +13,7 @@ from inspect import (getmro, isclass, isfunction, signature,)
 import quantities as pq
 import numpy as np
 from types import new_class
+import typing
 from collections import deque
 from functools import (partial, partialmethod)
 
@@ -438,6 +439,9 @@ def dynamic_trait(x, *args, **kwargs):
     elif issubclass(myclass, pq.Quantity):
         return QuantityTrait(default_value = x)
     
+    # elif issubclass(myclass, list):
+    #     return ListTrait
+    
     if isclass(force_trait) and issubclass(force_trait, traitlets.TraitType):
         traitclass = (force_trait, )
         
@@ -661,6 +665,7 @@ class transform_link(traitlets.link):
         self.target[0].unobserve(self._update_source, names=self.target[1])
         self.source, self.target = None, None
         
+# class ListTrait(Instance): 
 class ListTrait(List): # inheritance chain: List <- Container <- Instance
     """TraitType that ideally should notify:
     a) when a list contents has changed (i.e., gained/lost members)
@@ -672,12 +677,17 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
     See also FIXME/TODO:2022-01-29 13:29:19 in scipyen_traitlets module.
     """
     _trait = None
+    default_value = []
+    klass = list
+    _valid_defaults = (list,tuple)
+    _cast_types = (list, tuple)
     
     info_text = "Trait for lists that is sensitive to changes in content"
     
-    def __init__(self, trait=None, traits=None, default_value=None, **kwargs):
+    # def __init__(self, trait=None, traits=None, default_value=None, **kwargs):
+    def __init__(self, trait=typing.Any, traits=None, default_value=None, **kwargs):
         
-        self._traits = traits # a list of traits, one per element
+        # self._traits = traits # a list of traits, one per element
         self._length = 0
         
         self.hashed = 0
@@ -685,9 +695,33 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
         # initialize the List (<- Container <- Instance) NOW
         super(ListTrait, self).__init__(trait=trait, default_value=default_value, **kwargs)
         
-        if default_value is not None or default_value is not Undefined:
-            self._length = len(default_value)
-            self.hashed = gethash(default_value)
+#         if default_value is None and not kwargs.get("allow_none", False):
+#             default_value = Undefined
+#             
+#         if default_value is Undefined:
+#             if trait is not None:
+#                 if not is_trait(trait):
+#                     default_value = trait
+#                     # trait = None
+#             
+#             else:
+#                 default_value = list()
+#                 args = ()
+#         
+#         # if default_value is not None or default_value is not Undefined:
+#         if isinstance(default_value, self._valid_defaults):
+#             args = (default_value, )
+#             self._length = len(default_value)
+#             self.hashed = gethash(default_value)
+#             
+#         if is_trait(trait):
+#             self._trait = trait() if isinstance(trait, type) else trait
+#             
+#         if isinstance(traits, (list, tuple)):
+#             self._traits = [t() if isinstance(t, type) else t for t in traits]
+#         else:
+#             self._traits = None
+            
             
     def validate_elements(self, obj, value):
         # NOTE: 2021-08-19 11:28:10 do the inherited validation first
@@ -726,6 +760,7 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
             old_value = self.default_value
 
         obj._trait_values[self.name] = new_value
+        
         try:
             silent = bool(old_value == new_value)
             
@@ -871,7 +906,7 @@ def trait_from_type(x, *args, **kwargs):
         if immediate_class != list:
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
-        traitklass = new_class("ListTrait1", bases = (List,), exec_body = new_trait_callback)
+        traitklass = new_class("ListTrait", bases = (List,), exec_body = new_trait_callback)
         return traitklass(default_value = x, allow_none = allow_none)
         #return TestTrait(default_value = x, traits = traits, allow_none = allow_none)
         #return ListTrait(default_value = x, traits = traits, allow_none = allow_none)
