@@ -91,9 +91,7 @@ class GuiMessages(object):
         
 class FileIOGui(object):
     @safeWrapper
-    def chooseFile(self, caption:typing.Optional[str]=None, fileFilter:typing.Optional[str]=None, 
-                   single:typing.Optional[bool]=True, save:bool=False,
-                   targetDir:typing.Optional[str]=None) -> typing.Tuple[typing.Union[str, typing.List[str]], str]:
+    def chooseFile(self, caption:typing.Optional[str]=None, fileFilter:typing.Optional[str]=None, single:typing.Optional[bool]=True, save:bool=False, targetDir:typing.Optional[str]=None):
         """Launcher of file open dialog
         
         Parameters:
@@ -153,8 +151,7 @@ class FileIOGui(object):
         return fn, fl
     
     @safeWrapper
-    def chooseDirectory(self, caption:typing.Optional[str]=None,
-                        targetDir:typing.Optional[str]=None) -> str:
+    def chooseDirectory(self, caption:typing.Optional[str]=None,targetDir:typing.Optional[str]=None):
         
         if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
             dirName = str(QtWidgets.QFileDialog.getExistingDirectory(self, caption=caption, directory=targetDir))
@@ -167,14 +164,13 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     """Mixin type for windows that need to be aware of Scipyen's main workspace.
     
     Provides:
-    1) Factored-out common functionality needed in Scipyen's windows:
+    1) Common functionality needed in Scipyen's windows:
         1.1) Standard dialogs for importing data from the workspace, file open 
         & save operations
         
         1.2) Message dialogs
     
-    2) Management of Qt and non-Qt configurables, inherited from 
-        core.scipyen_config.ScipyenConfigurable (see details there)
+    2) Management of Qt and non-Qt configurables
         
         2.1) Auguments ScipyenConfigurable with standard Qt configurables for
         :classes: derived from Qt QMainWindow and QWidget: size, position, 
@@ -192,19 +188,31 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         
     About configurables.
     ====================
+        
+    Scipyen deals with two groups of configuration variables ("configurables",
+    or "settings"):
+        
+    • Qt configurables: variables related to the appearance of Qt widgets and
+        windows (e.g. position on screen, size, state)
+        
+    • non-Qt configurables (e.g. properties of cursors such as colors,
+        and various preferences for non-gui objects). These are also called
+        ":class:-configurables" because they contain preferences applied to a 
+        non-gui object type
     
-    The management of Qt and non-Qt settings is provided by ScipyenConfigurable.
+    WorkspaceGuiMixin manages both Qt and non-Qt settings and via its 
+    ScipyenConfigurable ancestor type.
     
-    Classes that inherit from WorkspaceGuiMixin indirectly inherit the following
+    Classes that inherit from WorkspaceGuiMixin also inherit the following
     from ScipyenConfigurable:
     
-    * the methods 'self.loadSettings' and 'self.saveSettings' that load/save the
-        Qt configurables ot her Scipyen.conf file.
+    • the methods 'self.loadSettings' and 'self.saveSettings' that load/save the
+        Qt configurables from/to the Scipyen.conf file.
         
-    * the attribute 'configurable_traits' - a DataBag that observes changes to
-        non-Qt configurable instance attributes ('traits')
+    • the attribute 'configurable_traits' - a DataBag that observes changes to
+        non-Qt configurable instance attributes (treated as 'traits')
         
-    * the (private) method _observe_configurables_ which is notified by the
+    • the (private) method _observe_configurables_() which is notified by the
         'configurable_traits' of attribute changes and synchronizes their value 
         with the config.yaml file.
     
@@ -212,10 +220,10 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     configuration files, a GUI :class: that inherits from WorkspaceGuiMixin
     needs to:
     
-    1) have python property setter, as well as the getter & setter methods for 
-    the relevant attributes DECORATED with the markConfigurable decorator
-    (defined in core.scipyen_config module). This decorator 'flags' these
-    instance attributes as Qt or  non-Qt configurables.
+    1) Define python property setter, as well as the getter & setter methods for 
+    the relevant attributes DECORATED with the `markConfigurable` decorator
+    (defined in core.scipyen_config module). This decorator 'flags' the
+    instance attributes as either Qt or non-Qt configurables.
     
     2) Call self.loadSettings() in its own __init__ method body.
         This is required for BOTH Qt and non-Qt configurables.
@@ -227,7 +235,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         components basd on a designer *.ui file, and certainly AFTER further 
         UI components are added manually.
         
-        NOTE that loadSettings() may be overridden in the derived :class:.
+        NOTE: By inheriting from WorkspaceGuiMixin (and, thus from
+        ScipyenConfigurable) loadSettings() is called automatically. Nevertheless,
+        this method may be overridden in the derived :class:.
         
     3) Call self.saveSetting() at an appropriate point during the life-time of 
         the instance of the :class:. 
@@ -243,18 +253,10 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         However, saveSettings ensures that all changes in the 
         non-Qt configurables are saved to the config.yaml file.
         
-    In Scipyen. the window classes that inherit from WorkspaceGuiMixin are
-    ScipyenWindow (the main window of Scipyen), the ScriptManager, the consoles
-    (ScipyenConsole, ExternalConsoleWindow, ExternalConsoleWidget) and all the
-    defined data viewer classes (QMainWindow-based). For the latter, the
-    inheritance chain is:
-    
-    <<data viewer :class:>> <- ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
-    
-    or
-    
-    <<data viewer :class:>> <- ScipyenFrameViewer <- ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
-    
+        NOTE: As the loadSettings() method, the saveSetting() method is also 
+        inherited from ScipyenConfigurable, but it may be overridden in the
+        derived :class:
+        
     """
     #In addition, further settings can be defined by either
     
@@ -311,8 +313,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     
     _owncfg = Bunch()
     
-    def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
-                 title="", *args, **kwargs):
+    def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None, title="", *args, **kwargs):
         #print("WorkspaceGuiMixin __init__ %s" % self.__class__.__name__)
         ScipyenConfigurable.__init__(self, *args, **kwargs)
         #ScipyenConfigurable.__init__(self, settings = settings)
@@ -372,11 +373,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         return self._scipyenWindow_
     
     @safeWrapper
-    def importWorkspaceData(self, dataTypes:typing.Union[typing.Type[typing.Any], typing.Sequence[typing.Type[typing.Any]]],
-                            title:str="Import from workspace",
-                            single:bool=True, 
-                            preSelected:typing.Optional[str]=None,
-                            with_varName:bool=False) -> list:
+    def importWorkspaceData(self, dataTypes:typing.Union[typing.Type[typing.Any], typing.Sequence[typing.Type[typing.Any]]], title:str="Import from workspace", single:bool=True, preSelected:typing.Optional[str]=None, with_varName:bool=False):
         """Launches ItemsListDialog to import on or several workspace variables.
         
         Parameters:
@@ -416,10 +413,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         return list()
     
     @safeWrapper
-    def exportDataToWorkspace(self, 
-                              data:typing.Any,
-                              var_name:str, 
-                              title:str="Export data to workspace"):
+    def exportDataToWorkspace(self, data:typing.Any, var_name:str, title:str="Export data to workspace"):
             
         newVarName = validate_varname(var_name)
         

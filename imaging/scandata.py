@@ -73,7 +73,7 @@ class ScanData(BaseScipyenData):
     """
     
 class ScanDataOptions(DataBag):
-    """Do not use
+    """Do not use ... yet
     """
     def __init__(self, detection_predicate=1.3, roi_width = 10, roi_auto_width=False,
                   reference="Ch1", indicator="Ch2", 
@@ -8650,18 +8650,18 @@ class ScanData(BaseScipyenData):
         import h5py
         from iolib import h5io, jsonio
         
-        cached_entity = get_cached_entity(entity_cache, self)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
         
         if isinstance(cached_entity, h5py.Group):
             group[target_name] = cached_entity
             return cached_entity
         
-        target_name, obj_attrs = h5io.make_obj_attrs(obj, oname=oname)
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         if isinstance(name, str) and len(name.strip()):
             target_name = name
         
         entity = group.create_group(target_name)
-        h5io.store_entity_in_cache(entity_cache, self, entity)
+        h5io.storeEntityInCache(entity_cache, self, entity)
         entity.attrs.update(obj_attrs)
 
         

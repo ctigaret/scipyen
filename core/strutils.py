@@ -19,7 +19,7 @@ __translation_table_to_R_identifier = str.maketrans(dict([(c_, ".") for c_ in st
 
 import errno, os
 
-def is_path(s:str) -> bool:
+def is_path(s:str):
     return any(c in s for c in (os.sep, os.pathsep, ";", "\\"))
     
 def str2range(s):
@@ -29,7 +29,7 @@ def str2range(s):
     else:
         return range(*parts[0:3])
         
-def is_pathname_valid(pathname: str) -> bool:
+def is_pathname_valid(pathname: str):
     '''
     `True` if the passed pathname is a valid pathname for the current OS;
     `False` otherwise.
@@ -235,12 +235,10 @@ class QRNameValidator(QtGui.QValidator):
             else:
                 return QtGui.QValidator.Acceptable
         
-        
     def fixup(self, value):
         return str2R(value)
         
-def numbers2str(value:typing.Optional[typing.Union[Number, np.ndarray, tuple, list]], 
-                precision:int=5, format:str="g", show_units=False) -> str:
+def numbers2str(value:typing.Optional[typing.Union[Number, np.ndarray, tuple, list]], precision:int=5, format:str="g", show_units=False):
     """Generates a string representation of numeric data in base 10.
     Parameters:
     ----------

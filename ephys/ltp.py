@@ -221,7 +221,7 @@ second collection of cursor times:
 
 NOTE: this may be circumvented by setting all signals to start at 0 in the 
 concatenated block (case 1.1) or averaged block (case 1.2), once they have been
-created, e.g. by calling ephys.set_relative_time_start()
+created, e.g. by calling neoutils.set_relative_time_start()
 
 cursors_1 = [c + 5 for c in cursors_0] # call this ONLY it NOT calling set_relative_time_start()
 
@@ -628,8 +628,9 @@ import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.datatypes as dt
 from core.quantities import units_convertible
-import core.plots as plots
+import plots.plots as plots
 import core.models as models
+import core.neoutils as neoutils
 import core.triggerprotocols as tp
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 
@@ -2872,25 +2873,25 @@ def extract_sample_EPSPs(data,
         
         
         
-    average_test_base = ephys.set_relative_time_start(ephys.average_segments([data["Test"]["Baseline"].segments[ndx] for ndx in test_base_segments_ndx], 
+    average_test_base = neoutils.set_relative_time_start(ephys.average_segments([data["Test"]["Baseline"].segments[ndx] for ndx in test_base_segments_ndx], 
                                                         signal_index = data["LTPOptions"]["Signals"][0])[0])
 
-    test_base = ephys.set_relative_time_start(ephys.get_time_slice(average_test_base, t0, t1))
+    test_base = neoutils.set_relative_time_start(ephys.get_time_slice(average_test_base, t0, t1))
     
-    average_test_chase = ephys.set_relative_time_start(ephys.average_segments([data["Test"]["Chase"].segments[ndx] for ndx in test_chase_segments_ndx],
+    average_test_chase = neoutils.set_relative_time_start(ephys.average_segments([data["Test"]["Chase"].segments[ndx] for ndx in test_chase_segments_ndx],
                                           signal_index = data["LTPOptions"]["Signals"][0])[0])
     
-    test_chase = ephys.set_relative_time_start(ephys.get_time_slice(average_test_chase, t0, t1))
+    test_chase = neoutils.set_relative_time_start(ephys.get_time_slice(average_test_chase, t0, t1))
     
-    control_base_average = ephys.set_relative_time_start(ephys.average_segments([data["Control"]["Baseline"].segments[ndx] for ndx in control_base_segments_ndx],
+    control_base_average = neoutils.set_relative_time_start(ephys.average_segments([data["Control"]["Baseline"].segments[ndx] for ndx in control_base_segments_ndx],
                                                             signal_index = data["LTPOptions"]["Signals"][0])[0])
     
-    control_base = ephys.set_relative_time_start(ephys.get_time_slice(control_base_average, t0, t1))
+    control_base = neoutils.set_relative_time_start(ephys.get_time_slice(control_base_average, t0, t1))
     
-    control_chase_average = ephys.set_relative_time_start(ephys.average_segments([data["Control"]["Chase"].segments[ndx] for ndx in control_chase_segments_ndx],
+    control_chase_average = neoutils.set_relative_time_start(ephys.average_segments([data["Control"]["Chase"].segments[ndx] for ndx in control_chase_segments_ndx],
                                           signal_index = data["LTPOptions"]["Signals"][0])[0])
     
-    control_chase = ephys.set_relative_time_start(ephys.get_time_slice(control_chase_average, t0, t1))
+    control_chase = neoutils.set_relative_time_start(ephys.get_time_slice(control_chase_average, t0, t1))
     
     
     result = neo.Block(name = "%s_sample_traces" % data["name"])

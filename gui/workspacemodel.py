@@ -15,7 +15,7 @@ event handlers pre_execute() and post_execute().
 # filter/finder in workspace viewer
 #
 
-import traceback, typing, inspect, os
+import traceback, typing, inspect, os, asyncio
 from copy import deepcopy
 import json
 
@@ -32,7 +32,7 @@ import matplotlib.mlab as mlb
 import numpy as np
 import seaborn as sb
 
-from core.prog import safeWrapper
+from core.prog import (safeWrapper, timefunc, processtimefunc)
 from core.utilities import (summarize_object_properties,
                             standard_obj_summary_headers,
                             safe_identity_test,
@@ -56,13 +56,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     
     '''
     modelContentsChanged = pyqtSignal(name = "modelContentsChanged")
+    workingDir=pyqtSignal(str, name="workingDir")
+    varsChanged = pyqtSignal(dict, name="varsChanged")
+    varModified = pyqtSignal(object, name="varModified")
     
-    def __init__(self, shell, user_ns_hidden=dict(), parent=None,
-                 mpl_figure_close_callback=None,
-                 mpl_figure_click_callback=None,
-                 mpl_figure_enter_callback=None):
+    def __init__(self, shell, user_ns_hidden=dict(), parent=None, mpl_figure_close_callback=None, mpl_figure_click_callback=None, mpl_figure_enter_callback=None):
         super(WorkspaceModel, self).__init__(parent)
         
+        self.loop = asyncio.get_event_loop()
         self.shell = shell # reference to IPython InteractiveShell of the internal console
         
         self.cached_vars = dict()
@@ -107,6 +108,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.mpl_figure_close_callback = mpl_figure_close_callback
         self.mpl_figure_click_callback = mpl_figure_click_callback
         self.mpl_figure_enter_callback = mpl_figure_enter_callback
+        
+        self.varsChanged.connect(self.slot_observe)
             
     def _foreign_namespaces_count_changed_(self, change):
         # FIXME / TODO 2020-07-30 23:49:13
@@ -558,7 +561,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.modified_vars.clear()
         self.new_vars.clear()
         self.deleted_vars.clear()
-        self.user_ns_hidden.clear()
+        #self.user_ns_hidden.clear()
         self.observed_vars.clear()
         
     def is_user_var(self, name, val):
@@ -571,18 +574,27 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return True
     
     def var_observer(self, change):
-        #print(f"WorkspaceModel.var_observer: change {change}")
-        name = change.name
-        displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
+        self.varsChanged.emit(change)
         
+    @pyqtSlot(dict)
+    def slot_observe(self, change):
+        name = change.name
+        displayed_vars_types = self.getDisplayedVariableNames()
+        # displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
+        # print(f"WorkspaceModel.slot_observe({change.name}, change.new: {change.new})")
         if name in self.shell.user_ns:
             if name not in displayed_vars_types:
                 self.addRowForVariable(name, self.shell.user_ns[name])
             else:
                 self.updateRowForVariable(name, self.shell.user_ns[name])
+                self.varModified.emit(self.shell.user_ns[name])
                 
             self.modelContentsChanged.emit()
-        
+            
+        else:
+            self.removeRowForVariable(name) # this actually might never be reached!!!
+            
+    #@timefunc
     def pre_execute(self):
         """Updates observed_vars DataBag
         """
@@ -593,14 +605,18 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         # need to withhold notifications here
         with self.observed_vars.hold_trait_notifications():
-            self.observed_vars.clear()
+            observed_set = set(self.observed_vars.keys())
+            cached_set = set(self.cached_vars)
             
-            self.observed_vars.update(self.cached_vars)
-        
+            observed_not_cached = observed_set - cached_set
+            for var in observed_not_cached:
+                self.observed_vars.pop(var, None)
+                
+    #@timefunc
     def post_execute(self):
         """Updates workspace model AFTER kernel execution.
-        Also takes into account matplotlib figures that have been created by
-        plt commands at the console
+        Also takes into account:
+        1) matplotlib figures that have been created by plt commands at the console
         """
         # NOTE: 2022-03-15 22:05:21
         # check if there is a mpl Figure created in the console (but NOT bound to
@@ -627,11 +643,13 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # just update the model directly
         self.update()
         
-    def _gen_item_for_object_(self, propdict:dict, 
-                            editable:typing.Optional[bool] = False, 
-                            elidetip:typing.Optional[bool] = False,
-                            background:typing.Optional[QtGui.QBrush]=None, 
-                            foreground:typing.Optional[QtGui.QBrush]=None) -> QtGui.QStandardItem:
+        current_dir = os.getcwd()
+        
+        self.workingDir.emit(current_dir)
+        
+        
+    def _gen_item_for_object_(self, propdict:dict, editable:typing.Optional[bool] = False, elidetip:typing.Optional[bool] = False, background:typing.Optional[QtGui.QBrush]=None, foreground:typing.Optional[QtGui.QBrush]=None):
+        #print(propdict)
         item = QtGui.QStandardItem(propdict["display"])
         
         ttip = propdict["tooltip"]
@@ -657,15 +675,13 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return item
     
     @safeWrapper
-    def generateRowContents(self, dataname:str, data:object, namespace:str="Internal") -> typing.List[QtGui.QStandardItem]:
-        #print("generateRowContents", dataname, data, namespace)
+    def generateRowContents(self, dataname:str, data:object, namespace:str="Internal"):
+        # print("generateRowContents", dataname, data, namespace)
         obj_props = summarize_object_properties(dataname, data, namespace=namespace)
         #print("generateRowContents obj_props", obj_props)
         return self.genRowFromPropDict(obj_props)
     
-    def genRowFromPropDict(self, obj_props:dict,
-                                      background:typing.Optional[QtGui.QBrush]=None,
-                                      foreground:typing.Optional[QtGui.QBrush]=None) -> typing.List[QtGui.QStandardItem]:
+    def genRowFromPropDict(self, obj_props:dict, background:typing.Optional[QtGui.QBrush]=None, foreground:typing.Optional[QtGui.QBrush]=None):
         """Returns a row of QStandardItems
         """
         return [self._gen_item_for_object_(obj_props[key], 
@@ -689,6 +705,24 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return [self.item(row, col).text() if asStrings else self.item(row, col) for col in range(self.columnCount())]
 
     def getRowIndexForVarname(self, varname, regVarNames=None):
+        """Returns the row index for the variable symbol 'varname'
+        
+        Parameters:
+        ==========
+        
+        varname: str; a symbol in the user namespace (get_ipython().user_ns)
+        
+        regVarNames: list of str or None (default); a list of symbols;
+        
+            When None, (default ) then 'varname' is looked up in the list of
+            the symbol currently shown in the "User Variables" tab of the 
+            Scipyen's main window.
+            
+            In this case, this function simply returns the row index in the 
+            workspace model
+        
+        
+        """
         if regVarNames is None:
             regVarNames = self.getDisplayedVariableNames()
             
@@ -701,6 +735,15 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             ndx = regVarNames.index(varname)
             
         return ndx
+    
+    def getVarName(self, index:QtCore.QModelIndex):
+        """Returns the symbol of a variable in the model, for a given model index.
+        
+        Returns none it if the symbol does not exist in the user workspace
+        """
+        v = self.item(index.row(), 0).text()
+        
+        return v if v in self.shell.user_ns else None # <- this is the workspace
 
     def getCurrentVarName(self):
         """DEPRECATED
@@ -744,7 +787,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             ns = "Internal"
             
-        #print("updateRowForVariable", dataname, data, ns)
+        # print("updateRowForVariable", dataname, data, ns)
         
         row = self.rowIndexForItemsWithProps(Workspace=ns)
         
@@ -800,7 +843,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         if row == -1:
             return
         
-        
         if isinstance(row, list):
             for r in row:
                 self.removeRow(r)
@@ -816,7 +858,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def addRowForVariable(self, dataname, data):
         """CAUTION Only use for data in the internal workspace, not in remote ones.
         """
-        #print("addRowForVariable: ", dataname, data)
+        # print("addRowForVariable: ", dataname, data)
         v_row = self.generateRowContents(dataname, data) # generate model view row contents
         self.appendRow(v_row) # append the row to the model
         
@@ -836,20 +878,26 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #print(f"WorkspaceModel.update observed_vars: {list(self.observed_vars.keys())}")
         del_vars = [name for name in self.observed_vars.keys() if name not in self.shell.user_ns.keys()]
 
+        # print(f"WorkspaceModel.update: {len(del_vars)} del_vars {del_vars}")
+        
+        # with self.observed_vars.hold_trait_notifications:
         self.observed_vars.remove_members(*del_vars)
         
+        for vname in del_vars:
+            self.removeRowForVariable(vname)
+        
+#         if len(del_vars) == 1:
+#             self.removeRowForVariable(del_vars[0])
+#             
+#         elif len(del_vars) > 1:
+#             self.clear()
+#             for item in self.observed_vars.items():
+#                 self.addRowForVariable(*item)
+            
         current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         
         self.observed_vars.update(current_vars)
         
-        #print(f"WorkspaceModel.update del_vars = {del_vars}")
-        
-        obsolete_displayed_vars = [n for n in self.getDisplayedVariableNames() if n not in self.shell.user_ns.keys()] # in the internal ws
-        
-        names_to_remove = set(del_vars) | set(obsolete_displayed_vars)
-        
-        for name in names_to_remove:
-            self.removeRowForVariable(name)
 
     def updateFromExternal(self, prop_dicts):
         """prop_dicts: {name: nested properties dict}
@@ -937,26 +985,45 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #from core.utilities import standard_obj_summary_headers
         
         if len(kwargs) == 0:
+            # return all row indices here
+            # if used froma  deleting function, thso shoudl result in the removal
+            # of all items in the model
             return range(self.rowCount())
 
         else:
             if self.rowCount() == 0:
                 return -1
             
+            # auxiliary vector for setting up logical indexin, see for loop below
             allrows = np.arange(self.rowCount())
+            
+            # set up logical indexing vector
             allndx = np.array([True] * self.rowCount())
             
+            # NOTE: 2022-10-28 13:41:36
+            # kwargs keys are column names in the workspace viewer (but with " "
+            #   replaced by "_")
+            # so, below, for each of the column names GIVEN in kwargs:
             for key, value in kwargs.items():
+                # find the column's index  - this is the index of the column name
+                # in the summary header
                 key_column = standard_obj_summary_headers.index(key.replace("_", " "))
-                
+                # now, find the viewer item based on the value mapped to the kwarg
+                # key, given the index of the key column; the value must be a str
+                # NOTE: findItems is a method of QAbstractItemModel
                 items_by_key = self.findItems(value, column=key_column)
                 
+                # once items are found, we get their row indices
                 rows_by_key = [i.index().row() for i in items_by_key]
                 
+                # key_ndx is an intermediate logical vector flagging True wherever
+                # a row index from the current model contents is in rows_by_key
                 key_ndx = np.array([allrows[k] in rows_by_key for k in range(len(allrows))])
                 
+                # update the logical vector
                 allndx = allndx & key_ndx
                 
+            # use the logial indexing to create a list of row indices
             ret = [int(v) for v in allrows[allndx]]
             #print("rowIndexForItemsWithProps ret", ret)
             #ret = list(allrows[allndx])
@@ -969,6 +1036,18 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
             else:
                 return ret
+            
+    @safeWrapper
+    def rowIndexForItemInWorkspace(self, name, Workspace="internal"):
+        """Variant of rowIndexForItemsWithProps selecting row indices for variables
+            in the internal workspace
+        
+        Accepts a list of names !
+        
+        TODO!
+        """
+        
+        pass
             
     @safeWrapper
     def rowIndexForNamedItemsWithProps(self, name, **kwargs):

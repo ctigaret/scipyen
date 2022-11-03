@@ -198,7 +198,7 @@ import inspect
 import itertools
 import functools
 import warnings
-import typing
+import typing, types
 from enum import Enum, IntEnum
 #### END core python modules
 
@@ -211,10 +211,10 @@ import pyqtgraph as pg
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-#from . import plots
 from core.prog import safeWrapper
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
-from core.triggerevent import (TriggerEvent, TriggerEventType, )
+from core.datazone import DataZone
+from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import TriggerProtocol
 
 from core import datatypes as dt
@@ -240,6 +240,85 @@ if __debug__:
     global __debug_count__
 
     __debug_count__ = 0
+    
+def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], start:int = 0, span:int=1, isISI:bool=False):
+    """Calculates the reciprocal of an inter-event interval.
+    
+    This can be the time interval between any two events with indices "start" &
+    "start" + "span".
+    
+    Parameters:
+    ==========
+    data: sequence of time stamps OR time intervals (python Quantity values with time units)
+        The interpretation is dictated by the 'isISI' parameter described below
+        
+    start: int, the index of the first time stamp to take into consideration
+        optional, default is 0 (i.e. the first time stamps in the 'data' parameter)
+    
+    span: int, the number of inter-event intervals (or "span");
+        optional, default is 1 i.e., one interval
+          
+    isISI:bool, flag to interpret the data as a sequence of time stamps (when False)
+        or time intervals (when True).
+        
+        Optional, default is False (i.e. data is taken as a sequence of time stamps)
+        
+    Returns:
+    ========
+    The frequency (reciprocal of the interval's duration) as a scalar Quantity 
+    in pq.Hz.
+    
+    If the data is empty or contains only one element, returns 0 Hz
+    
+    Example:
+    ===========
+    # Given a neo.SpikeTrain 'AP_train':
+    
+    In: AP_train.times
+    
+    Out: array([20.0971, 20.1261, 20.1582, ..., 20.2213, 20.261 , 20.3052]) * s
+    
+    # Find out the instantaneous frequency as the reciprocal of the interval 
+    # between the first and the third action potential:
+    
+    In: isiFrequency(AP_train.times, 0, 2)
+    Out: array(16.3441) * Hz
+    
+    # Suppose the time inter-AP intervals are collected as follows:
+    
+    In: Inter_AP_intervals = np.diff(AP_train.times)
+    
+    In: Inter_AP_intervals
+    Out: array([0.029 , 0.0322, 0.0327, 0.0304, 0.0396, 0.0442]) * s
+    
+    # To calculate the instantaneous frequency for the first two intervals:
+    
+    In: isifrequency(Inter_AP_intervals, 0, 2, True) # NOTE the third parameter
+    Out: array(16.3441) * Hz
+    
+    """
+    if len(data) <= 1:
+        return 0*pq.Hz
+    
+    if start < 0:
+        raise ValueError(f"'start' must be >= 0; got {start} instead")
+    
+    if start >= len(data):
+        raise ValueError(f"'start' must be < {len(data)}; got {start} instead")
+    
+    if span < 1:
+        raise ValueError(f"'span' expected to be at least 1; got {span} instead")
+    
+    if start + span >= len(data):
+        raise ValueError(f"'span' cannot be larger than {len(data)-start}; got {span} instead")
+    
+    if isISI:
+        return (1/np.sum(data[start:(start+span)])).rescale(pq.Hz)
+    
+    else:
+        stamps = data[start:(start+span+1)]
+        return (1/(stamps[-1]-stamps[start])).rescale(pq.Hz)
+    
 
 def correlate(in1, in2, **kwargs):
     """Calls scipy.signal.correlate(in1, in2, **kwargs).
@@ -373,68 +452,77 @@ def correlate(in1, in2, **kwargs):
         return corr
     
 @safeWrapper
-def cursors2epoch(*args, **kwargs) -> typing.Union[neo.Epoch, typing.Sequence]:
+def cursors2epoch(*args, **kwargs):
     """Constructs a neo.Epoch from a sequence of SignalCursor objects.
     
-    Each cursor contributes an interval in the Epoch.
+    Each cursor contributes an interval in the Epoch, corresponding to the 
+    cursor's horizontal (x) window. In other words, the interval's (start) time
+    equals the cursor's x coordinate - ½ cursor's x window, and the duration of
+    the interval equals the cursor's x window.
+    
+    NOTE: For DataSignals, the result is a DataZone.
     
     SignalCursor objects are defined in the signalviewer module; this function
     expects vertical and crosshair cursors (i.e., with cursorType one of
     SignalCursor.SignalCursorTypes.vertical, 
     SignalCursor.SignalCursorTypes.horizontal). 
     
-    SignalCursors can be represented by tuples of cursor 
-    "parameters" (see below), although tuples and cursor objects cannot be mixed.
+    SignalCursors can also be represented by tuples of cursor  "parameters" 
+    (see below), although tuples and cursor objects cannot be mixed.
     
     Variadic parameters:
     --------------------
-    *args: One or more SignalCursor object(s) (comma-separated list) or a  
-        sequence (tuple, list) of SignalCursor objects.
+    *args: comma-separated list of EITHER:
+    
+        • SignalCursor objects - all of either 'vertical' or 'crosshair' type.
         
-        SignalCursor objects must all be of type vertical or crosshair.
+        • SignalCursor tuples (2, 3 or 5 elements) of cursor parameters:
         
-        Alternatively, the function accepts tuples (2, 3 or 5 elements) of
-        cursor parameters, instead of actual SignalCursor objects, as follows:
-        
-        a) 2-tuples are interpreted as (time, window) pairs of coordinates
-            for a notional vertical cursor
+            ∘ 2-tuples are interpreted as (time, window) pairs of coordinates
+                for a notional vertical cursor
             
-        b) 3-tuples are interpreted as (time, window, label) triples of 
-            parameters of a notional vertical cursor
+            ∘ 3-tuples are interpreted as (time, window, label) triplets of 
+                parameters for a notional vertical cursor
             
-        c) 5-tuples are interpreted as (x, xwindow, y, ywindow, label) tuples of
-            a notional crosshair cursor. In this case only the x, xwindow and
-            label elements are used.
+            ∘ 5-tuples are interpreted as (x, xwindow, y, ywindow, label) tuples
+                 of parameters for a notional crosshair cursor; only the x, 
+                xwindow and label elements are used.
             
-        NOTE 1: the cases (a) and (b) are the value of the 'parameters' property
-        of a vertical and crosshair cursor, respectively. This means that such
-        a tuple can be obtained by referencing cursor.parameters property.
-        
-        NOTE 2: Mixing SignalCursor objects with parameter tuples is NOT allowed.
+        NOTE: the following are NOT allowed:
+            □ Mixing SignalCursor objects with parameter tuples.
+            □ Mixing parameter 2- 3- or 5-tuples is NOT allowed.
         
     Var-keyword parameters:
     ----------------------
     
     units: python Quantity or None (default)
-        By default, the epoch's units are seconds (pq.s) but in a neo.Epoch can
-        support any units
+        When not specified (i.e. units = None) the function assumes units of
+        quantities.s and will return a neo.Epoch object(*). 
+
+        When the specified units are NOT temporal, the result is a DataZone(*).
     
-    name: str, default is" Epoch"; not used when intervals is True (see below)
+        (*) assuming `intervals` is False
+        
+    name: str, default is "Epoch" or "Zone" (depending on `units`).
+         When `intervals` is True, this parameter is not used (see below).
     
-    sort: bool, default if True
-        When True, the cursors are sorted by their x coordinate
+    sort: bool, default is True
+        When True, the cursors, or their specifications, in *args are sorted by 
+        their x coordinate.
         
     intervals: bool, default is False.
     
-        When True, the function returns triplets of (start, stop, label)
+        When True, the function returns triplets of (start, stop, label) quantities.
         
-        Otherwise returns a neo.Epoch
+        Otherwise returns a neo.Epoch if `units` is quantities.s, or DataZone.
+        
         
     Returns:
     -------
     
-    When intervals is False (default), returns a neo.Epoch with intervals 
-        generated from the cursor x coordinates and horizontal windows:
+    When intervals is False (default), returns a neo.Epoch (or DataZone) with 
+        intervals generated from the cursors' x coordinates and horizontal 
+        windows (`xwindow` properties):
         
             times = cursor.x - cursor.xwindow/2
             durations = cursor.xwindow
@@ -446,6 +534,10 @@ def cursors2epoch(*args, **kwargs) -> typing.Union[neo.Epoch, typing.Sequence]:
             
             If units are provided, start and stop are python Quantity scalars,
             otherwise they are floating point scalars.
+    
+    ATTENTION: The numeric parameters are treated as cursor parameters; do NOT
+    calculate new time 'start' from these values! This function takes care of 
+    that!!!
             
     Examples:
     ========
@@ -453,7 +545,7 @@ def cursors2epoch(*args, **kwargs) -> typing.Union[neo.Epoch, typing.Sequence]:
     Given "cursors" a list of vertical SignalCursors, and "params" the 
     corresponding list of cursor parameters:
     
-    >>> params = [c.params for c in cursors]
+    >>> params = [c.parameters for c in cursors]
     
     >>> params
         [(0.20573370205046024, 0.001, 'v2'),
@@ -508,6 +600,7 @@ def cursors2epoch(*args, **kwargs) -> typing.Union[neo.Epoch, typing.Sequence]:
         raise TypeError("Units expected to be a python Quantity; got %s instead" % type(units).__name__)
         
     name = kwargs.get("name", "Epoch")
+    
     if not isinstance(name, str):
         raise TypeError("name expected to be a string")
     
@@ -556,8 +649,6 @@ def cursors2epoch(*args, **kwargs) -> typing.Union[neo.Epoch, typing.Sequence]:
         else:
             return [(v[0]-v[1]/2., v[1],         "%d"%k) if len(v) == 2 else (v[0]-v[1]/2., v[1],         v[2]) if len(v) == 3 else (v[0]-v[1]/2., v[1],         v[4]) for k,v in enumerate(values)]
         
-    #cursors = None
-    
     if len(args) == 0:
         raise ValueError("Expecting at least one argument")
     
@@ -568,7 +659,6 @@ def cursors2epoch(*args, **kwargs) -> typing.Union[neo.Epoch, typing.Sequence]:
                     t_d_i = __parse_cursors_tuples__(*[c.parameters for c in args[0]])                    
                 else:
                     raise TypeError("Expecting only vertical or crosshair cursors")
-                #t_d_i = [(c.x - c.xwindow/2., c.xwindow, c.ID) for c in args[0]]
                 
             elif all([isinstance(c, (tuple, list)) for c in args[0]]):
                 if all([len(c) in (2,3,5) for c in args[0]]):
@@ -606,20 +696,23 @@ def cursors2epoch(*args, **kwargs) -> typing.Union[neo.Epoch, typing.Sequence]:
     if sort:
         t_d_i = sorted(t_d_i, key=lambda x: x[0])
 
-    
     if intervals:
         return t_d_i
     
     else:
         # transpose t_d_i and unpack:
+        # print("cursors2epoch", t_d_i)
         t, d, i = [v for v in zip(*t_d_i)]
         
         if isinstance(t[0], pq.Quantity):
             units = t[0].units
+            
+        if not check_time_units(units):
+            return DataZone(times=t, durations=d, labels=i, units=units, name=name)
         
         return neo.Epoch(times=t, durations=d, labels=i, units=units, name=name)
     
-def cursors2intervals(*args, **kwargs) -> typing.Union[typing.Sequence, np.ndarray]:
+def cursors2intervals(*args, **kwargs):
     """Calls cursors2epochs with intervals set to True
     
     Additional var-keyword parameters:
@@ -697,31 +790,52 @@ def signal2epoch(sig, name=None, labels=None):
     return ret
 
 @safeWrapper
-def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal],
-               cursor: typing.Union[SignalCursor, tuple],
-               channel: typing.Optional[int] = None) -> pq.Quantity:
-    """The maximum value of the signal across the cursor's window.
+def epoch_reduce(func:types.FunctionType, signal: typing.Union[neo.AnalogSignal, DataSignal], epoch: typing.Union[neo.Epoch, tuple], channel: typing.Optional[int] = None):
+    """
+    The maximum value of a signal across an Epoch or a (t0, duration) interval.
+    
+    CAUTION: For an epoch with more than one interval, this returns the maximum
+    signal value across ALL the intervals in the Epoch.
+    
+    If this is not what you want, then call this function passing the desired
+    interval coordinates (t0, duration) of the Epoch.
+    
+    Example:
+    epoch_max(signal, (epoch.times[0], epoch.durations[0]))
     
     Parameters:
     ----------
     signal: neo.AnalogSignal, DataSignal
-    cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
+    epoch: tuple (t0, duration) or neo.Epoch
     channel: int or None (default)
         For multi-channel signal, specified which channel is used:
         0 <= channel < signal.shape[1]
     
-    Returns:
-    --------
-    Python Quantity array of shape (signal.shape[1], ) with the signal maximum
-    in the interval defined by the cursor's window, or the signal's sample value
-    at the cursor's x coordinate if cursor window is zero.
-    
-    NOTE: to get the signal extremes (and their sample indices) between two 
-    cursors, just call max(), min(), argmax() argmin() on a signal time slice 
-    obtained using the two cursor's x values.
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
-    t0,t1, _ = cursors2intervals(cursor, signal.times.units)
+    
+    if isinstance(epoch, tuple) and len(epoch) == 2:
+        t0, duration = epoch
+        if not isinstance(t0, pq.Quantity):
+            t0 *= signal.times.units
+            
+        else:
+            if not units_convertible(t0, signal.times.units):
+                raise ValueError(f"epoch start units ({t0.units}) are incompatible with the signal's domain ({signal.times.units})")
+            
+        if not isinstance(duration, pq.Quantity):
+            duration *= signal.times.units
+        else:
+            if not units_convertible(duration, signal.times.units):
+                raise ValueError(f"epoch duration units ({duration.units}) are incompatible with the signal's domain ({signal.times.units})")
+
+    elif isinstance(epoch, neo.Epoch):
+        t0 = epochs.times.min()
+        duration = np.sum(epoch.durations)
+        
+    else:
+        raise TypeError(f"epoch expected to be a tuple (t0, duration) or a neo.Epoch; got {epoch} instead")
+    
+    t1 = t0 + duration
     
     if t0 == t1:
         ret = signal[signal.time_index(t0),:]
@@ -734,10 +848,107 @@ def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     return ret
 
+def cursor_reduce(func:types.FunctionType, signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
+    """Reduced signal value (e.g. min, max, median etc) across a cursor's window.
+    
+    The reduced signal value is the value calculated by the `func` parameter
+    from a signal region defined by the cursor.
+    
+    If the window is 0, the function returns the signal value at the cursor's 
+    position in the signal domain.
+    
+    Parameters:
+    ----------
+    func:   types.FunctionType. A function which takes a numpy array and returns 
+            a value(*).
+            Such functions include those in the numpy package `np.min`, `np.max`,
+            `np.mean`, `np.median`, `np.std`, `np.var`, (and their 'nan' versions),
+            and functions defined in Scipyen's core.signalprocessing module (e.g.,
+            `sem`, `nansem`, `nansize`, `data_range`, `is_positive_waveform`, 
+            `waveform_amplitude`, `minmax`, etc.)
+    
+            NOTE: The core.signalprocessing module is already imported in a 
+                    Scipyen session under the `sigp` alias.
+    
+            (*) This value can be a scalar, or a tuple of scalars (e.g. sigp.maxmin)
+            
+    signal: neo.AnalogSignal, DataSignal
+    
+    cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
+    
+    channel: int or None (default)
+        For multi-channel signal, specified which channel is used:
+        0 <= channel < signal.shape[1]
+    
+    Returns:
+    --------
+    Python Quantity array of shape (signal.shape[1], ) with the reduced value
+    calculated from the signal region in the interval defined by the cursor's 
+    window, or the signal's sample value at the cursor's x coordinate if cursor 
+    window is zero.
+    
+    NOTE: To get the signal extremes (and their sample indices) between two 
+    cursors, just call max(), min(), argmax() argmin() on a signal time slice 
+    obtained using the two cursor's x values.
+    """
+    from gui.signalviewer import SignalCursor as SignalCursor
+    
+    if not isinstance(func, types.FunctionType):
+        raise TypeError(f"Expecting a function as first argument; got {type(func).__name__} instead")
+    
+    if isinstance(cursor, SignalCursor):
+        t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
+        t1 = (cursor.x + cursor.xwindow/2) * signal.times.units
+        
+    elif isinstance(cursor, tuple) and len(cursor) == 2:
+        t0, t1 = cursor
+        
+        if not isinstance(t0, pq.Quantity):
+            t0 *= signal.times.units
+            
+        else:
+            if not units_convertible(t0, signal.times.units):
+                raise ValueError(f"t0 units ({t0.units}) are not compatible with the signal's time units {signal.times.units}")
+    
+        if not isinstance(t1, pq.Quantity):
+            t1 *= signal.times.units
+    
+        else:
+            if not units_convertible(t1, signal.times.units):
+                raise ValueError(f"t1 units ({t1.units}) are not compatible with the signal's time units {signal.times.units}")
+        
+    else:
+        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor or a 2-tuple of scalars; got {cursors} instead")
+    
+    if t0 == t1:
+        ret = signal[signal.time_index(t0),:]
+        
+    else:
+        # ret = signal.time_slice(t0,t1).max(axis=0).flatten()
+        ret = func(signal.time_slice(t0,t1), axis=0).flatten()
+    
+    if isinstance(channel, int):
+        return ret[channel].flatten()
+    
+    return ret
+
 @safeWrapper
-def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                  cursor: typing.Union[SignalCursor, tuple],
-                  channel: typing.Optional[int] = None) -> np.ndarray:
+def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
+    """The maximum value of the signal across the cursor's window.
+    Calls cursor_reduce with np.max as `func` parameter.
+    """
+    return cursor_reduce(np.max, signal, cursor, channel)
+
+@safeWrapper
+def cursor_min(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
+    """The maximum value of the signal across the cursor's window.
+    Calls cursor_reduce with np.min as `func` parameter.
+    """
+    return cursor_reduce(np.min, signal, cursor, channel)
+
+
+@safeWrapper
+def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
     """The index of maximum value of the signal across the cursor's window.
 
     Parameters:
@@ -757,63 +968,11 @@ def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
     the sample index of the cursor's x coordinate relative to the beginning of
     the signal.
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
-
-    t0,t1,_ = cursors2intervals(cursor, units=signal.times.units)
     
-    t0_ndx = np.array(signal.time_index(t0)).flatten()
+    return cursor_reduce(np.argmax, signal, cursor, channel)
     
-    if t0 == t1:
-        return t0_ndx
-        
-    else:
-        ret = signal.time_slice(t0,t1).argmax(axis=0).flatten() + t0_ndx
-    
-        if isinstance(channel, int):
-            return ret[channel].flatten()
-        
-        return ret
-
 @safeWrapper
-def cursor_min(signal: typing.Union[neo.AnalogSignal, DataSignal],
-               cursor: typing.Union[tuple, SignalCursor],
-               channel: typing.Optional[int] = None) -> pq.Quantity:
-    """The minimum value of the signal across the cursor's window.
-    
-    Parameters:
-    ----------
-    signal: neo.AnalogSignal, DataSignal
-    cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
-    channel: int or None (default)
-        For multi-channel signal, specified which channel is used:
-        0 <= channel < signal.shape[1]
-    
-    Returns:
-    --------
-    Python Quantity array of shape (1, signal.shape[1]) with the signal minimum
-    in the interval defined by the cursor's window, or the signal's sample value
-    at the cursor's x coordinate if cursor window is zero.
-    
-    """
-    from gui.signalviewer import SignalCursor as SignalCursor
-
-    t0,t1,_ = cursors2intervals(cursor, units=signal.times.units)
-    
-    if t0 == t1:
-        ret = signal[signal.time_index(t0),:]
-        
-    else:
-        ret = signal.time_slice(t0,t1).min(axis=0).flatten()
-    
-    if isinstance(channel, int):
-        return ret[channel].flatten()
-    
-    return ret
-
-@safeWrapper
-def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                  cursor: typing.Union[tuple, SignalCursor],
-                  channel: typing.Optional[int] = None) -> np.ndarray:
+def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int] = None):
     """The index of minimum value of the signal across the cursor's window.
 
     Parameters:
@@ -833,27 +992,11 @@ def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     the sample index of the cursor's x coordinate relative to the beginning of
     the signal.
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
-
-    t0,t1, _ = cursors2intervals(cursor, units=signal.times.units)
     
-    t0_ndx = np.array(signal.time_index(t0)).flatten()
-    
-    if t0 == t1:
-        return t0_ndx
-        
-    else:
-        ret = signal.time_slice(t0,t1).argmin(axis=0).flatten() + t0_ndx
-        
-        if isinstance(channel, int):
-            return ret[channel].flatten()
-        
-        return ret
+    return cursor_reduce(np.argmin, signal, cursor, channel)
 
 @safeWrapper
-def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                  cursor: typing.Union[tuple, SignalCursor],
-                  channel: typing.Optional[int] = None) -> tuple:
+def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int] = None):
     """The maximum and minimum value of the signal across the cursor's window.
 
     Parameters:
@@ -875,66 +1018,27 @@ def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     object is still a two-element tuple).
     
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
-
-    t0,t1, _ = cursors2intervals(cursor, units = signal.times.units)
     
-    if t0==t1:
-        ret = signal[signal.time_index(t0),:]
-        
-        if isinstance(channel, int):
-            ret = ret[channel].flatten()
-            
-        return (ret, ret)
-        
-    else:
-    
-        mx = signal.time_slice(t0,t1).max(axis=0).flatten()
-        
-        if isinstance(channel, int):
-            mx = mx[channel].flatten()
-        
-        mn = signal.time_slice(t0,t1).min(axis=0).flatten()
-        
-        if isinstance(channel, int):
-            mn = mn[channel].flatten()
-        
-        return (mx, mn)
+    return cursor_reduce(sigp.maxmin, signal, cursor, channel)
 
 @safeWrapper
-def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                     cursor: typing.Union[tuple, SignalCursor],
-                     channel: typing.Optional[int] = None) -> tuple:
+def cursor_minmax(signal, cursor, channel):
+    return cursor_reduce(sigp.minmax, signal, cursor, channel)
+
+@safeWrapper
+def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int] = None):
     """The indices of signal maximum and minimum across the cursor's window.
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
-
-    t0,t1,_ = cursors2intervals(cursor, units=signal.times.units)
-    
-    t0_ndx = np.array(signal.time_index(t0)).flatten()
-    
-    if t0==t1:
-        return (t0_ndx, t0_ndx)
-        
-    else:
-    
-        mx = signal.time_slice(t0,t1).argmax(axis=0).flatten() + t0_ndx
-        
-        if isinstance(channel, int):
-            mx = mx[channel].flatten()
-        
-        mn = signal.time_slice(t0,t1).argmin(axis=0).flatten() + t0_ndx
-        
-        if isinstance(channel, int):
-            mn = mn[channel].flatten()
-        
-        return (mx, mn)
+    return cursor_reduce(sigp.argmaxmin, signal, cursor, channel)
 
 @safeWrapper
-def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                   cursor: typing.Union[tuple, SignalCursor],
-                   channel: typing.Optional[int]=None) -> pq.Quantity:
+def cursor_argminmax(signal, cursor, channel):
+    return cursor_reduce(sigp.argminmax, signal, cursor, channel)
+
+@safeWrapper
+def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int]=None):
     """Average of signal samples across the window of a vertical cursor.
+    Calls cursor_reduce with np.mean as `func` parameter
     
     Parameters:
     -----------
@@ -960,26 +1064,12 @@ def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
     A python Quantity with the same units as the signal.
     
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
+    return cursor_reduce(np.mean, signal, cursor, channel)
 
-    
-    t0, t1, _ = cursors2intervals(cursor, units=signal.times.units)
-    if t0 == t1:
-        ret = cursor_value(signal, cursor, channel=channel)
-        
-    else:
-        ret = signal.time_slice(t0,t1).mean(axis=0)
-        
-    
-    if isinstance(channel, int):
-        return ret[channel].flatten() # so that it can accept array indexing
-    
-    return ret
+cursor_mean = cursor_average
 
 @safeWrapper
-def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal],
-                 cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple],
-                 channel: typing.Optional[int] = None) -> pq.Quantity:
+def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple], channel: typing.Optional[int] = None):
     """Value of signal at the vertical cursor's time coordinate.
     
     Signal sample values are NOT averaged across the cursor's window.
@@ -1013,7 +1103,6 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal],
     
     """
     from gui.signalviewer import SignalCursor as SignalCursor
-
     
     data_index = cursor_index(signal, cursor)
     
@@ -1025,8 +1114,7 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal],
     return ret[channel].flatten() # so that it can be indexed
 
 @safeWrapper
-def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
-                 cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple]) -> int:
+def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple]):
     """Index of signal sample at the vertical cursor's time coordinate.
     
     Parameters:
@@ -1092,11 +1180,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
     return data_index
 
 @safeWrapper
-def cursors_measure(func, data, *cursors, 
-                    segment_index: int = None, 
-                    analog: typing.Optional[typing.Union[int, str]] = None, 
-                    irregular: typing.Optional[typing.Union[int, str]] = None,
-                    **kwargs) -> pq.Quantity:
+def cursors_measure(func, data, *cursors, segment_index: int = None, analog: typing.Optional[typing.Union[int, str]] = None, irregular: typing.Optional[typing.Union[int, str]] = None, **kwargs):
     """
     data: a neo.AnalogSignal or datatypes.DataSignal
     """
@@ -1156,10 +1240,7 @@ def cursors_measure(func, data, *cursors,
 
     
 @safeWrapper
-def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                       cursor0: typing.Union[SignalCursor, tuple], 
-                       cursor1: typing.Union[SignalCursor, tuple],
-                       channel: typing.Optional[int] = None) -> pq.Quantity:
+def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor0: typing.Union[SignalCursor, tuple], cursor1: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
     """Calculates the signal amplitude between two notional vertical cursors.
     
     amplitude = y1 - y0
@@ -1189,14 +1270,11 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
     return y1-y0
 
 @safeWrapper
-def cursors_distance(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                     cursor0: typing.Union[SignalCursor, tuple], 
-                     cursor1: typing.Union[SignalCursor, tuple],
-                     channel: typing.Optional[int] = None) -> pq.Quantity:
+def cursors_distance(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor0: typing.Union[SignalCursor, tuple], cursor1: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
     """Distance between two cursors, in signal samples.
     
-    NOTE: The distance between two cursors in the signal domain can be
-    calculated directly as the difference between the cursors' x coordinates
+    NOTE: The distance between two cursors in the signal domain is simply the
+            difference between the cursors' x coordinates!.
     
     """
     ret = [cursor_index(signal, c) for c in (cursor0, cursor1)]
@@ -1204,12 +1282,7 @@ def cursors_distance(signal: typing.Union[neo.AnalogSignal, DataSignal],
     return abs(ret[1]-ret[0])
 
 @safeWrapper
-def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                t0: typing.Union[float, pq.Quantity], 
-                t1: typing.Union[float, pq.Quantity],
-                w0: typing.Optional[typing.Union[float,  pq.Quantity]]=0.001*pq.s,
-                w1: typing.Optional[typing.Union[float, pq.Quantity]] = None,
-                channel: typing.Optional[int] = None) -> pq.Quantity:
+def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], t0: typing.Union[float, pq.Quantity], t1: typing.Union[float, pq.Quantity], w0: typing.Optional[typing.Union[float, pq.Quantity]]=0.001*pq.s, w1: typing.Optional[typing.Union[float, pq.Quantity]] = None, channel: typing.Optional[int] = None):
     """Calculates the chord slope of a signal between two time points t0 and t1.
     
                     slope = (y1 - y0) / (t1 - t0)
@@ -1293,10 +1366,7 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
     #pass
     
 @safeWrapper
-def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                        cursor0: typing.Union[SignalCursor, tuple],
-                        cursor1: typing.Union[SignalCursor, tuple],
-                        channel: typing.Optional[int] = None) -> pq.Quantity:
+def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor0: typing.Union[SignalCursor, tuple], cursor1: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
     """Signal chord slope between two vertical cursors.
     
     The function calculates the slope of a straight line connecting the 
@@ -1335,9 +1405,7 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
     return (y1-y0)/(t1-t0)
     
 @safeWrapper
-def epoch2cursors(epoch: neo.Epoch, 
-                  axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None,
-                  **kwargs) -> typing.Sequence:
+def epoch2cursors(epoch: neo.Epoch, axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None, **kwargs):
     """Creates vertical signal cursors from a neo.Epoch.
     
     Parameters:
@@ -1404,7 +1472,7 @@ def epoch2cursors(epoch: neo.Epoch,
     return ret
 
 @safeWrapper
-def epoch2intervals(epoch: neo.Epoch, keep_units:bool = False) -> typing.Sequence:
+def epoch2intervals(epoch: neo.Epoch, keep_units:bool = False):
     """Generates a sequence of intervals as triplets (t_start, t_stop, label).
     
     Each interval coresponds to the epoch's interval.
@@ -1425,7 +1493,7 @@ def epoch2intervals(epoch: neo.Epoch, keep_units:bool = False) -> typing.Sequenc
         return [(t, t+d, l) for (t,d,l) in zip(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels)]
     
 @safeWrapper
-def intervals2epoch(*args, **kwargs) -> neo.Epoch:
+def intervals2epoch(*args, **kwargs):
     """Construct a neo.Epoch from a sequence of interval tuples or triplets.
     
     Variadic parameters:
@@ -1545,7 +1613,7 @@ def intervals2epoch(*args, **kwargs) -> neo.Epoch:
         return ret
 
 @safeWrapper
-def intervals2cursors(*args, **kwargs) -> typing.Sequence:
+def intervals2cursors(*args, **kwargs):
     """Construct a neo.Epoch from a sequence of interval tuples or triplets.
     
     Variadic parameters:
@@ -1652,9 +1720,7 @@ def intervals2cursors(*args, **kwargs) -> typing.Sequence:
         return xwl
 
 @safeWrapper
-def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                  epoch: neo.Epoch,
-                  channel: typing.Optional[int] = None) -> list:
+def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal], epoch: neo.Epoch, channel: typing.Optional[int] = None):
     """Signal average across an epoch's intervals.
     
     Parameters:
@@ -1687,9 +1753,8 @@ def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
     return ret
 
 @safeWrapper
-def plot_signal_vs_signal(x: typing.Union[neo.AnalogSignal, neo.Segment, neo.Block],
-                          *args, **kwargs):
-    from . import plots
+def plot_signal_vs_signal(x: typing.Union[neo.AnalogSignal, neo.Segment, neo.Block], *args, **kwargs):
+    from plots import plots
     
     if isinstance(x, neo.Block):
         segment = kwargs.pop("segment", 0)
@@ -1713,10 +1778,7 @@ def plot_signal_vs_signal(x: typing.Union[neo.AnalogSignal, neo.Segment, neo.Blo
 
 
 @safeWrapper
-def plot_spike_waveforms(x: neo.SpikeTrain, 
-                         figure: typing.Union[mpl.figure.Figure, type(None)] = None, 
-                         new: bool = True, 
-                         legend: bool = False):
+def plot_spike_waveforms(x: neo.SpikeTrain, figure: typing.Union[mpl.figure.Figure, type(None)] = None, new: bool = True, legend: bool = False):
     import matplotlib.pyplot as plt
     
     if not isinstance(x, neo.SpikeTrain):
@@ -2598,8 +2660,7 @@ def average_signals(*args, fun=np.mean):
     return ret
 
 @safeWrapper
-def aggregate_signals(*args, name_prefix:str, 
-                      collectSD:bool=True, collectSEM:bool=True) -> dict:
+def aggregate_signals(*args, name_prefix:str, collectSD:bool=True, collectSEM:bool=True):
     """Returns signal mean, SD, SEM, and number of signals in args.
     All signals must be single-channel.
     
@@ -2805,16 +2866,10 @@ def parse_step_waveform_signal(sig, method="state_levels", **kwargs):
         adcrange = kwargs.pop("adcrange", 10)
         adcscale = kwargs.pop("adcrange", 1e3)
     
-        centroids = sigp.state_levels(sig_flt.magnitude, levels = levels, 
+        centroids, cnt, edg = sigp.state_levels(sig_flt.magnitude, levels = levels, 
                                     adcres = adcres, 
                                     adcrange = adcrange, 
                                     adcscale = adcscale)
-        
-        #centroids = sigp.state_levels(sig_flt.magnitude, levels = 0.5, 
-                                    #adcres = adcres, 
-                                    #adcrange = adcrange, 
-                                    #adcscale = adcscale)
-        
         
         centroids = np.array(centroids).T[:,np.newaxis]
         
@@ -3056,9 +3111,7 @@ def diff(sig, n=1, axis=-1, prepend=False, append=True):
     return ret
 
 @safeWrapper
-def gradient(sig:[neo.AnalogSignal, DataSignal, np.ndarray], 
-             n:int=1, 
-             axis:int=0) -> neo.AnalogSignal:
+def gradient(sig:[neo.AnalogSignal, DataSignal, np.ndarray], n:int=1, axis:int=0):
     """ First order gradient through central differences.
     
     Parameters:
@@ -3119,13 +3172,9 @@ def gradient(sig:[neo.AnalogSignal, DataSignal, np.ndarray],
     ret.annotations.update(sig.annotations)
     
     return ret
-
-    
     
 @safeWrapper
-def ediff1d(sig:[neo.AnalogSignal, DataSignal, np.ndarray],
-            to_end:numbers.Number=0, 
-            to_begin:[numbers.Number, type(None)]=None) -> neo.AnalogSignal:
+def ediff1d(sig:[neo.AnalogSignal, DataSignal, np.ndarray], to_end:numbers.Number=0, to_begin:[numbers.Number, type(None)]=None):
     """Differentiates each channel of an analogsignal with respect to its time basis.
     
     Parameters:
@@ -3182,10 +3231,7 @@ def ediff1d(sig:[neo.AnalogSignal, DataSignal, np.ndarray],
     return ret
 
 @safeWrapper
-def forward_difference(sig:[neo.AnalogSignal, DataSignal, np.ndarray], 
-                       n:int=1, 
-                       to_end:numbers.Number=0,
-                       to_begin:[numbers.Number, type(None)]=None) -> neo.AnalogSignal:
+def forward_difference(sig:[neo.AnalogSignal, DataSignal, np.ndarray], n:int=1, to_end:numbers.Number=0, to_begin:[numbers.Number, type(None)]=None):
     """Calculates the forward difference along the time axis.
     
     Parameters:
@@ -3449,21 +3495,14 @@ def signal_to_noise(x, axis=None, ddof=None, db=True):
     
     return ret
     
-def generate_text_stimulus_file(spike_times, start, duration, sampling_frequency, 
-                         spike_duration, spike_value, filename,
-                         atol=1e-12, rtol=1e-12, skipInvalidTimes=True,
-                         maxSweepDuration=None):
+def generate_text_stimulus_file(spike_times, start, duration, sampling_frequency, spike_duration, spike_value, filename, atol=1e-12, rtol=1e-12, skipInvalidTimes=True, maxSweepDuration=None):
     
     spike_trace = generate_spike_trace(spike_times, start, duration, sampling_frequency, 
                          spike_duration, spike_value, asNeoSignal=False)
     
     np.savetxt(filename, spike_trace)
     
-def generate_ripple_trace(ripple_times, start, duration, sampling_frequency,
-                          spike_duration=0.001, spike_value=5000, 
-                          spike_count=5, spike_isi=0.01,
-                          filename=None, atol=1e-12, rtol=1e-12, 
-                          skipInvalidTimes=True):
+def generate_ripple_trace(ripple_times, start, duration, sampling_frequency, spike_duration=0.001, spike_value=5000, spike_count=5, spike_isi=0.01, filename=None, atol=1e-12, rtol=1e-12, skipInvalidTimes=True):
     """Similar as generate_spike_trace and generate_text_stimulus_file combined.
     
     However, ripple times are the t_start values for ripple events. In turn,
@@ -3499,8 +3538,7 @@ def generate_ripple_trace(ripple_times, start, duration, sampling_frequency,
     
     """
     
-    def __inner_generate_ripples__(t_array, sp_times, t0, t_duration, 
-                                 s_freq, skip_invalid, atol_, rtol_):
+    def __inner_generate_ripples__(t_array, sp_times, t0, t_duration, s_freq, skip_invalid, atol_, rtol_):
         
         #print(sp_times)
         #print("t_duration", t_duration)
@@ -3589,14 +3627,7 @@ def generate_ripple_trace(ripple_times, start, duration, sampling_frequency,
     
             
 @safeWrapper
-def generate_spike_trace(spike_times, start, duration, sampling_frequency, 
-                         spike_duration=0.001, spike_value=5000,
-                         atol=1e-12, rtol=1e-12, skipInvalidTimes=True,
-                         maxSweepDuration=None,
-                         asNeoSignal=True, 
-                         time_units = pq.s, spike_units=pq.mV,
-                         name="Spike trace", description="Synthetic spike trace",
-                         **annotations):
+def generate_spike_trace(spike_times, start, duration, sampling_frequency, spike_duration=0.001, spike_value=5000, atol=1e-12, rtol=1e-12, skipInvalidTimes=True, maxSweepDuration=None, asNeoSignal=True, time_units = pq.s, spike_units=pq.mV, name="Spike trace", description="Synthetic spike trace", **annotations):
     """
     Converts a spike times array file to an AnalogSignal.
     
@@ -3663,8 +3694,7 @@ def generate_spike_trace(spike_times, start, duration, sampling_frequency,
         
     """
     
-    def __inner_trace_generate__(t_array, sp_times, t0, t_duration, 
-                                 s_freq, skip_invalid, atol_, rtol_):
+    def __inner_trace_generate__(t_array, sp_times, t0, t_duration, s_freq, skip_invalid, atol_, rtol_):
         
         spike_trace = np.full_like(t_array, 0.0)
         
@@ -3800,8 +3830,6 @@ def generate_spike_trace(spike_times, start, duration, sampling_frequency,
     
     else:
         return result
-    
-    
 
 def sampling_rate_or_period(rate, period):
     """
@@ -3846,157 +3874,7 @@ def sampling_rate_or_period(rate, period):
         raise TypeError("Sampling rate or period must have units")
     
     return rate
-        
 
-def set_relative_time_start(data, t = 0 * pq.s):
-    """
-    TODO: propagate to other members of a segment as well 
-    (IrregularlySampledSignal, epochs, spike trains, etc)
-    """
-    from neo.core.spiketrainlist import SpikeTrainList
-    if isinstance(data, neo.Block):
-        for segment in data.segments:
-            for isig in segment.irregularlysampledsignals:
-                isig.times = isig.times-segment.analogsignals[0].t_start + t
-                
-            for signal in segment.analogsignals:
-                signal.t_start = t
-                
-            try:
-                new_epochs = list()
-                
-                for epoch in segment.epochs:
-                    if epoch.times.size > 0:
-                        new_times = epoch.times - epoch.times[0] + t
-                        
-                    else:
-                        new_times = epoch.times
-                        
-                    new_epoch = neo.Epoch(new_times,
-                                          durations = epoch.durations,
-                                          labels = epoch.labels,
-                                          units = epoch.units,
-                                          name=epoch.name)
-                    
-                    new_epoch.annotations.update(epoch.annotations)
-                    
-                    new_epochs.append(new_epoch)
-                    
-                segment.epochs[:] = new_epochs
-                    
-                new_trains = list()
-                
-                for spiketrain in segment.spiketrains:
-                    if spiketrain.times.size > 0:
-                        new_times = spiketrain.times - spiketrain.times[0] + t
-                        
-                    else:
-                        new_times = spiketrain.times
-                        
-                    new_spiketrain = neo.SpikeTrain(new_times, 
-                                                    t_start = spiketrain.t_start - spiketrain.times[0] + t,
-                                                    t_stop = spiketrain.t_stop - spiketrain.times[0] + t,
-                                                    units = spiketrain.units,
-                                                    waveforms = spiketrain.waveforms,
-                                                    sampling_rate = spiketrain.sampling_rate,
-                                                    name=spiketrain.name,
-                                                    description=spiketrain.description)
-                    
-                    new_spiketrain.annotations.update(spiketrain.annotations)
-                        
-                    new_trains.append(spiketrain)
-                        
-                segment.spiketrains = SpikeTrainList(items=new_trains)
-                    
-                new_events = list()
-                
-                for event in segment.events:
-                    new_times = event.times - event.times[0] + t if event.times.size > 0 else event.times
-                    
-                    if isinstance(event, TriggerEvent):
-                        new_event = TriggerEvent(times = new_times,
-                                                    labels = event.labels,
-                                                    units = event.units,
-                                                    name = event.name,
-                                                    description = event.description,
-                                                    event_type = event.event_type)
-                    else:
-                        new_event = neo.Event(times = new_times,
-                                              labels = event.labels,
-                                              units = event.units,
-                                              name=event.name,
-                                              description=event.description)
-                        
-                        new_event.annotations.update(event.annotations)
-                        
-                    new_events.append(new_event)
-
-                segment.events[:] = new_events
-            
-            except Exception as e:
-                traceback.print_exc()
-                
-    elif isinstance(data, (tuple, list)):
-        if all([isinstance(x, neo.Segment) for x in data]):
-            for s in data:
-                for isig in s.irregularlysampledsignals:
-                    isig.times = isig.times-segment.analogsignals[0].t_start + t
-                    
-                for signal in s.analogsignals:
-                    signal.t_start = t
-                    
-                for epoch in s.epochs:
-                    epoch.times = epoch.times - epoch.times[0] + t
-                    
-                for strain in s.spiketrains:
-                    strain.times = strain.times - strain.times[0] + t
-                    
-                for event in s.events:
-                    event.times = event.times - event.times[0] + t
-                
-        elif all([isinstance(x, (neo.AnalogSignal, DataSignal)) for x in data]):
-            for s in data:
-                s.t_start = t
-                
-        elif all([isinstance(x, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal))]):
-            for s in data:
-                s.times = s.times - s.times[0] + t
-                
-        elif all([isinstance(x, (neo.SpikeTrain, neo.Event, neo.Epoch))]):
-            for s in data:
-                s.times = s.times - s.times[0] + t
-                    
-                
-    elif isinstance(data, neo.Segment):
-        for isig in data.irregularlysampledsignals:
-            isig.times = isig.times-data.analogsignals[0].t_start + t
-            
-        for signal in data.analogsignals:
-            signal.t_start = t
-            
-        for epoch in data.epochs:
-            epoch.times = epoch.times - epoch.times[0] + t
-            
-        for strain in data.spiketrains:
-            strain.times = strain.times - strain.times[0] + t
-            
-        for event in data.events:
-            event.times = event.times - event.times[0] + t
-                
-    elif isinstance(data, (neo.AnalogSignal, DataSignal)):
-        data.t_start = t
-        
-    elif isinstance(data, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
-        data.times = data.times - data.times[0] + t
-        
-    elif isinstance(data, (neo.SpikeTrain, neo.Event, neo.Epoch)):
-        data.times = data.times = data.times[0] + t
-        
-    else:
-        raise TypeError("Expecting a neo.Block, neo.Segment, neo.AnalogSignal or datatypes.DataSignal; got %s instead" % type(data).__name__)
-        
-        
-    return data
 
 class ElectrophysiologyDataParser(object):
     """Encapsulate acquisition parameters and protocols for electrophysiology data
@@ -4017,7 +3895,7 @@ class ElectrophysiologyDataParser(object):
         self._alternative_DAC_command_output_ = False
         self._alternative_digital_outputs_ = False
     
-    def parse_data(self, data:neo.Block, metadata:dict=None) -> None:
+    def parse_data(self, data:neo.Block, metadata:dict=None):
         if hasattr(data, "annotations"):
             self._data_source_ = data.annotations.get("software", "unknown")
             if self._data_source_ == "Axon":
@@ -4028,7 +3906,7 @@ class ElectrophysiologyDataParser(object):
                 # parse CEDSignal, CEDSpike, EPhus, unknown
                 pass
             
-    def _parse_axon_data_(self, data:neo.Block, metadata:dict=None) -> None:
+    def _parse_axon_data_(self, data:neo.Block, metadata:dict=None):
         data_protocol = data.annotations.get("protocol", None)
         
         self._averaged_runs_ = data_protocol.get("lRunsPerTrial",1) > 1

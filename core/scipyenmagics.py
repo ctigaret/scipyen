@@ -148,9 +148,9 @@ class ScipyenMagics(Magics):
         #if isinstance(mw, ScipyenWindow):
         if mw.__class__.__name__ == "ScipyenWindow":
             if lsdata is not None:
-                lscatWindow = CaTanalysis.LSCaTWindow(lsdata, parent=mw, pWin=mw, win_title="LSCaT")
+                lscatWindow = CaTanalysis.LSCaTWindow(lsdata, parent=mw, win_title="LSCaT")
             else:
-                lscatWindow = CaTanalysis.LSCaTWindow(parent=mw, pWin=mw, win_title="LSCaT")
+                lscatWindow = CaTanalysis.LSCaTWindow(parent=mw, win_title="LSCaT")
             lscatWindow.show()
             
         #return line

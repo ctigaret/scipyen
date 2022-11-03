@@ -1,5 +1,10 @@
 """ Collection of 1D and nD functions and helper functions, for use in model fitting.
 
+WARNING: This module is on its way to deprecation, and it wil be superseded by
+modelfitting.py in the (hopefully not too distant) future.
+
+For now, stick with THIS module.
+
 """
 import numpy as np
 import quantities as pq
@@ -14,31 +19,153 @@ def check_rise_decay_params(x):
     
     return (len(x)-3) // 2
 
-def generic_exp_decay(x, offset, scale, delay, decay):
-    """Realizes f(x) = scale * exp(-(x-delay)/decay) + offset
+def generic_exp_decay(x, y0, α, x0, τ):
+    """Realizes y = α × exp(-(x-x₀)/τ) + y₀
+    
+    NOTE: Python 3 only supports a subset of the unicode character set for 
+    identifiers (or variable names). 
+    
+    For example, the following are invalid variable names: 'a₀' or 'α₀', although
+    they MAY be used in documetation; on the other hand the following ARE valid:
+    'a0', 'a_0', 'α0', or 'α_0'
+
+    To insert unicode characters in variable names in Scipyen's console, use
+    '\'followed by 'Tab' key (and if necessary, press 'Tab' a second time).
+    
+    This works as well in jupyter qtconsole, but not in plain python REPL
     """
     
-    return scale * np.exp(-(x-delay)/decay) + offset
+    return α * np.exp(-(x-x0)/τ) + y0
+
+def alphaFunction(x, parameters):
+    """
+    The Alpha function: a single exponential rise and decay, both with the same 
+    time-constant (τ):
+    
+    y = a + b⋅(x-x₀)⋅exp(-(x-x₀)/τ)/τ if x-x₀ >= 0 and a elsewhere
+    
+    where:
+        a  is the offset;
+    
+        b  is the scale;
+    
+        x₀ is the delay ("onset");
+    
+        τ  is the time constant
+    
+    
+    Parameters:
+    ===========
+    x: predictor (independent variable) - 1D numpy ndarray
+    
+    parameters: 1D numeric sequence (tuple, list, numpy array) of four elements:
+    
+                a, b, x₀, τ
+    
+    Returns:
+    ========
+    1D numpy array (vector)
+    
+    Example: (run in Scipyen's console)
+    ========
+    
+    from core import models
+    
+    x = np.linspace(0.0,1.0, 1000);
+    
+    parameters = [0, -1, 0.05, 0.01];
+    
+    y = alphaFunction(x, parameters)
+    
+    plt.plot(x,y)
+    
+    """
+    
+    # make sure x is a 1D array (vector)
+    x = x.flatten()
+    
+    # unpack parameters
+    a, b, x0, tau = parameters
+    
+    xt = (x-x0)/tau
+    
+    y = np.full_like(x, a)
+    
+    y[xt>=0] = a + b * xt[xt>=0] * np.exp(-xt[xt>=0])
+    
+    return y
+
+def Clements_Bekkers_97(x, parameters):
+    """
+    Clements & Bekkers 1997 mEPSC waveform.
+
+    This approximates a single exponential rise and decay each with their own 
+    time constant:
+    
+    y = α + β * (1 - exp(-(x-x₀)/τ₁)) ⋅ exp(-(x-x₀)/τ₂) for x-x₀ >= 0, or α elsewhere
+    
+    where:
+        α  = offset (usually, 0.);
+    
+        β  = scale;
+    
+        x₀ = delay ("onset") (ms);
+    
+        τ₁, τ₂ = time constants, respectively, for rise and decay
+    
+    
+    Parameters:
+    ============
+    x: predictor (independent variable) - 1D numpy ndarray
+
+    parameters: 1D sequence (tuple, list, numpy array) of five float scalars:
+                α, β, x₀, τ₁ and τ₂
+    
+                where:
+                    α is considered in pA,
+                    β is dimensionless,
+                    x₀, τ₁ and τ₂ are considered in s
+    
+    Returns:
+    ========
+    1D numpy array (vector)
+    
+    
+    """
+    x = x.flatten()
+    
+    a, b, x0, t1, t2 = parameters
+    
+    xx = x-x0
+    
+    y = np.full_like(xx, a)
+    
+    y[xx>=0] = a + b * (1 - np.exp(-xx[xx>=0]/t1)) * np.exp(-xx[xx>=0]/t2)
+    
+    return y
+    
+    # y(tpos)=(1-exp(t(tpos).*-1/tau1)).*exp(t(tpos).*-1/tau2)
+    
 
 def exp_rise_multi_decay(x, parameters, returnDecays = False):
     """ Realization of a transient signal with a single exponential rise (r) and
         n exponential decays (d1..dn), at an onset (delay) x0 and a given 
         "DC" component (offset) o: 
 
-        y = (1 - exp( -(x-x0)/r ) * ( a_0     * exp( -(x-x0)/d_0) + 
-                                      a_1     * exp( -(x-x0)/d_1) +
-                                      .                           +
-                                      .                           +
-                                      a_(n-1) * exp( -(x-x0)/d_(n-1) ) ) + o               (1)
+        y = (1 - exp( -(x-x₀)/r ) * ( a₀     * exp( -(x-x₀)/d₀)     + 
+                                      a₁     * exp( -(x-x₀)/d₁)     +
+                                      .                             +
+                                      .                             +
+                                      aₙ₋₁   * exp( -(x-x₀)/dₙ₋₁ )) + o               (1)
 
 
         where:
 
-            x0        = onset (delay) of the transient; only makes sense when x0 >= 0
-            r         = rising phase time constant; 
-            a_0...a_(n-1)   = scale for each of the n decay components;
-            d_0...d_(n-1)   = time constant for each of the decay components;
-            o         = offset (`DC' component)
+            x₀          = onset (delay) of the transient; only makes sense when x0 >= 0
+            r           = rising phase time constant; 
+            a₀...aₙ₋₁   = scale for each of the n decay components;
+            d₀...dₙ₋₁   = time constant for each of the decay components;
+            o           = offset (`DC' component)
             
             
     Arguments:
@@ -55,18 +182,18 @@ def exp_rise_multi_decay(x, parameters, returnDecays = False):
             
             Model parameter values are interpreted to be given in the following order:
             
-            a0, d0, <a1, d1, ...an, dn>, o, r, x0
+            a₀, d₀, <a₁, d₁, ...aₙ, dₙ>, o, r, x₀
             
             For each decay component there are two parameters: 
             a (scale) and d (time constant).
             
-            Decay components are given in order (scale0, decay0, scale1, decay1, etc)
-            and are followed by offset (o), rise time constant (r) and delay (x0).
+            Decay components are given in order (scale₀, decay₀, scale₁, decay₁, etc)
+            and are followed by offset (o), rise time constant (r) and delay (x₀).
             
-            For example, [a0, sd0, a1, d1, o, r, x0] specifies a transient signal 
-            with two decay components, (a0, d0, a1, d1)
+            For example, [a₀, d₀, a₁, d₁, o, r, x₀] specifies a transient signal 
+            with two decay components, (a₀, d₀, a₁, d₁)
             
-            The time constants (r, d_0, d_1, ...) and the delay x0 are considered to
+            The time constants (r, d₀, d₁, ...) and the delay x₀ are considered to
             be given in the same time units as x. The offset and scale parameters
             are considered to be given in the units of the signal.
             For code simplicity I do NOT use python quantities here, so appropriate scaling
@@ -79,6 +206,19 @@ def exp_rise_multi_decay(x, parameters, returnDecays = False):
     
     yd = a list of model curves for each scaled decay component; it has as many curves
         as there are 'a' and 'd' elements in parameters
+        
+        
+    NOTE: Python 3 only supports a subset of the unicode character set for 
+    identifiers (or variable names). 
+    
+    For example, the following are invalid variable names: 'a₀' or 'α₀', although
+    they MAY be used in documetation; on the other hand the following ARE valid:
+    'a0', 'a_0', 'α0', or 'α_0'
+
+    To insert unicode characters in variable names in Scipyen's console, use
+    '\'followed by 'Tab' key (and if necessary, press 'Tab' a second time).
+    
+    This works as well in jupyter qtconsole, but not in plain python terminal
     
     """
     

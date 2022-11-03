@@ -22,7 +22,7 @@ from .traitutils import (traitlets, dynamic_trait, transform_link,
                          HasTraits, TraitType, TraitsObserver, 
                          ContainerTraitsObserver, Int, Bool, All, observe)
 
-from .prog import safeWrapper
+from .prog import safeWrapper, timefunc, processtimefunc
 from .strutils import str2symbol
 
 class DataBagTraitsObserver(HasTraits):
@@ -148,8 +148,27 @@ class DataBag(Bunch):
     #@staticmethod
     @classmethod
     def _make_hidden(cls, **kwargs):
+        """ Returns a Bunch where each key in kwargs is mapped to a bool.
+        The mapping flags whether a key in kwargs is to be considered "hidden attribute".
+    
+        Contrary to this label, a "hidden attribute" is one that it is NOT a
+        trait, yet it is still "visible" to the usual access API. Rather, they
+        are "hidden" to the instance of HasTraits which implements the traitlets
+        parts in DataBag (i.e., the DataBagTraitsObserver).
+        
+        Instead, a "hidden attribute" can be queried and assigned to (in order 
+        to change the behaviour of the  DataBag object) yet it is not considered
+        a trait type (hence changing it does not trigger a notification).
+    
+        The "hidden attributes" are:
+        "length", "use_mutable", "use_casting", "allow_none","verbose"
+    
+        and are augmented here with "mutable_types" because this was added to
+        the API design later, and I want to be able to unpickle old data...
+        """
         if not issubclass(cls, DataBag):
             raise TypeError(f"Expecting a DataBag or a type derived from DataBag; got {cls.__name__} instead")
+        
         ret = Bunch([(name, kwargs.pop(name, False)) for name in list(cls.hidden_traits) + ["mutable_types"]])
         #ret = Bunch([(name, kwargs.pop(name, False)) for name in list(DataBag.hidden_traits) + ["mutable_types"]])
         ret.length = 0
@@ -238,8 +257,8 @@ class DataBag(Bunch):
         
     def _light_trait_(self, obj):
         # NOTE: 2021-09-14 13:00:51 
-        # Might have to force dictionaries to behave as Any
-        # because of the long processing times
+        # Might have to change traiturils.dynamic_trait to force dictionaries to 
+        # behave as traitlets.Any because of the long processing times
         
         
         # NOTE: 2022-01-29 19:29:56 dynamic_trait is from traitutils
@@ -284,21 +303,25 @@ class DataBag(Bunch):
         #       d.23 = "a string"
         #
         # which is syntactically invalid in Python (see "6.3.1 Attribute references" 
-        # in The Python Launguage Reference).
+        # in The Python Language Reference).
         #
-        # Therefore, attribute access emulation comes with the price that the key
-        # in the key/value pair passed to __setattr__ must be a str, and that str
-        # must be a valid Python identifier.
-        #
-        # NOTE 2020-09-05 12:47:37 One may be tempted to convert the non-string
-        # key to its string representation - but that would open a can of worms:
-        # the string representation of non numeric types and custom objects is
-        # too complex for this purpose.
+        # 
         
         if not isinstance(key, str):
             raise TypeError("Expecting a str key; got %s instead" % type(key).__name__)
         
         try:
+            # NOTE: 2022-11-03 09:43:10
+            # this `try` block is for when traits (key values in __observer__) are
+            # being set upon unpickling - the observer may not be alive yet
+            #
+            # FIXME 2022-11-03 09:44:18 
+            # I am doubtful whether a DataBag is worth serializing - for data to
+            # be serialized/pickled, a Bunch might be a better way...
+            #
+            # NOTE: 2022-11-03 09:41:36
+            # __observer__ is hidden from dir() but can be accesses manually at
+            # console, e.g. <some DataBag instance>.__observer__
             obs = object.__getattribute__(self, "__observer__") # bypass usual API
             
         except:
@@ -308,6 +331,11 @@ class DataBag(Bunch):
             obs = DataBagTraitsObserver()
             object.__setattr__(self, "__observer__", obs)
 
+        # NOTE: 2022-11-03 09:50:59
+        #### BEGIN Deal with the situation where a "hidden attribute" is being set
+        # i.e. wheh __setitem__ is invoked for assigning to a "hidden attribute"
+        # we look it up then return
+        # see self._make_hidden for details
         try:
             hid = object.__getattribute__(self, "__hidden__")
             
@@ -325,9 +353,12 @@ class DataBag(Bunch):
                 hid["use_casting"] = False
 
             return
+        #### END Deal with the situation where a "hidden attribute" is being set
         
-        if obs.has_trait(key): # assign value to an existing trait
-            # NOTE 2020-09-05 12:52:39 Below, one could use getattr(obs, key)
+        #### BEGIN Deal with the actual traitlet - assign to an existing one or add a new one
+        if obs.has_trait(key): # NOTE: 2022-11-03 12:02:45 assign new value to existing
+            # NOTE 2020-09-05 12:52:39 
+            # Below, one could use getattr(obs, key)
             # to achieve the same thing as object.__getattribute__(obs, key)
             try:
                 old_value = object.__getattribute__(obs, key)
@@ -353,8 +384,8 @@ class DataBag(Bunch):
             except:
                 traceback.print_exc()
                 
-        else:
-            # add a new trait
+        else: # NOTE: 2022-11-03 12:02:34 add a new trait
+            
             if key not in ("__observer__", "__hidden__") and key not in self.__hidden__.keys():
                 trdict = {key: self._light_trait_(val)}
                 obs.add_traits(**trdict)
@@ -363,67 +394,6 @@ class DataBag(Bunch):
                 
             super().__setitem__(key, val)
             
-    #def __setattr__(self, key, val):
-        #"""Implements dotted assignment: obj.key = val
-        #"""
-        #if not isinstance(key, str):
-            #raise TypeError(f"Expecting a str; got {type(val).__name__} instead")
-        
-        #try:
-            #obs = object.__getattribute__(self, "__observer__")
-        #except:
-            #obs = DataBagTraitsObserver()
-            #object.__setattr__(self, "__observer__", obs)
-            
-        #try:
-            #hid = object.__getattribute__(self, "__hidden__")
-            
-        #except:
-            #hid = DataBag._make_hidden()
-            #object.__setattr__(self, "__hidden__", hid)
-            
-        #if key in hid:
-            #hid[key] = val
-            
-            #if key == "use_casting" and hid["use_casting"]:
-                #hid["use_mutable"] = False
-                
-            #if key == "use_mutable" and hid["use_mutable"]:
-                #hid["use_casting"] = False
-
-            #return
-        
-        #if obs.has_trait(key):
-            #try:
-                #old_value = object.__getattribute__(obs,key)
-                #target_type = type(old_value)
-                
-                #if type(val) != target_type:
-                    #if hid["use_casting"]:
-                        #new_val = target_type(val)
-                        #object.__setattr__(obs, key, new_val)
-                        
-                    #elif hid["use_mutable"]:
-                        #self.__coerce_trait__(obs, key, val)
-                        
-                    #else:
-                        #object.__setattr__(obs, key, val)
-                #else:
-                    #object.__setattr__(obs, key, val)
-                    
-                #super().__setitem__(key, val)
-            #except:
-                #traceback.print_exc()
-                
-        #else: #add new trait
-            #if key not in ("__observer__", "__hidden__") and key not in hid.keys():
-                #trdict = {key:self._light_trait_(val)}
-                #obs.add_traits(**trdict)
-                #object.__setattr__(obs, key, val)
-                #object.__getattribute__(self, "__hidden__").length = len(trdict)
-                
-            #super().__setitem__(key, val)
-                        
     def __len__(self):
         obs = object.__getattribute__(self, "__observer__") # bypass self.__getitem__()
         ret = len(obs.traits())
@@ -506,20 +476,6 @@ class DataBag(Bunch):
         except:
             raise #KeyError("%s" % key)
         
-    #def __contains__(self, key):
-        #"""Implements membership test ("in" keyword).
-        
-    
-        #"""
-        # NOTE: 2021-10-11 12:08:05 
-        # This doesn't work because the base type dict has __iter__(), and 'in'
-        # keyword goes for it first
-        #try:
-            #obs = object.__getattribute__(self, "__observer__")
-            #return obs.has_trait(key)
-        #except:
-            #raise
-        
     def __getstate__(self):
         """Returns the state of this object's observer wrapped in a dict
         """
@@ -532,12 +488,6 @@ class DataBag(Bunch):
         else:
             d = {"__observer__": {"_trait_notifiers":{}, "_trait_validators":{}}}
             
-        #obs = object.__getattribute__(self, "__observer__", None)
-        #if obs is None:
-            #d = {"__observer--": {"_trait_notifiers":{}, "_trait_validators":{}}}
-        #else:
-            #state = obs.__getstate__()
-            #d = {"__observer__": state}
         return d
     
     def __setstate__(self, state:dict):
@@ -589,7 +539,6 @@ class DataBag(Bunch):
         
         """
         return self._trait_values
-        #return dict((k,v) for k,v in self.items())
         
     def remove_members(self, *keys):
         #print(f"DataBag.remove_members {keys}")
@@ -631,7 +580,7 @@ class DataBag(Bunch):
         """
         try:
             ret = self.__getitem__(key)
-            self.__delitem__(key) # also updates __hidden__.length
+            self.__delitem__(key) # also calls remove_trait on the observed, and updates __hidden__.length
             return ret
         except:
             if len(args) == 0:
@@ -782,6 +731,7 @@ class DataBag(Bunch):
                        use_casting=self.use_casting,
                        allow_none=self.allow_none)
             
+    #@timefunc
     def update(self, other):
         """Updates this DataBag with key/value pairs from 'other'.
         

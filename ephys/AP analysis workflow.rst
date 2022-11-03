@@ -6,4 +6,4 @@ AP analysis workflow
 
 #. call
 
->>> ephys.membrane.analyse_AP_step_injection_series()
+>>> membrane.analyse_AP_step_injection_series()

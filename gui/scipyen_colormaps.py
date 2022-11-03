@@ -73,12 +73,6 @@ from PyQt5 import QtCore, QtGui
 
 try:
     import cmocean # some cool palettes/luts
-    # NOTE 2021-03-09 16:44:36
-    # the following is not reuired as these will be registered in matplotlib.cm._cmap_registry
-    # upon importing the cmocean module, with the "cmo." prefix added to their name
-    #for k, cmap in cmocean.cm.cmap_d.items():
-        #cm.register_cmap(name=k, cmap=cmap)
-    #del(k, cmap)
 except:
     pass
 
@@ -152,153 +146,153 @@ standardPaletteDict = Bunch({
 })
 
 svgPalette = Bunch(
-    aliceblue	= (240, 248, 255),
-    antiquewhite	= (250, 235, 215),
-    aqua	= ( 0, 255, 255),
-    aquamarine	= (127, 255, 212),
-    azure	= (240, 255, 255),
-    beige	= (245, 245, 220),
-    bisque	= (255, 228, 196),
-    black	= ( 0, 0, 0),
-    blanchedalmond	= (255, 235, 205),
-    blue	= ( 0, 0, 255),
-    blueviolet	= (138, 43, 226),
-    brown	= (165, 42, 42),
-    burlywood	= (222, 184, 135),
-    cadetblue	= ( 95, 158, 160),
-    chartreuse	= (127, 255, 0),
-    chocolate	= (210, 105, 30),
-    coral	= (255, 127, 80),
-    cornflowerblue	= (100, 149, 237),
-    cornsilk	= (255, 248, 220),
-    crimson	= (220, 20, 60),
-    cyan	= ( 0, 255, 255),
-    darkblue	= ( 0, 0, 139),
-    darkcyan	= ( 0, 139, 139),
-    darkgoldenrod	= (184, 134, 11),
-    darkgray	= (169, 169, 169),
-    darkgreen	= ( 0, 100, 0),
-    darkgrey	= (169, 169, 169),
-    darkkhaki	= (189, 183, 107),
-    darkmagenta	= (139, 0, 139),
-    darkolivegreen	= ( 85, 107, 47),
-    darkorange	= (255, 140, 0),
-    darkorchid	= (153, 50, 204),
-    darkred	= (139, 0, 0),
-    darksalmon	= (233, 150, 122),
-    darkseagreen	= (143, 188, 143),
-    darkslateblue	= ( 72, 61, 139),
-    darkslategray	= ( 47, 79, 79),
-    darkslategrey	= ( 47, 79, 79),
-    darkturquoise	= ( 0, 206, 209),
-    darkviolet	= (148, 0, 211),
-    deeppink	= (255, 20, 147),
-    deepskyblue	= ( 0, 191, 255),
-    dimgray	= (105, 105, 105),
-    dimgrey	= (105, 105, 105),
-    dodgerblue	= ( 30, 144, 255),
-    firebrick	= (178, 34, 34),
-    floralwhite	= (255, 250, 240),
-    forestgreen	= ( 34, 139, 34),
-    fuchsia	= (255, 0, 255),
-    gainsboro	= (220, 220, 220),
-    ghostwhite	= (248, 248, 255),
-    gold	= (255, 215, 0),
-    goldenrod	= (218, 165, 32),
-    gray	= (128, 128, 128),
-    grey	= (128, 128, 128),
-    green	= ( 0, 128, 0),
-    greenyellow	= (173, 255, 47),
-    honeydew	= (240, 255, 240),
-    hotpink	= (255, 105, 180),
-    indianred	= (205, 92, 92),
-    indigo	= ( 75, 0, 130),
-    ivory	= (255, 255, 240),
-    khaki	= (240, 230, 140),
-    lavender	= (230, 230, 250),
-    lavenderblush	= (255, 240, 245),
-    lawngreen	= (124, 252, 0),
-    lemonchiffon	= (255, 250, 205),
-    lightblue	= (173, 216, 230),
-    lightcoral	= (240, 128, 128),
-    lightcyan	= (224, 255, 255),
-    lightgoldenrodyellow	= (250, 250, 210),
-    lightgray	= (211, 211, 211),
-    lightgreen	= (144, 238, 144),
-    lightgrey	= (211, 211, 211),
-    lightpink	= (255, 182, 193),
-    lightsalmon	= (255, 160, 122),
-    lightseagreen	= ( 32, 178, 170),
-    lightskyblue	= (135, 206, 250),
-    lightslategray	= (119, 136, 153),
-    lightslategrey	= (119, 136, 153),
-    lightsteelblue	= (176, 196, 222),
-    lightyellow	= (255, 255, 224),
-    lime	= ( 0, 255, 0),
-    limegreen	= ( 50, 205, 50),
-    linen	= (250, 240, 230),
-    magenta	= (255, 0, 255),
-    maroon	= (128, 0, 0),
-    mediumaquamarine	= (102, 205, 170),
-    mediumblue	= ( 0, 0, 205),
-    mediumorchid	= (186, 85, 211),
-    mediumpurple	= (147, 112, 219),
-    mediumseagreen	= ( 60, 179, 113),
-    mediumslateblue	= (123, 104, 238),
-    mediumspringgreen	= ( 0, 250, 154),
-    mediumturquoise	= ( 72, 209, 204),
-    mediumvioletred	= (199, 21, 133),
-    midnightblue	= ( 25, 25, 112),
-    mintcream	= (245, 255, 250),
-    mistyrose	= (255, 228, 225),
-    moccasin	= (255, 228, 181),
-    navajowhite	= (255, 222, 173),
-    navy	= ( 0, 0, 128),
-    oldlace	= (253, 245, 230),
-    olive	= (128, 128, 0),
-    olivedrab	= (107, 142, 35),
-    orange	= (255, 165, 0),
-    orangered	= (255, 69, 0),
-    orchid	= (218, 112, 214),
-    palegoldenrod	= (238, 232, 170),
-    palegreen	= (152, 251, 152),
-    paleturquoise	= (175, 238, 238),
-    palevioletred	= (219, 112, 147),
-    papayawhip	 = (255, 239, 213),
-    peachpuff	= (255, 218, 185),
-    peru	= (205, 133, 63),
-    pink	= (255, 192, 203),
-    plum	= (221, 160, 221),
-    powderblue	 = (176, 224, 230),
+    aliceblue = (240, 248, 255),
+    antiquewhite = (250, 235, 215),
+    aqua = ( 0, 255, 255),
+    aquamarine    = (127, 255, 212),
+    azure = (240, 255, 255),
+    beige = (245, 245, 220),
+    bisque = (255, 228, 196),
+    black = ( 0, 0, 0),
+    blanchedalmond     = (255, 235, 205),
+    blue = ( 0, 0, 255),
+    blueviolet    = (138, 43, 226),
+    brown    = (165, 42, 42),
+    burlywood    = (222, 184, 135),
+    cadetblue    = ( 95, 158, 160),
+    chartreuse    = (127, 255, 0),
+    chocolate    = (210, 105, 30),
+    coral    = (255, 127, 80),
+    cornflowerblue    = (100, 149, 237),
+    cornsilk    = (255, 248, 220),
+    crimson    = (220, 20, 60),
+    cyan    = ( 0, 255, 255),
+    darkblue    = ( 0, 0, 139),
+    darkcyan    = ( 0, 139, 139),
+    darkgoldenrod    = (184, 134, 11),
+    darkgray    = (169, 169, 169),
+    darkgreen    = ( 0, 100, 0),
+    darkgrey    = (169, 169, 169),
+    darkkhaki    = (189, 183, 107),
+    darkmagenta    = (139, 0, 139),
+    darkolivegreen    = ( 85, 107, 47),
+    darkorange    = (255, 140, 0),
+    darkorchid    = (153, 50, 204),
+    darkred    = (139, 0, 0),
+    darksalmon    = (233, 150, 122),
+    darkseagreen    = (143, 188, 143),
+    darkslateblue    = ( 72, 61, 139),
+    darkslategray    = ( 47, 79, 79),
+    darkslategrey    = ( 47, 79, 79),
+    darkturquoise    = ( 0, 206, 209),
+    darkviolet    = (148, 0, 211),
+    deeppink    = (255, 20, 147),
+    deepskyblue    = ( 0, 191, 255),
+    dimgray    = (105, 105, 105),
+    dimgrey    = (105, 105, 105),
+    dodgerblue    = ( 30, 144, 255),
+    firebrick    = (178, 34, 34),
+    floralwhite    = (255, 250, 240),
+    forestgreen    = ( 34, 139, 34),
+    fuchsia    = (255, 0, 255),
+    gainsboro    = (220, 220, 220),
+    ghostwhite    = (248, 248, 255),
+    gold    = (255, 215, 0),
+    goldenrod    = (218, 165, 32),
+    gray    = (128, 128, 128),
+    grey    = (128, 128, 128),
+    green    = ( 0, 128, 0),
+    greenyellow    = (173, 255, 47),
+    honeydew    = (240, 255, 240),
+    hotpink    = (255, 105, 180),
+    indianred    = (205, 92, 92),
+    indigo    = ( 75, 0, 130),
+    ivory    = (255, 255, 240),
+    khaki    = (240, 230, 140),
+    lavender    = (230, 230, 250),
+    lavenderblush    = (255, 240, 245),
+    lawngreen    = (124, 252, 0),
+    lemonchiffon    = (255, 250, 205),
+    lightblue    = (173, 216, 230),
+    lightcoral    = (240, 128, 128),
+    lightcyan    = (224, 255, 255),
+    lightgoldenrodyellow    = (250, 250, 210),
+    lightgray    = (211, 211, 211),
+    lightgreen    = (144, 238, 144),
+    lightgrey    = (211, 211, 211),
+    lightpink    = (255, 182, 193),
+    lightsalmon    = (255, 160, 122),
+    lightseagreen    = ( 32, 178, 170),
+    lightskyblue    = (135, 206, 250),
+    lightslategray    = (119, 136, 153),
+    lightslategrey    = (119, 136, 153),
+    lightsteelblue    = (176, 196, 222),
+    lightyellow    = (255, 255, 224),
+    lime    = ( 0, 255, 0),
+    limegreen    = ( 50, 205, 50),
+    linen    = (250, 240, 230),
+    magenta    = (255, 0, 255),
+    maroon    = (128, 0, 0),
+    mediumaquamarine    = (102, 205, 170),
+    mediumblue    = ( 0, 0, 205),
+    mediumorchid    = (186, 85, 211),
+    mediumpurple    = (147, 112, 219),
+    mediumseagreen    = ( 60, 179, 113),
+    mediumslateblue    = (123, 104, 238),
+    mediumspringgreen    = ( 0, 250, 154),
+    mediumturquoise    = ( 72, 209, 204),
+    mediumvioletred    = (199, 21, 133),
+    midnightblue    = ( 25, 25, 112),
+    mintcream    = (245, 255, 250),
+    mistyrose    = (255, 228, 225),
+    moccasin    = (255, 228, 181),
+    navajowhite    = (255, 222, 173),
+    navy    = ( 0, 0, 128),
+    oldlace    = (253, 245, 230),
+    olive    = (128, 128, 0),
+    olivedrab    = (107, 142, 35),
+    orange    = (255, 165, 0),
+    orangered    = (255, 69, 0),
+    orchid    = (218, 112, 214),
+    palegoldenrod    = (238, 232, 170),
+    palegreen    = (152, 251, 152),
+    paleturquoise    = (175, 238, 238),
+    palevioletred    = (219, 112, 147),
+    papayawhip     = (255, 239, 213),
+    peachpuff    = (255, 218, 185),
+    peru    = (205, 133, 63),
+    pink    = (255, 192, 203),
+    plum    = (221, 160, 221),
+    powderblue     = (176, 224, 230),
     purple = (128, 0, 128),
-    red	= (255, 0, 0),
-    rosybrown	= (188, 143, 143),
-    royalblue	= ( 65, 105, 225),
-    saddlebrown	= (139, 69, 19),
-    salmon	 = (250, 128, 114),
-    sandybrown	 = (244, 164, 96),
-    seagreen	= ( 46, 139, 87),
-    seashell	= (255, 245, 238),
-    sienna	 = (160, 82, 45),
-    silver	 = (192, 192, 192),
-    skyblue	= (135, 206, 235),
-    slateblue	= (106, 90, 205),
-    slategray	= (112, 128, 144),
-    slategrey	= (112, 128, 144),
-    snow	= (255, 250, 250),
-    springgreen 	= ( 0, 255, 127),
-    steelblue 	= ( 70, 130, 180),
-    tan	= (210, 180, 140),
-    teal	= ( 0, 128, 128),
-    thistle	= (216, 191, 216),
-    tomato	= (255, 99, 71),
-    turquoise	= ( 64, 224, 208),
-    violet	= (238, 130, 238),
-    wheat	= (245, 222, 179),
-    white	= (255, 255, 255),
-    whitesmoke	= (245, 245, 245),
-    yellow	= (255, 255, 0),
-    yellowgreen	= (154, 205, 50),
+    red    = (255, 0, 0),
+    rosybrown    = (188, 143, 143),
+    royalblue    = ( 65, 105, 225),
+    saddlebrown    = (139, 69, 19),
+    salmon     = (250, 128, 114),
+    sandybrown     = (244, 164, 96),
+    seagreen    = ( 46, 139, 87),
+    seashell    = (255, 245, 238),
+    sienna     = (160, 82, 45),
+    silver     = (192, 192, 192),
+    skyblue    = (135, 206, 235),
+    slateblue    = (106, 90, 205),
+    slategray    = (112, 128, 144),
+    slategrey    = (112, 128, 144),
+    snow    = (255, 250, 250),
+    springgreen     = ( 0, 255, 127),
+    steelblue     = ( 70, 130, 180),
+    tan    = (210, 180, 140),
+    teal    = ( 0, 128, 128),
+    thistle    = (216, 191, 216),
+    tomato    = (255, 99, 71),
+    turquoise    = ( 64, 224, 208),
+    violet    = (238, 130, 238),
+    wheat    = (245, 222, 179),
+    white    = (255, 255, 255),
+    whitesmoke    = (245, 245, 245),
+    yellow    = (255, 255, 0),
+    yellowgreen    = (154, 205, 50),
     )
 
 qtGlobalColors = Bunch((x,n) for x, n in vars(QtCore.Qt).items() if isinstance(n, QtCore.Qt.GlobalColor))
@@ -1144,21 +1138,18 @@ def register_colormaps(colormap_dict, prefix:typing.Optional[str]=None,
             matplotlib.colors.LinearSegmentedColormap()
     
     """
+    # print(f"Registering custom colormaps {colormap_dict}")
     for cmap in colormap_dict:
-        if isinstance(prefix, str) and len(prefix.strip()):
-            cmap = "%s.%s" % (prefix, cmap)
+        cdata = colormap_dict[cmap]
+        register_colormap(cdata, name=cmap, prefix=None, N=N, gamma=gamma)
             
-        if cmap not in cm._cmap_registry:
-            cdata = colormap_dict[cmap]
-            register_colormap(cdata, name=cmap, prefix=None, N=N, gamma=gamma)
-            
-
 def register_colormap(cdata, name:typing.Optional[str]=None, 
                       prefix:typing.Optional[str]=None,
                       N:typing.Optional[int]=None, 
-                      gamma:typing.Optional[float]=0.1):
+                      gamma:typing.Optional[float]=1.0):
     """Registers a custom colormap with matplotlib.
     """
+    # print(f"register_colormap cdata: {cdata}")
     if isinstance(cdata, dict) and all([s in cdata for s in ("red", "green", "blue")]):
         if not (isinstance(name, str) and len(name.strip())):
             name = "LinearSegmentedMap"
@@ -1166,10 +1157,20 @@ def register_colormap(cdata, name:typing.Optional[str]=None,
         if isinstance(prefix, str) and len(prefix.strip()):
             name = "%s.%s" % (prefix, name)
             
-        if name in cm._cmap_registry:
-            warnings.warn("Colormap %s is already registered; this will overwrite it")
-    
-        cm.register_cmap(name = name, cmap = colors.LinearSegmentedColormap(name=name, segmentdata=cdata, N=N, gamma=gamma))
+        # print(f"Registering Colormap: {name}")
+        if name not in mpl.colormaps:
+            mpl.colormaps.register(cmap = colors.LinearSegmentedColormap(name, cdata, N, gamma),
+                                    name=name,force=True)
+#         if mpl._version.version_tuple[1] >= 6:
+#                                        
+#                 
+#         else:
+#             if name in cm._cmap_registry:
+#                 warnings.warn("Colormap %s is already registered; this will overwrite it")
+#         
+#             cm.register_cmap(name = name, cmap = colors.LinearSegmentedColormap(name, cdata, N, gamma))
+                    
+                
         
     elif isinstance(cdata, (tuple, list)) and all([(isinstance(rgb, (tuple, list)) and len(rgb) == 3) for rgb in cdata]):
         if not (isinstance(name, str) and len(name.strip())):
@@ -1178,10 +1179,16 @@ def register_colormap(cdata, name:typing.Optional[str]=None,
         if isinstance(prefix, str) and len(prefix.strip()):
             name = "%s.%s" % (prefix, name)
             
-        if name in cm._cmap_registry:
-            warnings.warn("Colormap %s is already registered; this will overwrite it")
-    
-        cm.register_cmap(name=name, cmap=colors.ListedColormap(np.array(cdata), name=name, N=N))
+        
+        if mpl._version.version_tuple[1] >= 6:
+            if name not in mpl.colormaps:
+                mpl.colormaps.register(cmap = colors.ListedColormap(np.array(cdata), name, N), force=True)
+                
+        else:
+            if name in cm._cmap_registry:
+                warnings.warn("Colormap %s is already registered; this will overwrite it")
+        
+            cm.register_cmap(name=name, cmap=colors.ListedColormap(np.array(cdata), name, N))
         
     elif isinstance(cdata, np.array) and cdata.shape[1] == 3:
         if not (isinstance(name, str) and len(name.strip())):
@@ -1190,20 +1197,31 @@ def register_colormap(cdata, name:typing.Optional[str]=None,
         if isinstance(prefix, str) and len(prefix.strip()):
             name = "%s.%s" % (prefix, name)
             
-        if name in cm._cmap_registry:
-            warnings.warn("Colormap %s is already registered; this will overwrite it")
-    
-        cm.register_cmap(name=name, cmap=colors.ListedColormap(cdata, name=name, N=N))
+        if mpl._version.version_tuple[1] >= 6:
+            if name not in mpl.colormaps:
+                mpl.colormaps.register(cmap = colors.ListedColormap(cdata, name, N), force=True)
+                
+        else:
+            if name in cm._cmap_registry:
+                warnings.warn("Colormap %s is already registered; this will overwrite it")
+        
+            cm.register_cmap(name=name, cmap=colors.ListedColormap(cdata, name, N))
         
     elif isinstance(cdata, colors.Colormap):
         if isinstance(name, str) and len(name.strip()):
             if isinstance(prefix, str) and len(prefix.strip()):
                 name = "%s.%s" % (prefix, name)
                 
-            cm.register_cmap(name=name, cmap=cdata)
+            if mpl._version.versino_tuple[1] >= 6:
+                mpl.colormaps.register(cmap = cdata, name=name, force=True)
+            else:
+                cm.register_cmap(name=name, cmap=cdata)
             
         else:
-            cm.register_cmap(cmap=cdata)
+            if mpl._version.version_tuple[1] >= 6:
+                mpl.colormaps.register(cdata, force=True)
+            else:
+                cm.register_cmap(cmap=cdata)
             
     else:
         warnings.warn("Cannot interpret color data for %s" % cmap)
@@ -1211,9 +1229,54 @@ def register_colormap(cdata, name:typing.Optional[str]=None,
 
 def get(name, lut=None, default=None):
     if isinstance(name, str) and len(name.strip()):
-        if name in cm._cmap_registry:
-            return cm.get_cmap(name=name, lut=lut)
+        if mpl._version.version_tuple[1]>= 6:
+            if name in mpl.colormaps:
+                cmap = mpl.colormaps[name]
+            else:
+                if default is None:
+                    cmap = mpl.colormaps["gray"]
+                elif isinstance(default, str) and default in mpl.colormaps:
+                    cmap = mpl.colormaps[default]
+                else:
+                    cmap = mpl.colormaps["gray"]
+                
+            if lut is not None:
+                return cmap.resampled(lut)
+            else:
+                return cmap
+            
+        else:
+            if name in cm._cmap_registry:
+                return cm.get_cmap(name=name, lut=lut)
 
+            else:
+                if default is None:
+                    return cm.get_cmap(name="gray", lut=lut)
+                
+                elif isinstance(default, str) and default in cm._cmap_registry:
+                    return cm.get_cmap(name=default, lut=lut)
+                
+                return cm.get_cmap(name="gray", lut=lut)
+        #return cm._cmap_registry[name]
+    
+    elif isinstance(name, colors.Colormap):
+        return name
+    
+    else:
+        if mpl._version.version_tuple[1] >= 6:
+            if default is None:
+                cmap = mpl.colormaps["gray"]
+            
+            elif isinstance(default, str) and default in mpl.colormaps:
+                cmap = mpl.colormaps[default]
+            else:
+                cmap = mpl.colormaps["gray"]
+            
+            if lut is not None:
+                return cmap.resampled(lut)
+            else:
+                return cmap
+    
         else:
             if default is None:
                 return cm.get_cmap(name="gray", lut=lut)
@@ -1222,19 +1285,6 @@ def get(name, lut=None, default=None):
                 return cm.get_cmap(name=default, lut=lut)
             
             return cm.get_cmap(name="gray", lut=lut)
-        #return cm._cmap_registry[name]
-    
-    elif isinstance(name, colors.Colormap):
-        return name
-    
-    else:
-        if default is None:
-            return cm.get_cmap(name="gray", lut=lut)
-        
-        elif isinstance(default, str) and default in cm._cmap_registry:
-            return cm.get_cmap(name=default, lut=lut)
-        
-        return cm.get_cmap(name="gray", lut=lut)
     
 def plot_linearmap(cdict):
     newcmp = colors.LinearSegmentedColormap('testCmap', segmentdata=cdict, N=256)
@@ -1265,7 +1315,7 @@ def read_colormap(filename:str, name:typing.Optional[str]=None,
     
     name:str (optional default is None)
         Name of the colormap. When None or an empty string, the colormap gets 
-        its name fromt hen basename of the file
+        its name from the basename of the file
     
     N:int (default: 256) number of colors 
     
@@ -1420,8 +1470,13 @@ def save_colormap(cmap:typing.Union[colors.LinearSegmentedColormap, colors.Liste
     except:
         traceback.print_exc()
     
-
-cm.register_cmap(name="None", cmap=cm.get_cmap(name="gray"))
+if mpl._version.version_tuple[1] >= 6:
+    mpl.colormaps.register(cmap = mpl.colormaps.get("gray"), name="None")
+else:
+    cm.register_cmap(name="None", cmap=cm.get_cmap(name="gray"))
+    
+# def registerCustomColorMaps():
+#     register_colormaps(CustomColorMaps)
 
 register_colormaps(CustomColorMaps)
     

@@ -1,4 +1,5 @@
-"""quickdialog module adaptedfrom vigranumpy.pyqt.quickdialog
+"""quickdialog module adapted from vigranumpy.pyqt.quickdialog
+Useful to have even when vigranumpy is not installed.
 """
 #######################################################################
 #                                                                      
@@ -38,7 +39,8 @@
 # Adaptation for use with PyQt5
 # Copyright 209-2021 by Cezar M. Tigaret (cezar.tigaret@gmail.com, TigaretC@cardiff.ac.uk)
 #########################################################################
-import os, typing
+import os, typing, inspect, math
+import numpy as np
 import PyQt5.QtCore as QtCore
 import PyQt5.QtGui as QtGui
 import PyQt5.QtWidgets as QtWidgets
@@ -127,7 +129,7 @@ class _OptionalValueInput(QtWidgets.QFrame):
         parent.addWidget(self)
         self.label = QtWidgets.QLabel(label)
         self.variable = QtWidgets.QLineEdit()
-        self.variable.setValidator(self._QValidator(self.variable))
+        self.variable.setValidator(self._QValidator(parent=self.variable))
 
         self._layout = QtWidgets.QHBoxLayout()
         self._layout.setSpacing(5)
@@ -187,9 +189,30 @@ class OptionalIntegerInput(_OptionalValueInput):
 class IntegerInput(OptionalIntegerInput):
     def value(self):
         return int(self.text())
+    
+class InftyDoubleValidator(QtGui.QDoubleValidator):
+    def __init__(self, bottom:float=-math.inf, top:float=math.inf, decimals:int=4, parent=None):
+        QtGui.QDoubleValidator.__init__(self,parent)
+        self.setBottom(bottom)
+        self.setTop(top)
+        self.setDecimals(decimals)
+        
+    def validate(self, s:str, pos:int):
+        valid = super().validate(s, pos)
+        # print(f"InftyDoubleValidator.validate s: {s}, pos: {pos}, valid {valid}, type: {type(valid).__name__}")
+        if valid[0] not in (QtGui.QValidator.Intermediate, QtGui.QValidator.Acceptable):
+            if s.lower() in ("-i", "i", "-in", "in"):
+                return (QtGui.QValidator.Intermediate, s, pos)
+            elif s.lower() in ("-inf", "inf"):
+                return (QtGui.QValidator.Acceptable, s, pos)
+            else:
+                return (QtGui.QValidator.Invalid, s, pos)
+            
+        return valid
 
 class OptionalFloatInput(_OptionalValueInput):
-    _QValidator = QtGui.QDoubleValidator
+    # _QValidator = QtGui.QDoubleValidator
+    _QValidator = InftyDoubleValidator
     _text2Value = float
     _mustContain = "a float"
 
@@ -291,8 +314,9 @@ class VChoice(Choice):
         Choice.__init__(self, parent, label, 1)
         
 class DialogGroup(QtWidgets.QFrame):
-    def __init__(self, parent, vertical = 0):
+    def __init__(self, parent, vertical = 0, validate=True):
         QtWidgets.QFrame.__init__(self, parent)
+        self.bypassValidation = not validate
         parent.addWidget(self)
         if vertical:
             self.layout = QtWidgets.QVBoxLayout(self)
@@ -319,21 +343,29 @@ class DialogGroup(QtWidgets.QFrame):
         self.addWidget(label, 0, QtCore.Qt.AlignLeft)
         
     def validate(self):
+        if self.bypassValidation:
+            # allow the use of stock Qt widgets which have their own validator
+            # (abd their validate() method takes extra mandatory arguments)
+            return True
+        
         for i in self.widgets:
             try:
                 if i.validate() == 0:
                     return False
             except AttributeError:
                 continue
+            
         return True
 
 class HDialogGroup(DialogGroup):
-    def __init__(self, parent):
-        DialogGroup.__init__(self, parent, 0)
+    def __init__(self, parent, validate=True):
+        DialogGroup.__init__(self, parent, 0, validate=validate)
         
 class VDialogGroup(DialogGroup):
-    def __init__(self, parent):
-        DialogGroup.__init__(self, parent, 1)
+    def __init__(self, parent, validate=True):
+        DialogGroup.__init__(self, parent, 1, validate=validate)
+        
+
        
 class QuickDialogComboBox(QtWidgets.QFrame):
     """A combobox to use with a QuickDialog.
@@ -465,19 +497,73 @@ class VariableNameStringInput(StringInput):
             self.variable.setText(validate_varname(self.text()))
         return True
     
+class QuickWidget(QtWidgets.QWidget):
+    """Quick creation of a custom widget
+    TODO: 2022-10-28 11:27:24
+    """
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, layoutType:type=QtWidgets.QVBoxLayout):
+        QtWidgets.QWidget.__init__(self, parent)
+        if QtWidgets.QLayout in inspect.getmro(layoutType):
+            self.layout = layoutType(self)
+        else:
+            self.layout = QtWidgets.QVBoxLayout(self)
+            
+        if isinstance(self.layout, QtWidgets.QGridLayout):
+            self.layout.setColumnStretch(5)
+            self.layout.setRowStretch(5)
+            self.layout.setVerticalSpacing(20)
+            self.layout.setHorizontalSpacing(20)
+        else:
+            self.layout.addStretch(5)
+            self.layout.addSpacing(20)
+            
+        self.widgets = list()
+        self.resize(500, -1)
+        
+    def addWidget(self, widget, stretch = 0, alignment = None):
+        if alignment is None:
+            alignment = QtCore.Qt.AlignTop
+        self.layout.insertWidget(len(self.widgets), widget, stretch, alignment)
+        self.widgets.append(widget)
+        
+            
+    def addSpacing(self, spacing):
+        self.layout.insertWidget(len(self.widgets), spacing)
+        self.widgets.append(None)
+        
+    def addStretch(self, stretch):
+        self.layout.insertStretch(len(self.widgets), stretch)
+        self.widgets.append(None)
+
+    def addLabel(self, labelString):
+        label = QtWidgets.QLabel(labelString, self)
+        self.addWidget(label, 0, QtCore.Qt.AlignLeft)
+    
 class QuickDialog(QtWidgets.QDialog):
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, title:typing.Optional[str]=None):
+    """From vigranumpy.pyqt.quickdialog"""
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, title:typing.Optional[str]=None, addStretch=True, addSpacing=True):
         QtWidgets.QDialog.__init__(self, parent)
 
         self.layout = QtWidgets.QVBoxLayout(self)
-        self.layout.addStretch(5)
-        self.layout.addSpacing(20)
+        if isinstance(addStretch, bool):
+            if addStretch:
+                self.layout.addStretch(5)
+                
+        elif isinstance(addStretch, int):
+            self.layout.addStretch(addStretch)
+                
+        if isinstance(addSpacing, bool):
+            if addSpacing:
+                self.layout.addSpacing(20)
+        elif isinstance(addSpacing, int):
+            self.layout.addSpacing(addSpacing)
         
         self.insertButtons()
         
         self.widgets = []
         if not isinstance(title, str) or len(title.strip()) == 0:
             title = "QuickDialog"
+            
         self.setWindowTitle(title)
         #self.setOrientation(QtCore.Qt.Vertical)
         self.resize(500,-1)
@@ -489,8 +575,6 @@ class QuickDialog(QtWidgets.QDialog):
         self.buttons.OK.setDefault(1)
         self.buttons.Cancel.clicked.connect(self.reject)
         self.buttons.OK.clicked.connect(self.tryAccept)
-        #self.connect(self.buttons.Cancel, SIGNAL("clicked()"), self.reject)
-        #self.connect(self.buttons.OK, SIGNAL("clicked()"), self.tryAccept)
         
         self.buttons.layout = QtWidgets.QHBoxLayout(self.buttons)
         self.buttons.layout.addStretch(5)

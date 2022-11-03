@@ -27,9 +27,9 @@ from traitlets.traitlets import (TraitError, TraitType, Instance, Container,
                                  Undefined, Unicode, is_trait)
 
 from .traitcontainers import DataBag
-from .traitutils import enhanced_traitlet_set
+#from .traitutils import (enhanced_traitlet_set, standard_traitlet_set)
 
-from .utilities import (gethash, safe_identity_test)
+from .utilities import gethash
 
 # NOTE: DataBagTrait <- Instance <- ClassBasedTraitType <- TraitType <- BaseDescriptor
 
@@ -369,7 +369,7 @@ class DataBagTrait(Instance):
                 value_trait = None
                 
         elif isinstance(default_value, DataBag):
-            self.hashed = gethash(default_value.as_dict)
+            self.hashed = gethash(default_value.as_dict) # FIXME/TODO this slows down; must find a way to speed up - give up on gethash?
 
         if per_key_traits is not None:
             if is_trait(per_key_traits):

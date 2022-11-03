@@ -3,6 +3,9 @@
 NOTE: 2022-01-29 13:32:21
 There are issues when trying to implement traitlets for collection's CONTENTS,
 see docstring in scipyen_traitlets module (FIXME/TODO 2022-01-29 13:29:19)
+# NOTE: 2022-11-03 14:36:21
+I'm sure there are lots of BUG(s) and/or redundant code - definitely needs
+cleaning up...
 """
 
 import enum
@@ -13,6 +16,7 @@ from inspect import (getmro, isclass, isfunction, signature,)
 import quantities as pq
 import numpy as np
 from types import new_class
+import typing
 from collections import deque
 from functools import (partial, partialmethod)
 
@@ -26,7 +30,7 @@ from traitlets import (HasTraits, MetaHasTraits, TraitType, All, Any, Bool, CBoo
     Type, This, Instance, TCPAddress, List, Tuple, UseEnum, ObjectName, 
     DottedObjectName, CRegExp, ForwardDeclaredType, ForwardDeclaredInstance, 
     link, directional_link, validate, observe, default,
-    observe_compat, BaseDescriptor, HasDescriptors,
+    observe_compat, BaseDescriptor, HasDescriptors, Container,
     )
 #, EventHandler,
     #)
@@ -47,6 +51,7 @@ import quantities as pq
 from core import datasignal
 from core.quantities import units_convertible
 from core.utilities import gethash, safe_identity_test
+from .prog import (timefunc, processtimefunc)
 
 # NOTE :2021-08-20 09:50:52
 # to figure out traitlets classes use the following idioms:
@@ -95,14 +100,17 @@ TRAITSMAP = {           # use casting versions
     #function:   (Any,)
     }
 
+#@timefunc
 def enhanced_traitlet_set(instance, obj, value):
     """Overrides traitlets.TraitType.set to check for special hash.
     This is supposed to also detect changes in the order of elements in sequences.
+    WARNING: Slows down execution
     """
     #print("enhanced set for %s" % type(instance).__name__)
-    #print("enhanced set for %s; value %s" % (type(instance).__name__, value))
+    # print("enhanced set for %s; value %s" % (type(instance).__name__, value))
     
-    new_value = instance._validate(obj, value)
+    #new_value = instance._validate(obj, value)
+    new_value = value
     
     try:
         old_value = obj._trait_values[instance.name]
@@ -111,10 +119,12 @@ def enhanced_traitlet_set(instance, obj, value):
         #print(f"{instance.name} not found")
         old_value = instance.default_value
         
-
+    # print(f"old_value {old_value} new_value {new_value}")
+    
     obj._trait_values[instance.name] = new_value
     
     try:
+        #silent = new_value is old_value
         new_hash = gethash(new_value)
         #print("\told %s (hash %s)\n\tnew %s (hash %s)" % (old_value, instance.hashed, new_value, new_hash))
         #print(instance.name, "old hashed", instance.hashed, "new_hash", new_hash)
@@ -141,10 +151,62 @@ def enhanced_traitlet_set(instance, obj, value):
         # comparison above returns something other than True/False
         obj._notify_trait(instance.name, old_value, new_value)
 
+#@timefunc
+def standard_traitlet_set(instance, obj, value):
+    """Overrides traitlets.TraitType.set to check for special hash.
+    This is supposed to also detect changes in the order of elements in sequences.
+    """
+    #print("enhanced set for %s" % type(instance).__name__)
+    #print("enhanced set for %s; value %s" % (type(instance).__name__, value))
+    
+    #new_value = instance._validate(obj, value)
+    new_value = value
+    
+    try:
+        old_value = obj._trait_values[instance.name]
+        
+    except KeyError:
+        #print(f"{instance.name} not found")
+        old_value = instance.default_value
+        
+
+    obj._trait_values[instance.name] = new_value
+    
+    obj._notify_trait(instance.name, old_value, new_value)
+    
+    #try:
+        ##silent = new_value is old_value
+        #new_hash = gethash(new_value)
+        ##print("\told %s (hash %s)\n\tnew %s (hash %s)" % (old_value, instance.hashed, new_value, new_hash))
+        ##print(instance.name, "old hashed", instance.hashed, "new_hash", new_hash)
+        #silent = (new_hash == instance.hashed)
+        
+        #if not silent:
+            #instance.hashed = new_hash
+            
+        ### NOTE: 2021-08-19 16:17:23
+        ### check for change in contents
+        ##if silent is not False:
+            ##new_hash = gethash(new_value)
+            ##silent = (new_hash == instance.hashed)
+            ##print("%s: silent after hash" % instance.name, silent)
+            ##if not silent:
+                ##instance.hashed = new_hash
+    #except:
+        #traceback.print_exc()
+        ## if there is an error in comparing, default to notify
+        #silent = False
+        
+    #if silent is not True:
+        ## we explicitly compare silent to True just in case the equality
+        ## comparison above returns something other than True/False
+        #obj._notify_trait(instance.name, old_value, new_value)
+
 def _dynatrtyp_exec_body_(ns, setfn = enhanced_traitlet_set):
     #print("ns:", ns)
     ns["info_text"]="Trait that is sensitive to content change"
-    ns["hashed"] = 0
+    # ns["hashed"] = 0
+    ns["hashed"] = -1
     ns["set"] = setfn
     
 #@safeWrapper
@@ -190,21 +252,10 @@ def adapt_args_kw(x, args, kw, allow_none):
         if "axistags" not in kw:
             kw["axistags"] = None # calls VigraArray.defaultAxistags or uses x.axistags if they exist
             
-    #elif isinstance(x, neo.ChannelIndex):
-        #if len(args) == 0:
-            #args = (x.index, )
-            
-        ##for attr in x._all_attrs:
-        #for attr in x._necessary_attrs:
-            #if attr[0] != "index":
-                #if attr[0] not in kw:
-                    #kw[attr[0]] = getattr(x, attr[0])
-        
     elif isinstance(x, (neo.AnalogSignal, datasignal.DataSignal)):
         if len(args) == 0:
             args = (x,) # takes units & time units from x
             
-        #for attr in x._all_attrs:
         for attr in x._necessary_attrs:
             if attr[0] != "signal":
                 if attr[0] not in kw:
@@ -214,41 +265,15 @@ def adapt_args_kw(x, args, kw, allow_none):
         if len(args) < 2:
             args = (x.times, x,)
             
-        #signature = inspect.signature(x.__class__.__init__)
-        
-        #init_params = signature.parameters
-        
-        #for attr in init_params:
-            #if attr[0] not in ("self","times", "signal")
-            
-        #for attr in x._all_attrs:
         for attr in x.__class__._necessary_attrs:
             if attr[0] not in ("times", "signal"):
                 if attr[0] not in kw:
                     kw[attr[0]] = getattr(x, attr[0], None)
                 
-    #elif isinstance(x, datasignal.IrregularlySampledDataSignal):
-        #if len(args) < 2:
-            #args = (x.times, x,)
-            
-        #signature = inspect.signature(x.__class__.__init__)
-        
-        #init_params = signature.parameters
-        
-        ##for attr in init_params:
-            ##if attr[0] not in ("self","times", "signal")
-            
-        ##for attr in x._all_attrs:
-        #for attr in x._necessary_attrs:
-            #if attr[0] not in ("times", "signal", "sampling_period"):
-                #if attr[0] not in kw:
-                    #kw[attr[0]] = getattr(x, attr[0], None)
-                
     elif isinstance(x, neo.SpikeTrain):
         if len(args)  == 0:
             args = (x.times, x.t_stop,)
             
-        #for attr in x._all_attrs:
         for attr in x._necessary_attrs:
             if attr[0] not in ("times", "t_stop"):
                 if attr[0] not in kw:
@@ -258,7 +283,6 @@ def adapt_args_kw(x, args, kw, allow_none):
         if len(args) == 0:
             args = (x, )
             
-        #for attr in x._all_attrs:
         for attr in x._necessary_attrs:
             if attr[0] != "image_data":
                 if attr[0] not in kw:
@@ -268,12 +292,7 @@ def adapt_args_kw(x, args, kw, allow_none):
         if len(args) == 0:
             args = (x, )
         
-    #elif isinstance(x, (neo.Segment, neo.Block, neo.Unit)):
-        #if len(args) == 0:
-            #args = (x, )
-        
     elif isinstance(x, (neo.Epoch, neo.Event)):
-        #for attr in x._all_attrs:
         for attr in x._necessary_attrs:
             if attr[0] not in kw:
                 kw[attr[0]] = getattr(x, attr[0], None)
@@ -299,28 +318,28 @@ def adapt_args_kw(x, args, kw, allow_none):
             kw["dtype"] = x.dtype
             
         if "buffer" not in kw:
-            #kw["buffer"] = x.data
             try:
                 # NOTE: 2021-12-14 10:50:35 
                 # issues with this when 'x' is a struct array 
                 # generated by h5io.pandas2Structarray
                 kw["buffer"] = x.data
-                #if isinstance(x.data, memoryview):
-                    #kw["buffer"] = x.data
-                #else:
-                    #print("x.data", x.data)
             except:
                 traceback.print_exc()
-                #print("x.data", x.data)
                 
         kw["default_value"] = x
         kw["allow_none"] = allow_none
         
-        #return ArrayTrait(x, **kw)
                     
     elif isinstance(x, (pd.DataFrame, pd.Series, pd.Index)):
         if len(args) == 0:
             args = (x, )
+            
+    elif isinstance(x, (int, float, complex, str)):
+        args = (x, )
+        kw["default_value"] = x
+        
+        kw["allow_none"] = allow_none
+        
 
     return args, kw
     
@@ -368,7 +387,7 @@ def dynamic_trait(x, *args, **kwargs):
     set_function: a function of the signature f(instance, obj, value)
         Optional, default is None
         
-        When None, the generated trait type uses the function enhanced_traitlet_set 
+        When None, the generated trait type uses the function standard_traitlet_set
         defined in this module.
         
         For details see traitlets.TraitType.set()
@@ -422,13 +441,23 @@ def dynamic_trait(x, *args, **kwargs):
     
     elif issubclass(myclass, pq.Quantity):
         return QuantityTrait(default_value = x)
+#     
+    elif issubclass(myclass, list):
+        return ListTrait(x)
+    
+    elif issubclass(myclass, tuple):
+        return Tuple(x)
+    
+    elif issubclass(myclass, dict):
+        return Dict(x)
     
     if isclass(force_trait) and issubclass(force_trait, traitlets.TraitType):
         traitclass = (force_trait, )
         
     else:
         # NOTE: 2021-08-20 12:22:12 For a finer granularity
-        traitclass = TRAITSMAP.get(myclass, (None, ))
+        # traitclass = TRAITSMAP.get(myclass, (Any, ))
+        traitclass = (Any,)
         
     if traitclass[0] is None:
         # NOTE: 2021-10-10 17:10:02
@@ -438,6 +467,7 @@ def dynamic_trait(x, *args, **kwargs):
         
     if not isfunction(set_function) or len(signature(set_function).parameters) != 3:
         set_function = enhanced_traitlet_set
+        #set_function = standard_traitlet_set
 
     exec_body_fn = partial(_dynatrtyp_exec_body_, setfn=set_function)
     
@@ -650,28 +680,72 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
     b) when an element in the list has changed (either a new value, or a new type)
     c) when the order of the elements has changed
     FIXME: 2022-01-29 15:22:27
-    This does do what is promised above.
+    This doesn't do what is promised above?
     TODO: Revisit this.
     See also FIXME/TODO:2022-01-29 13:29:19 in scipyen_traitlets module.
     """
     _trait = None
+    default_value = []
+    klass = list
+    _valid_defaults = (list,tuple)
+    # _cast_types = (list, tuple)
     
     info_text = "Trait for lists that is sensitive to changes in content"
     
-    def __init__(self, trait=None, traits=None, default_value=None, **kwargs):
-        
+    # def __init__(self, trait=None, traits=None, default_value=None, **kwargs):
+    # def __init__(self, trait=typing.Any, traits=None, default_value=None, **kwargs):
+    def __init__(self, trait=None, traits=None, default_value=Undefined, **kwargs):
+        """
+        trait: in the super() List traitype, `traits` restricts the type of elements
+                in the container to that TraitType -- i.e. all must be of the same type
+    
+                this is OK for homogeneous sequences
+    
+        traits: when specified, is a sequence of TypeTrais, so that the instance 
+                is valid when the list's elements are of these types - the intention
+                is to accomodate heterogeneous sequences
+    
+            FIXME/TODO: there are two options:
+                • we pass a list of traitlets with the same number of elements as the
+                instance of ListTrait - meaning that it will be valid if 
+                traitlet[k] validates the kth element in the ListTrait
+                 - a bit of overkill: for large lists we effectively pass a second
+                list as large as the list 
+    
+                • we pass a list of traitlets such that an element in the ListTrait
+                is valid IF it can be validated by at least one of the traitlets
+                in here - question is, how to do that?
+                WARNING this may introduce a BUG by casting a value to another
+                type, depending on thhe _cast_types of the particular trait used
+                to validate
+    
+        default_value: list, tuple, set 
+        """
         self._traits = traits # a list of traits, one per element
         self._length = 0
         
         self.hashed = 0
         
+        allow_none = kwargs.pop("allow_none", True) # make this True by default
+        
+        
         # initialize the List (<- Container <- Instance) NOW
+        # NOTE: 2022-11-02 22:45:46
+        # this will also set the super() defaults:
+        # self._minlen = tratielts.Int(0), 
+        # self._maxlen = traitlets.Int(sys.maxsize)
         super(ListTrait, self).__init__(trait=trait, default_value=default_value, **kwargs)
         
-        if default_value is not None or default_value is not Undefined:
-            self._length = len(default_value)
-            self.hashed = gethash(default_value)
+        # NOTE: for our purposes we don't really need the validation logic!
             
+    def instance_init(self, obj=None):
+        # print(f"ListTrait {self.__class__.__name__}")
+        if obj is None:
+            obj = self
+        if isinstance(self._trait, TraitType):
+            self._trait.instance_init(obj)
+        super(Container, self).instance_init(obj)
+        
     def validate_elements(self, obj, value):
         # NOTE: 2021-08-19 11:28:10 do the inherited validation first
         value = super(ListTrait, self).validate_elements(obj, value)
@@ -685,16 +759,28 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
             return value
         
         for k,v in enumerate(value):
-            if k < len(self._traits):
+            vv = list()
+            for t in self._traits:
+                # FIXME: 2022-11-02 23:18:08 potential BUG
                 try:
-                    v = self._traits[k]._validate(obj, v)
+                    v_ = self._traits[k]._validate(obj, v)
+                    vv.append(v_)
                 except TraitError:
-                    self.element_error(obj, v, self._traits[k])
-                else:
-                    validated.append(v)
+                    pass
+            if len(vv):
+                validated.append(vv[0])
                     
-            else:
-                validated.append(v)
+#             if k < len(self._traits):
+#                 try:
+#                     v = self._traits[k]._validate(obj, v)
+#                 except TraitError:
+#                     pass
+#                     self.element_error(obj, v, self._traits[k])
+#                 else:
+#                     validated.append(v)
+#                     
+#             else:
+#                 validated.append(v)
 
         return self.klass(validated)
 
@@ -709,6 +795,7 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
             old_value = self.default_value
 
         obj._trait_values[self.name] = new_value
+        
         try:
             silent = bool(old_value == new_value)
             
@@ -722,6 +809,7 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
         except:
             # if there is an error in comparing, default to notify
             silent = False
+            
         if silent is not True:
             # we explicitly compare silent to True just in case the equality
             # comparison above returns something other than True/False
@@ -853,7 +941,7 @@ def trait_from_type(x, *args, **kwargs):
         if immediate_class != list:
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
-        traitklass = new_class("ListTrait1", bases = (List,), exec_body = new_trait_callback)
+        traitklass = new_class("ListTrait", bases = (List,), exec_body = new_trait_callback)
         return traitklass(default_value = x, allow_none = allow_none)
         #return TestTrait(default_value = x, traits = traits, allow_none = allow_none)
         #return ListTrait(default_value = x, traits = traits, allow_none = allow_none)

@@ -141,6 +141,8 @@ from core.neoutils import (get_non_empty_spike_trains,
                            normalized_signal_index,
                            check_ephys_data, 
                            check_ephys_data_collection,
+                           set_relative_time_start,
+                           segment_start,
                            )
 
 from core.prog import safeWrapper
@@ -162,7 +164,7 @@ from core.traitcontainers import DataBag
 from imaging.vigrautils import kernel2array
 
 from ephys import ephys as ephys
-from ephys.ephys import (cursors2epoch, )
+from ephys.ephys import cursors2epoch
 
 #from core.patchneo import *
 
@@ -414,27 +416,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     defaultCursorHoverColor = "red"
 
-    def __init__(self, 
-                 x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
-                 y: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
-                 parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 ID:(int, type(None)) = None,
-                 win_title: (str, type(None)) = None, 
-                 doc_title: (str, type(None)) = None,
-                 frameIndex:(int, tuple, list, range, slice, type(None)) = None, 
-                 frameAxis:(int, type(None)) = None,
-                 signalIndex:(str, int, tuple, list, range, slice, type(None)) = None,
-                 signalChannelAxis:(int, type(None)) = None,
-                 signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None,
-                 irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, 
-                 irregularSignalChannelAxis:(int, type(None)) = None,
-                 irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, 
-                 separateSignalChannels:bool = False, 
-                 interval:(tuple, list) = None,
-                 channelIndex:object = None,
-                 currentFrame:(int, type(None)) = None,
-                 plotStyle: str = "plot",
-                 *args, **kwargs):
+    def __init__(self, x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, y: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, frameAxis:(int, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelAxis:(int, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, interval:(tuple, list) = None, channelIndex:object = None, currentFrame:(int, type(None)) = None, plotStyle: str = "plot", *args, **kwargs):
         """SignalViewer constructor.
         """
         super(QMainWindow, self).__init__(parent)
@@ -641,6 +623,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         super().__init__(data=None, parent=parent, ID=ID, win_title=win_title, 
                          doc_title=doc_title, *args, **kwargs)
         
+        self.observed_vars = DataBag(allow_none=True, mutable_types=True)
+        
+        self.observed_vars.verbose = True
+        self.observed_vars.observe(self.var_observer)
+        
         if isinstance(y, self.supported_types) or any([t in type(y).mro() for t in self.supported_types]):
             self.setData(x, y, frameIndex=frameIndex, 
                             frameAxis=frameAxis, signalIndex=signalIndex,
@@ -655,6 +642,253 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             currentFrame = currentFrame,
                             plotStyle = plotStyle,
                             *args, **kwargs)
+        
+    def _configureUI_(self):
+        """"""
+        self.setupUi(self)
+        
+        # NOTE: 2021-11-13 23:24:12
+        # signal/slot connections & UI for pg.PlotItem objects are configured in
+        # self._prepareAxes_()
+        
+        self.sig_plot.connect(self._slot_plot_numeric_data_thr_, type = QtCore.Qt.QueuedConnection)
+        
+        if self.viewerWidgetContainer.layout() is None:
+            self.viewerWidgetContainer.setLayout(QtWidgets.QGridLayout(self.viewerWidgetContainer))
+            
+        self.viewerWidgetContainer.layout().setSpacing(0)
+        self.viewerWidgetContainer.layout().setContentsMargins(0,0,0,0)
+        
+        self.actionSVG.triggered.connect(self.slot_export_svg)
+        self.actionTIFF.triggered.connect(self.slot_export_tiff)
+        self.actionPNG.triggered.connect(self.slot_export_png)
+        
+        self.cursorsMenu = QtWidgets.QMenu("Cursors", self)
+        self.epochsMenu = QtWidgets.QMenu("Epochs", self)
+        
+        self.menubar.setNativeMenuBar(True)
+
+        self.menubar.addMenu(self.cursorsMenu)
+        self.menubar.addMenu(self.epochsMenu)
+        
+        self.addCursorsMenu = QtWidgets.QMenu("Add Cursors", self)
+        self.addMultiAxesCursorMenu = QtWidgets.QMenu("Multi-axis", self)
+        
+        self.cursorsMenu.addMenu(self.addCursorsMenu)
+        
+        self.addCursorsMenu.addMenu(self.addMultiAxesCursorMenu)
+        
+        self.addVerticalCursorAction = self.addCursorsMenu.addAction("Vertical")
+        self.addVerticalCursorAction.triggered.connect(self.slot_addVerticalCursor)
+        
+        self.addHorizontalCursorAction = self.addCursorsMenu.addAction("Horizontal")
+        self.addHorizontalCursorAction.triggered.connect(self.slot_addHorizontalCursor)
+        
+        self.addCrosshairCursorAction = self.addCursorsMenu.addAction("Crosshair")
+        self.addCrosshairCursorAction.triggered.connect(self.slot_addCrosshairCursor)
+        
+        self.addCursorsMenu.addSeparator()
+        
+        self.addDynamicVerticalCursorAction = self.addCursorsMenu.addAction("Dynamic Vertical")
+        self.addDynamicVerticalCursorAction.triggered.connect(self.slot_addDynamicVerticalCursor)
+        
+        self.addDynamicHorizontalCursorAction = self.addCursorsMenu.addAction("Dynamic Horizontal")
+        self.addDynamicHorizontalCursorAction.triggered.connect(self.slot_addDynamicHorizontalCursor)
+        
+        self.addDynamicCrosshairCursorAction = self.addCursorsMenu.addAction("Dynamic Crosshair")
+        self.addDynamicCrosshairCursorAction.triggered.connect(self.slot_addDynamicCrosshairCursor)
+        
+        self.addMultiAxisVCursorAction = self.addMultiAxesCursorMenu.addAction("Vertical")
+        self.addMultiAxisVCursorAction.triggered.connect(self.slot_addMultiAxisVerticalCursor)
+        
+        self.addMultiAxisCCursorAction = self.addMultiAxesCursorMenu.addAction("Crosshair")
+        self.addMultiAxisCCursorAction.triggered.connect(self.slot_addMultiAxisCrosshairCursor)
+        
+        self.addMultiAxesCursorMenu.addSeparator()
+        
+        self.addDynamicMultiAxisVCursorAction = self.addMultiAxesCursorMenu.addAction("Dynamic Vertical")
+        self.addDynamicMultiAxisVCursorAction.triggered.connect(self.slot_addDynamicMultiAxisVerticalCursor)
+        
+        self.addDynamicMultiAxisCCursorAction = self.addMultiAxesCursorMenu.addAction("Dynamic Crosshair")
+        self.addDynamicMultiAxisCCursorAction.triggered.connect(self.slot_addDynamicMultiAxisCrosshairCursor)
+        
+        self.editCursorsMenu = QtWidgets.QMenu("Edit Cursor", self)
+        
+        self.editAnyCursorAction = self.editCursorsMenu.addAction("Choose...")
+        self.editAnyCursorAction.triggered.connect(self.slot_editCursor)
+        
+        self.editCursorAction = self.editCursorsMenu.addAction("Selected...")
+        self.editCursorAction.triggered.connect(self.slot_editSelectedCursor)
+        
+        self.cursorsMenu.addMenu(self.editCursorsMenu)
+        
+        self.removeCursorsMenu = QtWidgets.QMenu("Remove cursors", self)
+        
+        self.removeCursorAction = self.removeCursorsMenu.addAction("Remove a cursor...")
+        self.removeCursorAction.triggered.connect(self.slot_removeCursor)
+        
+        self.removeSelectedCursorAction = self.removeCursorsMenu.addAction("Remove selected cursor")
+        self.removeSelectedCursorAction.triggered.connect(self.slot_removeSelectedCursor)
+        
+        self.removeAllCursorsAction = self.removeCursorsMenu.addAction("Remove all cursors")
+        self.removeAllCursorsAction.triggered.connect(self.slot_removeCursors)
+        
+        self.cursorsMenu.addMenu(self.removeCursorsMenu)
+        
+        self.cursorsMenu.addSeparator()
+        
+        self.setCursorsShowValue = self.cursorsMenu.addAction("Cursors show value")
+        self.setCursorsShowValue.setCheckable(True)
+        self.setCursorsShowValue.setChecked(self._cursorsShowValue_)
+        self.setCursorsShowValue.toggled.connect(self._slot_setCursorsShowValue)
+        
+        self.setCursorsLabelPrecision = self.cursorsMenu.addAction("Cursor label precision...")
+        self.setCursorsLabelPrecision.triggered.connect(self._slot_setCursorLabelPrecision)
+        
+        self.cursorsColorsMenu = QtWidgets.QMenu("Cursor colors")
+        self.verticalCursorColorsAction = self.cursorsColorsMenu.addAction("Vertical cursor colors")
+        self.verticalCursorColorsAction.triggered.connect(self._slot_setVerticalCursorColors)
+        self.horizontalCursorColorsAction = self.cursorsColorsMenu.addAction("Horizontal cursor colors")
+        self.horizontalCursorColorsAction.triggered.connect(self._slot_setHorizontalCursorColors)
+        self.crosshairCursorColorsAction = self.cursorsColorsMenu.addAction("Crosshair cursor colors")
+        self.crosshairCursorColorsAction.triggered.connect(self._slot_setCrosshairCursorColors)
+        self.cursorHoverColorAction = self.cursorsColorsMenu.addAction("Cursors hover color")
+        self.cursorHoverColorAction.triggered.connect(self._slot_setCursorHoverColor)
+        
+        self.cursorsMenu.addMenu(self.cursorsColorsMenu)
+        
+        self.makeEpochsMenu = QtWidgets.QMenu("Make Epochs")
+        
+        self.epochsFromCursorsAction = self.makeEpochsMenu.addAction("From Cursors")
+        self.epochsFromCursorsAction.triggered.connect(self.slot_cursorsToEpoch)
+        self.epochsFromCursorsAction.setEnabled(self._scipyenWindow_ is not None)
+        
+        self.epochFromSelectedCursorAction = self.makeEpochsMenu.addAction("Selected SignalCursor to Epoch")
+        self.epochFromSelectedCursorAction.triggered.connect(self.slot_cursorToEpoch)
+        self.epochFromSelectedCursorAction.setEnabled(self._scipyenWindow_ is not None)
+        
+        self.epochBetweenCursorsAction = self.makeEpochsMenu.addAction("Epoch Between Two Cursors")
+        self.epochBetweenCursorsAction.triggered.connect(self.slot_epochBetweenCursors)
+        self.epochBetweenCursorsAction.setEnabled(self._scipyenWindow_ is not None)
+        
+        self.makeEpochsInDataMenu = QtWidgets.QMenu("Make Epochs in Data")
+        
+        self.epochsInDataFromCursorsAction = self.makeEpochsInDataMenu.addAction("From Cursors")
+        self.epochsInDataFromCursorsAction.triggered.connect(self.slot_cursorsToEpochInData)
+        
+        self.epochInDataFromSelectedCursorAction = self.makeEpochsInDataMenu.addAction("From Selected SignalCursor")
+        self.epochInDataFromSelectedCursorAction.triggered.connect(self.slot_cursorToEpochInData)
+        
+        self.epochInDataBetweenCursors = self.makeEpochsInDataMenu.addAction("Between Two Cursors")
+        self.epochInDataBetweenCursors.triggered.connect(self.slot_epochInDataBetweenCursors)
+        
+        # self.cursorsMenu.addSeparator()
+        
+        self.epochsMenu.addMenu(self.makeEpochsMenu)
+        self.epochsMenu.addMenu(self.makeEpochsInDataMenu)
+        
+        # the actual layout of the plot items (pyqtgraph framework)
+        self.signalsLayout = pg.GraphicsLayout()
+        self.signalsLayout.layout.setVerticalSpacing(0)
+
+        self.fig = pg.GraphicsLayoutWidget(parent = self.viewerWidgetContainer) 
+        styleHint = QtWidgets.QStyle.SH_DitherDisabledText
+        self.fig.style().styleHint(styleHint)
+        
+        #self.viewerWidgetLayout.addWidget(self.fig)
+        self.viewerWidget = self.fig
+        self.viewerWidgetContainer.layout().setHorizontalSpacing(0)
+        self.viewerWidgetContainer.layout().setVerticalSpacing(0)
+        self.viewerWidgetContainer.layout().contentsMargins().setLeft(0)
+        self.viewerWidgetContainer.layout().contentsMargins().setRight(0)
+        self.viewerWidgetContainer.layout().contentsMargins().setTop(0)
+        self.viewerWidgetContainer.layout().contentsMargins().setBottom(0)
+        self.viewerWidgetContainer.layout().addWidget(self.viewerWidget, 0,0)
+    
+        self.mainLayout = self.fig.ci
+        self.mainLayout.layout.setVerticalSpacing(0)
+        self.mainLayout.layout.setHorizontalSpacing(0)
+        
+        self.plotTitleLabel = self.mainLayout.addLabel("", col=0, colspan=1)
+        
+        self.mainLayout.nextRow()
+        self.mainLayout.addItem(self.signalsLayout)
+        
+        self.framesQSlider.setMinimum(0)
+        self.framesQSlider.setMaximum(0)
+        self.framesQSlider.valueChanged.connect(self.slot_setFrameNumber)
+        
+        self._frames_slider_ = self.framesQSlider
+        
+        self.framesQSpinBox.setKeyboardTracking(False)
+        self.framesQSpinBox.setMinimum(0)
+        self.framesQSpinBox.setMaximum(0)
+        self.framesQSpinBox.valueChanged.connect(self.slot_setFrameNumber)
+        
+        self._frames_spinner_ = self.framesQSpinBox
+        
+        self.signalsMenu = QtWidgets.QMenu("Signals", self)
+        
+        self.selectSignalComboBox.clear()
+        self.selectSignalComboBox.setCurrentIndex(0)
+        self.selectSignalComboBox.currentIndexChanged[int].connect(self.slot_analogSignalsComboBoxIndexChanged)
+        
+        self.plotAnalogSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
+        self.plotAnalogSignalsCheckBox.stateChanged[int].connect(self.slot_plotAnalogSignalsCheckStateChanged)
+        
+        self.selectIrregularSignalComboBox.clear()
+        self.selectIrregularSignalComboBox.setCurrentIndex(0)
+        self.selectIrregularSignalComboBox.currentIndexChanged[int].connect(self.slot_irregularSignalsComboBoxIndexChanged)
+        
+        self.plotIrregularSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
+        self.plotIrregularSignalsCheckBox.stateChanged[int].connect(self.slot_plotIrregularSignalsCheckStateChanged)
+        
+        #### BEGIN set up annotations dock widget
+        #print("_configureUI_ sets up annotations dock widget")
+        self.annotationsDockWidget = QtWidgets.QDockWidget("Annotations", self, objectName="annotationsDockWidget")
+        self.annotationsDockWidget.setWindowTitle("Annotations")
+        self.annotationsDockWidget.setFeatures(QtWidgets.QDockWidget.DockWidgetClosable | QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
+        
+        self.annotationsViewer = InteractiveTreeWidget(self.annotationsDockWidget)
+        self.annotationsViewer.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.annotationsViewer.setDragDropMode(QtWidgets.QAbstractItemView.DragOnly)
+        self.annotationsViewer.setDragEnabled(True)
+        
+        # NOTE: 2022-03-04 10:14:09 FIXME/TODO code to actually export to workspace
+        # items selected in the annotations viewer
+        #self.annotationsViewer.customContextMenuRequested[QtCore.QPoint].connect(self.slot_annotationsContextMenuRequested)
+        
+        self.annotationsDockWidget.setWidget(self.annotationsViewer)
+        
+        #print("_configureUI_ sets up annotations dock widget action")
+        #### END set up annotations dock widget
+        
+        #### BEGIN set up coordinates dock widget
+        #print("_configureUI_ sets up coordinates dock widget")
+        self.coordinatesDockWidget.setWindowTitle("Cursors")
+        
+        #print("_configureUI_ sets up coordinates dock widget action")
+        
+        #self.coordinatesDockWidget.visibilityChanged[bool].connect(self._slot_dock_visibility_changed_)
+        #### END set up coordinates dock widget
+        
+        #print("_configureUI_ sets up dock widget actions menu")
+        self.docksMenu = QtWidgets.QMenu("Panels", self)
+        
+        self.showAnnotationsDockWidgetAction = self.docksMenu.addAction("Annotations")
+        self.showAnnotationsDockWidgetAction.setObjectName("action_%s" % self.annotationsDockWidget.objectName())
+        self.showAnnotationsDockWidgetAction.triggered.connect(self.slot_showAnnotationsDock)
+        
+        self.showCoordinatesDockWidgetAction = self.docksMenu.addAction("Cursors")
+        self.showCoordinatesDockWidgetAction.setObjectName("action_%s" % self.coordinatesDockWidget.objectName())
+        self.showCoordinatesDockWidgetAction.triggered.connect(self.slot_showCoordinatesDock)
+        
+        self.menubar.addMenu(self.docksMenu)
+        
+        self.actionDetect_Triggers.triggered.connect(self.slot_detectTriggers)
+        self.actionDetect_Triggers.setEnabled(False)
+        
+        self.actionRefresh.triggered.connect(self.slot_refreshDataDisplay)
         
     # ### BEGIN properties
     @property
@@ -675,7 +909,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     dw[k].setVisible(v is True) # just to make sure v is a bool
                     
     @property
-    def cursorLabelPrecision(self) -> int:
+    def cursorLabelPrecision(self):
         return self._cursorLabelPrecision_
     
     @markConfigurable("CursorLabelPrecision")
@@ -697,7 +931,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.configurable_traits["CursorLabelPrecision"] = self._cursorLabelPrecision_
             
     @property
-    def cursorsShowValue(self) -> bool:
+    def cursorsShowValue(self):
         return self._cursorsShowValue_
     
     @markConfigurable("CursorsShowValue")
@@ -738,88 +972,88 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.configurable_traits["CursorYWindow"] = self._cursorWindowSizeY_
             
     @property
-    def cursorColors(self)->dict:
+    def cursorColors(self):
         return self._cursorColors_
     
     @cursorColors.setter
-    def cursorColors(self, val:dict) -> None:
+    def cursorColors(self, val:dict):
         if isinstance(val, dict) and all((s in val for s in ("crosshair", "horizontal", "vertical"))):
             self.crosshairCursorColor = QtGui.QColor(val["crosshair"]).name(QtGui.QColor.HexArgb)
             self.horizontalCursorColor = QtGui.QColor(val["horizontal"]).name(QtGui.QColor.HexArgb)
             self.verticalCursorColor = QtGui.QColor(val["vertical"]).name(QtGui.QColor.HexArgb)
 
     @property
-    def crosshairCursorColor(self) -> str:
+    def crosshairCursorColor(self):
         return self._cursorColors_["crosshair"]
     
     @markConfigurable("CrosshairCursorColor", trait_notifier=True)
     @crosshairCursorColor.setter
-    def crosshairCursorColor(self, val:str) -> None:
+    def crosshairCursorColor(self, val:str):
         self._set_cursors_color(val, "crosshair")
                 
     @property
-    def horizontalCursorColor(self) -> str:
+    def horizontalCursorColor(self):
         return self._cursorColors_["horizontal"]
     
     @markConfigurable("HorizontalCursorColor")
     @horizontalCursorColor.setter
-    def horizontalCursorColor(self, val:str) -> None:
+    def horizontalCursorColor(self, val:str):
         self._set_cursors_color(val, "horizontal")
                 
     @property
-    def verticalCursorColor(self) -> str:
+    def verticalCursorColor(self):
         return self._cursorColors_["vertical"]
     
     @markConfigurable("VerticalCursorColor")
     @verticalCursorColor.setter
-    def verticalCursorColor(self, val:str) -> None:
+    def verticalCursorColor(self, val:str):
         self._set_cursors_color(val, "vertical")
         
     @property
-    def linkedCursorColors(self) -> dict:
+    def linkedCursorColors(self):
         return self._linkedCursorColors_
     
     @linkedCursorColors.setter
-    def linkedCursorColors(self, val:dict) -> None:
+    def linkedCursorColors(self, val:dict):
         if isinstance(val, dict) and all((s in val for s in ("crosshair", "horizontal", "vertical"))):
             self.linkedCrosshairCursorColor = QtGui.QColor(val["crosshair"]).name(QtGui.QColor.HexArgb)
             self.linkedHorizontalCursorColor = QtGui.QColor(val["horizontal"]).name(QtGui.QColor.HexArgb)
             self.linkedVerticalCursorColor = QtGui.QColor(val["vertical"]).name(QtGui.QColor.HexArgb)
             
     @property
-    def linkedCrosshairCursorColor(self) -> str:
+    def linkedCrosshairCursorColor(self):
         return self._linkedCursorColors_["crosshair"]
     
     @markConfigurable("LinkedCrosshairCursorColor", trait_notifier=True)
     @linkedCrosshairCursorColor.setter
-    def linkedCrosshairCursorColor(self, val:str) -> None:
+    def linkedCrosshairCursorColor(self, val:str):
         self._set_cursors_color(val, "crosshair", True)
             
     @property
-    def linkedHorizontalCursorColor(self) -> str:
+    def linkedHorizontalCursorColor(self):
         return self._linkedCursorColors_["horizontal"]
     
     @markConfigurable("LinkedHorizontalCursorColor", trait_notifier=True)
     @linkedHorizontalCursorColor.setter
-    def linkedHorizontalCursorColor(self, val:str) -> None:
+    def linkedHorizontalCursorColor(self, val:str):
         self._set_cursors_color(val, "horizontal", True)
     
     @property
-    def linkedVerticalCursorColor(self) -> str:
+    def linkedVerticalCursorColor(self):
         return self._linkedCursorColors_["vertical"]
     
     @markConfigurable("LinkedVerticalCursorColor", trait_notifier=True)
     @linkedVerticalCursorColor.setter
-    def linkedVerticalCursorColor(self, val:str) -> None:
+    def linkedVerticalCursorColor(self, val:str):
         self._set_cursors_color(val, "vertical", True)
 
     @property
-    def cursorHoverColor(self) -> str:
+    def cursorHoverColor(self):
         return self._cursorHoverColor_
     
     @markConfigurable("CursorHoverColor")
     @cursorHoverColor.setter
-    def cursorHoverColor(self, val:str) -> None:
+    def cursorHoverColor(self, val:str):
         self._set_cursors_color(val, "hover")
         
     # ### END properties
@@ -1169,8 +1403,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return entities
     
     @safeWrapper
-    def _plot_discrete_entities_(self, /, entities:dict, 
-                                 axis:typing.Optional[int]=None, **kwargs):
+    def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list], axis:typing.Optional[int]=None, **kwargs):
         if len(entities) == 0:
             return
         
@@ -1316,8 +1549,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if self.annotationsViewer.topLevelItemCount() == 1:
             self.annotationsViewer.topLevelItem(0).setText(0, "Data")
         
-    def _setup_signal_choosers_(self, analog:(tuple, list, type(None)) = None, irregular:(tuple, list, type(None)) = None):
-        """
+    def _setup_signal_choosers_(self, analog = None, irregular = None):
+        """TODO/FIXME
         """
         from core.utilities import unique
         sigBlock = [QtCore.QSignalBlocker(widget) for widget in (self.selectSignalComboBox, self.selectIrregularSignalComboBox)]
@@ -1382,249 +1615,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.selectIrregularSignalComboBox.addItems(sig_names)
             self.selectIrregularSignalComboBox.setCurrentIndex(new_ndx)
             
-        if all([seq is None or (isinstance(seq, (tuple, list)) and len(seq)==0) for seq in (analog, irregular)]):
-            return
+        # if all([seq is None or (isinstance(seq, (tuple, list)) and len(seq)==0) for seq in (analog, irregular)]):
+        #     return
+        
 
-    def _configureUI_ (self):
-        # NOTE: 2021-11-13 23:24:12
-        # signal/slot connections & UI for pg.PlotItem objects are configured in
-        # self._prepareAxes_()
-        self.setupUi(self)
-        
-        self.sig_plot.connect(self._slot_plot_numeric_data_thr_, type = QtCore.Qt.QueuedConnection)
-        
-        if self.viewerWidgetContainer.layout() is None:
-            self.viewerWidgetContainer.setLayout(QtWidgets.QGridLayout(self.viewerWidgetContainer))
-            
-        self.viewerWidgetContainer.layout().setSpacing(0)
-        self.viewerWidgetContainer.layout().setContentsMargins(0,0,0,0)
-        
-        self.actionSVG.triggered.connect(self.slot_export_svg)
-        self.actionTIFF.triggered.connect(self.slot_export_tiff)
-        self.actionPNG.triggered.connect(self.slot_export_png)
-        
-        self.cursorsMenu = QtWidgets.QMenu("Cursors", self)
-        
-        self.menubar.setNativeMenuBar(True)
-
-        self.menubar.addMenu(self.cursorsMenu)
-        self.addCursorsMenu = QtWidgets.QMenu("Add Cursors", self)
-        self.addMultiAxesCursorMenu = QtWidgets.QMenu("Multi-axis", self)
-        
-        self.cursorsMenu.addMenu(self.addCursorsMenu)
-        
-        self.addCursorsMenu.addMenu(self.addMultiAxesCursorMenu)
-        
-        self.addVerticalCursorAction = self.addCursorsMenu.addAction("Vertical")
-        self.addVerticalCursorAction.triggered.connect(self.slot_addVerticalCursor)
-        
-        self.addHorizontalCursorAction = self.addCursorsMenu.addAction("Horizontal")
-        self.addHorizontalCursorAction.triggered.connect(self.slot_addHorizontalCursor)
-        
-        self.addCrosshairCursorAction = self.addCursorsMenu.addAction("Crosshair")
-        self.addCrosshairCursorAction.triggered.connect(self.slot_addCrosshairCursor)
-        
-        self.addCursorsMenu.addSeparator()
-        
-        self.addDynamicVerticalCursorAction = self.addCursorsMenu.addAction("Dynamic Vertical")
-        self.addDynamicVerticalCursorAction.triggered.connect(self.slot_addDynamicVerticalCursor)
-        
-        self.addDynamicHorizontalCursorAction = self.addCursorsMenu.addAction("Dynamic Horizontal")
-        self.addDynamicHorizontalCursorAction.triggered.connect(self.slot_addDynamicHorizontalCursor)
-        
-        self.addDynamicCrosshairCursorAction = self.addCursorsMenu.addAction("Dynamic Crosshair")
-        self.addDynamicCrosshairCursorAction.triggered.connect(self.slot_addDynamicCrosshairCursor)
-        
-        self.addMultiAxisVCursorAction = self.addMultiAxesCursorMenu.addAction("Vertical")
-        self.addMultiAxisVCursorAction.triggered.connect(self.slot_addMultiAxisVerticalCursor)
-        
-        self.addMultiAxisCCursorAction = self.addMultiAxesCursorMenu.addAction("Crosshair")
-        self.addMultiAxisCCursorAction.triggered.connect(self.slot_addMultiAxisCrosshairCursor)
-        
-        self.addMultiAxesCursorMenu.addSeparator()
-        
-        self.addDynamicMultiAxisVCursorAction = self.addMultiAxesCursorMenu.addAction("Dynamic Vertical")
-        self.addDynamicMultiAxisVCursorAction.triggered.connect(self.slot_addDynamicMultiAxisVerticalCursor)
-        
-        self.addDynamicMultiAxisCCursorAction = self.addMultiAxesCursorMenu.addAction("Dynamic Crosshair")
-        self.addDynamicMultiAxisCCursorAction.triggered.connect(self.slot_addDynamicMultiAxisCrosshairCursor)
-        
-        self.editCursorsMenu = QtWidgets.QMenu("Edit Cursor", self)
-        
-        self.editAnyCursorAction = self.editCursorsMenu.addAction("Choose...")
-        self.editAnyCursorAction.triggered.connect(self.slot_editCursor)
-        
-        self.editCursorAction = self.editCursorsMenu.addAction("Selected...")
-        self.editCursorAction.triggered.connect(self.slot_editSelectedCursor)
-        
-        self.cursorsMenu.addMenu(self.editCursorsMenu)
-        
-        self.removeCursorsMenu = QtWidgets.QMenu("Remove cursors", self)
-        
-        self.removeCursorAction = self.removeCursorsMenu.addAction("Remove a cursor...")
-        self.removeCursorAction.triggered.connect(self.slot_removeCursor)
-        
-        self.removeSelectedCursorAction = self.removeCursorsMenu.addAction("Remove selected cursor")
-        self.removeSelectedCursorAction.triggered.connect(self.slot_removeSelectedCursor)
-        
-        self.removeAllCursorsAction = self.removeCursorsMenu.addAction("Remove all cursors")
-        self.removeAllCursorsAction.triggered.connect(self.slot_removeCursors)
-        
-        self.cursorsMenu.addMenu(self.removeCursorsMenu)
-        
-        self.cursorsMenu.addSeparator()
-        
-        self.setCursorsShowValue = self.cursorsMenu.addAction("Cursors show value")
-        self.setCursorsShowValue.setCheckable(True)
-        self.setCursorsShowValue.setChecked(self._cursorsShowValue_)
-        self.setCursorsShowValue.toggled.connect(self._slot_setCursorsShowValue)
-        
-        self.setCursorsLabelPrecision = self.cursorsMenu.addAction("Cursor label precision...")
-        self.setCursorsLabelPrecision.triggered.connect(self._slot_setCursorLabelPrecision)
-        
-        self.cursorsColorsMenu = QtWidgets.QMenu("Cursor colors")
-        self.verticalCursorColorsAction = self.cursorsColorsMenu.addAction("Vertical cursor colors")
-        self.verticalCursorColorsAction.triggered.connect(self._slot_setVerticalCursorColors)
-        self.horizontalCursorColorsAction = self.cursorsColorsMenu.addAction("Horizontal cursor colors")
-        self.horizontalCursorColorsAction.triggered.connect(self._slot_setHorizontalCursorColors)
-        self.crosshairCursorColorsAction = self.cursorsColorsMenu.addAction("Crosshair cursor colors")
-        self.crosshairCursorColorsAction.triggered.connect(self._slot_setCrosshairCursorColors)
-        self.cursorHoverColorAction = self.cursorsColorsMenu.addAction("Cursors hover color")
-        self.cursorHoverColorAction.triggered.connect(self._slot_setCursorHoverColor)
-        
-        self.cursorsMenu.addMenu(self.cursorsColorsMenu)
-        
-        self.epochsMenu = QtWidgets.QMenu("Make Epochs")
-        
-        self.epochsFromCursorsAction = self.epochsMenu.addAction("Cursors to Epochs")
-        self.epochsFromCursorsAction.triggered.connect(self.slot_cursorsToEpoch)
-        self.epochsFromCursorsAction.setEnabled(self._scipyenWindow_ is not None)
-        
-        self.epochFromSelectedCursorAction = self.epochsMenu.addAction("Selected SignalCursor to Epoch")
-        self.epochFromSelectedCursorAction.triggered.connect(self.slot_cursorToEpoch)
-        self.epochFromSelectedCursorAction.setEnabled(self._scipyenWindow_ is not None)
-        
-        self.epochBetweenCursorsAction = self.epochsMenu.addAction("Epoch Between Two Cursors")
-        self.epochBetweenCursorsAction.triggered.connect(self.slot_epochBetweenCursors)
-        self.epochBetweenCursorsAction.setEnabled(self._scipyenWindow_ is not None)
-        
-        self.epochsInDataMenu = QtWidgets.QMenu("Make Epochs in Data")
-        
-        self.epochsInDataFromCursorsAction = self.epochsInDataMenu.addAction("From All Cursors")
-        self.epochsInDataFromCursorsAction.triggered.connect(self.slot_cursorsToEpochInData)
-        
-        self.epochInDataFromSelectedCursorAction = self.epochsInDataMenu.addAction("From Selected SignalCursor")
-        self.epochInDataFromSelectedCursorAction.triggered.connect(self.slot_cursorToEpochInData)
-        
-        self.epochInDataBetweenCursors = self.epochsInDataMenu.addAction("Between Two Cursors")
-        self.epochInDataBetweenCursors.triggered.connect(self.slot_epochInDataBetweenCursors)
-        
-        self.cursorsMenu.addSeparator()
-        
-        self.cursorsMenu.addMenu(self.epochsMenu)
-        self.cursorsMenu.addMenu(self.epochsInDataMenu)
-        
-        # the actual layout of the plot items (pyqtgraph framework)
-        self.signalsLayout = pg.GraphicsLayout()
-        self.signalsLayout.layout.setVerticalSpacing(0)
-
-        self.fig = pg.GraphicsLayoutWidget(parent = self.viewerWidgetContainer) 
-        styleHint = QtWidgets.QStyle.SH_DitherDisabledText
-        self.fig.style().styleHint(styleHint)
-        
-        #self.viewerWidgetLayout.addWidget(self.fig)
-        self.viewerWidget = self.fig
-        self.viewerWidgetContainer.layout().setHorizontalSpacing(0)
-        self.viewerWidgetContainer.layout().setVerticalSpacing(0)
-        self.viewerWidgetContainer.layout().contentsMargins().setLeft(0)
-        self.viewerWidgetContainer.layout().contentsMargins().setRight(0)
-        self.viewerWidgetContainer.layout().contentsMargins().setTop(0)
-        self.viewerWidgetContainer.layout().contentsMargins().setBottom(0)
-        self.viewerWidgetContainer.layout().addWidget(self.viewerWidget, 0,0)
-    
-        self.mainLayout = self.fig.ci
-        self.mainLayout.layout.setVerticalSpacing(0)
-        self.mainLayout.layout.setHorizontalSpacing(0)
-        
-        self.plotTitleLabel = self.mainLayout.addLabel("", col=0, colspan=1)
-        
-        self.mainLayout.nextRow()
-        self.mainLayout.addItem(self.signalsLayout)
-        
-        self.framesQSlider.setMinimum(0)
-        self.framesQSlider.setMaximum(0)
-        self.framesQSlider.valueChanged.connect(self.slot_setFrameNumber)
-        
-        self._frames_slider_ = self.framesQSlider
-        
-        self.framesQSpinBox.setKeyboardTracking(False)
-        self.framesQSpinBox.setMinimum(0)
-        self.framesQSpinBox.setMaximum(0)
-        self.framesQSpinBox.valueChanged.connect(self.slot_setFrameNumber)
-        
-        self._frames_spinner_ = self.framesQSpinBox
-        
-        self.signalsMenu = QtWidgets.QMenu("Signals", self)
-        
-        self.selectSignalComboBox.clear()
-        self.selectSignalComboBox.setCurrentIndex(0)
-        self.selectSignalComboBox.currentIndexChanged[int].connect(self.slot_analogSignalsComboBoxIndexChanged)
-        
-        self.plotAnalogSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
-        self.plotAnalogSignalsCheckBox.stateChanged[int].connect(self.slot_plotAnalogSignalsCheckStateChanged)
-        
-        self.selectIrregularSignalComboBox.clear()
-        self.selectIrregularSignalComboBox.setCurrentIndex(0)
-        self.selectIrregularSignalComboBox.currentIndexChanged[int].connect(self.slot_irregularSignalsComboBoxIndexChanged)
-        
-        self.plotIrregularSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
-        self.plotIrregularSignalsCheckBox.stateChanged[int].connect(self.slot_plotIrregularSignalsCheckStateChanged)
-        
-        #### BEGIN set up annotations dock widget
-        #print("_configureUI_ sets up annotations dock widget")
-        self.annotationsDockWidget = QtWidgets.QDockWidget("Annotations", self, objectName="annotationsDockWidget")
-        self.annotationsDockWidget.setWindowTitle("Annotations")
-        self.annotationsDockWidget.setFeatures(QtWidgets.QDockWidget.DockWidgetClosable | QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
-        
-        self.annotationsViewer = InteractiveTreeWidget(self.annotationsDockWidget)
-        self.annotationsViewer.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        self.annotationsViewer.setDragDropMode(QtWidgets.QAbstractItemView.DragOnly)
-        self.annotationsViewer.setDragEnabled(True)
-        
-        # NOTE: 2022-03-04 10:14:09 FIXME/TODO code to actually export to workspace
-        # items selected in the annotations viewer
-        #self.annotationsViewer.customContextMenuRequested[QtCore.QPoint].connect(self.slot_annotationsContextMenuRequested)
-        
-        self.annotationsDockWidget.setWidget(self.annotationsViewer)
-        
-        #print("_configureUI_ sets up annotations dock widget action")
-        #### END set up annotations dock widget
-        
-        #### BEGIN set up coordinates dock widget
-        #print("_configureUI_ sets up coordinates dock widget")
-        self.coordinatesDockWidget.setWindowTitle("Cursors")
-        
-        #print("_configureUI_ sets up coordinates dock widget action")
-        
-        #self.coordinatesDockWidget.visibilityChanged[bool].connect(self._slot_dock_visibility_changed_)
-        #### END set up coordinates dock widget
-        
-        #print("_configureUI_ sets up dock widget actions menu")
-        self.docksMenu = QtWidgets.QMenu("Panels", self)
-        
-        self.showAnnotationsDockWidgetAction = self.docksMenu.addAction("Annotations")
-        self.showAnnotationsDockWidgetAction.setObjectName("action_%s" % self.annotationsDockWidget.objectName())
-        self.showAnnotationsDockWidgetAction.triggered.connect(self.slot_showAnnotationsDock)
-        
-        self.showCoordinatesDockWidgetAction = self.docksMenu.addAction("Cursors")
-        self.showCoordinatesDockWidgetAction.setObjectName("action_%s" % self.coordinatesDockWidget.objectName())
-        self.showCoordinatesDockWidgetAction.triggered.connect(self.slot_showCoordinatesDock)
-        
-        self.menubar.addMenu(self.docksMenu)
-        
-        self.actionDetect_Triggers.triggered.connect(self.slot_detectTriggers)
-        self.actionDetect_Triggers.setEnabled(False)
-        
     # ### END private methods
     
     def setDataDisplayEnabled(self, value):
@@ -1658,14 +1652,28 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     and are defined along the horizontal and vertical axis, respectively
                     
         Var-keyword arguments ("name=value" pairs):
-        =============================================
-        
+        ===========================================
         xwindow = 1D sequence of floats with the horizontal extent of the cursor window
             (for crosshair and vertical cursors); must have as many elements as 
             coordinates supplied in the *where argument
+        
         ywindow   = as above, for crosshair and horizontal cursors
-        labels         = 1D sequence of str for cursor IDs; must have as many
+        
+        labels    = 1D sequence of str for cursor IDs; must have as many
             elements as supplied through the *where argument
+        
+        axis: int, or str, pyqtgraph.PlotItem, or None (default)
+            ∘   When an int this is a valid axis index in the current instance 
+                of ScipyenViewer (from top to bottom, 0 -> number of axes - 1)
+            
+            ∘   When a str, this can only be "all" or "a", meaning that the new 
+                cursors will span all axes (multi-axis cursors)
+        
+            ∘   When None (default) the cursors will be created in the axis that
+                is currently selected, or axis 0 is no axis is selected.
+        
+        NOTE: the display of cursor values is controlled by self.setCursorsShowValue
+        check box
         """
         
         def _addCursors_parse_coords_(coords):
@@ -1687,7 +1695,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     x,y = coords # distribute coordinates to individual values
                 
                 else:
-                    raise ValueError("Invalid coordinates specified: %s" % coords)
+                    raise ValueError(f"Invalid coordinates specified: {coords}")
                 
             elif isinstance(coords, (pq.Quantity, np.ndarray)):
                 if coords.size == 1:
@@ -1717,7 +1725,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     x,y = coords # distribute to individual values
                     
                 else:
-                    raise ValueError("Invalid coordinates specified: %s" % coords)
+                    raise ValueError(f"Invalid coordinates specified: {coords}")
                         
             elif isinstance(coords, numbers.Number):
                 if cursorType in ("v", "vertical", "Vertical", 
@@ -1736,12 +1744,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         
                 
             else:
-                raise ValueError("Invalid coordinates specification: %s" % coords)
+                raise ValueError(f"Invalid coordinates specification: {coords}")
             
             return x,y
         
         
-        def _use_coords_sequence_(seq, xw, yw, lbls):
+        def _use_coords_sequence_(seq, xw, yw, lbls, ax):
             """Adds cursors based on a sequence of cursor coordinates
             """
             for (k, coords) in enumerate(seq):
@@ -1777,42 +1785,47 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 elif isinstance(lbls, str):
                     lbl = lbls
                     
-                self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
-                               label=lbl, show_value = self.setCursorsShowValue.isChecked())
-                
+                if isinstance(ax, (int, pg.PlotItem, str)):
+                    self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
+                                label=lbl, show_value = self.setCursorsShowValue.isChecked(),
+                                axis=ax)
+                    
+                elif isinstance(ax, (tuple, list)) and all(isinstance(a, (int, pg.PlotItem)) for a in ax):
+                    if len(ax) != len(seq):
+                        raise ValueError(f"number of axes ({len(ax)}) should be the same as the number of cursors ({len(seq)})")
+                    
+                    self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
+                                label=lbl, show_value = self.setCursorsShowValue.isChecked(),
+                                axis=ax[k])
+
         xwindow = kwargs.pop("xwindow", self.defaultCursorWindowSizeX)
         ywindow = kwargs.pop("ywindow", self.defaultCursorWindowSizeY)
-        labels = kwargs.pop("labels", None)
+        labels  = kwargs.pop("labels",  None)
+        axis    = kwargs.pop("axis",    None)
+        
                
         if len(where) == 0: # no coordinates given
             x = y = None
             
         elif len(where) == 1: # a single object passed - figure it out
             if isinstance(where[0], np.ndarray):
-                _use_coords_sequence_(where[0], xwindow, ywindow, labels)
+                _use_coords_sequence_(where[0], xwindow, ywindow, labels, axis)
                 return
                 
-            x,y = _addCursors_parse_coords_(where[0])
+            x, y = _addCursors_parse_coords_(where[0])
             
         elif isinstance(where, (tuple, list, np.ndarray)):
-            _use_coords_sequence_(where, xwindow, ywindow, labels)
+            _use_coords_sequence_(where, xwindow, ywindow, labels, axis)
             return
 
-        self.addCursor(cursorType=cursorType, x=where, xwindow=xwindow, ywindow=ywindow,
-                        label=labels, show_value = self.setCursorsShowValue.isChecked())
+        self.addCursor(cursorType=cursorType, x=x, y=y, 
+                       xwindow=xwindow, ywindow=ywindow,
+                       label=labels, 
+                       show_value = self.setCursorsShowValue.isChecked(),
+                       axis = axis)
         
     
-    def addCursor(self, cursorType: typing.Union[str, SignalCursor.SignalCursorTypes] = "c", 
-                  x: typing.Optional[numbers.Number] = None,
-                  y: typing.Optional[numbers.Number] = None,
-                  xwindow: typing.Optional[numbers.Number] = None,
-                  ywindow: typing.Optional[numbers.Number] = None, 
-                  xBounds: typing.Optional[numbers.Number] = None,
-                  yBounds: typing.Optional[numbers.Number] = None, 
-                  label: typing.Optional[typing.Union[int, str, pg.PlotItem]] = None,
-                  follows_mouse: bool = False, 
-                  axis: typing.Optional[int] = None, 
-                  **kwargs):
+    def addCursor(self, cursorType: typing.Union[str, SignalCursor.SignalCursorTypes] = "c", x: typing.Optional[numbers.Number] = None, y: typing.Optional[numbers.Number] = None, xwindow: typing.Optional[numbers.Number] = None, ywindow: typing.Optional[numbers.Number] = None, xBounds: typing.Optional[numbers.Number] = None, yBounds: typing.Optional[numbers.Number] = None, label: typing.Optional[typing.Union[int, str, pg.PlotItem]] = None, follows_mouse: bool = False, axis: typing.Optional[int] = None, **kwargs):
         """ Add a cursor to the selected axes in the signal viewer window.
 
         When no data has been plotted, the cursor is created in the scene.
@@ -2014,7 +2027,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             
                         if cursor.cursorTypeName in ("crosshair", "horizontal"):
                             #plot_item_cursor_pos_text.append("Y: %f" % y)
-                            plot_item_cursor_pos_text.append("Y: %f (window: %f)" % (y, cursors.ywindow))
+                            plot_item_cursor_pos_text.append("Y: %f (window: %f)" % (y, cursor.ywindow))
                             
                         plot_item_text.append("\n".join(plot_item_cursor_pos_text))
                         
@@ -2370,6 +2383,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.displayFrame()
          
     # ### END PyQt slots
+    
+    def var_observer(self, change):
+        self.displayFrame()
+        
 
     def linkCursors(self, id1, *ids):
         """ Bidirectionally links cursors of the same type.
@@ -2466,14 +2483,26 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     #"def" selectCursor(self, ID):
         #self.slot_selectCursor(ID)
         
+    @pyqtSlot(object)
+    def slot_varModified(self, obj):
+        """Connected to _scipyenWindow_.workspaceModel.varModified signal
+        """
+        self.displayFrame()
+        
     @pyqtSlot()
     @safeWrapper
     def slot_refreshDataDisplay(self):
         if self._scipyenWindow_ is None:
             return
         
-        if self._data_var_name_ is not None and self._data_var_name_ in self._scipyenWindow_.workspace.keys():
-            self.setData(self._scipyenWindow_.workspace[self._data_var_name_], self._data_var_name_)
+        self.displayFrame()
+        
+        # if self._data_var_name_ is not None and self._data_var_name_ in self._scipyenWindow_.workspace.keys():
+        #     self.setData(self._scipyenWindow_.workspace[self._data_var_name_], self._data_var_name_)
+            
+        # if self.y in self._scipyenWindow_.workspace.values():
+        #     self.setData(self._scipyenWindow_.workspace[self._data_var_name_], self._data_var_name_)
+            
 
     def _hasCursor_(self, crsID): #  syntactic sugar
         if len(self._data_cursors_) == 0:
@@ -2564,18 +2593,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits[traitname] = name
         
-    def _addCursor_(self, cursor_type: typing.Union[str, SignalCursor.SignalCursorTypes], 
-                    x: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
-                    y: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
-                    xwindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
-                    ywindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
-                    xBounds: typing.Union[tuple, type(None)] = None,
-                    yBounds: typing.Union[tuple, type(None)] = None,
-                    axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None,
-                    label:typing.Optional[str] = None, 
-                    follows_mouse: bool = False, 
-                    precision:typing.Optional[int]=None,
-                    **kwargs) -> str:
+    def _addCursor_(self, cursor_type: typing.Union[str, SignalCursor.SignalCursorTypes], x: typing.Union[numbers.Number, pq.Quantity, type(None)] = None, y: typing.Union[numbers.Number, pq.Quantity, type(None)] = None, xwindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None, ywindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None, xBounds: typing.Union[tuple, type(None)] = None, yBounds: typing.Union[tuple, type(None)] = None, axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None, label:typing.Optional[str] = None, follows_mouse: bool = False, precision:typing.Optional[int]=None, **kwargs):
         """Creates a cursor.
         kwargs: var-keyword parameters for SignalCursor constructor (pen, etc)
         """
@@ -3539,8 +3557,40 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         vertAndCrossCursors = collections.ChainMap(self.crosshairSignalCursors, self.verticalSignalCursors)
         
         if len(vertAndCrossCursors) == 0:
+            QtWidgets.QMessageBox.warning(self,"Attach epoch to data",
+                                          "No vertical or croshair cursors found")
             return
         
+        elif len(vertAndCrossCursors) > 1:
+            # dialog to select cursors
+            if isinstance(self.selectedDataCursor, SignalCursor) and self.selectedDataCursor in vertAndCrossCursors.values():
+                cseldlg = pgui.ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
+                                            title="Select cursors", 
+                                            selectmode = QtWidgets.QAbstractItemView.ExtendedSelection,
+                                            preSelected=self.selectedDataCursor.name)
+            else:
+                cseldlg = pgui.ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
+                                            title="Select cursors",
+                                            selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
+            ans = cseldlg.exec_()
+            
+            if ans != QtWidgets.QDialog.Accepted:
+                return
+            
+            selItems = cseldlg.selectedItemsText
+            
+            if len(selItems) == 0:
+                return
+            
+            cursors = [self.dataCursor(name) for name in selItems]
+            
+            if len(cursors) == 0:
+                return
+            
+        
+        else:
+            cursors = [c for c in vertAndCrossCursors.values()]
+            
         if self._scipyenWindow_ is not None:
             if hasattr(self.y, "name") and isinstance(self.y.name, str) and len(self.y.name.strip()):
                 name = "%s_Epoch" % self.y.name
@@ -3562,15 +3612,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if isinstance(txt, str) and len(txt.strip()):
                     name=txt
                     
-        
-            cursors = [c for c in vertAndCrossCursors.values()]
-            
             cursors.sort(key=attrgetter('x')) # or key = lambda x: x.x
 
-            epoch = self.cursorsToEpoch(*cursors, name=name)
+            epoch = self.cursorsToEpoch(*cursors, name=name, embed=False)
             
             if epoch is not None:
-                self._scipyenWindow_._assignToWorkspace_(name, epoch)
+                self._scipyenWindow_.assignToWorkspace(name, epoch)
                 
     @pyqtSlot()
     @safeWrapper
@@ -3585,6 +3632,39 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                           "No vertical or croshair cursors found")
             return
         
+        elif len(vertAndCrossCursors) > 1:
+            # dialog to select cursors
+            if isinstance(self.selectedDataCursor, SignalCursor) and self.selectedDataCursor in vertAndCrossCursors.values():
+                cseldlg = pgui.ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
+                                               title="Select cursors", 
+                                               selectmode = QtWidgets.QAbstractItemView.ExtendedSelection,
+                                               preSelected=self.selectedDataCursor.name)
+            else:
+                cseldlg = pgui.ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
+                                                title="Select cursors",
+                                                selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
+            ans = cseldlg.exec_()
+            
+            if ans != QtWidgets.QDialog.Accepted:
+                return
+            
+            selItems = cseldlg.selectedItemsText
+            
+            if len(selItems) == 0:
+                return
+            
+            cursors = [self.dataCursor(name) for name in selItems]
+            
+#             print(cursors)
+#             
+            if len(cursors) == 0:
+                return
+            
+            cursors.sort(key=attrgetter('x'))
+            
+            # else:
+            #     cursors = [c for c in vertAndCrossCursors.values()]
+                    
         if hasattr(self.y, "name") and isinstance(self.y.name, str) and len(self.y.name.strip()):
             name = "%s_Epoch" % self.y.name
             
@@ -3602,32 +3682,32 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             d.epochNamePrompt.setText(name)
             
                 
-            d.toCurrentSegmentCheckBox = qd.CheckBox(d, "Current segment only")
-            d.toCurrentSegmentCheckBox.setChecked(False)
+            d.toAllSegmentsCheckBox = qd.CheckBox(d, "Embed in all segments")
+            d.toAllSegmentsCheckBox.setChecked(True)
+            
+            d.sweepRelativeCheckBox = qd.CheckBox(d, "Relative to each segment start")
+            d.sweepRelativeCheckBox.setChecked(True)
             
             d.overwriteEpochCheckBox = qd.CheckBox(d, "Overwrite existing epochs")
-            d.overwriteEpochCheckBox.setChecked(True);
-            
+            d.overwriteEpochCheckBox.setChecked(False);
             
             if d.exec() == QtWidgets.QDialog.Accepted:
                 txt = d.epochNamePrompt.text()
                 if isinstance(txt, str) and len(txt.strip()):
                     name = txt
 
-                toCurrentSegment = d.toCurrentSegmentCheckBox.isChecked()
+                toAllSegments    = d.toAllSegmentsCheckBox.isChecked()
+                relativeSweep    = d.sweepRelativeCheckBox.isChecked()
                 overwriteEpoch   = d.overwriteEpochCheckBox.isChecked()
                 
-            cursors = [c for c in vertAndCrossCursors.values()]
-            
-            cursors.sort(key=attrgetter('x'))
-            
-            self.cursorsToEpoch(*cursors, name=name, embed=True,
-                                current_seg_only=toCurrentSegment,
-                                overwrite=overwriteEpoch)
+                self.cursorsToEpoch(*cursors, name=name, embed=True,
+                                    all_segments = toAllSegments,
+                                    relative_to_segment_start = relativeSweep,
+                                    overwrite = overwriteEpoch)
 
         else:
             QtWidgets.QMessageBox.warning(self,"Attach epoch to data", 
-                                          "Epochs can only be embedded in neo.Block and neo.Segment data.\n\nPlease use actions in 'Make epochs' sub-menu")
+                                          "Epochs can only be embedded in neo.Block and neo.Segment data.")
             
     @pyqtSlot()
     @safeWrapper
@@ -3658,8 +3738,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 d.cursorComboBox.conextIndexChanged(partial(self._slot_update_cursor_to_epoch_dlg, d=d))
                 
             
-            d.toCurrentSegmentCheckBox = qd.CheckBox(d, "Current segment only")
-            d.toCurrentSegmentCheckBox.setChecked(False)
+            d.toAllSegmentsCheckBox = qd.CheckBox(d, "Propagate to all segments")
+            d.toAllSegmentsCheckBox.setChecked(True)
+            
+            d.sweepRelativeCheckBox = qd.CheckBox(d, "Relative to each segment start")
+            d.sweepRelativeCheckBox.setChecked(False)
             
             d.overwriteEpochCheckBox = qd.CheckBox(d, "Overwrite existing epochs")
             d.overwriteEpochCheckBox.setChecked(True);
@@ -3669,11 +3752,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if isinstance(txt, str) and len(txt.strip()):
                     name=txt
                     
-                toCurrentSegment = toCurrentSegmentCheckBox.isChecked()
-                overwriteEpoch   = overwriteEpochCheckBox.isChecked()
+                toAllSegments  = d.toAllSegmentsCheckBox.isChecked()
+                relativeSweep  = d.sweepRelativeCheckBox.isChecked()
+                overwriteEpoch = d. overwriteEpochCheckBox.isChecked()
                 
             self.cursorsToEpoch(self.selectedDataCursor, name=name, embed=True, 
-                                current_seg_only=toCurrentSegment,
+                                all_segments = toAllSegments,
+                                relative_to_segment_start = relativeSweep,
                                 overwrite = overwriteEpoch)
             
             #self.displayFrame() # called by cursorsToEpoch when embed is True
@@ -3686,52 +3771,54 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def slot_epochInDataBetweenCursors(self):
         vertAndCrossCursors = collections.ChainMap(self.crosshairSignalCursors, self.verticalSignalCursors)
         
-        if len(vertAndCrossCursors) == 0:
+        if len(vertAndCrossCursors) < 2:
+            QtWidgets.QMessageBox.warning(self,"Attach epoch to data",
+                                          "There must be at least two vertical or croshair cursors")
             return
         
         if isinstance(self.y, (neo.Block, neo.Segment)):
             d = qd.QuickDialog(self, "Make Epoch From Interval Between Cursors:")
             #d = vigra.pyqt.qd.QuickDialog(self, "Make Epoch From Interval Between Cursors:")
-            d.promptWidgets = list()
+            # d.promptWidgets = list()
             
-            namePrompt=qd.StringInput(d, "Name:")
-            #namePrompt=vigra.pyqt.qd.StringInput(d, "Name:")
-            namePrompt.setText("Epoch")
+            d.namePrompt=qd.StringInput(d, "Name:")
+            d.namePrompt.setText("Epoch")
             
-            c1Prompt = qd.StringInput(d, "SignalCursor 1:")
-            c2Prompt = qd.StringInput(d, "SignalCursor 2:")
+            # d.c1Prompt = qd.StringInput(d, "SignalCursor 1:")
+            # d.c2Prompt = qd.StringInput(d, "SignalCursor 2:")
             
-            #c1Prompt = vigra.pyqt.qd.StringInput(d, "SignalCursor 1:")
-            #c2Prompt = vigra.pyqt.qd.StringInput(d, "SignalCursor 2:")
+            d.c1Combo = qd.QuickDialogComboBox(d, "Select first cursor:")
+            d.c1Combo.setItems([c for c in vertAndCrossCursors])
+            d.c1Combo.setValue(0)
             
-            d.promptWidgets.append(namePrompt)
-            d.promptWidgets.append(c1Prompt)
-            d.promptWidgets.append(c2Prompt)
+            d.c2Combo = qd.QuickDialogComboBox(d, "Select second cursor")
+            d.c2Combo.setItems([c for c in vertAndCrossCursors])
+            d.c1Combo.setValue(1)
             
-            toCurrentSegmentCheckBox = qd.CheckBox(d, "Current segment only")
-            #toCurrentSegmentCheckBox = vigra.pyqt.qd.CheckBox(d, "Current segment only")
-            toCurrentSegmentCheckBox.setChecked(False)
+            d.toAllSegmentsCheckBox = qd.CheckBox(d, "Embed in all segments")
+            d.toAllSegmentsCheckBox.setChecked(True)
             
-            d.promptWidgets.append(toCurrentSegmentCheckBox)
+            d.sweepRelativeCheckBox = qd.CheckBox(d, "Relative to each segment start")
+            d.sweepRelativeCheckBox.setChecked(True)
             
-            overwriteEpochCheckBox = qd.CheckBox(d, "Overwrite existing epochs")
-            #overwriteEpochCheckBox = vigra.pyqt.qd.CheckBox(d, "Overwrite existing epochs")
-            overwriteEpochCheckBox.setChecked(True);
             
-            d.promptWidgets.append(overwriteEpochCheckBox)
+            d.overwriteEpochCheckBox = qd.CheckBox(d, "Overwrite existing epochs")
+            d.overwriteEpochCheckBox.setChecked(False);
             
             if d.exec() == QtWidgets.QDialog.Accepted:
-                name = namePrompt.text()
+                name = d.namePrompt.text()
                 
                 if name is None or len(name) == 0:
                     return
                 
-                c1ID = c1Prompt.text()
+                # c1ID = d.c1Prompt.text()
+                c1ID = d.c1Combo.text()
                 
                 if c1ID is None or len(c1ID) == 0:
                     return
                 
-                c2ID = c2Prompt.text()
+                # c2ID = d.c2Prompt.text()
+                c2ID = d.c2Combo.text()
                 
                 if c2ID is None or len(c2ID) == 0:
                     return
@@ -3742,36 +3829,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if c1 is None or c2 is None:
                     return
                 
-                toCurrentSegment = toCurrentSegmentCheckBox.isChecked()
-                overwriteEpoch   = overwriteEpochCheckBox.isChecked()
+                toAllSegments   = d.toAllSegmentsCheckBox.isChecked()
+                relativeSweep   = d.sweepRelativeCheckBox.isChecked()
+                overwriteEpoch  = d.overwriteEpochCheckBox.isChecked()
                 
-                epoch = self.epochBetweenCursors(c1, c2, name)
+                epoch = self.epochBetweenCursors(c1, c2, name=name, embed=True, 
+                                                 all_segments = toAllSegments,
+                                                 relative_to_segment_start = relativeSweep,
+                                                 overwrite = overwriteEpoch)
                 
-                if epoch is not None:
-                    name=epoch.name
-                    if name is None:
-                        name = "epoch"
-                
-                if isinstance(self.y, neo.Block):
-                    if toCurrentSegment:
-                        if overwriteEpoch:
-                            self.y.segments[self.frameIndex[self._current_frame_index_]].epochs = [epoch]
-                            
-                        else:
-                            self.y.segments[self.frameIndex[self._current_frame_index_]].epochs.append(epoch)
-                    else:
-                        if overwriteEpoch:
-                            for ndx in self.frameIndex:
-                                self.y.segments[ndx].epochs = [epoch]
-                        else:
-                            for ndx in self.frameIndex:
-                                self.y.segments[ndx].epochs.append(epoch)
-                else:
-                    if overwriteEpoch:
-                        self.y.epochs = [epoch]
-                    else:
-                        self.y.epochs.append(epoch)
-                    
                 self.displayFrame()
                 
     @pyqtSlot()
@@ -3843,7 +3909,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             epoch = self.cursorsToEpoch(self.selectedDataCursor, name=name)
             
             if epoch is not None:
-                self._scipyenWindow_._assignToWorkspace_(name, epoch)
+                self._scipyenWindow_.assignToWorkspace(name, epoch)
                 
     
     @pyqtSlot()
@@ -3895,11 +3961,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if name is None:
                     name = "epoch"
                     
-                self._scipyenWindow_._assignToWorkspace_(name, epoch)
+                self._scipyenWindow_.assignToWorkspace(name, epoch)
         
     @safeWrapper
-    def cursorsToEpoch(self, *cursors, name:typing.Optional[str] = None, embed:bool = False, 
-                             current_seg_only:bool = False, overwrite:bool = False) -> neo.Epoch:
+    def cursorsToEpoch(self, *cursors, name:typing.Optional[str] = None, embed:bool = False, all_segments:bool = True, relative_to_segment_start:bool=False, overwrite:bool = False):
         """Creates a neo.Epoch from a list of cursors
         
         Parameters:
@@ -3930,23 +3995,32 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             issues a warning. The epoch is still generated and is returned by the 
             function.
             
-        current_seg_only: bool, default is False. This parameter is used only when
+        all_segments: bool, default is True. This parameter is used only when
             "embed" is True and the plotted data support embedding of neo.Epoch 
             objects (see above).
             
-            When True, and plotted data is a neo.Block with more than one Segment
+            When False, and plotted data is a neo.Block with more than one Segment
             or a sequence of Segment objects, then the epoch will be collected in 
             the "epochs" attribute of the currently plotted Segment.
             
-            When False, then the generated Epoch will be collected in the "epochs"
+            When True, then the generated Epoch will be collected in the "epochs"
             attribute of all the Segment objects in the data.
             
-            This parameter is also ignored when plotted data is a neo.Block with
+            This parameter is ignored when plotted data is a neo.Block with
             one segment, a sequence containing a single neo.Segment, or just a
-            neo.Segment.
+            neo.Segment, and when the plotted data does not support Epochs.
             
-            The only exception is the case whe plotted data is a neo.Block with one
-            segment
+        relative_to_segment_start:bool, default is False
+            When the signals in the neo.Block data have different start times in
+            each segment, creating an Epoch in ALl segments from cursors defined 
+            in a segment will result in the epochs in ALL other segments falling 
+            OUTSIDE the time domain of the signals there.
+        
+            To avoid this, set relative_to_segment_start to True.
+        
+            Alternatively, one can modify the data time domain beforehand e.g., 
+            by calling set_relative_time_start() so that signals in ALL segments 
+            have the same t_start.
             
         overwrite: bool, default is False. This parameter is used only when
             "embed" is True and data supports embedding of neo.Epoch objects 
@@ -3958,8 +4032,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             When False, the generated Epoch is appended to the "epochs" collections
             in the plotted data.
             
-        
-        
         """
         
         if len(cursors) == 0:
@@ -3981,8 +4053,79 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 name = "Epoch"
             
+        if all_segments and relative_to_segment_start:
+            # NOTE: 2022-10-22 22:02:50 - NO WE DON'T !!!'
+            # we need this to figure out the units of the cursor's x coordinate, 
+            # taken ad the units of the signal plotted in the cursor's host axis 
+            # (PlotItem)
+            #
+            # For multi-axes cursors, we use the currently-selected axis !!!
+            # cursor_axes = [self.axes.index(c.hostItem) if isinstance(c.hostItem, pg.PlotItem) else self.axes.index(self.currentAxis) for c in cursors]
+            
+            # NOTE 2022-10-21 23:13:36
+            # when calculating segment t_start we use the minimum of `t_start` 
+            # of signals and spiketrains ONLY, to avoid any existing events or
+            # epochs that are out of the signal domain, in each segment
+            if isinstance(self.y, neo.Block):
+                segments = self.y.segments
+            elif isinstance(self.y, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self.y):
+                segments = self.y
+            elif isinstance(self.y, neo.Segment):
+                segments = [self.y]
+                
+            elif isinstance(self.y, neo.core.basesignal.BaseSignal):
+                if self.y.segment is None:
+                    return
+                
+                segments = [self.y.segment]
+                
+            else:
+                return
+            
+            if len(segments) == 0:
+                return
+                
+            seg_starts = [segment_start(s) for s in segments]
+            if not all(ss == seg_starts[0] for ss in seg_starts):
+                epochs = list()
+                current_seg_start = segment_start(segments[self.currentFrame])
+                
+                rel_starts = [c.x * current_seg_start.units - current_seg_start for c in cursors]
+                # print(f"SignalViewer.cursorsToEpoch: rel_starts: {rel_starts}")
+                for k, seg in enumerate(segments):
+                    s_start = seg_starts[k]
+                    epoch_tuples = [(s_start + rel_starts[i], cursors[i].xwindow*s_start.units, cursors[i].name) for i in range(len(cursors))]
+                    seg_epoch = cursors2epoch(*epoch_tuples, name=name)
+                    epochs.append(seg_epoch)
+                    if embed:
+                        if overwrite:
+                            seg.epochs = [seg_epoch]
+                        else:
+                            seg.epochs.append(seg_epoch)
+                            
+                self.displayFrame()
+                
+                return epochs
+                
+        # FIXME/TODO: 2022-10-23 23:57:00
+        # use self.FrameIndex[self.currentFrame] instead (that is because we'd
+        # be adapting this to multi-frame indices as in LSCaT !!!)
+        if isinstance(self.y, neo.Block):
+            # t_units = self.y.segments[self.currentFrame].t_start.units
+            t_units = self.y.segments[self.frameIndex[self._current_frame_index_]].t_start.units
+        elif isinstance(self.y, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self.y):
+            # t_units = self.y[self.currentFrame].t_start.units
+            t_units = self.y[self.frameIndex[self._current_frame_index_]].t_start.units
+        elif isinstance(self.y, neo.Segment):
+            t_units = self.y.t_start.units
+        elif isinstance(self.y, neo.core.basesignal.BaseSignal):
+            if self.y.segment is None:
+                return
+            t_units = self.y.times[0].units
+        else:
+            t_units = pq.s # reasonable default (although not necessarily always applicable !!!)
         
-        epoch = cursors2epoch(*cursors, name=name, sort=True)
+        epoch = cursors2epoch(*cursors, name=name, sort=True, units = t_units)
         
         if embed:
             if isinstance(self.y, neo.Block):
@@ -3997,13 +4140,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         self.y.segments[0].epochs.append(epoch)
                     
                 else:
-                    if current_seg_only:
-                        if overwrite:
-                            self.y.segments[self.frameIndex[self._current_frame_index_]].epochs = [epoch]
-                        else:
-                            self.y.segments[self.frameIndex[self._current_frame_index_]].epochs.append(epoch)
-                            
-                    else:
+                    if all_segments:
                         for ndx in self.frameIndex:
                             if overwrite:
                                 self.y.segments[ndx].epochs = [epoch]
@@ -4011,10 +4148,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             else:
                                 self.y.segments[ndx].epochs.append(epoch)
                             
+                    else:
+                        if overwrite:
+                            self.y.segments[self.frameIndex[self._current_frame_index_]].epochs = [epoch]
+                        else:
+                            self.y.segments[self.frameIndex[self._current_frame_index_]].epochs.append(epoch)
+                            
             elif isinstance(self.y, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self.y]):
                 if len(self.y) == 0:
                     warnings.warn("Plotted data is an empty sequence!")
-                    #return epoch
                 
                 elif len(self.y) == 1:
                     if overwrite:
@@ -4023,13 +4165,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         self.y[0].epochs.append(epoch)
                     
                 else:
-                    if current_seg_only:
-                        if overwrite:
-                            self.y[self.rameIndex[self._current_frame_index_]].epochs = [epoch]
-                        else:
-                            self.y[self.rameIndex[self._current_frame_index_]].epochs.append(epoch)
-                            
-                    else:
+                    if all_segments:
                         for ndx in self.frameIndex:
                             if overwrite:
                                 self.y[ndx].epochs = [epoch]
@@ -4037,12 +4173,25 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             else:
                                 self.y[ndx].epochs.append(epoch)
                             
+                    else:
+                        if overwrite:
+                            self.y[self.rameIndex[self._current_frame_index_]].epochs = [epoch]
+                        else:
+                            self.y[self.rameIndex[self._current_frame_index_]].epochs.append(epoch)
+                            
             elif isinstance(self.y, neo.Segment):
                 if overwrite:
                     self.y.epochs = [epoch]
                     
                 else:
                     self.y.epochs.append(epoch)
+                    
+            elif isinstance(self.y, neo.core.basesignal.BaseSignal):
+                if hasattr(self.y, "segment") and isinstance(self.y.segment, neo.Segment):
+                    if overwrite:
+                        self.y.segment.epochs = [epoch]
+                    else:
+                        self.y.segment.epocha.append(epoch)
                         
             else:
                 warnings.warn("Epochs can only be embeded in neo.Segment objects (either stand-alone, collected in a tuple or list, or inside a neo.Block)")
@@ -4051,16 +4200,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
         return epoch
     
-    #@safeWrapper
-    #def _gen_epoch_from_cursors_(self, *cursors, name):
-        #x = np.array([c.x for c in cursors]) * pq.s
-        #d = np.array([c.xwindow for c in cursors]) * pq.s
-        #labels = np.array([c.ID for c in cursors], dtype="S")
-        
-        #t = x - d/2
-        
-        #return neo.Epoch(times=t, durations=d, labels=labels, units=pq.s, name=name)
-        
     def cursorToEpoch(self, crs=None, name=None):
         """Creates a neo.Epoch from a single cursor
         DEPRECATED superceded by the new cursorsToEpoch
@@ -4073,7 +4212,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         if name is None:
             d = qd.QuickDialog(self, "Make Epoch From SignalCursor:")
-            #d = vigra.pyqt.qd.QuickDialog(self, "Make Epoch From SignalCursor:")
             d.promptWidgets = list()
             d.promptWidgets.append(qd.StringInput(d, "Name:"))
             #d.promptWidgets.append(vigra.pyqt.qd.StringInput(d, "Name:"))
@@ -4089,32 +4227,166 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         return cursors2epoch(crs, name=name)
         
-    def epochBetweenCursors(self, c0, c1, name=None):
+    def epochBetweenCursors(self, c0:SignalCursor, c1:SignalCursor, name:typing.Optional[str]=None, embed:bool = False, all_segments:bool = True, relative_to_segment_start:bool=False, overwrite:bool = False):
         if c0.isHorizontal or c1.isHorizontal:
             return
         
-        clist = sorted([c0, c1], key=attrgetter('x'))
+        cursors = sorted([c0, c1], key=attrgetter('x'))
         
-        if name is None:
-            d = qd.QuickDialog(self, "Make Epoch From The Interval Between Two Cursors:")
-            #d = vigra.pyqt.qd.QuickDialog(self, "Make Epoch From Interval Between Two Cursors:")
-            d.promptWidgets = list()
-            d.promptWidgets.append(qd.StringInput(d, "Name:"))
-            #d.promptWidgets.append(vigra.pyqt.qd.StringInput(d, "Name:"))
-            d.promptWidgets[0].setText("Epoch")
-            
-            if d.exec() == QtWidgets.QDialog.Accepted:
-                txt = d.promptWidgets[0].text()
-                if txt is not None and len(txt)>0:
-                    name=txt
-                    
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            if hasattr(self.y, "name") and isinstance(self.y.name, str) and len(self.y.name.strip()):
+                name = f"{self.y.name}_Epoch"
+            else:
+                name = "Epoch"
+                
+        if all_segments and relative_to_segment_start:
+            if isinstance(self.y, neo.Block):
+                segments = self.y.segments
+            elif isinstance(self.y, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self.y):
+                segments = self.y
             else:
                 return
+            
+            seg_starts = [segment_start(s) for s in segments]
+            if not all(ss == seg_starts[0] for ss in seg_starts):
+                current_seg_start = segment_start(segments[self.currentFrame])
+                
+                rel_starts = [c.x * current_seg_start.units - current_seg_start for c in cursors]
+                
+                epochs = list()
+                for k, seg in enumerate(segments):
+                    s_start = seg_starts[k]
+                    times = [s_start + rel_starts[i] for i in range(len(cursors))]
+                    duration = times[1]-times[0]
+                    seg_epoch = neo.Epoch(times = np.array([times[0]]), durations=np.array([duration]),
+                                            units = times[0].units,
+                                            labels = np.array([f"From {cursors[0].name} to {cursors[1].name}"]),
+                                            name=name)
+                    epochs.append(seg_epoch)
+                    if embed:
+                        if overwrite:
+                            seg.epochs = [seg_epoch]
+                        else:
+                            seg.epochs.append(seg_epoch)
+                            
+                self.displayFrame()
+                return epochs
+            
+        # FIXME/TODO: 2022-10-23 23:58:06
+        # see FIXME/TODO: 2022-10-23 23:57:00
+        if isinstance(self.y, neo.Block):
+            # t_units = self.y.segments[self.currentFrame].t_start.units
+            t_units = self.y.segments[self.frameIndex[self._current_frame_index_]].t_start.units
+        elif isinstance(self.y, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self.y):
+            # t_units = self.y[self.currentFrame].t_start.units
+            t_units = self.y[self.frameIndex[self._current_frame_index_]].t_start.units
+        elif isinstance(self.y, neo.Segment):
+            t_units = self.y.t_start.units
+        elif isinstance(self.y, neo.core.basesignal.BaseSignal):
+            if self.y.segment is None:
+                return
+            t_units = self.y.times[0].units
+        else:
+            t_units = pq.s # reasonable default (although not necessarily always applicable !!!)
         
-        return neo.Epoch(times = np.array([clist[0].x])*pq.s,
-                         durations = np.array([clist[1].x - clist[0].x]) * pq.s,
-                         units = pq.s, labels=np.array(["From %s to %s" % (clist[0].ID, clist[1].ID)], dtype="S"), \
-                         name=name)
+        epoch = neo.Epoch(times = np.array([cursors[0].x]), durations = np.array([cursors[1].x - cursors[0].x]),
+                          units = t_units, labels = np.array([f"From {cursors[0].name} to {cursors[1].name}"]),
+                          name = name)
+        
+        if embed:
+            if isinstance(self.y, neo.Block):
+                if len(self.y.segments) == 0:
+                    warnings.warn("Plotted data is a neo.Block without segments")
+                    #return epoch
+                
+                elif len(self.y.segments) == 1:
+                    if overwrite:
+                        self.y.segments[0].epochs = [epoch]
+                    else:
+                        self.y.segments[0].epochs.append(epoch)
+                    
+                else:
+                    if all_segments:
+                        for ndx in self.frameIndex:
+                            if overwrite:
+                                self.y.segments[ndx].epochs = [epoch]
+                                
+                            else:
+                                self.y.segments[ndx].epochs.append(epoch)
+                            
+                    else:
+                        if overwrite:
+                            self.y.segments[self.frameIndex[self._current_frame_index_]].epochs = [epoch]
+                        else:
+                            self.y.segments[self.frameIndex[self._current_frame_index_]].epochs.append(epoch)
+                            
+            elif isinstance(self.y, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self.y]):
+                if len(self.y) == 0:
+                    warnings.warn("Plotted data is an empty sequence!")
+                
+                elif len(self.y) == 1:
+                    if overwrite:
+                        self.y[0].epochs = [epoch]
+                    else:
+                        self.y[0].epochs.append(epoch)
+                    
+                else:
+                    if all_segments:
+                        for ndx in self.frameIndex:
+                            if overwrite:
+                                self.y[ndx].epochs = [epoch]
+                                
+                            else:
+                                self.y[ndx].epochs.append(epoch)
+                            
+                    else:
+                        if overwrite:
+                            self.y[self.rameIndex[self._current_frame_index_]].epochs = [epoch]
+                        else:
+                            self.y[self.rameIndex[self._current_frame_index_]].epochs.append(epoch)
+                            
+            elif isinstance(self.y, neo.Segment):
+                if overwrite:
+                    self.y.epochs = [epoch]
+                    
+                else:
+                    self.y.epochs.append(epoch)
+                    
+            elif isinstance(self.y, neo.core.basesignal.BaseSignal):
+                if hasattr(self.y, "segment") and isinstance(self.y.segment, neo.Segment):
+                    if overwrite:
+                        self.y.segment.epochs = [epoch]
+                    else:
+                        self.y.segment.epocha.append(epoch)
+                        
+            else:
+                warnings.warn("Epochs can only be embeded in neo.Segment objects (either stand-alone, collected in a tuple or list, or inside a neo.Block)")
+                
+            self.displayFrame()
+                
+        return epoch
+    
+        
+#         if name is None:
+#             d = qd.QuickDialog(self, "Make Epoch From The Interval Between Two Cursors:")
+#             #d = vigra.pyqt.qd.QuickDialog(self, "Make Epoch From Interval Between Two Cursors:")
+#             d.promptWidgets = list()
+#             d.promptWidgets.append(qd.StringInput(d, "Name:"))
+#             #d.promptWidgets.append(vigra.pyqt.qd.StringInput(d, "Name:"))
+#             d.promptWidgets[0].setText("Epoch")
+#             
+#             if d.exec() == QtWidgets.QDialog.Accepted:
+#                 txt = d.promptWidgets[0].text()
+#                 if txt is not None and len(txt)>0:
+#                     name=txt
+#                     
+#             else:
+#                 return
+        
+        # return neo.Epoch(times = np.array([cursors[0].x])*pq.s,
+        #                  durations = np.array([cursors[1].x - cursors[0].x]) * pq.s,
+        #                  units = pq.s, labels=np.array(["From %s to %s" % (cursors[0].ID, cursors[1].ID)], dtype="S"),
+        #                  name=name)
     
     def setPlotStyle(self, val):
         if val is None:
@@ -4134,18 +4406,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 ax_dict["item"].setStyle(tickFont=value)
                 
     @safeWrapper
-    def _parse_data_new_(self, 
-                     x, 
-                     y,
-                     frameIndex,
-                     frameAxis,
-                     signalChannelAxis,
-                     signalIndex,
-                     signalChannelIndex,
-                     irregularSignalIndex,
-                     irregularSignalChannelAxis,
-                     irregularSignalChannelIndex,
-                     separateSignalChannels) -> bool:
+    def _parse_data_new_(self, x, y, frameIndex, frameAxis, signalChannelAxis, signalIndex, signalChannelIndex, irregularSignalIndex, irregularSignalChannelAxis, irregularSignalChannelIndex, separateSignalChannels):
         """Sets up the data model, essentially -- "interprets" the data 
         structure such that plotting of different types of objects containing
         numeric data sequences is made possible.
@@ -4356,18 +4617,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return True
 
     @safeWrapper
-    def _parse_data_old_(self, 
-                     x, 
-                     y,
-                     frameIndex,
-                     frameAxis,
-                     signalChannelAxis,
-                     signalIndex,
-                     signalChannelIndex,
-                     irregularSignalIndex,
-                     irregularSignalChannelAxis,
-                     irregularSignalChannelIndex,
-                     separateSignalChannels) -> bool:
+    def _parse_data_old_(self, x, y, frameIndex, frameAxis, signalChannelAxis, signalIndex, signalChannelIndex, irregularSignalIndex, irregularSignalChannelAxis, irregularSignalChannelIndex, separateSignalChannels):
         """Sets up the data model, essentially -- "interprets" the data 
         structure such that plotting of different types of objects containing
         numeric data sequences is made possible.
@@ -4395,6 +4645,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(y, neo.core.Block):
             self.x = None # domain is contained in the signals inside the block
             self.y = y
+            self.docTitle = getattr(y, "name", None)
             
             # NOTE : 2022-01-17 14:17:23
             # if frameIndex was passed, then self._number_of_frames_ might turn
@@ -4447,6 +4698,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         elif isinstance(y, neo.core.Segment):
             #self.x = None # NOTE: x can still be supplied externally
             self.y = y
+            self.docTitle = getattr(y, "name", None)
             self._plotEpochs_(clear=True)
             
             # one segment is one frame
@@ -4470,6 +4722,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         elif isinstance(y, (neo.core.AnalogSignal, DataSignal)):
             self.y = y
+            self.docTitle = getattr(y, "name", None)
             
             # NOTE: no need for these as there is only one signal
             self.signalIndex = None
@@ -4511,6 +4764,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
         elif isinstance(y, (neo.core.IrregularlySampledSignal,  IrregularlySampledDataSignal)):
             self.y = y
+            self.docTitle = getattr(y, "name", None)
             self.frameIndex = range(1)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
@@ -4528,6 +4782,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         elif isinstance(y, neo.core.SpikeTrain): # plot a SpikeTrain independently of data
             self.y = y
+            self.docTitle = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
             self.frameIndex = range(1)
@@ -4536,6 +4791,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         elif isinstance(y, (neo.core.Event, DataMark )): # plot an event independently of data
             self.y = y
+            self.docTitle = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
             self.frameIndex = range(1)
@@ -4547,6 +4803,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             #self.dataAnnotations.append({"Epoch %s" % y.name: y.annotations})
             #pass # delegated to displayFrame()
             self.y = y
+            self.docTitle = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
             self.frameIndex = range(1)
@@ -4555,14 +4812,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             if self._docTitle_ is None or (isinstance(self._docTitle_, str) and len(self._docTitle_.strip()) == 0):
                 #because these may be plotted as an add-on so we don't want to mess up the title
-                if isinstance(title, str) and len(title.strip()) > 0:
-                    self._doctTitle_ = title
+                if isinstance(y.name, str) and len(y.name.strip()) > 0:
+                    self._doctTitle_ = y.name
                     
                 else:
                     self._docTitle_ = self.y.name
         
         elif isinstance(y, vigra.filters.Kernel1D):
             self.x, self.y = kernel2array(y)
+            self.docTitle = "Vigra Kernel 1D"
             self._plotEpochs_(clear=True)
             
             self.dataAxis = 0 # data as column vectors
@@ -4605,6 +4863,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 raise ValueError('\nCannot plot data with more than 3 dimensions\n')
             
             self.y = y
+            self.docTitle = "Numpy array"
             
             if self.y.ndim == 1: # one frame, one channel
                 self.dataAxis = 0 # data as column vectors
@@ -4635,6 +4894,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         else:
                             signalChannelAxis = self.y.channelIndex
                     else:
+                        
                         raise TypeError("signalChannelAxis must be specified when plotting numpy arrays")
                     
                 else:
@@ -4795,6 +5055,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.x = x
                     
                 self.y = yy
+                self.docTitle = "Vigra Kernel1D objects"
                 
             elif all([isinstance(i, neo.Segment) for i in y]):
                 # NOTE: 2019-11-30 09:35:42 
@@ -4816,6 +5077,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 self.x = None
                 self.y = y
+                self.docTitle = "Neo segments"
                 
                 self.signalIndex                    = signalIndex
                 self.irregularSignalIndex           = irregularSignalIndex
@@ -4838,6 +5100,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._number_of_frames_ = len(self.frameIndex)
                 self.signalIndex                    = signalIndex
                 self.irregularSignalIndex           = irregularSignalIndex
+                self.docTitle = "Neo blocks"
                 
             elif all([isinstance(i, (neo.core.AnalogSignal, neo.core.IrregularlySampledSignal,  
                                      DataSignal, IrregularlySampledDataSignal)) for i in y]):
@@ -4860,10 +5123,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 self.x = None
                 self.y = y
+                self.docTitle = "Neo signals"
                 
             elif all([isinstance(i, (neo.Epoch, DataZone, neo.Event, DataMark)) for i in y]):
                 #self.dataAnnotations = [{s.name: s.annotations} for s in y]
                 self.y = y
+                self.docTitle = "Epochs and zones"
                 self.dataAxis = 0
                 self.signalChannelAxis = 1
                 self.frameIndex = range(1)
@@ -4912,6 +5177,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
                 self.x = x
                 self.y = y
+                self.docTitle = "Numpy arrays"
             
             else:
                 raise TypeError("Can only plot a list of 1D vigra filter kernels, 1D/2D numpy arrays, or neo-like signals")
@@ -4919,44 +5185,28 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             raise TypeError("Plotting is not implemented for %s data types" % type(self.y).__name__)
 
+        with self.observed_vars.hold_trait_notifications():
+            self.observed_vars["x"] = self.x
+            self.observed_vars["y"] = self.y
             
         return True
     
     _parse_data_ = _parse_data_old_
     
     @safeWrapper
-    def _set_data_(self,
-                   x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
-                   y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
-                   doc_title:(str, type(None)) = None, 
-                   frameAxis:(int, str, vigra.AxisInfo, type(None)) = None,
-                   signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None,
-                   frameIndex:(int, tuple, list, range, slice, type(None)) = None, 
-                   signalIndex:(str, int, tuple, list, range, slice, type(None)) = None,
-                   signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None,
-                   irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, 
-                   irregularSignalChannelAxis:(int, type(None)) = None,
-                   irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, 
-                   separateSignalChannels:bool = False, 
-                   interval:(tuple, list, neo.Epoch, type(None)) = None,
-                   plotStyle:str = "plot",
-                   showFrame:int = None,
-                   *args, **kwargs):
-    
-        #self.train_plot_options["train_brush"] = kwargs.pop("train_brush", None)
-        #self.train_plot_options["train_hoverPen"] = kwargs.pop("train_hoverPen", None)
-        #self.train_plot_options["train_hoverBrush"] = kwargs.pop("train_hoverBrush", None)
-        
+    def _set_data_(self, x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)),  y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, doc_title:(str, type(None)) = None, frameAxis:(int, str, vigra.AxisInfo, type(None)) = None, signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, interval:(tuple, list, neo.Epoch, type(None)) = None, plotStyle:str = "plot", showFrame:int = None, *args, **kwargs):
         self.plot_start = None
         self.plot_stop = None
         
+            
         self.epoch_plot_options["epoch_pen"] = kwargs.pop("epoch_pen", None)
         self.epoch_plot_options["epoch_brush"] = kwargs.pop("epoch_brush", None)
         self.epoch_plot_options["epoch_hoverPen"] = kwargs.pop("epoch_hoverPen", None)
         self.epoch_plot_options["epoch_hoverBrush"] = kwargs.pop("epoch_hoverBrush", None)
         
-        #self.train_plot_options["train_pen"] = kwargs.pop("train_pen", None)
-        
+        self.plot_args = args
+        self.plot_kwargs = kwargs
+
         if isinstance(interval, neo.Epoch):
             # NOTE: 2019-01-24 21:05:34
             # use only the first epoch in an Epoch array (if there are several elements)
@@ -4986,9 +5236,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self.y))
                         
-            self.plot_args = args
-            self.plot_kwargs = kwargs
-            
             if isinstance(showFrame, int):
                 if showFrame < 0:
                     showFrame = 0
@@ -5021,8 +5268,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             self._update_annotations_()
             
+            # NOTE: 2022-11-01 10:37:06
+            # overwrites self.docTitle set by self._parse_data_
             if isinstance(doc_title, str) and len(doc_title.strip()):
                 self.docTitle = doc_title
+                
             
             self.frameChanged.emit(self._current_frame_index_)
 
@@ -5030,24 +5280,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             traceback.print_exc()
             
     @safeWrapper
-    def setData(self,
-                x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
-                y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
-                doc_title:(str, type(None)) = None, 
-                frameAxis:(int, str, vigra.AxisInfo, type(None)) = None,
-                signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None,
-                frameIndex:(int, tuple, list, range, slice, type(None)) = None, 
-                signalIndex:(str, int, tuple, list, range, slice, type(None)) = None,
-                signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None,
-                irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, 
-                irregularSignalChannelAxis:(int, type(None)) = None,
-                irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, 
-                separateSignalChannels:bool = False, 
-                interval:(tuple, list, neo.Epoch, type(None)) = None,
-                plotStyle:str = "plot",
-                get_focus:bool = False,
-                showFrame = None,
-                *args, **kwargs):
+    def setData(self, x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,doc_title:(str, type(None)) = None, frameAxis:(int, str, vigra.AxisInfo, type(None)) = None, signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, interval:(tuple, list, neo.Epoch, type(None)) = None, plotStyle:str = "plot", get_focus:bool = False, showFrame = None, *args, **kwargs):
         """ Sets up the plot data and updates the plot.
         
         Plotting is executed by displayFrame().
@@ -5294,7 +5527,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.frameChanged.emit(self._current_frame_index_)
 
     @property
-    def plotItemsWithLayoutPositions(self) -> typing.List:
+    def plotItemsWithLayoutPositions(self):
         """ A zipped list of tuples (PlotItem, grid coordinates).
         
         The structure is derived from the dictionary
@@ -5314,7 +5547,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return sorted(items, key=lambda x: x[1][0])
     
     @property
-    def plotItems(self) -> typing.List:
+    def plotItems(self):
         px = self.plotItemsWithLayoutPositions
         
         if len(px):
@@ -5332,14 +5565,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return self.plotItemsWithLayoutPositions
     
     @property
-    def axes(self) -> typing.List:
+    def axes(self):
         """The list of axes (PlotItem objects).
         
         Alias to self.plotItems property
         """
         return self.plotItems
     
-    def axis(self, index: int) -> pg.PlotItem:
+    def axis(self, index: int):
         """The axis (PlotItem) at the specified index.
         
         If index is not valid, returns None.
@@ -5354,7 +5587,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return plotitem
     
     @safeWrapper
-    def plotItem(self, index: int) -> pg.PlotItem:
+    def plotItem(self, index: int):
         """Returns the axis (PlotItem) at the specified index.
         
         Does the same thing as self.axis(index) but with the overhead of 
@@ -5368,9 +5601,18 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """Calls self.plotItem(index) -- syntactic sugar
         """
         return self.plotItem(index)
+    
+    @property
+    def selectedPlotItem(self):
+        """Alias to currentPlotItem"""
+        return self.currentPlotItem
+    
+    @selectedPlotItem.setter
+    def selectedPlotItem(self, index):
+        self.selectedPlotItem = index
         
     @property
-    def currentPlotItem(self) -> pg.PlotItem:
+    def currentPlotItem(self):
         """Reference to the selected (current) axis (PlotItem).
         
         The setter counterpart sets the current plot item to be a reference to
@@ -5431,6 +5673,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @currentAxis.setter
     def currentAxis(self, index):
         self.currentPlotItem = index
+        
+    @property
+    def selectedAxis(self):
+        """Alias to currentAxis"""
+        return self.currentAxis
+    
+    @selectedAxis.setter
+    def selectedAxis(self, index):
+        self.currentAxis = index
     
     def dataCursor(self, ID):
         """Not to be confused with the Qt method self.cursor() !!!
@@ -5482,6 +5733,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             else:
                 hostitem = self.currentPlotItem
+                
+        elif isinstance(index, str) and index == "all":
+            hostitem = self.signalsLayout.scene()
             
         elif isinstance(index, int):
             if index >=0:
@@ -5493,6 +5747,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 hostitem = self.signalsLayout.scene()
                 
+        elif isinstance(index, pg.PlotItem):
+            hostitem = index
+            
         if hostitem is not None: # may be None if there is no scene, i.e. no plot item
             ret =  [c for c in self._data_cursors_.values() if c.hostItem is hostitem]
         
@@ -5596,9 +5853,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 neo.IrregularlySampledSignal, 
                 datatypes.DataSignal, 
                 np.ndarray
-                vigra.filters.Kernel1D          -> NOTE  this is converted to two numpy arrays in plot()
+                vigra.filters.Kernel1D  -> NOTE  this is converted to two numpy arrays in plot()
         
-        Anything else  (?)                 -> _plot_numeric_data_
+        Anything else  (?)              -> _plot_numeric_data_
         
         """
         if self.y is None:
@@ -5606,6 +5863,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.currentFrameAnnotations = None
         
+        # print(f"SignalViewer.displayFrame {self.y}")
+        
+        #### BEGIN self.y is a sequence
         if isinstance(self.y, (tuple, list)): 
             # a sequence of objects
             #
@@ -5635,12 +5895,23 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                     neo.core.AnalogSignal, 
                                     neo.core.IrregularlySampledSignal,
                                     IrregularlySampledDataSignal)) for y_ in self.y]):
-                self._plotSignal_(self.y[self._current_frame_index_], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
-                self.currentFrameAnnotations = {type(self.y[self._current_frame_index_]).__name__: self.y[self._current_frame_index_].annotations}
+                if self._current_frame_index_ in self.frameIndex:
+                    ndx = self.frameIndex[self._current_frame_index_]
+                else:
+                    self._current_frame_index_ = 0
+                    ndx = self._current_frame_index_
+                    
+                self._plotSignal_(self.y[ndx], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
+                self.currentFrameAnnotations = {type(self.y[ndx]).__name__: self.y[ndx].annotations}
                 
             elif all([isinstance(y_, (neo.core.Epoch, DataZone)) for y_ in self.y]): 
-                # plot an Epoch independently of data; there is a single frame
+                # plot Epoch(s) independently of data; there is a single frame
+                
+                epochs_start_end = np.array([(e[0], e[-1] + e.durations[-1]) for e in self.y])
+                x_min, x_max = (np.min(epochs_start_end[:,0]), np.max(epochs_start_end[:,1]))
+                self._prepareAxes_(1)
                 self._plotEpochs_(self.y, **self.epoch_plot_options)
+                self.axes[0].showAxis("bottom", True)
                 
             elif all([isinstance(y_, neo.Segment) for y_ in self.y]):
                 segment = self.y[self.frameIndex[self._current_frame_index_]]
@@ -5693,6 +5964,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     self._plotNumpyArray_(self.x, self.y[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
                     
+        #### END self.y is a sequence
+        #### BEGIN self.y is a single object
         else:
             if isinstance(self.y, neo.core.Block):
                 # NOTE: 2019-11-24 22:31:26
@@ -5726,7 +5999,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._plotSignal_(self.y, *self.plot_args, **self.plot_kwargs)
 
             elif isinstance(self.y, (neo.core.Epoch, DataZone)): # plot an Epoch independently of data
+                x_min, x_max = (self.y[0], self.y[-1] + self.y.durations[-1])
+                self._prepareAxes_(1)
                 self._plotEpochs_(self.y, **self.epoch_plot_options)
+                self.axes[0].showAxis("bottom", True)
                 
             elif isinstance(self.y, (neo.Event, DataMark)):
                 self._plotEvents_(self.y)
@@ -5747,8 +6023,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             elif self.y is None:
                 pass
                 
-            else:
-                raise TypeError("Plotting of data of type %s not yet implemented" % str(type(self.y)))
+            # else:
+            #     raise TypeError("Plotting of data of type %s not yet implemented" % str(type(self.y)))
+        #### END self.y is a single object
             
         # NOTE: 2020-03-10 22:09:51
         # reselect an axis according to its index (if one had been selected before)
@@ -5793,12 +6070,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
         self._update_annotations_()
         
+        # finally, reset the curors bound for all axes
+        for k in range(len(self.axes)):
+            for c in self.cursorsInAxis(k):
+                c.setBounds()
+            
+        
     @safeWrapper
-    def _plotSpikeTrains_(self, 
-                          trains:typing.Optional[typing.Union[neo.SpikeTrain, tuple, list]] = None, 
-                          clear:bool = False, 
-                          **kwargs):
-                          #from_cache: bool = False,
+    def _plotSpikeTrains_(self, trains:typing.Optional[typing.Union[neo.SpikeTrain, tuple, list]] = None, clear:bool = False, **kwargs):
         """Plots stand-alone spike trains.
         """
         if trains is None or clear:
@@ -5818,13 +6097,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 self._prepareAxes_(1)
                 self._plot_discrete_entities_(trains_dict, **kwargs)
+                
+            self.axes[-1].showAxis("bottom", True)
             
     @safeWrapper
-    def _plotEvents_(self,
-                     events: typing.Optional[typing.Union[neo.Event, DataMark, typing.Sequence]] = None, 
-                     clear: bool = True,
-                     from_cache: bool = False,
-                     **kwargs):
+    def _plotEvents_(self, events: typing.Optional[typing.Union[neo.Event, DataMark, typing.Sequence]] = None, clear: bool = True, from_cache: bool = False, **kwargs):
         
         if events is None or clear:
             self._clear_lris_()
@@ -5843,13 +6120,83 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 self._prepareAxes_(1)
                 self._plot_discrete_entities_(events_dict, **kwargs)
+                
+            self.axes[-1].showAxis("bottom", True)
+        
+    def _plot_epochs_seq_(self, *args, **kwargs):
+        """Does the actual plotting of epoch data.
+        Epochs is always a non-empty sequence (tuple or list) of neo.Epochs
+        We keep this as a nested function to avoid calling it directly. Thus
+        there is no need to check if the epochs argument is the same as 
+        self.y (or contained within)
+        """
+        
+        # print(f"SignalViewer._plot_epochs_seq_ {args}")
+        
+        if len(args) == 0:
+            return
+        
+        epoch_pen = kwargs.pop("epoch_pen", self.epoch_plot_options["epoch_pen"])
+        epoch_brush = kwargs.pop("epoch_brush", self.epoch_plot_options["epoch_brush"])
+        epoch_hoverPen = kwargs.pop("epoch_hoverPen", self.epoch_plot_options["epoch_hoverPen"])
+        epoch_hoverBrush = kwargs.pop("epoch_hoverBrush", self.epoch_plot_options["epoch_hoverBrush"])
+        
+        # plot LRIs in a different colour for each epoch; 
+        # all LRIs that belong to the same epoch have the same colour.
+        if epoch_brush is None:
+            # no epoch brush specified
+            if len(args) > 1:
+                brushes = cycle([QtGui.QBrush(QtGui.QColor(*c)) for c in self.epoch_plot_options["epochs_color_set"]])
+                
+            else:
+                brushes = cycle([QtGui.QBrush(QtGui.QColor(0,0,255,50))]) # what seems to be the default in LinearRegionItem
+            
+        else: # epoch brushes have been specified in one of several ways:
+            if isinstance(epoch_brush, typing.Sequence):
+                # a tuple or list of brush specs
+                if all([isinstance(b, (QtGui.QColor, QtGui.QBrush, tuple, list)) for b in epoch_brush]):
+                    brushes = cycle([QtGui.QBrush(QtGui.QColor(c)) if isinstance(c, (QtGui.QColor, QtGui.QBrush)) else QtGui.QBrush(QtGui.QColor(*c)) for c in epoch_brush])
+                    
+                else:
+                    brushes = cycle([QtGui.QBrush(QtGui.QColor(*epoch_brush))])
+                    
+            elif isinstance(epoch_brush, QtGui.Color):
+                # a single Qt Color
+                brushes = cycle([QtGui.QBrush(epoch_brush)])
+                
+            elif isinstance(epoch_brush, QtGui.QBrush):
+                # a single Qt Brush
+                brushes = cycle([epoch_brush])
+                
+            else:
+                warnings.warn("Invalid brush specification %s" % epoch_brush)
+                brushes = cycle([None])
+                
+        for epoch in args:
+            # print(f"SignalViewer._plot_epochs_seq_ epoch times {epoch.times} durations {epoch.durations}")
+            x0 = epoch.times.flatten().magnitude
+            x1 = x0 + epoch.durations.flatten().magnitude
+            
+            brush = next(brushes)
+            
+            for k in range(len(self.axes)):
+                self.axes[k].update() # to update its viewRange()
+                
+                regions = [v for v in zip(x0,x1)]
+                
+                lris = [pg.LinearRegionItem(values=value, 
+                                            brush=brush, 
+                                            orientation=pg.LinearRegionItem.Vertical, 
+                                            movable=False) for value in regions]
+                
+                for kl, lri in enumerate(lris):
+                    self.axes[k].addItem(lri)
+                    lri.setZValue(10)
+                    lri.setVisible(True)
+                    lri.setRegion(regions[kl])
         
     @safeWrapper
-    def _plotEpochs_(self, 
-                     epochs: typing.Optional[typing.Union[neo.Epoch, DataZone, typing.Sequence]] = None, 
-                     clear: bool = True,
-                     from_cache: bool = False,
-                     **kwargs):
+    def _plotEpochs_(self, epochs: typing.Optional[typing.Union[neo.Epoch, DataZone, typing.Sequence]] = None, clear: bool = True, from_cache: bool = False, **kwargs):
         """Plots epochs.
         A neo.Epoch contains time intervals each defined by time and duration.
         Epoch intervals are drawn using pyqtgraph.LinearRegionItem objects.
@@ -5864,12 +6211,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             was set to plot standalone epoch data (i.e. epoch data NOT associated
             with a neo Segment, or with anything else).
             
-            Standalone epoch data is an Epoch or sequence of Epoch objects
+            FIXME: Standalone epoch data is an Epoch or sequence of Epoch objects
             passed as the 'y' parameter to self.setData(...) function
             (NOTE that self.setData is aliased to 'self.plot' and 'self.view').
             
             When the 'epochs' parameter is None or an empty sequence, the 
-            function plots the standalone epoch data, is it exists, or clears
+            function plots the standalone epoch data, if it exists, or clears
             any representations of previous epoch data from all axes.
             
         clear: bool, default is True.
@@ -5883,161 +6230,42 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         """
         
-        def _plot_epochs_seq_(*args, **kwargs):
-            """Does the actual plotting of epoch data.
-            Epochs is always a non-empty sequence (tuple or list) of neo.Epochs
-            We keep this as a nested function to avoid calling it directly. Thus
-            there is no need to check if the epochs argument is the same as 
-            self.y (or contained within)
-            """
-            if len(args) == 0:
-                return
-            
-            epoch_pen = kwargs.pop("epoch_pen", self.epoch_plot_options["epoch_pen"])
-            epoch_brush = kwargs.pop("epoch_brush", self.epoch_plot_options["epoch_brush"])
-            epoch_hoverPen = kwargs.pop("epoch_hoverPen", self.epoch_plot_options["epoch_hoverPen"])
-            epoch_hoverBrush = kwargs.pop("epoch_hoverBrush", self.epoch_plot_options["epoch_hoverBrush"])
-            
-            # plot LRIs in a different colour for each epoch; 
-            # all LRIs that belong to the same epoch have the same colour.
-            if epoch_brush is None:
-                # no epoch brush specified
-                if len(args) > 1:
-                    brushes = cycle([QtGui.QBrush(QtGui.QColor(*c)) for c in self.epoch_plot_options["epochs_color_set"]])
-                    
-                else:
-                    brushes = cycle([QtGui.QBrush(QtGui.QColor(0,0,255,50))]) # what seems to be the default in LinearRegionItem
-                
-            else: # epoch brushes have been specified in one of several ways:
-                if isinstance(epoch_brush, typing.Sequence):
-                    # a tuple or list of brush specs
-                    if all([isinstance(b, (QtGui.QColor, QtGui.QBrush, tuple, list)) for b in epoch_brush]):
-                        brushes = cycle([QtGui.QBrush(QtGui.QColor(c)) if isinstance(c, (QtGui.QColor, QtGui.QBrush)) else QtGui.QBrush(QtGui.QColor(*c)) for c in epoch_brush])
-                        
-                    else:
-                        brushes = cycle([QtGui.QBrush(QtGui.QColor(*epoch_brush))])
-                        
-                elif isinstance(epoch_brush, QtGui.Color):
-                    # a single Qt Color
-                    brushes = cycle([QtGui.QBrush(epoch_brush)])
-                    
-                elif isinstance(epoch_brush, QtGui.QBrush):
-                    # a single Qt Brush
-                    brushes = cycle([epoch_brush])
-                    
-                else:
-                    warnings.warn("Invalid brush specification %s" % epoch_brush)
-                    brushes = cycle([None])
-                    
-            # NOTE: 2020-03-09 12:09:40
-            # unlike the online documentation, pg.LinearRegionItem constructor 
-            # DOES NOT accept pen as argument
-            #if epoch_pen is None:
-                #if len(args) > 1:
-                    #pens = cycle([QtGui.QPen(QtGui.QColor(*c).darker()) for c in self.epoch_plot_options["epochs_color_set"]])
-                    
-                #else:
-                    #pens = cycle([QtGui.QPen(QtGui.QColor(0,0,255,50).darker())])
-                    
-            #else:
-                #if isinstance(epoch_pen, tying.Sequence):
-                    #if all([isinstance(b, (QtGui.QColor, QtGui.QBrush, tuple, list)) for b in epoch_pen]):
-                        #pens = cycle([QtGui.QPen(QtGui.QColor(c)) if isinstance(c, (QtGui.QColor, QtGui.QBrush)) else QtGui.QPen(QtGui.QColor(*c) for c in epoch_pen)])
-                        
-                    #else:
-                        #pens = cycle([QtGui.QPen(QtGui.QColor(*epoch_pen))])
-                        
-                #elif isinstance(epoch_pen, QtGui.QColor):
-                    #pens = cycle([QtGui.QBrush(QtGui.QColor(epoch_pen))])
-                    
-                #elif isinstance(epoch_pen, QtGui.QBrush):
-                    #pens = cycle([epoch_pen])
-                    
-                #elif isinstance(epoch_pen, QtGui.QPen):
-                    #pens = cycle([epoch_pen])
-                    
-                #else:
-                    #warnings.warn("Invalid pen specification %s" % epoch_pen)
-                    
-            # figure out the visible X range
-            minX = list()
-            maxX = list()
-            
-            visibleXRange = None
-            
-            for ax in self.axes:
-                if len(ax.dataItems):
-                    [x_min, x_max] = ax.viewRange()[0]
-                    
-                    minX.append(x_min)
-                    maxX.append(x_max)
-                    
-            if len(minX) and len(minX) == len(maxX):
-                visibleXRange = [min(minX), max(maxX)]
-            
-            for epoch in args:
-                x0 = epoch.times.flatten().magnitude
-                x1 = x0 + epoch.durations.flatten().magnitude
-                
-                if visibleXRange is not None:
-                    x0_visible = (x0 >= visibleXRange[0]) & (x0 <  visibleXRange[1])
-                    x1_visible = (x1 >  visibleXRange[0]) & (x1 <= visibleXRange[1])
-                    
-                    x_visible = x0_visible & x1_visible
-                    
-                else:
-                    x_visible = np.full_like(x0, fill_value=True, dtype="bool")
-                    
-                #print("x_visible", x_visible)
-                
-                brush = next(brushes)
-                
-                # see NOTE: 2020-03-09 12:09:40
-                #pen = next(pens)
-                
-                for k in range(len(self.axes)):
-                    data_x_min = list()
-                    data_x_max = list()
-                    
-                    regions = [v for v in zip(x0,x1)]
-                    
-                    lris = [pg.LinearRegionItem(values=value, 
-                                                brush=brush, 
-                                                orientation=pg.LinearRegionItem.Vertical, 
-                                                movable=False, 
-                                                bounds = visibleXRange) for value in regions]
-                    
-                    for kl, lri in enumerate(lris):
-                        self.axes[k].addItem(lri)
-                        lri.setZValue(10)
-                        lri.setVisible(x_visible[kl])
-                        lri.setRegion(regions[kl])
-            
-        # 1. clear existing LinearRegionItem objects.
+        # print(f"SignalViewer _plotEpochs_ epochs: {epochs}; cached: {self._cached_epochs_}")
+        
+        # BEGIN plot epochs from cache (containing standalone epoch data), if any and if requested
         
         if from_cache:
             epoch_seq = self._cached_epochs_.get(self.currentFrame, None)
             
-            if epoch_seq is not None:
+            # BEGIN plot epochs from cache: clear current displayed epoch if requested
+            # if epoch_seq is not None and clear:
+            if clear:
                 for k, ax in enumerate(self.axes):
                     lris = [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]
                     for l in lris:
                         ax.removeItem(l)
             
-                _plot_epochs_seq_(*epoch_seq, **kwargs)
+            # END plot epochs from cache: clear current displayed epoch if requested
+            
+            self._plot_epochs_seq_(*epoch_seq, **kwargs)
                 
             return
+        # END plot epochs from cache (containing standalone epoch data), if any and if requested
             
+        # BEGIN plot supplied epoch
+        # BEGIN clear current epoch display if requested
         if clear:
             for k, ax in enumerate(self.axes):
                 lris = [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]
                 for l in lris:
                     ax.removeItem(l)
+        # END clear current epoch display if requested
         
         epoch_seq = None
+        # END plot supplied epoch
         
         if epochs is None or len(epochs) == 0:
-            # None, an empty sequence or empty epoch
+            # None, an empty sequence of epochs or an empty epoch
             if isinstance(self.y, neo.Epoch):
                 self._prepareAxes_(1) # use a brand new single axis
                 epoch_seq = [self.y]
@@ -6055,7 +6283,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             else:
                 # NOTE: 2020-10-27 09:19:26
-                # some of therse may be relics from old API (i.e., neoepoch.Epoch)
+                # some of these may be relics from old API (i.e., neoepoch.Epoch)
                 # therefore we try to salvage them
                 epoch_seq = list()
                 
@@ -6074,7 +6302,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             raise TypeError("Expecting a neo.Epoch or a Sequence of neo.Epoch objects; got %s instead" % type(epochs).__name__)
         
         if epoch_seq is not None:
-            _plot_epochs_seq_(*epoch_seq, **kwargs)
+            self._plot_epochs_seq_(*epoch_seq, **kwargs)
             
             if self.currentFrame in self._cached_epochs_:
                 if len(self._cached_epochs_[self.currentFrame]):
@@ -6087,58 +6315,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             self._cached_epochs_.pop(self.currentFrame, None)
                     
-    #@safeWrapper
-    #def _plot_trains_dict_(self, trains_dict, **kwargs):
-        #if len(trains_dict) == 0:
-            #return
-        
-        #try:
-            #if len(self.axes) == 0:
-                #self._prepareAxes_(1)
-                
-            #spike_train_axis = self.signalsLayout.getItem(0,0)
-            
-            #height_interval = 1/len(trains_dict)
-            
-            #colors = cycle(self.defaultLineColorsList)
-            
-            #labelStyle = {"color": "#000000"}
-
-            #trains_x_list = list()
-            #trains_y_list = list()
-            
-            #for k_train, (tag, train) in enumerate(trains_dict.items()):
-                #data_name = tag if isinstance(tag, str) else "%d" % tag
-                
-                #x = train.times.magnitude.flatten()
-                #y = np.full(x.shape, height_interval * k_train + height_interval/2)
-                
-                #trains_x_list.append(x)
-                #trains_y_list.append(y)
-                
-            #tr_x = np.concatenate(trains_x_list, axis=np.newaxis)
-            #tr_y = np.concatenate(trains_y_list, axis=np.newaxis)
-            
-            #self._plot_numeric_data_(spike_train_axis,
-                                        #tr_x, tr_y, 
-                                        #symbol="spike",
-                                        #pen=None,
-                                        #name=data_name,
-                                        #symbolPen=QtGui.QPen(QtGui.QColor(next(colors))))
-                
-            #spike_train_axis.axes["left"]["item"].setPen(None)
-            #spike_train_axis.axes["left"]["item"].setLabel("Spike Trains", **labelStyle)
-            
-        #except Exception as e:
-            #traceback.print_exc()
-            
     @safeWrapper
     def _plotSegment_(self, seg, *args, **kwargs):
         """Plots a neo.Segment.
         Plots the signals (optionally the selected ones) present in a segment, 
         and the associated epochs, events, and spike trains.
         """
-        # NOTE: 2021-10-03 12:55:21 ChannelIndex is OUT
+        # NOTE: 2021-10-03 12:55:21 ChannelIndex is OUT of neo
         
         # NOTE: 2021-01-02 11:54:50
         # allow custom plot title - handy e.g., for plotting segments from across
@@ -6167,6 +6350,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         selected_irregs = list()
         selected_irregs_names = list()
         
+        # BEGIN prepate to plot regular (analog) signals
         if self._plot_analogsignals_:
             # now try to get the signal selections from the combo boxes
             current_ndx = self.selectSignalComboBox.currentIndex() 
@@ -6204,7 +6388,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
                 else:
                     selected_analog_names = ["Analog signal %d" % (current_ndx-1, )]
-                
+        # END   prepate to plot regular (analog) signals
+          
+        # BEGIN prepate to plot irregular signals
         if self._plot_irregularsignals_:
             current_ndx = self.selectIrregularSignalComboBox.currentIndex()
             current_txt = self.selectIrregularSignalComboBox.currentText()
@@ -6241,14 +6427,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     selected_irregs_names = ["Irregularly sampled signal %d" % (current_ndx-1,)]
         
+        # END   prepate to plot irregular signals
+        
+        # BEGIN initial set up axes
         nAnalogAxes = len(selected_analogs) 
         
         nIrregAxes = len(selected_irregs)
         
         nAxes = nAnalogAxes + nIrregAxes
+        # END   initial set up axes
         
         signames = selected_analog_names + selected_irregs_names # required for prepare axes and caching of cursors (see comments in _prepareAxes_())
         
+        # BEGIN prepare to plot spike trains
         # NOTE: 2019-11-25 15:19:16
         # for segments we do not plot signals with their channels separate
         # if needed, then get a reference to the signal and plot it individually
@@ -6257,20 +6448,25 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if len(spiketrains):
             nAxes += 1
             signames += ["spike trains"]
+        # END   prepare to plot spike trains
         
+        # BEGIN prepare to plot events
         events = get_non_empty_events(seg.events)
         
         if isinstance(events, (tuple, list)) and len(events):
             nAxes += 1
             signames += ["events"]
-            
+        # END   prepare to plot events
+           
+        # BEGIN finalize set up axes
         self._prepareAxes_(nAxes, sigNames=signames)
         
         axes = self.plotItems
+        # END   finalize set up axes
         
         kAx = 0
         
-        #### BEGIN plot analog signals 
+        #### BEGIN plot regular (analog) signals 
         for k, signal in enumerate(selected_analogs):
             signal_axis = self.signalsLayout.getItem(kAx,0)
             if isinstance(signal, neo.AnalogSignal):
@@ -6323,10 +6519,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             signal_axis.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
                                                autoReduceTextSpace=False)
-            
+            signal_axis.update()
             kAx += 1
          
-        #### END plot analog signals
+        #### END   plot regular (analog) signals
         
         #### BEGIN plot irregularly sampled signals
         for k, signal in enumerate(selected_irregs):
@@ -6372,10 +6568,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             signal_axis.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
                                                autoReduceTextSpace=False)
-            
+            signal_axis.update()
             kAx += 1
         
-        #### END plot irregularly sampled signals
+        #### END   plot irregularly sampled signals
         
         #### BEGIN plot spike trains
         if len(spiketrains):
@@ -6392,7 +6588,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             height_interval = 1/len(spiketrains) 
             
             self._plot_discrete_entities_(spiketrains, axis=kAx, **kwargs)
-
+            spike_train_axis.update()
             kAx +=1
                 
         #### END plot spike trains
@@ -6412,7 +6608,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             height_interval = 1/len(events)
             
             self._plot_discrete_entities_(events, axis=kAx, **kwargs)
-                
+            event_axis.update() 
             kAx +=1
             
         #### END plot events
@@ -6600,42 +6796,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                         xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
                                         *args, **kwargs)
             
-    #def _make_sig_plot_dict_(self,plotItem: pg.PlotItem, 
-                            #x:np.ndarray, 
-                            #y:np.ndarray,
-                            #xlabel:(str, type(None))=None, 
-                            #xunits: (str, pq.Quantity, type(None))=None,
-                            #ylabel:(str, type(None))=None, 
-                            #yunits:(str, pq.Quantity, type(None))=None,
-                            #title:(str, type(None))=None, 
-                            #name:(str, type(None))=None,
-                            #symbolcolorcycle:(cycle, type(None))=None,
-                            #*args, **kwargs):
-        
-    def _make_sig_plot_dict_(self,plotItem: pg.PlotItem, 
-                            x:np.ndarray, 
-                            y:np.ndarray,
-                            xlabel:(str, type(None))=None, 
-                            ylabel:(str, type(None))=None, 
-                            title:(str, type(None))=None, 
-                            name:(str, type(None))=None,
-                            symbolcolorcycle:(cycle, type(None))=None,
-                            *args, **kwargs):
-        
+    def _make_sig_plot_dict_(self,plotItem: pg.PlotItem, x:np.ndarray, y:np.ndarray, xlabel:(str, type(None))=None,  ylabel:(str, type(None))=None, title:(str, type(None))=None, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
         return {"plotItem":plotItem, 
                 "x": x, "y": y, 
                 "xlabel": xlabel, "ylabel": ylabel,
                 "title": title, "name": name, 
                 "symbolcolorcycle": symbolcolorcycle,
                 "args": args, "kwargs": kwargs}
-                    
-        #return {"plotItem":plotItem, 
-                #"x": x, "y": y, 
-                #"xlabel": xlabel, "xunits": xunits, 
-                #"ylabel": ylabel, "yunits": yunits,
-                #"title": title, "name": name, 
-                #"symbolcolorcycle": symbolcolorcycle,
-                #"args": args, "kwargs": kwargs}
                     
     @safeWrapper
     @pyqtSlot(dict)
@@ -6667,7 +6834,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.statusBar().clearMessage()
         
     @safeWrapper
-    def _prepare_numeric_data_plot_(self, x:np.ndarray, y:np.ndarray) -> tuple:
+    def _prepare_numeric_data_plot_(self, x:np.ndarray, y:np.ndarray):
         
         xx = list()
         yy = list()
@@ -6737,35 +6904,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         return xx, yy
     
-    def _generate_plot_data_items_(self, x, y, name:(str, type(None))=None,
-                                   symbolcolorcycle:(cycle, type(None))=None,
-                                   *args, **kwargs):
+    def _generate_plot_data_items_(self, x, y, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
         pass
                     
-        
-    #def _plot_numeric_data_(self, 
-                            #plotItem: pg.PlotItem, 
-                            #x:np.ndarray, 
-                            #y:np.ndarray,
-                            #xlabel:(str, type(None))=None, 
-                            #xunits: (str, pq.Quantity, type(None))=None,
-                            #ylabel:(str, type(None))=None, 
-                            #yunits:(str, pq.Quantity, type(None))=None,
-                            #title:(str, type(None))=None, 
-                            #name:(str, type(None))=None,
-                            #symbolcolorcycle:(cycle, type(None))=None,
-                            #*args, **kwargs):
     @safeWrapper
-    def _plot_numeric_data_(self, 
-                            plotItem: pg.PlotItem, 
-                            x:np.ndarray, 
-                            y:np.ndarray,
-                            xlabel:(str, type(None))=None, 
-                            ylabel:(str, type(None))=None, 
-                            title:(str, type(None))=None, 
-                            name:(str, type(None))=None,
-                            symbolcolorcycle:(cycle, type(None))=None,
-                            *args, **kwargs):
+    def _plot_numeric_data_(self, plotItem: pg.PlotItem, x:np.ndarray, y:np.ndarray, xlabel:(str, type(None))=None, ylabel:(str, type(None))=None, title:(str, type(None))=None, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
         """ The workhorse that does the actual plotting of signals
         Parameters:
         ----------
@@ -6954,15 +7097,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         plotItem.replot()
         
-        if self.axis_tick_font is not None:
-            for ax in plotItem.axes.values():
-                if ax["item"].isVisible():
-                    pass
-        
-        plotItemCursors = self.cursorsInAxis(plotItem)
-        
-        for c in plotItemCursors:
-            c.setBounds()
+#         plotItemCursors = self.cursorsInAxis(plotItem)
+#         
+#         for c in plotItemCursors:
+#             c.setBounds()
             
         if plotItem is self._current_plot_item_:
             lbl = "<B>%s</B>" % self._current_plot_item_.axes["left"]["item"].labelText

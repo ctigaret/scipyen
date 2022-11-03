@@ -151,7 +151,7 @@ def fft_purelet(image, nLevels, wavelet=None, sigma2=None, thr=None):
     ## NOTE: sampled frequency domain (0..2*pi), one for each direction
     ## NOTE: (vertical, horizontal)
 
-    zx_0 = np.exp(1j * twopi * np.linspace(0, 1, image.shape[0],  endpoint=False))
+    zx_0 = np.exp(1j * twopi * np.linspace(0, 1, image.shape[0], endpoint=False))
     zy_0 = np.exp(1j * twopi * np.linspace(0, 1, image.shape[1], endpoint=False))
 
     zx = np.zeros(zx_0.shape, dtype=np.complex128)

@@ -147,7 +147,7 @@ init_commands.extend(
     "".join(["sys.path.insert(2, '", __scipyen_path__, "')"]),
     "from core import extipyutils_host as hostutils",
     "from core.workspacefunctions import *",
-    "from core import plots as plots",
+    "from plots import plots as plots",
     "from core import datatypes as dt",
     "from core import neoutils",
     "from core.datatypes import * ",

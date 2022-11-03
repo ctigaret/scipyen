@@ -149,10 +149,7 @@ class SafeComparator(object):
             #print("y:", y)
             return False
         
-def __check_isclose_args__(rtol:typing.Optional[Number]=None, 
-      atol:typing.Optional[Number]=None, 
-      use_math:bool=True,
-      equal_nan:bool=True) -> tuple: # (func, rtol, atol)
+def __check_isclose_args__(rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=True):
     
     if not isinstance(rtol, Number):
         rtol = inspect.signature(math.isclose).parameters["rel_tol"].default if use_math else inspect.signature(np.isclose).parameters["rtol"].default
@@ -165,12 +162,7 @@ def __check_isclose_args__(rtol:typing.Optional[Number]=None,
     return f_isclose, rtol, atol
         
 @singledispatch
-def is_same_as(x, y, 
-               rtol:typing.Optional[Number]=None, 
-               atol:typing.Optional[Number]=None, 
-               use_math:bool=True, 
-               equal_nan:bool=False,
-               comparator = operator.eq):
+def is_same_as(x, y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
     """Compares two objects.
     
     Parameters:
@@ -199,19 +191,11 @@ def is_same_as(x, y,
     return operator.eq(x,y)
 
 @is_same_as.register(str)
-def _(x, y, rtol:typing.Optional[Number]=None, 
-            atol:typing.Optional[Number]=None, 
-            use_math:bool=True, 
-            equal_nan:bool=False,
-            comparator = operator.eq):
+def _(x, y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
     return comparator(x,y)
 
 @is_same_as.register(np.ndarray)
-def _(x,y,  rtol:typing.Optional[Number]=None, 
-            atol:typing.Optional[Number]=None, 
-            use_math:bool=True, 
-            equal_nan:bool=False,
-            comparator = operator.eq):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
     
     if comparator not in (operator.eq, isclose):
         raise TypeError(f"'comparator' expected one of operator.eq or isclose;; got {comparator} instead")
@@ -236,11 +220,7 @@ def _(x,y,  rtol:typing.Optional[Number]=None,
     return ret
 
 @is_same_as.register(pq.Quantity)
-def _(x,y,  rtol:typing.Optional[Number]=None, 
-            atol:typing.Optional[Number]=None, 
-            use_math:bool=True, 
-            equal_nan:bool=False,
-            comparator = operator.eq):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
     
     if comparator not in (operator.eq, isclose):
         raise TypeError(f"'comparator' expected one of operator.eq or isclose; got {comparator} instead")
@@ -275,12 +255,7 @@ def _(x,y,  rtol:typing.Optional[Number]=None,
     return ret
 
 @is_same_as.register(collections.abc.Sequence)
-def _(x,y,
-            rtol:typing.Optional[Number]=None, 
-            atol:typing.Optional[Number]=None, 
-            use_math:bool=True, 
-            equal_nan:bool=False,
-            comparator = operator.eq):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
     
     if comparator is isclose:
         comparator = partial(comparator, 
@@ -295,12 +270,7 @@ def _(x,y,
     return ret
 
 @is_same_as.register(collections.abc.Mapping)
-def _(x,y,
-            rtol:typing.Optional[Number]=None, 
-            atol:typing.Optional[Number]=None, 
-            use_math:bool=True, 
-            equal_nan:bool=False,
-            comparator = operator.eq):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
     
     # use for comparisons between mapping values
     simp_fun = partial(is_same_as, rtol=rtol, atol=atol, 
@@ -324,11 +294,7 @@ def ideq(x,y):
     return id(x) == id(y)
 
 @singledispatch
-def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarray, pq.Quantity], 
-            rtol:typing.Optional[Number]=None, 
-            atol:typing.Optional[Number]=None, 
-            use_math:bool=True, 
-            equal_nan:bool=False) -> typing.Union[bool, np.ndarray]:
+def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarray, pq.Quantity], rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
     """Generalized isclose.
     
     Parameters:
@@ -394,19 +360,11 @@ def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarra
     raise NotImplementedError(f"{type(x).__name__} objects are not supported")
 
 @isclose.register(str)
-def _(x,y,
-      rtol:typing.Optional[Number]=None, 
-      atol:typing.Optional[Number]=None, 
-      use_math:bool=True, 
-      equal_nan:bool=False):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
     return x.lower() == y.lower()
 
 @isclose.register(np.ndarray)
-def _(x,y,
-      rtol:typing.Optional[Number]=None, 
-      atol:typing.Optional[Number]=None, 
-      use_math:bool=True, 
-      equal_nan:bool=False):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
     
     if any(v.size > 1 for v in (x,y)):
         use_math = False
@@ -426,11 +384,7 @@ def _(x,y,
     return f_isclose(x,y)
 
 @isclose.register(pq.Quantity)
-def _(x,y,
-      rtol:typing.Optional[Number]=None, 
-      atol:typing.Optional[Number]=None, 
-      use_math:bool=True, 
-      equal_nan:bool=False):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
     
     if any(v.size > 1 for v in (x,y)):
         # use math only on scalars
@@ -462,21 +416,14 @@ def _(x,y,
     return f_isclose(x,y)
 
 @isclose.register(Number)
-def _(x,y,
-      rtol:typing.Optional[Number]=None, 
-      atol:typing.Optional[Number]=None, 
-      use_math:bool=True, 
-      equal_nan:bool=False):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
     
     f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
     
     return f_isclose(x,y)
 
 @isclose.register(complex)
-def _(x,y, rtol:typing.Optional[Number]=None, 
-            atol:typing.Optional[Number]=None, 
-            use_math:bool=True, 
-            equal_nan:bool=False):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
     
     f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
     
@@ -487,7 +434,7 @@ def all_or_not_all(*args):
     """
     return all(args) or all(not(arg) for arg in args)
 
-def hashiterable(x:typing.Iterable[typing.Any]) -> Number:
+def hashiterable(x:typing.Iterable[typing.Any]):
     """Takes into account the order of the elements.
     
     NOTE: This works when the type of the elements contained in the iterable are
@@ -497,81 +444,6 @@ def hashiterable(x:typing.Iterable[typing.Any]) -> Number:
     in order to prevent infinite recursion when these elements contain reference(s)
     to the iterable being 'hashed'.
     
-    Example 1:
-    
-    import random # to generate random sequences
-    random.seed()
-    
-    # generate 10 random sequences
-    k = 11
-    seqs = [random.sample(range(k), k) for i in range(k)]
-
-    seqs
-    
-        [[7, 5, 10, 1, 4, 2, 6, 3, 9, 8, 0],
-         [9, 0, 7, 1, 5, 8, 3, 10, 6, 4, 2],
-         [7, 10, 9, 3, 6, 4, 8, 1, 5, 0, 2],
-         [1, 6, 8, 2, 5, 10, 9, 4, 0, 7, 3],
-         [5, 7, 2, 0, 9, 6, 8, 4, 3, 10, 1],
-         [6, 0, 2, 9, 7, 1, 8, 3, 4, 10, 5],
-         [10, 2, 6, 7, 4, 1, 5, 9, 0, 8, 3],
-         [3, 7, 5, 1, 10, 0, 9, 6, 8, 4, 2],
-         [0, 5, 3, 8, 2, 9, 1, 6, 4, 7, 10],
-         [9, 10, 2, 3, 5, 8, 0, 1, 4, 7, 6],
-         [8, 9, 0, 3, 5, 7, 1, 4, 2, 6, 10]]    
-        
-    sums = [sum(hashiterable(x)) for x in seqs]
-
-    sums
-
-        [103034808763.81586,
-         103034808806.43579,
-         103034808697.90562,
-         103034808809.05049,
-         103034808811.85916,
-         103034808796.93391,
-         103034808824.6124,
-         103034808735.8485,
-         103034808837.7218,
-         103034808790.48198,
-         103034808795.09956]
-        
-    Example 2:
-    
-    k = 10
-    
-    eye = [[0]*k for i in range(k)]
-    
-    for i, s in enumerate(eye):
-        s[i]=1
-        
-    eye
-    
-        [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]
-
-    sums = [sum(hashiterable(x)) for s in eye]
-    
-    sums
-    
-        [102740977801.8254,
-         102740977802.8254,
-         102740977801.15872,
-         102740977804.8254,
-         102740977801.02539,
-         102740977806.8254,
-         102740977800.96825,
-         102740977808.8254,
-         102740977800.93651,
-         102740977810.8254]
         
     """
     if not hasattr(x, "__iter__"):
@@ -579,14 +451,90 @@ def hashiterable(x:typing.Iterable[typing.Any]) -> Number:
     
     # NOTE: 2021-08-21 10:02:46 FIXME
     # ATTENTION:
-    # The line below generate infinite recursion when v contains references to x
+    # The line below generates infinite recursion when v contains references to x
     #return (gethash(v) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
     # NOTE: 2021-08-21 10:08:01 FIXED
-    return ( (hash(type(v)) if (hasattr(v, "__iter__") or v is x) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
+    return hash( (type(x),) + tuple(type(v) if hasattr(v, "__iter__") or v is x else v for v in x) )
+    #return ( (hash(type(v)) if (hasattr(v, "__iter__") or v is x ) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
+    #Example 1:
+    
+    #import random # to generate random sequences
+    #random.seed()
+    
+    ## generate 10 random sequences
+    #k = 11
+    #seqs = [random.sample(range(k), k) for i in range(k)]
+
+    #seqs
+    
+        #[[7, 5, 10, 1, 4, 2, 6, 3, 9, 8, 0],
+         #[9, 0, 7, 1, 5, 8, 3, 10, 6, 4, 2],
+         #[7, 10, 9, 3, 6, 4, 8, 1, 5, 0, 2],
+         #[1, 6, 8, 2, 5, 10, 9, 4, 0, 7, 3],
+         #[5, 7, 2, 0, 9, 6, 8, 4, 3, 10, 1],
+         #[6, 0, 2, 9, 7, 1, 8, 3, 4, 10, 5],
+         #[10, 2, 6, 7, 4, 1, 5, 9, 0, 8, 3],
+         #[3, 7, 5, 1, 10, 0, 9, 6, 8, 4, 2],
+         #[0, 5, 3, 8, 2, 9, 1, 6, 4, 7, 10],
+         #[9, 10, 2, 3, 5, 8, 0, 1, 4, 7, 6],
+         #[8, 9, 0, 3, 5, 7, 1, 4, 2, 6, 10]]    
+        
+    #sums = [sum(hashiterable(x)) for x in seqs]
+
+    #sums
+
+        #[103034808763.81586,
+         #103034808806.43579,
+         #103034808697.90562,
+         #103034808809.05049,
+         #103034808811.85916,
+         #103034808796.93391,
+         #103034808824.6124,
+         #103034808735.8485,
+         #103034808837.7218,
+         #103034808790.48198,
+         #103034808795.09956]
+        
+    #Example 2:
+    
+    #k = 10
+    
+    #eye = [[0]*k for i in range(k)]
+    
+    #for i, s in enumerate(eye):
+        #s[i]=1
+        
+    #eye
+    
+        #[[1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+         #[0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+         #[0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+         #[0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+         #[0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+         #[0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+         #[0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+         #[0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+         #[0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+         #[0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]
+
+    #sums = [sum(hashiterable(x)) for s in eye]
+    
+    #sums
+    
+        #[102740977801.8254,
+         #102740977802.8254,
+         #102740977801.15872,
+         #102740977804.8254,
+         #102740977801.02539,
+         #102740977806.8254,
+         #102740977800.96825,
+         #102740977808.8254,
+         #102740977800.93651,
+         #102740977810.8254]
     #return ( (hash(type(v)) if isinstance(v, (list, deque, dict)) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
 
 @safeWrapper
-def gethash(x:typing.Any) -> Number:
+def gethash(x:typing.Any):
     """Calculates a hash-like figure for objects (including of non-hashable types)
     To be used for object comparisons.
     
@@ -611,55 +559,52 @@ def gethash(x:typing.Any) -> Number:
     
     # Arguably, we don't need to monitor elemental vale changes in these large
     # data sets, just their ndim/shape/size/axistags, etc
-    def _sumarr(_x):
-        return sum((hash(_x.ndim), hash(_x.size), hash(_x.shape),))
+    def _hasharr(_x):
+        return hash((type(_x), _x.size, _x.shape))
         
-    def _sumarrdtype(_x):
-        return _sumarr(_x) + hash(_x.dtype)
+    def _hasharrdtype(_x):
+        return hash((type(x), _x.size, _x.shape, _x.dtype))
 
     try:
         if is_hashable(x):
             return hash(x)
         
         elif isinstance(x, pq.Quantity):
-            return hash(type(x)) + _sumarrdtype(x) + hash(x.dimensionality)
+            return hash((type(x), x.size, x.shape, x.dtype, x.dimensionality))
         
         elif isinstance(x, vigra.VigraArray):
-            return hash(type(x)) + _sumarrdtype(x) + hash(x.axistags)
-            #return hash(type(x)) + gethash(np.array(x)) + hash(x.axistags)
+            return hash((type(x), x.size, x.shape, x.dtype, x.axistags))
         
         elif isinstance(x, vigra.vigranumpycore.ChunkedArrayBase):
-            return hash(type(x)) + _sumarrdtype(x) + sum((hash(x.chunk_array_shape), hash(x.chunk_shape), ))
+            return hash((type(x), x.chunk_array_shape, x.chunk_shape))
         
         elif isinstance(x, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
-            return hash(type(x)) + hash(x)
-            #return HASHRANDSEED + hash(x)
+            return hash(type(x), x)
         
         elif isinstance(x, np.ndarray):
-            return hash(type(x)) + _sumarrdtype(x)
-            #return HASHRANDSEED + sum([hash(x.shape), hash(x.size), hash(x.ndim) , hash(x.dtype)])
+            return _hasharrdtype(x)
         
         elif isinstance(x, pd.DataFrame):
-            return hash(type(x)) + _sumarr(x) + gethash(x.index) + gethash(x.columns) + sum((gethash(x[c]) for c in x.columns))
+            return hash((type(x), x.size, x.shape, x.dtype, x.index, x.columns))
         
         elif isinstance(x, pd.Series):
-            return hash(type(x)) + _sumarrdtype(x) + hash(tuple(x.index)) + hash(tuple(x.name))
-            #return HASHRANDSEED + hash(tuple(x.index)) + hash(tuple(x.name)) + hash(tuple(x)) + hash(x.dtype)
+            return hash(type(x), x.size, x.shape, x.dtype, x.index, x.name)
         
         elif isinstance(x, pd.Index):
-            return hash(type(x)) + _sumarrdtype(x)
-            #return HASHRANDSEED + hash(tuple(x)) 
+            return hash(type(x), tuple(x))
             
         elif hasattr(x, "__iter__"):
-            return hash(type(x)) + sum(hashiterable(x))
+            return hash((type(x),tuple(x)))
+            
+        elif isinstance(x, dict):
+            return hash((type(x), tuple(x)))
         
         elif not is_hashable(x):
             if hasattr(x, "__dict__"):
-                return hash(type(x)) + gethash(x.__dict__)
-            
+                return hash((type(x), x.__dict__))
+
             else:
                 return hash(type(x)) # FIXME 2021-08-20 14:22:13
-                #return HASHRANDSEED + hash(type(x)) # FIXME 2021-08-20 14:22:13
         
         else:
             # NOTE: 2021-08-19 16:18:20
@@ -668,15 +613,10 @@ def gethash(x:typing.Any) -> Number:
             # All user-defined classes and objects of user-defined types are also
             # hashable
             return hash(type(x)) + hash(x)
-            #return HASHRANDSEED + hash(x)
     except:
         return hash(type(x))
-        #return HASHRANDSEED + hash(type(x))
         
-def get_index_for_seq(index:int, 
-                      test:typing.Sequence[typing.Any], 
-                      target:typing.Sequence[typing.Any], 
-                      mapping:typing.Optional[dict]=None) -> int:
+def get_index_for_seq(index:int, test:typing.Sequence[typing.Any], target:typing.Sequence[typing.Any], mapping:typing.Optional[dict]=None):
     """Heuristic for computing an index into the target sequence.
     
     Returns an index into the `target` sequence given `index`:int index into
@@ -1009,8 +949,7 @@ class NestedFinder(object):
     supported_hierarchical_types = (dict, list, tuple, deque)
     nesting_types = supported_hierarchical_types
     
-    def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None,
-                 comparator:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=safe_identity_test):
+    def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None, comparator:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=safe_identity_test):
         """NestedFinder initializer.
         
         Parameters:
@@ -1252,9 +1191,7 @@ class NestedFinder(object):
 
         return ""
             
-    def _gen_elem(self, 
-                  src:typing.Any, ndx:typing.Any, 
-                  report:bool=False) -> typing.Generator[typing.Any, None, None]:
+    def _gen_elem(self, src:typing.Any, ndx:typing.Any, report:bool=False):
         """Element retrieval from collection given key or index
         Parameters:
         -----------
@@ -1319,8 +1256,7 @@ class NestedFinder(object):
             if report:
                 traceback.print_exc()
             
-    def _gen_nested_value(self, src:typing.Any, 
-                          path:typing.Optional[typing.List[typing.Any]]=None) -> typing.Generator[typing.Any, None, None]:
+    def _gen_nested_value(self, src:typing.Any, path:typing.Optional[typing.List[typing.Any]]=None):
         #print("_gen_nested_value, path", path)
         if path is None or (isinstance(path , list) and len(path) == 0):
             #print("\tnot path")
@@ -2519,7 +2455,7 @@ class NestedFinder(object):
         #return list(finder._gen_nested_value(data, paths))
         
     
-def reverse_dict(x:dict)->dict:
+def reverse_dict(x:dict):
     """Returns a reverse mapping (values->keys) from x
     
     Parameters:
@@ -2547,7 +2483,7 @@ def reverse_dict(x:dict)->dict:
         
     return ret
 
-def reverse_mapping_lookup(x:dict, y:typing.Any)->typing.Optional[typing.Any]:
+def reverse_mapping_lookup(x:dict, y:typing.Any):
     """Looks up the key mapped to value y in the x mapping (dict)
     Parameters:
     ===========
@@ -2895,7 +2831,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
 
     return result
     
-def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True) -> typing.Union[tuple, int]:
+def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True):
     """Alternative to list.index(), such that a missing value returns None
     of raising an Exception.
     DEPRECATED
@@ -3160,8 +3096,8 @@ def get_nested_value(src, path):
             NOTE: the path represents depth-first traversal of src.
     
     """
-    if not isinstance(src, NestedFinder.supported_collection_types):
-        raise TypeError("First parameter (%s) expected to be a %s; got %s instead" % (src, NestedFinder.supported_collection_types, type(src).__name__))
+    # if not isinstance(src, NestedFinder.supported_collection_types):
+    #     raise TypeError("First parameter (%s) expected to be a %s; got %s instead" % (src, NestedFinder.supported_collection_types, type(src).__name__))
     
     if isinstance(path, (tuple, list, deque)):
         try:
@@ -3354,11 +3290,7 @@ def gen_unique(seq, key=None):
         else:
             yield from (x for x in seq if key not in seen and not seen.add(key))
             
-            
-
-
-def name_lookup(container: typing.Sequence, name:str, 
-                multiple: bool = True) -> typing.Union[tuple, int]:
+def name_lookup(container: typing.Sequence, name:str, multiple: bool = True):
     """Get indices of container elements with attribute 'name' of given value(s).
     """
     
@@ -3378,9 +3310,7 @@ def name_lookup(container: typing.Sequence, name:str,
         
     return names.index(name)
 
-def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series]],
-                     index: typing.Optional[typing.Union[str, int, collections.abc.Sequence, np.ndarray, range, slice]] = None,
-                     silent:bool=False) -> typing.Union[range, tuple]:
+def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series]], index: typing.Optional[typing.Union[str, int, collections.abc.Sequence, np.ndarray, range, slice]] = None, silent:bool=False):
     """Transform various indexing objects to a range or iterable of int indices.
     
     Also checks the validity of the index for an iterable of data_len samples.
@@ -3576,9 +3506,7 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
     else:
         raise TypeError("Unsupported data type for index: %s" % type(index).__name__)
     
-def normalized_sample_index(data:np.ndarray, 
-                            axis: typing.Union[int, str, vigra.AxisInfo], 
-                            index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None) -> typing.Union[range, list]:
+def normalized_sample_index(data:np.ndarray, axis: typing.Union[int, str, vigra.AxisInfo], index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None):
     """Calls normalized_index on a specific array axis.
     Also checks index validity along a numpy array axis.
     
@@ -3615,7 +3543,7 @@ def normalized_sample_index(data:np.ndarray,
     except Exception as exc:
         raise RuntimeError("For data axis %d with size %d:" % (axis, data_len)) from exc
 
-def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)) -> int:
+def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)):
     """Returns an integer index for a specific array axis
     """
     if not isinstance(data, np.ndarray):
@@ -3732,6 +3660,16 @@ def sp_set_loc(x, index, columns, val):
     
     return x    
 
+def get_least_pwr10(x:typing.Sequence):
+    if not all(isinstance(v, Number) or (isinstance(v, pq.Quantity) and v.size == 1) for v in x):
+        raise TypeError("Expecting a sequence of scalars or scalar Quantity objects")
+    
+    if any (math.isinf(v) for v in x):
+        x = [v for v in x if not math.isinf(v)]
+    
+    fr = [abs(math.fmod(v, 10)) for v in x]
+    return min(int(math.log10(v)) if v > 0 else 0 for v in fr)
+
 def sp_get_loc(x, index, columns):
     """Retrieve values to pandas.SparseArray
     Work around .loc idiom when fill value is pd.NA
@@ -3829,3 +3767,26 @@ def sp_get_loc(x, index, columns):
             ret[c] = ret[c].astype(spdtypes[c])
     
     return ret
+
+def truncate_to_10_power(x):
+    if isinstance(x, np.ndarray):
+        u = None
+        if isinstance(x, pq.Quantity):
+            u = x.units
+            x = x.magnitude
+        
+        pw10 = 10**np.trunc(np.log10(np.abs(x)))
+        
+        ret = np.trunc(x/pw10) * pw10
+        
+        if isinstance(u,pq.Quantity):
+            return ret * u
+        
+        return ret
+    
+    elif isinstance(x, (float, int)):
+        pw10 = 10**math.trunc(math.log(math.abs(x),10))
+        return math.trunc(x/pw10) * pw10
+        
+            
+            

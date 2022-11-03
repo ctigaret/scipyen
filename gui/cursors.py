@@ -123,24 +123,62 @@ class SignalCursor(QtCore.QObject):
                 if len(types):
                     return types[0].name
                 
-    def __init__(self, plot_item:pg.PlotItem, 
-                 x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, 
-                 y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, 
-                 xwindow:float=0.0, ywindow:float=0.0,
-                 cursor_type:typing.Optional[typing.Union[str,SignalCursorTypes, tuple, list]] = None, 
-                 cursorID:str="c", 
-                 follower:bool=False, 
-                 parent:typing.Optional[pg.GraphicsItem]=None, 
-                 xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
-                 yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
-                 pen:typing.Optional[QtGui.QPen]=None, 
-                 hoverPen:typing.Optional[QtGui.QPen]=None, 
-                 linkedPen:typing.Optional[QtGui.QPen]=None,
-                 movable_label:bool=True, 
-                 show_value:bool=False, 
-                 precision:int=3,
-                 **kwargs):
-        
+    def __init__(self, plot_item:typing.Union[pg.PlotItem, pg.GraphicsScene], x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, xwindow:float=0.0, ywindow:float=0.0, cursor_type:typing.Optional[typing.Union[str,SignalCursorTypes, tuple, list]] = None, cursorID:str="c", follower:bool=False, parent:typing.Optional[pg.GraphicsItem]=None, xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, pen:typing.Optional[QtGui.QPen]=None, hoverPen:typing.Optional[QtGui.QPen]=None, linkedPen:typing.Optional[QtGui.QPen]=None, movable_label:bool=True, show_value:bool=False, precision:int=3, **kwargs):
+        """ SignalCursor constructor.
+            
+            By default, this creates a crosshair cursor.
+            
+            Positional parameters:
+            ======================
+            
+            plot_item: the axis (pyqtgraph.PlotItem) where the cursor resides, 
+                        or a pyqtgraph.GraphicsScene
+            
+            Named parameters (key/value pairs):
+            ===================================
+            x: numeric or quantity scalar, or None (default) - the cursor's
+                horizontal coordinate
+            
+            y: numeric or quantity scalar, or None (default) - the cursor's
+                vertical coordinate
+            
+            xwindow, ywindow: float (default 0.0); horizontal and vertical 
+                cursor windows
+            
+            cursor_type: str, SignalCursorTypes value, or a pair of bool flags 
+                (as a list or tuple) specifying which cursor spine is present, 
+                in the order vertical, horizontal, e.g.:
+                (False, True)  -> horizontal cursor
+                (True, False)  -> vertical cursor
+                (True, True)   -> crosshair cursor
+                (False, False) -> point cursor
+            
+            cursor_ID: str; optional, default is "c"
+            
+            follower
+            
+            parent: 
+            
+            xBounds, yBounds: tuple, list, pq.Quantity, np.ndarray or None (the default)
+                The min & max X and Y coordinates
+    
+            pen:typing.Optional[QtGui.QPen]=None
+            
+            hoverPen:typing.Optional[QtGui.QPen]=None
+            
+            linkedPen:typing.Optional[QtGui.QPen]=None
+            
+            movable_label:bool=True
+            
+            show_value:bool=False
+            
+            precision:int=3
+            
+        Var-keyword parameters:
+        =======================
+        (not used)
+            
+        """
         super(SignalCursor, self).__init__(parent=parent)
         
         self._parent_plot_window_ = None
@@ -158,8 +196,6 @@ class SignalCursor(QtCore.QObject):
         else:
             raise TypeError("plot_item expected to be a pyqtgraph.PlotItem object or a pyqtgraph.GraphicsScene object got %s instead" % type(plot_items).__name__)
         
-        
-        #if isinstance(parent, SignalViewer):
         if type(parent).__name__ == "SignalViewer":
             # only set parent plot window if parent is SignalViewer
             self._parent_plot_window_ = parent
@@ -629,9 +665,7 @@ class SignalCursor(QtCore.QObject):
             else:
                 self._is_selected_ = val
             
-    def setBounds(self, host:typing.Optional[pg.GraphicsItem]=None, 
-                  xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
-                  yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None) -> None:
+    def setBounds(self, host:typing.Optional[pg.GraphicsItem]=None, xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None):
         if host is None:
             host = self._host_graphics_item_
             
@@ -816,18 +850,9 @@ class SignalCursor(QtCore.QObject):
             
         self._add_lines_to_host_()
         
-    def _setup_(self, host:pg.GraphicsItem, 
-                cursor_type:typing.Union[str,SignalCursorTypes, tuple, list]="crosshair", 
-                x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, 
-                y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, 
-                xwindow:typing.Optional[float]=None, 
-                ywindow:typing.Optional[float]=None, 
-                follower:bool=False, 
-                cursorID:typing.Optional[str]=None, 
-                xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None,
-                yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None,
-                **kwargs) -> None:
-        
+    def _setup_(self, host:pg.GraphicsItem, cursor_type:typing.Union[str,SignalCursorTypes, tuple, list]="crosshair", x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, xwindow:typing.Optional[float]=None, ywindow:typing.Optional[float]=None, follower:bool=False, cursorID:typing.Optional[str]=None, xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, **kwargs):
+        """See docstring for __init__
+        """
         #print("SignalCursor._setup_ cursor_type %s" % cursor_type)
         
         show_lines = (False, False)
@@ -852,7 +877,7 @@ class SignalCursor(QtCore.QObject):
             cursor_type = Signalcursor.SignalCursorTypes.getType(cursor_type) # this may return None
             
         elif not isinstance(cursor_type, SignalCursor.SignalCursorTypes):
-            raise TypeError("cursor_type expectec to be a str, a tuple of two booleans or a SignalCursor.SignalCursorTypes; got %s instead" % type(cursor_type).__name__)
+            raise TypeError("cursor_type expected to be a str, a tuple of two booleans or a SignalCursor.SignalCursorTypes; got %s instead" % type(cursor_type).__name__)
             
         # to avoid doubts, is cursor_type is None then fallback to the default (crosshair)
         if cursor_type is None:
@@ -863,8 +888,6 @@ class SignalCursor(QtCore.QObject):
         
         self._cursor_type_ = cursor_type
             
-        #print("show_lines", show_lines)
-        
         self.setBounds(host, xBounds=xBounds, yBounds=yBounds)
         
         if isinstance(x, numbers.Number):
@@ -1413,6 +1436,15 @@ class SignalCursor(QtCore.QObject):
             raise TypeError("expected a numeric scalar value or a scalar python Quantity; got %s instead" % type(val).__name__)
         
         self._vWin_ = val
+        
+    @property
+    def name(self):
+        """Alias ot self.ID"""
+        return self._cursorId_
+    
+    @name.setter
+    def name(self, val):
+        self.ID = val # might throw errors there
         
     @property
     def ID(self):

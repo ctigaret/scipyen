@@ -66,53 +66,93 @@ def special_directories():
     TODO
     """
     if sys.platform == "linux" and HAS_PYXDG:
-        if os.environ.get("XDG_SESSION_DESKTOP", "") == "KDE" and "plasma5" in os.environ.get("DESKTOP_SESSION"):
+        if os.environ.get("XDG_SESSION_DESKTOP", "") == "KDE" and "plasma5" in os.environ.get("DESKTOP_SESSION", ""):
             pass
             
 
 def get_user_places():
+    ret = dict()
+    
     if sys.platform == "linux" and HAS_PYXDG:
         user_places = pio.loadXMLFile(os.path.join(xdg.BaseDirectory.xdg_data_home, "user-places.xbel"))
             
         if "xbel" not in user_places.documentElement.tagName.lower():
-            return
+            return ret
         
         bookmarks = user_places.getElementsByTagName("bookmark")
         
-        return bookmarks
-        
-        
-def get_user_place(path:typing.Union[pathlib.Path, str]) -> str:
-    path = ""
-    if isinstance(path, pathlib.Path):
-        path = path.as_uri()
-        
-    else: # normalize path string as uri string
-        parsed_path = urllib.parse.urlparse(path)
-        
-        if len(parsed_path.scheme) == 0:
-            if not os.path.isabs(path):
-                path = os.path.abspath(path)
+        for b in user_places.getElementsByTagName("bookmark"):
+            place_name = b.getElementsByTagName("title")[0].childNodes[0].data
+            place_url = b.getAttribute("href")
+            
+            info_node = b.getElementsByTagName("info")[0]
+            info_metadata_nodes = info_node.getElementsByTagName("metadata")
+            
+            place_icon_name = info_metadata_nodes[0].getElementsByTagName("bookmark:icon")[0].getAttribute("name")
+            
+            systemitem_nodes = info_metadata_nodes[1].getElementsByTagName("isSystemItem")
+            hidden_nodes = info_metadata_nodes[1].getElementsByTagName("isHidden")
+            app_nodes = info_metadata_nodes[1].getElementsByTagName("OnlyInApp")
+            
+            if len(systemitem_nodes):
+                is_system_place = systemitem_nodes[0].childNodes[0].data == "true"
+            else:
+                is_system_place=False
                 
-            path = pathlib.Path(path).as_uri()
+            if len(hidden_nodes):
+                is_hidden = hidden_nodes[0].childNodes[0].data == "true"
+            else:
+                is_hidden = False
+                
+            if len(app_nodes):
+                app_info = app_nodes[0].childNodes
+                if len(app_info):
+                    app = app_info[0].data
+                else:
+                    app = None
+            else:
+                app = None
             
-        #return path
+            ret[place_name] = {"url": place_url, 
+                               "icon": place_icon_name, # can be a system icon name or a path/file name
+                               "system":is_system_place == "true",
+                               "hidden":is_hidden == "true",
+                               "app":app}
+            
+        
+    return ret
+
+#def get_user_place(path:typing.Union[pathlib.Path, str]) -> str:
+    #path = ""
+    #if isinstance(path, pathlib.Path):
+        #path = path.as_uri()
+        
+    #else: # normalize path string as uri string
+        #parsed_path = urllib.parse.urlparse(path)
+        
+        #if len(parsed_path.scheme) == 0:
+            #if not os.path.isabs(path):
+                #path = os.path.abspath(path)
+                
+            #path = pathlib.Path(path).as_uri()
+            
+        ##return path
         
             
-    if sys.platform == "linux" and HAS_PYXDG:
-        user_places = pio.loadTextFile(os.path.join(xdg.BaseDirectory.xdg_data_home, "user-places.xbel"), forceText=True)
-        root = ET.fromstring(user_places)
+    #if sys.platform == "linux" and HAS_PYXDG:
+        #user_places = pio.loadTextFile(os.path.join(xdg.BaseDirectory.xdg_data_home, "user-places.xbel"), forceText=True)
+        #root = ET.fromstring(user_places)
         
-        if root.tag != "xbel":
-            return path
+        #if root.tag != "xbel":
+            #return path
         
-        place = root.findtext(".//*[@href='%s']/title" % path)
+        #place = root.findtext(".//*[@href='%s']/title" % path)
         
-        if place is None:
-            return path
+        #if place is None:
+            #return path
         
-        return place
+        #return place
 
         
-    else:
-        return path
+    #else:
+        #return path

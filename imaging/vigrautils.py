@@ -1820,8 +1820,7 @@ def proposeLayout(img:vigra.VigraArray,
                   "framesAxis":frames})
 
 @singledispatch
-def kernel2array(value:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D],
-                 compact:bool=False):
+def kernel2array(value:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D], compact:bool=False):
     """
     Generates a numpy array with coordinates and values for the kernel's samples
     Parameters
@@ -1888,11 +1887,6 @@ def kernel2array(value:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel
                 
     """
     raise NotImplementedError(f"{type(value).__name__} objects are not supported")
-    #if isinstance(value, vigra.filters.Kernel1D):
-        #return vK1D2array(value, compact)
-    
-    #elif isinstance(value, vigra.filters.Kernel2D):
-        #return vK2D2array(value, compact)
     
 @kernel2array.register(vigra.filters.Kernel1D)
 def _(value, compact=False):
@@ -1948,7 +1942,7 @@ def kernelfromarray(x):
             return ret
         
         else:
-            raise ValueError(f"Incorrect argument diensions or shape: {x.shape}")
+            raise ValueError(f"Incorrect argument dimensions or shape: {x.shape}")
             
     elif isinstance(x, (tuple, list)) and all(isinstance(x_, np.ndarray) and x_.ndim == 2 for x_ in x):
         if len(x) == 2: # => Kernel1D

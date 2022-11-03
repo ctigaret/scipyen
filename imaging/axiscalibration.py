@@ -1537,8 +1537,7 @@ class AxisCalibrationData(CalibrationData):
         for (k,c) in self.channels:
             self._data_.pop(k, None)
                 
-    def getChannelCalibration(self, index:typing.Optional[typing.Union[int, str]]=None,
-                              full:typing.Optional[bool]=False) -> typing.Optional[typing.Union[list, ChannelCalibrationData]]:
+    def getChannelCalibration(self, index:typing.Optional[typing.Union[int, str]]=None, full:typing.Optional[bool]=False) -> typing.Optional[typing.Union[list, ChannelCalibrationData]]:
         """ChannelCalibrationData for a single channel.
         
         Parameters:
@@ -1615,12 +1614,14 @@ class AxisCalibrationData(CalibrationData):
                         stacklevel=2)
             chcal = chcal[0]
             
+        #print(f"AxisCalibrationData.getChannelCalibration: chcal = {chcal}")
+            
         if len(chcal):
             if full:
                 return chcal
         
             else:
-                return chcal[1]
+                return chcal[0]
             
     def getChannelIndex(self, name:str) -> typing.Optional[int]:
         """Returns the index of the channel with given name.

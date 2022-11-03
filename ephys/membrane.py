@@ -19,7 +19,8 @@ import quantities as pq
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-from scipy import optimize, cluster#, where
+import scipy
+from scipy import optimize, cluster
 
 # TODO/FIXME 2019-07-29 13:08:29
 # -- move to pict.gui package
@@ -51,7 +52,7 @@ import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.models as models
 import core.datatypes as dt
-import core.plots as plots
+import plots.plots as plots
 import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.quantities import units_convertible
@@ -84,22 +85,20 @@ import ephys.ephys as ephys
 
 
 @safeWrapper
-def segment_Rs_Rin(segment: neo.Segment,
-                   Im: typing.Union[str, int],
-                   Vm: typing.Union[str, int, pq.Quantity, float],
-                   regions: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None,
-                   channel: typing.Optional[int] = None) -> pq.Quantity:
+def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.Union[str, int, pq.Quantity, float], regions: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None, channel: typing.Optional[int] = None):
     """Calculates the series (Rs) and input (Rin) resistances in voltage-clamp.
     
     Parameters:
     ----------
     segment: neo.Segment:
     
-        A recorded "sweep" containing at least one analog signal for the
-        recorded membrane current (Im).
+        A recorded "sweep" containing at least one analog signal containing 
+        recorded membrane current (`Im`) with membrane capacitive currents used
+        for the measurement of the series and input resistances (Rs and Rin).
         
-        Ideally the segment would also contain a signal with the command voltage 
-        for the rectangular membrane voltage waveform.
+        Ideally the segment would also contain a signal containing the command
+        voltage (`Vm`) for the rectangular membrane voltage waveform used to 
+        generate the capacitive membrane currents recorded in `Im`.
         
     Im: int, str.
     
@@ -124,23 +123,25 @@ def segment_Rs_Rin(segment: neo.Segment,
         signal) are used to calculate Rs and Rin.
         
         When a neo.Epoch: this is expected to contain three intervals
-        (i.e., len(epoch) == 3 is True), with label attribute being, 
-        respectively, "baseline", "Rs" and "Rin".
+        (i.e., len(epoch) == 3 is True), with the following labels (NOTE, these
+        are CASE-SENSITIVE):
+
+             "baseline", "Rs" and "Rin".
         
-        The intervals define a baseline region, a region containing the peak of
-        the outward capacitance transient, and a reigon of steady-state current
-        during the step membrane voltage change.
+        These intervals define a baseline region, a region containing the peak 
+        of the outward capacitance transient curent, and a region in the
+        steady-state current during the step membrane voltage change.
         
         When a tuple, it expected to have three elements, each a vertical 
-        SignalCursor with names (IDs) respectively, "baseline", "Rs" and "Rin".
+        SignalCursor with names (IDs) respectively, "baseline", "Rs" and "Rin"
+        (also case-sensitive).
         
         When None (default), the segment is expected to contain an epoch named
-        "Rm" (for membrane resistance) with the structure as described above.
+        "Rm" (for membrane resistance) with the intervals as described above.
         
-        NOTE: In the case of neo.Epoch or SignalCursor tuple, the order of the 
-        epoch intervals or cursors is irrelevant: the interval or cursor that is
-        appropriate for the baseline, Rs or Rin region will be selected by its
-        label (or cursor ID).
+        ATTENTION: The order of the epoch intervals or cursors is irrelevant: 
+        the interval or cursor for the baseline, Rs and Rin are selected 
+        according to their labels or cursor ID.
         
     channel: int or None (default)
     
@@ -210,22 +211,21 @@ def segment_Rs_Rin(segment: neo.Segment,
         
         region_labels = list(rm_epoch.labels)
         
-        if len(region_labels) == 0 or any ([s not in region_labels for s in ["baseline", "Rs", "Rin"]]):
-            raise ValueError("Cannot use Rm epoch with inappropriate interval labels")
+        if len(region_labels) == 0 or not all([s in region_labels for s in ["baseline", "Rs", "Rin"]]):
+            raise ValueError(f"Cannot use epoch {rm_epoch.name} with inappropriate interval labels {region_labels}")
         
         base_ndx = region_labels.index("baseline")
         irs_ndx = region_labels.index("Rs")
         irin_ndx = region_labels.index("Rin")
         
-        baseline_interval = [rm_epoch[base_ndx].times,
-                             rm_epoch[base_ndx].times + rm_epoch[base_ndx].duration]
+        baseline_interval = [rm_epoch.times[base_ndx],
+                             rm_epoch.times[base_ndx] + rm_epoch.durations[base_ndx]]
         
-        irs_interval = [rm_epoch[irs_ndx].times,
-                        rm_epoch[irs_ndx].times + rm_epoch[irs_ndx].duration]
+        irs_interval = [rm_epoch.times[irs_ndx],
+                        rm_epoch.times[irs_ndx] + rm_epoch.durations[irs_ndx]]
         
-        irin_interval = [rm_epoch[irin_ndx].times,
-                         rm_epoch[irin_ndx].times + rm_epoch[irin_ndx].duration]
-        
+        irin_interval = [rm_epoch.times[irin_ndx],
+                         rm_epoch.times[irin_ndx] + rm_epoch.durations[irin_ndx]]
         
     if any([i is None for i in [baseline_interval, irs_interval, irin_interval]]):
         raise RuntimeError("Cannot determine signal interval boundaries")
@@ -269,13 +269,13 @@ def segment_Rs_Rin(segment: neo.Segment,
         
         vstep = vrin - vbase
                 
-                
         if isinstance(channel, int):
             vstep = vstep[channel].flatten()
             
     Ibase = Im_signal.time_slice(baseline_interval[0], baseline_interval[1]).mean(axis=0)
     
-    Irs = Im_signal.time_slice(irs_interval[0], irs_interval[1]).mean(axis=0)
+    # Irs = Im_signal.time_slice(irs_interval[0], irs_interval[1]).mean(axis=0)
+    Irs = Im_signal.time_slice(irs_interval[0], irs_interval[1]).max(axis=0)
     
     Irin = Im_signal.time_slice(irin_interval[0], irin_interval[1]).mean(axis=0)
     
@@ -284,20 +284,67 @@ def segment_Rs_Rin(segment: neo.Segment,
         Irs = Irs[channel].flatten()
         Irin = Irin[channel].flatten()
         
-    Rs = vstep / (Irs - Ibase)
-    
     Rin = vstep / (Irin - Ibase)
     
-    return np.array([Rs, Rin]) * Rin.units
+    Rs = vstep / (Irs - Ibase)
     
+    return (np.array([Rs, Rin]) * Rin.units).rescale(pq.MOhm)
 
 @safeWrapper
-def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                   baseline: typing.Union[SignalCursor, tuple],
-                   rs: typing.Union[SignalCursor, tuple],
-                   rin: typing.Union[SignalCursor, tuple], 
-                   vstep: typing.Union[float, pq.Quantity],
-                   channel: typing.Optional[int] = None) -> pq.Quantity:
+def block_Rs_Rin(data:typing.Union[neo.Block,typing.Sequence[neo.Segment]], Im:typing.Union[str, int], Vm:typing.Union[str, int, pq.Quantity, float], regions:typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None, channel: typing.Optional[int] = None, name:typing.Optional[str] = None):
+    """Calls segment_Rs_Rin for all segments in data.
+    
+    Parameters:
+    ===========
+    data: neo.Block or a sequence (tuple, list) of neo.Segments
+    
+    Im, Vm, regions, channel - same as for segment_Rs_Rin()
+    
+    name: str or None (default) - the name prefix of the resulting signals (see
+        below)
+    
+        When None or an empty str, the name will be the name of the block else
+        the string "data".
+    
+    ATTENTION: See the requirement for `regions` in the help for segment_Rs_Rin.
+    
+    When `regions` is None (the default) each segment in the data is expected to 
+    contain an Epoch named "Rm" with three intervals labelled "baseline", "Rs",
+    and "Rin". Since each segment MAY have a different start time, the Epochs 
+    should be distinct in each segment.
+    
+    Returns:
+    ========
+    
+    Two neo.IrregularlySampledSignal objects with the time-course of the series
+    resistance (Rs) and input resistance (Rin)
+    
+    """
+    if isinstance(data, neo.Block):
+        segments = data.segments
+        
+    elif isinstance(data, (tuple, list) and all(isinstance(d, neo.Segment) for d in data)):
+        segments = data
+    else:
+        raise TypeError(f"Expecting a neo.Block, or a sequence of neo.Segments; got {type(data).__name__} instead")
+    
+    trsrin = [(s.t_start, segment_Rs_Rin(s, Im=Im, Vm=Vm, regions=regions, channel=channel)) for s in segments]
+    
+    times, rsrin = zip(*trsrin) # split into a times and a RsRin tuple
+    
+    t_vec = np.array(times) * times[0].units
+    rarray = np.concatenate(rsrin, axis=1) * rsrin[0].units
+    
+    if not isinstance(name, str) or len(name.strip())==0:
+        name = data.name if isinstance(data, neo.Block) and len(data.name.strip()) else "data"
+        
+    Rs  = neo.IrregularlySampledSignal(times=t_vec, signal = rarray[0,:], units = rarray.units, time_units = t_vec.units, name=f"{name}_Rs")
+    Rin = neo.IrregularlySampledSignal(times=t_vec, signal = rarray[1,:], units = rarray.units, time_units = t_vec.units, name=f"{name}_Rin")
+    
+    return Rs, Rin
+    
+@safeWrapper
+def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal], baseline: typing.Union[SignalCursor, tuple], rs: typing.Union[SignalCursor, tuple], rin: typing.Union[SignalCursor, tuple], vstep: typing.Union[float, pq.Quantity], channel: typing.Optional[int] = None):
     """Calculates series and input resistance from voltage-clamp recording.
     
     Applies to voltage-clamp recordings (membrane current signal)
@@ -326,6 +373,12 @@ def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
         
         When a Quantity it must be in units convertible to mV.
         
+    channel: int or None (default)
+    
+        For multi-channel signals, the index of the signal's channel. When None
+        (default) the values returned will be arrays with size equal to the 
+        number of channels in the signals.
+        
     Returns:
     -------
     
@@ -352,29 +405,50 @@ def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     return np.array([Rs, Rin]) * Rin.units
 
 @safeWrapper
-def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                 epoch: typing.Union[neo.Epoch, tuple],
-                 vstep: typing.Union[float, pq.Quantity],
-                 channel: typing.Optional[int] = None) -> pq.Quantity:
+def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal], epoch: typing.Union[neo.Epoch, tuple], vstep: typing.Union[float, pq.Quantity], channel: typing.Optional[int] = None):
     """Calculates series and input resistance based on epochs.
     
-    The baseline, Rs and Rin are calculated across the time intervals
-    defined in the Epoch.
+    The baseline, Rs and Rin are calculated across the time intervals defined in
+    the Epoch, which is expected to contain three intervals each with its own
+    time and duration (see neo.Epoch for details about Epoch objects)
     
     Parameters:
     -----------
     signal: neo.AnalogSignal or DataSignal
     
-    epoch: neo.Epoch defining three time intervals: baseline region, 
+    epoch: neo.Epoch with three time intervals with the following roles:
+        1) baseline → the baseline current BEFORE the depolarizing test voltage
+    
+        2) Rs       → contains the peak of the first capacitive transient 
+                        (at start of depolarizing test)
+    
+        3) Rin      → contains a region of the steady-state current during the 
+                        depolarizing text voltage, AND just before the repolarizing
+                        capacitive transient
+    
+    vstep: scalar float or Quantity in mV, the size (amplitude) of the depolarizing
+            test voltage
+    
+    channel: int or None (default). When given, it is the index of the signal
+        channel (for multi-channel signals).
+    
+        NOTE: AnalogSignal objects typically have just ONE channel (i.e., they 
+                are numpy array-like with shape (n,1) where n is the number of 
+                samples). Therefore, passing the default value for `channel`
+                (None) will result in just two scalars (Rs and Rin).
+    
+                If the signal has more than one channel, then passing the default
+                `channel` will result in two arrays (Rs and Rin) with as many
+                elements as channels.
     
     """
-    if not isinstance(signal, (neo.Analogsignal, DataSignal)):
+    if not isinstance(signal, (neo.AnalogSignal, DataSignal)):
         raise TypeError("signal expected to be a neo.AnalogSignal or DataSignal; got %s instead" % type(signal).__name__)
     
     if not isinstance(epoch, neo.Epoch):
         raise TypeError("epoch expected to be a neo.Epoch; got %s instead" % type(epoch).__name__)
     
-    if len(epoch != 3):
+    if len(epoch) != 3:
         raise TypeError("epoch must have three intervals; got %d instead" % len(epoch))
     
     if isinstance(vstep, float):
@@ -408,36 +482,7 @@ def v_Nernst(x_out, x_in, z, temp):
     
     return constants.R * T * np.log(x_out/x_in) / (z * F)
     
-def __get_par__(rd, pn, units, step, wave=0):
-    """Get AP parameter from results dictionary
-    
-    rd: dict (results dictionary)
-    pn: str (parameter name)
-    units: pq.Quantity (units for the parameter)
-    """
-    value = get_ap_analysis_param(rd, pn, step, wave)
-    if isinstance(value, float):
-        value *= units
-        
-    return value
 
-def __block_fun__(block_ndx, **kwargs):
-    print("__block_fun__")
-    b = block_ndx[0]
-    k = block_ndx[1]
-    ret = analyse_AP_step_injection_series(b, **kwargs)
-    
-    if isinstance(block_ndx[0].name, str) and len(block_ndx[0].name.strip()):
-        block_name = block_ndx[0].name
-        
-    else:
-        block_name = "Block_%d" % block_ndx[1]
-        
-    ret["Block_Name"] = block_name
-    ret["Block_Index"] = block_ndx[1]
-    
-    return ret
-        
 def __wave_interp_root_near_val__(w, value):
     """Factored-out code in the for loop under NOTE:2017-09-04 22:09:38
     """
@@ -780,8 +825,8 @@ def rheobase_latency(*args, **kwargs):
     -----------
     
     args: comma-separated sequence of python dictionaries as returned by 
-        analyse_AP_step_injection_series() function, or extract_AP_data_from_AP_train(), each 
-        containing the following mandatory items:
+        analyse_AP_step_injection_series() function, each containing the 
+        following mandatory items:
         
         "Injected_current" : a list with the values of injected current
         
@@ -1140,7 +1185,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
         raise TypeError("'ImSignal' expected to be an int or str; got %s instead" % type(ImSignal).__name__)
     
 
-    data = ephys.set_relative_time_start(data)
+    data = neoutils.set_relative_time_start(data)
     
     if t_start is not None and t_stop is not None:
         data = ephys.get_time_slice(data, t0=t_start, t1=t_stop)
@@ -1185,10 +1230,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
     return data
     
 
-def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None, 
-                   steadyStateDuration = 0.05 * pq.s, 
-                   box_size = 0, 
-                   Iinj=None):
+def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None, steadyStateDuration = 0.05 * pq.s, box_size = 0, Iinj=None):
     """
     Square pulse current injection in I-clamp experiments.
     
@@ -1288,7 +1330,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None,
         #
         #   the high state is the actual pulse
         #
-        centroids = sigp.state_levels(im, levels = 0.5)
+        centroids, cnt, edg = sigp.state_levels(im, levels = 0.5)
         centroids = np.array(centroids).T[:,np.newaxis]
         
         #[low, high]
@@ -1472,13 +1514,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None,
     return vbase, vss, vsag, vrebound, Rin, Rss, time_constant, vfit, v_flt
 
 
-def PassiveMembranePropertiesAnalysis(block:neo.Block, 
-                                      Vm_index:(int,str) = "Vm_prim_1", 
-                                      Im_index:(int,str) = "Im_sec_1", 
-                                      box_size:int = 63, 
-                                      name:(str, type(None)) = None, 
-                                      plot:bool = True,
-                                      **kwargs):
+def PassiveMembranePropertiesAnalysis(block:neo.Block, Vm_index:(int,str) = "Vm_prim_1", Im_index:(int,str) = "Im_sec_1", box_size:int = 63, name:(str, type(None)) = None,plot:bool = True,**kwargs):
     """User-friendly wrap around the passive_Iclamp function.
     
     Arguments:
@@ -1658,7 +1694,7 @@ def ap_waveform_roots(w, value, interpolate=False):
     
     if len(ge_value_starts) == 0:
         # bail out gracefully
-        print("ap_waveform_roots: cannot find start flag for signal >= %s" % value)
+        warnings.warn("ap_waveform_roots: cannot find where signla becomes >= %s" % value, RuntimeWarning)
         return rise_x, rise_y, rise_cslope, decay_x, decay_y, decay_cslope
         
     
@@ -1748,14 +1784,7 @@ def ap_waveform_roots(w, value, interpolate=False):
             
     return float(rise_x), float(rise_y), float(rise_cslope), float(decay_x), float(decay_y), float(decay_cslope)
 
-def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,
-                            triggers=None, tail=None,
-                            thr=20, atol=1e-8, smooth_window = 5,
-                            resample_with_period = 1e-5, t0=None, t1=None, 
-                            dataname=None, cell="NA", genotype="NA", source="NA", gender="NA",
-                            age=np.nan, record=None, protocol_name=None, 
-                            ref_vm = None, ref_vm_relative_onset=False,
-                            output_prefix=None):
+def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=None, tail=None,thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, dataname=None, cell="NA", genotype="NA", source="NA", gender="NA",age=np.nan, record=None, protocol_name=None,ref_vm = None, ref_vm_relative_onset=False,output_prefix=None):
     """Batch analysis for pulse-triggered APs in current-clamp.
     
     Loops through neo.Segments in data, calling analyse_AP_pulse_train for each
@@ -2002,13 +2031,7 @@ def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,
     else:
         return report, aggregated_report, grouped_report, segments_ap_results, segments_ap_waves, segments_ap_dvdt, segments_ap_d2vdt2
         
-def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,
-                           tail=None, thr=20, atol=1e-8, smooth_window = 5,
-                           resample_with_period = 1e-5, t0=None, t1=None, 
-                           record=None, dataname=None,
-                           cell="NA", genotype="NA", source="NA", gender="NA",
-                           age=np.nan, protocol_name="NA", 
-                           ref_vm = None, ref_vm_relative_onset=False):
+def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, record=None, dataname=None,cell="NA", genotype="NA", source="NA", gender="NA",age=np.nan, protocol_name="NA", ref_vm = None, ref_vm_relative_onset=False):
     
     """
     Analyses AP waveforms triggered by a train of current injection pulses.
@@ -2204,11 +2227,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,
     return ap_result, ap_report, ap_waves, ap_dvdt, ap_d2vdt2
     
 
-def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth_window = 5,
-                           resample_with_period = 1e-5, t0=None, t1=None, record=None, 
-                           cell="NA", genotype="NA", source="NA", gender="NA",
-                           age=np.nan, dataname=None, protocol_name="NA", 
-                           ref_vm = None, ref_vm_relative_onset=False):
+def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, record=None, cell="NA", genotype="NA", source="NA", gender="NA",age=np.nan, dataname=None, protocol_name="NA", ref_vm = None, ref_vm_relative_onset=False):
     """Waveform analysis for action potentials elicited individually by brief 
     pulses of current injection.
     
@@ -2412,131 +2431,84 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
     
     return ap_results, report, ap_waves, ap_dvdt, ap_d2vdt2
 
-def get_AP_param_vs_injected_current(data, parameter):
-    if not isinstance(data, (dict, tuple, list)):
-        raise TypeError("Expecting a dict, tuple, or list; got %s instead" % type(data).__name__)
+def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], parameter=str, min_APs:typing.Optional[int] = None):
+    """
+    Get AP parameter from an AP analysis data for each depolarising step.
     
-    if not isinstance(data, dict) or any([v not in data.keys() for v in ["Depolarising_steps", "Injected_current"]]):
-        raise ValueError("Data does not seem to be an AP analysis result")
-    
-    steps = data["Depolarising_steps"]
-    
-    injected_current = data["Injected_current"]
-    
-    i_units = injected_current.units
-    
-        #if "Depolarising_steps" in data.keys():
-            #i_step = int(data["Delta_I_step"])
+    Returns:
+    a list of parameter values
+    """
+
+    if isinstance(data, dict): 
+        if all(v in data.keys() for v in ["Depolarising_steps", "Injected_current"]):
+            steps = data["Depolarising_steps"]
+        else:
+            raise ValueError("Data does not seem to be an AP analysis result")
+
+    elif isinstance(data, (tuple, list)):
+        if all(["AP_analysis"] in d.keys() and isinstance(d["AP_analysis"], dict) for d in data):
+            steps = data
+        else:
+            raise ValueError("Data does not seem to be an AP analysis result")
             
-        #elif "AP_analysis" in data.keys():
-            #steps = [data]
-            #i_step = int(data["Injected_current"])
-            
-    #elif isinstance(data, (tuple, list)):
-        #if all([isinstance(d, dict) and "AP_analysis" in d.keys() for d in data]):
-            #steps = data
-            #i_step = steps[0]["Injected_current"]
-            
-        #else:
-            #raise ValueError("Sequence argument does not appear to contain AP analysis results")
-        
-    if not isinstance(parameter, str):
-        raise TypeError("'parameter' expected to be a str; got %s instead" % type(parameter).__name__)
+    else:
+        raise TypeError("Expecting a dict, tuple, or list containing results for each depolarizing step; got %s instead" % type(data).__name__)
     
     if any([parameter not in step["AP_analysis"].keys() for step in steps]):
         raise ValueError("parameter %s not found in all injection step analyses" % parameter)
-        
+    
+    if isinstance(min_APs, int) and min_APs < 0:
+        raise ValueError("minAPs must be > 0")
+    
+    else:
+        min_APs = None
+    
     max_parameter_array_len = 0
     
-    parameter_arrays_dict = dict()
+    ret = list()
     
-    parameter_units = pq.dimensionless
-    
-    #i_units = None
-    
-    #iinj_list = np.array([int(step["AP_analysis"]["Injected_current"]) for step in steps], dtype="float64")
-    
-    #i_start = int(iinj_list[0])
-    
-    #fl, int_val = math.modf(i_start/10)
-    
-    #if fl < 0.5:
-        #i_start = int(int_val*10)
-        
-    #else:
-        #i_start = int((int_val+1)*10)
-    
-    #fl, int_val = math.modf(i_step/10)
-    
-    #if fl < 0.5:
-        #i_step = int(int_val*10)
-        
-    #else:
-        #i_step = int((int_val+1)*10)
-    
-    ##i_step = int(data["Delta_I_step"])
-    
-    #i_max = i_start + i_step * (len(steps)-1)
-    
-    #injected_current = np.linspace(i_start, i_max, num=len(steps))
+    parameter_units = None
     
     for ks, step in enumerate(steps):
-        #injected_current = float(step["AP_analysis"]["Injected_current"])
-        
-        #if i_units is None:
-            #i_units = step["AP_analysis"]["Injected_current"].units
-        
-        parameter_data = step["AP_analysis"][parameter]
-        
-        if isinstance(parameter_data, neo.basesignal.BaseSignal):
-            parameter_units = parameter_data.units
+        if isinstance(min_APs, int):
+            if min_APs > 1:
+                if len(step["AP_analysis"]["AP_train"] < min_APs):
+                    continue
             
-            max_parameter_array_len = max(max_parameter_array_len, len(parameter_data))
-            
-            #parameter_arrays_dict[int(injected_current[ks])] = parameter_data.as_array()
-            parameter_arrays_dict["%.2f" % injected_current[ks]] = parameter_data.as_array()
-            
-            
-        else:
-            parameter_arrays_dict["%.2f" % injected_current[ks]] = np.array([])
-            
-    series_dict = dict()
-    
-    for key in ["Data", "Cell", "Source", "Sex", "Genotype", "Age", "Post-natal", "Treatment"]:
-        series_dict[key] = pd.Series(np.array([data[key]] * max_parameter_array_len, dtype="U"), name=key)
-    
-    for iinj, value in parameter_arrays_dict.items():
-        #exponent = math.floor(np.log10(np.abs(iinj)))
-        #exponent = np.copysign(round(np.log10(np.abs(iinj))), iinj)
+        parameter_data = step["AP_analysis"][parameter] # NOTE: if a quantity, this should have the same units throughout!!!
         
-        #int_part = int(math.modf(iinj//10)[1]*10)
+        if parameter_data is None:
+            continue
         
-        #int_part = int(math.ceil(math.floor(iinj)/10)*10)
-        
-        #print(int_part, exponent)
-        
-        #s_name = "%d" % int_part
-        #s_name = "%d" % iinj
-        #s_name = "%d" % (int_part * 100)
-        
-        #print("s_name",  s_name)
-        
-        if len(value) < max_parameter_array_len:
-            extension = np.full((max_parameter_array_len - len(value), 1), np.nan) * parameter_units
-            
-            if not isinstance(value, pq.Quantity):
-                value *= parameter_units
+        elif isinstance(parameter_data, np.ndarray):
+            if parameter_units is None or parameter_units == pq.dimensionless:
+                if isinstance(parameter_data, (neo.basesignal.BaseSignal, pq.Quantity)):
+                    parameter_units = parameter_data.units
+                else:
+                    parameter_units = pq.dimensionless
                 
-            #print(value.ndim, extension.ndim)
-            
-            series = pd.Series(data=np.append(value.flatten(), extension.flatten()), name = iinj)
+            if isinstance(parameter_data, neo.basesignal.BaseSignal):
+                parameter_value = parameter_data.as_array()
+                
+            else:
+                parameter_value = np.atleast_1d(parameter_data.magnitude) # enforce it being sizeable to enable len(...)
+                
+        elif isinstance(parameter_data, numbers.Number):
+            parameter_value = np.atleast_1d(np.array([parameter_data]))
+            parameter_units = pq.dimensionless
             
         else:
-            series = pd.Series(data=value.flatten(), name = iinj)
+            parameter_value = parameter_data
+            parameter_units = pq.dimensionless
             
-        series_dict[iinj] = series
+        if parameter_units is None:
+            parameter_units = pq.dimensionless
             
-    return pd.DataFrame(series_dict)
+        
+        ret.append(parameter_value)
+        
+    return list(map(lambda x: x * parameter_units, ret))
+
 
 def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_isi=False):
     """Extracts the AP waveforms from a Vm signal.
@@ -2581,7 +2553,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
             Required when "times" specifies only waveform START times and use_min_isi is False (see below)
             
             NOTE: when not None and "times" also specifies waveform STOP or DURATIONS,
-            the values in "after" will be added to the STOP/DURAITON values effectively
+            the values in "after" will be added to the STOP/DURATION values effectively
             resulting in longer waveforms
             
     use_min_isi: boolean, default False
@@ -2808,9 +2780,7 @@ def extract_pulse_triggered_APs(sig, times, tail = None):
     
     return waves
 
-def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, 
-                    vm_thr=0, rtol = 1e-5, atol = 1e-8, 
-                    return_all=False):
+def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, rtol = 1e-5, atol = 1e-8, return_all=False):
     # NOTE: 2019-11-29 16:49:14
     # use a Vm threshold to discard "aberrant" events
     
@@ -2921,6 +2891,8 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi,
             
     # ### END 
     
+    #print(f"detect_AP_rises: vm_thr = {vm_thr}")
+    
     # ### BEGIN NOTE: 2019-11-29 16:40:34 New algorithm
     # slightly modified detection algorithm:
     # 1) get the logical index where dv/dt >= threshold -- as in NOTE: 2019-04-25 09:22:13
@@ -2948,30 +2920,6 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi,
     # this shuould also preclude the use of a minisi condition
     # ### END NOTE: 2019-11-29 16:40:34 New algorithm
     
-    # ### BEGIN NOTE: 2019-04-25 09:24:45 DEPRECATED
-    # select end of the fast (initial) rising phase
-    # here, the Vm rising phase "slows down" but nevertheless faster than 10 V/s ("threshold")
-    # in other words, the following are satisfied:
-    #
-    # a) dVm/dt >= threshold
-    #
-    # b) d2Vm/dt2 < 0 (dVm/dt is MONOTONICALLY DECREASING)
-    #
-    #fast_rise_stops  = (dsdt.magnitude >= dsdt_thr) & (d2sdt2.magnitude < (0 - atol))
-    
-    #fast_rise_stop_flags  = np.ediff1d(np.asfarray(fast_rise_stops),  to_begin = 0) == 1 
-    
-    #fast_rise_stop_times  = sig.times[fast_rise_stop_flags]
-    
-    # ### END NOTE: 2019-04-25 09:24:45
-    
-    # ### BEGIN NOTE: 2019-11-29 17:19:01 DEPRECATED 2019-11-29 17:30:40 we don't use 2nd derivative anymore
-    # Although mathematically correct, the code at NOTE: 2019-04-25 09:24:45
-    # might pick up the end of the first "hump" in the 2st derivative of the AP 
-    # waveform, when the AP is not monotonically rising (see below at 
-    # NOTE: 2019-04-29 08:40:55) This would result in curtailed rise phases.
-    # ### END DEPRECATED 2019-11-29 17:30:40 we don't use 2nd derivative anymore
-    
     # NOTE: 2019-04-29 09:52:03
     # to find out when the fast rising phase of the waveform ends we get the time
     # of the next local maximum in the dsdt waveform slice following each fast 
@@ -2986,14 +2934,6 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi,
     # we'll have to pick the only first of such occurrence, which involves more CPU work
     peak_times              = np.full_like(fast_rise_start_times, np.nan)
     
-    # NOTE: 2019-11-29 17:36:23 use of minisi is DEPRECATED
-    # instead we use the signal time slice between two consecutive fast rise 
-    # start times
-    
-    #waves = list()
-    #dwaves = list()
-    
-        
     #print("detect_AP_rises signal t_start=%s, t_stop=%s" % (s.t_start, s.t_stop))
     #print("detect_AP_rises dsdt t_start=%s, t_stop=%s" % (dsdt.t_start, dsdt.t_stop))
     
@@ -3003,11 +2943,6 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi,
             # this won't ever happen would it?
             t = s.t_start
         
-        #t1 = t + minisi DEPRECATED use of minisi
-        # avoid going past signal t_stop
-        #if t1 > s.t_stop:
-            #t1 = s.t_stop
-            
         if k < len(fast_rise_start_times)-1:
             t1 = fast_rise_start_times[k+1]
             
@@ -3027,41 +2962,45 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi,
     return fast_rise_start_times, fast_rise_stop_times, peak_times#, waves, dwaves
         
 
-def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple],
-                     tail:pq.Quantity=0.5*pq.s,
-                     method:str="state_levels",
-                     box_size:numbers.Number=0, 
-                     adcres:numbers.Number=15,
-                     adcrange:numbers.Number=10,
-                     adcscale:numbers.Number=1e3,
-                     resample_with_period:(pq.Quantity, type(None)) = None,
-                     resample_with_rate:(pq.Quantity, type(None)) = None,
-                     Itimes_relative:bool = True,
-                     Itimes_samples:bool=False):
-
+def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple],tail:pq.Quantity=0.5*pq.s,method:str="state_levels",box_size:numbers.Number=0, adcres:numbers.Number=15,adcrange:numbers.Number=10,adcscale:numbers.Number=1e3,resample_with_period:(pq.Quantity, type(None)) = None,resample_with_rate:(pq.Quantity, type(None)) = None,Itimes_relative:bool = True,Itimes_samples:bool=False):
     """
-    im: analog signal with current injection recording, or a tuple of three
-        elements: I hold (pA), t_start *(pq.s) and t_stop (pq.s)
+    Extract the time slice of the VM corresponding to a current injection step.
+    
+    If a signal containing a rectangular current injection waveform is given, it
+    will also extract the corresponding time slice.
+    
+    Parameters:
+    -----------
+    
+    vm: neo.AnalogSignal; the recorded membrane voltage
+    
+    im: neo.AnalogSignal (with current injection rectangular waveform) or
+        a tuple of three python Quantity objects as follows: 
+            current injection amplitude (pA), t_start (pq.s) and t_stop (pq.s)
+            
+        where t_start and t_stop are the onset and the end of the current 
+        injection waveform.
+            
+        If 'im' is an AnalogSignal then t_start and t_stop will be determined
+        form the waveform, assuming it is a rectangular wave.
         
     tail: non-negative scalar Quantity (units: "s"); default is 0.5 s
-        duration of the analyzed Vm trace after beyond the end of depolarizing 
-        current injection step;
+        duration to be added to t_stop (see above) before slicing the signals
         
-        
-    resample_with_period: None (default), scalar float or Quantity
+    resample_with_period: None (default), scalar float or python Quantity
         When not None, the Vm signal will be resampled before processing.
         
-        When Quantity, it must be in units convertible (scalable) to the signal's
-        sampling period units.
+        When a Quantity, it must be in units convertible (scalable) to the 
+        signal's sampling period units.
         
-        Resampling occurs on the region corresponding to the depolarizing current
-        injection, before detection of AP waveforms.
+        Resampling occurs on the region corresponding to the current injection, 
+        prior to AP waveform detection.
         
-        Upsampling might be useful (see Naundorf et al, 2006) but slows down
-        the execution. To upsample the Vm signal, pass here a value smaller than
+        NOTE 1: Upsampling might be useful (see Naundorf et al, 2006) but slows
+        the code. To upsample the Vm signal, pass here a value smaller than
         the sampling period of the Vm signal.
         
-    resample_with_rate: None (default), scalar float or Quantity
+    resample_with_rate: None (default), scalar float or python Quantity.
         When not None, the Vm signal will be resampled before processing.
         
         When Quantity, it must be in units convertible (scalable) to the signal's
@@ -3070,25 +3009,28 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
         Resampling occurs on the region corresponding to the depolarizing current
         injection, before performing detection of AP waveforms.
         
-        Upsampling might be useful (see Naundorf et al, 2006) but slows down
-        the execution. To upsample the Vm signal, pass here a value larger than 
-        the sampling period of the Vm signal.
+        See NOTE 1 above.
         
     box_size: int >= 0; default is 0.
     
         size of the boxcar (scipy.signal.boxcar) used for filtering the Im signal
-        (containing the step current injection) before detecting the step 
-        boundaries (start & stop)
+        containing the current injection rectangular waveform, before detecting 
+        the waveform boundaries (t_start & t_stop)
         
         default is 0 (no boxcar filtering)
         
     method: str, one of "state_levels" (default) or "kmeans"
+        Detection method for the two "states" ("ON" and "OFF") in the rectangular
+        current injection.
+        
+        See also the functions:
+        ephys.parse_step_waveform_signal
     
-    adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
-        called from ephys.parse_step_waveform_signal() 
-        
+    adcres, adcrange, adcscale: float scalars
+        See also the functions:
+        ephys.parse_step_waveform_signal and signalprocessing.state_levels.
+    
         Used only when method is "state_levels"
-        
         
     Itimes_relative:bool, default is True; 
         When True and im is a triplet, then im[1] and im[2] are the times of 
@@ -3146,6 +3088,11 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
 
     if isinstance(im, neo.AnalogSignal):
         try:
+            # down, up, inj, centroids, label
+            # down = time point of the up-down transition
+            # up   = time point of the down-up transition
+            # inj  = injected current (difference between centroids )
+            # label = int array "mask" with 0 for down and 1 for up; same shape as im
             d, u, inj, c, l = ephys.parse_step_waveform_signal(im,
                                                                 method=method,
                                                                 box_size=box_size, 
@@ -3154,23 +3101,18 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
                                                                 adcscale=adcscale)
             
             
-            #print(f"d = {d} ({type(d)}), u = {u} ({type(u)})")
-            if d.ndim> 0:
+            if d.ndim > 0:
                 d = d[0]
             if u.ndim > 0:
                 u = u[0]
-            #if d < u:
-                #raise RuntimeError("Expecting a depolarizing current injection; got a hyperpolarizing current injection instead")
             
-            
-            #vstep = vm.time_slice(u,d)
             if d > u:
-                vstep = vm.time_slice(u,d + tail)
-                istep = im.time_slice(u,d)
+                vstep = vm.time_slice(u, d + tail)
+                istep = im.time_slice(u, d + tail)
                 
             elif d < u:
-                vstep = vm.time_slice(d,u + tail)
-                istep = im.time_slice(d,u)
+                vstep = vm.time_slice(d, u + tail)
+                istep = im.time_slice(d, u + tail)
                 inj *= -1.0
                 
             else:
@@ -3184,7 +3126,6 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             raise
             
     else:
-        #print(f"extract_AP_train: im {im}, Vm t_start {vm.t_start}, Vm t_stop {vm.t_stop}")
         Ihold = im[0]
         inj = Ihold
             
@@ -3236,31 +3177,19 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
         vstep = vm.time_slice(istart, istop + tail)
         istep = [istart, istop]
     
-    #print("extract_AP_train: Ihold", Ihold)
-    #print("extract_AP_train: Iinj", inj)
-    
-    # resample the Vm signal
+    # resample the Vm signal (the sliced one)
     if resample_with_period is not None:
         if resample_with_period > vstep.sampling_period:
             warnings.warn("A sampling period larger than the signal's sampling period (%s) was requested (%s); the signal will be DOWNSAMPLED" % (vstep.sampling_period, resample_with_period), RuntimeWarning)
 
-        #if resample_with_period < vstep.sampling_period:
-        #upsampling = (vstep.sampling_period.rescale(pq.s)/resample_with_period.rescale(pq.s)).magnitude.flatten()[0]
-            
         vstep = ephys.resample_pchip(vstep, resample_with_period)
         
         if vstep.size == 0:
             raise RuntimeError("Check resampling; new period requested was %s and the resampled signal has vanished" % resample_with_period)
         
-        #vstep = ephys.set_relative_time_start(vstep)
-        #istep = ephys.set_relative_time_start(istep)
-    
     return vstep, Ihold, inj, istep
 
-def detect_AP_waveform_times(sig, thr=10, smooth_window=5, 
-                             min_ap_isi= 6e-3*pq.s, 
-                             min_fast_rise_duration=None, 
-                             rtol=1e-5, atol = 1e-8, vm_thr=0):
+def detect_AP_waveform_times(sig, thr=10, smooth_window=5, min_ap_isi= 6e-3*pq.s, min_fast_rise_duration=None, rtol=1e-5, atol = 1e-8, vm_thr=0):
     """Detects AP waveform time starts in an AP train elicited by step depolarizing current injection.
     
     Detection is done primarily via thresholding on the 1st derivative of the Vm signal
@@ -3348,17 +3277,14 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
     else:
         d2v_dt2_smooth = d2v_dt2
         
+    ap_rises = detect_AP_rises(sig,
+                                dv_dt_smooth,
+                                d2v_dt2_smooth,
+                                thr, min_ap_isi,
+                                atol=atol,
+                                vm_thr=vm_thr)
     
-    #ap_fast_rise_start_times = detect_AP_start_times(sig, dv_dt_smooth, d2v_dt2_smooth, thr)
-    
-    #return ap_fast_rise_start_times
-    
-    ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_peak_times = detect_AP_rises(sig,
-                                                                            dv_dt_smooth,
-                                                                            d2v_dt2_smooth,
-                                                                            thr, min_ap_isi,
-                                                                            atol=atol,
-                                                                            vm_thr=vm_thr)
+    ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_peak_times = ap_rises
     
     if ap_fast_rise_start_times is None:
         ap_fast_rise_durations = None
@@ -3387,22 +3313,9 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
     return ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_fast_rise_durations, ap_peak_times, dv_dt, d2v_dt2
     
     
-def detect_AP_waveforms_in_train(sig, iinj, thr = 10, 
-                        before = 0.001, 
-                        after = None, 
-                        min_fast_rise_duration = None, 
-                        min_ap_isi = 6e-3*pq.s, 
-                        rtol = 1e-5, atol = 1e-8, 
-                        use_min_detected_isi=True,
-                        smooth_window = 5,
-                        interpolate_roots = False,
-                        decay_intercept_approx = "linear",
-                        decay_ref = "hm",
-                        get_duration_at_Vm=None,
-                        return_all = False,
-                        vm_thr=0):
+def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = None, min_fast_rise_duration = None, min_ap_isi = 6e-3*pq.s, rtol = 1e-5, atol = 1e-8, use_min_detected_isi=True,smooth_window = 5,interpolate_roots = False,decay_intercept_approx = "linear",decay_ref = "hm",get_duration_at_Vm=None,return_all = False, vm_thr=0):
     """Detects action potentials in a Vm signal.
-    For use with depolarizing step current injection experiments.
+    For use with experiments using "steps" of depolarizing current injections.
     
     Parameters:
     ----------
@@ -3534,7 +3447,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
         when using the "linear" approximation method (see above)
         
     get_duration_at_Vm: None or scalar:
-        When a scalar, the function report the AP waveform durations at the specified
+        When a scalar, the function reports the AP waveform durations at the specified
         Vm value, IN ADDITION TO the duration at 0 mV and half-max (which may vary
         across cells!)
             
@@ -3657,9 +3570,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     from scipy.interpolate import PchipInterpolator as pchip
     from scipy.signal import boxcar, convolve
     
-    #print(thr, before, after, min_fast_rise_duration, rtol, atol)
-    
-    #### BEGIN psrse parameters
+    #### BEGIN parse parameters
     # make sure before & after are quantities with compatible time units
     
     if isinstance(before, numbers.Real):
@@ -3686,12 +3597,6 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     
     if sig.ndim > 2 or (sig.ndim == 2 and sig.shape[1] > 1):
         raise TypeError("Signal must be a vector")
-    
-    #if smooth_window > 0:
-        #w = boxcar(smooth_window)/smooth_window
-        
-    #else:
-        #w = None
     
     if min_fast_rise_duration is None:
         min_fast_rise_duration = (10**(np.floor(np.log10(sig.sampling_period.rescale(pq.s).magnitude)) + 1)) * pq.s
@@ -3773,18 +3678,16 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     #### BEGIN Detect APs by thresholding on the 1st derivative of the Vm signal
     #
     
-    # parse parameters
-    #print("min_fast_rise_duration", min_fast_rise_duration)
-    # NOTE: 2019-07-11 15:31:59
-    # detection code moved to detect_AP_waveform_times()
-    ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_fast_rise_durations, ap_peak_times, dv_dt, d2v_dt2 = detect_AP_waveform_times(sig, 
-            thr=thr, 
-            smooth_window=smooth_window,
-            min_ap_isi=min_ap_isi,
-            min_fast_rise_duration=min_fast_rise_duration,
-            rtol=rtol, atol=atol,
-            vm_thr=vm_thr)
+    #print(f"detect_AP_waveforms_in_train: vm_thr = {vm_thr}")
+    ap_waveform_times = detect_AP_waveform_times(sig, thr=thr, 
+                                                 smooth_window=smooth_window,
+                                                 min_ap_isi=min_ap_isi,
+                                                 min_fast_rise_duration=min_fast_rise_duration,
+                                                 rtol=rtol, atol=atol,
+                                                 vm_thr=vm_thr)
 
+    ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_fast_rise_durations, ap_peak_times, dv_dt, d2v_dt2 = ap_waveform_times
+    
     # ### END detect APs by thresholding
     
     train_annotations = dict()
@@ -3807,7 +3710,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     train_annotations["AP_d2V_dt2_waveforms"]    = None
     
     
-    ap_train            = neo.SpikeTrain([], t_stop = 0*pq.s, units = pq.s)
+    ap_train = neo.SpikeTrain([], t_stop = 0*pq.s, units = pq.s)
     
     if ap_fast_rise_start_times is None:
         ap_train.annotations.update(train_annotations)
@@ -3847,8 +3750,10 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     
     # ### BEGIN Collect the AP waveforms
     #
-    ## this is a list of neo.AnalogSignals!
-    ap_waveform_signals, inter_AP_intervals, wave_starts, wave_stops = extract_AP_waveforms(sig, iinj, ap_fast_rise_start_times, before=before, after=after, use_min_isi=use_min_detected_isi)
+    ap_waves = extract_AP_waveforms(sig, iinj, ap_fast_rise_start_times, before=before, after=after, use_min_isi=use_min_detected_isi)
+    
+    ## ap_waveform_signals is a list of neo.AnalogSignals!
+    ap_waveform_signals, inter_AP_intervals, wave_starts, wave_stops = ap_waves
     
     #
     # ### END Collect the AP waveforms
@@ -3903,7 +3808,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     #
     # ### END Collect AP amplitude values
     
-    # ### BEGIN Calculate AP durations at half-maximum, 0 mV, and onset Vm
+    # ### BEGIN Calculate AP durations at various levels
     # 
     # NOTE: 2019-04-30 11:12:42
     # the onset Vm is a sample value (the value of the sample at sig_AP_start_index)
@@ -3927,9 +3832,9 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     #half_max = ap_amplitudes.magnitude / 2. # NOT a quantity
     half_max = ap_amplitudes / 2. # Quantity array
     
-    quarter_max = ap_amplitudes / 4.# Quantity array
-    
     third_max = ap_amplitudes / 3. # Quantity array
+    
+    quarter_max = ap_amplitudes / 4.# Quantity array
     
     # NOTE: 2019-04-30 11:08:28
     # Vm values at half max are calculated; to get their time points we need to
@@ -3975,17 +3880,19 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
             # NOTE: 2019-04-25 13:48:45
             # and same for Vm == Vm at onset ("instantaneous AP threshold")
             #print("find AP >= onset Vm %s" % ap_Vm_onset_values[k])
-            #rise_onset_Vm_x, decay_onset_Vm_x, rise_onset_slope, decay_onset_slope = __wave_interp_root_near_val__(w, ap_Vm_onset_values[k])
-            rise_onset_Vm_x, rise_onset_Vm_y, rise_onset_slope, decay_onset_Vm_x, decay_onset_Vm_y, decay_onset_slope = ap_waveform_roots(w, ap_Vm_onset_values[k])
+            ap_roots_onset =  ap_waveform_roots(w, ap_Vm_onset_values[k])
+            rise_onset_Vm_x, rise_onset_Vm_y, rise_onset_slope, decay_onset_Vm_x, decay_onset_Vm_y, decay_onset_slope = ap_roots_onset
 
             #print("find AP >= Vm half max %s" % vm_at_half_max[k])
-            #hm_rise_x, hm_decay_x, hm_rise_slope, hm_decay_slope = __wave_interp_root_near_val__(w, vm_at_half_max[k])
-            hm_rise_x, hm_rise_y, hm_rise_slope, hm_decay_x, hm_decay_y, hm_decay_slope = ap_waveform_roots(w, vm_at_half_max[k])
+            ap_roots_half_max = ap_waveform_roots(w, vm_at_half_max[k])
+            hm_rise_x, hm_rise_y, hm_rise_slope, hm_decay_x, hm_decay_y, hm_decay_slope = ap_roots_half_max
             
             # for 1/4 of maximum
-            qm_rise_x, qm_rise_y, qm_rise_slope, qm_decay_x, qm_decay_y, qm_decay_slope = ap_waveform_roots(w, vm_at_quart_max[k])
+            ap_roots_quart_max = ap_waveform_roots(w, vm_at_quart_max[k])
+            qm_rise_x, qm_rise_y, qm_rise_slope, qm_decay_x, qm_decay_y, qm_decay_slope = ap_roots_quart_max
             
-            tm_rise_x, tm_rise_y, tm_rise_slope, tm_decay_x, tm_decay_y, tm_decay_slope = ap_waveform_roots(w, vm_at_third_max[k])
+            ap_roots_third_max = ap_waveform_roots(w, vm_at_third_max[k])
+            tm_rise_x, tm_rise_y, tm_rise_slope, tm_decay_x, tm_decay_y, tm_decay_slope = ap_roots_third_max
             
             #print("find AP >= 0 Vm")
             # NOTE: 2019-04-25 13:48:32
@@ -4394,9 +4301,7 @@ def ap_phase_plot_data(vm, dvdt=None, smooth_window=None):
     return ret
 
 
-def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, 
-                        ref_vm_relative_onset=False, atol=1e-8, smooth_window = None,
-                        detect_times=True, dvdt_thr=10):
+def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relative_onset=False, atol=1e-8, smooth_window = None,detect_times=True, dvdt_thr=10):
     """ AP waveform analysis for APs triggered by individual current pulses.
     
     WARNING: only to be used on isolated AP waveforms, obtained by calling
@@ -4749,141 +4654,98 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
     
     return ret
 
-#"def" __train_analysis_loop__(segments, ret, iei, apfreq, naps,
-                            #apthr, aplat, **kwargs):
-    #"""Only collect relevant data !
-    #"""
-    
-    #istart = kwargs.get("istart", None)
-    #istep = kwargs.get("istep", None)
-    
-    
-    #ret["Depolarising_steps"] = list()
-    
-    #for k,segment in enumerate(segments):
-        ##print("analyse_AP_step_injection_series segment %d" % k)
-        #try:
-            #step_result, vstep = analyse_AP_step_injection(segment, **kwargs)
-            
-        #except Exception as e:
-            #print("in segment %d:" % k)
-            #traceback.print_exc()
-            #raise e
-        
-        #if segment.name is None or isinstance(segment.name, str) and len(segment.name.strip()) == 0:
-            #seg_name = "Segment_%d" % k
-            
-        #else:
-            #seg_name = "Segment_%s" % segment.name
-            
-        #segment_result = collections.OrderedDict()
-        #segment_result["Index"] = k
-        #segment_result["Name"] = seg_name
-        #segment_result["AP_analysis"] = step_result
-        #segment_result["Vm_signal"] = vstep
-        
-        #ret["Depolarising_steps"].append(segment_result)
-        
-        ## NOTE: 2019-05-02 13:02:54
-        ## collates relevant data for rheobase-latency from across all segments
-        ##i_inj.append(step_result["Injected_current"])
-        #iei.append(step_result["Inter_AP_intervals"])
-        #apfreq.append(step_result["Mean_AP_Frequency"])
-        #naps.append(step_result["Number_of_APs"])
-        
-        ## NOTE: 2019-05-02 12:05:57
-        ## collect data for rheobase-latency: 
-        ## ALWAYS work on the first AP!
-        ##if isinstance(step_result["AP_train"], neo.SpikeTrain) and len(step_result["AP_train"]):
-        #if is_AP_spiketrain(step_result["AP_train"]) and len(step_result["AP_train"]):
-            #ap_train = step_result["AP_train"]
-            #apthr.append(ap_train.annotations["AP_durations_V_onset"][0])
-            #aplat.append(ap_train[0]-ap_train.t_start)
-            
-        #else:
-            #apthr.append(np.array([np.nan]) * vstep.units)
-            #aplat.append(np.array([np.nan]) * vstep.times.units)
-            
+
+
 def analyse_AP_step_injection_series(data, **kwargs):
     """ Action potential (AP) detection and analysis in I-clamp experiment.
     
-    Performs action potential (AP) detection and analysis in data from a single 
-    I-clamp experiment (a "run") with a series of increasing depolarizing current 
-    injection steps (one injection per "sweep").
+    Detects and analyses action potentials (AP) fired during depolarizing current
+    injections in current clamp.
     
-    The AP detection is performed over the sweep interval corresponding to a 
-    step current injection.
+    The record may contain several sweeps where the current injection amplitude
+    is varied progressively (typically incremented by the same amount from an 
+    inital value).
     
-    The step current injection can be specified in one of three ways:
+    The current injection occurs during a defined time interval starting at the  
+    same time relative to the beginning of the sweep, and of identical duration
+    all sweeps.
     
-    a) pass a name or channel index to the ImSignal parameter (see below).
-        This is the preferred method when the recorded data CONTAINS a signal
-        representing the injected current.
-        
-        This is the index of the current injection signal in the sweep (or its
-        name). 
-        
-        The corresponding signal (a neo.AnalogSignal obejct) will then be used
-        to detect the current injection magnitude and time interval in each sweep.
-        
-    b) If a signal representing the injected current is NOT available/usable,
-        then use one of the methods described here:
+    In each sweep, action potentials are detected in the signal containing the 
+    recorded membrane voltage, during the time interval (or time slice) 
+    corresponding to the current injection.
     
-        b.1) specify Iinj_0 and delta_I parameters - this assumes that the 
-        current injection steps (one per sweep) are changed by a constant value
-        (delta_I) from an initial value (Iinj_0) used in the first sweep.
+    The current injection waveform can be recoded alongside the membrane voltage.
+    
+    When available, the current injection signal must be present in all sweeps
+    and is used to determine the amplitude, onset and duration of the current 
+    injection "step".
+    
+    Alternatively, the current injection amplitude(s) and time interval must be
+    specified using the following parameters:
+    
+    * for current injection amplitude:
+        'Iinj_0' and 'delta_I' (initial amplitude and increment from one sweep 
+            to the next)
+            
+        or:
         
-        b.2) specify Iinj as a sequence of current injection magnitudes (the 
-        most general case)
+        'Iinj': a sequence of current injection amplitudes - the length of the 
+        sequemce must equal the number of sweeps (i.e. neo.Segment objects) in
+        the data.
         
-        In both cases (b.1 and b.2) the time interval for the current injection
-        (Istart and Istop) must also be specified as floats or time quantities
+    * for current injection time interval:
+        Istart, Istop (int for samples, or python Quantity in time units)
         
-        When ALL sweeps start at the same time (say, 0*pq.s) then Istart and Istop
-        values apply to every sweep. Itimes_relative must be set to True
+        NOTE 1: it is assumed that current injection starts at the same time
+        relative to the beginning of the sweep, in all sweeps.
         
-        When ALL sweeps start at incremental times (as is often recorded in Clampex)
-        Itimes_relative must be set to True.
-        
-        Istart and Istop can also be specified as number of samples from the 
-        start of the sweep. In this case Itimes_samples must be set to True.
+        NOTE 2: when all sweeps start at the same time, Istart and Istop may be
+        specified in absolute time values (and pass Itimes_relative = False)
     
     Parameters:
     ----------
     data : neo.Block, list of neo.Segment, or a neo.Segment.
         Contains the recording from one run of a series of depolarizing current 
-            injections steps.
+            injections steps (one rectangular current injection pulse - or step
+            followed by return to initial condition).
             
-        When a neo.Block or a list of neo.Segment objects, each segment must 
-        contain a recorded sweep of rectangular current injection "step".
+        NOTE 3: one neo.Segment corresponds to one "sweep" in the experiment.
+            
+        When data is a neo.Block or a list of neo.Segment objects, with each 
+        segment containing one epoch of depolarizing current injection.
         
-        When a single neo.Segment, this contains data from a single step current
-        injection.
+        When data is a single neo.Segment, this contains data from a single step 
+        current injection with the same meaning as above.
         
-        Prerequisites:
-        1. Each segment must contain two analog signals (neo.AnalogSignal ):
-        * recorded membrane potential
-        * the injected current
+        The signal data is stored in the segments' 'analogsignals' attribute, 
+        containing the recorded membrane voltage signal and, optionally, the
+        signal with the recorded current injection waveform.
         
-        It is assumed that the amount of injected current is different in each 
-        segment and that the duration of the current injection step is the same 
-        in all segments.
+        When data has several segments and the signals are specified using 
+        integer indices, the membrane voltage and the optional current injection
+        signals MUST have the same index in the 'analogsignals' attribute of the
+        segments.
+        
         
     Var-keyword parameters (kwargs):
     --------------------------------
-    VmSignal: int or str
+    VmSignal: int or str; index or name of the Vm analog signal
         integer index, or name (string) of the Vm analog signal
-        optional; default is "Vm_prim_1"
+        NOTE: the index is the signal's index in the segments' 'analogsignals'
+        attribute (a list of AnalogSignal objects)
         
-    ImSignal = int or str
-        index, or name (string) of the Im analog signal
-        optional; default is None
+    ImSignal: int or str; index or name of the Im analog signal; optional, 
+        default is None
+        NOTE: the index has the same meaning as above.
         
-    Iinj_0: python quantity (pA), float scalar, or None: value of the first injected current
-        When None (default) the value will be determined from the Im signal of the first
-        depolarization step
+    Iinj_0: python quantity (pA), float scalar, or None: amplitude of the first 
+        current injection in the series; optional default is None.
+        
+        NOTE: When None, the value of the first will be determined from the Im 
+        signal of the segment
     
-    delta_I: python quantity (pA), float scalar, or None: size of the current injection increment
+    delta_I: python quantity (pA), float scalar, or None; current injection 
+        increment.
         When None (defaut) the value will be determined from the Im signal
         
     Istart, Istop: time quantities for current step injection, or None
@@ -4929,7 +4791,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         (plots the fitted curve) -- useful when a block or a list of segments is
         analyzed 
         
-    Var-keyword parameters passed on to analyse_AP_step_injection():
+    Var-keyword parameters passed on to analyse_AP_step_injection_sweep():
     ----------------------------------------------------------------
     tail: scalar Quantity (units: "s"); default is 0 s
         duration of the analyzed Vm trace after current injection has ceased
@@ -5080,7 +4942,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         for other fast-rising events)
         
 
-    NOTE: See analyse_AP_step_injection() documentation for details
+    NOTE: See analyse_AP_step_injection_sweep() documentation for details
     
     Var-keyword parameters related to the experiment "metadata"
     -----------------------------------------------------------
@@ -5112,8 +4974,8 @@ def analyse_AP_step_injection_series(data, **kwargs):
         optional; default is None
         
     
-    Returns:
-    ---------
+    Returns (see also 'Side effects', below):
+    -----------------------------------------
     ret: ordered dict with the following key/value pairs:
     
         "Name": str or None; 
@@ -5124,13 +4986,13 @@ def analyse_AP_step_injection_series(data, **kwargs):
             
             "Name": the name of the kth segment
             
-            "AP_analysis": the result returned by calling analyse_AP_step_injection on
+            "AP_analysis": the result returned by calling analyse_AP_step_injection_sweep on
                 the kth segment
             
             "Vm_signal": the region of the Vm signal in the kth segment, that 
                 has been analyzed (possibly, upsampled); this corresponds to the
                 current injection step or longer as specified by the "tail" 
-                parameter to the analyse_AP_step_injection function, so it is usually only
+                parameter to the analyse_AP_step_injection_sweep function, so it is usually only
                 a time slice of the original Vm signal.
         
         ret["Injected_current"] : neo.IrregularlySampledSignal
@@ -5140,37 +5002,43 @@ def analyse_AP_step_injection_series(data, **kwargs):
             values of Vm at AP threshold, one per segment.
             
         ret["Reference_AP_latency"] : neo.IrregularlySampledSignal
-            the latency of the first AP detected (time from start of step current 
-            injection), one per segment.
+            the latency of the first AP detected (time from start of step 
+            current injection), one per segment.
             
         ret["Mean_AP_Frequency"] : neo.IrregularlySampledSignal
             mean AP frequency (ie. number of APs / duration of the current injection
             step, expressed in Hz), one for each segment,
             
-        ret["Inter_AP_intervals"]   = list of arrays with inter-AP intervals
+        ret["Inter_AP_intervals"] : list of arrays with inter-AP intervals
             (one array per segment) or None for segments without APs
         
-        ret["AP_peak_values"]            = list of arrays with AP_peak_values
+        ret["AP_peak_values"] : list of arrays with AP_peak_values
             (one for each segment, or None for segments without APs)
             
-        ret["AP_peak_amplitudes"]        = list of arrays with AP amplitudes
+        ret["AP_peak_amplitudes"] : list of arrays with AP amplitudes
             (one for each segment or None for segments without APs)
         
-        ret["AP_durations_at_half-max"]     = list of arrays with AP width at 1/2 max
+        ret["AP_durations_at_half-max"] : list of arrays with AP width at 1/2 max
             (one for eaxch segment or None for segments without APs)
             
-        ret["AP_durations_V_0"]         = list of arrays with AP width at Vm = 0
+        ret["AP_durations_V_0"] : list of arrays with AP width at Vm = 0
             (one for each segment, or None for segments without APs)
             
-        ret["AP_durations_V_onset"]    = list of arrays with AP_width_at_threshold vm
-            (one for each segment or None for segments without APs)
+        ret["AP_durations_V_onset"] : list of arrays with AP width at 
+            Vm = threshold potential (one for each segment or None for segments
+            without APs)
             
-        ret["AP_maximum_dV_dt"]          = list of arrays with the maximum dV/dt per AP
+        ret["AP_maximum_dV_dt"] : list of arrays with the maximum dV/dt per AP
             (one for each segment, or None for segments without APs)
     
-    NOTE: the lengths of the arrays returned as list elements equals the number of APs
-        detected in the corresponding segment; if no APs are detected, None is inserted
-        instead of an empty array.
+        NOTE: the lengths of the arrays returned as list elements equals the 
+            number of APs detected in the corresponding segment; if no APs are
+            detected, None is inserted instead of an empty array.
+        
+    Side effects
+    ------------
+        The detected APs are embedded as SpikeTrain objects in the segments
+        where they have been detected.
         
     """
     if not isinstance(data, (neo.Block, neo.Segment)):
@@ -5185,13 +5053,6 @@ def analyse_AP_step_injection_series(data, **kwargs):
             
     else:
         segments = [data]
-    
-    #Iinj                = list()
-    #apIEI               = list()
-    #apFrequency         = list()
-    #nAPs                = list()
-    #apThr               = list()
-    #apLatency           = list()
     
     cellid = kwargs.pop("cell", "NA")
     sourceid = kwargs.pop("source", "NA")
@@ -5218,7 +5079,6 @@ def analyse_AP_step_injection_series(data, **kwargs):
     thr = kwargs.pop("thr", 10)
     
     VmSignal = kwargs.pop("VmSignal", "Vm_prim_1")
-    #ImSignal = kwargs.pop("ImSignal", "Im_sec_1")
     ImSignal = kwargs.pop("ImSignal", None)
     
     rheo = kwargs.pop("rheo", True)
@@ -5389,7 +5249,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
             else:
                 im = ImSignal
                 
-            step_result, vstep = analyse_AP_step_injection(segment, ImSignal = im, 
+            step_result, vstep = analyse_AP_step_injection_sweep(segment, ImSignal = im, 
                                                            Itimes_relative = Itimes_relative,
                                                            Itimes_samples = Itimes_samples,
                                                            **kwargs)
@@ -5420,18 +5280,12 @@ def analyse_AP_step_injection_series(data, **kwargs):
             Iinj = np.array(_inj) * _inj[0].units
             
         i_units = Iinj[0].units
-        #v_units = apThr[0].units
         
         ret["Name"] = "%s_%s" % (prefix, name)
         
         #print(ret["Name"], len(segments), "segments")
         
         # these are the collated data relevant for rheobase_latency
-        #ret["Injected_current"]     = neo.IrregularlySampledSignal(times = seg_times,
-                                                                   #signal = Iinj,
-                                                                   #units = i_units,
-                                                                   #time_units = t_units)
-        
         ret["Injected_current"]     = IrregularlySampledDataSignal(domain = seg_index,
                                                                    signal = Iinj,
                                                                    units = i_units,
@@ -5531,745 +5385,6 @@ def analyse_AP_step_injection_series(data, **kwargs):
     except Exception as e:
         print("In %s:" % name)
         traceback.print_exc()
-        
-def analyse_AP_step_injection_series_replicate(*blocks, **kwargs):
-    """AP analysis in several runs, each containing series of depolarising step current injections.
-    DEPRECATED
-    Iteratively applies analyse_AP_step_injection_series() for each series in the run
-    then summarizes the result (reports average values).
-    
-    Arguments:
-    ==========
-    
-    blocks = comma-separated sequence of neo.Block data, each containing
-        I-clamp experiments (step depolarizing curent injections) for AP induction
-        from the same cell
-        
-    kwargs -- see also summarise_AP_analysis_at_depol_step, 
-        
-        NOTE: this function will monitor the progress across the entire set of 
-        neo.Block objects.
-        
-        thr: scalar, default 10; threshold for Vm rise slope - 1st derivative --  for AP detection)
-        
-        VmSignal: string (default is "Vm_prim_1") or signal index - the recorded Vm signal
-        ImSignal: string (default is "Im_sec_1" ) or signal index - the injected Im signal
-        
-        name: str or None
-        
-        showProgress: boolean (default is False)
-            Intended to display the progress in the console
-            
-            ATTENTION: this is broken in QtConsole!
-            
-        The following are passed directly to summarise_AP_analysis_at_depol_step()
-            
-        step_index: int or None (default)
-            specify a particular index of the current injection step as the "test"
-            current for the AP analysis data to be summarized
-            
-            The None (default) takes 2* rheobase as the test current
-    
-        minsteps: int (default is 3)
-            minimum number of curent injection steps where APs were triggered, 
-            for performing rheobase-latency analysis
-            
-        require_same_step_increment: boolean, int or Quantity, default is True
-        
-            When True, rheobase-latency analysis will be performed only if all
-            block_results have the same current injection step differences.
-            
-            When False, performs rheobase-latency analysis using all block results
-            
-            When an int or Quantity, rheobase-latency analysis will be performed
-            only on those block results having the injection step difference
-            equal to the specified value.
-        
-    Returns:
-    ========
-    
-    An ordered dictionary with the summarized AP train analysis for the *blocks arguments.
-    
-    Also appends the average waveform of first AP at 2x rheobase
-    
-    Side effects:
-    =============
-    generates a list of dictionaries directly in the caller's namespace
-
-    
-    """
-    warnings.warn("Do not use", DeprecationWarning)
-    
-    def __analysis_loop__(blocks, result_list, thr, VmSignal,ImSignal, 
-                          progressSignal=None,
-                          show_progress=False, 
-                          **kwargs):
-        
-        pbar = None # console progressbar if show_progress
-        
-        if progressSignal is None and show_progress:
-            if ProgressBar is not None:
-                pbar = ProgressBar("", "", total = len(blocks),
-                                   complete_symbol="█", not_complete_symbol="-")
-                
-                pbar.update()
-                
-                # NOTE: Thu May 2 22:19:24 2019 GMT+0100
-                # progressbar doesn't work in QtConsole
-                #pbar = ProgressBar(widgets = [Percentage(), " ", Bar(left="[", right="]"), " ", ETA()], 
-                                #maxval=len(blocks),
-                                #fd = sys.stdout)
-                
-                #pbar.start()
-                #pbar.update(0)
-        
-        for k, b in enumerate(blocks):
-            result = analyse_AP_step_injection_series(b, 
-                                       thr = thr, 
-                                       VmSignal=VmSignal, 
-                                       ImSignal=ImSignal, 
-                                       rheo=True,
-                                       plot_rheo=False,
-                                       **kwargs)
-            
-            if isinstance(b.name, str) and len(b.name.strip()):
-                block_name = b.name
-                
-            else:
-                block_name = "Block_%d" % k
-                
-            result["Block_Name"] = block_name
-            result["Block_Index"] = k
-            
-            result_list.append(result)
-            
-            if progressSignal is not None:
-                progressSignal.emit(k)
-                
-            elif pbar is not None:
-                pbar.set_stat(k+1)
-                pbar.update()
-                # NOTE: progressbar doesn't work in QtConsole
-                #pbar.update(k+1)
-
-        if pbar is not None:
-            pbar.end()
-            #pbar.end_m("Done!")
-            # NOTE: 2019-05-02 22:20:37
-            # progressbar doesn't work in QtConsole
-            #pbar.finish()
-    
-    if len(blocks) ==0:
-        raise ValueError("Expecting some data blocks to analyze")
-    
-    # unwrap blocks if it only has one tuple or list element
-    if len(blocks) == 1 and isinstance(blocks[0], (tuple, list)):
-        blocks = blocks[0]
-    
-    if not all([isinstance(b, neo.Block) for b in blocks]):
-        raise TypeError("Expecting a variadic list of neo.Block objects")
-    
-    #if not all([len(block[0].segments) == len(b.segments) for b in blocks[1:]]):
-        #raise ValueError("All blocks must have the same number of segments")
-    
-    thr = kwargs.pop("thr", 10)
-    
-    if not isinstance(thr, int):
-        thr = 10
-    
-    VmSignal = kwargs.pop("VmSignal", "Vm_prim_1")
-    
-    if not isinstance(VmSignal, str) or len(VmSignal.strip()) == 0:
-        VmSignal = "Vm_prim_1"
-    
-    ImSignal = kwargs.pop("ImSignal", "Im_sec_1")
-    
-    if not isinstance(ImSignal, str) or len(ImSignal.strip()) == 0:
-        ImSignal = "Im_sec_1"
-    
-    step_index = kwargs.pop("step_index", None)
-    
-    show_progress = kwargs.pop("show_progress", False)
-    
-    gui_progress = kwargs.pop("gui_progress", False)
-    
-    minsteps = kwargs.get("minsteps", 3)
-    
-    #step_increment = kwargs.get("require_same_step_increment", True)
-    
-    if not isinstance(minsteps, int):
-        raise TypeError("minsteps expected to be an int; got %s instead" % type(minsteps).__name__)
-
-    if minsteps < 1:
-        raise ValueError("minsteps must be > 0: got %s instead" % minsteps)
-    
-    #AP_index = kwargs.pop("AP_index", None)
-    
-    newkwargs = dict()
-    
-    newkwargs["test_current"] = kwargs.pop("test_current", None)
-    #newkwargs["plot"] = kwargs.pop("plot", True)
-    newkwargs["fitrheo"] = kwargs.pop("fitrheo", False)
-    newkwargs["xstart"] = kwargs.pop("xstart", 0)
-    newkwargs["xend"] = kwargs.pop("xend", 0.1)
-    newkwargs["npts"] = kwargs.pop("npts", 100)
-    newkwargs["minsteps"] = minsteps
-    
-    nrheo = kwargs.pop("nrheo", 2) # factor of rheobase at which test_current is taken
-    
-    kwargs["resample_with_period"] = 1e-5
-    
-    #print("resample_with_period", kwargs["resample_with_period"])
-    
-    if not isinstance(nrheo, int):
-        nrheo = 2
-        
-    newkwargs["nrheo"] = nrheo
-        
-    newkwargs["name"] = kwargs.pop("name", None)
-    
-    ret = collections.OrderedDict()
-    
-    block_results = list()
-    
-    if isinstance(VmSignal, str):
-        VmSignal = ephys.get_index_of_named_signal(blocks[0].segments[0], VmSignal)
-        
-    Vm_units = blocks[0].segments[0].analogsignals[VmSignal].units
-    time_units = blocks[0].segments[0].analogsignals[VmSignal].times.units
-    sampling_period = blocks[0].segments[0].analogsignals[VmSignal].sampling_period
-
-    try:
-        if gui_progress:
-            pd =  QtWidgets.QProgressDialog("AP analysis","Cancel", 0, len(blocks))
-            
-            worker = pgui.ProgressWorker(__analysis_loop__, pd, blocks, block_results, 
-                                 thr, VmSignal, ImSignal,
-                                 show_progress = False, **kwargs)
-            
-            worker.signals.signal_finished.connect(pd.reset)
-            
-            threadpool = QtCore.QThreadPool()
-            threadpool.start(worker)
-            
-        else:
-            __analysis_loop__(blocks, block_results, thr, VmSignal, ImSignal, 
-                              show_progress = show_progress, **kwargs)
-        
-    except Exception as e:
-        traceback.print_exc()
-
-    ret["Block_Results"] = block_results
-    
-    ## perform rheobase-latency analysis
-    #results_for_rheo = [r for r in block_results if test_for_rheobase_latency(r, minsteps)]
-    
-    #if len(results_for_rheo) == 0:
-        #print("No suitable series for rheobase analysis were found")
-    
-        #ret["Summary"]["rheobase_analysis"] = None
-        
-    #else:
-        #if isinstance(step_increment, bool) and step_increment:
-            #dIstep = results_for_rheo[0]["Delta_I_step"]
-            ##print(dIstep)
-            #r_ok = [r for r in results_for_rheo if r["Delta_I_step"] == dIstep]
-            
-            #results_for_rheo[:] = r_ok # this may be empty
-            
-            ##print(len(results_for_rheo))
-            
-        #else:
-            #if isinstance(step_increment, int):
-                #step_increment *= results_for_rheo[0]["Delta_I_step"].units
-                
-            #elif isinstance(step_increment, pq.Quantity):
-                #if not units_convertible(step_increment, results_for_rheo[0]["Delta_I_step"].units):
-                    #raise TypeError("require_same_step_increment has incompatible units (%s); expecting %s" % (step_increment.units, results_for_rheo[0]["Delta_I_step"].units))
-                
-            #else:
-                #raise TypeError("require_same_step_increment must be a bool, int or Quantity; got %s instead" % type(require_same_step_increment).__name__)
-            
-            #r_ok = [k for k, r in enumerate(results_for_rheo) if np.isclose(r["Delta_I_step"].magnitude, step_increment.magnitude)]
-                
-            #results_for_rheo[:] = r_ok # this may be empty
-            
-        #if len(results_for_rheo) == 0:
-            #print("No suitable series for rheobase analysis were found")
-            
-            #ret["Summary"]["rheobase_analysis"] = None
-            
-        #else:
-            #rheo_ret = rheobase_latency(*results_for_rheo, **kwargs)
-    
-            #ret["Summary"]["rheobase_analysis"] = rheo_ret
-        
-    # now summarize across block results
-    if len(block_results):
-        ret["Summary"] = summarise_AP_analysis_at_depol_step(*block_results, **newkwargs)
-        
-    elif step_index is not None:
-        newkwargs["step_index"] = step_index
-        ret["Summary"] = summarise_AP_analysis_at_depol_step(*block_results,  **newkwargs)
-        
-    else:
-        ret["Summary"] = None
-
-    return ret
-
-def lookup_injected_current_for_frequency(data, frequency, atol = 10, rtol = 0, equal_nan = True):
-    """Lookup the current injection value(s) that generated AP discharge with a given nominal frequency.
-    
-    The function addresses the question "what is the value of the injected current
-    where this cell fired APs with a specific (nominal) frequency of X Hz?"
-    
-    Because the discharge frequency is calculated (as opposed to the injected 
-    current which is pre-determined), the function will search for actual frequency
-    values that are "close to" the specified nominal frequency. If such frequencies
-    are found, the function returns the injected current values that triggered
-    discharges with those frequencies that were found.
-    
-    The comparison is done by isclose() function in the `numpy` package.
-    
-    `a` and `b` are "close to" each other when
-    
-    absolute(`a` - `b`) <= (`atol` + `rtol` * absolute(`b`))
-    
-    Parameters:
-    ----------
-    
-    data: datatypes.IrregularlySampledDataSignal containing the calculated discharge
-        frequency for each injected current step.
-        
-        This is typically returned by get_AP_frequency_vs_injected_current().
-        
-    frequency: scalar float, the nominal frequency of AP discharge, for which 
-        the value of the injected current is sought.
-        
-    atol: scalar float, absolute tolerance in the frequency value
-    
-    rtol: scalar float, relative tolerance in the frequency value
-    
-    Returns:
-    -------
-    
-    A list of current injection values where the cell has discharged APs with a
-        frequency "close" to the nominal value.
-    
-    See also:
-    
-    ephys.inverse_lookup()
-    
-    """
-    
-    ret, index, sigvals = neoutils.inverse_lookup(data, frequency, atol=atol, rtol=rtol, equal_nan=equal_nan)
-    
-    return ret, sigvals
-
-def get_AP_frequency_for_specific_current_injection(data, iinj, isi=None, name=None, description=None):
-    """Retrieve the discharge frequencies triggered by a specific value of the depolarizing current injection.
-    
-    When no such injection exists, returns [nan * pq.Hz].
-    
-    NOTE:
-    Because technically it is possible to have more than one depolarizing steps with the
-    same value of injected current in the same series, we return these values as a list.
-    
-    However, in a typical experiment the current injection steps will have unique
-    values of iinj.
-    
-    Parameters
-    ==========
-    
-    data: dict, the result of AP analysis on a series of depoarizing steps
-    
-    Named parameters:
-    ================
-    isi: None (default), an int >= 0, or a tuple of ints. Type of AP frequency returned:
-    
-        When isi is None, the function returns the average discharge frequency
-        calulcate as the number of spikes divided by the duration of the spike
-        train.
-        
-        When isi is an int, the function returns the instantaneous AP frequency
-        corresponding to the isi interval in the train.
-        
-        NOTE: returns np.nan if isi >= the number of inter-spike intervals
-        
-        When isi is a sequence of two int elements the function returns the 
-            average instantaneous frequency over the range of intevals specified 
-            by the isi tuple.
-            
-            
-        Examples:
-        
-        1) to get the instantaneous frequency of the first inter-spike interval
-        pass isi = 0
-        
-        2) to get the instantaneous frequency averaged over the first three
-        inter-spike intervals (see Gu et al, J. Physiol, 2007), pass
-        
-        isi = (0,3) (NOTE that this willl average the instantaneous frequency
-            over inter-spike intervals 0, 1 and 2)
-            
-    
-    Returns:
-    =======
-    frequencies: tuple of frequencies (typical experiment will produce a list with
-            one element, see NOTE above)
-            
-    step_indices: tuple of indices of the injection step recordings that generated
-        AP discharge with those frequencies. 
-        
-        Each value in frequencies was generated during the injection current step
-        with the corresponding index in step_indices
-    
-    """
-
-    step_indices, injected_current_steps = zip(*[(k, step) for k, step in enumerate(data["Depolarising_steps"]) if step["AP_analysis"]["Injected_current"] == iinj])
-    
-    if len(injected_current_steps) == 0:
-        return [np.nan*pq.Hz]
-    
-    # NOTE: although unusual, is not impossible to have several step with the same injected current value
-    
-    frequencies = list()
-    
-    for step in injected_current_steps:
-        if isi is None:
-            value = step["AP_analysis"]["Mean_AP_Frequency"]
-            
-        elif isinstance(isi, int):
-            inst_freq = list()
-            
-            isi_freq = 1/step["AP_analysis"]["Inter_AP_intervals"]
-
-            isi_freq = isi_freq.rescale(pq.Hz)
-            
-            if isi < 0 or isi >= len(isi_freq):
-                value = np.nan * pq.Hz
-                
-            else:
-                value = (isi_freq[isi].magnitude)
-                
-        elif isinstance(isi, (tuple, list)) and len(isi) == 2 and all([isinstance(v, int) for v in isi]):
-            isi_freq = 1/step["AP_analysis"]["Inter_AP_intervals"]
-            
-            isi_freq = isi_freq.rescale(pq.Hz)
-            
-            try:
-                value = np.nanmean(isi_freq[isi[0]:isi[1]])
-                
-            except:
-                value = np.nan * pq.Hz
-                
-        else:
-            raise TypeError("isi expected to be None, an int or a sequence of two int")
-        
-        frequencies.append(value)
-        
-    return frequencies, step_indices
-
-def get_AP_frequency_vs_injected_current(data, isi=None, name=None, description=None):
-    """Retrieves AP discharge frequency from the result of AP analysis in a series of depolarising steps
-    
-    Parameters
-    ==========
-    
-    data: dict, the result of AP analysis on a series of depoarizing steps
-    
-    Named parameters:
-    ================
-    isi: None (default), an int >= 0, or a tuple of ints. Type of AP frequency returned:
-    
-        When isi is None, the function returns the average discharge frequency
-        calulcate as the number of spikes divided by the duration of the spike
-        train.
-        
-        When isi is an int, the function returns the instantaneous AP frequency
-        corresponding to the isi interval in the train.
-        
-        NOTE: returns np.nan if isi >= the number of inter-spike intervals
-        
-        When isi is a sequence of two int elements the function returns the 
-            average instantaneous frequency over the range of intervals specified 
-            by the isi tuple.
-            
-            
-        Examples:
-        
-        1) to get the instantaneous frequency of the first inter-spike interval
-        pass isi = 0
-        
-        2) to get the instantaneous frequency averaged over the first three
-        inter-spike intervals (see Gu et al, J. Physiol, 2007), pass
-        
-        isi = (0,3) (NOTE that this will average the instantaneous frequency
-            over inter-spike intervals 0, 1 and 2)
-            
-    
-    """
-    iinj = np.array([int(step["AP_analysis"]["Injected_current"]) for step in data["Depolarising_steps"]], dtype="float64")
-    
-    if isi is None:
-        signal = np.array([step["AP_analysis"]["Mean_AP_Frequency"] for step in data["Depolarising_steps"]])
-        
-        
-        if not isinstance(name, str):
-            name = "Mean AP Frequency"
-            
-    elif isinstance(isi, int):
-        inst_freq = list()
-        
-        for step in data["Depolarising_steps"]:
-            isi_freq = 1/step["AP_analysis"]["Inter_AP_intervals"]
-
-            isi_freq = isi_freq.rescale(pq.Hz)
-            
-            if isi < 0 or isi >= len(isi_freq):
-                value = np.nan * pq.Hz
-                
-            else:
-                value = (isi_freq[isi].magnitude)
-                
-            inst_freq.append(value)
-                
-        signal = inst_freq
-        
-        if not isinstance(name, str):
-            name = "Instantaneous AP Frequency %d" % isi
-            
-    elif isinstance(isi, (tuple, list)) and len(isi) == 2 and all([isinstance(v, int) for v in isi]):
-        inst_freq = list()
-        
-        for step in data["Depolarising_steps"]:
-            isi_freq = 1/step["AP_analysis"]["Inter_AP_intervals"]
-            
-            isi_freq = isi_freq.rescale(pq.Hz)
-            
-            try:
-                value = np.nanmean(isi_freq[isi[0]:isi[1]])
-                
-            except:
-                value = np.nan * pq.Hz
-                
-            inst_freq.append(value)
-                
-        signal = inst_freq
-        
-        if not isinstance(name, str):
-            name = "%d - %d ISI Averaged frequency" % (isi[0], isi[1])
-        
-    else:
-        raise TypeError("isi expected to be None, an int or a sequence of two int")
-    
-    result = IrregularlySampledDataSignal(domain=iinj,
-                                                signal=signal,
-                                                units = pq.Hz, domain_units = pq.pA)
-
-    result.name = name
-        
-    result.domain_name = "Injected current"
-    
-    return result
-
-def get_AP_params_in_series(data, 
-                            parameter, 
-                            normalize_to_first_spike=False, 
-                            independent_variable="iinj", 
-                            minaps = 5,
-                            ap_index = None):
-    """Extract AP parameters from analyse_AP_step_injection_series result.
-    Useful to collect parameters that change with firing frequency and/or injected current.
-    
-    Positional parameters:
-    ======================
-    data: dict; the return of analyse_AP_step_injection_series(...)
-    
-        WARNING: no checks are performed against the contents of 'data'; if 'data'
-        is not what is expected to be, the function will raise an Exception.
-        
-    parameter: str, case-insensitive; the AP parameter that is extracted from data.
-        Acceptable values are the keys in the data/Depolarising_steps/AP_analysis 
-        nested dictionary, or one of the following 'aliases':
-        
-        "amplitude" = peak amplitude
-        "whm"       = AP duration at half-max
-        "maxrise"   = AP max dV/dt
-        "onset"     = AP onset
-        "isi"       = AP ISI
-        "ifreq"     = AP instantaneous frequency (1/ISI)
-        "freq"      = mean discharge frequency
-    
-    Named parameters:
-    =================
-    normalize_to_first_spike: bool, default is False
-        When True, the values are normalized to those of the first AP in the train
-        except for the "freq".
-        
-    independent_variable: str, case-insensitive: the AP parameter against which 
-        the desired parameter is to be assessed.
-        
-        Acceptable values are:
-        "iinj" = injected current
-        "freq" = mean AP discharge frequency (only when 'parameter' is not 'freq')
-        
-    minaps: int; the minimum number of APs in the train, for the train to be 
-    considered for analysis
-    
-    ap_index: None (default) or non-negative int
-        When None, returns the value of the desired parameter for all APs in the
-        train.
-        
-        When an int, returns the value for the specified AP; if ap_index >= minaps
-        the value of minaps will be adjusted.
-        
-        NOTE: In Python indexing starts at 0. For example, to get the 5th AP, 
-        specify minaps=5, ap_index = 4 (minaps may be >= 5 in this example)
-        
-    Returns:
-    =======
-    
-    When parameters are queried for a single spike in each injection step, the 
-    function returns an irregularly sampled data signal where the domain contains
-    the independent variable, and the data contains the parameter values for the 
-    specified spike index at each injection step in the series.
-    
-
-    Otherwise, the function returns a list of two elements where:
-        
-        Elements [0] is an irregularly sampled data signal with the independent 
-        variable.
-        
-        Element [1] is a list with the parameter values (each a scalar or an irregularly
-        sampled signal) one for each injection step
-    
-    A list of with two elements, or a datatypes.IrregularlySampledDataSignal when as_signal:
-        lists, or of irregularly sampled signals. Each element in the list
-    contains the data corresponding to a depolarising step current injection
-    that generated at least one spike discharge.
-    
-    """
-    
-    invert = False
-    
-    if not isinstance(parameter, str):
-        raise TypeError("'parameter' expected to be a str; got %s instead" % type(parameter).__name__)
-    
-    parameter = parameter.strip().lower()
-
-    if parameter == "duration":
-        param_name = "Duration_at_ref_Vm"
-        container = "Action_potentials"
-        
-    elif parameter == "amplitude":
-        param_name = "Vm_amplitude"
-        container = "Action_potentials"
-    
-    elif parameter == "whm":
-        param_name = "Duration_at_half_max"
-        container = "Action_potentials"
-    
-    elif parameter == "maxrise":
-        param_name = "Max_dV_dt"
-        container = "Action_potentials"
-    
-    elif parameter == "onset":
-        param_name = "Vm_onset"
-        container = "Action_potentials"
-    
-    elif parameter == "isi":
-        param_name = "Inter_AP_intervals"
-        container = None
-    
-    elif parameter == "ifreq":
-        param_name = "Inter_AP_intervals"
-        invert = True
-        container = None
-    
-    elif parameter == "freq":
-        param_name = "Mean_AP_Frequency"
-        container = None
-        
-    else:
-        raise ValueError("Inadmissible 'parameter' %s" % parameter)
-        
-    if not isinstance(independent_variable, str):
-        raise TypeError("'independent_variable' expected to be a str; got %s instead" % type(independent_variable).__name__)
-
-    independent_variable = independent_variable.strip().lower()
-    
-    if independent_variable == "iinj":
-        ivar_name = "Injected_current"
-        
-    elif independent_variable == "freq":
-        if parameter == "freq":
-            warnings.warn("Retrieving frequency as function of frequency! Is this what you really want?")
-        ivar_name = "Mean_AP_Frequency"
-        
-    else:
-        raise ValueError("Inadmissible 'independent_variable' %s" % independent_variable)
-    
-    if isinstance(ap_index, int):
-        if ap_index < 0:
-            raise ValueError("When specified, 'ap_index' must be non-negative")
-        
-        if ap_index >= minaps:
-            minaps=ap_index+1
-            
-
-    # would be nice to do list comprehensions here but let's keep this code explicit
-    ivar_list = []
-    var_list = []
-    
-    for step in data["Depolarising_steps"]:
-        if step["AP_analysis"]["AP_train"] is not None:
-            if container == "Action_potentials":
-                params = []
-                for ap in step["AP_analysis"][container]:
-                    params.append(ap[param_name]) # scalar Quantities, one per AP
-                    
-                param_array = IrregularlySampledDataSignal([k for k in range(len(params))], params,
-                                                              units = params[0].units,
-                                                              domain_units = pq.dimensionless,
-                                                              name=param_name)
-            else:
-                # collects top level data such as ISI and / or mean freq
-                param_array = step["AP_analysis"][param_name] # this ARE irregularly sampled signals
-                
-            #print(len(param_array), minaps)
-                
-            if len(param_array) < minaps: # skip this if it has fewer than desired spikes
-                continue
-            
-            if invert: # this is only True for Inter_AP_intervals, to calculate instantaneous frequency
-                param_array = (1/param_array).rescale(pq.Hz)
-                
-            if normalize_to_first_spike:
-                param_array = (param_array.magnitude.flatten()/param_array[0].magnitude.flatten())*pq.dimensionless
-                
-            if isinstance(ap_index, int):
-                var_list.append(param_array[ap_index]*param_array.units) # extract a scalar value for a single AP
-                
-            else:
-                var_list.append(param_array) # extract the entire array
-                    
-            ivar_list.append(step["AP_analysis"][ivar_name]) # Quantity with length of 1
-            
-    if all([isinstance(v, (float, np.float64)) or v.size==1 for v in var_list]):
-        result = IrregularlySampledDataSignal(ivar_list, var_list,
-                                                domain_units = ivar_list[0].units,
-                                                units = var_list[0].units,
-                                                name=param_name)
-    else:
-        ivar_data = IrregularlySampledDataSignal([k for k in range(len(ivar_list))], ivar_list,
-                                             domain_units = pq.dimensionless,
-                                             units = ivar_list[0].units,
-                                             name = ivar_name)
-    
-        result = [ivar_data, var_list]
-        
-    return result
         
     
 def plot_rheobase_latency(data, xstart=None, xend=None):
@@ -6372,7 +5487,7 @@ def test_for_rheobase_latency(data, minsteps=3):
                 neo.IrregularlySampledSignal objects
         
             "Depolarising_steps" is a list of dictionaries as output by a call
-                to analyse_AP_step_injection().
+                to analyse_AP_step_injection_sweep().
         
     b) The number of "Depolarising_steps" with at least one AP detected >= minsteps
         
@@ -6396,355 +5511,6 @@ def test_for_rheobase_latency(data, minsteps=3):
         return False
     
     return ok
-
-def summarise_AP_analysis_at_depol_step(*results, **kwargs):
-    """Summary of AP analysis at a specified injected current,
-    
-    Var-positional parameters:
-    -------------------------
-    *results: dictionaries output by analyse_AP_step_injection_series ("block results")
-
-    Var-keyword parameters:
-    ----------------------
-        nrheo: scalar; default is 2
-            nrheo x Irheobase is the current injection targeted for analysis
-            
-            Must be > 0. For meaningful results, it should be > 1
-            
-        test_current: None (default), or scalar (int, float or Quantity)
-            The value of the test current used as test case for summary. The 
-            function will use data from the current injection step with the 
-            nearest value to this parameter, as test case for summary.
-            
-            When specified (not None) it overrides nrheo.
-            
-        step_index: None (default) or an int
-            Index of the step current to be considered as test case for summary. 
-            
-            When specified, it overrides both nrheo and test_current.
-            
-        NOTE: Specifying either test_current or step_index will override nrheo parameter
-            
-        name: str or None (default)
-            the name of the experimental data set
-            
-        minsteps: int (default is 3)
-            minimum number of curent injection steps where APs were triggered, 
-            for performing rheobase-latency analysis
-            
-        require_same_step_increment: boolean, int or Quantity, default is True
-        
-            When True, rheobase-latency analysis will be performed only if all
-            block_results have the same current injection step differences.
-            
-            When False, performs rheobase-latency analysis using all block results
-            
-            When an int or Quantity, rheobase-latency analysis will be performed
-            only on those block results having the injection step difference
-            equal to the specified value.
-        
-            
-    Other parameters are passed on to the rheobase_latency() function, see
-        rheobase_latency documentation
-    
-    Each dictionary in *results contains the data returned by one call of analyse_AP_step_injection_series
-    """
-    #if len(results) < 2:
-        #raise ValueError("Expecting at least two block analysis results; got %d instead" % len(results))
-    
-    # find out data at 2x rheobase or 3x rheobase
-    # NOTE: 2017-09-27 12:57:36 update below from wkargs
-    
-    test_current = kwargs.pop("test_current", None)
-    
-    rheobase_factor = kwargs.pop("nrheo", 2) # 2x rheobase # default
-    
-    step_index = kwargs.pop("step_index", None)
-    
-    name = kwargs.pop("name", None)
-    
-    minsteps = kwargs.get("minsteps", 3)
-    
-    step_increment = kwargs.pop("require_same_step_increment", True)
-    
-    if not isinstance(minsteps, int):
-        raise TypeError("minsteps expected to be an int; got %s instead" % type(minsteps).__name__)
-
-    if minsteps < 1:
-        raise ValueError("minsteps must be > 0: got %s instead" % minsteps)
-    
-    # NOTE: 2017-09-07 15:39:44
-    # perform strength-latency analysis first
-    # this always uses the smallest current that fired APs
-    #kwargs["plot"] = False
-    
-    # TODO: exclude from args the results with fewer than minsteps current injection
-    # steps with APs detected
-    
-    if len(results) == 1 and isinstance(results[0], dict):
-        if "Block_Results" in results[0]:
-            try:
-                results = results[0]["Block_Results"]
-                
-            except:
-                print("Data does not appear to contain AP analysis in depolarising current steps")
-                return
-    
-    results_for_rheo = [r for r in results if test_for_rheobase_latency(r, minsteps)]
-    
-    #print(results_for_rheo)
-    
-    if len(results_for_rheo) == 0:
-        print("No suitable series for rheobase analysis were found")
-        return
-    
-    #print("step_increment", step_increment)
-    
-    if isinstance(step_increment, bool) and step_increment:
-        dIstep = results_for_rheo[0]["Delta_I_step"]
-        #print(dIstep)
-        r_ok = [r for r in results_for_rheo if r["Delta_I_step"] == dIstep]
-        
-        results_for_rheo[:] = r_ok # this may be empty
-        
-        #print(len(results_for_rheo))
-        
-    else:
-        if isinstance(step_increment, int):
-            step_increment *= results_for_rheo[0]["Delta_I_step"].units
-            
-        elif isinstance(step_increment, pq.Quantity):
-            if not units_convertible(step_increment, results_for_rheo[0]["Delta_I_step"].units):
-                raise TypeError("require_same_step_increment has incompatible units (%s); expecting %s" % (step_increment.units, results_for_rheo[0]["Delta_I_step"].units))
-            
-        else:
-            raise TypeError("require_same_step_increment must be a bool, int or Quantity; got %s instead" % type(require_same_step_increment).__name__)
-        
-        r_ok = [k for k, r in enumerate(results_for_rheo) if np.isclose(r["Delta_I_step"].magnitude, step_increment.magnitude)]
-            
-        results_for_rheo[:] = r_ok # this may be empty
-        
-    if len(results_for_rheo) == 0:
-        print("No suitable series for rheobase analysis were found")
-        return
-    
-    ret = rheobase_latency(*results_for_rheo, **kwargs)
-    
-    if ret is None:
-        return
-
-    # index of segment result
-    x_rheo_ndx = None
-    
-    if test_current is None:
-        if step_index is None:
-            # rely on rheobase factor 
-            # WARNING there may not be a recording for such a current step!
-            if not isinstance(rheobase_factor, numbers.Real):
-                raise TypeError("rheobase_factor expected to be a scalar; got %s instead" % type(rheobase_factor).__name__)
-            
-            if rheobase_factor <= 0:
-                raise ValueError("rheobase factor must be > 0; got %g instead" % rheobase_factor)
-            
-            test_current = ret["Irh"] * rheobase_factor
-            
-            itol = np.nanmean(np.diff(ret["I"].magnitude.flatten()))/2.
-            
-            x_rheo_ndx = np.where(np.isclose(ret["I"].magnitude, test_current.magnitude, atol = itol))[0]
-            
-            if len(x_rheo_ndx):
-                x_rheo_ndx = x_rheo_ndx[0]
-                Itest = ret["I"][x_rheo_ndx]
-                
-            else:
-                warnings.warn("No step with %s current injection (%g x %s rheobase) was found in data " % (test_current, rheobase_factor, ret["Irh"]))
-                Itest = None
-            
-        else:
-            if not isinstance(step_index, int):
-                raise TypeError("When neither nrheo nor test_current are given, step_index must be specified")
-            
-            if step_index < 0:
-                raise ValueError("step_index must be >= 0; got %d instead" % step_index)
-            
-            if step_index >= len(ret["I"]):
-                raise ValueError("step_index (%d) is too large for %d current injection steps" % (step_index, len(ret["I"])))
-            
-            Itest = ret["I"][step_index]
-            
-            x_rheo_ndx = step_index
-            
-            rheobase_factor = Itest/ret["Irh"]
-            
-    else:
-        if isinstance(test_current, numbers.Real):
-            test_current *= ret["I"].units
-            
-        elif isinstance(test_current, pq.Quantity):
-            if not units_convertible(test_current.units, ret["I"].units):
-                raise TypeError("When specified, test_current must be either a float scalar, or a python quantity in %s " % ret["I"].units.dimensionality.string)
-            
-            if test_current.units != ret["I"].units:
-                test_current.rescale(ret["I"].units)
-            
-        else:
-            raise TypeError("'test_current' must be either None or a scalar (float or Quantity); got %s instead" % type(test_current).__name__)
-
-        itol = np.nanmean(np.diff(ret["I"].magnitude.flatten()))/2.
-        
-        x_rheo_ndx = np.where(np.isclose(ret["I"].magnitude, test_current.magnitude, atol = itol))[0]
-        
-        if len(x_rheo_ndx):
-            x_rheo_ndx = int(x_rheo_ndx[0])
-            
-            Itest = ret["I"][x_rheo_ndx]
-            
-            rheobase_factor = Itest/ret["Irh"]
-            
-        else:
-            warnings.warn("No step with %s current injection was found in data" % test_current)
-            Itest = None
-            
-    #
-    # index of the segment where the injected current is rheobase_factor times Irheobase
-    #
-    # for current injection  = Irheobase * rheobase_factor, the following AP 
-    # measures are returned:
-    #  0) Segment: segment index where the injected current is rheobase_factor times Irheobase
-    #  1) mean maximal dV/dt for the first AP
-    #  2) mean Vthreshold of the first AP
-    #  3) mean peak value for the first AP
-    #  4) mean amplitude of the first AP
-    #  5) mean AP width at Vthreshold, for the first AP
-    #  6) mean AP width at Vm = 0, for the first AP
-    #  7) mean AP width at 1/2 maximum, for the first AP
-    #  8) Inter_AP_intervals
-    #  9) number of APs / curent injection duration
-    # 10) mean AP frequency
-    #
-    
-    # contains a summary of AP parameters at test current (averaged across the 
-    # block results used for rheobase analysis)
-    
-    r_ndx = []
-    
-    if Itest is not None:
-        results_with_APs_at_test_current = [r for r in results_for_rheo if get_ap_analysis_param(r, "AP_train", int(x_rheo_ndx)) is not None]
-        
-        if len(results_with_APs_at_test_current):
-            ret["Test_Current"] = collections.OrderedDict()
-            
-            ret["Test_Current"]["Value"]                          = Itest
-            ret["Test_Current"]["Rheobase_factor"]                = rheobase_factor
-            ret["Test_Current"]["Name"]                           = name
-            ret["Test_Current"]["Segment_index"]                  = x_rheo_ndx
-            
-            #print("segment index for test current", x_rheo_ndx)
-            
-            ret["Test_Current"]["Number_of_APs"]                  = np.array([get_ap_analysis_param(resdict, "Number_of_APs", int(x_rheo_ndx)) for resdict in results_with_APs_at_test_current])
-            nAPs = np.array([v for v in ret["Test_Current"]["Number_of_APs"] if isinstance(v, numbers.Real)])
-            ret["Test_Current"]["Average_number_of_APs"]          = nAPs.mean()
-            
-            # we need to know the minimum number of APs fired at test current so that we 
-            # summarize (mean) their parameters
-            ret["Test_Current"]["Minimum_number_of_APs"]          = nAPs.min()
-            min_nAPs = ret["Test_Current"]["Minimum_number_of_APs"]
-            
-            #print("min_nAPs", min_nAPs)
-            
-            freq_units      = get_ap_analysis_param(results_with_APs_at_test_current[0], "Mean_AP_Frequency", int(x_rheo_ndx)).units
-            time_units      = get_ap_analysis_param(results_with_APs_at_test_current[0], "Inter_AP_intervals", int(x_rheo_ndx)).units
-            Vm_units        = get_ap_analysis_param(results_with_APs_at_test_current[0], "Vm_onset", int(x_rheo_ndx)).units
-            dVdT_units      = get_ap_analysis_param(results_with_APs_at_test_current[0], "Max_dV_dt", int(x_rheo_ndx)).units
-            
-            sampling_period = get_ap_analysis_param(results_with_APs_at_test_current[0], "Vm_signal", int(x_rheo_ndx)).sampling_period
-            
-            
-            ap_freq = [__get_par__(resdict, "Mean_AP_Frequency", freq_units, int(x_rheo_ndx)) for resdict in results_with_APs_at_test_current]
-            
-            apfr = [v.rescale(freq_units) for v in ap_freq if isinstance(v, pq.Quantity)]
-            
-            ret["Test_Current"]["Mean_AP_Frequency"]  = np.nanmean(np.array(apfr)) * freq_units
-            
-            ap_ints  = [(k, get_ap_analysis_param(resdict, "Inter_AP_intervals", int(x_rheo_ndx))) for k, resdict in enumerate(results_with_APs_at_test_current)]
-            
-            ap_ints_ok = [a[1][:(min_nAPs-1)].flatten().rescale(time_units)[:,np.newaxis] for a in ap_ints if isinstance(a[1], np.ndarray) and len(a[1]) >= (min_nAPs-1)]
-            
-            if len(ap_ints_ok):
-                if len(ap_ints_ok) == 1:
-                    ret["Test_Current"]["AP_intervals"]                   = ap_ints_ok[0]
-                else:
-                    ret["Test_Current"]["AP_intervals"]                   = np.nanmean(np.concatenate(ap_ints_ok, axis=1), axis=1) * time_units
-                
-                ret["Test_Current"]["AP_Instantaneous_frequency"]     = (1/ret["Test_Current"]["AP_intervals"]).rescale(freq_units)
-                
-                ret["Test_Current"]["Action_potentials"] = list()
-                
-                for ap_index in range(min_nAPs):
-                    APdict                                 = collections.OrderedDict()
-                    APdict["Index"]                        = ap_index
-
-                    APdict["Mean_AP_Max_dV_dt"]                 = np.nanmean(np.array([__get_par__(resdict, "Max_dV_dt", dVdT_units, int(x_rheo_ndx), ap_index).rescale(dVdT_units) for resdict in results_with_APs_at_test_current])) * dVdT_units
-                    APdict["Mean_AP_Onset"]                     = np.nanmean(np.array([__get_par__(resdict, "Vm_onset", Vm_units, int(x_rheo_ndx), ap_index).rescale(Vm_units) for resdict in results_with_APs_at_test_current])) * Vm_units
-                    APdict["Mean_AP_Peak"]                      = np.nanmean(np.array([__get_par__(resdict, "Vm_peak", Vm_units, int(x_rheo_ndx), ap_index).rescale(Vm_units) for resdict in results_with_APs_at_test_current])) * Vm_units
-                    APdict["Mean_AP_Amplitude"]                 = np.nanmean(np.array([__get_par__(resdict, "Vm_amplitude", Vm_units, int(x_rheo_ndx), ap_index).rescale(Vm_units) for resdict in results_with_APs_at_test_current])) * Vm_units
-                    APdict["Mean_AP_duration_at_onset"]         = np.nanmean(np.array([__get_par__(resdict, "Duration_at_onset", time_units, int(x_rheo_ndx), ap_index).rescale(time_units) for resdict in results_with_APs_at_test_current])) * time_units
-                    APdict["Mean_AP_duration_at_0_Vm"]          = np.nanmean(np.array([__get_par__(resdict, "Duration_at_0mV", time_units, int(x_rheo_ndx), ap_index).rescale(time_units) for resdict in results_with_APs_at_test_current])) * time_units
-                    APdict["Mean_AP_duration_at_half_max"]      = np.nanmean(np.array([__get_par__(resdict, "Duration_at_half_max", time_units, int(x_rheo_ndx), ap_index).rescale(time_units) for resdict in results_with_APs_at_test_current])) * time_units
-                    APdict["Mean_AP_half_max"]                  = np.nanmean(np.array([__get_par__(resdict, "Vm_half_max", Vm_units, int(x_rheo_ndx), ap_index).rescale(Vm_units) for resdict in results_with_APs_at_test_current])) * Vm_units
-                    
-                    APdict["Mean_AP_duration_at_quarter_max"]   = np.nanmean(np.array([__get_par__(resdict, "Duration_at_quarter_max", time_units, int(x_rheo_ndx), ap_index) for resdict in results_with_APs_at_test_current])) * time_units
-                    APdict["Mean_AP_quarter_max"]               = np.nanmean(np.array([__get_par__(resdict, "Vm_quart_max", Vm_units, int(x_rheo_ndx), ap_index) for resdict in results_with_APs_at_test_current])) * Vm_units
-                    APdict["Mean_AP_duration_at_ref_Vm"]        = np.nanmean(np.array([__get_par__(resdict, "Duration_at_ref_Vm", time_units, int(x_rheo_ndx), ap_index) for resdict in results_with_APs_at_test_current])) * time_units
-                    APdict["Mean_AP_ref_Vm"]                    = np.nanmean(np.array([__get_par__(resdict, "Vm_ref", Vm_units, int(x_rheo_ndx), ap_index) for resdict in results_with_APs_at_test_current])) * Vm_units
-
-                    #APdict["Mean_AP_duration_at_quarter_max"]   = np.nanmean(np.array([__get_par__(resdict, "Duration_at_quarter_max", time_units, int(x_rheo_ndx), ap_index).rescale(time_units) for resdict in results_with_APs_at_test_current])) * time_units
-                    #APdict["Mean_AP_quarter_max"]               = np.nanmean(np.array([__get_par__(resdict, "Vm_quart_max", Vm_units, int(x_rheo_ndx), ap_index).rescale(Vm_units) for resdict in results_with_APs_at_test_current])) * Vm_units
-                    #APdict["Mean_AP_duration_at_ref_Vm"]        = np.nanmean(np.array([__get_par__(resdict, "Duration_at_ref_Vm", time_units, int(x_rheo_ndx), ap_index).rescale(time_units) for resdict in results_with_APs_at_test_current])) * time_units
-                    #APdict["Mean_AP_ref_Vm"]                    = np.nanmean(np.array([__get_par__(resdict, "Vm_ref", Vm_units, int(x_rheo_ndx), ap_index).rescale(Vm_units) for resdict in results_with_APs_at_test_current])) * Vm_units
-
-                    APdict["Waveforms"]                         = [get_ap_analysis_param(resdict, "Waveform", int(x_rheo_ndx), ap_index) for resdict in results_with_APs_at_test_current]
-                    
-                    if len(APdict["Waveforms"]):
-                        min_wave_len = min([len(w) for w in APdict["Waveforms"]])
-                        
-                        ap_waveforms = np.concatenate([w[0:min_wave_len, np.newaxis] for w in APdict["Waveforms"]], 
-                                                        axis=1)
-                        
-                        #print("summarise_AP_analysis_at_depol_step: ap_waveforms shape %d" % ap_index, ap_waveforms.shape)
-                        
-                        ap_waveforms_signal = neo.AnalogSignal(ap_waveforms, 
-                                                            units = Vm_units,
-                                                            t_start = 0 * time_units,
-                                                            sampling_period = sampling_period,
-                                                            name="AP_%d_at_test_current" % ap_index,
-                                                            description="AP %d at test current %s from each step series" % (ap_index, Itest))
-                        
-                        avg_waveform_signal = neo.AnalogSignal(np.nanmean(ap_waveforms_signal, axis=1),
-                                                                units = ap_waveforms_signal.units,
-                                                                t_start = ap_waveforms_signal.t_start,
-                                                                sampling_period = ap_waveforms_signal.sampling_period,
-                                                                name="Average_AP_%d_at_test_current" % ap_index,
-                                                                description="Average of AP %d at test current %s across all step series" % (ap_index, Itest))
-                    
-                        APdict["Waveforms_signals"] = ap_waveforms_signal
-                        APdict["Average_waveform_signal"] = avg_waveform_signal
-                        
-                    ret["Test_Current"]["Action_potentials"].append(APdict)
-        
-            r_ndx = [results.index(r) for r in results_with_APs_at_test_current]
-            
-            
-        else:
-            warnings.warn("No block result found with AP fired at %s current injection step (%d x %s at rheobase)" % (Itest, rheobase_factor, ret["Irh"]))
-            r_ndx = []
-            
-    else:
-        r_ndx= []
-    
-    ret["Block_result_indices"] = r_ndx
-    
-    return ret
 
 def report_AP_analysis(data, name=None):
     """Reports data from analyse_AP_step_series_replicate in pandas format.
@@ -6918,424 +5684,7 @@ def report_AP_analysis(data, name=None):
     
     return summary, params, waveforms
 
-#"def" analyse_AP_step_injection_old(segment, 
-                              #VmSignal = "Vm_prim_1", 
-                              #ImSignal = "Im_sec_1", 
-                              #tail = 0 * pq.s, 
-                              #resample_with_period = None, 
-                              #resample_with_rate=None,
-                              #**kwargs):
-    #"""AP Train analysis in a sweep (segment) of I-clamp experiments
-    
-    #Positional parameters:
-    #---------------------
-    
-    #segment: a neo.Segment with at least two analog signals (see below)
-    
-    #Named parameters:
-    #----------------
-    
-    #VmSignal, ImSignal: scalar indices or strings with analogsignal names containing,
-        #respectively, the Vm reponse and membrane current injection
-        
-        #optional (defaults are "Vm_prim_1" and "Im_sec_1", respectively)
-        
-    #tail: scalar Quantity (units: "s"); default is 0 s
-        #duration of the analyzed Vm trace after current injection has ceased
-    
-    #Var-keyword parameters (kwargs):
-    #--------------------------------
-    
-    #resample_with_period: None (default), scalar float or Quantity
-        #When not None, the Vm signal will be resampled before processing.
-        
-        #When Quantity, it must be in units convertible (scalable) to the signal's
-        #sampling period units.
-        
-        #Resampling occurs on the region corresponding to the depolarizing current
-        #injection, before detection of AP waveforms.
-        
-        #Upsampling might be useful (see Naundorf et al, 2006) but slows down
-        #the execution. To upsample the Vm signal, pass here a value smaller than
-        #the sampling period of the Vm signal.
-        
-    #resample_with_rate: None (default), scalar float or Quantity
-        #When not None, the Vm signal will be resampled before processing.
-        
-        #When Quantity, it must be in units convertible (scalable) to the signal's
-        #sampling rate units.
-        
-        #Resampling occurs on the region corresponding to the depolarizing current
-        #injection, before performing detection of AP waveforms.
-        
-        #Upsampling might be useful (see Naundorf et al, 2006) but slows down
-        #the execution. To upsample the Vm signal, pass here a value larger than 
-        #the sampling period of the Vm signal.
-        
-    #NOTE: The following are passed to ephys.parse_step_waveform_signal():
-    
-    #box_size: int >= 0; default is 0.
-    
-        #size of the boxcar (scipy.signal.boxcar) used for filtering the Im signal
-        #(containing the step current injection) before detecting the step 
-        #boundaries (start & stop)
-        
-        #default is 0 (no boxcar filtering)
-        
-    #method: str, one of "state_levels" (default) or "kmeans"
-    
-    #adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
-        #called from ephys.parse_step_waveform_signal() 
-        
-        #Used only when mthod is "state_levels"
-        
-    #NOTE: The following are passed directly to detect_AP_waveforms_in_train():
-    
-    #thr: floating point scalar: the minimum value of dV/dt of the Vm waveform to
-        #be considered an action potential (default is 10) -- parameter is passed to detect_AP_waveforms_in_train()
-        
-    #before, after: floating point scalars, or Python Quantity objects in time 
-        #units convertible to the time units used by VmSignal.
-        #interval of the VmSignal data, respectively, before and after the actual
-        #AP in the returned AP waveforms -- parameters are passed to detect_AP_waveforms_in_train()
-        
-        #defaults are:
-        #before: 1e-3
-        #after: None
-        
-    #min_fast_rise_duration : None, scalar or Quantity (units "s");
-    
-        #The minimum duration of the initial (fast) segment of the rising 
-        #phase of a putative AP waveform.
-        
-        #When None, is will be set to the next higher power of 10 above the sampling period
-        #of the signal.
-    
-    #min_ap_isi : None, scalar or Quantity;
-    
-                #Minimum interval between two consecutive AP fast rising times 
-                #("kinks"). Used to discriminate against suprious fast rising time
-                #points that occur DURING the rising phase of AP waveforms.
-                
-                #This can happen when the AP waveforms has prominent IS and the SD 
-                #"spikes", 
-                
-                #see Bean, B. P. (2007) The action potential in mammalian central neurons.
-                #Nat.Rev.Neurosci (8), 451-465
-
-    #rtol, atol: float scalars;
-        #the relative and absolute tolerance, respectively, used in value 
-        #comparisons (see numpy.isclose())
-        
-        #defaults are:
-        #rtol: 1e-5
-        #atol: 1e-8
-                
-    #use_min_detected_isi: boolean, default True
-    
-        #When True, individual AP waveforms cropped from the Vm signal "sig" will
-            #have the duration equal to the minimum detected inter-AP interval.
-        
-        #When False, the durations of the AP waveforms will be taken to the onset
-            #of the next AP waveform, or the end of the Vm signal
-            
-    #smooth_window: int >= 0; default is 5
-        #The length (in samples) of a smoothing window (boxcar) used for the 
-        #signal's derivatives.
-        
-        #The length of the window will be adjusted if the signal is upsampled.
-        
-    #interpolate_roots: boolean, default False
-        #When true, use linear inerpolation to find the time coordinates of the
-        #AP waveform rise and decay phases crossing over the onset, half-maximum
-        #and 0 mV. 
-        
-        #When False, uss the time coordinate of the first & last sample >= Vm value
-        #(onset, half-max, or 0 mV) respectively, on the rise and decay phases of
-        #the AP waveform.
-        
-        #see ap_waveform_roots()
-        
-    #decay_intercept_approx: str, one of "linear" (default) or "levels"
-        #Used when the end of the decay phase cannot be estimated from the onset
-        #Vm.
-        
-        #The end of the decay is considerd to be the time point when the decaying
-        #Vm crosses over (i.e. goes below) the onset value of the action potential.
-        
-        #Whe the AP waveform is riing on a rising baseline, this time point cannot
-        #be determined.
-        
-        #Instead, it is estimated as specified by "decay_intercept_approx" parameter:
-        
-        #When decay_intercept_approx is "linear", the function uses linear extrapolation
-        #from a (higher than Vm onset) value specified by decay_ref (see below)
-        #to the onset value.
-        
-        #When decay_intercept_approx is "levels", the function estimates a "pseudo-baseline"
-        #as the lowest of two state levels determined from the AP waveform histogram.
-        
-        #The pseudo-baseline is then used to estimate the time intercept on the decay
-        #phase.
-        
-    #decay_ref: str, one of "hm" or "zero", or floating point scalar
-        #Which Vm value should be used to approximate the end of the decay phase
-        #when using the "linear" approximation method (see above)
-        
-    #Returns:
-    #-------
-    #result : ordered dict; 
-        #key names should be self-explanatory
-        
-        #contains the result of the AP train analysis, including the AP train
-        #itself, and AP waveforms and derivatves (1st and 2nd order) as 
-        #neo.AnalogSignals -- see detect_AP_waveforms_in_train()
-    
-    #vstep : neo.AnalogSignal; 
-        #contains the time slice of the Vm signal, encompassing  the AP train
-    
-    #References:
-    #-----------
-    
-    #Naundorf et al (2006). Unique features of action potential initiation in 
-        #cortical neurons. Nature 440, 1060–1063.
-    
-    #"""
-    ##print("analyse_AP_step_injection kwargs:", kwargs)
-    #method      = kwargs.pop("method", "state_levels")
-    #box_size    = kwargs.pop("box_size", 0)
-    #adcres      = kwargs.pop("adcres", 15)
-    #adcrange    = kwargs.pop("adcrange", 10)
-    #adcscale    = kwargs.pop("adcscale", 1e3) # (mV -> V)
-    
-    #kwargs.pop("return_all", None) # remove the debugging parameter
-    
-    ## NOTE: 2019-05-03 13:08:48
-    ## removed: result not has individual AP analysis for all detected APs
-    ## 
-    
-    ##ap_index = kwargs.pop("ap_index", 0)
-    
-    ##if not isinstance(ap_index, int):
-        ##raise TypeError("'ap_index' expected to be an int; got %s instead" % type(ap_index).__name__)
-    
-    ##if ap_index < 0:
-        ##raise ValueError("'ap_index' must be >= 0; got %d instead" % ap_index)
-        
-    #if isinstance(VmSignal, str):
-        #VmSignal = ephys.get_index_of_named_signal(segment, VmSignal)
-        
-    #if isinstance(ImSignal, str):
-        #ImSignal = ephys.get_index_of_named_signal(segment, ImSignal)
-        
-    #im = segment.analogsignals[ImSignal].copy()
-    
-    #vm = segment.analogsignals[VmSignal].copy()
-    
-    ## down, up, inj, centroids, label
-    ## down = time point of the up-down transition
-    ## up   = time point of the down-up transition
-    ## inj  = injected current (difference between centroids )
-    ## label = int array "mask" with 0 for down and 1 for up; same shape as im
-    ##print("method", method)
-    #d, u, inj, c, l = ephys.parse_step_waveform_signal(im,
-                                                          #method=method,
-                                                          #box_size=box_size, 
-                                                          #adcres=adcres,
-                                                          #adcrange=adcrange,
-                                                          #adcscale=adcscale)
-    
-    #if d < u:
-        #raise RuntimeError("Expecting a depolarizing current injection; got a hyperpolarizing current injection instead")
-    
-    
-    ##vstep = vm.time_slice(u,d)
-    #vstep = vm.time_slice(u,d + tail)
-    #Ihold = im.time_slice(d, im.t_stop).mean()
-    
-    ## NOTE: 2019-04-29 13:32:46
-    ## upsample the Vm signal if required
-    
-    ## parse resample_... parameters
-    #if not all([v is None for v in (resample_with_period, resample_with_rate)]):
-        #if isinstance(resample_with_period, float):
-            #resample_with_period *= vstep.sampling_period.units
-            
-        #elif isinstance(resample_with_period, pq.Quantity):
-            #if resample_with_period.size > 1:
-                #raise TypeError("new sampling period must be a scalar Quantity; got %s instead" % resample_with_period)
-            
-            #if units_convertible(resample_with_period, vstep.sampling_period):
-                #if resample_with_period.units != vstep.sampling_period.units:
-                    #resample_with_period.rescale(vstep.sampling_period.units)
-                    
-            #else:
-                #raise TypeError("new sampling period has incompatible units (%s); expecting (%s)" % (resample_with_period.units, vstep.sampling_period.units))
-            
-        #elif resample_with_period is not None:
-            #raise TypeError("new sampling period expected to be a scalar float, Quantity, or None; got %s instead" % type(resample_with_period).__name__)
-        
-        #if isinstance(resample_with_rate, float):
-            #resample_with_rate *= vstep.sampling_rate.units
-            
-        #elif isinstance(resample_with_rate, pq.Quantity):
-            #if resample_with_rate.size > 1:
-                #raise TypeError("new sampling rate must be a scalar Quantity; got %s instead" % resample_with_rate)
-        
-            #if units_convertible(resample_with_rate, vstep.sampling_rate):
-                #if resample_with_rate.units != vstep.sampling_rate.units:
-                    #resample_with_rate.rescale(vstep.sampling_rate.units)
-                    
-            #else:
-                #raise TypeError("new sampling rate has incompatible units (%s); expecting (%s)" % (resample_with_rate.units, vstep.sampling_rate.units))
-            
-        #elif resample_with_rate is not None:
-            #raise TypeError("new sampling rate expected to be a scalar float, Quantity, or None; got %s instead" % type(resample_with_rate).__name__)
-        
-        #if resample_with_rate is not None and resample_with_period is None:
-            #resample_with_period = ephys.sampling_rate_or_period(resample_with_rate, resample_with_period)
-            
-        #elif resample_with_rate is not None and resample_with_period is not None:
-            #if not ephys.sampling_rate_or_period(resample_with_rate, resample_with_period):
-                #raise ValueError("resample_with_rate (%s) and resample_with_period (%s) are incompatible" % (resample_with_rate, resample_with_period))
-    
-    ## resample the Vm signal
-    #if resample_with_period is not None:
-        #smooth_window = kwargs.get("smooth_window", 0)
-        
-        #if resample_with_period > vstep.sampling_period:
-            #warnings.warn("A sampling period larger than the signal's sampling period (%s) was requested (%s); the signal will be DOWNSAMPLED" % (vstep.sampling_period, resample_with_period), RuntimeWarning)
-
-        #if resample_with_period < vstep.sampling_period:
-            #vstep = ephys.resample_pchip(vstep, resample_with_period)
-            
-            #upsampling = int(vstep.sampling_period/resample_with_period)
-            
-            ## adjust the smooth window for the new sampling_period
-            #if smooth_window > 0:
-                #smooth_window *= upsampling
-                
-                #if upsampling % 2 == 0:
-                    #smooth_window += 1
-                    
-                #kwargs["smooth_window"] = smooth_window
-
-            #if vstep.size == 0:
-                #raise RuntimeError("Check resampling; new period requested was %s and the resampled signal has vanished" % resample_with_period)
-    
-    ## returns the array of time "stamps" (neo.SpikeTrain) and a list of AP
-    ## waveforms (neo.AnalogSignal objects)
-    #ap_train, ap_waveform_signals = detect_AP_waveforms_in_train(vstep, **kwargs)
-    
-    #result = collections.OrderedDict() #dict()
-    
-    ##if isinstance(ap_train, neo.SpikeTrain) and len(ap_train):
-    #if is_AP_spiketrain(ap_train):
-        #if len(segment.spiketrains) > 0: 
-            ## check to see if there already is a spike train of APs; don't just append
-            #for k, st in enumerate(segment.spiketrains):
-                #if is_AP_spiketrain(st):
-                    #segment.spiketrains[k] = ap_train
-                    
-        #else:
-            #segment.spiketrains.append(ap_train)
-            
-        #result["AP_half_max_epoch"] = ephys.signal2epoch(ap_train.annotations["AP_durations_V_half_max"])
-        #result["AP_quart_max_epoch"] = ephys.signal2epoch(ap_train.annotations["AP_durations_V_quart_max"])
-        
-        #result["AP_Vm0_epoch"] = ephys.signal2epoch(ap_train.annotations["AP_durations_V_0"])
-        
-        #result["AP_onsetVm_epoch"] = ephys.signal2epoch(ap_train.annotations["AP_durations_V_onset"])
-        
-        #result["AP_half_max"] = ap_train.annotations["AP_half_max"]
-        #result["AP_quart_max"]= ap_train.annotations["AP_quart_max"]
-        #result["AP_peak_amplitudes"] = ap_train.annotations["AP_peak_amplitudes"]
-        #result["AP_peak_values"] = ap_train.annotations["AP_peak_values"]
-        
-        #if all([v in ap_train.annotations.keys() for v in ("AP_durations_at_Ref_Vm", "Ref_Vm")]):
-            #result["AP_durations_at_Ref_Vm"] = ap_train.annotations["AP_durations_at_Ref_Vm"]
-            #result["Ref_Vm"] = ap_train.annotations["Ref_Vm"]
-            
-        #else:
-            #result["AP_durations_at_Ref_Vm"] = None
-            #result["Ref_Vm"] = None
-            
-        
-        #result["AP_train"] = ap_train
-        
-        ##result["AP_waveforms"] = ap_waveform_signals
-        
-        #result["Injected_current"] = inj
-        #result["Ihold"] = Ihold
-        
-        ## NOTE: mean AP frequency:
-        #if len(ap_train) > 1:
-            ## Mean AP freq = number of APs / full duration of the AP train;
-            ## full AP train duration (NOT the duration of the depolarized Vm region)
-            ## is the time difference between the end of the last AP and start of the
-            ## first AP;
-            ## time of the end of last AP is time of start of last AP + last AP duration at Vm  ==  Vonset
-            #mean_ap_freq  = (len(ap_train) / (ap_train[-1] + ap_train.annotations["AP_durations_V_onset"][-1] - ap_train[0])).rescale(pq.Hz)
-            #ap_intvl = np.diff(ap_train.magnitude, axis=0) * vm.times.units
-            
-        #else: # just 1 AP:
-            ## here, there is NO AP train (just one AP) so we're forced to use the
-            ## full duration of the depolarized Vm trace
-            #mean_ap_freq = np.array([1. / vstep.duration.magnitude]) * pq.Hz
-            #ap_intvl = np.array([np.nan]) * vm.times.units
-            
-        #result["Inter_AP_intervals"] = ap_intvl
-        
-        #result["Mean_AP_Frequency"]  = mean_ap_freq
-        
-        #result["Number_of_APs"] = len(ap_train)
-        
-        #result["Action_potentials"] = list()
-        
-        ##if len(ap_train):
-        #for k in range(len(ap_train)):
-            ## this will contain all relevant parameters, extracted
-            ## for each AP -- saves typing later to access them but uses 
-            ## a lot of memory
-            ## this also stores the waveform array
-            #ap_dict = extract_AP_data_from_AP_train(ap_train, k)
-            
-            ## the waveforms numpy ndarray are cropped or padded to have the same
-            ## size on axis 0 (see NOTE: 2019-04-24 14:01:33 and NOTE: 2019-05-03 13:32:58
-            ## in detect_AP_waveforms_in_train code)
-            ## therefore we also store here a ref to the waveform as a neo.AnalogSignal
-            ## (neither cropped, nor padded)
-            #ap_dict["Waveform_signal"] = ap_waveform_signals[k]
-            
-            #result["Action_potentials"].append(ap_dict)
-                
-    #else:
-        #result["AP_onsetVm_epoch"] = None
-        #result["AP_half_max_epoch"] = None
-        #result["AP_quart_max_epoch"] = None
-        #result["AP_Vm0_epoch"] = None
-        #result["AP_half_max"] = None
-        #result["AP_quart_max"] = None
-        #result["AP_peak_amplitudes"] = None
-        #result["AP_peak_values"] = None
-        #result["AP_train"] = None
-        #result["AP_waveforms"] = []
-        #result["Injected_current"] = inj
-        #result["Inter_AP_intervals"] = np.array([np.nan]) * vm.times.units
-        #result["Mean_AP_Frequency"] = np.array([np.nan]) * pq.Hz
-        #result["Number_of_APs"] = 0
-        #result["Action_potentials"] = list()
-        ##result["First_AP"] = None
-        ##result["Reference_AP"] = None
-        
-    #return result, vstep
-
-def analyse_AP_step_injection(segment, 
-                              VmSignal:typing.Union[int, str] = "Vm_prim_1", 
-                              ImSignal:typing.Union[int, str, tuple] = "Im_sec_1", 
-                              Itimes_relative:bool = True,
-                              Itimes_samples:bool = False,
-                              **kwargs):
+def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "Vm_prim_1", ImSignal:typing.Union[int, str, tuple] = "Im_sec_1", Itimes_relative:bool = True,Itimes_samples:bool = False,**kwargs):
     """AP Train analysis in a sweep (segment) of I-clamp experiments
     
     Positional parameters:
@@ -7602,13 +5951,6 @@ def analyse_AP_step_injection(segment,
         raise TypeError(f"ImSignal expected a str (signal name) int signal index) or a triplet (amplitude, start & stop times); got {ImSignal} instad")
                 
     
-    # down, up, inj, centroids, label
-    # down = time point of the up-down transition
-    # up   = time point of the down-up transition
-    # inj  = injected current (difference between centroids )
-    # label = int array "mask" with 0 for down and 1 for up; same shape as im
-    #print("method", method)
-    
     vstep, Ihold, Iinj, istep = extract_AP_train(vm,im,
                                     tail=tail,
                                     method=method,
@@ -7620,8 +5962,6 @@ def analyse_AP_step_injection(segment,
                                     resample_with_rate=resample_with_rate,
                                     Itimes_relative = Itimes_relative,
                                     Itimes_samples = Itimes_samples)
-    
-    #print("Ihold", Ihold)
     
     # adjust the smooth window for the new sampling_period
     if smooth_window > 0:
@@ -7676,7 +6016,7 @@ def analyse_AP_step_injection(segment,
         # first AP;
         # time of the end of last AP is time of start of last AP + last AP duration at Vonset
         
-        #print("analyse_AP_step_injection for Iinj %g: ap_train[-1]: %g, AP_durations_V_onset[-1]: %g, ap_train[0]: %g" % (Iinj, ap_train[-1], ap_train.annotations["AP_durations_V_onset"][-1], ap_train[0]))
+        #print("analyse_AP_step_injection_sweep for Iinj %g: ap_train[-1]: %g, AP_durations_V_onset[-1]: %g, ap_train[0]: %g" % (Iinj, ap_train[-1], ap_train.annotations["AP_durations_V_onset"][-1], ap_train[0]))
         mean_ap_freq  = ( len(ap_train) / ( ap_train[-1] - ap_train[0] ) ).rescale(pq.Hz)
         # why do I sometimes get np.nan here ?
         # because you need to also provide a tail in case the last AP is right on the end of the Vm signal!
@@ -7731,7 +6071,7 @@ def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
     """
     averaged_block = ephys.average_blocks(*data_blocks, step_index = step_index, signal_index = [Vm_index, Iinj_index], name=name_prefix)
     
-    ephys.set_relative_time_start(averaged_block)
+    neoutils.set_relative_time_start(averaged_block)
     
     ephys.auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = True, label = "Ion", append=False)
     ephys.auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
@@ -7749,7 +6089,7 @@ def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
     AHP = (averaged_block.segments[0].analogsignals[Vm_index] - Base).time_slice(Ioff, averaged_block.segments[0].analogsignals[Vm_index].t_stop)
     
     AHP.name = "%s_AHP" % name_prefix
-    ephys.set_relative_time_start(AHP)
+    neoutils.set_relative_time_start(AHP)
 
     params = dict()
     params["name"] = name_prefix
@@ -7777,7 +6117,7 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
         bb = deepcopy(b)
         #bb = ephys.neo_copy(b)
         
-        ephys.set_relative_time_start(bb)
+        neoutils.set_relative_time_start(bb)
         
         ephys.auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = True, label="Ion", append=False)
         ephys.auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
@@ -7818,7 +6158,7 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
     
     AHP.name = "%s_AHP_%d_%s" % (name_prefix, Iinj.magnitude, Iinj.units.dimensionality)
     
-    ephys.set_relative_time_start(AHP)
+    neoutils.set_relative_time_start(AHP)
 
     params = dict()
     params["name"] = name_prefix
@@ -7871,261 +6211,711 @@ def is_AP_spiketrain(x):
         ret &= (isinstance(x.name, str) and x.name.endswith("AP_train")) or (all([k.startswith("AP_") for k in x.annotations]))
     
     return ret
-    
-def extract_AP_data_from_AP_train(ap_train, ap_index=0):
-    """
-    DEPRECATED
-    """
-    warnings.warn("Deprecated", DeprecationWarning)
-    
-    if isinstance(ap_train, neo.Segment):
-        sptr = [t for t in ap_train.spiketrains if is_AP_spiketrain(t)]
-        
-        if len(sptr):
-            if len(sptr) > 1:
-                warnings.warn("The data segment appears to have %d putative AP spike trains out of %d spike trains; the last one (%dth) will be used" % (len(sptr), len(ap_train.spiketrains), len(sptr)-1))
-                              
-            ap_train = sptr[-1]
-    
-        else:
-            warnings.warn("The data Segment has no suitable spike trains")
-            return  None
-        
-    elif isinstance(ap_train, neo.SpikeTrain):
-        if not is_AP_spiketrain(ap_train):
-            raise ValueError("data does not seem to be an AP spike train")
-        
-    else:
-        raise TypeError("ap_train expected to be a neo.Segment or neo.SpikeTrain; got %s instead" % type(ap_train).__name__)
-    
-    if not isinstance(ap_index, int):
-        raise TypeError("ap_index expected to be an int; got %s instead" % type(ap_index).__name__)
-    
-    if ap_index < 0:
-        raise ValueError("ap_index expected to be >= 0; got %d instead" % ap_index)
-    
-    if ap_index >= len(ap_train):
-        warnings.warn("ap_index %d past the end of the AP train with %d APs" % (ap_index, len(sptr)))
-        return None
-    
-    result = collections.OrderedDict()
-    
-    result["Index"] = ap_index
-    
-    result["Duration_at_half_max"] = ap_train.annotations["AP_durations_V_half_max"][ap_index]
 
-    result["Duration_at_quarter_max"] = ap_train.annotations["AP_durations_V_quart_max"][ap_index]
-    
-    result["Duration_at_onset"] = ap_train.annotations["AP_durations_V_onset"][ap_index]
-    
-    result["Duration_at_0mV"] = ap_train.annotations["AP_durations_V_0"][ap_index]
-    
-    if all([v in ap_train.annotations.keys() for v in ("AP_durations_at_Ref_Vm", "Ref_Vm")]):
-        if ap_train.annotations["AP_durations_at_Ref_Vm"] is not None:
-            result["Duration_at_ref_Vm"] = ap_train.annotations["AP_durations_at_Ref_Vm"][ap_index]
-            
-        else:
-            result["Duration_at_ref_Vm"] = np.nan
-            
-        if ap_train.annotations["Ref_Vm"] is not None:
-            result["Vm_ref"] = ap_train.annotations["Ref_Vm"]
-            
-        else:
-            result["Vm_ref"] = np.nan
-    
-    result["Latency"]  =  np.array([ap_train[ap_index]-ap_train.t_start]) * ap_train.times.units
-    
-    result["Max_dV_dt"] = ap_train.annotations["AP_Maximum_dV_dt"][ap_index]
-    
-    result["Vm_amplitude"] = ap_train.annotations["AP_peak_amplitudes"][ap_index]
-    
-    result["Vm_half_max"] = ap_train.annotations["AP_half_max"][ap_index]
-    
-    result["Vm_quart_max"] = ap_train.annotations["AP_quart_max"][ap_index]
+def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.s, sampling_rate=1e4*pq.Hz):
+    """Helper function to generate a synthetic post-synaptic current waveform.
 
-    result["Vm_onset"] = ap_train.annotations["AP_onset_Vm"][ap_index]
+    The waveform realizes the Clements & Bekkers 1997 model as a neo.AnalogSignal.
     
-    result["Vm_peak"] = ap_train.annotations["AP_peak_values"][ap_index]
+    The model has a fast mono-exponential rise and a somewhat slower mono-exponential
+    decay ("Alpha-function") that mimics a post-synaptic current (e.g. a miniature
+    or spontaneous E/I PSC, henceforth dubbed a "mini-PSC")
     
-    result["Waveform"] = ap_train.waveforms[ap_index,:]
-        
-    return result
-        
-        
-def get_ap_analysis_param(rdict, param_name, step_index, waveform_index = 0):
-    """Retrieves the numeric value of an AP analysis result.
-    DEPRECATED
+    Parameters:
+    ===========
+    model_parameters: a sequence of floating point numbers with the parameters
+        for the Clements & Bekkers 97 mEPSC model (see core.models.Clements_Bekkers_97(...))
     
-    Positional parameters:
-    ---------------------
-    rdict: dict (or subclass)
+    Named parameters:
+    =================
+    units: a quantities.UnitQuantity, or quantities.Quantity; default is quantities.pA
     
-        This is expected to be one of:
-        
-        a) result returned by analyse_AP_step_injection_series() function
-        
-        b) result returned by analyse_AP_step_injection() function
-        
-        c) result returned by extract_AP_data_from_AP_train() function
-        
-    param_name: str
-        A name of the variable in the AP analysis results (case-sensitive!) or
-        the strings "time_units" or "data_units".
-        
-    step_index: int >= 0
-        Index of the current injection step for which the AP analysis has been performed.
-        
-        Ignored in cases (b) and (c), above
-        
-    waveform_index: int >= 0
-        Index or the AP waveform for which the value of parameter is sought.
-        
-        Ignored in case (c) above
-        
-    NOTE: nochecks are performed on the dictionary data structure, but a traceback
-    is printed on stderr when an exception is made, while the value returned is
-    np.nan.
+    t_start, duration: scalar quantities, typically in quantities.s (for 
+        AnalogSignals) although one can imagine a similar waveform in other 
+        domains (e.g., space) hence usable with DataSignal objects as well.
+    
+        Defaults are 0*pq.s and 0.05*pq.s (50 ms) for t_start and duration, respectively.
+    
+    NOTE: make sure both t_start and duration have the same (or-interconvertible)
+    units
+    
+    
+    sampling_rate: scalar quantity in units reciprocal of duration.units; for
+        example, in the case where domain.units == quantities.s this is expected
+        to be in quantities.Hz
+    
+        Default is 1e4 Hz.
     
     Returns:
-    --------
+    ========
     
-    a scalar, or a Quantity, or a numpy array.
-    
-    When no AP train anaysis is found, or is does not contain a finite value
-    for the variable, it returns np.nan (or None when parameter_name is "waveform").
-    
-    Similarly, when step_index points past the list of segment results in 
-    rdict, a warning is issued and the function returns np.nan or None as above.
+    A neo.AnalogSignal containing the synthetic waveform of a "mini-PSC".
     
     """
-    warnings.warn("Do not use", DeprecationWarning)
     
-    if not isinstance(rdict, dict):
-        raise TypeError("Expecting a dict; got %s instead" % type(rdict).__name__)
+    from core import models, quantities # not to be confused with pq!!!
     
-    # ensure that if Waveform is requested and is not found, then return None
-    # instead of np.nan
-    if param_name == "Waveform":
-        ret = None
-        
+    x = np.linspace(t_start, t_start + duration, num=int(sampling_rate * duration))
+    
+    if all(isinstance(p, pq.Quantity) for p in model_parameters):
+        model_parameters = tuple(p.magnitude for p in model_parameters)
+    
+    y = models.Clements_Bekkers_97(x.magnitude, model_parameters)
+    
+    dstring = f"Clements_Bekkers_97 α={model_parameters[0]}, β={model_parameters[1]}, x₀={model_parameters[2]}, τ₁={model_parameters[3]}, τ₂={model_parameters[4]}"
+    
+    if quantities.check_time_units(x):
+        klass = neo.AnalogSignal
     else:
-        ret = np.array([np.nan])
+        klass = DataSignal
         
-    #print("step_index", step_index)
+    ret = klass(y, units = units, t_start=t_start, 
+                            sampling_rate=sampling_rate,
+                            name="Clements & Bekkers '97 model",
+                            description=dstring)
     
-    try:
-        if "Depolarising_steps" in rdict and isinstance(rdict["Depolarising_steps"], list):
-            if step_index < 0:
-                raise ValueError("step_index expected to be >= 0; got %d instead" % step_index)
+    ret.annotations["parameters"] = model_parameters
+    ret.array_annotations["channel_name"] = ["CB97"]
+    ret.array_annotations["channel_ids"] = ["0"]
+    
+    
+    return ret
+    
+def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02)):
+    """Detect miniature or spontaneous PSCs by cross-correlation with a waveform.
+    
+    Parameters:
+    ==========
+    
+    x: neo.AnalogSignal containing the recorded membrane current that 
+        will be scanned for mEPSCs. Typically this is single-channel, meaning it
+        is a 2D array with a singleton 2nd axis (e.g., x.shape = (n,1) where `n`
+        is the number of samples in `x`)
+    
+    waveform: neo.AnalogSignal or 1D numpy array (vector, i.e., 
+        waveform.shape = (m,) where `m` is the number of samples in `waveform`).
+    
+        Contains a model mEPSC (ie. a "synthetic" waveform) or a "template" 
+        mEPSC waveform extracted from a signal.
+    
+        ATTENTION: Make sure this model waveform has the SAME SAMPLING RATE as 
+        the signal!!!
+    
+        ALTERNATIVELY, the waveform can be specified by a sequence of six scalars, 
+        where the first five are the Clements & Bekkers 1997 model parameters:
+        α, β, x₀, τ₁ and τ₂ (see models.Clements_Bekkers_97 for details)
+        and the 6ᵗʰ element is the duration of the model waveform (which will
+        be generated ad-hoc); this last element is assumed to be in the units of
+        the domain of x.
+    
+        By default, waveform is (0., -1., 0.01, 0.001, 0.01, 0.05) which means,
+        for a membrane current signal `x` in pA:
+    
+        α  =  0.0 pA (ie. no offset)
+        β  = -1.0 (i.e. downward deflection)
+        x₀ =  0.01 (i.e. 10 ms from the start of the waveform)
+        τ₁ =  0.001 (i.e., rising time constant of 1 ms)
+        τ₂ =  0.01  (i.e., decay time constant of 10 ms)
+        
+        and 50 ms duration of the model waveform
+    
+        NOTE: When specified in this way the waveform will be generated ad-hoc
+        using the sampling rate of the signal `x`.
+    
+    For example, if creating the waveform as a plain numpy array:
+    
+    t_start     = 0     # [s]
+    duration    = 0.2   # [s]
+    sr          = 1e4   # [Hz]
+    
+    t = np.linspace(0, duration, num = sr * duration)
+    model = models.Clements_Bekkers_97(x, parameters)
+    
+    As a convenience, you can use PSCwaveform(...) function in this module to
+    generate a synthetic  waveform as a neo.AnalogSignal.
+    
+    Returns:
+    ========
+    A dict with keys:
+    "mini_starts": a quantity array with the start times of the detected waveforms
+    
+    "mini_peaks": a quantity array with the times of the "mini's" peak (or trough)
+    
+    "minis": a list of AnalogSignal objects with the detected "mini" waveforms.
+    
+    "waveform": the actual waveform used as model or "template". 
+    
+        This is either:
+    
+        • the realization of the synthetic mPSC (when the `waveform` parameter 
+            is the sequence of model parameters)
+    
+        • the `waveform` parameters itself, when it is a template (synthetic or
+            otherwise)
+        
+    ATTENTION: When detection has failed, returns None
+    
+    """
+    if isinstance(waveform, np.ndarray) and not dt.is_vector(waveform):
+        raise TypeError("waveform expected to be a vector")
+    
+    elif isinstance(waveform, (tuple, list)):
+        if len(waveform) == 6:
+            waveduration = waveform[5] * x.times.units
             
-            elif step_index >= len(rdict["Depolarising_steps"]):
-                warnings.warn("step_index (%d) too large for %d injection steps" % (step_index, len(rdict["Depolarising_steps"])))
-                return ret
+            waveform = PSCwaveform(waveform[0:-1], units = x.units,
+                                     t_start = 0*x.times.units,
+                                     duration = waveduration,
+                                     sampling_rate = x.sampling_rate)
+    else:
+        raise ValueError("Incorrect waveform specification")
+    
+    # 1) normalize the model waveform
+    mdl = sigp.normalise_waveform(waveform)
+    
+    mdl = np.atleast_2d(mdl)
+    
+    if mdl.shape[1] > 1:
+        mdl = mdl.T
+        
+    # 2) cross-correlate the signal with the normalized model waveform
+    
+    xc = scipy.signal.correlate(x, mdl, mode="valid")
+    
+    # 3) de-trend the cross-correlation signal (so that noise is almost about 0)
+    dxc = scipy.signal.detrend(xc, type="constant", axis=0)
+    
+    # 4) find out where cross-correlation is largers than its noise (root-mean-square)
+    flags = dxc > sigp.rms(dxc)
+    
+    # 5) find out starts and stops of those regions
+    # NOTE: 2022-10-25 16:44:58
+    # Putative peak regions start where flag_bounds are > 0 and end where 
+    # flag_bounds < 0 (we'd expect each +1 bound ie. a BEGIN to be FOLLOWED by 
+    # a -1 bound ie. and END).
+    #
+    flag_bounds = np.ediff1d(flags.astype(np.dtype(float)))
+    
+    # NOTE: 2022-10-25 16:46:10
+    # The only exception to NOTE: 2022-10-25 16:44:58 is when the cross-correlation
+    # signal ends with an upwards deflection (unlikely, but we can still check)
+    peak_begins = np.where(flag_bounds > 0)[0] # sample indices
+    peak_ends   = np.where(flag_bounds < 0)[0] # sample indices
+    
+    if len(peak_begins) == 0 or len(peak_ends) == 0:
+        return # nothing detected ?!?
+    
+    if len(peak_begins) > len(peak_ends):
+        if peak_begins[-1] > peak_ends[-1]:
+            peak_begins = peak_begins[0:-1]
+        elif peak_begins[-1] < peak_ends[-1]:
+            peak_begins = peak_begins[1:]
+            
+    elif len(peak_begins) < len(peak_ends):
+        if peak_begins[0] > peak_ends[0]:
+            peak_ends = peak_ends[1:]
+            
+        elif peak_begins[-1] > peak_ends[-1]:
+            peak_ends = peak_ends[0:-1]
+            
+        
+    # 6) find the location of the local maxima in the cross-correlation signal 
+    # location is given in sample indices
+    # ATTENTION: these maxima correspond to samples where the model or template 
+    # fits best with the signal data; theo DO NOT correspond to the "peak" (or
+    # trough) of the actual mini EPSC!!!
+    xcmaxima = [np.argmax(xc[v[0]:v[1]]) + v[0] for v in zip(peak_begins, peak_ends) if len(xc[v[0]:v[1]]) > 0]
+    
+    # 7) locate the actual peaks (for positive waveform) or troughs (negative waveforms)
+    if sigp.is_positive_waveform(waveform):
+        peakfunc = np.argmax
+    else:
+        peakfunc = np.argmin
+    
+    peaks = [peakfunc(x.magnitude[v[0]:v[1]]) + v[0] for v in zip(peak_begins, peak_ends) if len(x.magnitude[v[0]:v[1]]) > 0]
 
-            segdict = rdict["Depolarising_steps"][step_index]
-            
-        else:
-            segdict = rdict
-            
-        if param_name == "Vm_signal" and "Vm_signal" in segdict:
-            return segdict["Vm_signal"]
-        
-        if param_name == "AP_train":
-            if "AP_analysis" in segdict:
-                return segdict["AP_analysis"]["AP_train"]
-            
-            else:
-                return None
-            
-        if "AP_analysis" in segdict:
-            ap_train = segdict["AP_analysis"]["AP_train"]
-            
-            if ap_train is None:
-                warnings.warn("No AP train analysis found for depolarizing step %d" % step_index)
-                #return np.array([np.nan])
-                return None
-            
-            if len(segdict["AP_analysis"]["Action_potentials"]):
-                ap_dict = segdict["AP_analysis"]["Action_potentials"][waveform_index]
-                
-            else:
-                ap_dict = None
-            
-            if param_name in ("Duration_at_half_max",
-                              "Duration_at_quarter_max",
-                              "Duration_at_ref_Vm",
-                                "Duration_at_onset",
-                                "Duration_at_0mV",
-                                "Latency",
-                                "Max_dV_dt",
-                                "Vm_amplitude",
-                                "Vm_half_max", 
-                                "Vm_quart_max",
-                                "Vm_ref",
-                                "Vm_onset", 
-                                "Vm_peak",
-                                "Waveform"):
-                if ap_dict is None:
-                    warnings.warn("AP analysis data for %dth AP was not found" % waveform_index)
-                    return np.array([np.nan])
-                else:
-                    ret = ap_dict[param_name]
-                    
-                    if ret is None:
-                        ret = np.nan
-                
-                    if isinstance(ret, float):
-                        ret = np.array([ret])
-                
-                
-            elif param_name in ("Injected_current",
-                                "Inter_AP_intervals",
-                                "Mean_AP_Frequency",
-                                "Number_of_APs"):
-                ret = segdict["AP_analysis"][param_name]
-                
-                if isinstance(ret, float):
-                    ret = np.array([ret])
-                
-            else:
-                raise ValueError("parameter %s not found" % param_name)
-            
-        else:
-            # maybe this is output from extract_AP_data_from_AP_train
-            if param_name in ("Duration_at_half_max",
-                              "Duration_at_quarter_max",
-                              "Duration_at_ref_Vm",
-                              "Duration_at_onset",
-                              "Duration_at_0mV",
-                              "Latency",
-                              "Max_dV_dt",
-                              "Vm_amplitude",
-                              "Vm_half_max", 
-                              "Vm_quart_max",
-                              "Vm_ref",
-                              "Vm_onset", 
-                              "Vm_peak",
-                              "Waveform"):
-                ret = segdict[param_name]
-                
-                if ret is None:
-                    ret = np.nan
-                
-                if isinstance(ret, float):
-                    ret = np.array([ret])
-                
-            elif param_name == "time_units":
-                ret = segdict["Duration_at_half_max"].units
-                
-            elif param_name == "data_units":
-                ret = segdict["Vm_amplitude"].units
-                
-            else:
-                raise ValueError("parameter %s not found in data" % param_name)
-        
-        return ret
+    # 8) get the start & end of the signal's regions where putative minis were found
     
-    except Exception as e:
-        traceback.print_exc()
-        return ret
+    if isinstance(waveform, neo.core.basesignal.BaseSignal):
+        mini_duration = waveform.duration
+    else:
+        # NOTE: 2022-10-25 18:16:26
+        # you need to make sure the waveform (if a plain numpy array) has the
+        # same "sampling rate" as the signal
+        mini_duration = len(waveform) / x.sampling_rate
+    
+    mini_starts = x.times[xcmaxima]
+    
+    mini_ends = mini_starts + mini_duration
+    
+    mini_peaks = x.times[peaks]
+    
+    # minis = neoutils.set_relative_time_start([x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop])
+    minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
+    
+    
+    for m in minis:
+        m.annotations["Accept"] = True
+    
+    # NOTE: 2022-10-26 22:22:37
+    # reconstruct this in the caller so that we can use several epochs on the
+    # same signal/segment
+    # FIXME/TODO: 2022-10-25 18:25:48
+    # a neo.SpikeTrain is defined in the time domain only !!!
+    # MUST create a SpikeTrain-like signal object type for anything else
+    
+#     dstring = f"mEPSC detected in {x.name}"
+#     
+#     if isinstance(waveform, neo.core.basesignal.BaseSignal) and len(waveform.description.strip()):
+#         dstring += f" using {waveform.description}"
         
+#     waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
+#     
+#     ret = neo.SpikeTrain(mini_starts, t_stop = x.t_stop, units = x.times.units,
+#                          t_start = x.t_start, sampling_rate = x.sampling_rate,
+#                          name=f"{x.name}_mEPSCs", description=dstring)
+#     
+#     ret.waveforms = waves
+#     ret.annotations["peak_times"] = mini_peaks
+#     ret.annotations["mEPSC_parameters"] = waveform.annotations["parameters"]
+    
+    # return ret, mini_peaks, minis
+    return {"mini_starts":mini_starts, "mini_peaks":mini_peaks, "minis":minis,
+            "waveform":waveform}
+
+def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), Im:typing.Union[int, str] = "IN0", epoch=None, clear_spiketrains:bool=True, fit_waves:bool=False):
+    """Batch m(E/I)PSC analysis.
+    Detects and analyses mPSCs in a neo.Block, neo.Segment, or a sequence of 
+    neo.Segment objects.
+    
+    NOTE: a neo.Block already contains a collection of segments, see 
+    neo API reference:
+    https://neo.readthedocs.io/en/stable/api_reference.html
+    
+    The segments (sweeps) are expected to contain a signal with the 
+    recorded membrane current for mini EPSCs.
+    
+    The signal is identified by the "Im" parameter to this function (see below).
+    
+    Furthermore, each segment MUST have an epoch, named "mEPSC", which sets the
+    region in the signal, where minis are going to be detected and analysed.
+    
+    Segmenst without such an epoch will be skipped.
+    
+    The results are returned as a list of pairs (SpikeTrain, list of AnalogSignal)
+    with one pair per segment in the Block.
+    
+    In each pair, the SpikeTrain contains the time stamps of the detected minis,
+    and the list of AnalogSignal object contains the detected mEPSC waveforms.
+    
+    Individual rejection of mEPSC rejection must be done manually for now.
+    
+    Parameters:
+    ==========
+    x: neo.Block or a sequence (tuple, list) of neo.Segments, where each segment
+        contains:
+
+        • an analog signal identified by the `Im` parameter below, which 
+        represents the recorded membrane current with putative miniature or 
+        spontaneous post-synaptic currents (mEPSCs or mIPSCs) 
+    
+        • an Epoch named "mPSC" or any name specified in the `epoh_name` parameter
+    
+    waveform: numpy array (1D), or a sequence of six float scalars
+        
+        • when a numpy array, this is a "template" waveform: usually, a synthetic
+            mPSC generated by the `models.Clements_Bekkers_97` function, or a
+            'real-life' mPSC waveform (usually averaged from several records, for
+            a better signal/noise ratio). You probably want to use the former, 
+            created with some default parameters.
+    
+        • when a sequence of floats, it contains the five parameters for the
+            Clements & Bekkers 1997 waveform model, AND the duration of the
+            synthetic waveform whcih will be generated ad hoc (see also the 
+            `detect_mPSC` function in this module).
+    
+    Im: str or int. The identifier of the membrane current signal contained in
+        the segments of `x`.
+    
+        When a str, its Im is the name of the signal (e.g., "IN0", "Im_prim_0", 
+        etc., as set in the configuration of the acquisition software and/or 
+        protocol).
+    
+        When an int, Im is the index of the signal in the segment's `analogsignals`
+        attribute.
+    
+        ATTENTION: 
+        • when Im is a str, the signal where mPSC detection is performed
+        can be at any index in the segment's analogsignals collection (a very
+        unusual situation), but MUST be present in ALL segments of `x`.
+    
+        • when Im is an int, it must be a valid index for the segment's
+        analogsignals collection.
+    
+    epoch:str, int, sequence of str or int, or None; default is None
+        Optional specification of an epoch (or epochs) where mPSC detection will
+        occur.
+    
+        NOTE: This will retrict mPSC detection to a selected region (or regions)
+        of the signal without interference from other tests (e.g. seal test, etc)
+        
+        • when a str, this is the name of the epoch where mPSC detection will be 
+        performed.
+    
+        • when an int, this is the index of the epoch, in the segment's epochs
+    
+        • when a sequence of str or int: the names, or indices, of the epochs for
+        mPSC detection
+    
+        NOTE: if the speification points to a non-existent epoch, this will be 
+        ignored and no detection will take place
+    
+        • when None (the default), the detection will be performed on the ENTIRE
+        signal (almost surely not what you want in most cases)
+    
+    clear_spiketrains:bool, optional, default is True
+        When True, all SpikeTrain objects in the segments of `x` are removed.
+        Typically, this is to allow a "clean" rerun of the mPSC detection. 
+
+        As  explained below (see "Side effects") the time stamps of any detected
+        mPSCs in each segment are stored in a SpikeTrain embedded in the segment,
+        in `x`.
+    
+        The `clear_spiketrains = True` flag allows re-running the detection 
+        without accumulating SpikeTrain from previous runs.
+    
+    fit_waves:bool, optional, default is False
+        When True, the Clements & Bekkers 1997 model will be fitted to the 
+        each of the detected mPSC waveforms, using the waveform's parameters as
+        initial values for the model. 
+        
+        CAUTION: Fitting each mPSC waveform will significantly increase the
+        execution time of this function.
+    
+    Returns:
+    =======
+    A tuple with :
+        • A list where each element is a list of detected mPSC waveforms (as 
+            AnalogSignals) or None, for each segment in `x`. 
+            If `fit_wave` is True, then each mPSC waveform will have an additional
+            channel containing the fitted curve, and the fit result will be
+            embedded in its annotations.
+    
+        • The template waveform as an AnalogSignal
+    
+    Side effects:
+    =============
+    The time stamps for the detected mPSCs (i.e., the times of the mPSC waveforms
+    starts) are embedded as a SpikeTrain in the segments where mPSC detection was
+    successful.
+    
+    The waveforms of the detected mPSCs are attached to the embedded SpikeTrain 
+    object.
+    
+    
+    """
+    
+    if clear_spiketrains:
+        neoutils.clear_spiketrains(x)
+    
+    result = list()
+    
+    if isinstance(x, neo.Block):
+        segments = x.segments
+        data_name = x.name
+    elif isinstance(x, neo.Segment):
+        segments = [x]
+        data_name = x.name
+    elif isinstance(x, (tuple, list)) and all(isinstance(s, neo.Segment) for s in x):
+        segments = x
+        data_name = "Segments"
+    else:
+        raise TypeError(f"Expecting a neo.Block, a neo.Segment, or a sequence of neo.Segments; got {type(x).__name__} instead")
+    
+    if len(segments) == 0:
+        warnings.warn("No data to analyse")
+        return None, None
+    
+    for k, s in enumerate(segments):
+        dstring = f"mEPSC detected in {data_name} segment {s.name}"
+        
+        try:
+            if isinstance(Im, str):
+                im = s.analogsignals[ephys.get_index_of_named_signal(s, Im)].copy()
+                
+            elif isinstance(Im, int):
+                im = s.analogsignals[Im].copy()
+                
+            else:
+                result.append(None)
+                continue
+        except:
+            warnings.warn(f"No membrane current signal with index or name {Im} is found in segment {k}")
+            result.append(None)
+            continue
+        
+        # print(s.epochs)
+        start_times = list()
+        peak_times  = list()
+        mini_waves  = list()
+        
+        # NOTE: 2022-10-26 23:35:36
+        # We use the same template across all segments; to avoid repeated function
+        # calls, we cache the template waveform here, once it has been generated
+        # as needed
+        template = None 
+        
+        if epoch is None:
+            if template is None:
+                detection = detect_mPSC(im, waveform)
+            else:
+                detection = detect_mPSC(im, template)
+            
+            if detection is None:
+                result.append(None)
+                continue
+            
+            start_times = detection["mini_starts"]
+            peak_times  = detection["mini_peaks"]
+            mini_waves  = detection["minis"]
+            
+            if template is None:
+                template = detection["waveform"]
+                
+        else:
+            if len(s.epochs) == 0:
+                warnings.warn(f"The {k}-th segment of {data_name} Block has no epochs!")
+                result.append(None)
+                continue
+            
+            if isinstance(epoch, str):
+                mPSCdetectepochs = [e for e in s.epochs if e.name == epoch]
+                if len(mPSCdetectepochs) == 0:
+                    warnings.warn(f"The {k}-th segment of {data_name} Block does not have epoch(s) named {epoch}")
+                    result.append(None)
+                    continue
+                
+            elif isinstance(epoch, int):
+                if epoch in range(-1*len(s.epochs), len(s.epochs)):
+                    mPSCdetectepochs = [s.epochs[epoch]]
+                    
+                else:
+                    warnings.warn(f"Epoch index {epoch} is not valid for the {k}-th segment of {data_name} Block with {len(s.epochs)} epochs")
+                    result.append(None)
+                    continue
+                
+            elif isinstance(epoch, (tuple, list)) and all(isinstance(e, (str, int)) for e in epoch):
+                mPSCdetectepochs = list()
+                
+                for e in epoch:
+                    if isinstance(e, str):
+                        me_ = [e_ for e_ in s.epochs if e_.name == e]
+                        if len(me_) == 0:
+                            warnings.warn(f"The {k}-th segment of {data_name} Block has no epoch named {e}")
+                        mPSCdetectepochs.extend(me_)
+                        
+                    elif isinstance(e, int):
+                        if e in range(-1*len(s.epochs), len(s.epochs)):
+                            mPSCdetectepochs.append(s.epochs[e])
+                        else:
+                            warnings.warn(f"Epoch index {e} is not valid for the {k}-th segment of {data_name} Block with {len(s.epochs)} epochs")
+                            
+            
+            if len(mPSCdetectepochs) == 0:
+                warnings.warn(f"No epochs with specified name or index wwere found in the {k}-th segment of {data_name} Block")
+                result.append(None)
+                continue
+            
+            # mPSCdetectepochs = mPSCdetectepochs[0]
+            mini_waves = list()
+            mini_starts = list()
+            mini_peaks = list()
+            
+            
+            for detect_epoch in mPSCdetectepochs:
+                sig = im.time_slice(detect_epoch.times[0], detect_epoch.times[0] + detect_epoch.durations[0])
+                if template is None:
+                    detection = detect_mPSC(sig, waveform) # only generate template ONCE
+                else:
+                    detection = detect_mPSC(sig, template) 
+                    # starts, peaks, epoch_minis, template = detect_mPSC(sig, template) 
+                if detection is None:
+                    continue
+                
+                template = detection["waveform"]
+                
+                mini_waves.extend(detection["minis"])
+                mini_starts.append(detection["mini_starts"])
+                mini_peaks.append(detection["mini_peaks"])
+                
+            if len(mini_starts) and len(mini_peaks):
+                start_times = np.hstack(mini_starts) * mini_starts[0].units
+                peak_times = np.hstack(mini_peaks) * mini_peaks[0].units
+            
+        if len(start_times) > 0:
+            if isinstance(template, neo.core.basesignal.BaseSignal) and len(template.description.strip()):
+                dstring += f" using {template.description}"
+                
+            train = neo.SpikeTrain(start_times, t_stop = im.t_stop, units = im.times.units,
+                                    t_start = im.t_start, sampling_rate = im.sampling_rate,
+                                    name = f"{data_name}_{s.name}_PSCs", description=dstring)
+            
+            # # waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
+            # train.waveforms = waves
+            train.annotations["peak_times"] = peak_times
+            train.annotations["source"] = "mPSC_detection"
+            
+            if isinstance(template, neo.core.basesignal.BaseSignal):
+                train.annotations["mPSC_parameters"] = template.annotations["parameters"]
+            # elif isinstance(waveform, neo.core.basesignal.BaseSignal):
+            #     train.annotations["mPSC_parameters"] = waveform.annotations["parameters"]
+            # elif isinstance(waveform, (tuple, list)) and len(waveform)==6:
+            #     train.annotations["mPSC_parameters"] = waveform[:-1]
+                # CAUTION here 2022-10-26 23:09:15 possible BUG
+                
+            # NOTE: 2022-10-27 23:14:18
+            # fit mPSC waves if asked
+            if fit_waves:
+                for k,w in enumerate(mini_waves):
+                    fw = fit_mPSC(w, template.annotations["parameters"])
+                    
+                    mini_waves[k] = fw
+                
+            # this below is (time, channel, spike)
+            train_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
+            
+            # a SpikeTrain expects (spike, channel, time) hence train_waves.T
+            train.waveforms = train_waves.T # 
+            
+            s.spiketrains.append(train)
+            
+            result.append(mini_waves)
+        else:
+            result.append(None)
+        
+    return result, template
+        
+    
+def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Optional[typing.Sequence]=None):
+    """Convenience wrapper to curvefitting.fit_mPSC_model with suitable lower & upper bounds
+    
+    Parameters:
+    ===========
+    x: neo.AnalogSignal or DataSignal) with a miniEPSC (i.e. fragment of a signal)
+    
+    params: sequence of float scalars; these are the initial parameter values for
+            the Clements & Bekkers '97 model:
+            
+            α, β, x₀, τ₁ and τ₂, where:
+    
+            α  = offset (usually, 0.) in signal units, usually [pA];
+        
+            β  = scale (-1. for downward waveform; 1. for upward waveform);
+                 dimensionless
+        
+            x₀ = delay ("onset") [ms];
+        
+            τ₁, τ₂ = the "rise" and "decay" time constants, respectively, in [ms]
+    
+    lo, up: None, or a sequence of floats of the same length as params, with the
+            the lower and upper bounds, respectively, for the model parameters.
+    
+            When None they will assume the following default values:
+    
+            • for downward waveform (params[1] < 0):
+                        α,         β,        x₀,     τ₁        τ₂:
+                lo  = ( 0.,       -np.inf,   0.,     1.0e-4,   1.0e-4)
+                hi  = ( np.inf,    0.,       np.inf, 0.01,     0.01)
+    
+            • for upward waveform (params[1] >=0 ):
+                        α,         β,        x₀,     τ₁        τ₂:
+                lo  = ( 0.,        0,        0.,     1.0e-4,   1.0e-4)
+                hi  = ( np.inf,    np.inf,   np.inf, 0.01,     0.01)
+    
+    ATTENTION: the structure of the params lo and up sequences is NOT checked.  
+        If you feed garbage the function will either throw an exception, or will
+        fail to give you what you want.
+    """
+    
+    if not isinstance(x, (neo.AnalogSignal, DataSignal)):
+        raise TypeError(f"Data in 'x' expected to be a neo.AnalogSignal or DataSignal; got {type(x).__name__} instead")
+    
+    
+    # NOTE: 2022-10-27 22:44:40
+    # For fitting, waveform domain must start at 0, therefore we shift is needed,
+    # but cache the original t_start to restore afterwards
+    t_start = x.t_start
+    if x.t_start.magnitude != 0:
+        x = neoutils.set_relative_time_start(x)
+    
+    l, c, e = sigp.state_levels(x[:,0])
+    
+    # NOTE: 2022-10-27 22:53:50
+    # FYI these are:
+    # α, β, x₀, τ₁ and τ₂
+    # same structure for lower & upper bounds (respectively, lo & up)
+    params = list(params)
+    params[0] = l[1] # adapt the offset to the DC components in the waveform
+    
+    if lo is None:
+        if params[1] < 0:   # downward mPSC
+            lo = (0., -np.inf, 0., 1e-4, 1e-4)
+        else:               # upward mPSC
+            lo = (0., 0, 0., 1e-4, 1e-4)
+            
+    if up is None:
+        if params[1] < 0:   # downward mPSC
+            up = (np.inf, 0., np.inf, 0.01, 0.01) # fix upper bounds for the time constants to 0.1.
+        else:
+            up = (np.inf, np.inf, np.inf, 0.01, 0.01) # fix upper bounds for the time constants to 0.1.
+            
+    
+    # NOTE: 2022-10-27 22:45:23
+    # Normally, the waveform has just one channel: the mPSC "cropped" out from 
+    # the signal it was detected in
+    #
+    # However, if the waveform was fitted before, the fitted curve is in the 2nd
+    # channel. To avoid appending further curves upon re-fitting, we use the 1st
+    # channel as data to fit, and overwrite the 2nd channel with the fitted curve
+    # if a 2nd channel exists, else we just append the newly fit curve as 2nd 
+    # channel
+    
+    xx = x[:,0] # this always works even if there is only one channel, 
+                # and returns an AnalogSignal
+                
+    fitresult = crvf.fit_mPSC_model(xx, params, bounds = [lo, up])
+    
+    fitted_x = type(x)(fitresult[0], units = x.units, t_start = x.t_start, sampling_rate = x.sampling_rate, name="mPSCfit")
+    
+    if x.shape[1] > 1:
+        x[:,1] = fitted_x # modifies x in-place
+    else:
+        for annkey in x.array_annotations:
+            if annkey == "channel_names":
+                fitted_x.array_annotations[annkey] = ["mPSCfit"]
+            elif annkey == "channel_ids":
+                fitted_x.array_annotations[annkey] = x.array_annotations[annkey][0] + "_fit"
+            else:
+                fitted_x.array_annotations[annkey] = x.array_annotations[annkey]
+                
+        
+        x = x.merge(fitted_x) # returns a new x
+    
+    # NOTE: 2022-10-27 22:44:50
+    # Restore the domain start of the waveform (see NOTE: 2022-10-27 22:44:40)
+    x.t_start = t_start
+    
+    x.annotations["mPSC_fit"] = fitresult[1]
+    x.annotations["amplitude"] = sigp.waveform_amplitude(x[:,0])
+    x.annotations["fit_amplitude"] = sigp.waveform_amplitude(x[:,1])
+    
+    return x
+    
+    
+    
+    
+    
+    
+    
+    
+    

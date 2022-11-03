@@ -63,14 +63,6 @@ bokeh
 pytest
 pyneuroml       # optional
 pylmeasure      # optional
-jupyter_cms
-jupyterlab
-jupyterthemes
-nodejs
-pingouin
-researchpy
-scikit-learn
-scikit-image
 language_tool_python
 pyabf
 ipyparallel

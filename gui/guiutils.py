@@ -1,6 +1,7 @@
 """Various helpers for GUI
 """
-import typing, warnings
+import typing, warnings, math
+from core.utilities import get_least_pwr10
 from PyQt5 import (QtCore, QtWidgets, QtGui)
 from gui.painting_shared import (FontStyleType, standardQtFontStyles, 
                                  FontWeightType, standardQtFontWeights)
@@ -19,11 +20,45 @@ class UnitsStringValidator(QtGui.QValidator):
         except:
             return QtGui.QValidator.Invalid
         
-def get_elided_text(s,w):
+def get_QDoubleSpinBox_params(x:typing.Sequence):
+    """Return stepSize and decimals for a QDoubleSpinBox given x.
+
+    x is a sequence of numbers
+    """
+    dd = get_least_pwr10(x)
+    if dd < 0:
+        return (abs(dd), 10**dd)
+    return (0, 1)
+    
+def csqueeze(s:str, w:int):
+    """Returns text elided to the right
+    """
+    if len(s) > w and w > 3:
+        part = (w-3)/2
+        return s[0:part] + "get_QDoubleSpinBox_params..."
+    return s
+
+def rsqueeze(s:str, w:int):
+    """Returns text elided to the right
+    """
+    if len(s) > w:
+        part = w - 3
+        return s[0:part] + "..."
+    return s
+
+def lsqueeze(s:str, w:int):
+    """Returns text elided to the left
+    """
+    if len(s) > w:
+        part = w - 3
+        return "..." + s[part:]
+    return s
+        
+def get_elided_text(s:str, w:int):
     fm = QtWidgets.QApplication.fontMetrics()
     return fm.elidedText(s, QtCore.Qt.ElideRight, w)
 
-def get_text_width(s, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
+def get_text_width(s:str, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
     fm = QtWidgets.QApplication.fontMetrics()
     sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
     return sz.width()

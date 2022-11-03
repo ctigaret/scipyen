@@ -116,12 +116,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     supported_types = (object, )
     view_action_name = None
     
-    def __init__(self, data: object = None, 
-                 parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 ID:(int, type(None)) = None,
-                 win_title: (str, type(None)) = None, 
-                 doc_title: (str, type(None)) = None,
-                 **kwargs) -> None:
+    def __init__(self, data: object = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, **kwargs):
         """Constructor.
         
         Sets up attributes common to all Scipyen's viewers.
@@ -226,9 +221,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         else:
             self.update_title(win_title = win_title, doc_title = doc_title)
             
-    def update_title(self, doc_title: (str, type(None)) = None, 
-                     win_title: (str, type(None)) = None,
-                     enforce: bool = False):
+    def update_title(self, doc_title: (str, type(None)) = None, win_title: (str, type(None)) = None, enforce: bool = False):
         """Sets up the window title according to the pattern document - viewer.
         
         Parameters:
@@ -342,9 +335,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """
         pass
     
-    def view(self, data: (object, type(None)), 
-                doc_title: (str, type(None)) = None, 
-                *args, **kwargs):
+    def view(self, data: (object, type(None)), doc_title: (str, type(None)) = None, *args, **kwargs):
         """Set the data to be displayed by this viewer.
         NOTE: Must be defined (overridden) in the derived :class:.
         In the derived class, the function binds the data to the actual data
@@ -605,12 +596,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             self.setData(data)
         """
         pass
-        #if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-            #if self._data_ in self._scipyenWindow_.workspace.values():
-                #pass
-                
-            #if isinstance(self._data_var_name_, str) and len(self._data_var_name_.strip()) and self._data_var_name_ in self._scipyenWindow_.workspace:
-                #self.setData(self._scipyenWindow_.workspace[self._data_var_name_])
             
 class ScipyenFrameViewer(ScipyenViewer):
     """Base type for Scipyen viewers that handle data "frames".
@@ -668,15 +653,7 @@ class ScipyenFrameViewer(ScipyenViewer):
     # index of the frame in the data
     frameChanged            = pyqtSignal(int, name="frameChanged")
     
-    def __init__(self, data: typing.Optional[object] = None, 
-                 parent: typing.Optional[QtWidgets.QMainWindow] = None, 
-                 ID: typing.Optional[int] = None,
-                 win_title: typing.Optional[str] = None, 
-                 doc_title: typing.Optional[str] = None,
-                 frameIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None,
-                 currentFrame: typing.Optional[int] = None,
-                 missingFrameValue:typing.Optional[object]=None,
-                 *args, **kwargs):
+    def __init__(self, data: typing.Optional[object] = None, parent: typing.Optional[QtWidgets.QMainWindow] = None, ID: typing.Optional[int] = None, win_title: typing.Optional[str] = None, doc_title: typing.Optional[str] = None, frameIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None, currentFrame: typing.Optional[int] = None, missingFrameValue:typing.Optional[object]=None, *args, **kwargs):
         """Constructor for ScipyenFrameViewer.
         
         Parameters:

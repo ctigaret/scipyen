@@ -38,6 +38,7 @@ clear_events - core.neoutils
 import typing, warnings, traceback
 from itertools import chain
 from copy import (deepcopy, copy,)
+from datetime import datetime, date, time, timedelta
 from numbers import (Number, Real,)
 from functools import partial
 import numpy as np
@@ -56,7 +57,7 @@ from core.neoutils import (get_index_of_named_signal, remove_events, clear_event
                            is_same_as, get_events)
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal, )
-from core.prog import safeWrapper
+from core.prog import (safeWrapper, WithDescriptors)
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.traitcontainers import DataBag
 
@@ -92,7 +93,7 @@ DEFAULTS["ImagingFrameTrigger"]["Name"] = "imaging"
 
 #### END module-level default options
     
-class TriggerProtocol(object):
+class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
     """Encapsulates an experimental stimulation protocol (i.e., "triggers").
     
     A protocol is composed of at least one type of TriggerEvent objects, and
@@ -158,9 +159,20 @@ class TriggerProtocol(object):
         an array of events
     
     """
-    def __init__(self, pre = None, post = None, photo = None, acquisition = None, 
-                 events = None, segment_index = [], imaging_delay = 0 * pq.s, 
-                 name="protocol"):
+    
+    # TODO: 2022-10-11 10:39:31
+    # migration to WithDescriptors API:
+    # include the properties below into _data_attributes_
+    
+    # these are in addition to the _recommended_attrs inherited from BaseNeo
+    
+    _data_attributes_ = (("file_datetime", datetime),
+                         ("rec_datetime", datetime))
+    
+    _decsriptor_attributes_ = _data_attributes_ + neo.core.baseneo.BaseNeo._recommended_attrs
+    
+    def __init__(self, pre = None, post = None, photo = None, acquisition = None, events = None, segment_index = [], imaging_delay = 0 * pq.s, name="protocol"):
+        # TODO/FIXME: do you still need the 'events' parameter?
         """
         Named parameters:
         =================
@@ -559,10 +571,7 @@ class TriggerProtocol(object):
         return len(self.segmentIndices())
     
     @safeWrapper
-    def hasSameEvents(self, other, 
-                      rtol = RELATIVE_TOLERANCE, 
-                      atol = ABSOLUTE_TOLERANCE, 
-                      equal_nan = EQUAL_NAN):
+    def hasSameEvents(self, other, rtol = RELATIVE_TOLERANCE, atol = ABSOLUTE_TOLERANCE, equal_nan = EQUAL_NAN):
         """Compares pre-, post- and photo- events with those from other TriggerProtocol.
         
         NOTE: 2018-06-07 22:42:04
@@ -968,11 +977,11 @@ class TriggerProtocol(object):
     
     @name.setter
     def name(self, value):
-        if isinstance(value, str):
+        if isinstance(value, (str, type(None))):
             self.__protocol_name__ = value
             
         else:
-            raise TypeError("Expecting a str; got %s instead" % type(value).__name__)
+            raise TypeError("Expecting a str or None; got %s instead" % type(value).__name__)
         
     @property
     def segmentIndex(self):
@@ -1187,56 +1196,86 @@ class TriggerProtocol(object):
         import h5py
         from iolib import h5io
         
-        cached_entity = get_cached_entity(entity_cache, self)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
         
         if isinstance(cached_entity, h5py.Group):
             group[target_name] = cached_entity
             return cached_entity
         
-        target_name, obj_attrs = h5io.make_obj_attrs(obj, oname=oname)
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         if isinstance(name, str) and len(name.strip()):
             target_name = name
         
         entity = group.create_group(target_name)
-        h5io.store_entity_in_cache(entity_cache, self, entity)
+        h5io.storeEntityInCache(entity_cache, self, entity)
         entity.attrs.update(obj_attrs)
         
-        for name in ("presynaptic", "postsynaptic", "photostimulation", "acquisition", "imagingDelay" ,"segmentIndex"):
+        for name in ("presynaptic", "postsynaptic", "photostimulation", 
+                     "acquisition", "imagingDelay" ,"segmentIndex"):
             # since these are (deep) copies - see NOTE: 2021-11-24 12:43:27
             # and TODO: 2021-11-24 12:33:57 - there are very good chances their
             # entities are NOT already in the cache
             trigger = getattr(self, name, None)
+            
             if isinstance(trigger, TriggerEvent):
                 oname = trigger.name
             else:
                 oname = name
                 
-            h5io.make_hdf5_entity(trigger, entity,
+            h5io.makeHDF5Entity(trigger, entity,
                                   name=name, oname=oname, 
-                                  compression=compression, chunks=chunks, 
+                                  compression = compression, chunks=chunks, 
                                   track_order = track_order, entity_cache=entity_cache)
             
         
         return entity
     
-    def from_hdf5_entity(self, group):
+    @classmethod
+    def objectFromHDF5Entity(cls, entity, cache:dict = {}):
         import h5py
-        if not isinstance(group, h5py.Group):
-            raise TypeError(f"Expecting a HDF5 Group; got {type(gtroup)._name__} instead")
+        from iolib import h5io
+        # print(f"cls {cls}, entity {entity}")
+        if not isinstance(entity, h5py.Group):
+            raise TypeError(f"Expecting a HDF5 Group; got {type(entity).__name__} instead")
         
         # TODO 2021-11-24 13:15:13 implement me!
+        
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        components = dict()
+        
+        for name in ("presynaptic", "postsynaptic", "photostimulation", 
+                     "acquisition", "imagingDelay" ,"segmentIndex"):
+            obj_entity = entity.get(name, None)
+            
+            if obj_entity is None:
+                components[name] = None
+                
+            elif obj_entity in cache:
+                components[name] = cache[obj_entity]
+                
+            else:
+                components[name] = h5io.objectFromHDF5Entity(obj_entity, cache)
+                
+        return cls(pre              = components["presynaptic"],
+                   post             = components["postsynaptic"],
+                   photo            = components["photostimulation"],
+                   acquisition      = components["acquisition"],
+                   imaging_delay    = components["imagingDelay"],
+                   segment_index    = components["segmentIndex"],
+                   name             = attrs["name"])
+                
+            
+        
         
 
 #### BEGIN Module-level functions
 
 @safeWrapper
-def auto_define_trigger_events(src, event_type, analog_index, 
-                               times=None, label=None, name=None, 
-                               use_lo_hi=True, time_slice=None, 
-                               clear = False,
-                               clearSimilarEvents=True, 
-                               clearTriggerEvents=True, 
-                               clearAllEvents=False):
+def auto_define_trigger_events(src, event_type, analog_index, times=None, label=None, name=None, use_lo_hi=True, time_slice=None, clear = False, clearSimilarEvents=True, clearTriggerEvents=True, clearAllEvents=False):
     """Constructs TriggerEvent objects from events detected in analog signals.
     
     TriggerEvent objects are constructed using either time stamps given as
@@ -1446,10 +1485,7 @@ def auto_define_trigger_events(src, event_type, analog_index,
                 
     return src
 
-def get_trigger_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
-                       as_dict:bool=False, flat:bool=False, 
-                       triggers:typing.Optional[typing.Union[str, int, type, typing.Sequence]]=None,
-                       match:str="==") -> list:
+def get_trigger_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence], as_dict:bool=False, flat:bool=False, triggers:typing.Optional[typing.Union[str, int, type, typing.Sequence]]=None, match:str="==") -> list:
     """
     Returns a list of TriggerEvent objects embedded in the data.
     
@@ -1801,11 +1837,7 @@ def embed_trigger_event(event, segment, clear=False):
             
         
 @safeWrapper
-def embed_trigger_protocol(protocol:TriggerProtocol, 
-                           target:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], 
-                           useProtocolSegments:bool=True, 
-                           clearTriggers:bool=True, 
-                           clearEvents:bool=False):
+def embed_trigger_protocol(protocol:TriggerProtocol, target:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], useProtocolSegments:bool=True, clearTriggers:bool=True, clearEvents:bool=False):
     """ Embeds TriggerEvent objects found in the TriggerProtocol 'protocol', 
     in the segments of 'target'.
     
@@ -2171,13 +2203,7 @@ def parse_trigger_protocols(src, return_source:typing.Optional[bool]=False):
     
     return protocols
 
-def auto_detect_trigger_protocols(data: neo.Block, 
-                               presynaptic:tuple=(), 
-                               postsynaptic:tuple=(),
-                               photostimulation:tuple=(),
-                               imaging:tuple=(),
-                               clear:typing.Union[bool, str, int, tuple, list, ]=False,
-                               up=True, protocols=True):
+def auto_detect_trigger_protocols(data: neo.Block, presynaptic:tuple=(), postsynaptic:tuple=(), photostimulation:tuple=(), imaging:tuple=(), clear:typing.Union[bool, str, int, tuple, list, ]=False, up=True, protocols=True):
     
     """Determines the set of trigger protocols in a neo.Block by searching for 
     trigger waveforms in the analogsignals contained in data.

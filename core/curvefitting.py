@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 Wrappers around scipy.optimize
+
+FIXME/TODO: 2022-10-25 23:57:08
+Harmonize the API (this is the role of the upcoming modelfitting.py module)
 """
 
 #### BEGIN core python modules
@@ -138,10 +141,7 @@ def fitGauss1DSum(x, y, locations, **kwargs):
     
     return popt, pcov, yfit
     
-    
-
-def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), 
-                                      method="trf", loss="linear"):
+def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), method="trf", loss="linear"):
     """Fits CaT model to CaT data.
     
     Parameters:
@@ -202,7 +202,7 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf),
         if identical to the fittedCurve
         
         
-    result: a dict tyhat contains the following:
+    result: a dict that contains the following:
 
     result["Fit"]: the result of the fitting routine
     result["Coefficients"]: fitted coefficients (same organization as p0)
@@ -313,7 +313,7 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf),
             raise TypeError("Lower bounds (bounds[0]) expected a real scalar, a sequence of real scalars, or a sequence of sequences of real scalars")
         
         
-        if isinstance(u0, float):
+        if isinstance(u0, numbers.Real):
             up[:] = [u0] * len(x0) # easy because p0 has already been linearized in x0
             
         elif isinstance(u0, (tuple, list)):
@@ -438,8 +438,8 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf),
     
     
     # NOTE: 2018-09-17 10:28:43
-    # the R2 (r-squared) is computed here for the entire fit; 
-    # the R2 for individual components is computed below see NOTE: 2018-09-17 10:29:54
+    # Here, the R² is computed for the entire fit; 
+    # The R² for individual components is computed further below, see NOTE: 2018-09-17 10:29:54
     rsq = list()
     
     sst = np.sum( (ydata - ydata.mean()) ** 2.)
@@ -505,4 +505,222 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf),
     
     return fittedCurve, fittedComponentCurves, result
 
+def fit_mPSC_model(data, p0, **kwargs):
+    """Fits a Clements & Bekkers '97 waveform through the data.
+    
+    Parameters:
+    ==========
+    data: 1D array-like; the data to be fitted
+    
+    p0: 1D array-like (or sequence) with the initial values for the waveform 
+        model parameters (a.k.a the independent variables)
+    
+        The model parameters are a, b, x₀, τ₁, τ₂ (all float scalars). Hence p0
+        must contain five scalars in the same order as shown here.
+    
+    Var-keyword parameters
+    ======================
+    
+    These collect the named parameters and the args and kwargs passed directly
+    to scipy.optimize.least_squares(). For a complete description please see the 
+    documentation of scipy.optimize.least_squares()
+    
+    jac
+    bounds
+    method
+    ftol
+    xtol
+    gtol
+    x_scale
+    loss
+    f_scale
+    max_nfev
+    diff_step
+    tr_solver
+    tr_options
+    jac_sparsity
+    verbose
+    args
+    
+    The var-keyword parameters not listed above are passed as `kwargs` parameter
+    to the least_squares() function.
+    
+    Returns:
+    ========
+    fittedCurve: numpy array
+    
+    result: dict with the mapping:
+        "Fit"           → the result of scipy.optimize.least_squares
+        "Coefficients"  → the fitted parameters for the Clements & Bekkers '97 model
+        "Rsq"           → the R² of the fit (goodness of fit)
+    
+    
+    """
+    # TODO/FIXME: 2022-10-25 23:33:58
+    # allow lower/upper bounds individually for each parameter
+    
+    from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+    
+    if not isinstance(data, (neo.AnalogSignal, DataSignal)):
+        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datatypes.DataSignal; got %s instead" % type(data).__name__)
+    
+    if data.ndim == 2 and data.shape[1] > 1:
+        raise ValueError("Data must contain a single channel")
+    
+    if not isinstance(p0, (tuple, list)):
+        raise TypeError("Initial parameters expected to be a list; got %s instead" % type(p0).__name__)
+    
+    if not isinstance(bounds, (tuple, list)) or len(bounds) != 2:
+        raise TypeError("bounds expected a 2-tuple or a 2-element list")
+    
+    def __cost_fun__(x, t, y, *args, **kwargs):  # returns residuals
+        yf = models.Clements_Bekkers_97(t, x)
+        
+        ret = y-yf
+        
+        return ret
+    
+    jac         = kwargs.pop("jac",         "2-point")
+    bounds      = kwargs.pop("bounds",      (-np.inf, np.inf))
+    method      = kwargs.pop("method",      "trf")
+    ftol        = kwargs.pop("ftol",        1e-8)
+    xtol        = kwargs.pop("xtol",        1e-8)
+    gtol        = kwargs.pop("gtol",        1e-8)
+    x_scale     = kwargs.pop("x_scale",     1.0)
+    loss        = kwargs.pop("loss",        "linear")
+    f_scale     = kwargs.pop("f_scale",     1.0)
+    max_nfev    = kwargs.pop("max_nfev",    None)
+    diff_step   = kwargs.pop("diff_step",   None)
+    tr_solver   = kwargs.pop("tr_solver",   None)
+    tr_options  = kwargs.pop("tr_options",  {})
+    jac_sparsity= kwargs.pop("jac_sparsity",None)
+    verbose     = kwargs.pop("verbose",     0)
+    
+    # not used here, but remove it from kwargs anyway
+    args        = kwargs.pop("args",        ()) 
+    
+    
+    
+    # find out where NaNs are in data
+    realDataNdx = ~np.isnan(data)
+    
+    ydata = data.magnitude[realDataNdx]
+    
+    realDataNdx = np.squeeze(realDataNdx)
+    
+    if isinstance(data, neo.AnalogSignal):
+        domaindata = data.times.magnitude
+        
+    else:
+        domaindata = data.domain.magnitude
+    
+    xdata  = domaindata[realDataNdx]
+    
+    # to correct for the onset parameters!
+    if all(realDataNdx):
+        deltaOnset = 0
+        
+    else:
+        deltaOnset = xdata[0]
+    
+    # reset xdata to start at 0
+    xdata -= deltaOnset
+    
 
+    x0 = p0
+#     lo = list()
+#     up = list()
+#     
+#     l0 = bounds[0]
+#     u0 = bounds[1]
+#     
+#     if isinstance(l0, numbers.Real):
+#         lo = [l0] * len(p0)
+#         
+#     elif isinstance(l0, (tuple, list)) and len(l0) == len(x0) and all(isinstance(l, numbers.Real) for l in l0):
+#         lo = [l for l in l0]
+#     else:
+#         raise ValueError(f"Incorrect lower bounds specified {l0}")
+#     
+#     if isinstance(u0, numbers.Real):
+#         up = [u0] * len(p0)
+#     elif isinstance(u0, (tuple, list)) and len(u0) == len(x0) and all(isinstance(l, numbers.Real) for l in u0):
+#         up = [l for l in u0]
+#     else:
+#         raise ValueError(f"Incorrect upper bounds specified {l0}")
+#     
+#     bnds = (lo, up)
+    
+    # NOTE: 2022-10-30 14:39:57
+    # solve a non-linear least-squares problem with bounds on the variables
+    # x0 is the initial "guess" (initial values for model parameters, a.k.a the 
+    # independent variables)
+    res = optimize.least_squares(__cost_fun__, x0, args=(xdata, ydata), jac=jac,
+                                 bounds = bounds, method=method, loss=loss,
+                                 ftol=ftol, xtol=xtol, gtol=gtol, x_scale=x_scale,
+                                 f_scale=f_scale, max_nfev=max_nfev, 
+                                 diff_step=diff_step, tr_solver=tr_solver,
+                                 tr_options=tr_options, jac_sparsity=jac_sparsity,
+                                 verbose=verbose, kwargs=kwargs)
+    
+    res_x = list(res.x.flatten())
+    
+    # create fitted curve
+    fC = models.Clements_Bekkers_97(xdata, res_x)
+    
+    sst = np.sum( (ydata - ydata.mean()) ** 2.)
+    
+    sse = np.sum((fC - ydata) ** 2.)
+    
+    # R² for the entire fit
+    rsq = 1 - sse/sst # only one R²
+    
+    result = collections.OrderedDict()
+    result["Fit"] = res
+    result["Coefficients"] = res_x
+    result["Rsq"] = rsq
+    
+    # reconstruct final fitted curve (REMEMBER: we have taken out the NaNs!)
+    initialSupport = np.full((data.shape[0],), np.NaN)
+    
+    fittedCurve = initialSupport.copy()
+    
+    fittedCurve[realDataNdx] = fC
+    
+    return fittedCurve, result
+
+def fit_mPSC_wave(data, wave):
+    """R² between data and a template waveform
+    
+    Not a curve fit but a measure of how well the data is matched by the waveform
+    template - used when detecting mEPSCs using a template waveform (rather than
+                a synthetic mEPSC which is a realization of the Clements & Bekkers '97
+                waveform)
+    """
+    
+    if not isinstance(data, (neo.AnalogSignal, DataSignal)):
+        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datatypes.DataSignal; got %s instead" % type(data).__name__)
+    
+    if data.ndim == 2 and data.shape[1] > 1:
+        raise ValueError("Data must contain a single channel")
+    
+    
+    if not isinstance(wave, (neo.AnalogSignal, DataSignal)):
+        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datatypes.DataSignal; got %s instead" % type(data).__name__)
+    
+    if wave.ndim == 2 and save.shape[1] > 1:
+        raise ValueError("Data must contain a single channel")
+    
+    if data.size != wave.size:
+        raise ValueError("Both data and wave must have the same size")
+    
+    sst = np.sum((data.magnitude.flatten() - data.magnitude.flatten().mean()) ** 2.)
+    
+    sse = np.sum((wave.magnitude.flatten() - data.magnitude.flatten()) ** 2.)
+    
+    return 1 - sse/sst
+    
+    
+    
+    
+    

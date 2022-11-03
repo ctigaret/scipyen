@@ -433,10 +433,6 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                                 if vval != v:
                                     raise AttributeError(f"{self.private_name} expected to have {k} with value {v}; got {vval} instead")
 
-#class SignatureDict(Bunch):
-    #def __init__(self, / , *args, **kwargs):
-        #super().__init__(*args, **kwargs)
-        
 class ContextExecutor(ContextDecorator):
     def __enter__(self):
         return self
@@ -621,8 +617,18 @@ def signature2Dict(sig, name:typing.Optional[str]=None,
     
     if isinstance(sig, CALLABLE_TYPES):
         name = sig.__name__
-        qualname = sig.__qualname__
+        if hasattr(sig, "__qualname__"):
+            qualname = sig.__qualname__
+        else:
+            # 'Boost.Python.function' object has no attribute '__qualname__'
+            # and there may be others…
+            qualname = sig.__name__
         module = getattr(sig, "__module__", None)
+        
+        # FIXME: 2022-10-07 23:19:18 
+        # no signature found for Boost.Python.function objects
+        # …and may be others too…
+        # since I cannot easily fix this, best is to avoid calling this
         sig = inspect.signature(sig)
         
     if not isinstance(sig, Signature):

@@ -1,6 +1,6 @@
 """
     This module contains:
-    
+
     1) PlanarGraphics objects:
         Move (aliased to Point and Start)
         Line
@@ -112,7 +112,7 @@ def generateBrushCycle(color:typing.Optional[QtGui.QColor] = None,
             # single value spec (R,G,B,A)
             brushes = itertools.cycle(QtGui.Brush(QtGui.QColor(*c)))
             
-    pass
+    #pass
 
 def generatePenCycle():
     pass
@@ -127,9 +127,9 @@ def genColorTable(cmap, ncolors=256):
     return colortable
 
 class GuiWorkerSignals(QtCore.QObject):
-    signal_finished = pyqtSignal()
-    sig_error = pyqtSignal(tuple)
-    signal_result = pyqtSignal(object)
+    signal_finished = pyqtSignal(name="signal_finished")
+    sig_error = pyqtSignal(tuple, name="sig_error")
+    signal_result = pyqtSignal(object, name="signal_result")
     
 class GuiWorker(QtCore.QRunnable):
     def __init__(self, fn, *args, **kwargs):
@@ -141,10 +141,13 @@ class GuiWorker(QtCore.QRunnable):
         
         self.signals = GuiWorkerSignals()
         
+        self.result = None
+        
     @pyqtSlot()
     def run(self):
         try:
-            result = self.fn(*self.args, **self.kwargs)
+            self.result = self.fn(*self.args, **self.kwargs)
+            self.signals.signal_result.emit(self.result)  # Return the result of the processing
             
         except:
             traceback.print_exc()
@@ -154,7 +157,7 @@ class GuiWorker(QtCore.QRunnable):
             self.signals.sig_error.emit((exc_type, value, traceback.format_exc()))
             
         else:
-            self.signals.signal_result.emit(result)  # Return the result of the processing
+            #self.signals.signal_result.emit(self.result)  # Return the result of the processing
             self.signals.signal_finished.emit()  # Done
             
         finally:
@@ -316,9 +319,7 @@ class MouseEventSink(QtCore.QObject):
 class ItemsListDialog(QDialog, Ui_ItemsListDialog):
     itemSelected = QtCore.pyqtSignal(str)
 
-    def __init__(self, parent = None, itemsList=None, title=None, 
-                 preSelected=None, modal=False, 
-                 selectmode=QtWidgets.QAbstractItemView.SingleSelection):
+    def __init__(self, parent = None, itemsList=None, title=None, preSelected=None, modal=False, selectmode=QtWidgets.QAbstractItemView.SingleSelection):
         super(ItemsListDialog, self).__init__(parent)
         self.setupUi(self)
         self.setModal(modal)
@@ -329,6 +330,23 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         self.searchLineEdit.setClearButtonEnabled(True)
         
         self.searchLineEdit.textEdited.connect(self.slot_locateSelectName)
+        
+        if isinstance(selectmode, str):
+            if selectmode.lower == "single":
+                selectmode = QtWidgets.QAbstractItemView.SingleSelection
+            elif selectmode.lower == "contiguous":
+                selectmode = QtWidgets.QAbstractItemView.ContiguousSelection
+            elif selectmode.lower == "extended":
+                selectmode = QtWidgets.QAbstractItemView.ExtendedSelection
+            elif selectmode.lower == "multi":
+                selectmode = QtWidgets.QAbstractItemView.MultiSelection
+            else:
+                warnings.warn(f"I don't know what '{selectmode}' selection means...")
+                selectmode = QtWidgets.QAbstractItemView.SingleSelection
+                
+            
+        if not isinstance(selectmode, QtWidgets.QAbstractItemView.SelectionMode):
+            selectmode = QtWidgets.QAbstractItemView.SingleSelection
         
         self.listWidget.setSelectionMode(selectmode)
     

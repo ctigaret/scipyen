@@ -212,14 +212,12 @@ given further below, for Python 3.9.7, boost 1.77.0
         Boost.Graph, 
         Boost.Graph parallel
         
-        NOTE: Boost can (and should) be built inside the virtual Python 
-        environment, see below.
+        NOTE: Boost can be built inside the virtual Python environment, see below.
     
     
         Qt5                                 Scipyen GUI
 
         cmake3, cmake3-full                 Build VIGRA and NEURON
-        Devel packages NOT necessary.
     
 
         zlib                                Build VIGRA
@@ -227,8 +225,7 @@ given further below, for Python 3.9.7, boost 1.77.0
         openexr                             Build VIGRA
         openssl >= 1.11                     Build VIGRA
         fftw3                               Build VIGRA
-        (optionally, but recomended
-        with MPI bindings)
+        (including with MPI bindings and threads support)
         mpich                               Build NEURON
         tiff                                Build VIGRA
         jpeg                                Build VIGRA
@@ -290,7 +287,7 @@ In short (example using sistem-wide Python 3.9):
 4.1 Create Scipyen configuration scripts - $HOME/.scipyenrc
 
     user@site:~> cd scipyen/doc/install
-    user@site:~/scipyen/doc/install> ./make_script_links.sh <path-where-environment-is>
+    user@site:~/scipyen/doc/install> ./make_script_links.sh <path-where-environment-is> <path-to-scipyen-diretory>
     
 4.2 activate the environment:
     start a new terminal the call 'scipyact'
@@ -300,7 +297,7 @@ reflects the use of Python-3.9)
 
 4.3 install pip requirements
 
-call pip install -r $HOME/scipyen/doc/installation/pip_requirements_Linux.txt
+call pip install -r $HOME/scipyen/doc/install/pip_requirements_Linux.txt
 
 WARNING: The installation of PyQt5 wheel using pip is, by default, disabled in
 pip_requirements_Linux.txt (the line is simply commented-out) for the reasons
@@ -312,6 +309,9 @@ If you decide NOT to build PyQt5 but to rely on the installation of a binary PyQ
 wheel, then enable the installation of PyQt5 in pip_requirements_Linux.txt first,
 by "un-commenting" the line (remove the "#" and any spaces at the beginning of 
 the line containing PyQt5).
+
+The disadvantage of this is that the PyQt5 elements in Scipyen do not follow, or
+integrate with, the Qt GUI settings of your desktop (especially when using KDE).
 
 =================================================================
 5. BUILD DEPENDENCIES(*)
@@ -365,6 +365,19 @@ For each of these, cd into their source tree and run:
 ..............
     REQUIRES: Qt5 and Qt5-devel packages installed on the host machine.
     
+    NOTE: This is building PyQt5 binary libaries from source, using Qt5 
+    libraries (and devel packages) available on your local platform (usually,
+    system-wide, and independent of the python's virtual environment).
+    
+    YOU MAY HAVE TO REBUILD the PyQt5 binaries after upgrading your platform's 
+    Qt5 stack. This is more likely to happen when your platform is running a 
+    "rolling release" OS distribution such as OpenSUSE Tumbleweed. 
+    
+    If, after such upgrade you see messages about missing symbols or version 
+    mismatches related to one of libQt5xxx libraries when launching scipyen from 
+    the terminal, then it is very likely you need to rebuild PyQt5.
+    
+    
     Use downloaded PyQt5-5.15.3.dev2012141313.tar.gz from scipyen-dependencies/Unix
     
     PyQt5-5.15.7.dev2202011035.tar.gz from here:
@@ -381,6 +394,14 @@ For each of these, cd into their source tree and run:
     make install
     
     pip list (should indicate PyQt5, sip)
+    
+    or, better (NOTE everything is case-sensitive):
+        
+        pip list | grep sip
+        
+        pip list | grep PyQt5
+        
+        
 ................................
 5.1.3 PyQt5.sip extension module:
 ................................
@@ -390,12 +411,18 @@ For each of these, cd into their source tree and run:
 
     pip show PyQt5-sip <-- verifies that PyQt5 sip module is installed
     
+    NOTE: You may have to rebuild Pyt5.sip after rebuilding PyQt5 itself
+    
+    Also, pip list | grep PyQt5 shoudl now report both PyQt5 and PyQt5-sip
+    packages.
+    
+    
 After installing pip requirements below, test that PyQt5  was installed OK
 by launching 'jupyter qtconsole' - Qt widgets should have the style used by your
 desktop.
     
 --------------------------------------------------------------------------------
-5.2 BUILD AND INSTALL BOOST LIBRARIES (OPTIONAL)
+5.2 BUILD AND INSTALL BOOST LIBRARIES (OPTIONAL; you can use system's software management)
 --------------------------------------------------------------------------------
 
 NOTE: Optional, ONLY IF if the system-wide boost libraries are not available for the
@@ -425,6 +452,8 @@ On Linux :
   (OPTIONAL, required to use bokeh with NEURON and jupyterlab; however, 
    installing nodejs via pip might just be enough)
   
+  NOTE: this is independnet of, and not require for, Vigra - it can be built later
+  
   Download source archive node-v15.6.0.tar.gz 
   NOTE: to use with Python 3.10 you need node-v16.14.0.tar.gz
   
@@ -452,7 +481,7 @@ create an out-of-source build tree, also in src:
 mkdir vigra-build && cd vigra-build
 
 ....................................
-5.4.2 If needed, patch vigra sources
+5.4.2 Patch vigra sources - NOTE: THIS IS NECESSARY with the latest hdf5 libraries
 ....................................
 
 See scipyen/doc/install/vigra_patches/README for details. 
@@ -500,6 +529,9 @@ cmake-gui ../vigra
 ....................................
 5.4.4 make & install
 ....................................
+    <patch hdf5impex, vigranumpy, as per scipyen/doc/install/vigra-patches/README
+    section "For both Linux and Windows 10, subsection (1)>
+    
     make
     
     !!! NOTE !!!
@@ -512,6 +544,9 @@ cmake-gui ../vigra
         (NOTE: this corrects deprecated syntax)
     NOTE: 2022-02-20 22:26:47 the above issue did not come up on Tumbleweed and
         Python 3.10
+        
+    <patch vigranumpy as per scipyen/doc/install/vigra-patches/README
+    section "For both Linux and Windows 10, subsection (2)>
         
     make doc 
     make install (--> installs in $VIRTUAL_ENV/doc/vigra and $VIRTUAL_ENV/doc/vigranumpy)
@@ -531,6 +566,9 @@ cmake-gui ../vigra
     
     The '.scipyenrc' bash script, which is sourced by Scipyen launch bash 
     script, takes care of that (see make_script_links.sh in this directory)
+    
+    NOTE 3: vigra will NOT be listed in pip list, although it will be available
+    to `import vigra` in a Python or Juyter session
     
 -------------------------------------------------------------------------------
 5.5. BUILD AND INSTALL PyTables (tables)
@@ -613,6 +651,9 @@ Example (as of 2022-02-16 12:25:17 on Tumbleweed 20220213)
         IV_ENABLE_SHARED=true
         IV_ENABLE_X11_DYNAMIC=false # NOTE: 2022-02-16 12:50:18 setting to True prevents the GUI from showing!
         MOD2C_ENABLE_LEGACY_UNITS=false
+    
+    NOTE: for more recent nrn repos make sure all INSTALL variables in cmake point to
+    $VIRTUAL_ENV/xxx instead of /usr/local/xxx
         
 5.6.4 build & install
 
@@ -704,16 +745,6 @@ Finally the $VIRTUAL_ENV directory tree should look like this:
                     -- x86_64
                     
 
-
-================================================================================
-7.Optional: Install h5pyViewer
-NOTE: This does not seem to be maintained anymore: pip install h5pyViewer fails
-================================================================================
-
-Grab the git repo:
-    git clone https://github.com/ganymede42/h5pyViewer.git
-    
-Get your fingers dirty...
 
 ================================================================================
                                 
