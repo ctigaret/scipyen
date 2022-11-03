@@ -1,51 +1,86 @@
 # -*- coding: utf-8 -*-
-""" Scipyen configuration module
+""" Scipyen configuration module to manage and store GUI- and non-GUI-related 
+configuration data (a.k.a "settings") specific to Scipyen, beyond the lifetime
+of a running Scipyen session.
+
+There are three sets of settings in Scipyen:
+
+1) Qt settings.
+These relate to Scipyen's graphical user interface (GUI). Examples include the
+geometry and state of Scipyen's windows (and, where applicable, their docklets),
+and other UI-related information such as the filters for file and/or variable 
+names, directory history, etc).
+
+    Because Scipyen's GUI is built using the Qt toolkit (via PyQt5) these
+    settings are managed and stored using Qt toolkit QSettings framework in Qt 
+    Core module.
+    
+    The Qt settings are stored across Scipyen sessions in the fioe "Scipyen.conf"
+    at a location that depends on the OS.
+    
+    On Linux distributions with the latest directory hierarchy standard (the 
+    XDG Base Directory Specification¹) the "Scipyen.conf" file is in 
+    "NativeFormat" and is located in $HOME/.config/Scipyen.
+    
+    The location of the Qt settings data can be found by calling
+    
+    `mainWindow.qsettings.fileName()`
+    
+    or
+    
+    `scipyenconf.get_QtSettings_file()`
+    
+    at the Scipyen console
+    
+
+2) Non-Qt settings
+These relate to various Scipyen components (e.g. cursor colors in SignalViewer, 
+settings for Scipyen's apps - mostly numeric and textual data)
+
+    These settings are managed by the python confuse package, which operates with
+    two files:
+    
+    • a read-only "default" configuration (found in Scipyen's installation 
+    directory) named "config_default.yaml"
+    
+    • a user configuration file named "config.yaml" located in the same directory
+    where the QSettings are installed.
+    
+3) Jupyter/IPython settings
+These relate to various configurations for the jupyter/IPython framework used 
+by Scipyen's console, and also for matplotlib and for most part ARE NOT managed
+by Scipyen. For details please see online documentation for jupyter & IPython²,
+and matplotlib³.
+
+    NOTE: Some of these configurations are superseded by some Qt and non-Qt
+    settings (e.g. location of the vertical scrollbar in the Scipyen's console)
+
+NOTE: There is currently, a limited overlap between the scopes of the first two
+categories of settings (e.g. colors of the GUI cursors are specified as non-Qt
+even though the cursors are rendered using the Qt toolkit).
+
+The reason for a "setting" to be considered as Qt or non-Qt largely depends on
+whether the setting (and its value) is more suitable to be stored in a 
+hierarchical (i.e. arbitrarily nested) structure.
+
+The confuse package (used for the so-called non-Qt settings) natively allows a
+hierarchical organization of the settings. 
+
+In contrast, both Qt's QSettings and Jupyter/IPython/matplotlib configuration 
+frameworks (see below) are best suited for a linear organization of the 
+configuration data (i.e. without nesting).
+
+Footnotes:
+¹ https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+
+² https://docs.jupyter.org/en/latest/use/config.html?highlight=configuration
+
+³ https://matplotlib.org/stable/tutorials/introductory/customizing.html
 
 are configuration settings for various Scipyen functionalities:
 
-ScanData analysis
-
-electrophysiology apps (LTP, AP analysis, IV curves, etc)
-
-The non-gui options are stored in yaml file format using the confuse library.
-
-The gui options are stored directly in Scipyen.conf under groups given by the
-name of the QMainWindow or QWidget subclass which represents the user interface
-of the (sub)application that uses these options (e.g., LSCaTWindow, ScipyenWindow,
-SignalViewer, etc).
-
-While gui-related options (e.g., window size/position, recent files,
-recent directories, etc.) are stored using the PyQt5/Qt5 settings framework,
-non-gui options contain custom parameter values for various modules, e.g.
-options for ScanData objects, trigger detection, etc. 
-
-These "non-gui" options are often represented by hierarchica data structures
-(e.g., nested dict) not easily amenable to the linear (and binary) format of the
-Qt5 settings framework.
 
 """
-# NOTE: 2021-01-09 10:54:10
-# A framework for configuration options:
-# A configuration is a possibly nested (i.e., hierarchical) mapping that contains 
-# parameter values for various modules and functions in Scipyen, that are unrelated
-# to GUI configuration options
-# 
-# When the mapping is hierarchical, it provides a branched configuration structure 
-# (think nested dictionaries): a parameter may be retrieved directly by its "leaf"
-# name as long as the leaf name is unique inside the configuration, or by its 
-# fully-qualified path name (dot-separated names).
-# 
-# A parameter value can be any type, and is stored under a str key (the name of 
-# the parameter) which must be a valid Python identifier (this excludes Python
-# keywords).
-# 
-# Some leaf names are fixed (e.g. see FunctionConfiguration, below)
-# 
-# Implementation:
-# Configurations are DataBag() objects. A parameter with value type DataBag and
-# stored in the configuration will be interpreted as a "subconfiguraton"
-#
-
 #import base64
 import os
 import inspect, typing, types, math, numbers
@@ -1028,12 +1063,29 @@ class ScipyenConfigurable(object):
         return parent
 
     def _observe_configurables_(self, change):
-        if self.__class__.__name__ == "MPSCAnalysis":
-            print(f"ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_():")
-            print(f"\tchange.name = {change.name}")
-            print(f"\tchange.type = {change.type}")
-            print(f"\tchange.old = {change.old} ({type(change.old).__name__})")
-            print(f"\tchange.new = {change.new} ({type(change.new).__name__})")
+        #### BEGIN debug - comment out when done
+        # if self.__class__.__name__ == "MPSCAnalysis":
+        #     print(f"ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_():")
+        #     print(f"\tchange.name = {change.name}")
+        #     print(f"\tchange.type = {change.type}")
+        #     print(f"\tchange.old = {change.old} ({type(change.old).__name__})")
+        #     print(f"\tchange.new = {change.new} ({type(change.new).__name__})")
+        #     print("\ttraits observer state:") 
+        #     for k, v in self.configurable_traits.__observer__.__getstate__().items():
+        #         if isinstance(v, dict):
+        #             print(f"\t\t{k}:")
+        #             for kk, vv in v.items():
+        #                 print(f"\t\t\t{kk} = {vv}")
+        #         else:
+        #             print(f"\t\t{k} = {v}")
+        #     print("\tobserver class traits:")
+        #     for k, v in self.configurable_traits.__observer__.class_traits().items():
+        #         print(f"\t\t{k} = {v}")
+        #     print("\tobserver class own traits")
+        #     for k, v in self.configurable_traits.__observer__.class_own_traits().items():
+        #         print(f"\t\t{k} = {v}")
+        #### END debug - comment out when done
+                
         isTop = hasattr(self, "isTopLevel") and self.isTopLevel
         parent = self._get_parent_()
         tag = self.configTag
@@ -1049,12 +1101,17 @@ class ScipyenConfigurable(object):
                 for kk,vv in v.items():
                     scipyen_config[k][kk].set(vv)
                     
+        #### BEGIN debug - comment out when done
 #         if self.__class__.__name__ == "MPSCAnalysis":
 #             print(f"\twriting configuration file")
-#             
-#         write_config(scipyen_config)
-        if self.__class__.__name__ == "MPSCAnalysis":
-            print(f"DONE ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_()\n\n")
+        #### END debug - comment out when done
+            
+        write_config(scipyen_config)
+        
+        #### BEGIN debug - comment out when done
+        # if self.__class__.__name__ == "MPSCAnalysis":
+        #     print(f"DONE ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_()\n\n")
+        #### END debug - comment out when done
             
         
     def _make_confuse_config_data_(self, change, isTop=True, parent=None, tag=None):
@@ -1169,10 +1226,12 @@ class ScipyenConfigurable(object):
         saveWindowSettings(self.qsettings, self, group_name=group_name, prefix=prefix)
     
     def __load_config_key_val__(self, settername, val):
-        if self.__class__.__name__ == "MPSCAnalysis":
-            print(f"ScipyenConfigurable<{self.__class__.__name__}>. __load_config_key_val__ settername {settername}, val {val}")
+        #### BEGIN debug - comment out when done
+        # if self.__class__.__name__ == "MPSCAnalysis":
+        #     print(f"ScipyenConfigurable<{self.__class__.__name__}>. __load_config_key_val__ settername {settername}, val {val}")
             #print("ScipyenConfigurable.__load_config_key_val__")
             #print("\tsettername: %s, val: %s" % (settername, val))
+        #### END debug - comment out when done
         setter = inspect.getattr_static(self, settername, None)
         
         if isinstance(val, str) and any(c in val for c in ("()")):
@@ -1209,8 +1268,10 @@ class ScipyenConfigurable(object):
             
             user_conf = self._get_config_view_(isTop, parent, tag)
             
-            if self.__class__.__name__ == "MPSCAnalysis":
-                print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings() user_conf {user_conf}")
+            #### BEGIN debug - comment out when done
+            # if self.__class__.__name__ == "MPSCAnalysis":
+            #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings() user_conf {user_conf}")
+            #### END debug - comment out when done
 
             if isinstance(user_conf, dict):
                 for k, v in user_conf.items():
@@ -1253,8 +1314,10 @@ class ScipyenConfigurable(object):
             
             user_conf = self._get_config_view_(isTop, parent, tag)
             
-            if self.__class__.__name__ == "MPSCAnalysis":
-                print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf {user_conf}")
+            #### BEGIN debug - comment out when done
+            # if self.__class__.__name__ == "MPSCAnalysis":
+            #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf {user_conf}")
+            #### END debug - comment out when done
             
             changed = False
             
@@ -1275,8 +1338,11 @@ class ScipyenConfigurable(object):
                         getter = getattr(self, gettername)
                         val  = getter()
 
-                if self.__class__.__name__ == "MPSCAnalysis":
-                    print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() user_conf {user_conf}, val {val} ({type(val).__name__}), v {v} ({type(v).__name__})")
+                #### BEGIN debug - comment out when done
+                # if self.__class__.__name__ == "MPSCAnalysis":
+                #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() user_conf {user_conf}, val {val} ({type(val).__name__}), v {v} ({type(v).__name__})")
+                #### END debug - comment out when done
+                    
                     if val != v:
                         # NOTE: 2022-11-01 21:54:34
                         # must convert value to something digestible by 
@@ -1292,12 +1358,16 @@ class ScipyenConfigurable(object):
                         changed = True
                         
             if changed:
-                if self.__class__.__name__ == "MPSCAnalysis":
-                    print(f"\twriting configuration file")
+                #### BEGIN debug - comment out when done
+                # if self.__class__.__name__ == "MPSCAnalysis":
+                #     print(f"\twriting configuration file")
+                #### END debug - comment out when done
                 #self._update_config_view(user_conf, isTop, parent, tag)
                 write_config(scipyen_config)
-                if self.__class__.__name__ == "MPSCAnalysis":
-                    print(f"DONE ScipyenConfigurable<{self.__class__.__name__}>.saveSettings()\n\n")
+                #### BEGIN debug - comment out when done
+                # if self.__class__.__name__ == "MPSCAnalysis":
+                #     print(f"DONE ScipyenConfigurable<{self.__class__.__name__}>.saveSettings()\n\n")
+                #### END debug - comment out when done
                 
         if issubclass(self.__class__, (QtWidgets.QWidget, Figure)):
             self.saveWindowSettings()
@@ -1453,6 +1523,27 @@ class FunctionConfiguration(ScipyenConfiguration):
         super().__init__(name=fname, args=fargs, kwargs=fkwargs)
         
 def get_config_file(configuration:confuse.Configuration=scipyen_config, default:bool=False):
+    """Returns the fully qualified path to the file holding non-Qt configuration.
+        
+    Named Parameters
+    ================
+    • configuration - optional;
+        By default, this is `scipyen_config`, the default confuse.LazyConfig object 
+        currently active during a Scipyen session.        
+        
+        However, a different instance of confuse.Configuration obejct can be 
+        specified here (this can also be a LazyConfig object)
+        
+    • default: optional default if False
+        When True, the function returns the path to file holding the default
+        configuration data (typically, in the directory where Scipyen is installed).
+        
+        When False, the function returns the path to the file holding the user
+        configuration, the contents of which may vary from session to session
+        (and reflect the state of the last running Scipyen session)
+        
+        
+    """
     if not configuration._materialized:
         configuration.read()
         
@@ -1468,6 +1559,9 @@ def get_config_dir(configuration:confuse.Configuration=scipyen_config):
         configuration.read()
             
     return configuration.config_dir()
+
+def get_QtSettings_file():
+    return ScipyenConfigurable.qsettings.fileName()
 
 @safeWrapper
 def write_config(config:typing.Optional[confuse.Configuration]=scipyen_config, filename:typing.Optional[str]=None, full:bool=True, redact:bool=False, as_default:bool=False, default_only:bool=False):

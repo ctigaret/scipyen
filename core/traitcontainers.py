@@ -148,8 +148,27 @@ class DataBag(Bunch):
     #@staticmethod
     @classmethod
     def _make_hidden(cls, **kwargs):
+        """ Returns a Bunch where each key in kwargs is mapped to a bool.
+        The mapping flags whether a key in kwargs is to be considered "hidden attribute".
+    
+        Contrary to this label, a "hidden attribute" is one that it is NOT a
+        trait, yet it is still "visible" to the usual access API. Rather, they
+        are "hidden" to the instance of HasTraits which implements the traitlets
+        parts in DataBag (i.e., the DataBagTraitsObserver).
+        
+        Instead, a "hidden attribute" can be queried and assigned to (in order 
+        to change the behaviour of the  DataBag object) yet it is not considered
+        a trait type (hence changing it does not trigger a notification).
+    
+        The "hidden attributes" are:
+        "length", "use_mutable", "use_casting", "allow_none","verbose"
+    
+        and are augmented here with "mutable_types" because this was added to
+        the API design later, and I want to be able to unpickle old data...
+        """
         if not issubclass(cls, DataBag):
             raise TypeError(f"Expecting a DataBag or a type derived from DataBag; got {cls.__name__} instead")
+        
         ret = Bunch([(name, kwargs.pop(name, False)) for name in list(cls.hidden_traits) + ["mutable_types"]])
         #ret = Bunch([(name, kwargs.pop(name, False)) for name in list(DataBag.hidden_traits) + ["mutable_types"]])
         ret.length = 0
@@ -286,13 +305,23 @@ class DataBag(Bunch):
         # which is syntactically invalid in Python (see "6.3.1 Attribute references" 
         # in The Python Language Reference).
         #
-        # Therefore, DataBag does NOT implement attribute access to its trait members
         # 
         
         if not isinstance(key, str):
             raise TypeError("Expecting a str key; got %s instead" % type(key).__name__)
         
         try:
+            # NOTE: 2022-11-03 09:43:10
+            # this `try` block is for when traits (key values in __observer__) are
+            # being set upon unpickling - the observer may not be alive yet
+            #
+            # FIXME 2022-11-03 09:44:18 
+            # I am doubtful whether a DataBag is worth serializing - for data to
+            # be serialized/pickled, a Bunch might be a better way...
+            #
+            # NOTE: 2022-11-03 09:41:36
+            # __observer__ is hidden from dir() but can be accesses manually at
+            # console, e.g. <some DataBag instance>.__observer__
             obs = object.__getattribute__(self, "__observer__") # bypass usual API
             
         except:
@@ -302,6 +331,11 @@ class DataBag(Bunch):
             obs = DataBagTraitsObserver()
             object.__setattr__(self, "__observer__", obs)
 
+        # NOTE: 2022-11-03 09:50:59
+        #### BEGIN Deal with the situation where a "hidden attribute" is being set
+        # i.e. wheh __setitem__ is invoked for assigning to a "hidden attribute"
+        # we look it up then return
+        # see self._make_hidden for details
         try:
             hid = object.__getattribute__(self, "__hidden__")
             
@@ -319,9 +353,12 @@ class DataBag(Bunch):
                 hid["use_casting"] = False
 
             return
+        #### END Deal with the situation where a "hidden attribute" is being set
         
-        if obs.has_trait(key): # assign value to an existing trait
-            # NOTE 2020-09-05 12:52:39 Below, one could use getattr(obs, key)
+        #### BEGIN Deal with the actual traitlet - assign to an existing one or add a new one
+        if obs.has_trait(key): # NOTE: 2022-11-03 12:02:45 assign new value to existing
+            # NOTE 2020-09-05 12:52:39 
+            # Below, one could use getattr(obs, key)
             # to achieve the same thing as object.__getattribute__(obs, key)
             try:
                 old_value = object.__getattribute__(obs, key)
@@ -347,8 +384,8 @@ class DataBag(Bunch):
             except:
                 traceback.print_exc()
                 
-        else:
-            # add a new trait
+        else: # NOTE: 2022-11-03 12:02:34 add a new trait
+            
             if key not in ("__observer__", "__hidden__") and key not in self.__hidden__.keys():
                 trdict = {key: self._light_trait_(val)}
                 obs.add_traits(**trdict)

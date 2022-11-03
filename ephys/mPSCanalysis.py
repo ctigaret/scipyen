@@ -18,7 +18,7 @@ import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.models as models
 from core.traitcontainers import DataBag
-from core.scipyen_config import markConfigurable
+from core.scipyen_config import (markConfigurable, get_config_file)
 
 from core.quantities import (arbitrary_unit, check_time_units, units_convertible,
                             unit_quantity_from_name_or_symbol, str2quantity)
@@ -54,27 +54,29 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     _default_model_units_  = pq.pA
     _default_time_units_   = pq.s
     
-    _default_params_names_ = ("α", "β", "x₀", "τ₁", "τ₂")
+    _default_params_names_ = ["α", "β", "x₀", "τ₁", "τ₂"]
     
-    _default_params_initl_ = (0.*_default_model_units_, 
+    _default_params_initl_ = [0.*_default_model_units_, 
                               -1.*pq.dimensionless, 
                               0.005*_default_time_units_, 
                               0.001*_default_time_units_, 
-                              0.01*_default_time_units_)
+                              0.01*_default_time_units_]
     
-    _default_params_lower_ = (0.*_default_model_units_, 
+    _default_params_lower_ = [0.*_default_model_units_, 
                               -math.inf*pq.dimensionless, 
                               0.*_default_time_units_, 
                               1.0e-4*_default_time_units_, 
-                              1.0e-4*_default_time_units_)
+                              1.0e-4*_default_time_units_]
     
-    _default_params_upper_ = (math.inf*_default_model_units_, 
+    _default_params_upper_ = [math.inf*_default_model_units_, 
                               0.*pq.dimensionless,  
                               math.inf*_default_time_units_,
                               0.01*_default_time_units_, 
-                              0.01*_default_time_units_)
+                              0.01*_default_time_units_]
     
     _default_duration_ = 0.02*_default_time_units_
+    
+    _default_template_file = os.path.join(os.path.dirname(get_config_file()),"mPSCTemplate.h5" )
     
     def __init__(self, ephysdata=None, title:str="mPSC Detect", clearOldPSCs=False, parent=None, ephysViewer=None, **kwargs):
         self._dialog_title_ = title if len(title.strip()) else "mPSC Detect"
@@ -101,7 +103,12 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         
         self._template_ = None
         
+        self._use_template_ = False
+        
         self._model_waveform_ = None
+        
+        self._template_file_ = self._default_template_file
+        
         
         # TODO: 2022-11-01 17:46:50
         # replace this with the one from ephysdata
@@ -133,23 +140,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self._params_upper_ = self._default_params_upper_
         self._mPSCduration_ = self._default_duration_
         
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            print(f"{self.__class__.__name__} setting initial state for parameters...")
-            # NOTE: these DIRECTLY assign to the configurable traits
-            # FIXME: 2022-11-02 21:58:18 these should be list not tuple ?!?
-            self.configurable_traits["mPSCParametersInitial"] = self._params_initl_
-            self.configurable_traits["mPSCParametersLowerBounds"] = self._params_lower_
-            self.configurable_traits["mPSCParametersUpperBounds"] = self._params_upper_
-            self.configurable_traits["mPSCDuration"] = self._mPSCduration_
-            print(f"DONE {self.__class__.__name__} setting initial state for parameters\n\n")
-        
-#             self.configurable_traits["mPSCParametersInitial"] = tuple(quantity2str(v, precision=4) for v in self._params_initl_)
-#             self.configurable_traits["mPSCParametersLowerBounds"] = tuple(quantity2str(v, precision=4) for v in self._params_lower_)
-#             self.configurable_traits["mPSCParametersUpperBounds"] = tuple(quantity2str(v, precision=4) for v in self._params_upper_)
-#             self.configurable_traits["mPSCDuration"] = quantity2str(self._mPSCduration_, precision=4)
-#         
         self.loadSettings()
-        
                 
         # parse ephysdata parameter
         self._set_ephys_data_(ephysdata)
@@ -166,18 +157,17 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self.paramsGroupBox = QtWidgets.QGroupBox("mPSC Model", self.paramsGroup)
         self.paramsGroupLayout = QtWidgets.QGridLayout(self.paramsGroupBox)
         
-        self.paramsWidget = ModelParametersWidget(self.mPSCParametersInitial, 
-                                        parameterNames = self.mPSCParametersNames,
-                                        lower = self.mPSCParametersLowerBounds,
-                                        upper = self.mPSCParametersUpperBounds,
+        self.paramsWidget = ModelParametersWidget(self._params_initl_, 
+                                        parameterNames = self._params_names_,
+                                        lower = self._params_lower_,
+                                        upper = self._params_upper_,
                                         orientation="vertical", parent=self.paramsGroupBox)
         
-        self.paramsWidget.sig_dataChanged.connect(self._slot_modelParametersChanged)
+        self.paramsWidget.sig_parameterChanged[str, str].connect(self._slot_modelParameterChanged)
         
         self.paramsGroupLayout.addWidget(self.paramsWidget, 0, 0, 4, 4)
         
         
-        # self.durationGroup = qd.HDialogGroup(self.paramsGroup)
         self.durationLabel = QtWidgets.QLabel("Duration:", parent=self.paramsGroupBox)
         self.durationSpinBox = QtWidgets.QDoubleSpinBox(self.paramsGroupBox)
         self.durationSpinBox.setMinimum(-math.inf)
@@ -185,7 +175,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self.durationSpinBox.setDecimals(self.paramsWidget.spinDecimals)
         self.durationSpinBox.setSingleStep(self.paramsWidget.spinStep)
         self.durationSpinBox.setValue(self.mPSCDuration.magnitude)
-        self.durationSpinBox.valueChanged.connect(self._slot_duration_changed)
+        self.durationSpinBox.valueChanged.connect(self._slot_modelDurationChanged)
         if isinstance(self.mPSCDuration, pq.Quantity):
             self.durationSpinBox.setSuffix(f" {self.mPSCDuration.dimensionality}")
         else:
@@ -202,12 +192,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self.paramsGroupLayout.addWidget(self.durationSpinBox,4, 1, 1, 2)
         self.paramsGroupLayout.addWidget(self.plotWaveFormButton, 4, 3, 1, 1)
         
-        # self.durationGroup.addWidget(self.durationLabel, alignment = QtCore.Qt.Alignment())
-        # self.durationGroup.addWidget(self.durationSpinBox, alignment=QtCore.Qt.Alignment())
-        # self.durationGroup.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-        
         self.paramsGroup.addWidget(self.paramsGroupBox)
-        # self.paramsGroup.addWidget(self.durationGroup)
         
         self.mainGroup.addWidget(self.paramsGroup)
 
@@ -217,10 +202,12 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         
         self.clearDetectionCheckBox = qd.CheckBox(self.settingsWidgetsGroup, "Clear previous detection")
         self.clearDetectionCheckBox.setIcon(QtGui.QIcon.fromTheme("edit-clear-history"))
+        self.clearDetectionCheckBox.setChecked(self._clear_events_flag_ == True)
         self.clearDetectionCheckBox.stateChanged.connect(self._slot_clearDetectionChanged)
         
         self.useTemplateWaveFormCheckBox = qd.CheckBox(self.settingsWidgetsGroup, "Use mPSC template")
         self.useTemplateWaveFormCheckBox.setIcon(QtGui.QIcon.fromTheme("template"))
+        self.useTemplateWaveFormCheckBox.setChecked(self._use_template_)
         self.useTemplateWaveFormCheckBox.stateChanged.connect(self._slot_useTemplateWaveForm)
         
         self.settingsWidgetsGroup.addWidget(self.clearDetectionCheckBox)
@@ -271,10 +258,6 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         #### END Group for mPSC detection in whole data
         
         self.addWidget(self.mainGroup)
-        
-        # self.addWidget(self.waveFormDisplay)
-        
-        # self.buttons.layout.insertStretch(3)
         
         self.buttons.OK.setIcon(QtGui.QIcon.fromTheme("dialog-ok-apply"))
         self.buttons.Cancel.setIcon(QtGui.QIcon.fromTheme("dialog-cancel"))
@@ -341,9 +324,36 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                                         title="Import mPSC Template",
                                         single=True)
         
-        if len(tpl):
+        if len(tpl) and isinstance(tpl[0], neo.AnalogSignal):
             self._template_ = tpl[0]
-            self._plot_template_()
+            if os.path.isfile(self._template_file_):
+                pio.saveHDF5(self._template_, self._template_file_)
+            return
+            
+        self._template_ = None
+        
+    def _open_template_file(self, fileName:typing.Optional[str]):
+        # NOTE: 2022-11-03 16:50:03
+        # chooseFile is defined in FileIOGui and inherited via WorkspaceGuiMixin
+        
+        if not isinstance(fileName, str) or len(fileName.strip()) or not os.path.isfile(fileName):
+            fileName, fl = self.chooseFile("Choose mPSC Template", "Pickle Files (*.pkl);;Axon text files (*.atf);; Axon binary files (*.abf)")
+        
+            if len(fileName.strip()) == 0:
+                return
+        
+        data = pio.loadFile(fileName)
+        
+        if isinstance(data, neo.AnalogSignal):
+            self._template_ = data
+            
+            if os.path.isfile(self._template_file_):
+                pio.saveHDF5(self._template_, self._template_file_)
+            
+            return True
+        else:
+            self.criticalMessage("The chosen file does not contain an Analog Signal")
+            return False
         
     def open(self):
         if self._ephys_:
@@ -373,10 +383,14 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             self.waveFormDisplay.plot(self._template_)
             
     def _plot_model_(self):
-        self._model_waveform_ = membrane.PSCwaveform(self.mPSCParametersInitial,
+        if isinstance(self._template_, neo.AnalogSignal) and self._use_template_:
+            self.waveFormDisplay.plot(self._template_)
+        else:
+            self._model_waveform_ = membrane.PSCwaveform(self._params_initl_,
                                                         duration = self.mPSCDuration,
                                                         sampling_rate = self._waveform_sampling_rate)
-        self.waveFormDisplay.plot(self._model_waveform_)
+            
+            self.waveFormDisplay.plot(self._model_waveform_)
             
     @pyqtSlot()
     def _slot_plot_model(self):
@@ -415,10 +429,15 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @pyqtSlot()
     def _slot_useTemplateWaveForm(self):
         val = self.useTemplateWaveFormCheckBox.selection()
-        if val == true:
-            if self._template_ is none:
+        self._use_template_ = val==True
+        if self._use_template_:
+            if self._template_ is None:
+                if os.path.isfile(self._template_file_):
+                    if self._open_template_file()
                 self._load_template()
                     
+            signalBlocker = QtCore.QSignalBlocker(self.useTemplateWaveFormCheckBox)
+            self.useTemplateWaveFormCheckBox.setChecked(isinstance(self._template_, neo.AnalogSignal))
                     
     @pyqtSlot()
     def _slot_clearDetectionChanged(self):
@@ -479,24 +498,39 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                 self._ephysViewer_.plot(self._ehys_)
                 
     @pyqtSlot(float)
-    def _slot_duration_changed(self, value):
+    def _slot_modelDurationChanged(self, value):
         self.mPSCDuration = self.durationSpinBox.value() * self._default_time_units_
         self._plot_model_()
         
-    @pyqtSlot()
-    def _slot_modelParametersChanged(self):
-        # α, β, x₀, τ₁ and τ₂ AND WAVEFORM_DURATION !!! 
-        print(f"{self.__class__.__name__}._slot_modelParametersChanged ...")
-        # NOTE / FIXME: 2022-11-02 22:00:22 these are pd.Series, neither list, nor tuple
-        # They will be converted to lists by their corresponding setter methods
-        # e.g.0@ mPSCParametersInitial.setter, etc
-        self.mPSCParametersInitial      = self.paramsWidget.parameters["Initial Value:"]
-        self.mPSCParametersLowerBounds  = self.paramsWidget.parameters["Lower Bound:"]
-        self.mPSCParametersUpperBounds  = self.paramsWidget.parameters["Upper Bound:"]
-        self.mPSCDuration               = self.durationSpinBox.value() * self._default_time_units_
+    # @pyqtSlot()
+    # def _slot_modelParametersChanged(self):
+    #     # α, β, x₀, τ₁ and τ₂ AND WAVEFORM_DURATION !!! 
+    #     #### BEGIN debug - comment out when done
+    #     # print(f"{self.__class__.__name__}._slot_modelParametersChanged ...")
+    #     #### END debug - comment out when done
+    #     # NOTE / FIXME: 2022-11-02 22:00:22 these are pd.Series, neither list, nor tuple
+    #     # They will be converted to lists by their corresponding setter methods
+    #     # e.g.0@ mPSCParametersInitial.setter, etc
+    #     self.mPSCParametersInitial      = self.paramsWidget.parameters["Initial Value:"]
+    #     self.mPSCParametersLowerBounds  = self.paramsWidget.parameters["Lower Bound:"]
+    #     self.mPSCParametersUpperBounds  = self.paramsWidget.parameters["Upper Bound:"]
+    #     self.mPSCDuration               = self.durationSpinBox.value() * self._default_time_units_
+    #     self._plot_model_()
+    #     #### BEGIN debug - comment out when done
+    #     # print(f"DONE {self.__class__.__name__}._slot_modelParametersChanged\n\n")
+    #     #### END debug - comment out when done
+        
+    @pyqtSlot(str, str)
+    def _slot_modelParameterChanged(self, row, column):
+        if column == "Initial Value:":
+            self.mPSCParametersInitial      = self.paramsWidget.parameters["Initial Value:"]
+        elif column == "Lower Bound:":
+            self.mPSCParametersLowerBounds  = self.paramsWidget.parameters["Lower Bound:"]
+        elif column == "Upper Bound:":
+            self.mPSCParametersUpperBounds  = self.paramsWidget.parameters["Upper Bound:"]
+            
         self._plot_model_()
-        print(f"DONE {self.__class__.__name__}._slot_modelParametersChanged\n\n")
-                
+        
     @property
     def currentFrame(self):
         return self._currentFrame_
@@ -543,6 +577,29 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self._set_ephys_data_(value)
         
     @property
+    def useTemplateWaveForm(self):
+        return self._use_template_
+    
+    @markConfigurable("UseTemplateWaveform")
+    @useTemplateWaveForm.setter
+    def useTemplateWaveForm(self, value):
+        self._use_template_ = value == True
+        
+    @property
+    def templateWaveFormFile(self):
+        return self._template_file_
+    
+    @markConfigurable("templateWaveFormFile")
+    @templateWaveFormFile.setter
+    def templateWaveFormFile(self, value:str):
+        import os
+        if isinstance(value, str) and os.path.isfile(value):
+            self._template_file_ = value
+            
+        else:
+            self._template_file_ = self._default_template_file
+        
+    @property
     def clearOldPSCs(self):
         return self._clear_events_flag_
     
@@ -553,31 +610,30 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits["ClearOldPSCsOnDetection"] = self._clear_events_flag_
             
-    @property
-    def mPSCParametersNames(self):
-        return self._params_names_
-    
-    @markConfigurable("mPSCParametersNames")
-    @mPSCParametersNames.setter
-    def mPSCParametersNames(self, val):
-        if isinstance(val, (tuple, list)) and all(isinstance(s, str) for s in val):
-            self._params_names_ = val
-
-            if isinstance(getattr(self, "configurable_traits", None), DataBag):
-                self.configurable_traits["mPSCParametersNames"] = self._params_names_
-        else:
-            raise TypeError("Expecting a sequence of str for parameter names")
+#     @property
+#     def mPSCParametersNames(self):
+#         return self._params_names_
+#     
+#     @markConfigurable("mPSCParametersNames")
+#     @mPSCParametersNames.setter
+#     def mPSCParametersNames(self, val):
+#         if isinstance(val, (tuple, list)) and all(isinstance(s, str) for s in val):
+#             self._params_names_ = val
+# 
+#             if isinstance(getattr(self, "configurable_traits", None), DataBag):
+#                 self.configurable_traits["mPSCParametersNames"] = self._params_names_
+#         else:
+#             raise TypeError("Expecting a sequence of str for parameter names")
         
     @property
     def mPSCParametersInitial(self):
         """Initial parameter values
         """
-        return self._params_initl_
+        return dict(zip(self._params_names_, self._params_initl_))
     
     @markConfigurable("mPSCParametersInitial")
     @mPSCParametersInitial.setter
-    def mPSCParametersInitial(self, val):
-        # print(f"@mPSCParametersInitial.setter {val}")
+    def mPSCParametersInitial(self, val:typing.Union[pd.Series, tuple, list, dict]):
         if isinstance(val, pd.Series):
             val = list(val)
             
@@ -591,6 +647,12 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             else:
                 raise TypeError("Expecting a sequence of scalar quantities or their str representations")
             
+        elif isinstance(val, dict):
+            assert set(val.keys()) == set(self._params_names_), f"Argument keys for initial values must match parameters names {self._params_names_}"
+            
+            for k, v in val.items():
+                self._params_initl_[self._params_names_.index(k)] = v
+            
         elif val in (None, np.nan, math.nan):
             raise TypeError(f"Initial parameter values cannot be {val}")
         
@@ -598,19 +660,15 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             raise TypeError(f"Expecting a sequence of scalar quantities (or their str representations) for initial values; instead, got {type(val).__name__}:\n {val}")
 
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            print(f"{self.__class__.__name__}@mPSCParametersInitial.setter val = {self._params_initl_} ({type(val).__name__})")
-            self.configurable_traits["mPSCParametersInitial"] = self._params_initl_
-            print(f"DONE {self.__class__.__name__}@mPSCParametersInitial.setter\n\n")
-            # self.configurable_traits["mPSCParametersInitial"] = tuple(quantity2str(v) for v in self._params_initl_)
+            self.configurable_traits["mPSCParametersInitial"] = dict(zip(self._params_names_, self._params_initl_))
                 
     @property
     def mPSCParametersLowerBounds(self):
-        return self._params_lower_
+        return dict(zip(self._params_names_, self._params_lower_))
     
     @markConfigurable("mPSCParametersLowerBounds")
     @mPSCParametersLowerBounds.setter
-    def mPSCParametersLowerBounds(self, val):
-        # print(f"@mPSCParametersLowerBounds.setter {val}")
+    def mPSCParametersLowerBounds(self, val:typing.Union[pd.Series, tuple, list, dict]):
         if isinstance(val, pd.Series):
             val = list(val)
         
@@ -624,6 +682,12 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             else:
                 raise TypeError("Expecting a sequence of scalar quantities or their str representations")
             
+        elif isinstance(val, dict):
+            assert set(val.keys()) == set(self._params_names_), f"Argument keys for lower bounds must match parameters names {self._params_names_}"
+            
+            for k, v in val.items():
+                self._params_lower_[self._params_names_.index(k)] = v
+            
         elif val in (None, np.nan, math.nan):
             self._params_lower_ = val
             
@@ -631,22 +695,15 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the lower bounds; instead, got {type(val).__name__}:\n {val}")
                 
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            print(f"{self.__class__.__name__}@mPSCarametersLowerBounds.setter val = {self._params_lower_} ({type(val).__name__})")
-            self.configurable_traits["mPSCParametersLowerBounds"] = self._params_lower_
-            print(f"DONE {self.__class__.__name__}@mPSCarametersLowerBounds.setter\n\n")
-            # if self._params_lower_ in (None, np.nan, math.nan):
-            #     self.configurable_traits["mPSCParametersLowerBounds"] = self._params_lower_
-            # else:
-            #     self.configurable_traits["mPSCParametersLowerBounds"] = tuple(quantity2str(v) for v in self._params_lower_)
+            self.configurable_traits["mPSCParametersLowerBounds"] = dict(zip(self._params_names_, self._params_lower_))
                 
     @property
     def mPSCParametersUpperBounds(self):
-        return self._params_upper_
+        return dict(zip(self._params_names_, self._params_upper_))
     
     @markConfigurable("mPSCParametersUpperBounds")
     @mPSCParametersUpperBounds.setter
-    def mPSCParametersUpperBounds(self, val):
-        # print(f"@mPSCParametersUpperBounds.setter {val}")
+    def mPSCParametersUpperBounds(self, val:typing.Union[pd.Series, tuple, list, dict]):
         if isinstance(val, pd.Series):
             val = list(val)
         
@@ -660,6 +717,12 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             else:
                 raise TypeError("Expecting a sequence of scalar quantities or their str representations")
             
+        elif isinstance(val, dict):
+            assert set(val.keys()) == set(self._params_names_), f"Argument keys for upper bounds must match parameters names {self._params_names_}"
+            
+            for k, v in val.items():
+                self._params_upper_[self._params_names_.index(k)] = v
+            
         elif val in (None, np.nan, math.nan):
             self._params_upper_ = val
 
@@ -667,9 +730,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the upper bounds; instead, got {type(val).__name__}:\n {val}")
                 
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            print(f"{self.__class__.__name__}@mPSCParametersUpperBounds.setter val = {self._params_upper_} ({type(val).__name__})")
-            self.configurable_traits["mPSCParametersUpperBounds"] = self._params_upper_
-            print(f"DONE {self.__class__.__name__}@mPSCParametersUpperBounds.setter\n\n")
+            self.configurable_traits["mPSCParametersUpperBounds"] = dict(zip(self._params_names_, self._params_upper_))
                 
     @property
     def mPSCDuration(self):

@@ -91,11 +91,7 @@ class GuiMessages(object):
         
 class FileIOGui(object):
     @safeWrapper
-    def chooseFile(self, caption:typing.Optional[str]=None, 
-                   fileFilter:typing.Optional[str]=None, 
-                   single:typing.Optional[bool]=True, 
-                   save:bool=False,
-                   targetDir:typing.Optional[str]=None) -> typing.Tuple[typing.Union[str, typing.List[str]], str]:
+    def chooseFile(self, caption:typing.Optional[str]=None, fileFilter:typing.Optional[str]=None, single:typing.Optional[bool]=True, save:bool=False, targetDir:typing.Optional[str]=None):
         """Launcher of file open dialog
         
         Parameters:
@@ -155,8 +151,7 @@ class FileIOGui(object):
         return fn, fl
     
     @safeWrapper
-    def chooseDirectory(self, caption:typing.Optional[str]=None,
-                        targetDir:typing.Optional[str]=None) -> str:
+    def chooseDirectory(self, caption:typing.Optional[str]=None,targetDir:typing.Optional[str]=None):
         
         if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
             dirName = str(QtWidgets.QFileDialog.getExistingDirectory(self, caption=caption, directory=targetDir))

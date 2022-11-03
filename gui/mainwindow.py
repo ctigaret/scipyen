@@ -51,9 +51,6 @@ from importlib import reload # I use this all too often !
 #### END core python modules
 
 #### BEGIN 3rd party modules
- # NOTE: 2021-08-17 16:52:16
- # get this via scipyen_config module aliased as scipyenconf
-#import confuse
 
 #### BEGIN Configurable objects with traitlets.config
 # NOTE: 2021-08-23 11:02:10 

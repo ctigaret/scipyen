@@ -3,6 +3,9 @@
 NOTE: 2022-01-29 13:32:21
 There are issues when trying to implement traitlets for collection's CONTENTS,
 see docstring in scipyen_traitlets module (FIXME/TODO 2022-01-29 13:29:19)
+# NOTE: 2022-11-03 14:36:21
+I'm sure there are lots of BUG(s) and/or redundant code - definitely needs
+cleaning up...
 """
 
 import enum
@@ -27,7 +30,7 @@ from traitlets import (HasTraits, MetaHasTraits, TraitType, All, Any, Bool, CBoo
     Type, This, Instance, TCPAddress, List, Tuple, UseEnum, ObjectName, 
     DottedObjectName, CRegExp, ForwardDeclaredType, ForwardDeclaredInstance, 
     link, directional_link, validate, observe, default,
-    observe_compat, BaseDescriptor, HasDescriptors,
+    observe_compat, BaseDescriptor, HasDescriptors, Container,
     )
 #, EventHandler,
     #)
@@ -438,9 +441,15 @@ def dynamic_trait(x, *args, **kwargs):
     
     elif issubclass(myclass, pq.Quantity):
         return QuantityTrait(default_value = x)
+#     
+    elif issubclass(myclass, list):
+        return ListTrait(x)
     
-    # elif issubclass(myclass, list):
-    #     return ListTrait
+    elif issubclass(myclass, tuple):
+        return Tuple(x)
+    
+    elif issubclass(myclass, dict):
+        return Dict(x)
     
     if isclass(force_trait) and issubclass(force_trait, traitlets.TraitType):
         traitclass = (force_trait, )
@@ -729,6 +738,14 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
         
         # NOTE: for our purposes we don't really need the validation logic!
             
+    def instance_init(self, obj=None):
+        # print(f"ListTrait {self.__class__.__name__}")
+        if obj is None:
+            obj = self
+        if isinstance(self._trait, TraitType):
+            self._trait.instance_init(obj)
+        super(Container, self).instance_init(obj)
+        
     def validate_elements(self, obj, value):
         # NOTE: 2021-08-19 11:28:10 do the inherited validation first
         value = super(ListTrait, self).validate_elements(obj, value)
