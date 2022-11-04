@@ -48,7 +48,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 
 from core.prog import (safeWrapper, no_sip_autoconversion)
 from core.utilities import reverse_mapping_lookup
-from .painting_shared import (standardPalette, standardPaletteDict, svgPalette,
+from gui.painting_shared import (standardPalette, standardPaletteDict, svgPalette,
                               getPalette, paletteQColor, qcolor,
                               standardQColor, svgQColor, mplColors, qtGlobalColors, 
                               canDecode, populateMimeData, fromMimeData,
@@ -56,8 +56,8 @@ from .painting_shared import (standardPalette, standardPaletteDict, svgPalette,
                               comboDelegateBrush,get_name_color, ColorPalette,
                               )
 
-from .scipyen_colormaps import (qcolor, get_name_color,ColorPalette)
-from . import quickdialog
+from gui.scipyen_colormaps import (qcolor, get_name_color,ColorPalette)
+from gui import quickdialog
 
 from .stylewidgets import PenComboBox
 

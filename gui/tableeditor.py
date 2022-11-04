@@ -63,7 +63,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 Ui_TableEditor, QMainWindow = __loadUiType__(os.path.join(__module_path__, "tableeditor.ui"))
-Ui_TableEditorWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "tableeditorwidget.ui"))
+Ui_TableEditorWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "widgets","tableeditorwidget.ui"))
 
 class MetaHeaderView(QtWidgets.QHeaderView):
     #Re: How to edit Horizontal Header Item in QTableWidget, on QtCentre

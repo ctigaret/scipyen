@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SpinBoxSlider</class>
+ <widget class="QWidget" name="SpinBoxSlider">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>477</width>
+    <height>42</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <layout class="QHBoxLayout" name="horizontalLayout">
+   <item>
+    <widget class="QLabel" name="frameLabel">
+     <property name="text">
+      <string>Frame:</string>
+     </property>
+     <property name="buddy">
+      <cstring>frameQSpinBox</cstring>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QSpinBox" name="frameQSpinBox"/>
+   </item>
+   <item>
+    <widget class="QLabel" name="totalFramesCountLabel">
+     <property name="text">
+      <string>of: 0</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QSlider" name="frameQSlider">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

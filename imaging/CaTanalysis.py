@@ -3398,7 +3398,7 @@ def removeMirrorCursor(data, vc):
     data.sceneCursors.pop(vc.name, None)
     
     
-class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
+class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     # NOTE: 2021-09-23 10:43:12
     # ScipyenFrameViewer <- ScipyenViewer <- WorkspaceGuiMixin
     # NOTE: 2021-07-08 10:04:42 About configuration/settings

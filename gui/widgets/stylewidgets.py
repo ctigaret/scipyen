@@ -12,7 +12,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 from core.prog import (safeWrapper, no_sip_autoconversion)
 from core.utilities import reverse_mapping_lookup
 
-from .painting_shared import (make_transparent_bg,
+from gui.painting_shared import (make_transparent_bg,
                               standardQtPenStyles,
                               standardQtPenJoinStyles,
                               standardQtPenCapStyles,
@@ -42,7 +42,7 @@ from .painting_shared import (make_transparent_bg,
                               Brush, Pen,
                               )
 
-from .quickdialog import QuickDialog
+from gui.quickdialog import QuickDialog
 from .gradientwidgets import GradientDialog
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))

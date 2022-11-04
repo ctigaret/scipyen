@@ -32,20 +32,28 @@ import ephys.ephys as ephys
 from core.prog import safeWrapper
 
 from gui import quickdialog as qd
+import gui.scipyenviewer as scipyenviewer
+from gui.scipyenviewer import ScipyenFrameViewer
 import gui.signalviewer as sv
 from gui.signalviewer import SignalCursor as SignalCursor
 import gui.pictgui as pgui
 from gui.workspacegui import (GuiMessages, WorkspaceGuiMixin)
-from gui.modelfitting_ui import ModelParametersWidget
+from gui.widgets.modelfitting_ui import ModelParametersWidget
 from gui import guiutils
 
 import iolib.pictio as pio
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
+# class MPSCAnalysis(ScipyenFrameViewer):
+# NOTE: 2022-11-04 14:23:22 ScipyenFrameViewer does NOT work with QuickDialog → SegmentationFault
 class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     """Mini-PSC analysis window ("app")
     Most of the GUI logic as in triggerdetectgui.TriggerDetectDialog
+    
+    TODO: 2022-11-04 14:08:45 
+    Migrate to QMainWindow/ScipyenViewer
+    
     """
     
     # NOTE: 2022-10-31 14:59:15
@@ -79,6 +87,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     _default_template_file = os.path.join(os.path.dirname(get_config_file()),"mPSCTemplate.h5" )
     
     def __init__(self, ephysdata=None, title:str="mPSC Detect", clearOldPSCs=False, parent=None, ephysViewer=None, **kwargs):
+        # self.threadpool = QtCore.QThreadPool()
         self._dialog_title_ = title if len(title.strip()) else "mPSC Detect"
         super().__init__(parent=parent, title=self._dialog_title_)
         
@@ -87,6 +96,8 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self._mPSC_detected_ = False
         
         self._currentFrame_ = 0
+        
+        self._currentWaveformIndex_ = 0
         
         # NOTE: 2022-10-28 10:33:57
         # When not empty, this list must have as many elements as there are 
@@ -117,13 +128,6 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         # • name (or index) of the epoch (if any) where detection is being made
         self._waveform_sampling_rate = 1e4*pq.Hz # to be replaced with the one from data
         
-        # TODO: 2022-10-28 11:47:43
-        # save/restore parameters , lower & upper in user_config, under model name
-        # needs modelfitting.py done & dusted
-        
-        # self._params_units_ = tuple(x.units.dimensionality for x in self._params_initl_)
-        self.waveFormDisplay = sv.SignalViewer(win_title="mPSC waveform", parent=self)#.mainGroup)
-        
         if not isinstance(ephysViewer, sv.SignalViewer):
             self._ephysViewer_ = sv.SignalViewer(win_title=self._dialog_title_)
             self._owns_viewer_ = True
@@ -133,6 +137,9 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             self._owns_viewer_ = False
             
         self._ephysViewer_.frameChanged[int].connect(self._slot_ephysFrameChanged)
+        
+        self.waveFormDisplay = sv.SignalViewer(win_title="mPSC waveform", parent=self)#.mainGroup)
+        self.waveFormDisplay.frameChanged[int].connect(self._slot_waveformFrameChanged)
         
         # NOTE: 2022-11-03 22:55:52 
         #### BEGIN these shouldn't be allowed to change
@@ -155,9 +162,157 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         
         
     def _configureUI_(self):
-        self.mainGroup = qd.VDialogGroup(self)
+        """Does what a UI form created with Qt5 Designer would normally do
+        """
+        # NOTE: 2022-11-04 11:17:27
+        # • individual widgets are added to a QLayout of a QGroupBox
+        # • the QGroupBox is added to a quickdialog.DialogGroup
+        # • the DialogGoup is then added to the mainGroup (a quickdialog.VDialogGroup)
+        # • finally, the VDialogGroup is added to self (which inherits from quickdialog.QuickDialog)
+        # self.mainGroup = QtWidgets.QFrame(self)
+        # self.setCentralWidget(self.mainGroup)
+        # self.mainLayout = QtWidgets.QGridLayout(self.mainGroup)
+        self.mainGroup = qd.VDialogGroup(self) # only works with QuickDialog
         
-        self.paramsGroup = qd.VDialogGroup(self.mainGroup)
+        self.topGroup = qd.HDialogGroup(self.mainGroup)
+        
+        self.dataAndTemplateFrame = QtWidgets.QFrame(self.topGroup)
+        self.dataAndTemplateFrameLayout = QtWidgets.QGridLayout(self.dataAndTemplateFrame)
+        
+        #### BEGIN data group
+        self.dataGroup = qd.VDialogGroup(self.dataAndTemplateFrame)
+        self.dataGroupBox = QtWidgets.QGroupBox("Data", self.dataGroup)
+        self.dataGroupBoxLayout = QtWidgets.QGridLayout(self.dataGroupBox)
+        self.openDataPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("document-open"),
+                                                        "Open", 
+                                                        parent = self.dataGroupBox)
+        self.dataGroupBoxLayout.addWidget(self.openDataPushButton, 0,0, 1,1)
+        
+        self.importDataPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("document-import"),
+                                                          "Import", 
+                                                          parent = self.dataGroupBox)
+        self.dataGroupBoxLayout.addWidget(self.importDataPushButton, 0,1, 1,1)
+        
+        # TODO: 2022-11-04 14:47:18
+        # connect to a slot that:
+        # 1) select a signal's name - flag if data segments are inconsistent
+        # 2) gets the SigalViewer axis where the signal is shown (SignalViewer 
+        #   needs not be visible but definitely needs to have plotted the data
+        #   first)
+        self.signalNameLabel = QtWidgets.QLabel("Signal:", self.dataGroupBox)
+        self.dataGroupBoxLayout.addWidget(self.signalNameLabel, 1, 0, 1, 1)
+        self.signalNameComboBox = QtWidgets.QComboBox(self.dataGroupBox)
+        self.dataGroupBoxLayout.addWidget(self.signalNameComboBox, 1, 1, 1, 1)
+        
+        # TODO 2022-11-04 14:54:59
+        # populate with suitable epochs when data is loaded (imported or otherwise)
+        # prepended with "None" (i.e. no epoch selected)
+        # by default set it to None (first item in the combobox dropdown list)
+        #
+        # By suitable epochs we mean epochs that have similar times relative to
+        # the sart of the segments, AND have the same name across all segments
+        # 
+        # TODO 2022-11-04 15:04:29
+        # connect to a slot that:
+        # 1) sets the detection epoch internally to the selected epoch name
+        # 
+        self.epochNameLabel = QtWidgets.QLabel("Epoch:", self.dataGroupBox)
+        self.dataGroupBoxLayout.addWidget(self.epochComboBox, 2, 0, 1, 1)
+        self.epochComboBox = QtWidgets.QComboBox(self.dataGroupBox)
+        self.dataGroupBoxLayout.addWidget(self.epochComboBox, 2, 1, 1, 1)
+        
+        self.plotDataPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("graphics"),
+                                                        "Plot",
+                                                        parent = self.dataGroupBox)
+        self.dataGroupBoxLayout.addWidget(self.plotDataPushButton, 3, 0, 1, 1)
+        
+        # TODO: 2022-11-04 14:46:32
+        # connected to a slot that:
+        # 1) checks for the existence of two vertical cursors in the SignalViewer 
+        #   axis where the signal (selected by the above combo box) is plotted;
+        #   the cursors must be single-axis cursors (i.e NOT spanning across the
+        #   signal viewer's axes)
+        # 2) if there are no cursors the use a QMessageBox to prompt the user to
+        #    add two vertical cursors
+        # 3) call SignalViewer's method to generate an Epoch between two 
+        #   vertical cursors - pre-set the epoch name to "mPSC Detection", and
+        #   pre-set "relative to segment start"
+        # 4) if epoch generation was successful then select the epoch name in
+        #   the epoch combobox (to indicate it was chosen for detection)
+        self.makeEpochPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("select"),
+                                                         "Make Epoch",
+                                                         parent = self.dataGroupBox)
+        self.dataGroupBoxLayout.addWidget(self.makeEpochPushButton,3,1,1,1)
+        
+        self.dataGroup.addWiget(self.dataGroupBox)
+        self.dataAndTemplateFrameLayout.addWidget(self.dataGroup, 0,0,1,2)
+        #### END data group
+        
+        #### BEGIN mPSC Template Group
+        self.templateGroup = qd.VDialogGroup(self.templateAndDetectionGroup)
+        self.templateGroupBox = QtWidgets.QGroupBox("mPSC Template", self.templateGroup)
+        self.templateGroupBox.setCheckable(True)
+        self.templateGroupBox.setChecked(self._use_template_)
+        self.templateGroupBox.clicked.connect(self._slot_useTemplateWaveForm)
+        self.templateGroupBoxLayout = QtWidgets.QGridLayout(self.templateGroupBox)
+        
+        #### BEGIN load template button
+        self.loadTemplatePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("template"),
+                                                  "Import", 
+                                                  parent = self.templateGroupBox)
+        self.loadTemplatePushButton.setToolTip("Load a mPSC template from workspace")
+        self.loadTemplatePushButton.setWhatsThis("Load a mPSC template from workspace")
+        self.loadTemplatePushButton.setStatusTip("Load a mPSC template from workspace")
+        self.loadTemplatePushButton.clicked.connect(self._slot_loadTemplate)
+        self.templateGroupBoxLayout.addWidget(self.loadTemplatePushButton, 0, 0, 1, 1)
+        #### END load template button
+        
+        #### BEGIN push button for loading template from file
+        self.loadTemplateFilePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("document-new-from-template"),
+                                                      "Open", 
+                                                      parent = self.templateGroupBox)
+        self.loadTemplateFilePushButton.setToolTip("Load a mPSC template from a file")
+        self.loadTemplateFilePushButton.setWhatsThis("Load a mPSC template from a file.\nThe file must contain a single AnalogSignal, and can be a pickle (*.pkl), axon text file (*.atf) or binary (*.abf) file")
+        self.loadTemplateFilePushButton.setStatusTip("Load a mPSC template from a file")
+        self.loadTemplateFilePushButton.clicked.connect(self._slot_openTemplate)
+        self.templateGroupBoxLayout.addWidget(self.loadTemplateFilePushButton, 0, 1, 1, 1)
+        #### END push button for loading template from file
+        
+        #### BEGIN push button for creating a new template
+        self.createTemplatePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("document-save-as-template"),
+                                                              "Store",
+                                                              parent = self.templateGroupBox)
+        self.createTemplatePushButton.setToolTip("Create a new template from the mPSC waveform")
+        self.createTemplatePushButton.setWhatsThis("Create a new template from the mPSC waveform")
+        self.createTemplatePushButton.setStatusTip("Create a new template from the mPSC waveform")
+        self.createTemplatePushButton.clicked.connect(self._slot_createTemplate)
+        self.templateGroupBoxLayout.addWidget(self.createTemplatePushButton, 1, 0, 1, 1)
+        #### END push button for creating a new template
+        
+        #### BEGIN push button for removing stored template
+        self.forgetTemplatePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("delete"),
+                                                    "Forget",
+                                                    parent = self.templateGroupBox)
+        
+        self.forgetTemplatePushButton.setToolTip("Forget old mPSC template")
+        self.forgetTemplatePushButton.setWhatsThis("Forget old mPSC template.\nA new template must be loaded from workspace or a file")
+        self.forgetTemplatePushButton.setStatusTip("Forget old mPSC template")
+        self.forgetTemplatePushButton.clicked.connect(self._slot_forgetTemplate)
+        self.templateGroupBoxLayout.addWidget(self.forgetTemplatePushButton, 1, 1, 1, 1)
+        #### END push button for removing stored template
+        
+        self.templateGroup.addWidget(self.templateGroupBox)
+        self.dataAndTemplateFrame.addWidget(self.templateGroup)
+        #### END mPSC Template Group
+        
+        #### BEGIN Plot waveform button
+        self.plotWaveFormButton = QtWidgets.QPushButton("Plot model")
+        self.plotWaveFormButton.clicked.connect(self._slot_plot_model)
+        self.paramsGroupLayout.addWidget(self.plotWaveFormButton, 4, 3, 1, 1)
+        #### END Plot waveform button
+        
+        #### BEGIN model parameters group
+        self.paramsGroup = qd.VDialogGroup(self.topGroup)
         self.paramsGroupBox = QtWidgets.QGroupBox("mPSC Model", self.paramsGroup)
         self.paramsGroupLayout = QtWidgets.QGridLayout(self.paramsGroupBox)
         
@@ -174,6 +329,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         # strictly positive; hence, setting the minimum spin box value to the 
         # value of the spinStep seems like a good idea
         
+        #### BEGIN Model parameters widget
         self.paramsWidget.getSpinBox("τ₁", "Initial Value:").setMinimum(self.paramsWidget.spinStep)
         self.paramsWidget.getSpinBox("τ₁", "Lower Bound:").setMinimum(self.paramsWidget.spinStep)
         self.paramsWidget.getSpinBox("τ₁", "Upper Bound:").setMinimum(self.paramsWidget.spinStep)
@@ -185,7 +341,9 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self.paramsWidget.sig_parameterChanged[str, str].connect(self._slot_modelParameterChanged)
         
         self.paramsGroupLayout.addWidget(self.paramsWidget, 0, 0, 4, 4)
+        #### END Model parameters widget
         
+        #### BEGIN Model duration label & spin box
         self.durationLabel = QtWidgets.QLabel("Duration:", parent=self.paramsGroupBox)
         self.durationSpinBox = QtWidgets.QDoubleSpinBox(self.paramsGroupBox)
         self.durationSpinBox.setMinimum(-math.inf)
@@ -202,118 +360,111 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         t = self.durationSpinBox.text()
         mWidth = guiutils.get_text_width(t)
         self.durationSpinBox.setMinimumWidth(mWidth + 3*mWidth//10)
-        
-        self.plotWaveFormButton = QtWidgets.QPushButton("Plot model")
-        self.plotWaveFormButton.clicked.connect(self._slot_plot_model)
-        
         self.paramsGroupLayout.addWidget(self.durationLabel,4, 0, 1, 1)
         self.paramsGroupLayout.addWidget(self.durationSpinBox,4, 1, 1, 2)
-        self.paramsGroupLayout.addWidget(self.plotWaveFormButton, 4, 3, 1, 1)
+        #### END Model duration label & spin box
         
         self.paramsGroup.addWidget(self.paramsGroupBox)
         
         self.mainGroup.addWidget(self.paramsGroup)
+        #### END model parameters group
+        
+        #### BEGIN detection HGroup
+        self.templateAndDetectionGroup = qd.HDialogGroup(self)
+        #### BEGIN mPSC Detection
+        self.fullDetectionGroup = qd.VDialogGroup(self.templateAndDetectionGroup)
+        self.fullDetectionGroupBox = QtWidgets.QGroupBox("Detect mPSCs", self.fullDetectionGroup)
+        self.fullDetectionLayout = QtWidgets.QGridLayout(self.fullDetectionGroupBox)
+        
+        #### BEGIN push button for detection in frame (sweep, or segment)
+        self.detectmPSCInFramePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-find"),
+                                                                 "Sweep", parent=self.fullDetectionGroupBox)
+        self.detectmPSCInFramePushButton.setToolTip("Detect mPSCs in current sweep")
+        self.detectmPSCInFramePushButton.setWhatsThis("Detect mPSCs in current sweep")
+        self.detectmPSCInFramePushButton.setStatusTip("Detect mPSCs in current sweep")
+        self.detectmPSCInFramePushButton.clicked.connect(self.slot_detect_in_frame)
+        self.fullDetectionLayout.addWidget(self.detectmPSCInFramePushButton, 0, 0, 1, 1)
+        #### END push button for detection in frame (sweep, or segment)
+        
+        #### BEGIN push button for undo detection in frame (sweep, or segment)
+        self.undoFramePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-undo"),
+                                                         "Undo", parent = self.fullDetectionGroupBox)
+        self.undoFramePushButton.setToolTip("Undo mPSCs detection in current sweep")
+        self.undoFramePushButton.setWhatsThis("Undo mPSCs detection in current sweep")
+        self.undoFramePushButton.setStatusTip("Undo mPSCs detection in current sweep")
+        self.undoFramePushButton.clicked.connect(self.slot_undo_frame)
+        self.fullDetectionLayout.addWidget(self.undoFramePushButton, 0, 1, 1, 1)
+        #### END push button for undo detection in frame (sweep, or segment)
+        
+        
+        #### BEGIN push button for detection in whole data (neo.Block or list of neo.Segment)
+        self.detectmPSCPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-find"),
+                                                          "Data", parent=self.fullDetectionGroupBox)
+        self.detectmPSCPushButton.setToolTip("Detect mPSCS in all sweeps")
+        self.detectmPSCPushButton.setWhatsThis("Detect mPSCS in all sweeps")
+        self.detectmPSCPushButton.setStatusTip("Detect mPSCS in all sweeps")
+        self.detectmPSCPushButton.clicked.connect(self.slot_detect)
+        self.fullDetectionLayout.addWidget(self.detectmPSCPushButton, 1, 0, 1, 1)
+        #### END push button for detection in whole data (neo.Block or list of neo.Segment)
+        
+        #### BEGIN push button for undo detection in whole data (neo.Block or list of neo.Segment)
+        self.undoDetectionPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-undo"),
+                                                             "Undo", parent=self.fullDetectionGroupBox)
+        self.undoDetectionPushButton.setToolTip("Undo detection in all sweeps")
+        self.undoDetectionPushButton.setWhatsThis("Undo detection in all sweeps")
+        self.undoDetectionPushButton.setStatusTip("Undo detection in all sweeps")
+        self.fullDetectionLayout.addWidget(self.undoDetectionPushButton, 1, 1, 1, 1)
+        self.undoDetectionPushButton.clicked.connect(self.slot_undo)
+        #### END push button for undo detection in whole data (neo.Block or list of neo.Segment)
+        
+        self.fullDetectionGroup.addWidget(self.fullDetectionGroupBox)
+        self.templateAndDetectionGroup.addWidget(self.fullDetectionGroup)
+        #### END mPSC Detection
+        
+        self.mainGroup.addWidget(self.templateAndDetectionGroup)
+        #### END template and detection HGroup
 
-        self.templateGroup = qd.VDialogGroup(self)
-        self.templateGroupBox = QtWidgets.QGroupBox("Use mPSC Template", self.templateGroup)
-        self.templateGroupBox.setCheckable(True)
-        self.templateGroupBox.setChecked(self._use_template_)
-        self.templateGroupBox.clicked.connect(self._slot_useTemplateWaveForm)
-        self.templateGroupBoxLayout = QtWidgets.QGridLayout(self.templateGroupBox)
+        #### BEGIN group for detection in frame: detect in frame & undo frame detection
+        # self.frameDetectionGroup = qd.HDialogGroup(self.fullDetectionGroup)
         
-        self.loadTemplatePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("template"),
-                                                  "Load...", 
-                                                  parent = self.templateGroupBox)
-        self.loadTemplatePushButton.setToolTip("Load a mPSC template from workspace")
-        self.loadTemplatePushButton.setWhatsThis("Load a mPSC template from workspace")
-        self.loadTemplatePushButton.setStatusTip("Load a mPSC template from workspace")
-        self.loadTemplatePushButton.clicked.connect(self._slot_loadTemplate)
+        # self.frameDetectionGroupBox = QtWidgets.QGroupBox("Sweep", self.frameDetectionGroup)
         
-        self.loadTemplateFilePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("document-new-from-template"),
-                                                      "Open file...", 
-                                                      parent = self.templateGroupBox)
-        self.loadTemplateFilePushButton.setToolTip("Load a mPSC template from a file")
-        self.loadTemplateFilePushButton.setWhatsThis("Load a mPSC template from a file.\nThe file must contain a single AnalogSignal, and can be a pickle (*.pkl), axon text file (*.atf) or binary (*.abf) file")
-        self.loadTemplateFilePushButton.setStatusTip("Load a mPSC template from a file")
-        self.loadTemplateFilePushButton.clicked.connect(self._slot_openTemplate)
+        # self.frameDetectionLayout = QtWidgets.QHBoxLayout(self.frameDetectionGroupBox)
         
-        self.forgetTemplatePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("delete"),
-                                                    "Forget current",
-                                                    parent = self.templateGroupBox)
+        # self.frameDetectionLayout.addWidget(self.detectmPSCInFramePushButton)
+        # self.frameDetectionLayout.addWidget(self.undoFramePushButton)
         
-        self.forgetTemplatePushButton.setToolTip("Forget olsd mPSC template")
-        self.forgetTemplatePushButton.setWhatsThis("Forget olsd mPSC template.\nA new template must be loaded from workspace or a file")
-        self.forgetTemplatePushButton.setStatusTip("Forget olsd mPSC template")
-        self.forgetTemplatePushButton.clicked.connect(self._slot_forgetTemplate)
+        # self.frameDetectionGroup.addWidget(self.frameDetectionGroupBox)
         
-        self.createTemplatePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("document-save-as-template"),
-                                                              "Store",
-                                                              parent = self.templateGroupBox)
-        self.createTemplatePushButton.setToolTip("Create a new template from the mPSC waveform")
-        self.createTemplatePushButton.setWhatsThis("Create a new template from the mPSC waveform")
-        self.createTemplatePushButton.setStatusTip("Create a new template from the mPSC waveform")
-        self.createTemplatePushButton.clicked.connect(self._slot_createTemplate)
+        # self.fullDetectionLayout.addWidget(self.frameDetectionGroup)
+        
+        #### END group for detection in frame: detect in frame & undo frame detection
+            
+        #### BEGIN Group for mPSC detection in whole data
+        # self.dataDetectionGroup = qd.HDialogGroup(self.fullDetectionGroup)
+        # self.dataDetectionGroupBox = QtWidgets.QGroupBox("Data", self.dataDetectionGroup)
+        # self.dataDetectionLayout = QtWidgets.QHBoxLayout(self.dataDetectionGroupBox)
+        
+        # self.dataDetectionGroup.addWidget(self.dataDetectionGroupBox)
+        
+        # self.fullDetectionLayout.addWidget(self.dataDetectionGroup)
         
         
-        #### BEGIN settings widgets group: contains settings widgets (buttons & checkboxes)
+        #### END Group for mPSC detection in whole data
+        
+        
+        #### BEGIN clear detection group
         self.settingsWidgetsGroup = qd.HDialogGroup(self.mainGroup)
         
         self.clearDetectionCheckBox = qd.CheckBox(self.settingsWidgetsGroup, "Clear previous detection")
         self.clearDetectionCheckBox.setIcon(QtGui.QIcon.fromTheme("edit-clear-history"))
         self.clearDetectionCheckBox.setChecked(self._clear_events_flag_ == True)
         self.clearDetectionCheckBox.stateChanged.connect(self._slot_clearDetectionChanged)
-        
-        # self.useTemplateWaveFormCheckBox = qd.CheckBox(self.settingsWidgetsGroup, "Use mPSC template")
-        # self.useTemplateWaveFormCheckBox.setIcon(QtGui.QIcon.fromTheme("template"))
-        # self.useTemplateWaveFormCheckBox.setChecked(self._use_template_)
-        # self.useTemplateWaveFormCheckBox.stateChanged.connect(self._slot_useTemplateWaveForm)
-        
         self.settingsWidgetsGroup.addWidget(self.clearDetectionCheckBox)
         # self.settingsWidgetsGroup.addWidget(self.useTemplateWaveFormCheckBox)
         
         self.mainGroup.addWidget(self.settingsWidgetsGroup)
-        #### END settings widgets group: contains settings widgets (buttons & checkboxes)
-        
-        #### BEGIN group for detection in frame: detect in frame & undo frame detection
-        self.frameDetectionGroup = qd.HDialogGroup(self.mainGroup)
-        self.frameDetectionGroupBox = QtWidgets.QGroupBox("Detect in sweep", self.frameDetectionGroup)
-        
-        self.frameDetectionLayout = QtWidgets.QHBoxLayout(self.frameDetectionGroupBox)
-        self.detectmPSCInFramePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-find"),
-                                                                 "Detect", parent=self.frameDetectionGroupBox)
-        self.detectmPSCInFramePushButton.clicked.connect(self.slot_detect_in_frame)
-        
-        self.undoFramePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-undo"),
-                                                         "Undo", parent = self.frameDetectionGroupBox)
-        self.undoFramePushButton.clicked.connect(self.slot_undo_frame)
-        
-        self.frameDetectionLayout.addWidget(self.detectmPSCInFramePushButton)
-        self.frameDetectionLayout.addWidget(self.undoFramePushButton)
-        self.frameDetectionGroup.addWidget(self.frameDetectionGroupBox)
-        
-        self.mainGroup.addWidget(self.frameDetectionGroup)
-        #### END group for detection in frame: detect in frame & undo frame detection
-            
-        #### BEGIN Group for mPSC detection in whole data
-        self.detectionGroup = qd.HDialogGroup(self.mainGroup)
-        self.detectionGroupBox = QtWidgets.QGroupBox("Detect in data", self.detectionGroup)
-        self.detectionGroupLayout = QtWidgets.QHBoxLayout(self.detectionGroupBox)
-        self.detectmPSCPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-find"),
-                                                          "Detect", parent=self.detectionGroupBox)
-        self.detectmPSCPushButton.clicked.connect(self.slot_detect)
-        
-        self.undoDetectionPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-undo"),
-                                                             "Undo", parent=self.detectionGroupBox)
-        self.undoDetectionPushButton.clicked.connect(self.slot_undo)
-        
-        self.detectionGroupLayout.addWidget(self.detectmPSCPushButton)
-        self.detectionGroupLayout.addWidget(self.undoDetectionPushButton)
-        
-        self.detectionGroup.addWidget(self.detectionGroupBox)
-        
-        
-        self.mainGroup.addWidget(self.detectionGroup)
-        #### END Group for mPSC detection in whole data
+        #### END clear detection group
         
         self.addWidget(self.mainGroup)
         
@@ -488,14 +639,14 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         
     @pyqtSlot()
     def _slot_useTemplateWaveForm(self):
-        val = self.useTemplateWaveFormCheckBox.selection()
+        val = self.templateGroupBox.isChecked()
         self._use_template_ = val==True
         if self._use_template_:
             if self._template_ is None:
                 self._use_template_ =  self._open_template_file(self._template_file_) or self._load_template()
                     
-            signalBlocker = QtCore.QSignalBlocker(self.useTemplateWaveFormCheckBox)
-            self.useTemplateWaveFormCheckBox.setChecked(isinstance(self._template_, neo.AnalogSignal))
+            signalBlocker = QtCore.QSignalBlocker(self.templateGroupBox)
+            self.templateGroupBox.setChecked(isinstance(self._template_, neo.AnalogSignal))
             
     @pyqtSlot()
     def _slot_loadTemplate(self):
@@ -530,6 +681,10 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     def _slot_ephysFrameChanged(self, value):
         """"""
         self._currentFrame_ = value
+        
+    @pyqtSlot(int)
+    def _slot_waveformFrameChanged(self, value):
+        self._currentWaveformIndex_ = value
         
     @pyqtSlot()
     def slot_detect(self):

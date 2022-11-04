@@ -177,7 +177,7 @@ from . import scipyen_colormaps as colormaps
 from .scipyenviewer import (ScipyenViewer, ScipyenFrameViewer,Bunch)
 from .dictviewer import (InteractiveTreeWidget, DataViewer,)
 from .cursors import SignalCursor
-from .colorwidgets import ColorSelectionWidget, quickColorDialog
+from gui.widgets.colorwidgets import ColorSelectionWidget, quickColorDialog
 from gui.pictgui import GuiWorker
 #### END pict.gui modules
 

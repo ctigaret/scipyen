@@ -130,7 +130,7 @@ from qimage2ndarray import gray2qimage, array2qimage, alpha_view, rgb_view, byte
 
 # don't use this yet, until we fully understand how to deal with VigraQt colormap
 #mechanism from Python side
-Ui_EditColorMapWidget, QWidget = __loadUiType__(os.path.join(__module_path__,"editcolormap2.ui"))
+Ui_EditColorMapWidget, QWidget = __loadUiType__(os.path.join(__module_path__,"widgets","editcolormap2.ui"))
 
 #Ui_ItemsListDialog, QDialog = __loadUiType__(os.path.join(__module_path__,'itemslistdialog.ui'))
 

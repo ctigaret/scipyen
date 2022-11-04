@@ -250,9 +250,9 @@ from . import consoles
 from . import gui_viewers
 from . import scipyen_colormaps as colormaps
 # colormaps.registerCustomColorMaps()
-from . import colorwidgets
-from . import stylewidgets
-from . import gradientwidgets
+from .widgets import colorwidgets
+from .widgets import stylewidgets
+from .widgets import gradientwidgets
 from . import interact
 from gui.interact import (getInput, getInputs, packInputs, selectWSData)
 

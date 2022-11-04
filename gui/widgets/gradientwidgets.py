@@ -16,7 +16,7 @@ from core.prog import (safeWrapper, no_sip_autoconversion)
 
 from core.utilities import (counter_suffix, reverse_dict, reverse_mapping_lookup)
 
-from .painting_shared import (HoverPoints, x_less_than, y_less_than,
+from gui.painting_shared import (HoverPoints, x_less_than, y_less_than,
                               qtGlobalColors, standardPalette, standardPaletteDict, 
                               svgPalette, getPalette, paletteQColor, 
                               standardQColor, svgQColor, qtGlobalColors, mplColors,
@@ -39,7 +39,7 @@ from .painting_shared import (HoverPoints, x_less_than, y_less_than,
                               restrict_point, 
                               printPoints)
 
-from . import quickdialog as qd
+from gui import quickdialog as qd
 
 class ShadeWidget(QtWidgets.QWidget):
     colorsChanged   = pyqtSignal(QtGui.QPolygonF, name="colorsChanged")
