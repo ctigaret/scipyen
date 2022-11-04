@@ -126,6 +126,8 @@ def Clements_Bekkers_97(x, parameters):
                     β is dimensionless,
                     x₀, τ₁ and τ₂ are considered in s
     
+                and τ₁ > 0 τ₂ > 0
+    
     Returns:
     ========
     1D numpy array (vector)
@@ -140,12 +142,12 @@ def Clements_Bekkers_97(x, parameters):
     
     y = np.full_like(xx, a)
     
-    y[xx>=0] = a + b * (1 - np.exp(-xx[xx>=0]/t1)) * np.exp(-xx[xx>=0]/t2)
+    if any(v ==0 for v in (t1, t2)):
+        y[xx>=0] = np.nan
+    else:
+        y[xx>=0] = a + b * (1 - np.exp(-xx[xx>=0]/t1)) * np.exp(-xx[xx>=0]/t2)
     
     return y
-    
-    # y(tpos)=(1-exp(t(tpos).*-1/tau1)).*exp(t(tpos).*-1/tau2)
-    
 
 def exp_rise_multi_decay(x, parameters, returnDecays = False):
     """ Realization of a transient signal with a single exponential rise (r) and

@@ -51,6 +51,9 @@ class ModelParametersWidget(QtWidgets.QWidget):
     #                                 index(row), column name
     sig_parameterChanged = pyqtSignal(str,        str,        name="sig_parameterChanged")
     
+    _default_spin_decimals_ = 4
+    _default_spin_step_ = 1e-4
+    
     def __init__(self, parameters:typing.Sequence, parameterNames:typing.Optional[typing.Sequence]=None, spinStep:typing.Optional[float]=None, spinDecimals:typing.Optional[int]=None, lower:typing.Optional[typing.Sequence]=None, upper:typing.Optional[typing.Sequence]=None, orientation:str ="vertical", parent:QtWidgets.QWidget=None):
         """ Constructor of ModelParametersWidget.
     
@@ -153,17 +156,16 @@ class ModelParametersWidget(QtWidgets.QWidget):
         else:
             raise TypeError(f"'upper' expected to be a scalar or a sequence of {len(parameters)} elements; instead, got {upper}")
         
-        self._spinDecimals_ = spinDecimals
-        self._spinStep_ = spinStep
-        
-        spinD, spinS = guiutils.get_QDoubleSpinBox_params(parameters + lower) 
-        
-        if self._spinDecimals_ is None:
-            self._spinDecimals_ = spinD
+        if not isinstance(spinDecimals, int) or spinDecimals < 0:
+            self._spinDecimals_ = self._default_spin_decimals_
+        else:
+            self._spinDecimals_ = spinDecimals
             
-        if self._spinStep_ is None:
-            self._spinStep_ = spinS
-            
+        if not isinstance(spinStep, float) or spinStep < 0:
+            self._spinStep_ = self._default_spin_step_
+        else:
+            self._spinStep_ = spinStep
+        
         self._spin_min_ = -math.inf
         self._spin_max_ =  math.inf
         
@@ -214,26 +216,18 @@ class ModelParametersWidget(QtWidgets.QWidget):
                 else:
                     p = self._parameters_.loc[i,c]
                     w = QtWidgets.QDoubleSpinBox(self)
+                    
+                    # WARNING: 2022-11-03 23:39:21
+                    # This is for general case.
+                    # Depending on the model for which this is intended, one may
+                    # have to restrict these to physically (and mathematically)
+                    # reasonable values by accessing these spine boxes directly
+                    # (based on parameter name and value type i.e. initial, lower
+                    # or upper bound)
+                    # This can be done using self.getSpinBox() method, see
+                    # mPSCanalysis.MPSCAnalysis for an example
                     w.setMinimum(-math.inf)
                     w.setMaximum(math.inf)
-                    
-                    # TODO/FIXME2022-10-30 21:10:14
-                    # if self._verticalLayout_:
-                    #     if c not in (["Lower Bound:", "Upper Bound:"]):
-                    #         lo = self._parameters_.loc[i, "Lower Bound:"]
-                    #         up = self._parameters_.loc[i, "Upper Bound:"]
-                    #     else:
-                    #         lo = -math.inf
-                    #         up = math.inf
-                    # else:
-                    #     if i not in (["Lower Bound:", "Upper Bound:"]):
-                    #         lo = self._parameters_.loc["Lower Bound:", c]
-                    #         up = self._parameters_.loc["Upper Bound:", c]
-                    #     else:
-                    #         lo = -math.inf
-                    #         up = math.inf
-                    # w.setMinimum(max(-math.inf, lo))
-                    # w.setMaximum(min(math.inf, up))
                     
                     w.setDecimals(self.spinDecimals)
                     w.setSingleStep(self.spinStep)
@@ -254,22 +248,8 @@ class ModelParametersWidget(QtWidgets.QWidget):
                             
                     t = w.text()
                     minSpinWidth.append(guiutils.get_text_width(t))
-                    # print(f"minWidth {minWidth}")
-                    # w.setMinimumWidth(minWidth)
                     w.setObjectName(f"{str2symbol(i)}_{str2symbol(c)}_spinBox")
                     spinBoxes.append(w)
-                    
-                    # TODO/FIXME - MAYBE
-                    # if self._verticalLayout_:
-                    #     if c == "Lower Bound:":
-                    #         w.valueChanged.connect(self._slot_setSpinMinimum)
-                    #     elif c == "Upper Bound:":
-                    #         w.valueChanged.connect(self._slot_setSpinMaximum)
-                    # else:
-                    #     if i == "Lower Bound:":
-                    #         w.valueChanged.connect(self._slot_setSpinMinimum)
-                    #     elif i == "Upper Bound:":
-                    #         w.valueChanged.connect(self._slot_setSpinMaximum)
                     
                 self.widgetsLayout.addWidget(w, layout_row, layout_col, 1, 1)
         
@@ -283,13 +263,46 @@ class ModelParametersWidget(QtWidgets.QWidget):
             w.setMinimumWidth(minWidth + 3*minWidth//10)
             w.setSizePolicy(sp)
             
+    def getSpinBox(self, paramName:str, value_type:str):
+        """Access the spin box of a numeric parameter initial value, or boundary.
         
+        Useful to restrict the of values for a particular spin box to a range
+        that is both physically and numerically reasonable, AFER the widget has
+        been constructed.
+        
+        See mPSCanalysis.MPSCAnalysis for an example.
+        
+        Parameters:
+        ==========
+        paramName: the name of the parameter
+        value_type: the name of the parameter value type (e.g. "Initial Value:"
+                    or "Lower Bound:" etc)
+        """
+        rowNdx = list(self.parameters.index)
+        colNdx = list(self.parameters.columns)
+        
+        paramNdx = rowNdx if self.isVertical else colNdx
+        valueNdx = colNdx if self.isVertical else rowNdx
+        
+        if paramName not in paramNdx:
+            raise ValueError(f"Parameter named {paramName} not found")
+        if value_type not in valueNdx:
+            raise ValueError(f"Parameter value for {value_type} not found")
+        
+        paramRow = paramNdx.index(paramName) + 1
+        paramCol = valueNdx.index(value_type) + 1
+        
+        return self.widgetsLayout.itemAtPosition(paramRow, paramCol).widget()
+            
     @property
-    def widgets(self):
-        return self._widgets_
+    def isVertical(self):
+        return self._verticalLayout_
     
     @property
     def parameters(self):
+        """A pandas DataFrame with model parameters, lower and upper bounds.
+            Follows the widget's orientation
+        """
         return self._parameters_
     
     @property
@@ -310,26 +323,15 @@ class ModelParametersWidget(QtWidgets.QWidget):
     
     @pyqtSlot(float)
     def _slot_newvalue(self, value):
-        # print(f"ModelParametersWidget._slot_newvalue value {value}")
         widget = self.sender()
         if isinstance(widget, QtWidgets.QDoubleSpinBox):
             index = self.widgetsLayout.indexOf(widget)
             if index == -1: # this should never happen
                 return
-            
-            # NOTE: 2022-10-30 08:36:35
-            # linear indexing in the grid layout → column varies faster
-            # 
-            # Furthermore:
-            # self.widgetsLayout.rowCount()      → self._parameters_.shape[0] + 1
-            # self.widgetsLayout.columnCount()   → self._parameters_.shape[1] + 1 
-            #
-            
+
             layout_col = index // self.widgetsLayout.rowCount()
             layout_row = index % self.widgetsLayout.rowCount()
 
-            # print(f"ModelParametersWidget._slot_newvalue widget {widget} value {value} index {index}, layout row {layout_row}, layout col {layout_col}")
-            
             old_val = self._parameters_.iloc[layout_row-1, layout_col-1]
             if isinstance(old_val, pq.Quantity):
                 self._parameters_.iloc[layout_row-1, layout_col-1] = value * old_val.units
@@ -340,49 +342,6 @@ class ModelParametersWidget(QtWidgets.QWidget):
             self.sig_parameterChanged.emit(self._parameters_.index[layout_row-1], 
                                            self._parameters_.columns[layout_col-1])
             
-    @pyqtSlot(float)
-    def _slot_setSpinMaximum(self, value:float):
-        # TODO/FIXME 2022-10-30 21:09:27
-        w = self.sender()
-        if isinstance(w, QtWidgets.QDoubleSpinBox):
-            index = self.widgetsLayout.indexOf(w)
-            if index == -1:
-                return
-            
-            col = index // self.widgetsLayout.rowCount()
-            row = index % self.widgetsLayout.owCount()
-            
-            if self._verticalLayout_:
-                target = self.widgetsLayout.itemAtPosition(row, 1).widget()
-            else:
-                target = self.widgetsLayout.itemAtPosition(1, col).widget()
-                
-            # print(target.value())
-            
-            if isinstance(target, QtWidgets.QDoubleSpinBox):
-                target.setMinimum(value)
-        
-    @pyqtSlot(float)
-    def _slot_setSpinMinimum(self, value:float):
-        # TODO/FIXME 2022-10-30 21:09:27
-        w = self.sender()
-        if isinstance(w, QtWidgets.QDoubleSpinBox):
-            index = self.widgetsLayout.indexOf(w)
-            if index == -1:
-                return
-            
-            col = index // self.widgetsLayout.rowCount()
-            row = index % self.widgetsLayout.rowCount()
-            
-            if self._verticalLayout_:
-                target = self.widgetsLayout.itemAtPosition(row, 1).widget()
-            else:
-                target = self.widgetsLayout.itemAtPosition(1, col).widget()
-                
-            if isinstance(target, QtWidgets.QDoubleSpinBox):
-                target.setMaximum(value)
-            
-            
     def validate(self):
         """ Always returns True.
         This method is present so that ModelParametersWidget instances can be
@@ -392,8 +351,3 @@ class ModelParametersWidget(QtWidgets.QWidget):
     
     def getParameterValue(self, parameter_name:str, what:str):
         return self.parameters.loc[parameter_name, what]
-
-class ModelFittingDialog(qd.QuickDialog):
-    # TODO 2022-10-30 22:07:42
-    def __init__(self, parameters:typing.Sequence, parameterNames:typing.Optional[typing.Sequence]=None, lower:typing.Optional[typing.Sequence]=None, upper:typing.Optional[typing.Sequence]=None, orientation:str ="vertical"):
-        pass

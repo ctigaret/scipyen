@@ -134,7 +134,11 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             
         self._ephysViewer_.frameChanged[int].connect(self._slot_ephysFrameChanged)
         
+        # NOTE: 2022-11-03 22:55:52 
+        #### BEGIN these shouldn't be allowed to change
         self._params_names_ = self._default_params_names_
+        #### END these shouldn't be allowed to change
+        
         self._params_initl_ = self._default_params_initl_
         self._params_lower_ = self._default_params_lower_
         self._params_upper_ = self._default_params_upper_
@@ -163,10 +167,24 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                                         upper = self._params_upper_,
                                         orientation="vertical", parent=self.paramsGroupBox)
         
+        # NOTE: ModelParametersWidget is by design generic; however, for models 
+        # where parameters cannot be zero (i.e., they are factors of denominators)
+        # their corresponding spin boxes' minimum values must be constrained to
+        # avoid 0; in particular for the mPSC model, both time constants MUST be
+        # strictly positive; hence, setting the minimum spin box value to the 
+        # value of the spinStep seems like a good idea
+        
+        self.paramsWidget.getSpinBox("τ₁", "Initial Value:").setMinimum(self.paramsWidget.spinStep)
+        self.paramsWidget.getSpinBox("τ₁", "Lower Bound:").setMinimum(self.paramsWidget.spinStep)
+        self.paramsWidget.getSpinBox("τ₁", "Upper Bound:").setMinimum(self.paramsWidget.spinStep)
+        
+        self.paramsWidget.getSpinBox("τ₂", "Initial Value:").setMinimum(self.paramsWidget.spinStep)
+        self.paramsWidget.getSpinBox("τ₂", "Lower Bound:").setMinimum(self.paramsWidget.spinStep)
+        self.paramsWidget.getSpinBox("τ₂", "Upper Bound:").setMinimum(self.paramsWidget.spinStep)
+        
         self.paramsWidget.sig_parameterChanged[str, str].connect(self._slot_modelParameterChanged)
         
         self.paramsGroupLayout.addWidget(self.paramsWidget, 0, 0, 4, 4)
-        
         
         self.durationLabel = QtWidgets.QLabel("Duration:", parent=self.paramsGroupBox)
         self.durationSpinBox = QtWidgets.QDoubleSpinBox(self.paramsGroupBox)
@@ -196,6 +214,46 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         
         self.mainGroup.addWidget(self.paramsGroup)
 
+        self.templateGroup = qd.VDialogGroup(self)
+        self.templateGroupBox = QtWidgets.QGroupBox("Use mPSC Template", self.templateGroup)
+        self.templateGroupBox.setCheckable(True)
+        self.templateGroupBox.setChecked(self._use_template_)
+        self.templateGroupBox.clicked.connect(self._slot_useTemplateWaveForm)
+        self.templateGroupBoxLayout = QtWidgets.QGridLayout(self.templateGroupBox)
+        
+        self.loadTemplatePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("template"),
+                                                  "Load...", 
+                                                  parent = self.templateGroupBox)
+        self.loadTemplatePushButton.setToolTip("Load a mPSC template from workspace")
+        self.loadTemplatePushButton.setWhatsThis("Load a mPSC template from workspace")
+        self.loadTemplatePushButton.setStatusTip("Load a mPSC template from workspace")
+        self.loadTemplatePushButton.clicked.connect(self._slot_loadTemplate)
+        
+        self.loadTemplateFilePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("document-new-from-template"),
+                                                      "Open file...", 
+                                                      parent = self.templateGroupBox)
+        self.loadTemplateFilePushButton.setToolTip("Load a mPSC template from a file")
+        self.loadTemplateFilePushButton.setWhatsThis("Load a mPSC template from a file.\nThe file must contain a single AnalogSignal, and can be a pickle (*.pkl), axon text file (*.atf) or binary (*.abf) file")
+        self.loadTemplateFilePushButton.setStatusTip("Load a mPSC template from a file")
+        self.loadTemplateFilePushButton.clicked.connect(self._slot_openTemplate)
+        
+        self.forgetTemplatePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("delete"),
+                                                    "Forget current",
+                                                    parent = self.templateGroupBox)
+        
+        self.forgetTemplatePushButton.setToolTip("Forget olsd mPSC template")
+        self.forgetTemplatePushButton.setWhatsThis("Forget olsd mPSC template.\nA new template must be loaded from workspace or a file")
+        self.forgetTemplatePushButton.setStatusTip("Forget olsd mPSC template")
+        self.forgetTemplatePushButton.clicked.connect(self._slot_forgetTemplate)
+        
+        self.createTemplatePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("document-save-as-template"),
+                                                              "Store",
+                                                              parent = self.templateGroupBox)
+        self.createTemplatePushButton.setToolTip("Create a new template from the mPSC waveform")
+        self.createTemplatePushButton.setWhatsThis("Create a new template from the mPSC waveform")
+        self.createTemplatePushButton.setStatusTip("Create a new template from the mPSC waveform")
+        self.createTemplatePushButton.clicked.connect(self._slot_createTemplate)
+        
         
         #### BEGIN settings widgets group: contains settings widgets (buttons & checkboxes)
         self.settingsWidgetsGroup = qd.HDialogGroup(self.mainGroup)
@@ -205,13 +263,13 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self.clearDetectionCheckBox.setChecked(self._clear_events_flag_ == True)
         self.clearDetectionCheckBox.stateChanged.connect(self._slot_clearDetectionChanged)
         
-        self.useTemplateWaveFormCheckBox = qd.CheckBox(self.settingsWidgetsGroup, "Use mPSC template")
-        self.useTemplateWaveFormCheckBox.setIcon(QtGui.QIcon.fromTheme("template"))
-        self.useTemplateWaveFormCheckBox.setChecked(self._use_template_)
-        self.useTemplateWaveFormCheckBox.stateChanged.connect(self._slot_useTemplateWaveForm)
+        # self.useTemplateWaveFormCheckBox = qd.CheckBox(self.settingsWidgetsGroup, "Use mPSC template")
+        # self.useTemplateWaveFormCheckBox.setIcon(QtGui.QIcon.fromTheme("template"))
+        # self.useTemplateWaveFormCheckBox.setChecked(self._use_template_)
+        # self.useTemplateWaveFormCheckBox.stateChanged.connect(self._slot_useTemplateWaveForm)
         
         self.settingsWidgetsGroup.addWidget(self.clearDetectionCheckBox)
-        self.settingsWidgetsGroup.addWidget(self.useTemplateWaveFormCheckBox)
+        # self.settingsWidgetsGroup.addWidget(self.useTemplateWaveFormCheckBox)
         
         self.mainGroup.addWidget(self.settingsWidgetsGroup)
         #### END settings widgets group: contains settings widgets (buttons & checkboxes)
@@ -222,11 +280,11 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         
         self.frameDetectionLayout = QtWidgets.QHBoxLayout(self.frameDetectionGroupBox)
         self.detectmPSCInFramePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-find"),
-                                                                 "Detect in frame", parent=self.frameDetectionGroupBox)
+                                                                 "Detect", parent=self.frameDetectionGroupBox)
         self.detectmPSCInFramePushButton.clicked.connect(self.slot_detect_in_frame)
         
         self.undoFramePushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-undo"),
-                                                         "Undo Frame", parent = self.frameDetectionGroupBox)
+                                                         "Undo", parent = self.frameDetectionGroupBox)
         self.undoFramePushButton.clicked.connect(self.slot_undo_frame)
         
         self.frameDetectionLayout.addWidget(self.detectmPSCInFramePushButton)
@@ -328,9 +386,11 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             self._template_ = tpl[0]
             if os.path.isfile(self._template_file_):
                 pio.saveHDF5(self._template_, self._template_file_)
-            return
+            return True
             
         self._template_ = None
+        
+        return False
         
     def _open_template_file(self, fileName:typing.Optional[str]):
         # NOTE: 2022-11-03 16:50:03
@@ -340,7 +400,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
             fileName, fl = self.chooseFile("Choose mPSC Template", "Pickle Files (*.pkl);;Axon text files (*.atf);; Axon binary files (*.abf)")
         
             if len(fileName.strip()) == 0:
-                return
+                return False
         
         data = pio.loadFile(fileName)
         
@@ -432,12 +492,35 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self._use_template_ = val==True
         if self._use_template_:
             if self._template_ is None:
-                if os.path.isfile(self._template_file_):
-                    if self._open_template_file()
-                self._load_template()
+                self._use_template_ =  self._open_template_file(self._template_file_) or self._load_template()
                     
             signalBlocker = QtCore.QSignalBlocker(self.useTemplateWaveFormCheckBox)
             self.useTemplateWaveFormCheckBox.setChecked(isinstance(self._template_, neo.AnalogSignal))
+            
+    @pyqtSlot()
+    def _slot_loadTemplate(self):
+        self._load_template()
+        
+    @pyqtSlot()
+    def _slot_openTemplate(self):
+        self._open_template_file()
+        
+    @pyqtSlot()
+    def _slot_forgetTemplate(self):
+        self._template_ = None
+        if os.path.isfile(self._template_file_):
+            os.remove(self._template_file_)
+        
+        signalBlocker = QtCore.QSignalBlocker(self.useTemplateWaveFormCheckBox)
+        self.useTemplateWaveFormCheckBox.setChecked(isinstance(self._template_, neo.AnalogSignal))
+        
+    @pyqtSlot()
+    def _slot_createTemplate(self):
+        if isinstance(self._template_, neo.AnalogSignal):
+            if os.path.isfile(self._template_file_):
+                pio.saveHDF5(self._template_, self._template_file_)
+        
+         
                     
     @pyqtSlot()
     def _slot_clearDetectionChanged(self):
@@ -610,21 +693,6 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits["ClearOldPSCsOnDetection"] = self._clear_events_flag_
             
-#     @property
-#     def mPSCParametersNames(self):
-#         return self._params_names_
-#     
-#     @markConfigurable("mPSCParametersNames")
-#     @mPSCParametersNames.setter
-#     def mPSCParametersNames(self, val):
-#         if isinstance(val, (tuple, list)) and all(isinstance(s, str) for s in val):
-#             self._params_names_ = val
-# 
-#             if isinstance(getattr(self, "configurable_traits", None), DataBag):
-#                 self.configurable_traits["mPSCParametersNames"] = self._params_names_
-#         else:
-#             raise TypeError("Expecting a sequence of str for parameter names")
-        
     @property
     def mPSCParametersInitial(self):
         """Initial parameter values
@@ -634,24 +702,28 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @markConfigurable("mPSCParametersInitial")
     @mPSCParametersInitial.setter
     def mPSCParametersInitial(self, val:typing.Union[pd.Series, tuple, list, dict]):
-        if isinstance(val, pd.Series):
-            val = list(val)
-            
-        if isinstance(val, (tuple, list)):
-            if all(isinstance(s, pq.Quantity) for s in val):
-                self._params_initl_ = [v for v in val]
+        if isinstance(val, (pd.Series, tuple, list, dict)):
+            if len(val) != len(self._default_params_initl_):
+                val = self._default_params_initl_
                 
-            elif all(isinstance(v, str) for v in val):
-                self._params_initl_ = list(str2quantity(v) for v in val)
+            elif isinstance(val, pd.Series):
+                val = list(val)
+                
+            if isinstance(val, (tuple, list)):
+                if all(isinstance(s, pq.Quantity) for s in val):
+                    self._params_initl_ = [v for v in val]
+                    
+                elif all(isinstance(v, str) for v in val):
+                    self._params_initl_ = list(str2quantity(v) for v in val)
 
-            else:
-                raise TypeError("Expecting a sequence of scalar quantities or their str representations")
-            
-        elif isinstance(val, dict):
-            assert set(val.keys()) == set(self._params_names_), f"Argument keys for initial values must match parameters names {self._params_names_}"
-            
-            for k, v in val.items():
-                self._params_initl_[self._params_names_.index(k)] = v
+                else:
+                    raise TypeError("Expecting a sequence of scalar quantities or their str representations")
+                
+            elif isinstance(val, dict):
+                assert set(val.keys()) == set(self._params_names_), f"Argument keys for initial values must match parameters names {self._params_names_}"
+                
+                for k, v in val.items():
+                    self._params_initl_[self._params_names_.index(k)] = v
             
         elif val in (None, np.nan, math.nan):
             raise TypeError(f"Initial parameter values cannot be {val}")
@@ -669,6 +741,11 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @markConfigurable("mPSCParametersLowerBounds")
     @mPSCParametersLowerBounds.setter
     def mPSCParametersLowerBounds(self, val:typing.Union[pd.Series, tuple, list, dict]):
+        if isinstance(val, (pd.Series, tuple, list, dict)):
+            if len(val) not in (1, len(self._default_params_initl_)):
+                val = self._default_params_lower_
+                # raise ValueError(f"Expecting 1 or {len(self._default_params_initl_)} lower bounds; instead, got {len(val)}")
+            
         if isinstance(val, pd.Series):
             val = list(val)
         
@@ -704,24 +781,28 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
     @markConfigurable("mPSCParametersUpperBounds")
     @mPSCParametersUpperBounds.setter
     def mPSCParametersUpperBounds(self, val:typing.Union[pd.Series, tuple, list, dict]):
-        if isinstance(val, pd.Series):
-            val = list(val)
-        
-        if isinstance(val, (tuple, list)):
-            if all(isinstance(v, pq.Quantity) for v in val):
-                self._params_upper_ = [v for v in val]
-                
-            elif all(isinstance(v, str) for v in val):
-                self._params_upper_ = list(str2quantity(v) for v in val)
-                
-            else:
-                raise TypeError("Expecting a sequence of scalar quantities or their str representations")
+        if isinstance(val, (pd.Series, tuple, list, dict)):
+            if len(val) not in (1, len(self._default_params_initl_)):
+                val = self._default_params_upper_
             
-        elif isinstance(val, dict):
-            assert set(val.keys()) == set(self._params_names_), f"Argument keys for upper bounds must match parameters names {self._params_names_}"
+            elif isinstance(val, pd.Series):
+                val = list(val)
             
-            for k, v in val.items():
-                self._params_upper_[self._params_names_.index(k)] = v
+            if isinstance(val, (tuple, list)):
+                if all(isinstance(v, pq.Quantity) for v in val):
+                    self._params_upper_ = [v for v in val]
+                    
+                elif all(isinstance(v, str) for v in val):
+                    self._params_upper_ = list(str2quantity(v) for v in val)
+                    
+                else:
+                    raise TypeError("Expecting a sequence of scalar quantities or their str representations")
+                
+            elif isinstance(val, dict):
+                assert set(val.keys()) == set(self._params_names_), f"Argument keys for upper bounds must match parameters names {self._params_names_}"
+                
+                for k, v in val.items():
+                    self._params_upper_[self._params_names_.index(k)] = v
             
         elif val in (None, np.nan, math.nan):
             self._params_upper_ = val
