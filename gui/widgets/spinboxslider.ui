@@ -20,12 +20,12 @@
       <string>Frame:</string>
      </property>
      <property name="buddy">
-      <cstring>frameQSpinBox</cstring>
+      <cstring>framesQSpinBox</cstring>
      </property>
     </widget>
    </item>
    <item>
-    <widget class="QSpinBox" name="frameQSpinBox"/>
+    <widget class="QSpinBox" name="framesQSpinBox"/>
    </item>
    <item>
     <widget class="QLabel" name="totalFramesCountLabel">
@@ -35,7 +35,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QSlider" name="frameQSlider">
+    <widget class="QSlider" name="framesQSlider">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>

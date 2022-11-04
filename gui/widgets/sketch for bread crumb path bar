@@ -1,0 +1,22 @@
+mainWindow.fileSyetemModel.rootPath() -> is the path to the current folder
+
+realrootpath = os.path.realpath(mainWindow.fileSystemModel.rootPath()) -> is the real path to the current folder
+
+alternatively (,aybe less confusing to the user) just use the unresolved path:
+    
+rootpath = mainWindow.fileSystemModel.rootPath()
+
+    this needs to be broken down to a bread crumb:
+        
+        the easiest way is to 
+        
+        from pathlib import Path
+        
+        path = Path(realrootpath)
+        
+        then 
+        
+        parts = path.parts -> a list of strings
+        
+    
+    
