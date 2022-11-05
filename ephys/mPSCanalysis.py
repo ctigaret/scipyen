@@ -31,6 +31,8 @@ import ephys.ephys as ephys
 
 from core.prog import safeWrapper
 
+from core.workspacefunctions import get_symbol_in_namespace
+
 from gui import quickdialog as qd
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import ScipyenFrameViewer
@@ -52,7 +54,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
     # NOTE: this refgers to the type of data where mPSC detection is done.
     # The mPSC waveform viewer only expects neo.AnalogSignal
-    supported_types = (neo.Block, neo.Segment)
+    supported_types = (neo.Block, neo.Segment, type(None))
     
     _default_model_units_  = pq.pA
     _default_time_units_   = pq.s
@@ -81,7 +83,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
     _default_template_file = os.path.join(os.path.dirname(get_config_file()),"mPSCTemplate.h5" )
     
-    def __init__(self, ephysdata=None, clearOldPSCs=False, ephysViewer:typing.Optional[sv.SignalViewer]=None, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="mPSC Detection and Analysis", **kwargs):
+    def __init__(self, ephysdata=None, clearOldPSCs=False, ephysViewer:typing.Optional[sv.SignalViewer]=None, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="mPSC Detect", **kwargs):
         # NOTE: 2022-11-05 14:54:24
         # by default, frameIndex is set to all available frames - KISS
         self.threadpool = QtCore.QThreadPool()
@@ -92,15 +94,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._data_var_name_ = None
         self._cached_detection_ = None
         self._data_ = None
-        self._ephysViewer_ = None # to be sorted out in _configureUI_
-        
+
         # NOTE: 2022-11-05 15:14:11
         # logic from TriggerDetectDialog: if this instance of MPSCAnalysis
         # uses its own viewer then self._own_viewer_ will be set to True
         # This allows re-using a SignalViewer that already exists in the 
         # workspace.
         self._own_viewer_ = False
-        
         # NOTE: 2022-11-03 22:55:52 
         #### BEGIN these shouldn't be allowed to change
         self._params_names_ = self._default_params_names_
@@ -114,45 +114,86 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         super().__init__(data=ephysdata, win_title=win_title, 
                          doc_title=self._data_var_name_, parent=parent)
         
-        self.resize(-1,-1)
+        self.winTitle = "mPSC Detect"
         
-    def _configureUI_(self):
-        self.setupUi(self)
-        self._frames_spinBoxSlider_ = SpinBoxSlider(parent=self)
-        # NOTE: 2022-11-05 13:20:35 TODO REMOVE
-        # For compatibility with older ScipyenFrameViewer API where the frames
-        # slider and frames spin box are managed separately
-        self._frames_spinner_ = self._frames_spinBoxSlider_.framesQSpinBox
-        self._frames_slider_ = self._frames_spinBoxSlider_.framesQSlider
-        self._frames_spinBoxSlider_.label = "Sweep:"
-        self._frames_spinBoxSlider_.setRange(0, self._number_of_frames_)
-        self._frames_spinBoxSlider_.valueChanged.connect(self.slot_setFrameNumber)
-        
-        self._mPSCSpinBoxSlider_.label = "mPSC:"
-        self._mPSCSpinBoxSlider_.setRange(0,0)
-        
+        # NOTE: 2022-11-05 23:48:25
+        # must be executed here AFTER superclasses have been initialized
+        if not isinstance(ephysViewer, sv.SignalViewer):
+            self._ephysViewer_ = sv.SignalViewer(win_title=self._winTitle_, parent=self)
+            self._owns_viewer_ = True
+        else:
+            self._ephysViewer_ = ephysViewer
+            self._owns_viewer_ = False
+            
+        if self._data_ is not None:
+            self._ephysViewer_.plot(self._data_)
+            
         # NOTE: 2022-11-05 15:09:59
         # will stay hidden until a waveform (either a mPSC model realisation or 
         # a template mPSC) or a sequence of detetected minis becomes available
         self._waveFormViewer_ = sv.SignalViewer(win_title="mPSC waveform", parent=self)
         
+        # NOTE: 2022-11-05 23:08:01
+        # this is inherited from WorkspaceGuiMixin therefore it needs full
+        # initialization of WorkspaceGuiMixin instance
+        # self._data_var_name_ = self.getDataSymbolInWorkspace(self._data_)
         
-        if not isinstance(ephysViewer, sv.SignalViewer):
-            self._ephysViewer_ = sv.SignalViewer() # title set upon plotting
-            # self._ephysViewer_ = sv.SignalViewer(win_title=self._dialog_title_)
-            self._owns_viewer_ = True
-            
+        self.resize(-1,-1)
+        
+    def _configureUI_(self):
+        self.setupUi(self)
+        
+        # NOTE: 2022-11-05 23:36:28 
+        # add the paramsWidget to the placeholder
+        self._paramsWidgetContainer.setLayout(QtWidgets.QGridLayout(self._paramsWidgetContainer))
+        self._paramsWidgetContainer.layout().setSpacing(0)
+        self._paramsWidgetContainer.layout().setContentsMargins(0, 0, 0, 0)
+        self._paramsWidget = ModelParametersWidget(self._params_initl_, 
+                                        parameterNames = self._params_names_,
+                                        lower = self._params_lower_,
+                                        upper = self._params_upper_,
+                                        orientation="vertical", parent=self._paramsWidgetContainer)
+        self._paramsWidgetContainer.layout().addWidget(self._paramsWidget, 0,0)
+        
+        # NOTE: 2022-11-05 23:31:17 adding the SliderSpinBox widgets
+        # see # NOTE: 2022-11-05 23:26:25 in iv.ImageViewer for the logic of this.
+        self._frames_spinBoxSliderContainer.setLayout(QtWidgets.QGridLayout(self._frames_spinBoxSliderContainer))
+        self._frames_spinBoxSliderContainer.layout().setSpacing(0)
+        self._frames_spinBoxSliderContainer.layout().setContentsMargins(0, 0, 0, 0)
+        self._frames_spinBoxSlider = SpinBoxSlider(parent=self._frames_spinBoxSliderContainer)
+        self._frames_spinBoxSliderContainer.layout().addWidget(self._frames_spinBoxSlider, 0, 0)
+        # NOTE: 2022-11-05 13:20:35 TODO REMOVE
+        # For compatibility with older ScipyenFrameViewer API where the frames
+        # slider and frames spin box are managed separately
+        self._frames_spinner_ = self._frames_spinBoxSlider.framesQSpinBox
+        self._frames_slider_ = self._frames_spinBoxSlider.framesQSlider
+        self._frames_spinBoxSlider.label = "Sweep:"
+        self._frames_spinBoxSlider.setRange(0, self._number_of_frames_)
+        self._frames_spinBoxSlider.valueChanged.connect(self.slot_setFrameNumber)
+        
+        # NOTE: 2022-11-05 23:32:32
+        # see NOTE: 2022-11-05 23:31:17
+        self._mPSC_spinBoxSliderContainer.setLayout(QtWidgets.QGridLayout(self._mPSC_spinBoxSliderContainer))
+        self._mPSC_spinBoxSliderContainer.layout().setSpacing(0)
+        self._mPSC_spinBoxSliderContainer.layout().setContentsMargins(0, 0, 0, 0)
+        self._mPSCSpinBoxSlider = SpinBoxSlider(parent=self._mPSC_spinBoxSliderContainer)
+        self._mPSC_spinBoxSliderContainer.layout().addWidget(self._mPSCSpinBoxSlider, 0, 0)
+        
+        self._mPSCSpinBoxSlider.label = "mPSC:"
+        self._mPSCSpinBoxSlider.setRange(0,0)
+        
+        
+    def _set_data_(self, *args, **kwargs):
+        if len(args):
+            data = args[0]
         else:
-            self._ephysViewer_ = ephysViewer
-            self._owns_viewer_ = False
+            data = kwargs.pop("data", None)
             
-        
-    def _set_data_(self, data, *args, **kwargs):
         if neoutils.check_ephys_data_collection(data): # and self._check_supports_parameter_type_(data):
             self._cached_detection_ = list()
             
-            if isinstance(value, neo.Block):
-                for s in value.segments:
+            if isinstance(data, neo.Block):
+                for s in data.segments:
                     if len(s.spiketrains):
                         trains = [st for st in s.spiketrains if st.annotations.get("source", None)=="mPSC_detection"]
                         if len(trains):
@@ -160,8 +201,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                         else:
                             self._cached_detection_.append(None)
                             
-                self._data_ = value
-                self._data_var_name_ = self.getDataSymbolInworkspace(self._data_)
+                self._data_ = data
+                # NOTE: 2022-11-05 22:59:26
+                # inherited from WorkspaceGuiMixin; HOWEVER, when this is called
+                # duyring __init__ the WorkspaceGuiMixin instance if not fully
+                # initialized
+                # self._data_var_name_ = self.__class__.workspaceSymbolForData(self._data_)
                 # NOTE: 2022-11-05 14:50:26
                 # although self._data_frames_ and self._number_of_frames_ end up
                 # having the same value they are distinct entities and the three 
@@ -170,22 +215,22 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._frameIndex_ = range(self._data_frames_)
                 self._number_of_frames_ = len(self._frameIndex_)
                             
-            elif isinstance(value, neo.Segment):
-                if len(value.spiketrains):
-                    trains = [st for st in value.spiketrains if st.annotations.get("source", None)=="mPSC_detection"]
+            elif isinstance(data, neo.Segment):
+                if len(data.spiketrains):
+                    trains = [st for st in data.spiketrains if st.annotations.get("source", None)=="mPSC_detection"]
                     if len(trains):
                         self._cached_detection_.append(trains[0])
                     else:
                         self._cached_detection_.append(None)
                             
-                self._data_ = value
-                self._data_var_name_ = self.getDataSymbolInworkspace(self._data_)
+                self._data_ = data
+                # self._data_var_name_ = self.__class__.workspaceSymbolForData(self._data_)
                 self._data_frames_ = 1
                 self._frameIndex_ = range(self._data_frames_)
                 self._number_of_frames_ = len(self._frameIndex_)
                 
-            elif isinstance(value, (tuple, list)) and all(isinstance(v, neo.Segment) for v in value):
-                for s in value.segments:
+            elif isinstance(data, (tuple, list)) and all(isinstance(v, neo.Segment) for v in data):
+                for s in data.segments:
                     if len(s.spiketrains):
                         trains = [st for st in s.spiketrains if st.annotations.get("source", None)=="mPSC_detection"]
                         if len(trains):
@@ -193,26 +238,30 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                         else:
                             self._cached_detection_.append(None)
                             
-                self._data_ = value
-                self._data_var_name_ = self.getDataSymbolInworkspace(self._data_)
+                self._data_ = data
+                # self._data_var_name_ = self.__class__.workspaceSymbolForData(self._data_)
                 self._data_frames_ = len(self._data_)
                 self._frameIndex_ = range(self._data_frames_)
                 self._number_of_frames_ = len(self._frameIndex_)
                             
             else:
-                self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects; got {type(value).__name__} instead")
+                self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects; got {type(data).__name__} instead")
                 return
             
-        elif value is None:
+        elif data is None:
             # WARNING: passing None clears the viewer
             self.clear()
             return
             
         else:
-            self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects, or None; got {type(value).__name__} instead")
+            self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects, or None; got {type(data).__name__} instead")
             return
         
-        self._ephysViewer_.plot(self._data_)
+        self._data_var_name_ = self.__class__.workspaceSymbolForData(self._data_)
+        
+        # NOTE: 2022-11-05 23:52:11
+        # self._ephysViewer_ is not yet available when _set_data_ is called from __init__()
+        # self._ephysViewer_.plot(self._data_) 
         
         
     def clear(self):
@@ -227,7 +276,18 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._data_frames_ = 0
         self._frameIndex_ = []
         self._number_of_frames_ = 0
-        self._frames_spinBoxSlider_.setRange(0, 0)
+        self._frames_spinBoxSlider.setRange(0, 0)
+        
+    def closeEvent(self, evt):
+        if self._ephysViewer_.isVisible():
+            if self._owns_viewer_:
+                self._ephysViewer_.close()
+            else:
+                self._ephysViewer_.refresh()
+                
+        self._waveFormViewer_.close()
+                
+        super().closeEvent(evt)
         
         
     
@@ -664,7 +724,6 @@ class MPSCAnalysisDialog(qd.QuickDialog, WorkspaceGuiMixin):
         
         self.setWindowModality(QtCore.Qt.NonModal)
         self.setSizeGripEnabled(True)
-        
         
     def _set_ephys_data_(self, value):
         if neoutils.check_ephys_data_collection(value, mix=False):

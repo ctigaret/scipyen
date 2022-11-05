@@ -3762,6 +3762,19 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         #self.setWindowTitle("Image Viewer")
         
+        # NOTE: 2022-11-05 23:26:25
+        # adding a custom widget in a placeholder in the UI form; this is because
+        # widgets defined in Scipyen have no Qt 5 Designer equivalent
+        # the placeholder is a QWidget () in the UI form
+        # we set the placeholder's layout to a gridlayout with tight spacing &
+        # margins
+        # then we create an instance of the custom widgtet with this placeholder
+        # as parent
+        # finally, we add the custom Scipyen widget to the placeholder grid 
+        # layout at position 0,0
+        #
+        # The placeholder here is self.viewerWidgetContainer (defined in the 
+        # Designer UI form)
         if self.viewerWidgetContainer.layout() is None:
             self.viewerWidgetContainer.setLayout(QtWidgets.QGridLayout(self.viewerWidgetContainer))
             
@@ -3771,12 +3784,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.intensityCalibrationWidget = None
             
         self.viewerWidget = GraphicsImageViewerWidget(parent = self.viewerWidgetContainer, imageViewer=self)
+        
+        # NOTE: 2022-11-05 23:28:39
+        # presumably, these tweaks are redundant
         self.viewerWidgetContainer.layout().setHorizontalSpacing(0)
         self.viewerWidgetContainer.layout().setVerticalSpacing(0)
         self.viewerWidgetContainer.layout().contentsMargins().setLeft(0)
         self.viewerWidgetContainer.layout().contentsMargins().setRight(0)
         self.viewerWidgetContainer.layout().contentsMargins().setTop(0)
         self.viewerWidgetContainer.layout().contentsMargins().setBottom(0)
+        
         self.viewerWidgetContainer.layout().addWidget(self.viewerWidget, 0,0)
         
         # NOTE: 2017-12-18 09:37:07 this relates to mouse cursor position!!!

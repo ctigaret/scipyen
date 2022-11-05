@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import typing
+import typing, os
 from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 from PyQt5.uic import loadUiType as __loadUiType__
@@ -7,7 +7,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-Ui_SpinBoxSlider, QWidget = __loadUiType(os.path.join(__module_path__, "spinboxslider.ui"))
+Ui_SpinBoxSlider, QWidget = __loadUiType__(os.path.join(__module_path__, "spinboxslider.ui"))
 
 class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
     """Compound widget with a SpinBox and Slider.
@@ -31,6 +31,7 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         self._whatsThis_ = self._toolTip_
         self._statusTip_ = self._toolTip_
 
+        super().__init__(parent=parent)
         self._configureUI_()
         
         
@@ -122,7 +123,7 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
     def prefix(self):
         return self._prefix_
     
-    @prefix.setTitlePrefix
+    @prefix.setter
     def prefix(self, value:str):
         if isinstance(value, str):
             self._prefix_ = value
@@ -194,7 +195,7 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         self.totalFramesCountLabel.setStatusTip(self._toolTip_)
         
     @pyqtSlot(int)
-    def _slot_setValue(self, value:int):
+    def slot_setValue(self, value:int):
         val = int(value)
         if val in range(self.minimum, self.maximum+1):
             self._value_ = val

@@ -9,7 +9,7 @@ from PyQt5 import (QtCore, QtWidgets, QtGui)
 from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty)
 #from traitlets.config import SingletonConfigurable
 from core.utilities import safeWrapper
-from core.workspacefunctions import (user_workspace, validate_varname,)
+from core.workspacefunctions import (user_workspace, validate_varname,get_symbol_in_namespace)
 from core.scipyen_config import (ScipyenConfigurable, 
                                  syncQtSettings, 
                                  markConfigurable, 
@@ -313,6 +313,27 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     
     _owncfg = Bunch()
     
+    @staticmethod
+    def appWindowStatic():
+        ws = user_workspace()
+        ret = None
+        if ws is not None:
+            ret = ws["mainWindow"]
+            
+        else:
+            frame_records = inspect.getouterframes(inspect.currentframe())
+            for (n,f) in enumerate(frame_records):
+                if "ScipyenWindow" in f[0].f_globals:
+                    ret = f[0].f_globals["ScipyenWindow"].instance()
+                    break
+            
+        return ret
+    
+    @staticmethod
+    def workspaceSymbolForData(data):
+        ws = WorkspaceGuiMixin.appWindowStatic().workspace
+        return get_symbol_in_namespace(data, ws)        
+    
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None, title="", *args, **kwargs):
         ScipyenConfigurable.__init__(self, *args, **kwargs)
                 
@@ -434,5 +455,13 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             
             self.statusBar().showMessage("Done!")
         
+    def getDataSymbolInWorkspace_(self, data=None):
+        """Calls workspacefunctions.get_symbol_in_namespace for the data.
+        """
+        if data is None:
+            data = self._data_
+        if data is not None and isinstance(self._scipyenWindow_, QtWidgets.QMainWindow) and self._scipyenWindow_.__class__.__name__.startswith("ScipyenWindow"):
+            return get_symbol_in_namespace(data, self._scipyenWindow_.workspace)
+    
             
         

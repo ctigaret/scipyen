@@ -11,7 +11,7 @@ from PyQt5 import (QtCore, QtWidgets, QtGui,)
 from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 
 from core.utilities import safeWrapper
-from core import workspacefunctions as wfunc
+# from core import workspacefunctions as wfunc
 from .workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 from pandas import NA
 
@@ -234,8 +234,9 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # setData ALMOST SURELY needs the ui elements to be initialized - hence 
         # it is called here, AFTER self._configureUI_()
         if data is not None:
-            # NOTE: 2022-01-17 12:39:49 this will call setData in the derived
-            # _class_, if defined
+            # NOTE: 2022-01-17 12:39:49 this will call _set_data_
+            # subclasses can override this by defining their own setData()
+            # see, e.g., SignalViewer
             self.setData(data = data, doc_title = doc_title)
             
         else:
@@ -374,14 +375,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         else:
             return __check_val_type_is_supported__(value)
         
-    def getDataSymbolInWorkspace_(self, data=None):
-        """Calls workspacefunctions.get_symbol_in_namespace for the data.
-        """
-        if data is None:
-            data = self._data_
-        if data is not None and isinstance(self._scipyenWindow_, QtWidgets.QMainWindow) and self._scipyenWindow_.__class__.__name__.startswith("ScipyenWindow"):
-            return wfunc.get_symbol_in_namespace(data, self._scipyenWindow_.workspace)
-    
     def setData(self, *args, **kwargs):
         """Generic function to set the data to be displayed by this viewer.
         
@@ -427,11 +420,15 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # their deisgned functionality.
         #
         # Subclasses may also override this method if necessary, but then call
-        # super().setData(...) from within theis own setData()
+        # super().setData(...) from within their own setData()
         #
         
-        if not any([self._check_supports_parameter_type_(a) for a in args]):
-            raise TypeError("Expecting one of the supported types: %s" % " ".join([s.__name__ for s in self.supported_types]))
+        if len(args):
+            # print(f"ScipyenViewer<{self.__class__.__name__}>setData:")
+            # for k,a in enumerate(args):
+            #     print(f"\targ{k}: {type(a)}")
+            if not any([self._check_supports_parameter_type_(a) for a in args]):
+                raise TypeError("Expecting one of the supported types: %s" % " ".join([s.__name__ for s in self.supported_types]))
             
         get_focus = kwargs.get("get_focus", False)
         
