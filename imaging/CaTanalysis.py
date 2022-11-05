@@ -9901,6 +9901,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         win.signal_graphicsObjectDeselected.connect(self.slot_graphics_objects_deselected, type = QtCore.Qt.QueuedConnection)
         
     def _signalviewer_setup_(self, win):
+        # TODO 2022-11-05 15:04:37 is this still required ?!?
         pass
             
     @safeWrapper
@@ -9920,8 +9921,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         # NOTE: 2022-01-17 16:57:06
         # to properly deal with frame indices from the ScanData.framesMap we 
-        # don't link viewers anymore; instead, we capture their frame number
-        # change via the separate slot _slot_frameChangedInChildViewer
+        # don't link viewers anymore; instead, we capture changes in each viewer's
+        # frame number throught the separate slot _slot_frameChangedInChildViewer
         #for viewer in allviewers:
             #viewer.linkToViewers(*allviewers, broadcast=False)
         

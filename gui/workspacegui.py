@@ -314,9 +314,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     _owncfg = Bunch()
     
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None, title="", *args, **kwargs):
-        #print("WorkspaceGuiMixin __init__ %s" % self.__class__.__name__)
         ScipyenConfigurable.__init__(self, *args, **kwargs)
-        #ScipyenConfigurable.__init__(self, settings = settings)
                 
         self._scipyenWindow_ = None
         
@@ -365,8 +363,8 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     @property
     def appWindow(self):
         """The application main window.
-        This is a reference to the  Scipyen main window, unless explicitly given
-        as something else at the viewer's initiation.
+        This is a reference to the Scipyen main window, unless explicitly given
+        as some other QMainWindow at the viewer's initiation.
         
         appWindow gives access to Scipyen main window API (e.g. the workspace).
         """

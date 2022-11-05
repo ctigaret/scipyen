@@ -73,6 +73,9 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         
     @property
     def maximum(self):
+        """The maximum value in the spinbox and slider.
+        Also sets up the value in the "of..." label.
+        """
         return self.maximum
     
     @maximum.setter

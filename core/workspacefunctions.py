@@ -22,7 +22,7 @@ try:
 except ImportError:
     pass
 
-def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None) -> bool:
+def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None):
     """Sets or gets the state of scipyen debugging.
     
     The state is a boolean variable SCIPYEN_DEBUG in the user namespace.
@@ -66,9 +66,7 @@ def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None) -> bool:
     elif not isinstance(arg, bool):
         raise TypeError("Expecting a str ('on' or 'off'), a bool, or None; got %s instead" % arg)
         
-def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, 
-            var_type:typing.Optional[typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]]=None,
-            sort:bool=False, sortkey:object=None, reverse:bool=False):
+def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_type:typing.Optional[typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]]=None, sort:bool=False, sortkey:object=None, reverse:bool=False):
     """List names of variables in a namespace, according to a selection criterion.
     
     Returns a (possibly sorted) list of variable names if found, or an empty list.
@@ -186,7 +184,6 @@ def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None,
     
     return ret
     
-    
 def getvarsbytype(vartype, ws=None):
     """Get variables by type, from a namespace or a dict
     """
@@ -213,9 +210,7 @@ def getvarsbytype(vartype, ws=None):
     
     #return dict(lst)
         
-def getvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, 
-            var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None,
-            as_dict:bool=False, sort:bool= False, sortkey:object=None, reverse:bool = False) -> object:
+def getvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None, as_dict:bool=False, sort:bool= False, sortkey:object=None, reverse:bool = False):
     """Collects a subset of variabes from a workspace or a dictionary.
 
     Returns a (possibly sorted) list of the variables if found, or an empty list.
@@ -375,7 +370,6 @@ def getvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None,
         
     return ret
 
-    
 def assignin(variable, varname, ws=None):
     """Assign variable as varname in workspace ws"""
     
@@ -397,7 +391,7 @@ def assignin(variable, varname, ws=None):
     
 assign = assignin # syntactic sugar
 
-def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None) -> list:
+def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None):
     """Returns a list of symbols to which 'x' is bound in the namespace 'ws'
     
     The  list is empty when the variable 'x' does not exist in ws (e.g when it is
@@ -419,7 +413,7 @@ def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None) -> li
         
     return [k for k in ws if ws[k] is x and not k.startswith("_")]
 
-def user_workspace() -> dict:
+def user_workspace():
     """Returns a reference to the user workspace (a.k.a user namespace)
     """
     frame_records = inspect.getouterframes(inspect.currentframe())
@@ -427,7 +421,7 @@ def user_workspace() -> dict:
         if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within Scipyen's IPython console
             return f[0].f_globals["mainWindow"].workspace
         
-def scipyentopdir() -> str:
+def scipyentopdir():
     user_ns = user_workspace()
     return user_ns["mainWindow"]._scipyendir_
 
@@ -558,7 +552,6 @@ def delvars(*args, glob=True, ws=None):
                 for t in targets:
                     ws.pop(t[0], None)
                         
-                    
 def validate_varname(arg, ws=None):
     """Converts a putative variable name "arg" into a valid one.
     

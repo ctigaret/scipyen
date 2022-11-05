@@ -4,7 +4,7 @@ from itertools import chain
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-from PyQt5.uic import loadUiType
+from PyQt5.uic import loadUiType as __loadUiType__
 
 import numpy as np
 import quantities as pq
@@ -39,15 +39,202 @@ from gui.signalviewer import SignalCursor as SignalCursor
 import gui.pictgui as pgui
 from gui.workspacegui import (GuiMessages, WorkspaceGuiMixin)
 from gui.widgets.modelfitting_ui import ModelParametersWidget
+from gui.widgets.spinboxslider import SpinBoxSlider
 from gui import guiutils
 
 import iolib.pictio as pio
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
+__Ui_mPSDDetectWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__, "mPSCDetectWindow.ui"))
+
+class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
+    
+    # NOTE: this refgers to the type of data where mPSC detection is done.
+    # The mPSC waveform viewer only expects neo.AnalogSignal
+    supported_types = (neo.Block, neo.Segment)
+    
+    _default_model_units_  = pq.pA
+    _default_time_units_   = pq.s
+    
+    _default_params_names_ = ["α", "β", "x₀", "τ₁", "τ₂"]
+    
+    _default_params_initl_ = [0.*_default_model_units_, 
+                              -1.*pq.dimensionless, 
+                              0.005*_default_time_units_, 
+                              0.001*_default_time_units_, 
+                              0.01*_default_time_units_]
+    
+    _default_params_lower_ = [0.*_default_model_units_, 
+                              -math.inf*pq.dimensionless, 
+                              0.*_default_time_units_, 
+                              1.0e-4*_default_time_units_, 
+                              1.0e-4*_default_time_units_]
+    
+    _default_params_upper_ = [math.inf*_default_model_units_, 
+                              0.*pq.dimensionless,  
+                              math.inf*_default_time_units_,
+                              0.01*_default_time_units_, 
+                              0.01*_default_time_units_]
+    
+    _default_duration_ = 0.02*_default_time_units_
+    
+    _default_template_file = os.path.join(os.path.dirname(get_config_file()),"mPSCTemplate.h5" )
+    
+    def __init__(self, ephysdata=None, clearOldPSCs=False, ephysViewer:typing.Optional[sv.SignalViewer]=None, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="mPSC Detection and Analysis", **kwargs):
+        # NOTE: 2022-11-05 14:54:24
+        # by default, frameIndex is set to all available frames - KISS
+        self.threadpool = QtCore.QThreadPool()
+        
+        self._clear_events_flag_ = clearOldPSCs == True
+        self._mPSC_detected_ = False
+        self._currentWaveformIndex_ = 0
+        self._data_var_name_ = None
+        self._cached_detection_ = None
+        self._data_ = None
+        self._ephysViewer_ = None # to be sorted out in _configureUI_
+        
+        # NOTE: 2022-11-05 15:14:11
+        # logic from TriggerDetectDialog: if this instance of MPSCAnalysis
+        # uses its own viewer then self._own_viewer_ will be set to True
+        # This allows re-using a SignalViewer that already exists in the 
+        # workspace.
+        self._own_viewer_ = False
+        
+        # NOTE: 2022-11-03 22:55:52 
+        #### BEGIN these shouldn't be allowed to change
+        self._params_names_ = self._default_params_names_
+        #### END these shouldn't be allowed to change
+        
+        self._params_initl_ = self._default_params_initl_
+        self._params_lower_ = self._default_params_lower_
+        self._params_upper_ = self._default_params_upper_
+        self._mPSCduration_ = self._default_duration_
+        
+        super().__init__(data=ephysdata, win_title=win_title, 
+                         doc_title=self._data_var_name_, parent=parent)
+        
+        self.resize(-1,-1)
+        
+    def _configureUI_(self):
+        self.setupUi(self)
+        self._frames_spinBoxSlider_ = SpinBoxSlider(parent=self)
+        # NOTE: 2022-11-05 13:20:35 TODO REMOVE
+        # For compatibility with older ScipyenFrameViewer API where the frames
+        # slider and frames spin box are managed separately
+        self._frames_spinner_ = self._frames_spinBoxSlider_.framesQSpinBox
+        self._frames_slider_ = self._frames_spinBoxSlider_.framesQSlider
+        self._frames_spinBoxSlider_.label = "Sweep:"
+        self._frames_spinBoxSlider_.setRange(0, self._number_of_frames_)
+        self._frames_spinBoxSlider_.valueChanged.connect(self.slot_setFrameNumber)
+        
+        self._mPSCSpinBoxSlider_.label = "mPSC:"
+        self._mPSCSpinBoxSlider_.setRange(0,0)
+        
+        # NOTE: 2022-11-05 15:09:59
+        # will stay hidden until a waveform (either a mPSC model realisation or 
+        # a template mPSC) or a sequence of detetected minis becomes available
+        self._waveFormViewer_ = sv.SignalViewer(win_title="mPSC waveform", parent=self)
+        
+        
+        if not isinstance(ephysViewer, sv.SignalViewer):
+            self._ephysViewer_ = sv.SignalViewer() # title set upon plotting
+            # self._ephysViewer_ = sv.SignalViewer(win_title=self._dialog_title_)
+            self._owns_viewer_ = True
+            
+        else:
+            self._ephysViewer_ = ephysViewer
+            self._owns_viewer_ = False
+            
+        
+    def _set_data_(self, data, *args, **kwargs):
+        if neoutils.check_ephys_data_collection(data): # and self._check_supports_parameter_type_(data):
+            self._cached_detection_ = list()
+            
+            if isinstance(value, neo.Block):
+                for s in value.segments:
+                    if len(s.spiketrains):
+                        trains = [st for st in s.spiketrains if st.annotations.get("source", None)=="mPSC_detection"]
+                        if len(trains):
+                            self._cached_detection_.append(trains[0])
+                        else:
+                            self._cached_detection_.append(None)
+                            
+                self._data_ = value
+                self._data_var_name_ = self.getDataSymbolInworkspace(self._data_)
+                # NOTE: 2022-11-05 14:50:26
+                # although self._data_frames_ and self._number_of_frames_ end up
+                # having the same value they are distinct entities and the three 
+                # lines below illustrate how to set them up
+                self._data_frames_ = len(self._data_.segments)
+                self._frameIndex_ = range(self._data_frames_)
+                self._number_of_frames_ = len(self._frameIndex_)
+                            
+            elif isinstance(value, neo.Segment):
+                if len(value.spiketrains):
+                    trains = [st for st in value.spiketrains if st.annotations.get("source", None)=="mPSC_detection"]
+                    if len(trains):
+                        self._cached_detection_.append(trains[0])
+                    else:
+                        self._cached_detection_.append(None)
+                            
+                self._data_ = value
+                self._data_var_name_ = self.getDataSymbolInworkspace(self._data_)
+                self._data_frames_ = 1
+                self._frameIndex_ = range(self._data_frames_)
+                self._number_of_frames_ = len(self._frameIndex_)
+                
+            elif isinstance(value, (tuple, list)) and all(isinstance(v, neo.Segment) for v in value):
+                for s in value.segments:
+                    if len(s.spiketrains):
+                        trains = [st for st in s.spiketrains if st.annotations.get("source", None)=="mPSC_detection"]
+                        if len(trains):
+                            self._cached_detection_.append(trains[0])
+                        else:
+                            self._cached_detection_.append(None)
+                            
+                self._data_ = value
+                self._data_var_name_ = self.getDataSymbolInworkspace(self._data_)
+                self._data_frames_ = len(self._data_)
+                self._frameIndex_ = range(self._data_frames_)
+                self._number_of_frames_ = len(self._frameIndex_)
+                            
+            else:
+                self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects; got {type(value).__name__} instead")
+                return
+            
+        elif value is None:
+            # WARNING: passing None clears the viewer
+            self.clear()
+            return
+            
+        else:
+            self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects, or None; got {type(value).__name__} instead")
+            return
+        
+        self._ephysViewer_.plot(self._data_)
+        
+        
+    def clear(self):
+        self._ephysViewer_.clear()
+        self._ephysViewer_.setVisible(False)
+        self._cached_detection_ = None
+        self._mPSC_detected_ = False
+        self._data_ = None
+        self._data_var_name_ = None
+        self._currentWaveformIndex_ = 0
+        self._model_waveform_ = None
+        self._data_frames_ = 0
+        self._frameIndex_ = []
+        self._number_of_frames_ = 0
+        self._frames_spinBoxSlider_.setRange(0, 0)
+        
+        
+    
+
 # class MPSCAnalysis(ScipyenFrameViewer):
 # NOTE: 2022-11-04 14:23:22 ScipyenFrameViewer does NOT work with QuickDialog → SegmentationFault
-class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
+class MPSCAnalysisDialog(qd.QuickDialog, WorkspaceGuiMixin):
     """Mini-PSC analysis window ("app")
     Most of the GUI logic as in triggerdetectgui.TriggerDetectDialog
     
@@ -218,7 +405,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         # 1) sets the detection epoch internally to the selected epoch name
         # 
         self.epochNameLabel = QtWidgets.QLabel("Epoch:", self.dataGroupBox)
-        self.dataGroupBoxLayout.addWidget(self.epochComboBox, 2, 0, 1, 1)
+        self.dataGroupBoxLayout.addWidget(self.epochNameLabel, 2, 0, 1, 1)
         self.epochComboBox = QtWidgets.QComboBox(self.dataGroupBox)
         self.dataGroupBoxLayout.addWidget(self.epochComboBox, 2, 1, 1, 1)
         
@@ -245,7 +432,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                                                          parent = self.dataGroupBox)
         self.dataGroupBoxLayout.addWidget(self.makeEpochPushButton,3,1,1,1)
         
-        self.dataGroup.addWiget(self.dataGroupBox)
+        # self.dataGroup.addWiget(self.dataGroupBox)
         self.dataAndTemplateFrameLayout.addWidget(self.dataGroup, 0,0,1,2)
         #### END data group
         
@@ -492,7 +679,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                         else:
                             self._cached_detection_.append(None)
                             
-                self._ephys_ = value
+                self._data_ = value
                             
             elif isinstance(value, neo.Segment):
                 if len(value.spiketrains):
@@ -502,7 +689,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                     else:
                         self._cached_detection_.append(None)
                             
-                self._ephys_ = value
+                self._data_ = value
                 
             elif isinstance(value, (tuple, list)) and all(isinstance(v, neo.Segment) for v in value):
                 for s in value.segments:
@@ -513,7 +700,7 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
                         else:
                             self._cached_detection_.append(None)
                             
-                self._ephys_ = value
+                self._data_ = value
                             
             else:
                 self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects; got {type(value).__name__} instead")

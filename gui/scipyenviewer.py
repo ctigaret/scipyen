@@ -11,6 +11,7 @@ from PyQt5 import (QtCore, QtWidgets, QtGui,)
 from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 
 from core.utilities import safeWrapper
+from core import workspacefunctions as wfunc
 from .workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 from pandas import NA
 
@@ -32,10 +33,19 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     -----------------------
     As a minimum, subclasses of ScipyenViewer must:
     
-    1) define a :class: attribute named "supported_viewers", which is a tuple or
-    list of python stypes supported by the viewer.
+    1) define a :class: attribute named "supported_types", set to a tuple or
+        list of python data types supported by the viewer.
+
+        Viewers also support sequences of data (list, tuple); the objects in the 
+        sequence must be of one of the types specified here.
+
+        This attribute is mostly for the benefit of Scipyen's mechanism of 
+        choosing an appropriate viewer for an object in the workspace, but it 
+        can be used by the viewer itself to determine what to do with the "data"
+        passed to its constructor.
+        
     
-    2) define a :class: attribute called "view_action_name" which is a str that 
+    2) define a :class: attribute called "view_action_name" set to a str that 
         gives the name for the menu item invoked to display a variable using this
         viewer. Scipyen will use this attribute to generate a menu item in the
         Workspace context menu. 
@@ -171,7 +181,17 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         # NOTE: 2019-11-09 09:30:38
         # _data_var_name_ is either None, or the symbol bound to the data in user's namespace
-        #self._data_var_name_ = None
+        # 
+        # Used only when data has been loaded via a QAction (i.e. menu item) or
+        # following a button click and is the symbol to which the displayed data 
+        # is bound, in the workspace.
+        # 
+        # When given (and indeee bound to the displayed data) this can be used 
+        # to refresh the data after it was modified
+        # 
+        # TODO: 2022-11-05 12:02:52 
+        # implement a traitlets/observable mechanism for this purpose
+        self._data_var_name_ = None
 
         if isinstance(ID, int):
             self._ID_ = ID
@@ -346,8 +366,21 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.setData(data, doc_title=doc_title, *args, **kwargs)
         
     def _check_supports_parameter_type_(self, value):
-        return isinstance(value, self.supported_types) or any([t in type(value).mro() for t in self.supported_types])
+        def __check_val_type_is_supported__(val):
+            return isinstance(value, self.supported_types) or any([t in type(value).mro() for t in self.supported_types])
+            
+        if isinstance(value (tuple, list)):
+            return all(__check_val_type_is_supprted__(v) for v in value)
+        else:
+            return __check_val_type_is_supported__(value)
         
+    def getDataSymbolInWorkspace_(self, data=None):
+        """Calls workspacefunctions.get_symbol_in_namespace for the data.
+        """
+        if data is None:
+            data = self._data_
+        if data is not None and isinstance(self._scipyenWindow_, QtWidgets.QMainWindow) and self._scipyenWindow_.__class__.__name__.startswith("ScipyenWindow"):
+            return wfunc.get_symbol_in_namespace(data, self._scipyenWindow_.workspace)
     
     def setData(self, *args, **kwargs):
         """Generic function to set the data to be displayed by this viewer.
@@ -380,7 +413,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         # NOTE: 2020-09-25 10:35:34
         # 
-        # This function does thw following:
+        # This function does the following:
         #
         # 1. delegates to _set_data_(...) -- which does nothing here and MUST be
         #   overridden (see below).
@@ -399,7 +432,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         if not any([self._check_supports_parameter_type_(a) for a in args]):
             raise TypeError("Expecting one of the supported types: %s" % " ".join([s.__name__ for s in self.supported_types]))
-            
             
         get_focus = kwargs.get("get_focus", False)
         
@@ -594,6 +626,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             data = data_vars[self._data_var_name_]
             
             self.setData(data)
+        
+        NOTE: Must be implemented in the derived subclass.
         """
         pass
             
@@ -646,7 +680,85 @@ class ScipyenFrameViewer(ScipyenViewer):
     
     Derived classes:
     ----------------
-    ImageViewer, SignalViewer, LSCaTWindow.
+    ImageViewer, SignalViewer, LSCaTWindow, MPSCAnalysis, LTPAnalysis, APTrains.
+
+    ATTENTION: When deriving a viewer window type from ScipyenFrameViewer:
+
+    • in the __init__ method of the derived type call `super().__init__(...)` in  
+        order to create an instance of the superclass ScipyenFrameViewer.
+        
+        The superclass __init__ method calls two methods which have to be 
+        implemented specifically in the derived viewer class:
+        
+        ∘ `self._configureUI_` 
+
+        ∘ `self._set_data_`
+        
+        The call order is as follows (↓ indicates temporal succession,
+        → indicates function call):
+        
+        self.__int__() → super().__init__() → self._configureUI_()
+                                ↓
+                         super().__init__() → self.loadSettings()
+                                ↓
+                         super().__init__() → self.setData → self._set_data_()
+        
+        The above call sequence mandates that instance variables of the derived
+        class be assigned default values BEFORE calling super().__init__()
+
+    • define (implement) `self._set_data_()` method:
+        This is called by self.setData (defined in ScipoyenViewer superclass) 
+        and will parse the data to be displayed in order to set up properties 
+        of the various GUI widgets in the derived class.
+        
+        If specific customizations are rewuired by the derived viewer you may
+        call super().__init__() with `data` parameter set to None, then call 
+        `self._set_data_` manually in the subclass __init__, passing custom 
+        parameters to it. This ensures self._set_data_ is called AFTER the call
+        to self._configureUI_
+        
+        NOTE: `self._set_data_` can be called either directly or indirectly by 
+        calling `self.setData` method inherited all the way from ScipyenViewer.
+        
+        The self._set_data_ method MUST:
+        ∘ assign the "data" object to self._data_ property (inherited all the
+            way from ScipyenViewer)
+        
+        ∘ assign values to the following instance attributes inherited from 
+            ScipyenFrameViewer:
+            □ self._data_var_name_
+            □ self._data_frames_
+            □ self._frameIndex_
+            □ self._number_of_frames_
+        
+        ∘ assign values to instance attributes of the derived class, containing
+            properties of GUI widgets of the derived class.
+        
+        ∘ set the properties of the GUI widgets according to the instance 
+            attributes listed above
+        
+        ∘ assign values ot any instance attributes that 
+
+    • define (implement) `self._configureUI_()`, but do NOT call it directly:
+        ∘ this method is called by the ScipyenFrameViewer __init__ (see above).
+
+        ∘ the method instantiates the GUI widgets and connects their signals to 
+            appropriate slots (Qt framework)
+        
+            WARNING: Make sure these slots are defined (implemented) in the 
+                derived class, unless they are already inherited (and NOT defined
+                as abstract methods) from the ScipyenFrameViewer or ScipyenViewer
+                superclasses.
+
+        ∘ ATTENTION: in classes that use UI forms generated with Qt 5 Designer, 
+            this method MUST call `self.setupUi(self)` first thing, in order to
+            instantiate all the widgets declared in the UI form.
+        
+        ∘ CAUTION: the widgets properties may require certain class or instance
+            attributes having default values  - make sure these conditions are 
+            met.
+        
+
     """
     
     # signal emitted when the viewer displays a data frame; value:int = the
@@ -707,6 +819,10 @@ class ScipyenFrameViewer(ScipyenViewer):
         self._frames_spinner_           = None
         self._frames_slider_            = None
         
+        # NOTE: 2022-11-05 13:10:22
+        # Migrate to using gui.widgets.SliderSpinBox
+        self._frames_spinBoxSlider_     = None
+        
         self._missing_frame_value_ = missingFrameValue or NA
         
         # NOTE: 2022-01-17 13:02:27
@@ -737,6 +853,8 @@ class ScipyenFrameViewer(ScipyenViewer):
         """The number of "frames" (segments, sweeps) in which data is organized.
         This may be larger than nFrames which is the number of frames the viewer
         can actually display.
+        
+        See also: self.nFrames property.
         """
         return self._data_frames_
     
@@ -744,18 +862,29 @@ class ScipyenFrameViewer(ScipyenViewer):
     def nFrames(self):
         """The number of data "frames" this viewer knows of; read-only.
         
+        A "frame" is either a 2D slice through a nD array (e.g. a 2D slice of a 
+        VigraArray), a neo.Segment (which corresponds to an electrophysiology
+        "sweep") or a data element in a sequence-like collection (e.g. a 1D 
+        array or a neo BaseSignal in a list or tuple) considered as a unit of
+        visualization.
+        
         The displayed frames may be a subset of the frames that the data is 
         logically organized in, consisting of the frames selected for viewing.
         
-        In the general case,
-            self.nFrames <= self.dataFrames
-            
-        This can happen when only a subset of the data frames are to be shown.
-            
-        An exception from this rule is the case case of multi-channel signals 
-        plotted in SignalViewer, with one channel per frame - hence, there
-        are several frames displayed one at a time, even if data is logically
-        organized in just one frame.
+        See also: self.dataFrames property.
+        
+        Generally, self.nFrames = self.dataFrames.
+        
+        When self.nFrames < self.dataFrames this signifies that only a subset 
+        of the frames available in the data are to be shown.
+        
+        Conversely, self.nFrames > self.dataFrames happens when multi-channel 
+        signals are plotted in SignalViewer with one channel per frame - hence, 
+        there are several frames displayed one at a time, even if data is l
+        ogically organized in just one frame.
+        
+        The distinction between self.nFrames and self.dataFrames is useful for
+        multi-index displays (see CaTAnslysis.LSCaTWindow)
         """
         return self._number_of_frames_
     
@@ -872,6 +1001,10 @@ class ScipyenFrameViewer(ScipyenViewer):
         return self._linkedViewers_
     
     @property
+    def framesSpinBoxSlider(self):
+        return self._frames_spinBoxSlider_
+    
+    @property
     def framesSlider(self):
         """Read-only access to the frames QSlider.
         
@@ -984,6 +1117,10 @@ class ScipyenFrameViewer(ScipyenViewer):
             
             self.frameChanged.emit(value)
             
+            # NOTE: 2022-11-05 15:07:13
+            # the linkedViewers mechanism is still useful even though it is 
+            # bypassed in LSCaTWindow (where there is a need to deal with special
+            # indexing in ScanData, see ScanData.framesMap)
             for viewer in self.linkedViewers:
                 viewer.currentFrame = value
             

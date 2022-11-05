@@ -3338,7 +3338,7 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence], as_di
             raise TypeError("Unexpected parameter type %s" % type(src[0]).__name__)
         
 def check_ephys_data_collection(x:typing.Any, mix:bool=False):
-    """Checks if x is a data type representing a collection of electrophysiology data.
+    """Checks if x is a collection of electrophysiology data.
     This check is performed too often not to warrant a function for it.
     
     Parameters:
@@ -3349,9 +3349,12 @@ def check_ephys_data_collection(x:typing.Any, mix:bool=False):
         sequence (tuple, list)
     
  
-    See neoutils.check_ephys_data for what is understood by electrophysiolgy data
+    See also neoutils.check_ephys_data()
     
     """
+    # NOTE: TODO: 2022-11-05 11:33:19
+    # These two functions are somewhat redundant to the ScipyenViewer testing of
+    # data types
     if isinstance(x, ephys_data_collection):
         return True
     

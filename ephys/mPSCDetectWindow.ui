@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>526</width>
-    <height>588</height>
+    <height>666</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -355,7 +355,8 @@
               <string>Plot</string>
              </property>
              <property name="icon">
-              <iconset theme="graphics"/>
+              <iconset theme="graphics">
+               <normaloff>.</normaloff>.</iconset>
              </property>
             </widget>
            </item>
@@ -365,7 +366,8 @@
               <string>Make epoch</string>
              </property>
              <property name="icon">
-              <iconset theme="select"/>
+              <iconset theme="select">
+               <normaloff>.</normaloff>.</iconset>
              </property>
             </widget>
            </item>
@@ -392,7 +394,8 @@
                 <string>Import</string>
                </property>
                <property name="icon">
-                <iconset theme="document-import"/>
+                <iconset theme="document-import">
+                 <normaloff>.</normaloff>.</iconset>
                </property>
               </widget>
              </item>
@@ -402,7 +405,8 @@
                 <string>Open</string>
                </property>
                <property name="icon">
-                <iconset theme="document-open"/>
+                <iconset theme="document-open">
+                 <normaloff>.</normaloff>.</iconset>
                </property>
               </widget>
              </item>
@@ -412,7 +416,8 @@
                 <string>Create</string>
                </property>
                <property name="icon">
-                <iconset theme="template"/>
+                <iconset theme="template">
+                 <normaloff>.</normaloff>.</iconset>
                </property>
               </widget>
              </item>
@@ -422,7 +427,8 @@
                 <string>Remember</string>
                </property>
                <property name="icon">
-                <iconset theme="document-save-as-template"/>
+                <iconset theme="document-save-as-template">
+                 <normaloff>.</normaloff>.</iconset>
                </property>
               </widget>
              </item>
@@ -432,7 +438,8 @@
                 <string>Forget</string>
                </property>
                <property name="icon">
-                <iconset theme="delete"/>
+                <iconset theme="delete">
+                 <normaloff>.</normaloff>.</iconset>
                </property>
               </widget>
              </item>
@@ -447,7 +454,8 @@
            <string>Plot mPSC Template or Model</string>
           </property>
           <property name="icon">
-           <iconset theme="graphics"/>
+           <iconset theme="graphics">
+            <normaloff>.</normaloff>.</iconset>
           </property>
          </widget>
         </item>
@@ -506,7 +514,8 @@
             <string>Sweep</string>
            </property>
            <property name="icon">
-            <iconset theme="go-jump"/>
+            <iconset theme="go-jump">
+             <normaloff>.</normaloff>.</iconset>
            </property>
           </widget>
          </item>
@@ -516,7 +525,8 @@
             <string>Undo sweep</string>
            </property>
            <property name="icon">
-            <iconset theme="edit-undo"/>
+            <iconset theme="edit-undo">
+             <normaloff>.</normaloff>.</iconset>
            </property>
           </widget>
          </item>
@@ -526,7 +536,8 @@
             <string>Data</string>
            </property>
            <property name="icon">
-            <iconset theme="edit-find"/>
+            <iconset theme="edit-find">
+             <normaloff>.</normaloff>.</iconset>
            </property>
           </widget>
          </item>
@@ -536,7 +547,8 @@
             <string>Undo</string>
            </property>
            <property name="icon">
-            <iconset theme="edit-undo"/>
+            <iconset theme="edit-undo">
+             <normaloff>.</normaloff>.</iconset>
            </property>
           </widget>
          </item>
@@ -546,7 +558,8 @@
             <string>Validate</string>
            </property>
            <property name="icon">
-            <iconset theme="checkmark"/>
+            <iconset theme="checkmark">
+             <normaloff>.</normaloff>.</iconset>
            </property>
           </widget>
          </item>
@@ -555,7 +568,7 @@
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_2">
          <item>
-          <widget class="QWidget" name="framesSliderSpinBox" native="true">
+          <widget class="QWidget" name="_mPSCSpinBoxSlider" native="true">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
              <horstretch>0</horstretch>
@@ -572,6 +585,16 @@
           </widget>
          </item>
         </layout>
+       </item>
+       <item>
+        <widget class="QWidget" name="_frames_sliderSpinBox_" native="true">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+        </widget>
        </item>
       </layout>
      </widget>
@@ -599,7 +622,8 @@
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionOpen">
    <property name="icon">
-    <iconset theme="document-open"/>
+    <iconset theme="document-open">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Open</string>
@@ -607,7 +631,8 @@
   </action>
   <action name="actionImport">
    <property name="icon">
-    <iconset theme="document-import"/>
+    <iconset theme="document-import">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Import</string>

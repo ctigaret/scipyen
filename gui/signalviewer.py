@@ -347,10 +347,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         neo.IrregularlySampledSignal and datatypes.DataSignal.
         
        ChannelIndex, Unit -- see the documentation of neo package
+
             
-        
-    
-    
     CHANGELOG
     =========
     NOTE: 2019-02-11 13:52:30
@@ -1149,7 +1147,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     globalAnnotations = {type(x).__name__ : x.annotations},
                     docTitle = None
                     )
-        print("_interpret_signal", type(x))
+        # print("SignalViewer._interpret_signal", type(x))
         if isinstance(x, (neo.core.basesignal.BaseSignal, neo.SpikeTrain, neo.Event, neo.Epoch, DataMark, DataZone)):
             ret["signalChannelAxis"] = 1
             ret["signalChannelIndex"] = normalized_sample_index(x.as_array(), ret["signalChannelAxis"], kwargs.get("signalChannelIndex", None))
