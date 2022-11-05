@@ -180,7 +180,8 @@ class MPSCAnalysis(qd.QuickDialog, WorkspaceGuiMixin):
         self.dataAndTemplateFrameLayout = QtWidgets.QGridLayout(self.dataAndTemplateFrame)
         
         #### BEGIN data group
-        self.dataGroup = qd.VDialogGroup(self.dataAndTemplateFrame)
+        # self.dataGroup = qd.VDialogGroup(self.dataAndTemplateFrame)
+        self.dataGroup = QtWidgets.QFrame(self.topGroup)
         self.dataGroupBox = QtWidgets.QGroupBox("Data", self.dataGroup)
         self.dataGroupBoxLayout = QtWidgets.QGridLayout(self.dataGroupBox)
         self.openDataPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("document-open"),

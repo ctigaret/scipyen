@@ -15,7 +15,7 @@
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout">
    <item>
-    <widget class="QLabel" name="frameLabel">
+    <widget class="QLabel" name="descriptionLabel">
      <property name="text">
       <string>Frame:</string>
      </property>

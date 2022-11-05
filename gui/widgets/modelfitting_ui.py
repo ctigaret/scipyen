@@ -4,7 +4,7 @@ import math, numbers, typing, os
 import pandas as pd
 import quantities as pq
 from core.strutils import str2symbol
-from . import guiutils
+from gui import guiutils
 import gui.quickdialog as qd
 
 from PyQt5 import QtCore, QtGui, QtWidgets
