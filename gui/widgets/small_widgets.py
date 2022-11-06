@@ -51,11 +51,10 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         self.unitComboBox.currentIndexChanged.connect(self._slot_unitComboNewIndex)
         
     def _setupUnitCombo(self):
-        combo_units = set()
+        combo_units = list()
         unscalables = set()
         
         units = [u for u in scq.UNITS_DICT[self._currentUnitsFamily]["irreducibles"] | scq.UNITS_DICT[self._currentUnitsFamily]["derived"]]
-        # print(f"{[u.name for u in units]}")
         
         fdt_ = set()
         for u in units:
@@ -71,34 +70,32 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
             try:
                 if u.dimensionality in fdt:
                     fdu_.add(u)
+                else:
+                    unscalables.add(u)
             except:
                 unscalables.add(u)
         
         fdu = list(fdu_)
         
-        units_reduced = [u for u in units if u not in fdu or (u in fdu and u.name not in [u_.name for u_ in fdu])]
-        
-        # print(f"units_reduced {units_reduced}")
+        units_reduced = sorted([u for u in units if u not in fdu or (u in fdu and u.name not in [u_.name for u_ in fdu])], key = lambda x: x.name)
         
         for u in fdu:
-            combo_units.add(u)
-            u_s = list()
+            combo_units.append(u)
+            u_s = set()
             for uu in units_reduced:
                 try:
                     u_scale = float(uu.rescale(u).magnitude)
-                    u_s.append((uu, u_scale))
+                    u_s.add((uu, u_scale))
                 except:
                     unscalables.add(uu)
                     continue
             if len(u_s):
-                u_ss = set(sorted(u_s, key = lambda x: x[1]))
-                combo_units = combo_units | set([v[0] for v in u_ss])
+                u_ss = sorted(list(u_s), key = lambda x: x[1])
+                combo_units += [v[0] for v in u_ss]
                 
-        combo_units = combo_units | unscalables
+        combo_units += list(unscalables)
         
         self._currentFamilyUnits = list(combo_units)
-        
-        # print(f"_currentFamilyUnits {self._currentUnitsFamily}: {combo_units}")
         
         signalBlocker = QtCore.QSignalBlocker(self.unitComboBox)
         self.unitComboBox.clear()
@@ -108,12 +105,15 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
     def _slot_refresh_unitComboBox(self, value):
         self._currentUnitsFamily = self._unitFamilies[self.unitFamilyComboBox.currentIndex()]
         self._setupUnitCombo()
+        currentUnit = self._currentFamilyUnits[self.unitComboBox.currentIndex()]
+        self.unitChanged.emit(currentUnit)
+        
         
     @pyqtSlot(int)
     def _slot_unitComboNewIndex(self, value):
         currentUnit = self._currentFamilyUnits[self.unitComboBox.currentIndex()]
         
-        print(f"self.__class__.__name__._slot_unitComboNewIndex {currentUnit}, type: {type(currentUnit).__name__}, dimensionality: {currentUnit.dimensionality}")
+        # print(f"self.__class__.__name__._slot_unitComboNewIndex {currentUnit}, type: {type(currentUnit).__name__}, dimensionality: {currentUnit.dimensionality}")
         
         self.unitChanged.emit(currentUnit)
         
