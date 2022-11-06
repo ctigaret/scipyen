@@ -38,7 +38,9 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
         
     gender: str: one of "F", "M", "NA"; optional, default is None
     
-    biometric: dict; optional, default is None
+    biometric: dict; optional, default is None; the contents are free-form, but 
+        should have some sort of systematic organization.
+
         When a dict it may contain:
             'weight' -> python Quantity of mass units; optional, default is None
             

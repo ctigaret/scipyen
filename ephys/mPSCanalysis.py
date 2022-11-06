@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os, typing, math
 from numbers import (Number, Real,)
 from itertools import chain

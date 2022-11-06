@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Widgets for parameter inputs
 """
 import math, numbers, typing, os
