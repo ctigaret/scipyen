@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>727</width>
-    <height>226</height>
+    <height>182</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -15,7 +15,7 @@
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="0" column="0">
-    <layout class="QVBoxLayout" name="mainLayout">
+    <layout class="QVBoxLayout" name="verticalLayout">
      <item>
       <layout class="QVBoxLayout" name="dataNameVerticalLayout">
        <property name="spacing">
@@ -102,7 +102,10 @@
       </layout>
      </item>
      <item>
-      <layout class="QHBoxLayout" name="horizontalLayout_3">
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <property name="spacing">
+        <number>0</number>
+       </property>
        <item>
         <layout class="QFormLayout" name="sourceCellFieldTreatmentFormLayout">
          <property name="horizontalSpacing">
@@ -216,42 +219,19 @@
            </property>
           </widget>
          </item>
-         <item row="3" column="0">
-          <widget class="QLabel" name="treatmentLabel">
-           <property name="text">
-            <string>Treatment:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="1">
-          <widget class="QLineEdit" name="treatmentLineEdit"/>
-         </item>
         </layout>
        </item>
        <item>
-        <layout class="QGridLayout" name="ageGenderGenotypeGridLayout">
-         <property name="spacing">
-          <number>2</number>
-         </property>
+        <layout class="QFormLayout" name="formLayout">
          <item row="0" column="0">
           <widget class="QLabel" name="ageLabel">
            <property name="text">
             <string>Age:</string>
            </property>
-           <property name="buddy">
-            <cstring>ageDoubleSpinBox</cstring>
-           </property>
           </widget>
          </item>
-         <item row="0" column="1" colspan="2">
-          <widget class="QDoubleSpinBox" name="ageDoubleSpinBox">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-          </widget>
+         <item row="0" column="1">
+          <widget class="QWidget" name="ageWidget" native="true"/>
          </item>
          <item row="1" column="0">
           <widget class="QLabel" name="genderLabel">
@@ -269,7 +249,7 @@
            </property>
           </widget>
          </item>
-         <item row="1" column="1" colspan="2">
+         <item row="1" column="1">
           <widget class="QComboBox" name="genderComboBox">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
@@ -300,7 +280,7 @@
            </property>
           </widget>
          </item>
-         <item row="2" column="0" colspan="2">
+         <item row="2" column="0">
           <widget class="QLabel" name="genotypeLabel">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
@@ -316,7 +296,7 @@
            </property>
           </widget>
          </item>
-         <item row="2" column="2">
+         <item row="2" column="1">
           <widget class="QComboBox" name="genotypeComboBox">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Minimum" vsizetype="Fixed">

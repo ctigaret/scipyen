@@ -370,7 +370,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         def __check_val_type_is_supported__(val):
             return isinstance(value, self.supported_types) or any([t in type(value).mro() for t in self.supported_types])
             
-        if isinstance(value (tuple, list)):
+        if isinstance(value, (tuple, list)):
             return all(__check_val_type_is_supprted__(v) for v in value)
         else:
             return __check_val_type_is_supported__(value)

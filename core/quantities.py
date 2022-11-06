@@ -9,7 +9,7 @@ import operator
 from functools import (reduce, partial, cache)
 
 _pqpfx = sorted(inspect.getmembers(pq.prefixes, lambda x: isinstance(x, (float, int))) + [("deca", pq.prefixes.deka)], key = lambda x: x[1])
-                            
+
 def make_prefix_symbol(pfx):
     if pfx.endswith("a"):
         if pfx in ("deka", "deca"):
@@ -78,16 +78,16 @@ arbitrary_unit = arbitraryUnit = ArbitraryUnit = a_u = pq.UnitQuantity('arbitrar
 
 pixel_unit = pixelUnit = PixelUnit = pixel = pu = pix = px = pq.UnitQuantity('pixel', 1. * pq.dimensionless, symbol='pixel')
 
-day_in_vitro = div = DiV = pq.UnitQuantity("day in vitro", 1 * pq.day, symbol = "div")
-week_in_vitro = wiv = WiV = pq.UnitQuantity("week in vitro", 1 * pq.week, symbol = "wiv")
+day_in_vitro = div = DiV = pq.UnitTime("day in vitro", 1 * pq.day, symbol = "div")
+week_in_vitro = wiv = WiV = pq.UnitTime("week in vitro", 1 * pq.week, symbol = "wiv")
 
-postnatal_day = pnd = PnD = pq.UnitQuantity("postnatal day", 1 * pq.day, symbol = "pnd")
-postnatal_week = pnw = PnW = pq.UnitQuantity("postnatal week", 1 * pq.week, symbol = "pnw")
-postnatal_month = pnm = PnM = pq.UnitQuantity("postnatal month", 1 * pq.month, symbol = "pnm")
+postnatal_day = pnd = PnD = pq.UnitTime("postnatal day", 1 * pq.day, symbol = "pnd")
+postnatal_week = pnw = PnW = pq.UnitTime("postnatal week", 1 * pq.week, symbol = "pnw")
+postnatal_month = pnm = PnM = pq.UnitTime("postnatal month", 1 * pq.month, symbol = "pnm")
 
-embryonic_day = emd = EmD = pq.UnitQuantity("embryonic day", 1 * pq.day, symbol = "emd")
-embryonic_week = emw = EmW = pq.UnitQuantity("embryonic week", 1 * pq.week, symbol = "emw")
-embryonic_month = emm = EmM = pq.UnitQuantity("embryonic month", 1 * pq.month, symbol = "emm")
+embryonic_day = emd = EmD = pq.UnitTime("embryonic day", 1 * pq.day, symbol = "emd")
+embryonic_week = emw = EmW = pq.UnitTime("embryonic week", 1 * pq.week, symbol = "emw")
+embryonic_month = emm = EmM = pq.UnitTime("embryonic month", 1 * pq.month, symbol = "emm")
 
 # NOTE: 2017-07-21 16:05:38
 # a dimensionless unit for channel axis (when there are more than one channel in the data)
@@ -142,9 +142,14 @@ for cq in custom_quantities:
 
 del(custom_quantities, cq, _pqpfx)
 
-def __get_standard_units_definitions():
+def get_units():
+    """REturns all units definitions in the Python Quantities package, augmented.
+    
+    """
     ret = dict()
     unitsmodules = [(k,v) for (k,v) in pq.units.__dict__.items() if inspect.ismodule(v)]
+    
+    _upriority = ("length", "time", "temperature", "mass", "substance", "information", "other")
     
     for module in unitsmodules:
         # check for all quantities
@@ -157,12 +162,20 @@ def __get_standard_units_definitions():
         # hence they can be used as dict keys
         
         if len(module_units):
+            ugroup = module[0].capitalize()
             units = set(u[1] for u in module_units)
-            ir_units = set(u[1] for u in module_units if isinstance(u[1], pq.unitquantity.IrreducibleUnit) and type(u[1]).__name__.replace("Unit","") == module[0].capitalize())
+            ir_units = set(u[1] for u in module_units if isinstance(u[1], pq.unitquantity.IrreducibleUnit) and type(u[1]).__name__.replace("Unit","") == ugroup)
             der_units = units - ir_units
-            ret[module[0]]=dict()
-            ret[module[0]]["irreducibles"] = ir_units
-            ret[module[0]]["derived"] = der_units
+            ret[ugroup]=dict()
+            ret[ugroup]["irreducibles"] = ir_units
+            ret[ugroup]["derived"] = der_units
+            if ugroup.lower() == "time":
+                ret[ugroup]["derived"] = ret[ugroup]["derived"] | {day_in_vitro, week_in_vitro, postnatal_day, postnatal_month, postnatal_week, embryonic_day, embryonic_month, embryonic_week}
+            elif ugroup.lower() == "frequency":
+                ret[ugroup]["derived"] = ret[ugroup]["derived"] | {angle_frequency_unit, space_frequency_unit}
+            elif ugroup == "electromagnetism":
+                ret[ugroup]["derived"] = ret[ugroup]["derived"] | {kiloohm, megaohm, gigaohm}
+                
             
         # reverse-locate irreducibles
         
@@ -181,10 +194,13 @@ def __get_standard_units_definitions():
                     if i not in derived:
                         derived[i] = set()
                     derived[i].add(k)
+                    
+    ret["other"]={"irreducibles": {arbitrary_unit, pixel_unit, channel_unit},
+                  "derived": set()}
             
     return ret, irreducibles, derived
 
-UNITS_DICT, IRREDUCIBLES, DERIVED = __get_standard_units_definitions()
+UNITS_DICT, IRREDUCIBLES, DERIVED = get_units()
         
 
 def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]):

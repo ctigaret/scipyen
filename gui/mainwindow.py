@@ -3579,27 +3579,21 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if ret == QtWidgets.QMessageBox.No:
             return
         
-        #print(f"***\nScipyenWindow.slot_deleteSelectedVars varNames = {varNames}")
-        
         # FIXME: 2022-10-13 18:40:01
         # this is still too slow and cumbersome - possibly overheads in 
         # WorkspaceModel 
         for n in varNames:
             obj = self.workspace[n]
             if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
-                #print("%s.slot_deleteSelectedVars %s: %s" % (self.__class__.__name__, n, obj.__class__.__name__))
                 if isinstance(obj, mpl.figure.Figure):
                     plt.close(obj) # also removes obj.number from plt.get_fignums()
                     
                 else:
                     obj.close()
-                    #obj.closeEvent(QtGui.QCloseEvent())
+
                 self.deRegisterViewer(obj) # does not remove its symbol for workspace - this has already been removed by delete action
                 
             self.removeWorkspaceSymbol(n)
-            # self.removeFromWorkspace(n, by_name=True, update=True)
-            # self.removeFromWorkspace(n, by_name=True, update=False)
-            #self.workspace.pop(n, None)
             
         self.workspaceModel.currentItem = None
         
@@ -3768,7 +3762,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.close()
         
     def closeEvent(self, evt):
-        #open_windows = ((name, obj) for (name, obj) in self.workspace.items() if isinstance(obj, QtWidgets.QWidget))
         if self.external_console is not None:
             self.external_console.window.closeEvent(evt)
             if not evt.isAccepted():
@@ -3786,6 +3779,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.saveSettings()
         
+        open_windows = ((name, obj) for (name, obj) in self.workspace.items() if isinstance(obj, QtWidgets.QWidget))
+        for win in open_windows:
+            if win[1] is not self:
+                win[1].close()
+            
         evt.accept()
         
     #def saveSettings(self):
@@ -5974,7 +5972,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     
                 else:
                     obj.close()
-                    #obj.closeEvent(QtGui.QCloseEvent())
+                    
                 self.deRegisterViewer(obj) # does not remove its symbol for workspace - this has already been removed by delete action
                 
             self.removeWorkspaceSymbol(n)
