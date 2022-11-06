@@ -6,6 +6,8 @@ from PyQt5.uic import loadUiType
 from gui.painting_shared import (FontStyleType, standardQtFontStyles, 
                                  FontWeightType, standardQtFontWeights)
 
+from gui import quickdialog as qd
+
 import quantities as pq
 from core import quantities as scq
 import pandas as pd
@@ -26,6 +28,8 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         
         _derived = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducibles"])==0]
         
+        self._currentUnit = None
+        
         self._unitFamilies = list(_irreds + _derived)
         
         self._currentUnitsFamily = None
@@ -44,6 +48,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         self.unitFamilyComboBox.currentIndexChanged.connect(self._slot_refresh_unitComboBox)
         
         self._currentUnitsFamily = self._unitFamilies[self.unitFamilyComboBox.currentIndex()]
+        
         self._setupUnitCombo()
         self.unitComboBox.setCurrentIndex(0)
         
@@ -105,25 +110,43 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
     def _slot_refresh_unitComboBox(self, value):
         self._currentUnitsFamily = self._unitFamilies[self.unitFamilyComboBox.currentIndex()]
         self._setupUnitCombo()
-        currentUnit = self._currentFamilyUnits[self.unitComboBox.currentIndex()]
-        self.unitChanged.emit(currentUnit)
+        self._currentUnit = self._currentFamilyUnits[self.unitComboBox.currentIndex()]
+        self.unitChanged.emit(self._currentUnit)
         
         
     @pyqtSlot(int)
     def _slot_unitComboNewIndex(self, value):
-        currentUnit = self._currentFamilyUnits[self.unitComboBox.currentIndex()]
+        self._currentUnit = self._currentFamilyUnits[self.unitComboBox.currentIndex()]
         
         # print(f"self.__class__.__name__._slot_unitComboNewIndex {currentUnit}, type: {type(currentUnit).__name__}, dimensionality: {currentUnit.dimensionality}")
         
-        self.unitChanged.emit(currentUnit)
+        self.unitChanged.emit(self._currentUnit)
+        
+    @property
+    def currentUnit(self):
+        return self._currentUnit
         
 
 class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
-    # TODO 2022-10-31 16:43:09 maybe 
+    """Subclass of QDoubleSpinBox aware of Python quantities.
+    Single step, number of decimals and units suffix are all configurable.
+    """
     def __init__(parent=None):
         super().__init__(self, parent=parent)
         
+        self._default_units_ = pq.dimensionless
         self._units_ = pq.dimensionless
+        
+        self._default_singleStep = 1e-2
+        self._singleStep = self._default_singleStep
+        
+        self._default_decimals = -math.log10(self._singleStep) if self._singleStep < 1 else 1
+        self._decimals = self._default_decimals
+        
+        self.setSingleStep(self._singleStep)
+        self.setDecimals(self._decimals)
+        
+        self.setContextMenuPolicy(QtCore.Qt.DefaultContextMenu)
         
     @property
     def units(self):
@@ -133,11 +156,62 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     def units(self, value:typing.Optional[pq.Quantity] = None):
         if isinstance(value, pq.Quantity):
             self._units_ = value.units
-            super().setSuffix(f" {self._value_.dimensionality}")
+            super().setSuffix(f" {self._value_.dimensionality.unicode}")
         else:
             self._units_ = pq.dimensionless
             super().setSuffix("")
             
+    def contextMenuEvent(self, evt):
+        cm = QtWidgets.QMenu("Options", self)
+        setUnitsAction = cm.addAction("Set quantity units")
+        setUnitsAction.triggered.connect(self._slot_setUnits)
+        setSingleStepAction = cm.addAction("Set single step")
+        setPrecisionAction.triggered.connect(self._slot_setSingleStep)
+        setDecimalsAction = cm.addAction("Set decimals")
+        setDecimalsAction.triggered.connect(self._slot_setDecimals)
+        resetAction = cm.addAction("Reset")
+        resetAction.triggered.connect(self._slot_reset)
+        cm.popup(evt.pos())
+        
+    @pyqtSlot()
+    def _slot_setUnits(self):
+        dlg = qd.QuickDialog(parent = self)
+        quantityWidget = QuantityChooserWidget(parent = dlg)
+        dlg.addWidget(quantityWidget)
+        if dlg.exec():
+            self.units = quantityWidget.currentUnit
+            
+    @pyqtSlot()
+    def _slot_setSingleStep(self):
+        dlg = qd.Quickdialog(parent=self)
+        floatInput = qd.FloatInput(dlg, "Step (float)")
+        floatInput.setValue(f"{self._singleStep}")
+        dlg.addwidget(floatInput)
+        if dlg.exec():
+            value = floatInput.value()
+            self.setSingleStep(value)
+            
+    @pyqtSlot()
+    def _slot_setDecimals(self):
+        dlg = qd.Quickdialog(parent=self)
+        intInput = qd.IntegerInput(dlg, "Decimals (int, > 0)")
+        intInput.setValue(f"{self._decimals}")
+        dlg.addwidget(intInput)
+        if dlg.exec():
+            value = intInput.value()
+            if value < 0:
+                value  = 0
+            self.setDecimals(value)
+            
+    @pyqtSlot()
+    def _slot_reset(self):
+        self.setSingleStep(self._default_singleStep)
+        self.setDecimals(self._default_decimals)
+        self.units = self._default_units_
+            
     
+        
+        
+        
             
     
