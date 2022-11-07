@@ -45,20 +45,18 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
             self.addWidget(w)
         
         addEntryPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("list-add"),
-                                                   "Add entry",
-                                                   parent = self.buttons)
+                                                   "Add entry", parent=self.buttons)
         self.buttons.layout.addWidget(addEntryPushButton)
         addEntryPushButton.clicked.connect(self._slot_addEntry)
         
         removeEntryPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("list-remove"),
-                                                      "Remove entry",
-                                                      parent = self.buttons)
+                                                      "Remove entry", parent=self.buttons)
         self.buttons.layout.addWidget(removeEntryPushButton)
         removeEntryPushButton.clicked.connect(self._slot_removeEntry)
         
     def _generate_widgets(self):
         widgets = list()
-        for k, v in self._mapping_:
+        for k, v in self._mapping_.items():
             if isinstance(v, int):
                 factory = qd.IntegerInput
             elif isinstance(v, float):
@@ -86,7 +84,7 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
         for w in to_remove:
             del(self.widgets[self.widgets.index(w)])
             
-        dlg.update()
+        self.update()
         
     def _slot_addEntry(self):
         dlg = qd.QuickDialog(parent=self, title="Add entry")
@@ -140,7 +138,7 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
         if dlg.exec():
             entry = entriesCombo.text()
             
-            del(self._mapping_[entry]
+            del(self._mapping_[entry])
             
             self._clearWidgets()
             
