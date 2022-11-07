@@ -217,7 +217,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QLabel" name="genderLabel">
+      <widget class="QLabel" name="sexLabel">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
          <horstretch>0</horstretch>
@@ -228,12 +228,12 @@
         <string>Sex:</string>
        </property>
        <property name="buddy">
-        <cstring>genderComboBox</cstring>
+        <cstring>sexComboBox</cstring>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QComboBox" name="genderComboBox">
+      <widget class="QComboBox" name="sexComboBox">
        <property name="sizePolicy">
         <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
          <horstretch>0</horstretch>

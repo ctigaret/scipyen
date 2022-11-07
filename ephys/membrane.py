@@ -1784,7 +1784,7 @@ def ap_waveform_roots(w, value, interpolate=False):
             
     return float(rise_x), float(rise_y), float(rise_cslope), float(decay_x), float(decay_y), float(decay_cslope)
 
-def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=None, tail=None,thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, dataname=None, cell="NA", genotype="NA", source="NA", gender="NA",age=np.nan, record=None, protocol_name=None,ref_vm = None, ref_vm_relative_onset=False,output_prefix=None):
+def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=None, tail=None,thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, dataname=None, cell="NA", genotype="NA", source="NA", sex="NA",age=np.nan, record=None, protocol_name=None,ref_vm = None, ref_vm_relative_onset=False,output_prefix=None):
     """Batch analysis for pulse-triggered APs in current-clamp.
     
     Loops through neo.Segments in data, calling analyse_AP_pulse_train for each
@@ -1854,7 +1854,7 @@ def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=No
         genotype = data.genotype
         source = data.sourceID
         age = data.age
-        gender = data.gender
+        sex = data.sex if hasattr(data, "sex") else getattr(data, "gender", "NA")
         data = data.electrophysiology
         
     if not isinstance(segment_index, (int, tuple, list, range, slice, type(None))):
@@ -1939,7 +1939,7 @@ def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=No
                                                             resample_with_period=resample_with_period,
                                                             t0=t0,t1=t1, 
                                                             cell=cell, genotype=genotype, 
-                                                            source=source, gender=gender,
+                                                            source=source, sex=sex,
                                                             age=age, dataname=dataname, 
                                                             record=recname, 
                                                             protocol_name=protocol_name,
@@ -1981,9 +1981,9 @@ def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=No
                                                      AP = grouped_report.index)
         grouped_report.Genotype = grouped_report.Genotype.astype("category")
         
-        grouped_report = grouped_report.assign(Gender = [gender] * len(grouped_report),
+        grouped_report = grouped_report.assign(Sex = [sex] * len(grouped_report),
                                                      AP = grouped_report.index)
-        grouped_report.Gender = grouped_report.Gender.astype("category")
+        grouped_report.Sex = grouped_report.Sex.astype("category")
         
         sdict = dict()
         
@@ -2006,9 +2006,9 @@ def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=No
                                                      AP = aggregated_report.index)
         aggregated_report.Genotype = aggregated_report.Genotype.astype("category")
         
-        aggregated_report = aggregated_report.assign(Gender = [gender] * len(aggregated_report),
+        aggregated_report = aggregated_report.assign(Sex = [sex] * len(aggregated_report),
                                                      AP = aggregated_report.index)
-        aggregated_report.Gender = aggregated_report.Gender.astype("category")
+        aggregated_report.Sex = aggregated_report.Sex.astype("category")
         
         
         
@@ -2031,7 +2031,7 @@ def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=No
     else:
         return report, aggregated_report, grouped_report, segments_ap_results, segments_ap_waves, segments_ap_dvdt, segments_ap_d2vdt2
         
-def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, record=None, dataname=None,cell="NA", genotype="NA", source="NA", gender="NA",age=np.nan, protocol_name="NA", ref_vm = None, ref_vm_relative_onset=False):
+def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, record=None, dataname=None,cell="NA", genotype="NA", source="NA", sex="NA",age=np.nan, protocol_name="NA", ref_vm = None, ref_vm_relative_onset=False):
     
     """
     Analyses AP waveforms triggered by a train of current injection pulses.
@@ -2097,7 +2097,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr
     
     tail, thr, atol, smooth_window, resample_with_period, t0, t1,
     
-    record, dataname, cell, genotype, source, gender, age,
+    record, dataname, cell, genotype, source, sex, age,
     
     protocol_name, ref_vm
     
@@ -2217,7 +2217,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr
                                                    resample_with_period=resample_with_period,
                                                    t0=t0, t1=t1, record=recordname, 
                                                    cell=cell, genotype=genotype, 
-                                                   source=source, gender=gender,
+                                                   source=source, sex=sex,
                                                    age=age, dataname=dataname, protocol_name=protocol_name,
                                                    ref_vm = ref_vm,
                                                    ref_vm_relative_onset = ref_vm_relative_onset)
@@ -2227,7 +2227,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr
     return ap_result, ap_report, ap_waves, ap_dvdt, ap_d2vdt2
     
 
-def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, record=None, cell="NA", genotype="NA", source="NA", gender="NA",age=np.nan, dataname=None, protocol_name="NA", ref_vm = None, ref_vm_relative_onset=False):
+def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, record=None, cell="NA", genotype="NA", source="NA", sex="NA",age=np.nan, dataname=None, protocol_name="NA", ref_vm = None, ref_vm_relative_onset=False):
     """Waveform analysis for action potentials elicited individually by brief 
     pulses of current injection.
     
@@ -2272,7 +2272,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
     source: str, unique identifier of the recording source (e.g. animal ID, 
         culture ID, etc.); default is "NA"
         
-    gender: str, the genetic sex or gender or "NA" (default) when not available
+    sex: str, the genetic sex or sex or "NA" (default) when not available
     
     age: scalar float, default is np.nan
     
@@ -2407,7 +2407,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
         
         res_dict["Genotype"] = pd.Series([genotype] * len(ap_results), name="Genotype").astype("category")
         
-        res_dict["Gender"] = pd.Series([gender] * len(ap_results), name="Gender").astype("category")
+        res_dict["Sex"] = pd.Series([sex] * len(ap_results), name="Sex").astype("category")
         
         res_dict["Age"] = pd.Series([age] * len(ap_results), name="Age")
         

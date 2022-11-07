@@ -2459,7 +2459,7 @@ class ScanData(BaseScipyenData):
                 
                 result.age      = unit.age
                 result.genotype = unit.genotype
-                result.gender   = unit.gender
+                result.sex   = unit.sex
                 result.sourceID = unit.sourceID
                 
                 result._analysis_units_.add(analysis_unit)
@@ -2473,7 +2473,7 @@ class ScanData(BaseScipyenData):
         result._analysis_unit_.field = self._analysis_unit_.field
         result._analysis_unit_.age = self._analysis_unit_.age
         result._analysis_unit_.genotype = self._analysis_unit_.genotype
-        result._analysis_unit_.gender= self._analysis_unit_.gender
+        result._analysis_unit_.sex= self._analysis_unit_.sex
         result._analysis_unit_.inScene= self._analysis_unit_.inScene
         result._analysis_unit_.sourceID = self._analysis_unit_.sourceID
         result._analysis_unit_.parent = self
@@ -3714,7 +3714,7 @@ class ScanData(BaseScipyenData):
                 unit.field = self.analysisUnit().field
                 unit.sourceID = self.analysisUnit().sourceID
                 unit.genotype = self.analysisUnit().genotype
-                unit.gender = self.analysisUnit().gender
+                unit.sex = self.analysisUnit().sex
                 unit.age = self.analysisUnit().age
                 
                 for d in self.analysisUnit().descriptors:
@@ -5474,7 +5474,7 @@ class ScanData(BaseScipyenData):
         ret_unit.age = self.analysisUnit().age
         ret_unit.sourceID = self.analysisUnit().sourceID
         ret_unit.genotype = self.analysisUnit().genotype
-        ret_unit.gender = self.analysisUnit().gender
+        ret_unit.sex = self.analysisUnit().sex
         
         # force ret_unit's name to be that of the landmark (if present)
         if analysis_unit.landmark is not None:

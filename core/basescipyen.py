@@ -36,7 +36,7 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
         optional, default is None)
             e.g., 15 pq.div or 20 * pq.pnd (postnatal day), or 16 * pq.emd (embryonic day)
         
-    gender: str: one of "F", "M", "NA"; optional, default is None
+    sex: str: one of "F", "M", "NA"; optional, default is None
     
     biometric: dict; optional, default is None; the contents are free-form, but 
         should have some sort of systematic organization.

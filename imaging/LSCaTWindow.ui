@@ -253,12 +253,12 @@
                </sizepolicy>
               </property>
               <property name="text">
-               <string>Gender:</string>
+               <string>Sex:</string>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QComboBox" name="genderComboBox">
+             <widget class="QComboBox" name="sexComboBox">
               <property name="sizePolicy">
                <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
                 <horstretch>0</horstretch>
@@ -3946,7 +3946,7 @@ SourceID,
 Cell, 
 Field, 
 Age, 
-Gender, 
+Sex, 
 Genotype
 
 and also the data-wide analysis unit descriptors (Distance from soma, etc...)</string>

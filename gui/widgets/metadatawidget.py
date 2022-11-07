@@ -42,7 +42,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             self._age_units = pq.div
             self._age  = self._age * self._age_units
             
-        self._gender = kwargs.pop("gender", pd.NA)
+        self._sex = kwargs.pop("sex", pd.NA)
         self._genotype = kwargs.pop("genotype", pd.NA)
         
         self._configureUI_()
@@ -81,17 +81,17 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         self.fieldIDLineEdit.undoAvailable = True
         self.fieldIDLineEdit.redoAvailable = True
         
-        gender = ["NA", "F", "M"]
+        sex = ["NA", "F", "M"]
         
-        my_gender = str(self._gender).strip("<>")
-        if my_gender in gender:
-            gender_ndx = gender.index(my_gender)
+        my_sex = str(self._sex).strip("<>")
+        if my_sex in sex:
+            sex_ndx = sex.index(my_sex)
         else:
-            gender_ndx = 0 # → NA
+            sex_ndx = 0 # → NA
         
-        self.genderComboBox.setEditable(False)
-        self.genderComboBox.addItems(gender)
-        self.genderComboBox.setCurrentIndex(gender_ndx)
+        self.sexComboBox.setEditable(False)
+        self.sexComboBox.addItems(sex)
+        self.sexComboBox.setCurrentIndex(sex_ndx)
         
         my_genotype = str(self._genotype).strip("<>")
         
@@ -119,7 +119,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         ret["Cell"] = self.cellIDLineEdit.text()
         ret["Field"] = self.fieldIDLineEdit.text()
         ret["Age"] = self.ageSpinBox.value() # will return units of time
-        ret["Gender"] = self.genderComboBox.currentText()
+        ret["Sex"] = self.sexComboBox.currentText()
         ret["Genotype"] = self.genotypeComboBox.currentText()
         
         return ret

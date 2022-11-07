@@ -2423,8 +2423,8 @@ def collateReports(data):
         if "Source" not in data[0].columns:
             addSource(data[0])
             
-        if "Gender" not in data[0].columns:
-            addGender(data[0], "NA")
+        if "Sex" not in data[0].columns:
+            addSex(data[0], "NA")
             
         if "Age" not in data[0].columns:
             addAge(data[0], "NA")
@@ -2439,8 +2439,8 @@ def collateReports(data):
             if "Source" not in d.columns:
                 addSource(d)
             
-            if "Gender" not in d.columns:
-                addGender(d, "NA")
+            if "Sex" not in d.columns:
+                addSex(d, "NA")
                 
             if "Age" not in d.columns:
                 addAge(d, "NA")
@@ -2740,12 +2740,12 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
                         genotype = strutils.str2symbol(scandata.genotype)
                         #genotype = strutils.str2R(scandata.genotype)
                         
-                    gender = strutils.str2symbol(analysis_unit.gender)
-                    #gender = strutils.str2R(analysis_unit.gender)
+                    sex = strutils.str2symbol(analysis_unit.sex)
+                    #sex = strutils.str2R(analysis_unit.sex)
                     
-                    if "na" in gender.lower():
-                        gender = strutils.str2symbol(scandata.gender)
-                        #gender = strutils.str2R(scandata.gender)
+                    if "na" in sex.lower():
+                        sex = strutils.str2symbol(scandata.sex)
+                        #sex = strutils.str2R(scandata.sex)
                     
                     age = analysis_unit.age
                     
@@ -2757,7 +2757,7 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
                     #sig_result["Data"]      = strutils.str2R(scandata.name)
                     sig_result["Source"]    = strutils.str2symbol(analysis_unit.sourceID)
                     #sig_result["Source"]    = strutils.str2R(analysis_unit.sourceID)
-                    sig_result["Gender"]    = gender
+                    sig_result["Sex"]    = sex
                     sig_result["Age"]       = age
                     sig_result["Cell"]      = strutils.str2symbol(analysis_unit.cell)
                     sig_result["Field"]     = strutils.str2symbol(analysis_unit.field)
@@ -3920,7 +3920,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 [self.cellLineEdit.editingFinished,                     self.slot_gui_changed_cell_name,    QtCore.Qt.QueuedConnection],
                 [self.fieldLineEdit.editingFinished,                    self.slot_gui_changed_field_name,   QtCore.Qt.QueuedConnection],
                 [self.genotypeComboBox.currentIndexChanged[str],        self.slot_gui_changed_genotype,     QtCore.Qt.QueuedConnection],
-                [self.genderComboBox.currentIndexChanged[str],          self.slot_gui_changed_gender,       QtCore.Qt.QueuedConnection],
+                [self.sexComboBox.currentIndexChanged[str],          self.slot_gui_changed_sex,       QtCore.Qt.QueuedConnection],
                 [self.ageLineEdit.editingFinished,                      self.slot_gui_age_changed,          QtCore.Qt.QueuedConnection]
             ]
         
@@ -4139,11 +4139,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.genotypeComboBox.addItems(genotypes)
         self.genotypeComboBox.setCurrentIndex(0)
         
-        gender = ["NA", "F", "M"]
+        sex = ["NA", "F", "M"]
         
-        self.genderComboBox.setEditable(False)
-        self.genderComboBox.addItems(gender)
-        self.genderComboBox.setCurrentIndex(0)
+        self.sexComboBox.setEditable(False)
+        self.sexComboBox.addItems(sex)
+        self.sexComboBox.setCurrentIndex(0)
         
         self.ageLineEdit.setText("NA")
         self.ageLineEdit.setClearButtonEnabled(True)
@@ -4955,7 +4955,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
 
             lsdata = scandata_name_vars[choiceDialog.selectedItemsText[0]]
             
-            for attribute in ("sourceID", "cell", "field", "age", "gender", "genotype"):
+            for attribute in ("sourceID", "cell", "field", "age", "sex", "genotype"):
                 if hasattr(lsdata, attribute):
                     # do this instead of prescribing a default value here, as we 
                     # don't want to override previus values
@@ -7764,17 +7764,17 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
     @pyqtSlot(str)
     @safeWrapper
-    def slot_gui_changed_gender(self, val):
+    def slot_gui_changed_sex(self, val):
         if self._data_ is None:
             return
         
         if self._selected_analysis_unit_ is not None:
-            self._selected_analysis_unit_.gender = val
+            self._selected_analysis_unit_.sex = val
             
         else:
-            self._data_.analysisUnit().gender = val
+            self._data_.analysisUnit().sex = val
             for unit in self._data_.analysisUnits:
-                unit.gender = val
+                unit.sex = val
             
         self._update_report_()
         
@@ -7829,7 +7829,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 self.cursorXposDoubleSpinBox, self.cursorYposDoubleSpinBox, \
                 self.cursorXwindow, self.cursorYwindow, \
                 self.unitTypeComboBox, self.genotypeComboBox, \
-                self.genderComboBox, self.ageLineEdit, self.defineAnalysisUnitCheckBox)]
+                self.sexComboBox, self.ageLineEdit, self.defineAnalysisUnitCheckBox)]
             
             if not self._data_.hasAnalysisUnit(self._selected_analysis_cursor_):
                 self._data_.defineAnalysisUnit(self._selected_analysis_cursor_)
@@ -10711,7 +10711,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         # see NOTE: 2018-09-25 22:19:58
         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in self._analysis_unit_gui_widgets_]
-        signalBlockers += [QtCore.QSignalBlocker(self.genotypeComboBox), QtCore.QSignalBlocker(self.genderComboBox), QtCore.QSignalBlocker(self.ageLineEdit)]
+        signalBlockers += [QtCore.QSignalBlocker(self.genotypeComboBox), QtCore.QSignalBlocker(self.sexComboBox), QtCore.QSignalBlocker(self.ageLineEdit)]
         
         self.defineAnalysisUnitCheckBox.setTristate(False)
         
@@ -10804,15 +10804,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 else:
                     self.genotypeComboBox.setCurrentIndex(genotype_index)
                     
-                gender_index = self.genderComboBox.findText(self._data_.gender)
+                sex_index = self.sexComboBox.findText(self._data_.sex)
                 
-                if gender_index == -1:
-                    gender_index = 0
-                    self._data_.gender = "NA"
-                    self.genderComboBox.setCurrentIndex(0)
+                if sex_index == -1:
+                    sex_index = 0
+                    self._data_.sex = "NA"
+                    self.sexComboBox.setCurrentIndex(0)
                     
                 else:
-                    self.genderComboBox.setCurrentIndex(gender_index)
+                    self.sexComboBox.setCurrentIndex(sex_index)
                     
                 self.ageLineEdit.setText("%s" % self._data_.age)
                     
@@ -10850,15 +10850,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 else:
                     self.genotypeComboBox.setCurrentIndex(genotype_index)
                     
-                gender_index = self.genderComboBox.findText(self._data_.gender)
+                sex_index = self.sexComboBox.findText(self._data_.sex)
                 
-                if gender_index == -1:
-                    gender_index = 0
-                    self._data_.gender = "NA"
-                    self.genderComboBox.setCurrentIndex(0)
+                if sex_index == -1:
+                    sex_index = 0
+                    self._data_.sex = "NA"
+                    self.sexComboBox.setCurrentIndex(0)
                     
                 else:
-                    self.genderComboBox.setCurrentIndex(gender_index)
+                    self.sexComboBox.setCurrentIndex(sex_index)
                     
                 self.ageLineEdit.setText("%s" % self._data_.age)
                     
@@ -10898,7 +10898,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             # ###
             # BEGIN Data tab
             dataWidgetsSignalBockers = [QtCore.QSignalBlocker(widget) for widget in \
-                (self.scanDataNameLineEdit, self.cellLineEdit, self.fieldLineEdit, self.genotypeComboBox, self.unitTypeComboBox, self.genderComboBox, self.ageLineEdit)]
+                (self.scanDataNameLineEdit, self.cellLineEdit, self.fieldLineEdit, self.genotypeComboBox, self.unitTypeComboBox, self.sexComboBox, self.ageLineEdit)]
             
             self.sourceIDLineEdit.setText(self._data_.sourceID)
             
@@ -10922,14 +10922,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             else:
                 self.genotypeComboBox.setCurrentIndex(genotype_index)
             
-            gender_index = self.genderComboBox.findText(self._data_.gender)
+            sex_index = self.sexComboBox.findText(self._data_.sex)
             
-            if gender_index == -1:
+            if sex_index == -1:
                 self._data_.genotype = "NA"
                 self.genotypeComboBox.setCurrentIndex(0)
                 
             else:
-                self.genotypeComboBox.setCurrentIndex(gender_index)
+                self.genotypeComboBox.setCurrentIndex(sex_index)
                 
             self.ageLineEdit.setText("%s" % self._data_.age)
             
@@ -12309,7 +12309,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
              self.cursorXposDoubleSpinBox, self.cursorYposDoubleSpinBox, 
              self.cursorXwindow, self.cursorYwindow, 
              self.unitTypeComboBox, self.genotypeComboBox,
-             self.genderComboBox, self.defineAnalysisUnitCheckBox)]
+             self.sexComboBox, self.defineAnalysisUnitCheckBox)]
 
         #self.scanDataNameLineEdit.editingFinished.disconnect(self.slot_setDataName)
         #self.cellLineEdit.editingFinished.disconnect(self.slot_gui_changed_cell_name)
@@ -12371,7 +12371,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.selectCursorSpinBox.setValue(-1)
         self.unitTypeComboBox.setCurrentIndex(0)
         self.genotypeComboBox.setCurrentIndex(0)
-        self.genderComboBox.setCurrentIndex(0)
+        self.sexComboBox.setCurrentIndex(0)
         
         self.protocolTableWidget.clearContents()
         self.protocolTableWidget.setRowCount(0)
@@ -12505,14 +12505,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             raise TypeError("channels is expected to be a list of str or int, or None")
                 
-def addGender(data, value):
-    """Creates a 'Gender' column in the data.
+def addSex(data, value):
+    """Creates a 'Sex' column in the data.
     Parameters:
     ==========
     data: pandas.DataFrame with LSCaT results
     value = string, one of "m", "f", "na" (case-insensitive)
     
-    ATTENTION: Data should all have the same source, otherwise the gender will be 
+    ATTENTION: Data should all have the same source, otherwise the sex will be 
         coerced to "na"
         
     Modifies data in-place; the columns will be inserted after the source column,
@@ -12526,20 +12526,20 @@ def addGender(data, value):
         raise TypeError("value parameter expectd a str; got %s instead" % type(value).__name__)
     
     if value.lower().strip() not in ("f", "m", "na"):
-        raise ValueError("Gender expected to be one of 'f', 'm', or 'na' (case-insensitive); got %s instead" % value)
+        raise ValueError("Sex expected to be one of 'f', 'm', or 'na' (case-insensitive); got %s instead" % value)
     
     if "Source" in data.columns:
         if all([s == data.Source[0] for s in data.Source]):
-            gdr = pd.Series([value] * len(data.Source), name="Gender").astype("category")
+            gdr = pd.Series([value] * len(data.Source), name="Sex").astype("category")
             
         else:
-            warnings.warn("Not all data have the same source; coercing Gender to 'NA'")
-            gdr = pd.Series(["NA"] * len(data.Source), name="Gender").astype("category")
+            warnings.warn("Not all data have the same source; coercing Sex to 'NA'")
+            gdr = pd.Series(["NA"] * len(data.Source), name="Sex").astype("category")
             
         data.insert(1, gdr)
         
     else:
-        gdr = pd.Series([value] * len(data.Source), name="Gender").astype("category")
+        gdr = pd.Series([value] * len(data.Source), name="Sex").astype("category")
         index = data.columns.index("Source")
         data.insert(index, gdr)
         
@@ -12685,8 +12685,8 @@ def addAge(data, value):
         age_series = pd.Series([age] * len(data.index), name="Age")
         
         if "Source" in data.columns:
-            if "Gender" in data.columns:
-                index = data.columns.index("Gender")
+            if "Sex" in data.columns:
+                index = data.columns.index("Sex")
             
             else:
                 index = data.columns.index("Source")
