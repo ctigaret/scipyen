@@ -3954,15 +3954,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self.analysisUnitNameLineEdit, self.defineAnalysisUnitCheckBox, self.descriptorsEditorBtn, 
             self.extractCurrentUnitButton]
             
-        #self._analysis_unit_gui_widgets_ = [
-            #self.setupCursorsBtn, self.setupCursorsAllFrames, self.importCursorsBtn, 
-            #self.deleteAnalysisUnitsBtn, self.deleteAllAnalysisUnitsBtn, 
-            #self.selectCursorSpinBox, self.cursorXposDoubleSpinBox, self.cursorYposDoubleSpinBox,
-            #self.cursorXwindow, self.cursorYwindow, self.unitTypeComboBox, 
-            #self.analysisUnitNameLineEdit, self.defineAnalysisUnitCheckBox, self.descriptorsEditorBtn, 
-            #self.extractCurrentUnitButton, self.removeCursorButton, self.addVerticalCursorBtn]
-            
-        
         self._analysis_unit_gui_signal_slots_ = [
                 [self.selectCursorSpinBox.valueChanged[int],        self.slot_gui_spinbox_select_cursor_by_index],
                 [self.cursorXposDoubleSpinBox.valueChanged[float],  self.slot_gui_changed_cursor_x_pos],
@@ -3977,36 +3968,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 [self.extractUnitsButton.clicked,                   self.slot_exportAnalysisUnits,                      QtCore.Qt.QueuedConnection],
             ]
         
-        #self._analysis_unit_gui_signal_slots_ = [
-                #[self.setupCursorsBtn.clicked,                      self.slot_setupLinescanCursorsInCurrentFrame,       QtCore.Qt.QueuedConnection],
-                #[self.setupCursorsAllFrames.clicked,                self.slot_setupLinescanCursorsInSpecifiedFrames,    QtCore.Qt.QueuedConnection],
-                #[self.importCursorsBtn.clicked,                     self.slot_adoptAnalysisUnitsFromScanData,           QtCore.Qt.QueuedConnection],
-                #[self.deleteAnalysisUnitsBtn.clicked,               self.slot_deleteAnalysisUnits,                      QtCore.Qt.QueuedConnection],
-                #[self.deleteAllAnalysisUnitsBtn.clicked,            self.slot_deleteAllAnalysisUnits,                   QtCore.Qt.QueuedConnection],
-                #[self.selectCursorSpinBox.valueChanged[int],        self.slot_gui_spinbox_select_cursor_by_index,                      QtCore.Qt.QueuedConnection],
-                #[self.cursorXposDoubleSpinBox.valueChanged[float],  self.slot_gui_changed_cursor_x_pos,                 QtCore.Qt.QueuedConnection],
-                #[self.cursorYposDoubleSpinBox.valueChanged[float],  self.slot_gui_changed_cursor_y_pos,                 QtCore.Qt.QueuedConnection],
-                #[self.cursorXwindow.valueChanged[float],            self.slot_gui_changed_cursor_xwindow,               QtCore.Qt.QueuedConnection],
-                #[self.cursorYwindow.valueChanged[float],            self.slot_gui_changed_cursor_ywindow,               QtCore.Qt.QueuedConnection],
-                #[self.unitTypeComboBox.currentIndexChanged[str],    self.slot_gui_changed_unit_type_string,             QtCore.Qt.QueuedConnection],
-                #[self.analysisUnitNameLineEdit.editingFinished,           self.slot_gui_changed_analysis_unit_name,                  QtCore.Qt.QueuedConnection],
-                #[self.defineAnalysisUnitCheckBox.stateChanged[int], self.slot_change_analysis_unit_state,               QtCore.Qt.QueuedConnection],
-                #[self.descriptorsEditorBtn.clicked,                 self.slot_gui_edit_analysis_unit_descriptors,                     QtCore.Qt.QueuedConnection],
-                #[self.extractCurrentUnitButton.clicked,             self.slot_exportCurrentAnalysisUnit,                QtCore.Qt.QueuedConnection],
-                #[self.extractUnitsButton.clicked,                   self.slot_exportAnalysisUnits,                      QtCore.Qt.QueuedConnection],
-                #[self.removeCursorButton.clicked,                   self.slot_remove_analysis_cursor,                   QtCore.Qt.QueuedConnection],
-                #[self.addVerticalCursorBtn.clicked,                 self.slot_gui_add_vertical_cursor,                  QtCore.Qt.QueuedConnection]
-            #]
-        
-        
         self._protocol_gui_signal_slots_ = [
                 [self.protocolTableWidget.itemChanged[QtWidgets.QTableWidgetItem],  self.slot_protocolTableEdited, QtCore.Qt.QueuedConnection],
                 [self.addProtocolAction.triggered,                                  self.slot_addProtocol, QtCore.Qt.QueuedConnection],
                 [self.removeProtocolAction.triggered,                               self.slot_removeProtocol, QtCore.Qt.QueuedConnection]
             ]
-        
-        #self._filters_gui_signal_slots_ = [
-            #]
         
         self._epscat_channels_calibration_gui_signal_slots_ = [
                 [self.indicatorChannelComboBox.currentIndexChanged[int], self.slot_epscatIndicatorChannelChanged,   QtCore.Qt.QueuedConnection],
@@ -4063,11 +4029,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 [self.saveReportBtn.clicked,                self.slot_reportLSCaTResults, QtCore.Qt.QueuedConnection],
                 [self.viewReportBtn.clicked,                self.slot_showReportWindow, QtCore.Qt.QueuedConnection]
             ]
-        
-        #self.__output_gui_signal_slots__ = [
-                #[self.collectUnitsBtn.clicked,      self.slot_collectAnalysisUnits, QtCore.Qt.QueuedConnection],
-                #[self.reportResultsBtn.clicked,     self.slot_reportLSCaTResults]
-           #]
         
         # NOTE: 2018-05-21 15:25:31
         # this function only does additional set up for gui objects

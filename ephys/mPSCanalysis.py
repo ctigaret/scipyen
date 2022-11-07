@@ -53,7 +53,7 @@ __Ui_mPSDDetectWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_
 
 class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
-    # NOTE: this refgers to the type of data where mPSC detection is done.
+    # NOTE: this refers to the type of data where mPSC detection is done.
     # The mPSC waveform viewer only expects neo.AnalogSignal
     supported_types = (neo.Block, neo.Segment, type(None))
     
@@ -294,7 +294,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
 
 # class MPSCAnalysis(ScipyenFrameViewer):
-# NOTE: 2022-11-04 14:23:22 ScipyenFrameViewer does NOT work with QuickDialog → SegmentationFault
+# ATTENTION: 2022-11-04 14:23:22 
+# ScipyenFrameViewer does NOT work with QuickDialog → SegmentationFault
+# but WorkspaceGuiMixin does
 class MPSCAnalysisDialog(qd.QuickDialog, WorkspaceGuiMixin):
     """Mini-PSC analysis window ("app")
     Most of the GUI logic as in triggerdetectgui.TriggerDetectDialog

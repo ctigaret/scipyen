@@ -202,6 +202,8 @@ def get_units():
 
 UNITS_DICT, IRREDUCIBLES, DERIVED = get_units()
         
+def unitFamilies():
+    return [k for k in UNITS_DICT]
 
 def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]):
     """

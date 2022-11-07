@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """quickdialog module adapted from vigranumpy.pyqt.quickdialog
 Useful to have even when vigranumpy is not installed.
+
 """
 #######################################################################
 #                                                                      

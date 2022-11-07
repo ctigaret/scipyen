@@ -58,8 +58,9 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
             
             'dose' -> scalar python Quantity with units of substance (or mass, 
                 e.g., g or moles),  density or concentration (i.e. mass/volume)
-                or mass/mass (numerically dimensionless after simplification) -
-                when it makes sense, e.g. for drug treatments, or None
+                or mass/mass (e/g/, mg/kg, numerically dimensionless after 
+                simplification) - when it makes sense, e.g. for drug treatments, 
+                or None
             
             'route'-> str: how the procedure was administrered (when it makes 
                 sense, such as drug treatment, e.g. i.v., i.p., p.o, i.c., 
@@ -67,9 +68,9 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
                 classification later
                 
             'schedule' -> neo.Epoch: the schedule of treatment, e.g.
-                times & duration of drug admninstation or procedure application
+                times & duration of drug adminstration or procedure application
                 
-    protocols: list of TriggerProtocol (for electrophysiology/imaging data)
+    triggers: list of TriggerProtocol (for electrophysiology/imaging data)
     
     descriptors: dict with any other descriptors
                 
@@ -105,6 +106,7 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
                             ("triggers",            list(),     TriggerProtocol),
                             ("file_datetime",       datetime),
                             ("rec_datetime",        datetime),
+                            ("descriptors",         dict)
                         )
     
     _descriptor_attributes_ = _data_children_ + _data_attributes_ + neo.core.baseneo.BaseNeo._recommended_attrs
@@ -129,7 +131,6 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
     def mandatory_descriptors(self):
         return dict((a[0], getattr(self, a[0], None)) for a in self._descriptor_attributes_)
     
-
     @property
     def descriptors(self):
         return get_descriptors(self)
