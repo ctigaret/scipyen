@@ -338,7 +338,7 @@ class MPSCAnalysisDialog(qd.QuickDialog, WorkspaceGuiMixin):
     
     def __init__(self, ephysdata=None, title:str="mPSC Detect", clearOldPSCs=False, parent=None, ephysViewer=None, **kwargs):
         # self.threadpool = QtCore.QThreadPool()
-        self._dialog_title_ = title if len(title.strip()) else "mPSC Detect"
+        self._dialog_title_ = title if isinstance(title, str) and len(title.strip()) else "mPSC Detect"
         super().__init__(parent=parent, title=self._dialog_title_)
         
         self._clear_events_flag_ = clearOldPSCs == True

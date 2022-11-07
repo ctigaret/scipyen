@@ -106,7 +106,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         self.genotypeComboBox.lineEdit().setClearButtonEnabled(True)
         self.genotypeComboBox.lineEdit().redoAvailable = True
         self.genotypeComboBox.lineEdit().undoAvailable = True
-        self.genotypeComboBox.addItems(genotypes)
+        self.genotypeComboBox.addItems(self._available_genotypes)
         self.genotypeComboBox.setCurrentIndex(genotype_ndx)
         
         

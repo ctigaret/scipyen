@@ -211,6 +211,54 @@ class InftyDoubleValidator(QtGui.QDoubleValidator):
                 return (QtGui.QValidator.Invalid, s, pos)
             
         return valid
+    
+class ComplexValidator(QtGui.QDoubleValidator):
+    def __init__(self, bottom:float=-math.inf, top:float=math.inf, decimals:int=4, parent=None):
+        self.setBottom(bottom)
+        self.setTop(top)
+        self.setDecimals(decimals)
+        
+    def validate(self, s:str, pos:int):
+        valid = super().validate(s, pos)
+        if valid[0] not in (QtGui.QValidator.Intermediate, QtGui.QValidator.Acceptable):
+            s_ = s.strip("()") # strip away the parantheses & any space
+            s_parts = s_split("+") # is it canonical form?
+            if len(s_parts) == 2:
+                real = s_parts[0]
+                imag = s_parts[1]
+            elif len(s_parts) == 1:
+                real = s_parts[1]
+                imag = None
+            
+            real_valid = super().validate(real, pos)
+            
+            if real_valid[0] in (QtGui.QValidator.Intermediate, QtGui.QValidator.Acceptable):
+                if imag is None:
+                    return (real_valid[0], s, pos)
+                else:
+                    if imag.lower().endswith("j"):
+                        imag = imag.lower().strip("j")
+                        
+                    imag_valid = super().validate(imag, pos)
+                    return (imag_valid[0], s, pos)
+                
+            else:
+                return (QtGui.QValidator.Invalid, s, pos)
+                        
+    
+class ComplexInput(_OptionalValueInput):
+    _QValidator = ComplexValidator
+    _txt2value = complex
+    _mustContain = "a complex value"
+    
+    def setValue(self, x:typing.Union[complex, str]):
+        if isinstance(x, complex):
+            super().setValue(str(x))
+        else:
+            super().setValue(x)
+        
+    def value(self):
+        return complex(self.text())
 
 class OptionalFloatInput(_OptionalValueInput):
     # _QValidator = QtGui.QDoubleValidator
@@ -219,6 +267,12 @@ class OptionalFloatInput(_OptionalValueInput):
     _mustContain = "a float"
 
 class FloatInput(OptionalFloatInput):
+    def setValue(self, x:typing.Union[float, str]):
+        if isinstance(x, float):
+            super().setValue(str(x))
+        else:
+            super().setValue(x)
+        
     def value(self):
         return float(self.text())
 
@@ -238,6 +292,9 @@ class OptionalStringInput(QtWidgets.QFrame):
                     
     def setFocus(self):
         self.variable.setFocus()
+        
+    def setValue(self, text):
+        self.variable.setText(text)
             
     def setText(self, text):
         self.variable.setText(text)
@@ -468,16 +525,16 @@ class VariableNameStringInput(StringInput):
             
         def validate(self, s, pos):
             if not s.isidentifier() or keyword.iskeyword(s):
-                ret = QtGui.QValidator.Invalid
+                ret = (QtGui.QValidator.Invalid, s, pos)
                 #if s[0:pos].isidentifier() and not keyword.iskeyword(s[0:pos]):
                     #ret = QtGui.QValidator.Intermediate
                 #else:
                     #ret = QtGui.QValidator.Invalid
             else:
-                ret = QtGui.QValidator.Acceptable
+                ret = (QtGui.QValidator.Acceptable, s, pos)
                 
             #print("validate returns: ", ret)
-            return ret
+            return ret 
         
         
         def fixup(self, s):

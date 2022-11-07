@@ -687,7 +687,7 @@ Example (as of 2022-02-16 12:25:17 on Tumbleweed 20220213)
             (NOTE conversion of some jupyter notebooks this may fail --> 
              until this is solved, please use the online documentation)
     
-        Optionally, copy/move (or, better make a symbolic link) 
+        Optionally, copy/move (or, better still, make a symbolic link) 
         $VIRTUAL_ENV/src/nrn/docs/_build to $VIRTUAL_ENV/doc/neuron
     
 
