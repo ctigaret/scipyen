@@ -214,6 +214,7 @@ class InftyDoubleValidator(QtGui.QDoubleValidator):
     
 class ComplexValidator(QtGui.QDoubleValidator):
     def __init__(self, bottom:float=-math.inf, top:float=math.inf, decimals:int=4, parent=None):
+        QtGui.QDoubleValidator.__init__(self, parent)
         self.setBottom(bottom)
         self.setTop(top)
         self.setDecimals(decimals)
@@ -222,7 +223,7 @@ class ComplexValidator(QtGui.QDoubleValidator):
         valid = super().validate(s, pos)
         if valid[0] not in (QtGui.QValidator.Intermediate, QtGui.QValidator.Acceptable):
             s_ = s.strip("()") # strip away the parantheses & any space
-            s_parts = s_split("+") # is it canonical form?
+            s_parts = s.split("+") # is it canonical form?
             if len(s_parts) == 2:
                 real = s_parts[0]
                 imag = s_parts[1]
@@ -248,7 +249,7 @@ class ComplexValidator(QtGui.QDoubleValidator):
     
 class ComplexInput(_OptionalValueInput):
     _QValidator = ComplexValidator
-    _txt2value = complex
+    _text2Value = complex
     _mustContain = "a complex value"
     
     def setValue(self, x:typing.Union[complex, str]):
@@ -460,6 +461,9 @@ class QuickDialogComboBox(QtWidgets.QFrame):
         for text in textList:
             self.variable.addItem(text)
             
+    def setCurrentIndex(self, value:int):
+        self.setValue(value)
+            
     def setValue(self, index):
         if isinstance(index, int) and index >= -1 and index < self.variable.model().rowCount():
             self.variable.setCurrentIndex(index)
@@ -614,6 +618,7 @@ class QuickDialog(QtWidgets.QDialog):
         if isinstance(addSpacing, bool):
             if addSpacing:
                 self.layout.addSpacing(20)
+                
         elif isinstance(addSpacing, int):
             self.layout.addSpacing(addSpacing)
         

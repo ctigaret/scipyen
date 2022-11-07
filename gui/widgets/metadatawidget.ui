@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>732</width>
-    <height>250</height>
+    <width>593</width>
+    <height>264</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -15,93 +15,82 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <layout class="QVBoxLayout" name="dataNameVerticalLayout">
-     <property name="spacing">
-      <number>2</number>
-     </property>
+    <layout class="QHBoxLayout" name="horizontalLayout_1">
      <item>
-      <layout class="QHBoxLayout" name="horizontalLayout_1">
-       <item>
-        <widget class="QLabel" name="dataVarNameLabel">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>Name of the variable in the workspace</string>
-         </property>
-         <property name="frameShape">
-          <enum>QFrame::StyledPanel</enum>
-         </property>
-         <property name="frameShadow">
-          <enum>QFrame::Plain</enum>
-         </property>
-         <property name="text">
-          <string/>
-         </property>
-         <property name="textInteractionFlags">
-          <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <spacer name="horizontalSpacer">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>40</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-      </layout>
+      <widget class="QLabel" name="dataVarNameLabel">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="toolTip">
+        <string>Name of the variable in the workspace</string>
+       </property>
+       <property name="frameShape">
+        <enum>QFrame::StyledPanel</enum>
+       </property>
+       <property name="frameShadow">
+        <enum>QFrame::Plain</enum>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+       <property name="textInteractionFlags">
+        <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+       </property>
+      </widget>
      </item>
      <item>
-      <layout class="QHBoxLayout" name="horizontalLayout_2">
-       <item>
-        <widget class="QLabel" name="nameLabel">
-         <property name="text">
-          <string>Name:</string>
-         </property>
-         <property name="buddy">
-          <cstring>dataNameLineEdit</cstring>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLineEdit" name="dataNameLineEdit">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-           <horstretch>10</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>Data name</string>
-         </property>
-         <property name="statusTip">
-          <string>Data name</string>
-         </property>
-         <property name="whatsThis">
-          <string>Data name</string>
-         </property>
-         <property name="clearButtonEnabled">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-      </layout>
+      <spacer name="horizontalSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
      </item>
     </layout>
    </item>
    <item>
     <layout class="QFormLayout" name="formLayout">
      <item row="0" column="0">
+      <widget class="QLabel" name="nameLabel">
+       <property name="text">
+        <string>Name:</string>
+       </property>
+       <property name="buddy">
+        <cstring>dataNameLineEdit</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="1">
+      <widget class="QLineEdit" name="dataNameLineEdit">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+         <horstretch>10</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="toolTip">
+        <string>Data name</string>
+       </property>
+       <property name="statusTip">
+        <string>Data name</string>
+       </property>
+       <property name="whatsThis">
+        <string>Data name</string>
+       </property>
+       <property name="clearButtonEnabled">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="0">
       <widget class="QLabel" name="sourceIDLabel">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
@@ -117,7 +106,7 @@
        </property>
       </widget>
      </item>
-     <item row="0" column="1">
+     <item row="1" column="1">
       <widget class="QLineEdit" name="sourceIDLineEdit">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
@@ -130,7 +119,7 @@
        </property>
       </widget>
      </item>
-     <item row="1" column="0">
+     <item row="2" column="0">
       <widget class="QLabel" name="cellIDLabel">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
@@ -146,7 +135,7 @@
        </property>
       </widget>
      </item>
-     <item row="1" column="1">
+     <item row="2" column="1">
       <widget class="QLineEdit" name="cellIDLineEdit">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
@@ -168,7 +157,7 @@
        </property>
       </widget>
      </item>
-     <item row="2" column="0">
+     <item row="3" column="0">
       <widget class="QLabel" name="fieldIDLabel">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
@@ -184,7 +173,7 @@
        </property>
       </widget>
      </item>
-     <item row="2" column="1">
+     <item row="3" column="1">
       <widget class="QLineEdit" name="fieldIDLineEdit">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
@@ -236,7 +225,7 @@
         </sizepolicy>
        </property>
        <property name="text">
-        <string>Gender:</string>
+        <string>Sex:</string>
        </property>
        <property name="buddy">
         <cstring>genderComboBox</cstring>
@@ -256,6 +245,15 @@
          <width>80</width>
          <height>0</height>
         </size>
+       </property>
+       <property name="toolTip">
+        <string>Genetic sex</string>
+       </property>
+       <property name="statusTip">
+        <string>Genetic sex</string>
+       </property>
+       <property name="whatsThis">
+        <string>Genetic sex</string>
        </property>
        <property name="currentText">
         <string/>
@@ -304,6 +302,15 @@
          <height>0</height>
         </size>
        </property>
+       <property name="toolTip">
+        <string>Genotype</string>
+       </property>
+       <property name="statusTip">
+        <string>Genotype</string>
+       </property>
+       <property name="whatsThis">
+        <string>Genotype</string>
+       </property>
        <property name="editable">
         <bool>true</bool>
        </property>
@@ -311,6 +318,137 @@
         <number>50</number>
        </property>
       </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <item>
+      <widget class="QPushButton" name="biometricsPushButton">
+       <property name="toolTip">
+        <string>Additional biometrics</string>
+       </property>
+       <property name="statusTip">
+        <string>Additional biometrics</string>
+       </property>
+       <property name="whatsThis">
+        <string>Additional biometrics</string>
+       </property>
+       <property name="text">
+        <string>Biometrics</string>
+       </property>
+       <property name="icon">
+        <iconset theme="package"/>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="procedurePushButton">
+       <property name="toolTip">
+        <string>Procedure (treatment, etc)</string>
+       </property>
+       <property name="statusTip">
+        <string>Procedure (treatment, etc)</string>
+       </property>
+       <property name="whatsThis">
+        <string>Procedure (treatment, etc)</string>
+       </property>
+       <property name="text">
+        <string>Procedure</string>
+       </property>
+       <property name="icon">
+        <iconset theme="configure"/>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="triggersPushButton">
+       <property name="toolTip">
+        <string>Trigger protocols</string>
+       </property>
+       <property name="statusTip">
+        <string>Trigger protocols</string>
+       </property>
+       <property name="whatsThis">
+        <string>Trigger protocols</string>
+       </property>
+       <property name="text">
+        <string>Triggers</string>
+       </property>
+       <property name="icon">
+        <iconset theme="configure"/>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="dateTimePushButton">
+       <property name="toolTip">
+        <string>Date &amp; time of file, recording, analysis</string>
+       </property>
+       <property name="statusTip">
+        <string>Date &amp; time of file, recording, analysis</string>
+       </property>
+       <property name="whatsThis">
+        <string>Date &amp; time of file, recording, analysis</string>
+       </property>
+       <property name="text">
+        <string>Date, time</string>
+       </property>
+       <property name="icon">
+        <iconset theme="change-date-symbolic"/>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="descriptorsPushButton">
+       <property name="toolTip">
+        <string>Additional descriptors (structured)</string>
+       </property>
+       <property name="statusTip">
+        <string>Additional descriptors (structured)</string>
+       </property>
+       <property name="whatsThis">
+        <string>Additional descriptors (structured)</string>
+       </property>
+       <property name="text">
+        <string>Descriptors</string>
+       </property>
+       <property name="icon">
+        <iconset theme="settings-configure"/>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="notesPushButton">
+       <property name="toolTip">
+        <string>Description</string>
+       </property>
+       <property name="statusTip">
+        <string>Description</string>
+       </property>
+       <property name="whatsThis">
+        <string>Description</string>
+       </property>
+       <property name="text">
+        <string>Notes</string>
+       </property>
+       <property name="icon">
+        <iconset theme="description"/>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer_2">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
      </item>
     </layout>
    </item>

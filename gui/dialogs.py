@@ -17,7 +17,9 @@ from gui import quickdialog as qd
 from gui.workspacegui import (GuiMessages, WorkspaceGuiMixin)
 
 class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
-    def __init__(self, mapping:typing.Optional[dict] = None, title:typing.Optional[str]="Biometrics", parent:typing.Optional[QtWidgets.QWidget]=None):
+    _supported_value_types_ = (str, int, float, complex)
+    
+    def __init__(self, mapping:typing.Optional[dict] = None, title:typing.Optional[str]="Mapping Editor", parent:typing.Optional[QtWidgets.QWidget]=None):
         """The key parameter is 'mapping', which is a Python dict object
         with str keys and basic python data types (number.Numbers, str).
 
@@ -28,8 +30,7 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
             dialog is used should be re-designed.
         
         """
-        self._title_ = title if isinstance(title, str) and len(title.strip()) else "Biometrics"
-        
+        self._title_ = title if isinstance(title, str) and len(title.strip()) else "Mapping Editor"
         super().__init__(parent=parent, title=self._title_)
         
         if mapping is None:
@@ -41,8 +42,17 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
         
         widgets = self._generate_widgets()
         
-        for w in widgets:
-            self.addWidget(w)
+        # NOTE: 2022-11-07 22:09:42
+        # when widgets are, or inherit from, quickdialog widgets, they are 
+        # automatically added to the parent during their __init__; the parent
+        #  must define the method `addWidget` - in this case, parent is self.
+        #
+        # (quickdialog widgets are designed to be added "quickly" this way to the
+        # QuickDialog)  
+        #
+        # calling addWidget again here causes layout issues
+        # for w in widgets:
+        #     super().addWidget(w)
         
         addEntryPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("list-add"),
                                                    "Add entry", parent=self.buttons)
@@ -53,6 +63,17 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
                                                       "Remove entry", parent=self.buttons)
         self.buttons.layout.addWidget(removeEntryPushButton)
         removeEntryPushButton.clicked.connect(self._slot_removeEntry)
+        
+        self.resize(-1,-1)
+        
+    @pyqtSlot()
+    def _slot_entryValueChanged(self):
+        # NOTE: 2022-11-07 22:40:17
+        # the sender is the variable attribute of the quickdialog widget
+        w = self.sender().parent() 
+        value = w.value() if isinstance(w, (qd.IntegerInput, qd.FloatInput, qd.ComplexInput)) else w.text()
+        if w.label.text() in self._mapping_:
+            self._mapping_[w.label.text()] = value
         
     def _generate_widgets(self):
         widgets = list()
@@ -69,7 +90,12 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
                 raise TypeError(f"Unsupported value type {type(v).__name__} in {k}")
             
             w=factory(parent=self, label=k)
+            w.variable.setClearButtonEnabled(True)
+            w.variable.undoAvailable = True
+            w.variable.redoAvailable = True
+            w.variable.editingFinished.connect(self._slot_entryValueChanged)
             w.setValue(v)
+            
             widgets.append(w)
             
         return widgets
@@ -85,11 +111,15 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
             del(self.widgets[self.widgets.index(w)])
             
         self.update()
+        self.resize(-1,-1)
         
     def _slot_addEntry(self):
+        valid_types = [t.__name__ for t in self._supported_value_types_]
         dlg = qd.QuickDialog(parent=self, title="Add entry")
-        ename = qd.StringInput(parent = dlg, label="Entry name")
-        etype = qd.StringInput(parent = dlg, label="Entry type")
+        ename = qd.StringInput(parent = dlg, label="Entry name:")
+        etype = qd.QuickDialogComboBox(parent = dlg, label="Entry type:")
+        etype.setItems(valid_types)
+        etype.setCurrentIndex(0)
         dlg.addWidget(ename)
         dlg.addWidget(etype)
         if dlg.exec():
@@ -97,7 +127,6 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
             val_factory = None
             entry_name = strutils.str2symbol(ename.text())
             entry_type = etype.text()
-            valid_types = ("complex", "float", "int", "str", "string")
             if entry_type.lower() not in valid_types:
                 self.criticalMessage("Entry type:", f"Expecting one of {valid_types}; instead, got {entry_type}")
                 return
@@ -124,10 +153,13 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
             
             widgets = self._generate_widgets()
             
-            for w in widgets:
-                self.addWidget(w)
+            # NOTE: 2022-11-07 22:15:32
+            # see NOTE: 2022-11-07 22:09:42
+            # for w in widgets:
+            #     self.addWidget(w)
                 
             self.update()
+            self.resize(-1,-1)
     
     def _slot_removeEntry(self):
         dlg = qd.QuickDialog(parent=self, title="Remove Entry")
@@ -144,15 +176,16 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
             
             widgets = self._generate_widgets()
             
-            for w in widgets:
-                self.addWidget(w)
+            # NOTE: 2022-11-07 22:15:49
+            # see NOTE: 2022-11-07 22:09:42
+            # for w in widgets:
+            #     self.addWidget(w)
                 
             self.update()
+            self.resize(-1,-1)
             
     def value(self):
-        ret = dict((w.label, w.value()) for w in self.widgets)
-            
-        
-            
+        return self._mapping_
+        # ret = dict((w.label.text(), w.value() if isinstance(w, (qd.IntegerInput, qd.FloatInput, qd.ComplexInput)) else w.text())  for w in self.widgets)
             
                 

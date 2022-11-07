@@ -94,7 +94,7 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
                             ("sourceID",            "NA"),
                             ("cell",                "NA"),
                             ("genotype",            "NA"),
-                            ("gender",              "NA"),
+                            ("sex",                 "NA"),
                             ("age",                 (0*pq.s, "NA")),
                             ("biometric_weight",    (0*pq.g, "NA")), 
                             ("biometric_height",    (0*pq.m, "NA")),
@@ -106,6 +106,7 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
                             ("triggers",            list(),     TriggerProtocol),
                             ("file_datetime",       datetime),
                             ("rec_datetime",        datetime),
+                            ("analysis_datetime",   datetime),
                             ("descriptors",         dict)
                         )
     
