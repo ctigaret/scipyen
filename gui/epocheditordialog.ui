@@ -15,7 +15,7 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_3">
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout_3">
+    <layout class="QHBoxLayout" name="horizontalLayout_4">
      <item>
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
@@ -29,7 +29,7 @@
         <widget class="QListView" name="epochsListView"/>
        </item>
        <item>
-        <layout class="QHBoxLayout" name="horizontalLayout">
+        <layout class="QHBoxLayout" name="horizontalLayout_3">
          <item>
           <widget class="QToolButton" name="addEpochToolButton">
            <property name="toolTip">
@@ -70,6 +70,62 @@
            </property>
           </widget>
          </item>
+         <item>
+          <widget class="QToolButton" name="plotEpochToolButton">
+           <property name="toolTip">
+            <string>Plot epoch</string>
+           </property>
+           <property name="statusTip">
+            <string>Plot epoch</string>
+           </property>
+           <property name="whatsThis">
+            <string>Plot epoch</string>
+           </property>
+           <property name="text">
+            <string>Plot selected epoch</string>
+           </property>
+           <property name="icon">
+            <iconset theme="quickview"/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="clearProtocolsToolButton">
+           <property name="toolTip">
+            <string>Remove all epochs</string>
+           </property>
+           <property name="statusTip">
+            <string>Remove all epochs</string>
+           </property>
+           <property name="whatsThis">
+            <string>Remove all epochs</string>
+           </property>
+           <property name="text">
+            <string>Clear</string>
+           </property>
+           <property name="icon">
+            <iconset theme="edit-clear-all">
+             <normaloff>.</normaloff>.</iconset>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer_2">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout">
          <item>
           <widget class="QToolButton" name="epochsFileChooserToolButton">
            <property name="toolTip">
@@ -187,27 +243,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QToolButton" name="clearProtocolsToolButton">
-           <property name="toolTip">
-            <string>Remove all epochs</string>
-           </property>
-           <property name="statusTip">
-            <string>Remove all epochs</string>
-           </property>
-           <property name="whatsThis">
-            <string>Remove all epochs</string>
-           </property>
-           <property name="text">
-            <string>Clear</string>
-           </property>
-           <property name="icon">
-            <iconset theme="edit-clear-all">
-             <normaloff>.</normaloff>.</iconset>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="horizontalSpacer_2">
+          <spacer name="horizontalSpacer_3">
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
            </property>

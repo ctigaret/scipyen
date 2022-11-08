@@ -885,9 +885,11 @@ def plot_Gantt_Epochs(data:typing.Union[tuple, list, neo.Epoch], **kwargs):
         raise TypeError(f"Expecting a neo.Epoch or a sequence (tuple, list of neo.Epoch objects; instead, got {type(data).__name__}")
                         
     kwargs["names"] = [epoch.name for epoch in data]
-    data = [pd.DataFrame([dict(Task=i[2], Start=i[0], Finish=i[0]+i[1], Name = i[2] if isinstance(i[2], str) and len(i[2].strip()) else f"Interval {k}" ) for i in ephys.epoch2intervals(epoch)]) for k, epoch in enumerate(data)]
+    data = [pd.DataFrame([dict(Task=i[2], Start=i[0], Finish=i[0]+i[1], Name = i[2] if isinstance(i[2], str) and len(i[2].strip()) else f"Interval {k}" ) for i in ephys.epoch2intervals(epoch)]) for k, epoch in enumerate(data) if len(epoch)]
+
+    if len(data):
+        return plot_Gantt_DF(data=data, **kwargs)
     
-    return plot_Gantt_DF(data=data, **kwargs)
 
 
 def plot_Gantt_DF(data:typing.Union[tuple, list, pd.DataFrame], **kwargs):
