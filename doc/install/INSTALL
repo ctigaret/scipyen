@@ -631,7 +631,6 @@ Example (as of 2022-02-16 12:25:17 on Tumbleweed 20220213)
         NRN_ENABLE_INTERVIEWS=true
         NRN_ENABLE_MECH_DLL_STYLE=true
         NRN_ENABLE_MODULE_INSTALL=true
-        NRN_ENABLE_INTERNAL_READLINE=false
         NRN_MODULE_INSTALL_OPTIONS --prefix= --home=$VIRTUAL_ENV
         NRN_ENABLE_MPI=true
         NRN_ENABLE_MPI_DYNAMIC=false
@@ -650,6 +649,7 @@ Example (as of 2022-02-16 12:25:17 on Tumbleweed 20220213)
     IV
         IV_ENABLE_SHARED=true
         IV_ENABLE_X11_DYNAMIC=false # NOTE: 2022-02-16 12:50:18 setting to True prevents the GUI from showing!
+        
         MOD2C_ENABLE_LEGACY_UNITS=false
     
     NOTE: for more recent nrn repos make sure all INSTALL variables in cmake point to
