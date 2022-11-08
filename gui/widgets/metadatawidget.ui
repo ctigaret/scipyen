@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>593</width>
-    <height>264</height>
+    <width>639</width>
+    <height>278</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -338,7 +338,8 @@
         <string>Biometrics</string>
        </property>
        <property name="icon">
-        <iconset theme="package"/>
+        <iconset theme="package">
+         <normaloff>.</normaloff>.</iconset>
        </property>
       </widget>
      </item>
@@ -357,7 +358,8 @@
         <string>Procedure</string>
        </property>
        <property name="icon">
-        <iconset theme="configure"/>
+        <iconset theme="configure">
+         <normaloff>.</normaloff>.</iconset>
        </property>
       </widget>
      </item>
@@ -376,7 +378,8 @@
         <string>Triggers</string>
        </property>
        <property name="icon">
-        <iconset theme="configure"/>
+        <iconset theme="configure">
+         <normaloff>.</normaloff>.</iconset>
        </property>
       </widget>
      </item>
@@ -395,12 +398,13 @@
         <string>Date, time</string>
        </property>
        <property name="icon">
-        <iconset theme="change-date-symbolic"/>
+        <iconset theme="change-date-symbolic">
+         <normaloff>.</normaloff>.</iconset>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="descriptorsPushButton">
+      <widget class="QPushButton" name="annotationsPushButton">
        <property name="toolTip">
         <string>Additional descriptors (structured)</string>
        </property>
@@ -411,10 +415,11 @@
         <string>Additional descriptors (structured)</string>
        </property>
        <property name="text">
-        <string>Descriptors</string>
+        <string>Annotations</string>
        </property>
        <property name="icon">
-        <iconset theme="settings-configure"/>
+        <iconset theme="settings-configure">
+         <normaloff>.</normaloff>.</iconset>
        </property>
       </widget>
      </item>
@@ -433,7 +438,8 @@
         <string>Notes</string>
        </property>
        <property name="icon">
-        <iconset theme="description"/>
+        <iconset theme="description">
+         <normaloff>.</normaloff>.</iconset>
        </property>
       </widget>
      </item>

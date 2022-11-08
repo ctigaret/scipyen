@@ -63,6 +63,16 @@ def get_text_width(s:str, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray
     sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
     return sz.width()
 
+def get_text_height(s:str, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
+    fm = QtWidgets.QApplication.fontMetrics()
+    sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
+    return sz.height()
+
+def get_text_width_and_height(s:str, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
+    fm = QtWidgets.QApplication.fontMetrics()
+    sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
+    return sz.width(), sz.height()
+
 def get_font_style(val:typing.Union[str, FontStyleType]) -> typing.Union[int, QtGui.QFont.Style]:
     """Returns an int or a QtGui.QFont.Style enum value
     

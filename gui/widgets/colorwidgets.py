@@ -112,7 +112,7 @@ class ColorPushButton(QtWidgets.QPushButton):
         opt.icon = QtGui.QIcon()
         
     @property
-    def strongTransparentPattern(self) -> bool:
+    def strongTransparentPattern(self):
         return self._strongTransparentPattern
         
     @strongTransparentPattern.setter
@@ -121,11 +121,11 @@ class ColorPushButton(QtWidgets.QPushButton):
         self.update()
         
     @property
-    def changed(self) -> bool:
+    def changed(self):
         return self._changed
     
     @property
-    def keepAlphaOnDropPaste(self) -> bool:
+    def keepAlphaOnDropPaste(self):
         return self._keepAlpha
     
     @keepAlphaOnDropPaste.setter
@@ -152,7 +152,7 @@ class ColorPushButton(QtWidgets.QPushButton):
         self._defaultColor = qcolor
         
     @property
-    def alphaChannelEnabled(self) -> bool:
+    def alphaChannelEnabled(self):
         return self._alphaChannelEnabled
     
     @alphaChannelEnabled.setter
@@ -203,13 +203,15 @@ class ColorPushButton(QtWidgets.QPushButton):
             style.drawPrimitive(QtWidgets.QStyle.PE_FrameFocusRect, focusOpt, painter, self)
         
     @safeWrapper
-    def sizeHint(self) -> QtCore.QSize:
+    def sizeHint(self):
+        """Returns a QSize"""
         opt = QtWidgets.QStyleOptionButton()
         self.initStyleOption(opt)
         return self.style().sizeFromContents(QtWidgets.QStyle.CT_PushButton, opt, QtCore.QSize(16,16), self)
 
     @safeWrapper
-    def minimumSizeHint(self) -> QtCore.QSize:
+    def minimumSizeHint(self):
+        """Returns a QSize"""
         opt = QtWidgets.QStyleOptionButton()
         self.initStyleOption(opt)
         return self.style().sizeFromContents(QtWidgets.QStyle.CT_PushButton, opt, QtCore.QSize(8,8), self)
@@ -294,14 +296,12 @@ class ColorComboDelegate(QtWidgets.QAbstractItemDelegate):
     LayoutMetrics = IntEnum(value="LayoutMetrics", names={"FrameMargin":3},
                             module=__name__, qualname="ColorComboDelegate.LayoutMetrics")
     
-    def __init__(self, parent:typing.Optional[QtCore.QObject]=None, 
-                 transparentPixmap:typing.Optional[QtGui.QPixmap] = None):
+    def __init__(self, parent:typing.Optional[QtCore.QObject]=None,  transparentPixmap:typing.Optional[QtGui.QPixmap] = None):
         super().__init__(parent)
         self._tPmap = transparentPixmap
     
     #@no_sip_autoconversion(QtCore.QVariant)
-    def paint(self, painter:QtGui.QPainter, option:QtWidgets.QStyleOptionViewItem,
-              index:QtCore.QModelIndex):
+    def paint(self, painter:QtGui.QPainter, option:QtWidgets.QStyleOptionViewItem, index:QtCore.QModelIndex):
         innerColor = QtGui.QColor(QtCore.Qt.white)
         isSelected = (option.state and QtWidgets.QStyle.State_Selected)
         paletteBrush = comboDelegateBrush(index, QtCore.Qt.BackgroundRole).style() == QtCore.Qt.NoBrush

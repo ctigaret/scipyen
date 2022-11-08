@@ -31,6 +31,14 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         
         self._default_genotypes_ = kwargs.pop("default_genotypes", ["NA", "wt", "het", "hom","+/+", "+/-", "-/-"])
         
+        self._biometrics_ = kwargs.pop("biometrics", dict())
+        
+        self._procedures_ = kwargs.pop("procedures", dict())
+        
+        self._annotations_ = kwargs.pop("annotations", dict())
+        
+        self._data_description_ = kwargs.pop("description", "")
+        
         self._available_genotypes = self._default_genotypes_
         
         if isinstance(self._age, pq.Quantity):
@@ -109,6 +117,12 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         self.genotypeComboBox.addItems(self._available_genotypes)
         self.genotypeComboBox.setCurrentIndex(genotype_ndx)
         
+        biometricsPushButton.clicked.connect(self._slot_editBiometrics)
+        procedurePushButton.clicked.connect(self._slot_editProcedures)
+        triggersPushButton.clicked.connect(self._slot_editTriggers)
+        dateTimePushButton.clicked.connect(self._slot_editDateTime)
+        annotationsPushButton.clicked.connect(self._slot_editAnnotations)
+        notesPushButton.clicked.connect(self._slot_editNotes)
         
     def value(self):
         """Returns a dict with field values takes from individual children
@@ -123,3 +137,60 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         ret["Genotype"] = self.genotypeComboBox.currentText()
         
         return ret
+    
+    @pyqtSlot()
+    def _slot_editAnnotations(self):
+        # TODO 2022-11-08 08:31:20
+        # enable a scrollable view in GenericMappingDialog
+        # when there are more than 5-6 entries in the mapping
+        # use that to edit annotations
+        pass
+    
+    @pyqtSlot()
+    def _slot_editBiometrics(self):
+        # TODO 2022-11-08 08:32:12
+        # use GenericMappingDialog
+        pass
+    
+    @pyqtSlot()
+    def _slot_editDateTime(self):
+        # TODO 2022-11-08 08:32:23
+        # create DateTimeInput widget in gui.quickdialog, use here wrapped
+        # in a quickdialog
+        pass
+    
+    @pyqtSlot()
+    def _slot_editNotes(self):
+        # TODO: 
+        # create a simple (rich) text editor GUI, use here
+        # (check examples in Qt5 stack)
+        pass
+    
+    @pyqtSlot()
+    def _slot_editProcedures(self):
+        # TODO: 2022-11-08 08:35:39 
+        # use GenericMappingDialog
+        # TODO: 2022-11-08 08:36:52
+        # create an EpochWidget for gui.quickdialog, to edit/generate
+        # neo.Epoch with intervals
+        # SUGGEST: use ProtocolEditorDialog as a model of what an
+        # EpochEditor may look like:
+        # A QListView with Epoch names (thus being able to handle more 
+        # than one Epoch)
+        # a QTableView with headings: "Name", "Start", "Duration" and one row
+        # per Epoch interval - populated with data from the Epoch selected in 
+        # the list view
+        # 
+        # TODO: 2022-11-08 08:37:39 (maybe)
+        # create a Gantt chart-like widget viewer to include with the
+        # epoch editor
+        pass
+    
+    @pyqtSlot()
+    def _slot_editTriggers(self):
+        # TODO: 2022-11-08 08:36:10
+        # use gui.protocoleditordialog.ProtocolEditorDialog
+        # but with the following functions enabled conditionally: 
+        #
+        # trigger detection ↔ is there ephysdata available
+    

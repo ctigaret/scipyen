@@ -635,7 +635,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     fig.canvas.mpl_connect("close_event", self.mpl_figure_close_callback)
                     
                 if self.mpl_figure_click_callback:
-                    fig.canvas.mpl_connect("button_press", self.mpl_figure_click_callback)
+                    fig.canvas.mpl_connect("button_press_event", self.mpl_figure_click_callback)
                     
                 if self.mpl_figure_enter_callback:
                     fig.canvas.mpl_connect("figure_enter_event", self.mpl_figure_enter_callback)

@@ -320,8 +320,7 @@ all_palettes = Bunch(
     )
         
 class ColorPalette(object):
-    def __init__(self, collection_name:typing.Optional[str]="all", fmt:QtGui.QColor.NameFormat=QtGui.QColor.HexRgb,
-                 **color_collections):
+    def __init__(self, collection_name:typing.Optional[str]="all", fmt:QtGui.QColor.NameFormat=QtGui.QColor.HexRgb, **color_collections):
         """
         collection_name: str (optional, default is "all")
             Only used when color_collections (see below) is empty
@@ -375,7 +374,7 @@ class ColorPalette(object):
                 
         self._mappings_ = Bunch((n, m if isinstance(m, dict) else Bunch(map(lambda x: (get_name_color(x, "all")[0], x), m))) for n,m in color_collections.items())
         
-    def __getitem_mappings__(self, key):#, default=None):
+    def __getitem_mappings__(self, key):
         yield from (m.get(key, None) for m in self._mappings_.values())
         #yield from (m.get(key, default) for m in self._mappings_.values())
         
@@ -741,29 +740,43 @@ def rgb2mpl(val:typing.Union[list, tuple]):
         return tuple((v/255. for v in val[0:3]))
     
     else:
-        raise ValueError("Sequence must contain floats in [0,1] or integers in [0,255]")
+        raise ValueError(f"Sequence must contain floats in {[0,1]} or integers in {[0,255]}")
         
 def mpl2rgb(val:typing.Union[list, tuple]):
     """Converts matplotlib style R,G,B (float) triplet into Qt R, G, B (int)
     Performs the inverse of rgb2mpl.
     """
-    if not isinstance(val, (tuple, list)):
-        raise TypeError("Expecting a sequence; got %s instead" % str(val))
+    if not isinstance(val, (tuple, list, np.ndarray)):
+        raise TypeError(f"Expecting a sequence; got {str(val)} instead")
     
     if all((isinstance(v, float) and v >= 0 and v <= 1 for v in val)):
-        if len(val) != 3:
-            raise ValueError("Expecting an R, G, B triplet; got %s instead" % str(val))
-        return tuple((map(lambda f: int(round(f*255)), val)))
+        if len(val) in (3,4):
+            return tuple((map(lambda f: int(round(f*255)), val)))
+        else:
+            raise ValueError(f"Expecting an R, G, B <A> tuple; got {str(val)} instead")
     
     elif all((isinstance(v, int) and v in range(256) for v in val)):
-        if len(val) not in range(3,5):
-            raise ValueError("Expecting an R,G,B or R,G,B,A tuple; gt %s instead" % str(val))
+        if len(val) not in range(3,4):
+            raise ValueError(f"Expecting an R,G,B or R,G,B,A tuple; got {str(val)} instead")
         return val
     
+    elif isinstance(val, np.ndarray):
+        if len(val) in (3,4):
+            if np.all(val >= 0. & val <=1.):
+                return tuple((map(lambda f: int(round(f*255)), val)))
+            elif np.all(val >=0 & val <=255):
+                return tuple((map(lambda f: int(round(f*255)), val)))
+            else:
+                raise ValueError("Expecting values between 0 and 1 or between 0 and 255")
+        else:
+            raise ValueError(f"Expecting 3 or 4 values; got {len(val)} instead")
+                
+            
+    
     else:
-        raise ValueError("Sequence must contain floats in [0,1] or integers in [0,255]")
+        raise ValueError(f"Sequence must contain floats in {[0,1]} or integers in {[0,255]}")
         
-def qcolor(val:typing.Union[QtGui.QColor, int, str, typing.Sequence[typing.Union[int, float]]]) -> QtGui.QColor:
+def qcolor(val:typing.Union[QtGui.QColor, int, str, typing.Sequence[typing.Union[int, float]]]):
     """Returns a QColor based on val.
     
     Parameters:
@@ -784,8 +797,13 @@ def qcolor(val:typing.Union[QtGui.QColor, int, str, typing.Sequence[typing.Union
     elif isinstance(val, QtCore.Qt.GlobalColor):
         return QtGui.QColor(val)
     
-    elif isinstance(val, (tuple, list)):
-        return QtGui.QColor.fromRgb(*mpl2rgb(val))
+    elif isinstance(val, (tuple, list, np.ndarray)):
+        if len(val) in (3,4):
+            return QtGui.QColor.fromRgb(*mpl2rgb(val))
+        else:
+            warnings.warn(f"Invalid color specification: {val}")
+            return QtGui.QColor()
+            
     
     elif isinstance(val, int):
         if val in range(len(qtGlobalColors)):
@@ -813,7 +831,7 @@ def qcolor(val:typing.Union[QtGui.QColor, int, str, typing.Sequence[typing.Union
         warnings.warn(f"Invalid color specification: {val}")
         return QtGui.QColor()# invalid color!
             
-def hexpalette(palette:typing.Union[dict, tuple, list], fmt:QtGui.QColor.NameFormat=QtGui.QColor.HexRgb) -> dict:
+def hexpalette(palette:typing.Union[dict, tuple, list], fmt:QtGui.QColor.NameFormat=QtGui.QColor.HexRgb):
     if isinstance(palette, dict):
         return dict((k, qcolor(c).name(fmt).lower()) for k,c in palette.items())
     
@@ -823,21 +841,14 @@ def hexpalette(palette:typing.Union[dict, tuple, list], fmt:QtGui.QColor.NameFor
     else:
         raise TypeError("Palette expected a dict or sequence; got %s instead" % type(palette).__name__)
         
-def get_name_color(x:typing.Union[str, tuple, list, QtCore.Qt.GlobalColor, QtGui.QColor], 
-                   palette:typing.Optional[typing.Union[dict, tuple, list, str, ColorPalette]]=None, 
-                   case_sensitive=False,
-                   tuple_strict=False,
-                   fmt:QtGui.QColor.NameFormat=QtGui.QColor.HexRgb) -> typing.Generator[typing.Tuple[str, QtGui.QColor], None, None]:
+def get_name_color(x:typing.Union[str, tuple, list, QtCore.Qt.GlobalColor, QtGui.QColor], palette:typing.Optional[typing.Union[dict, tuple, list, str, ColorPalette]]=None, case_sensitive=False, tuple_strict=False, fmt:QtGui.QColor.NameFormat=QtGui.QColor.HexRgb):
     """Return a tuple (color name, QColor) given 'x' and optionally, a palette.
     
     """
     color = qcolor(x)
     
-    
     if palette is None:
         palette = ColorPalette(fmt=fmt)
-    
-    #print(f"get_name_color: {x} -> color = {color}")
     
     if isinstance(palette, str):
         palette = getPalette(palette)
@@ -847,9 +858,7 @@ def get_name_color(x:typing.Union[str, tuple, list, QtCore.Qt.GlobalColor, QtGui
         
     elif isinstance(palette, ColorPalette):
         if x in palette:
-            #print(f"get_name_color from ColorPalette: {x} found")
             color = palette.qcolor(x)
-            #print(f"get_name_color from ColorPalette: color = {color}")
             return(x, color)
             
         name = palette.colorname(color, 
@@ -860,7 +869,6 @@ def get_name_color(x:typing.Union[str, tuple, list, QtCore.Qt.GlobalColor, QtGui
         if name is None:
             name = color.name(fmt)
         
-        #print(f"get_name_color for {color} from ColorPalette: name = {name}")
         return (name, color)
         
     elif not isinstance(palette, dict):
@@ -901,12 +909,13 @@ def get_name_color(x:typing.Union[str, tuple, list, QtCore.Qt.GlobalColor, QtGui
                 return (nn[index], QtGui.QColor(cc[index]))
                 
     name = x if isinstance(x, str) else color.name(fmt) # fallback!
+    
     return (name, color)
     
-def standardQColor(i:int) -> QtGui.QColor:
+def standardQColor(i:int):
     return paletteQColor(standardPalette, i)
 
-def svgQColor(i:str) -> QtGui.QColor:
+def svgQColor(i:str):
     return paletteQColor(svgPalette, i)
 
 def getPalette(name:str="std"):
@@ -961,7 +970,7 @@ def getPalette(name:str="std"):
         return standardPaletteDict
     
     
-def genPaletteQColor(x) -> typing.Generator[QtGui.QColor, None, None]:
+def genPaletteQColor(x):
     """QColor generator from color palette entries.
     
     To use, call 'next(...)', or better still pass a default value as well, i.e.:
@@ -1013,56 +1022,7 @@ def genPaletteQColor(x) -> typing.Generator[QtGui.QColor, None, None]:
             
     yield QtGui.QColor() # invalid color
         
-        
-#def paletteQColors(palette:typing.Union[dict, tuple, list, str, ColorPalette]) -> typing.Generator[typing.Iterator[QtGui.QColor],
-                                                                                #None,
-                                                                                #None]:
-    #"""Iterates color entries in a color palette
-    
-    #Parameters: 
-    #===========
-    #WARNING: the type of the parameters is not checked; if any exception are 
-    #raised the function will return an invalid QColor.
-
-    #palette: A sequence, a mapping, or a str (palette name)
-        #When a sequence, its elements can be:
-        #a) sequences of 3 or 4 int elements: (r, g, b) , or (r, g, b, a)
-            #(with 3 elements alpha channel a = 255 is implied)
-        #b) QtCore.Qt.GlobalColor objects
-        #c) QtGui.QColor objects
-        #d) str - color name
-            #Either a simple color name (e.g., "red") - represeting an internal
-            #Qt.GlobalColor (e.g. QtCore.Qt.red)
-            
-            #or name qualified by dot-separated prefix e.g. "QtCore.Qt.red" 
-            #(which in this example evaluates to the same color as above); 
-            
-            #Allowed values for the prefix are (case-insensitive):
-            #"Qt", "QtCore", "QtCore.Qt", "standard", and "SVG"
-            
-            #this form allows the indirect  use of colors from several pre-defined
-            #palettes including the Qt.GlobalColor and palettes that store colors
-            #as name = value mapping.
-            
-        #When a mapping (dict), it must contain str keys mapped to:
-            #a) tuples of int values with 3 or 4 elements as above
-            #b) a QtCore.Qt.GlobalColor object,
-            #c) QtGui.QColor object
-            #d) a str (another color name, either simple or qualified as above)
-            
-        #When a str, this identifies a registered color palette.
-        
-        #See this module's documentation for available palettes
-    #"""
-    #if isinstance(palette, dict):
-        #iterable = palette.values()
-    #else:
-        #iterable = palette
-
-    #return (next(c, QtGui.QColor()), palette)
-
-def paletteQColor(palette:typing.Union[dict, list, tuple, str, ColorPalette], 
-                  index:typing.Union[int, str]) -> QtGui.QColor:
+def paletteQColor(palette:typing.Union[dict, list, tuple, str, ColorPalette], index:typing.Union[int, str]):
     """Retrieve color entry from a color palette.
     
     Parameters: 
@@ -1124,9 +1084,7 @@ def paletteQColor(palette:typing.Union[dict, list, tuple, str, ColorPalette],
     except:
         return QtGui.QColor()
         
-def register_colormaps(colormap_dict, prefix:typing.Optional[str]=None, 
-                       N:typing.Optional[int]=256,
-                       gamma:typing.Optional[float]=1.0):
+def register_colormaps(colormap_dict, prefix:typing.Optional[str]=None, N:typing.Optional[int]=256, gamma:typing.Optional[float]=1.0):
     """Register in matplotlib, custom colormaps collected in a dictionary.
     
     Parameters:
@@ -1143,10 +1101,7 @@ def register_colormaps(colormap_dict, prefix:typing.Optional[str]=None,
         cdata = colormap_dict[cmap]
         register_colormap(cdata, name=cmap, prefix=None, N=N, gamma=gamma)
             
-def register_colormap(cdata, name:typing.Optional[str]=None, 
-                      prefix:typing.Optional[str]=None,
-                      N:typing.Optional[int]=None, 
-                      gamma:typing.Optional[float]=1.0):
+def register_colormap(cdata, name:typing.Optional[str]=None, prefix:typing.Optional[str]=None, N:typing.Optional[int]=None, gamma:typing.Optional[float]=1.0):
     """Registers a custom colormap with matplotlib.
     """
     # print(f"register_colormap cdata: {cdata}")
@@ -1228,6 +1183,9 @@ def register_colormap(cdata, name:typing.Optional[str]=None,
         
 
 def get(name, lut=None, default=None):
+    """Returns a registered colormap by its name.
+    NOTE: This function is aliased as get_colormap in this module
+    """
     if isinstance(name, str) and len(name.strip()):
         if mpl._version.version_tuple[1]>= 6:
             if name in mpl.colormaps:
@@ -1257,7 +1215,6 @@ def get(name, lut=None, default=None):
                     return cm.get_cmap(name=default, lut=lut)
                 
                 return cm.get_cmap(name="gray", lut=lut)
-        #return cm._cmap_registry[name]
     
     elif isinstance(name, colors.Colormap):
         return name
@@ -1286,6 +1243,8 @@ def get(name, lut=None, default=None):
             
             return cm.get_cmap(name="gray", lut=lut)
     
+get_colormap = get
+
 def plot_linearmap(cdict):
     newcmp = colors.LinearSegmentedColormap('testCmap', segmentdata=cdict, N=256)
     rgba = newcmp(np.linspace(0, 1, 256))
@@ -1299,9 +1258,7 @@ def plot_linearmap(cdict):
     ax.set_ylabel('RGB')
     plt.show()
     
-def read_colormap(filename:str, name:typing.Optional[str]=None, 
-                  prefix:typing.Optional[str]=None,
-                  N:int=256, gamma:float=1.0, register:bool=False):
+def read_colormap(filename:str, name:typing.Optional[str]=None, prefix:typing.Optional[str]=None,N:int=256, gamma:float=1.0, register:bool=False):
     """Reads a colormap from a file generates with save_colormap()
     
     Parameters:
@@ -1391,10 +1348,7 @@ def read_colormap(filename:str, name:typing.Optional[str]=None,
     else:
         raise RuntimeError("Cannot interpret %s" % filename)
     
-def save_colormap(cmap:typing.Union[colors.LinearSegmentedColormap, colors.ListedColormap],
-                  filename:typing.Optional[str]=None,
-                  distribute:bool=False,
-                  sep:str=","):
+def save_colormap(cmap:typing.Union[colors.LinearSegmentedColormap, colors.ListedColormap], filename:typing.Optional[str]=None, distribute:bool=False, sep:str=","):
     """
     Saves the colormap to an ASCII file.
     
@@ -1469,15 +1423,55 @@ def save_colormap(cmap:typing.Union[colors.LinearSegmentedColormap, colors.Liste
         
     except:
         traceback.print_exc()
+        
+def get_color4mpl(colorspec):
+    """Convenience function to get a color for matplotlib
+    """
+    if isinstance(colorspec, (tuple, list)):
+        if all(isinstance(s, (str, tuple, list)) for s in colorspec):
+            try:
+                colorspec = [get_name_color(s)[0] for s in colorspec]
+            except:
+                warnings.warn("Bad color specification")
+                colorspec = None
+            
+        elif all(isinstance(v, numbers.Number) for v in colorspec):
+            try:
+                colorspec = get_name_color(colorspec)[0]
+            except:
+                warnings.warn("Bad color specification")
+                colorspec = None
+                
+    elif isinstance(colorspec, str):
+        try:
+            colorspec = get_name_color(colorspec)[0]
+        except:
+            traceback.print_exc()
+            warnings.warn("Bad color specification")
+            colorspec = None
+    else:                
+        warnings.warn("Bad color specification")
+        colorspec = None
+        
+    return colorspec
+
+def auto_fg_color(bg):
+    """ 'Guesstimates' a foreground color given a background color
+    Returns a color name (vlack or white) depending on the HSV value
+    of the background color
+    """
+    hsv = qcolor(bg).getHsv()
+    # print(f"{__name__}.auto_fg_color: bg {bg} hsv {hsv}")
+    if hsv[2] < 128:
+        return "white"
+    return "black"
+    
     
 if mpl._version.version_tuple[1] >= 6:
     mpl.colormaps.register(cmap = mpl.colormaps.get("gray"), name="None")
 else:
     cm.register_cmap(name="None", cmap=cm.get_cmap(name="gray"))
     
-# def registerCustomColorMaps():
-#     register_colormaps(CustomColorMaps)
-
 register_colormaps(CustomColorMaps)
     
 defaultPalette = ColorPalette()
