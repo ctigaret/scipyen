@@ -43,6 +43,9 @@ import gui.pictgui as pgui
 from gui.workspacegui import (GuiMessages, WorkspaceGuiMixin)
 from gui.widgets.modelfitting_ui import ModelParametersWidget
 from gui.widgets.spinboxslider import SpinBoxSlider
+from gui.widgets.metadatawidget import MetaDataWidget
+from gui.widgets import small_widgets
+from gui.widgets.small_widgets import QuantitySpinBox
 from gui import guiutils
 
 import iolib.pictio as pio
@@ -144,44 +147,100 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def _configureUI_(self):
         self.setupUi(self)
         
+        # NOTE: 2022-11-08 22:55:24 Using custom widgets in Designer.
+        # Straightforward:
+        # A.1) Use a QWidget in lieu of your custom widget.
+        # A.2) Promote this place-holder QWidget to the actual widget type:
+        # A.2.1) give the name of the custom widget class as promoted class name, 
+        #       e.g. QuantitySpinBox
+        #       or   ModelParametersWidget
+        # A.2.2) use the fully qualified module name as header file (instead of an
+        #   actual header file name) - 
+        #       e.g. gui.widgets.small_widgets (for QuantitySpinBox)
+        #       or gui.widgets.modelfitting_ui (for ModelParametersWidget)
+        # A.2.3) then check Global include to True
+        #
+        # Advantages:
+        #   • requires NO extra code written in the Python module containing the 
+        #       class definition that uses the UI, provided that the modules that
+        #       define the custom widget (and given as "header file" upon
+        #       promotion int he Designer) are imported (and importable by 
+        #       loadUiType)
+        #   
+        # Disadvantage:
+        #   • cannot pass custom parameter values to the custom widget 
+        #   • therefore, no "fancy" __init__ for the custom widget:
+        #       one has to make sure the __init__ can work with only the bare 
+        #       minimum parameters, which are passed on the Qt superclass.
+        #       These bae minimum parameters these are usually just "parent", 
+        #       which must be the first positional parameter, and denotes the 
+        #       parent widget of the custom widget. 
+        #       The loadUiType assigns automatically the "parent" based on the UI 
+        #       form.
+        #       All other parameters to the constructor (__init__) can be given 
+        #       either as named parameters (with default value) or as var-keyword 
+        #       parameters (easy to unpack and given default values)
+        #
+        # Alternatively (if above doesn't work, but WARNING this is more cumbersome):
+        # B.1) Use a QWidget in lieu of your custom widget
+        # B.2) Use this place-holder widget as a container:
+        # B.2.1) set its layout to, e.g., a grid layout 
+        # B.3) Construct an instance of your custom widget - make sure you bind
+        # it to an atribute in self (parent class); set its parent to the 
+        #       place-holder widget above
+        # B.4) Add the instance of the custom widget to the layout of the place-holder
+        #
+        # Advantages:
+        # • can pass custom parameter values to the constructor of the custom widget
+        #
+        # Disadvantages:
+        # • cumbersome to write code (and perhas, more difficult to track/debug)
+        
+        # self._metaDataWidgetContainer.setLayout(QtWidgets.QGridLayout(self._metaDataWidgetContainer))
+        # self._metaDataWidgetContainer.layout().setSpacing(0)
+        # self._metaDataWidgetContainer.layout().setContentsMargins(0,0,0,0)
+        # self.metaDataWidget = MetaDataWidget(parent=self._metaDataWidgetContainer) 
+        # self._metaDataWidgetContainer.layout().addWidget(self.metaDataWidget)
+        
         # NOTE: 2022-11-05 23:36:28 
         # add the paramsWidget to the placeholder
         self._paramsWidgetContainer.setLayout(QtWidgets.QGridLayout(self._paramsWidgetContainer))
         self._paramsWidgetContainer.layout().setSpacing(0)
         self._paramsWidgetContainer.layout().setContentsMargins(0, 0, 0, 0)
-        self._paramsWidget = ModelParametersWidget(self._params_initl_, 
+        self.paramsWidget = ModelParametersWidget(self._params_initl_, 
                                         parameterNames = self._params_names_,
                                         lower = self._params_lower_,
                                         upper = self._params_upper_,
-                                        orientation="vertical", parent=self._paramsWidgetContainer)
-        self._paramsWidgetContainer.layout().addWidget(self._paramsWidget, 0,0)
+                                        orientation="vertical", 
+                                        parent=self._paramsWidgetContainer)
+        self._paramsWidgetContainer.layout().addWidget(self.paramsWidget, 0,0)
         
         # NOTE: 2022-11-05 23:31:17 adding the SliderSpinBox widgets
         # see # NOTE: 2022-11-05 23:26:25 in iv.ImageViewer for the logic of this.
         self._frames_spinBoxSliderContainer.setLayout(QtWidgets.QGridLayout(self._frames_spinBoxSliderContainer))
         self._frames_spinBoxSliderContainer.layout().setSpacing(0)
         self._frames_spinBoxSliderContainer.layout().setContentsMargins(0, 0, 0, 0)
-        self._frames_spinBoxSlider = SpinBoxSlider(parent=self._frames_spinBoxSliderContainer)
-        self._frames_spinBoxSliderContainer.layout().addWidget(self._frames_spinBoxSlider, 0, 0)
+        self.frames_spinBoxSlider = SpinBoxSlider(parent=self._frames_spinBoxSliderContainer)
+        self._frames_spinBoxSliderContainer.layout().addWidget(self.frames_spinBoxSlider, 0, 0)
         # NOTE: 2022-11-05 13:20:35 TODO REMOVE
         # For compatibility with older ScipyenFrameViewer API where the frames
         # slider and frames spin box are managed separately
-        self._frames_spinner_ = self._frames_spinBoxSlider.framesQSpinBox
-        self._frames_slider_ = self._frames_spinBoxSlider.framesQSlider
-        self._frames_spinBoxSlider.label = "Sweep:"
-        self._frames_spinBoxSlider.setRange(0, self._number_of_frames_)
-        self._frames_spinBoxSlider.valueChanged.connect(self.slot_setFrameNumber)
+        self._frames_spinner_ = self.frames_spinBoxSlider.framesQSpinBox
+        self._frames_slider_ = self.frames_spinBoxSlider.framesQSlider
+        self.frames_spinBoxSlider.label = "Sweep:"
+        self.frames_spinBoxSlider.setRange(0, self._number_of_frames_)
+        self.frames_spinBoxSlider.valueChanged.connect(self.slot_setFrameNumber)
         
         # NOTE: 2022-11-05 23:32:32
         # see NOTE: 2022-11-05 23:31:17
         self._mPSC_spinBoxSliderContainer.setLayout(QtWidgets.QGridLayout(self._mPSC_spinBoxSliderContainer))
         self._mPSC_spinBoxSliderContainer.layout().setSpacing(0)
         self._mPSC_spinBoxSliderContainer.layout().setContentsMargins(0, 0, 0, 0)
-        self._mPSCSpinBoxSlider = SpinBoxSlider(parent=self._mPSC_spinBoxSliderContainer)
-        self._mPSC_spinBoxSliderContainer.layout().addWidget(self._mPSCSpinBoxSlider, 0, 0)
+        self.mPSCSpinBoxSlider = SpinBoxSlider(parent=self._mPSC_spinBoxSliderContainer)
+        self._mPSC_spinBoxSliderContainer.layout().addWidget(self.mPSCSpinBoxSlider, 0, 0)
         
-        self._mPSCSpinBoxSlider.label = "mPSC:"
-        self._mPSCSpinBoxSlider.setRange(0,0)
+        self.mPSCSpinBoxSlider.label = "mPSC:"
+        self.mPSCSpinBoxSlider.setRange(0,0)
         
         
     def _set_data_(self, *args, **kwargs):
@@ -277,7 +336,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._data_frames_ = 0
         self._frameIndex_ = []
         self._number_of_frames_ = 0
-        self._frames_spinBoxSlider.setRange(0, 0)
+        self.frames_spinBoxSlider.setRange(0, 0)
         
     def closeEvent(self, evt):
         if self._ephysViewer_.isVisible():

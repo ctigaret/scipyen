@@ -7,6 +7,7 @@ import quantities as pq
 from core.strutils import str2symbol
 from gui import guiutils
 import gui.quickdialog as qd
+from gui.widgets.small_widgets import QuantitySpinBox
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
@@ -55,13 +56,20 @@ class ModelParametersWidget(QtWidgets.QWidget):
     _default_spin_decimals_ = 4
     _default_spin_step_ = 1e-4
     
-    def __init__(self, parameters:typing.Sequence, parameterNames:typing.Optional[typing.Sequence]=None, spinStep:typing.Optional[float]=None, spinDecimals:typing.Optional[int]=None, lower:typing.Optional[typing.Sequence]=None, upper:typing.Optional[typing.Sequence]=None, orientation:str ="vertical", parent:QtWidgets.QWidget=None):
+    def __init__(self, parent:QtWidgets.QWidget=None, **kwargs):
         """ Constructor of ModelParametersWidget.
     
             Positional parameters:
             ======================
+    
+            parent: parent widget or None
+    
+            Var-keywords:
+            =============
+    
             parameters: sequence (tuple, list, 1D array-like) with the initial
-                        values for the fit model
+                        values for the fit model;
+            default: None
     
             parameterNames: None (default) or a sequence of str with the names 
                         of the parameters (it must have same number of elements 
@@ -97,66 +105,14 @@ class ModelParametersWidget(QtWidgets.QWidget):
         """
         QtWidgets.QWidget.__init__(self, parent=parent)
         
-        if all(isinstance(p, pq.Quantity) for p in parameters):
-            units = [p.units for p in parameters]
-        else:
-            units = []
+        parameters = kwargs.pop("parameters", [])
+        parameterNames = kwargs.pop("parameterNames", None)
+        spinStep = kwargs.pop("spinStep", None)
+        spinDecimals = kwargs.op("spinDecimals", None)
+        lower = kwargs.pop("lower", None)
+        upper = kwargs.pop("upper", None)
+        orientation = kwargs.pop("orientation", "vertical")):
             
-        
-        if parameterNames is None:
-            parameterNames  = [f"parameter_{k}" for k in range(len(parameters))]
-            
-        elif isinstance(parameterNames, (tuple,list)):
-            if not all(isinstance(s, str) for s in parameterNames):
-                raise TypeError("Expecting strings for parameter names")
-            
-            if any(len(s.strip()) == 0 for s in parameterNames):
-                raise TypeError("Cannot accept empty string for parameter names")
-            
-            if len(parameterNames) != len(parameters):
-                raise ValueError(f"When a sequence, parameterNames must have the same number of elements as parameters {len(parameters)}; instead, got {parameterNames}")
-            
-        else:
-            raise TypeError(f"'parameterNames' must be a sequence or None; instead, got {parameterNames}")
-                
-        if isinstance(lower, numbers.Number):
-            if len(units):
-                lower = [lower * u for u in units]
-            else:
-                lower = [lower] * len(parameters)
-                
-        elif isinstance(lower, (tuple, list)):
-            if len(lower) != len(parameters):
-                raise TypeError(f"'lower' expected to be a sequence of {len(parameters)} elements; instead, got {lower}")
-            
-            if not all(isinstance(v, (numbers.Number, pq.Quantity)) for v in lower):
-                raise TypeError(f"'lower' expected to contain scalars or scalar Quantity; instead, got {lower}")
-            
-            if all(isinstance(v, pq.Quantity) for v in lower) and any(v.size != 1 for v in lower):
-                raise TypeError(f"'lower' expected to contain scalars or scalar Quantity; instead, got {lower}")
-            
-        else:
-            raise TypeError(f"'lower' expected to be a scalar or a sequence of {len(parameters)} elements; instead, got {lower}")
-        
-        if isinstance(upper, numbers.Number):
-            if len(units):
-                upper = [upper *u for u in units]
-            else:
-                upper = [upper] * len(parameters)
-            
-        elif isinstance(upper, (tuple, list)):
-            if len(upper) != len(parameters):
-                raise TypeError(f"'upper' expected to be a sequence of {len(parameters)} elements; instead, got {upper}")
-            
-            if not all(isinstance(v, (numbers.Number, pq.Quantity)) for v in upper):
-                raise TypeError(f"'upper' expected to contain scalars or scalar Quantities; instead, got {upper}")
-            
-            if all(isinstance(v, pq.Quantity) for v in upper) and any(v.size !=1 for v in upper):
-                raise TypeError(f"'upper' expected to contain scalars or scalar Quantities; instead, got {upper}")
-            
-        else:
-            raise TypeError(f"'upper' expected to be a scalar or a sequence of {len(parameters)} elements; instead, got {upper}")
-        
         if not isinstance(spinDecimals, int) or spinDecimals < 0:
             self._spinDecimals_ = self._default_spin_decimals_
         else:
@@ -170,34 +126,97 @@ class ModelParametersWidget(QtWidgets.QWidget):
         self._spin_min_ = -math.inf
         self._spin_max_ =  math.inf
         
+        self.spinBoxes = list()
+        
         if orientation.lower() == "horizontal":
             self._verticalLayout_ = False
         else:
             self._verticalLayout_ = True
             
-        self._parameters_ = pd.DataFrame({"Initial Value:": parameters,
-                                          "Lower Bound:":lower,
-                                          "Upper Bound:":upper},
-                                        index = parameterNames)
-        
+        self._parameters_ = self.setParameters(parameters, lower, upper, parameterNames)
+            
+#         if len(parameters):
+#             if all(isinstance(p, pq.Quantity) for p in parameters):
+#                 units = [p.units for p in parameters]
+#             else:
+#                 units = []
+#             
+#             if parameterNames is None:
+#                 parameterNames  = [f"parameter_{k}" for k in range(len(parameters))]
+#                 
+#             elif isinstance(parameterNames, (tuple,list)):
+#                 if not all(isinstance(s, str) for s in parameterNames):
+#                     raise TypeError("Expecting strings for parameter names")
+#                 
+#                 if any(len(s.strip()) == 0 for s in parameterNames):
+#                     raise TypeError("Cannot accept empty string for parameter names")
+#                 
+#                 if len(parameterNames) != len(parameters):
+#                     raise ValueError(f"When a sequence, parameterNames must have the same number of elements as parameters {len(parameters)}; instead, got {parameterNames}")
+#                 
+#             else:
+#                 raise TypeError(f"'parameterNames' must be a sequence or None; instead, got {parameterNames}")
+#                     
+#             if isinstance(lower, numbers.Number):
+#                 if len(units):
+#                     lower = [lower * u for u in units]
+#                 else:
+#                     lower = [lower] * len(parameters)
+#                     
+#             elif isinstance(lower, (tuple, list)):
+#                 if len(lower) != len(parameters):
+#                     raise TypeError(f"'lower' expected to be a sequence of {len(parameters)} elements; instead, got {lower}")
+#                 
+#                 if not all(isinstance(v, (numbers.Number, pq.Quantity)) for v in lower):
+#                     raise TypeError(f"'lower' expected to contain scalars or scalar Quantity; instead, got {lower}")
+#                 
+#                 if all(isinstance(v, pq.Quantity) for v in lower) and any(v.size != 1 for v in lower):
+#                     raise TypeError(f"'lower' expected to contain scalars or scalar Quantity; instead, got {lower}")
+#                 
+#             else:
+#                 raise TypeError(f"'lower' expected to be a scalar or a sequence of {len(parameters)} elements; instead, got {lower}")
+#             
+#             if isinstance(upper, numbers.Number):
+#                 if len(units):
+#                     upper = [upper * u for u in units]
+#                 else:
+#                     upper = [upper] * len(parameters)
+#                 
+#             elif isinstance(upper, (tuple, list)):
+#                 if len(upper) != len(parameters):
+#                     raise TypeError(f"'upper' expected to be a sequence of {len(parameters)} elements; instead, got {upper}")
+#                 
+#                 if not all(isinstance(v, (numbers.Number, pq.Quantity)) for v in upper):
+#                     raise TypeError(f"'upper' expected to contain scalars or scalar Quantities; instead, got {upper}")
+#                 
+#                 if all(isinstance(v, pq.Quantity) for v in upper) and any(v.size !=1 for v in upper):
+#                     raise TypeError(f"'upper' expected to contain scalars or scalar Quantities; instead, got {upper}")
+#                 
+#             else:
+#                 raise TypeError(f"'upper' expected to be a scalar or a sequence of {len(parameters)} elements; instead, got {upper}")
+#         
+#             self._parameters_ = pd.DataFrame({"Initial Value:": parameters,
+#                                               "Lower Bound:":lower,
+#                                               "Upper Bound:":upper},
+#                                               index = parameterNames)
+#             
+#         else:
+#             self._parameters_ = None
+            
         if not self._verticalLayout_:
             self._parameters_ = self._parameters_.T
         
         self._configureUI_()
         
-    def _configureUI_(self):
-        if not self.objectName():
-            self.setObjectName("ModelParametersWidget")
-        
-        self.gridLayout = QtWidgets.QGridLayout(self)
-        self.gridLayout.setObjectName(u"gridLayout")
-        self.widgetsLayout = QtWidgets.QGridLayout()
-        self.widgetsLayout.setObjectName(u"widgetsLayout")
-        
+    def _generate_widgets(self):
+        if self._verticalLayout_:
+            paramsDF = self._parameters_
+        else:
+            paramsDF = self._parameters_.T
+            
         header = ["Parameters:"] + [c for c in self._parameters_.columns]
-        
         minSpinWidth = list()
-        spinBoxes = list()
+        self.spinBoxes = list()
 
         for layout_col, c in enumerate(header):   
             # NOTE: 2022-10-31 09:31:48
@@ -207,7 +226,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
 
             self.widgetsLayout.addWidget(w, 0, layout_col, 1, 1)
 
-            for ki, i in enumerate(self._parameters_.index): # row index into the DataFrame
+            for ki, i in enumerate(paramsDF.index): # row index into the DataFrame
                 layout_row = ki + 1
 
                 if layout_col == 0:
@@ -215,8 +234,8 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     w.setObjectName(f"label_{str2symbol(i)}")
                     
                 else:
-                    p = self._parameters_.loc[i,c]
-                    w = QtWidgets.QDoubleSpinBox(self)
+                    p = paramsDF.loc[i,c]
+                    w = QuantitySpinBox(self)
                     
                     # WARNING: 2022-11-03 23:39:21
                     # This is for general case.
@@ -227,42 +246,55 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     # or upper bound)
                     # This can be done using self.getSpinBox() method, see
                     # mPSCanalysis.MPSCAnalysis for an example
-                    w.setMinimum(-math.inf)
-                    w.setMaximum(math.inf)
+                    w.setMinimum(self._spin_min_)
+                    w.setMaximum(self._spin_max_)
                     
                     w.setDecimals(self.spinDecimals)
                     w.setSingleStep(self.spinStep)
                     w.valueChanged[float].connect(self._slot_newvalue)
                     w.setAccelerated(True)
+                    w.setValue(p)
                     
-                    if isinstance(p, pq.Quantity):
-                        w.setValue(p.magnitude)
-                        
-                        if p.units != pq.dimensionless:
-                            w.setSuffix(f" {p.units.dimensionality}")
-                        else:
-                            w.setSuffix(" ")
-                            
-                    else:
-                        w.setValue(p)
-                        w.setSuffix(" ")
-                            
                     t = w.text()
                     minSpinWidth.append(guiutils.get_text_width(t))
                     w.setObjectName(f"{str2symbol(i)}_{str2symbol(c)}_spinBox")
-                    spinBoxes.append(w)
+                    self.spinBoxes.append(w)
                     
                 self.widgetsLayout.addWidget(w, layout_row, layout_col, 1, 1)
-        
-        self.gridLayout.addLayout(self.widgetsLayout, 0, 0, 1, 1)
-        
+                
         sp = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         sp.setHorizontalStretch(1)
         sp.setVerticalStretch(0)
         minWidth = max(minSpinWidth)
-        for w in spinBoxes:
+        for w in self.spinBoxes:
             w.setMinimumWidth(minWidth + 3*minWidth//10)
             w.setSizePolicy(sp)
+            
+    def _configureUI_(self):
+        if not self.objectName():
+            self.setObjectName("ModelParametersWidget")
+        
+        self.gridLayout = QtWidgets.QGridLayout(self)
+        self.gridLayout.setObjectName(u"gridLayout")
+        self.widgetsLayout = QtWidgets.QGridLayout()
+        self.widgetsLayout.setObjectName(u"widgetsLayout")
+        self.gridLayout.addLayout(self.widgetsLayout, 0, 0, 1, 1)
+        
+        self._generate_widgets()
+            
+    def _clear_widgets(self):
+        to_remove = list()
+        for w in self.spinBoxes:
+            w.setParent(None)
+            w.valueChanged[float].disconnect(self._slot_newvalue)
+            self.widgetsLayout.removeWidget(w)
+            to_remove.append(w)
+            
+        for w in to_remove:
+            del(self.spinBoxes[self.spinBoxes.index(w)])
+            
+        self.update()
+        
             
     def getSpinBox(self, paramName:str, value_type:str):
         """Access the spin box of a numeric parameter initial value, or boundary.
@@ -279,8 +311,9 @@ class ModelParametersWidget(QtWidgets.QWidget):
         value_type: the name of the parameter value type (e.g. "Initial Value:"
                     or "Lower Bound:" etc)
         """
-        rowNdx = list(self.parameters.index)
-        colNdx = list(self.parameters.columns)
+        paramsDF = self.parameters
+        rowNdx = list(paramsDF.index)
+        colNdx = list(paramsDF.columns)
         
         paramNdx = rowNdx if self.isVertical else colNdx
         valueNdx = colNdx if self.isVertical else rowNdx
@@ -303,8 +336,135 @@ class ModelParametersWidget(QtWidgets.QWidget):
     def parameters(self):
         """A pandas DataFrame with model parameters, lower and upper bounds.
             Follows the widget's orientation
+        
+        Orientation must be changed BEFORE setting new parameters via the setter
+        of this property
         """
-        return self._parameters_
+        if self._verticalLayout_:
+            return self._parameters_
+        else:
+            return self._parameters_.T
+            
+    @parameters.setter
+    def parameters(self, params):
+        if isinstance(params, df.DataFrames) and all(s in params.columns for s in ("Initial Value:", "Lower Bound:", "Upper Bound:")):
+            if isinstance(self._parameters_, pd.DataFrame) and self._parameters_.shape == paramsDF.shape and np.all(self._parameters_index == paramsDF.index):
+                if self.isVertical:
+                    pDF = paramsDF
+                else:
+                    pDF = paramsDF.T
+                    
+                for c in pDF.columns:
+                    for r in pDF.index:
+                        self.getSpinBox(r, c).setValue(pDF.loc[r,c])
+                        
+            else:
+                self._parameters_ = params
+                self._clear_widgets()
+                self._generate_widgets()
+                        
+            self._clear_widgets()
+            self._generate_widgets()
+            
+    def setParameters(self, parameters:typing.Sequence, lower=None, upper=None, parameterNames=None, refresh = False):
+        """Generates new parameters data frame.
+        
+        Does not update the display UNLESS refresh is True. The display update
+        either changes individual values in the spin boxes (if the new parameters
+        names match the current ones) or repopulates the widget with a new set 
+        of spin boxes.
+        
+        In either case, the refresh uses the current orientation (vertical or 
+        horizontal) of the data layout.
+        
+        If a different orientation is requiredm then it must be set BEFORE 
+        setting the new parameters.
+        """
+        if len(parameters):
+            if all(isinstance(p, pq.Quantity) for p in parameters):
+                units = [p.units for p in parameters]
+            else:
+                units = []
+            
+            if parameterNames is None:
+                parameterNames  = [f"parameter_{k}" for k in range(len(parameters))]
+                
+            elif isinstance(parameterNames, (tuple,list)):
+                if not all(isinstance(s, str) for s in parameterNames):
+                    raise TypeError("Expecting strings for parameter names")
+                
+                if any(len(s.strip()) == 0 for s in parameterNames):
+                    raise TypeError("Cannot accept empty string for parameter names")
+                
+                if len(parameterNames) != len(parameters):
+                    raise ValueError(f"When a sequence, parameterNames must have the same number of elements as parameters {len(parameters)}; instead, got {parameterNames}")
+                
+            else:
+                raise TypeError(f"'parameterNames' must be a sequence or None; instead, got {parameterNames}")
+                    
+            if isinstance(lower, numbers.Number):
+                if len(units):
+                    lower = [lower * u for u in units]
+                else:
+                    lower = [lower] * len(parameters)
+                    
+            elif isinstance(lower, (tuple, list)):
+                if len(lower) != len(parameters):
+                    raise TypeError(f"'lower' expected to be a sequence of {len(parameters)} elements; instead, got {lower}")
+                
+                if not all(isinstance(v, (numbers.Number, pq.Quantity)) for v in lower):
+                    raise TypeError(f"'lower' expected to contain scalars or scalar Quantity; instead, got {lower}")
+                
+                if all(isinstance(v, pq.Quantity) for v in lower) and any(v.size != 1 for v in lower):
+                    raise TypeError(f"'lower' expected to contain scalars or scalar Quantity; instead, got {lower}")
+                
+            else:
+                raise TypeError(f"'lower' expected to be a scalar or a sequence of {len(parameters)} elements; instead, got {lower}")
+            
+            if isinstance(upper, numbers.Number):
+                if len(units):
+                    upper = [upper *u for u in units]
+                else:
+                    upper = [upper] * len(parameters)
+                
+            elif isinstance(upper, (tuple, list)):
+                if len(upper) != len(parameters):
+                    raise TypeError(f"'upper' expected to be a sequence of {len(parameters)} elements; instead, got {upper}")
+                
+                if not all(isinstance(v, (numbers.Number, pq.Quantity)) for v in upper):
+                    raise TypeError(f"'upper' expected to contain scalars or scalar Quantities; instead, got {upper}")
+                
+                if all(isinstance(v, pq.Quantity) for v in upper) and any(v.size !=1 for v in upper):
+                    raise TypeError(f"'upper' expected to contain scalars or scalar Quantities; instead, got {upper}")
+                
+            else:
+                raise TypeError(f"'upper' expected to be a scalar or a sequence of {len(parameters)} elements; instead, got {upper}")
+        
+            paramsDF = pd.DataFrame({"Initial Value:": parameters,
+                                              "Lower Bound:":lower,
+                                              "Upper Bound:":upper},
+                                              index = parameterNames)
+            
+            if refresh:
+                if isinstance(self._parameters_, pd.DataFrame) and self._parameters_.shape == paramsDF.shape and np.all(self._parameters_index == paramsDF.index):
+                    if self.isVertical:
+                        pDF = paramsDF
+                    else:
+                        pDF = paramsDF.T
+                        
+                    for c in pDF.columns:
+                        for r in pDF.index:
+                            self.getSpinBox(r, c).setValue(pDF.loc[r,c])
+                            
+                else:
+                    self._parameters_ = paramsDF
+                    self._clear_widgets()
+                    self._generate_widgets()
+                        
+                    
+            
+            return paramsDF
+        
     
     @property
     def spinDecimals(self):

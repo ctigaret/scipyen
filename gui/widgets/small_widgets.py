@@ -472,13 +472,15 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         return val * self.units
         
     def setValue(self, value:typing.Union[pq.Quantity, float, type(pd.NA)]):
+        """Also allows changing the units if not convertible to current ones.
+        Otherwise the value will be rescales to current units.
+        """
         if isinstance(value, pq.Quantity):
             if value.size > 1:
                 raise TypeError("Only scalar quantities are allowed")
             
-            if self.units != pq.dimensionless and not scq.units_convertible(self.units, value.units):
-                raise TypeError(f"The new value {value} must be scalable to {self.units}")
-                val = value.rescale(self.units)
+            if scq.units_convertible(self.units, value.units):
+                val = float(value.rescale(self.units).magnitude)
             else:
                 self.units = value.units
                 val = float(value.magnitude)
@@ -503,8 +505,6 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         else:
             raise TypeError(f"Expecting a scalar quantity or a float; instead, got {value}")
         
-        # super().setValue(val)
-    
     @property
     def unitFamily(self):
         return self._unitFamily_

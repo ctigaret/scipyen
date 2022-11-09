@@ -14,323 +14,9 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout_7">
+   <layout class="QVBoxLayout" name="verticalLayout_5">
     <item>
-     <layout class="QVBoxLayout" name="dataInfoLayout">
-      <item>
-       <layout class="QVBoxLayout" name="verticalLayout_5">
-        <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_8">
-          <item>
-           <widget class="QLabel" name="scanDataVarNameLabel">
-            <property name="toolTip">
-             <string>Name of the variable in the workspace</string>
-            </property>
-            <property name="frameShape">
-             <enum>QFrame::NoFrame</enum>
-            </property>
-            <property name="frameShadow">
-             <enum>QFrame::Plain</enum>
-            </property>
-            <property name="text">
-             <string/>
-            </property>
-            <property name="textInteractionFlags">
-             <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-        <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_9">
-          <item>
-           <widget class="QLabel" name="label_60">
-            <property name="text">
-             <string>Name:</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLineEdit" name="scanDataNameLineEdit">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-              <horstretch>10</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="toolTip">
-             <string>Data name</string>
-            </property>
-            <property name="statusTip">
-             <string>Data name</string>
-            </property>
-            <property name="whatsThis">
-             <string>Data name</string>
-            </property>
-            <property name="clearButtonEnabled">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-       </layout>
-      </item>
-      <item>
-       <layout class="QVBoxLayout" name="verticalLayout_10">
-        <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_24">
-          <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_22">
-            <item>
-             <widget class="QLabel" name="sourceIDLabel">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="text">
-               <string>Source:</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLineEdit" name="sourceIDLineEdit">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                <horstretch>10</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="clearButtonEnabled">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_20">
-            <item>
-             <widget class="QLabel" name="label_56">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="text">
-               <string>Cell:</string>
-              </property>
-              <property name="buddy">
-               <cstring>cellLineEdit</cstring>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLineEdit" name="cellLineEdit">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="toolTip">
-               <string>Cell name</string>
-              </property>
-              <property name="statusTip">
-               <string>Cell name</string>
-              </property>
-              <property name="whatsThis">
-               <string>Cell name</string>
-              </property>
-              <property name="clearButtonEnabled">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_21">
-            <item>
-             <widget class="QLabel" name="label_57">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="text">
-               <string>Field:</string>
-              </property>
-              <property name="buddy">
-               <cstring>fieldLineEdit</cstring>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLineEdit" name="fieldLineEdit">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="toolTip">
-               <string>Field name</string>
-              </property>
-              <property name="statusTip">
-               <string>Field name</string>
-              </property>
-              <property name="whatsThis">
-               <string>Field name</string>
-              </property>
-              <property name="clearButtonEnabled">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-         </layout>
-        </item>
-        <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_25">
-          <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_23">
-            <item>
-             <widget class="QLabel" name="label_62">
-              <property name="text">
-               <string>Age:</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLineEdit" name="ageLineEdit">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>80</width>
-                <height>0</height>
-               </size>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_18">
-            <item>
-             <widget class="QLabel" name="label_61">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="text">
-               <string>Sex:</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QComboBox" name="sexComboBox">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>80</width>
-                <height>0</height>
-               </size>
-              </property>
-              <property name="currentText">
-               <string/>
-              </property>
-              <property name="maxVisibleItems">
-               <number>3</number>
-              </property>
-              <property name="maxCount">
-               <number>3</number>
-              </property>
-              <property name="insertPolicy">
-               <enum>QComboBox::NoInsert</enum>
-              </property>
-              <property name="minimumContentsLength">
-               <number>3</number>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_19">
-              <item>
-               <widget class="QLabel" name="genotypeLabel">
-                <property name="sizePolicy">
-                 <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
-                  <horstretch>0</horstretch>
-                  <verstretch>0</verstretch>
-                 </sizepolicy>
-                </property>
-                <property name="text">
-                 <string>Genotype:</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QComboBox" name="genotypeComboBox">
-                <property name="sizePolicy">
-                 <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                  <horstretch>0</horstretch>
-                  <verstretch>0</verstretch>
-                 </sizepolicy>
-                </property>
-                <property name="minimumSize">
-                 <size>
-                  <width>80</width>
-                  <height>0</height>
-                 </size>
-                </property>
-                <property name="editable">
-                 <bool>true</bool>
-                </property>
-                <property name="maxVisibleItems">
-                 <number>50</number>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <spacer name="horizontalSpacer">
-                <property name="orientation">
-                 <enum>Qt::Horizontal</enum>
-                </property>
-                <property name="sizeHint" stdset="0">
-                 <size>
-                  <width>40</width>
-                  <height>20</height>
-                 </size>
-                </property>
-               </spacer>
-              </item>
-             </layout>
-            </item>
-           </layout>
-          </item>
-         </layout>
-        </item>
-       </layout>
-      </item>
-     </layout>
+     <widget class="MetaDataWidget" name="metaDataWidget" native="true"/>
     </item>
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout">
@@ -338,43 +24,30 @@
        <layout class="QVBoxLayout" name="verticalLayout">
         <item>
          <widget class="QGroupBox" name="dataGroupBox">
+          <property name="toolTip">
+           <string>Electrophysiology record</string>
+          </property>
+          <property name="statusTip">
+           <string>Electrophysiology record</string>
+          </property>
+          <property name="whatsThis">
+           <string>Electrophysiology record</string>
+          </property>
           <property name="title">
            <string>Data</string>
           </property>
           <layout class="QGridLayout" name="gridLayout_2">
-           <item row="0" column="0">
-            <widget class="QLabel" name="signalNameLabel">
-             <property name="text">
-              <string>Signal:</string>
+           <item row="2" column="8">
+            <widget class="QToolButton" name="makeEpochToolButton">
+             <property name="toolTip">
+              <string>Make mPSC analysis epoch</string>
              </property>
-            </widget>
-           </item>
-           <item row="0" column="1" colspan="2">
-            <widget class="QComboBox" name="signalNameComboBox"/>
-           </item>
-           <item row="1" column="0">
-            <widget class="QLabel" name="label">
-             <property name="text">
-              <string>Epoch:</string>
+             <property name="statusTip">
+              <string>Make mPSC analysis epoch</string>
              </property>
-            </widget>
-           </item>
-           <item row="1" column="1" colspan="2">
-            <widget class="QComboBox" name="epochComboBox"/>
-           </item>
-           <item row="2" column="0" colspan="2">
-            <widget class="QPushButton" name="plotDataPushButton">
-             <property name="text">
-              <string>Plot</string>
+             <property name="whatsThis">
+              <string>Make mPSC analysis epoch</string>
              </property>
-             <property name="icon">
-              <iconset theme="graphics">
-               <normaloff>.</normaloff>.</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="2">
-            <widget class="QPushButton" name="makeEpochPushButton">
              <property name="text">
               <string>Make epoch</string>
              </property>
@@ -384,11 +57,171 @@
              </property>
             </widget>
            </item>
+           <item row="0" column="2" colspan="7">
+            <widget class="QComboBox" name="signalNameComboBox">
+             <property name="toolTip">
+              <string>Signal name</string>
+             </property>
+             <property name="statusTip">
+              <string>Signal name</string>
+             </property>
+             <property name="whatsThis">
+              <string>Signal name</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="2" colspan="7">
+            <widget class="QComboBox" name="epochComboBox">
+             <property name="toolTip">
+              <string>Select mPSC epoch</string>
+             </property>
+             <property name="statusTip">
+              <string>Select mPSC epoch</string>
+             </property>
+             <property name="whatsThis">
+              <string>Select mPSC epoch</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="2">
+            <widget class="QToolButton" name="openDataFileToolButton">
+             <property name="toolTip">
+              <string>Load electrophysiology data from file</string>
+             </property>
+             <property name="statusTip">
+              <string>Load electrophysiology data from file</string>
+             </property>
+             <property name="whatsThis">
+              <string>Load electrophysiology data from file</string>
+             </property>
+             <property name="text">
+              <string>Open data file</string>
+             </property>
+             <property name="icon">
+              <iconset theme="document-open"/>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QLabel" name="signalNameLabel">
+             <property name="text">
+              <string>Signal:</string>
+             </property>
+             <property name="buddy">
+              <cstring>signalNameComboBox</cstring>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="4">
+            <widget class="QToolButton" name="importDataToolButton">
+             <property name="toolTip">
+              <string>Import electropysiology data from workspace</string>
+             </property>
+             <property name="statusTip">
+              <string>Import electropysiology data from workspace</string>
+             </property>
+             <property name="whatsThis">
+              <string>Import electropysiology data from workspace</string>
+             </property>
+             <property name="accessibleName">
+              <string/>
+             </property>
+             <property name="text">
+              <string>Import data</string>
+             </property>
+             <property name="icon">
+              <iconset theme="document-import"/>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="3">
+            <widget class="QToolButton" name="saveDataToolButton">
+             <property name="toolTip">
+              <string>Save electrophysiology data to file</string>
+             </property>
+             <property name="statusTip">
+              <string>Save electrophysiology data to file</string>
+             </property>
+             <property name="whatsThis">
+              <string>Save electrophysiology data to file</string>
+             </property>
+             <property name="accessibleName">
+              <string/>
+             </property>
+             <property name="text">
+              <string>Save data</string>
+             </property>
+             <property name="icon">
+              <iconset theme="document-save"/>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QLabel" name="label">
+             <property name="text">
+              <string>Epoch:</string>
+             </property>
+             <property name="buddy">
+              <cstring>epochComboBox</cstring>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="6">
+            <widget class="QToolButton" name="plotDataToolButton">
+             <property name="toolTip">
+              <string>Plot electrophysiology data</string>
+             </property>
+             <property name="statusTip">
+              <string>Plot electrophysiology data</string>
+             </property>
+             <property name="whatsThis">
+              <string>Plot electrophysiology data</string>
+             </property>
+             <property name="text">
+              <string>Plot</string>
+             </property>
+             <property name="icon">
+              <iconset theme="graphics">
+               <normaloff>.</normaloff>.</iconset>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="5">
+            <widget class="QToolButton" name="exportDataToolButton">
+             <property name="toolTip">
+              <string>Export electrophysiology data to workspace</string>
+             </property>
+             <property name="statusTip">
+              <string>Export electrophysiology data to workspace</string>
+             </property>
+             <property name="whatsThis">
+              <string>Export electrophysiology data to workspace</string>
+             </property>
+             <property name="accessibleName">
+              <string/>
+             </property>
+             <property name="text">
+              <string>Export data</string>
+             </property>
+             <property name="icon">
+              <iconset theme="document-export"/>
+             </property>
+            </widget>
+           </item>
           </layout>
          </widget>
         </item>
         <item>
          <widget class="QGroupBox" name="useTemplateGroupBox">
+          <property name="toolTip">
+           <string>Use mPSC template</string>
+          </property>
+          <property name="statusTip">
+           <string>Use mPSC templat</string>
+          </property>
+          <property name="whatsThis">
+           <string>Use mPSC templat</string>
+          </property>
           <property name="title">
            <string>mPSC Template</string>
           </property>
@@ -402,23 +235,23 @@
            <item>
             <layout class="QHBoxLayout" name="horizontalLayout_4">
              <item>
-              <widget class="QToolButton" name="import_mPSCtemplateButton">
-               <property name="text">
-                <string>Import</string>
-               </property>
-               <property name="icon">
-                <iconset theme="document-import">
-                 <normaloff>.</normaloff>.</iconset>
-               </property>
-              </widget>
-             </item>
-             <item>
               <widget class="QToolButton" name="open_mPSCtemplateButton">
                <property name="text">
                 <string>Open</string>
                </property>
                <property name="icon">
                 <iconset theme="document-open">
+                 <normaloff>.</normaloff>.</iconset>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="import_mPSCtemplateButton">
+               <property name="text">
+                <string>Import template</string>
+               </property>
+               <property name="icon">
+                <iconset theme="document-import">
                  <normaloff>.</normaloff>.</iconset>
                </property>
               </widget>
@@ -431,6 +264,26 @@
                <property name="icon">
                 <iconset theme="template">
                  <normaloff>.</normaloff>.</iconset>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="save_mPSCtemplateButton">
+               <property name="text">
+                <string>Save template</string>
+               </property>
+               <property name="icon">
+                <iconset theme="document-save"/>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="export_mPSCtemplateButton">
+               <property name="text">
+                <string>Export template</string>
+               </property>
+               <property name="icon">
+                <iconset theme="document-export"/>
                </property>
               </widget>
              </item>
@@ -463,6 +316,15 @@
         </item>
         <item>
          <widget class="QPushButton" name="plot_mPSCWaveformPushButton">
+          <property name="toolTip">
+           <string>Plot mPSC template or model</string>
+          </property>
+          <property name="statusTip">
+           <string>Plot mPSC template or model</string>
+          </property>
+          <property name="whatsThis">
+           <string>Plot mPSC template or model</string>
+          </property>
           <property name="text">
            <string>Plot mPSC Template or Model</string>
           </property>
@@ -476,6 +338,15 @@
       </item>
       <item>
        <widget class="QGroupBox" name="mPSCmodelGroupBox">
+        <property name="toolTip">
+         <string>Parameters for mPSC model</string>
+        </property>
+        <property name="statusTip">
+         <string>Parameters for mPSC model</string>
+        </property>
+        <property name="whatsThis">
+         <string>Parameters for mPSC model</string>
+        </property>
         <property name="title">
          <string>mPSC Model</string>
         </property>
@@ -483,7 +354,7 @@
          <item>
           <layout class="QVBoxLayout" name="verticalLayout_3">
            <item>
-            <widget class="QWidget" name="_paramsWidgetContainer" native="true">
+            <widget class="ModelParametersWidget" name="paramsWidget" native="true">
              <property name="sizePolicy">
               <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
                <horstretch>1</horstretch>
@@ -496,13 +367,35 @@
             <layout class="QHBoxLayout" name="horizontalLayout_5">
              <item>
               <widget class="QLabel" name="label_2">
+               <property name="toolTip">
+                <string>Duration of synthetic mPSC waveform</string>
+               </property>
+               <property name="statusTip">
+                <string>Duration of synthetic mPSC waveform</string>
+               </property>
+               <property name="whatsThis">
+                <string>Duration of synthetic mPSC waveform</string>
+               </property>
                <property name="text">
                 <string>Duration:</string>
+               </property>
+               <property name="buddy">
+                <cstring>durationSpinBox</cstring>
                </property>
               </widget>
              </item>
              <item>
-              <widget class="QDoubleSpinBox" name="durationSpinBox"/>
+              <widget class="QuantitySpinBox" name="durationSpinBox">
+               <property name="toolTip">
+                <string>Duration of synthetic mPSC waveform</string>
+               </property>
+               <property name="statusTip">
+                <string>Duration of synthetic mPSC waveform</string>
+               </property>
+               <property name="whatsThis">
+                <string>Duration of synthetic mPSC waveform</string>
+               </property>
+              </widget>
              </item>
             </layout>
            </item>
@@ -652,6 +545,25 @@
    </property>
   </action>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>QuantitySpinBox</class>
+   <extends>QDoubleSpinBox</extends>
+   <header location="global">gui.widgets.small_widgets</header>
+  </customwidget>
+  <customwidget>
+   <class>MetaDataWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">gui.widgets.metadatawidget</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>ModelParametersWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">gui.widgets.modelfitting_ui</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

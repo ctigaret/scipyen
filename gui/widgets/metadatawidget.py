@@ -117,12 +117,12 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         self.genotypeComboBox.addItems(self._available_genotypes)
         self.genotypeComboBox.setCurrentIndex(genotype_ndx)
         
-        biometricsPushButton.clicked.connect(self._slot_editBiometrics)
-        procedurePushButton.clicked.connect(self._slot_editProcedures)
-        triggersPushButton.clicked.connect(self._slot_editTriggers)
-        dateTimePushButton.clicked.connect(self._slot_editDateTime)
-        annotationsPushButton.clicked.connect(self._slot_editAnnotations)
-        notesPushButton.clicked.connect(self._slot_editNotes)
+        self.biometricsPushButton.clicked.connect(self._slot_editBiometrics)
+        self.procedurePushButton.clicked.connect(self._slot_editProcedures)
+        self.triggersPushButton.clicked.connect(self._slot_editTriggers)
+        self.dateTimePushButton.clicked.connect(self._slot_editDateTime)
+        self.annotationsPushButton.clicked.connect(self._slot_editAnnotations)
+        self.notesPushButton.clicked.connect(self._slot_editNotes)
         
     def value(self):
         """Returns a dict with field values takes from individual children
@@ -193,4 +193,4 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         # but with the following functions enabled conditionally: 
         #
         # trigger detection ↔ is there ephysdata available
-    
+        pass    
