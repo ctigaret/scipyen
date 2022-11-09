@@ -37,27 +37,7 @@
            <string>Data</string>
           </property>
           <layout class="QGridLayout" name="gridLayout_2">
-           <item row="2" column="8">
-            <widget class="QToolButton" name="makeEpochToolButton">
-             <property name="toolTip">
-              <string>Make mPSC analysis epoch</string>
-             </property>
-             <property name="statusTip">
-              <string>Make mPSC analysis epoch</string>
-             </property>
-             <property name="whatsThis">
-              <string>Make mPSC analysis epoch</string>
-             </property>
-             <property name="text">
-              <string>Make epoch</string>
-             </property>
-             <property name="icon">
-              <iconset theme="select">
-               <normaloff>.</normaloff>.</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="2" colspan="7">
+           <item row="0" column="2" colspan="8">
             <widget class="QComboBox" name="signalNameComboBox">
              <property name="toolTip">
               <string>Signal name</string>
@@ -67,19 +47,6 @@
              </property>
              <property name="whatsThis">
               <string>Signal name</string>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="2" colspan="7">
-            <widget class="QComboBox" name="epochComboBox">
-             <property name="toolTip">
-              <string>Select mPSC epoch</string>
-             </property>
-             <property name="statusTip">
-              <string>Select mPSC epoch</string>
-             </property>
-             <property name="whatsThis">
-              <string>Select mPSC epoch</string>
              </property>
             </widget>
            </item>
@@ -98,7 +65,8 @@
               <string>Open data file</string>
              </property>
              <property name="icon">
-              <iconset theme="document-open"/>
+              <iconset theme="document-open">
+               <normaloff>.</normaloff>.</iconset>
              </property>
             </widget>
            </item>
@@ -112,61 +80,43 @@
              </property>
             </widget>
            </item>
-           <item row="2" column="4">
-            <widget class="QToolButton" name="importDataToolButton">
-             <property name="toolTip">
-              <string>Import electropysiology data from workspace</string>
-             </property>
-             <property name="statusTip">
-              <string>Import electropysiology data from workspace</string>
-             </property>
-             <property name="whatsThis">
-              <string>Import electropysiology data from workspace</string>
-             </property>
-             <property name="accessibleName">
-              <string/>
-             </property>
-             <property name="text">
-              <string>Import data</string>
-             </property>
-             <property name="icon">
-              <iconset theme="document-import"/>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="3">
-            <widget class="QToolButton" name="saveDataToolButton">
-             <property name="toolTip">
-              <string>Save electrophysiology data to file</string>
-             </property>
-             <property name="statusTip">
-              <string>Save electrophysiology data to file</string>
-             </property>
-             <property name="whatsThis">
-              <string>Save electrophysiology data to file</string>
-             </property>
-             <property name="accessibleName">
-              <string/>
-             </property>
-             <property name="text">
-              <string>Save data</string>
-             </property>
-             <property name="icon">
-              <iconset theme="document-save"/>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="1">
-            <widget class="QLabel" name="label">
-             <property name="text">
-              <string>Epoch:</string>
-             </property>
-             <property name="buddy">
-              <cstring>epochComboBox</cstring>
-             </property>
-            </widget>
-           </item>
            <item row="2" column="6">
+            <widget class="QToolButton" name="exportDataToolButton">
+             <property name="toolTip">
+              <string>Export electrophysiology data to workspace</string>
+             </property>
+             <property name="statusTip">
+              <string>Export electrophysiology data to workspace</string>
+             </property>
+             <property name="whatsThis">
+              <string>Export electrophysiology data to workspace</string>
+             </property>
+             <property name="accessibleName">
+              <string/>
+             </property>
+             <property name="text">
+              <string>Export data</string>
+             </property>
+             <property name="icon">
+              <iconset theme="document-export">
+               <normaloff>.</normaloff>.</iconset>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="2" colspan="8">
+            <widget class="QComboBox" name="epochComboBox">
+             <property name="toolTip">
+              <string>Select mPSC epoch</string>
+             </property>
+             <property name="statusTip">
+              <string>Select mPSC epoch</string>
+             </property>
+             <property name="whatsThis">
+              <string>Select mPSC epoch</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="7">
             <widget class="QToolButton" name="plotDataToolButton">
              <property name="toolTip">
               <string>Plot electrophysiology data</string>
@@ -186,25 +136,79 @@
              </property>
             </widget>
            </item>
-           <item row="2" column="5">
-            <widget class="QToolButton" name="exportDataToolButton">
+           <item row="2" column="9">
+            <widget class="QToolButton" name="makeEpochToolButton">
              <property name="toolTip">
-              <string>Export electrophysiology data to workspace</string>
+              <string>Make mPSC analysis epoch</string>
              </property>
              <property name="statusTip">
-              <string>Export electrophysiology data to workspace</string>
+              <string>Make mPSC analysis epoch</string>
              </property>
              <property name="whatsThis">
-              <string>Export electrophysiology data to workspace</string>
+              <string>Make mPSC analysis epoch</string>
+             </property>
+             <property name="text">
+              <string>Make epoch</string>
+             </property>
+             <property name="icon">
+              <iconset theme="select">
+               <normaloff>.</normaloff>.</iconset>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="4">
+            <widget class="QToolButton" name="saveDataToolButton">
+             <property name="toolTip">
+              <string>Save electrophysiology data to file</string>
+             </property>
+             <property name="statusTip">
+              <string>Save electrophysiology data to file</string>
+             </property>
+             <property name="whatsThis">
+              <string>Save electrophysiology data to file</string>
              </property>
              <property name="accessibleName">
               <string/>
              </property>
              <property name="text">
-              <string>Export data</string>
+              <string>Save data</string>
              </property>
              <property name="icon">
-              <iconset theme="document-export"/>
+              <iconset theme="document-save">
+               <normaloff>.</normaloff>.</iconset>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QLabel" name="label">
+             <property name="text">
+              <string>Epoch:</string>
+             </property>
+             <property name="buddy">
+              <cstring>epochComboBox</cstring>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="3">
+            <widget class="QToolButton" name="importDataToolButton">
+             <property name="toolTip">
+              <string>Import electropysiology data from workspace</string>
+             </property>
+             <property name="statusTip">
+              <string>Import electropysiology data from workspace</string>
+             </property>
+             <property name="whatsThis">
+              <string>Import electropysiology data from workspace</string>
+             </property>
+             <property name="accessibleName">
+              <string/>
+             </property>
+             <property name="text">
+              <string>Import data</string>
+             </property>
+             <property name="icon">
+              <iconset theme="document-import">
+               <normaloff>.</normaloff>.</iconset>
              </property>
             </widget>
            </item>
@@ -273,7 +277,8 @@
                 <string>Save template</string>
                </property>
                <property name="icon">
-                <iconset theme="document-save"/>
+                <iconset theme="document-save">
+                 <normaloff>.</normaloff>.</iconset>
                </property>
               </widget>
              </item>
@@ -283,7 +288,8 @@
                 <string>Export template</string>
                </property>
                <property name="icon">
-                <iconset theme="document-export"/>
+                <iconset theme="document-export">
+                 <normaloff>.</normaloff>.</iconset>
                </property>
               </widget>
              </item>
@@ -415,7 +421,7 @@
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_3">
          <item>
-          <widget class="QPushButton" name="detectInSweepPushButton">
+          <widget class="QToolButton" name="detectInSweepToolButton">
            <property name="text">
             <string>Sweep</string>
            </property>
@@ -426,7 +432,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="undoSweepPushButton">
+          <widget class="QToolButton" name="undoSweepToolButton">
            <property name="text">
             <string>Undo sweep</string>
            </property>
@@ -437,7 +443,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="detectInDataPushButton">
+          <widget class="QToolButton" name="detectInDataToolButton">
            <property name="text">
             <string>Data</string>
            </property>
@@ -448,7 +454,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="undoDataPushButton">
+          <widget class="QToolButton" name="undoDataToolButton">
            <property name="text">
             <string>Undo</string>
            </property>
@@ -459,7 +465,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="validate_mPSCsPushButton">
+          <widget class="QToolButton" name="validate_mPSCsToolButton">
            <property name="text">
             <string>Validate</string>
            </property>
@@ -469,12 +475,95 @@
            </property>
           </widget>
          </item>
+         <item>
+          <widget class="QToolButton" name="saveResultsToolButton">
+           <property name="text">
+            <string>Save results</string>
+           </property>
+           <property name="icon">
+            <iconset theme="document-save"/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="saveResultsAsToolButton">
+           <property name="acceptDrops">
+            <bool>false</bool>
+           </property>
+           <property name="toolTip">
+            <string>Save results as</string>
+           </property>
+           <property name="statusTip">
+            <string>Save results as</string>
+           </property>
+           <property name="whatsThis">
+            <string>Save results as</string>
+           </property>
+           <property name="text">
+            <string>Save as</string>
+           </property>
+           <property name="icon">
+            <iconset theme="document-save-as"/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="exportResultsToolButton">
+           <property name="toolTip">
+            <string>Export results to workspace</string>
+           </property>
+           <property name="statusTip">
+            <string>Export results to workspace</string>
+           </property>
+           <property name="whatsThis">
+            <string>Export results to workspace</string>
+           </property>
+           <property name="text">
+            <string>Export results</string>
+           </property>
+           <property name="icon">
+            <iconset theme="document-export"/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="clearResultsToolButton">
+           <property name="toolTip">
+            <string>Clear results</string>
+           </property>
+           <property name="statusTip">
+            <string>Clear results</string>
+           </property>
+           <property name="whatsThis">
+            <string>Clear results</string>
+           </property>
+           <property name="text">
+            <string>Clear results</string>
+           </property>
+           <property name="icon">
+            <iconset theme="delete"/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
         </layout>
        </item>
        <item>
         <layout class="QHBoxLayout" name="_mPSCSpinBoxSliderLayout">
          <item>
-          <widget class="QWidget" name="_mPSC_spinBoxSliderContainer" native="true">
+          <widget class="SpinBoxSlider" name="mPSC_spinBoxSlider" native="true">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
              <horstretch>0</horstretch>
@@ -493,7 +582,7 @@
         </layout>
        </item>
        <item>
-        <widget class="QWidget" name="_frames_spinBoxSliderContainer" native="true">
+        <widget class="SpinBoxSlider" name="frames_spinBoxSlider" native="true">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
            <horstretch>0</horstretch>
@@ -513,7 +602,7 @@
      <x>0</x>
      <y>0</y>
      <width>526</width>
-     <height>28</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -561,6 +650,12 @@
    <class>ModelParametersWidget</class>
    <extends>QWidget</extends>
    <header location="global">gui.widgets.modelfitting_ui</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>SpinBoxSlider</class>
+   <extends>QWidget</extends>
+   <header location="global">gui.widgets.spinboxslider</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

@@ -399,14 +399,19 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         When either is None, the 'minimum' and 'maximum' will be set to
         -math.inf and math.inf, respectively.
         """
+        # print(f"{self.__class__.__name__}.setRange({minimum}, {maximum})")
         # parameter sanity checks:
         if all(isinstance(v, pq.Quantity) for v in (minimum, maximum)):
             # NOTE: 2022-11-07 09:55:43
             # sanity check when both are quantities
             if any(v.size > 1 for v in (minimum, maximum)):
                 raise TypeError("Expecting scalar quantities for both minimum and maximum ")
+            
             if scq.units_convertible(minimum, maximum):
-                maximum = maximum.rescale(minimum)
+                # NOTE: 2022-11-09 09:07:15
+                # rescale to minimum units explicitly, 
+                # in case minimum magnitude is 0 (and thus raise exception)
+                maximum = maximum.rescale(minimum.units)
                 
             else:
                 raise TypeError(f"{minimum} and {maximum} have incompatible units")

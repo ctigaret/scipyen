@@ -13,6 +13,7 @@ import neo
 import pyqtgraph as pg
 import pandas as pd
 
+from iolib import pictio as pio
 import core.neoutils as neoutils
 import core.workspacefunctions as wf
 import core.signalprocessing as sigp
@@ -94,11 +95,19 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self._clear_events_flag_ = clearOldPSCs == True
         self._mPSC_detected_ = False
-        self._currentWaveformIndex_ = 0
         self._data_var_name_ = None
         self._cached_detection_ = None
+        
         self._data_ = None
+        self._mPSC_waveform_ = None
 
+        self._data_frames_ = 0
+        self._frameIndex_ = range(self._data_frames_)
+        self._number_of_frames_ = len(self._frameIndex_)
+        
+        self._waveform_frames = 0
+        self._currentWaveformIndex_ = 0
+        
         # NOTE: 2022-11-05 15:14:11
         # logic from TriggerDetectDialog: if this instance of MPSCAnalysis
         # uses its own viewer then self._own_viewer_ will be set to True
@@ -119,6 +128,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                          doc_title=self._data_var_name_, parent=parent)
         
         self.winTitle = "mPSC Detect"
+        
+        self._set_data_(ephysdata)
         
         # NOTE: 2022-11-05 23:48:25
         # must be executed here AFTER superclasses have been initialized
@@ -202,46 +213,64 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # self.metaDataWidget = MetaDataWidget(parent=self._metaDataWidgetContainer) 
         # self._metaDataWidgetContainer.layout().addWidget(self.metaDataWidget)
         
-        # NOTE: 2022-11-05 23:36:28 
-        # add the paramsWidget to the placeholder
-        self._paramsWidgetContainer.setLayout(QtWidgets.QGridLayout(self._paramsWidgetContainer))
-        self._paramsWidgetContainer.layout().setSpacing(0)
-        self._paramsWidgetContainer.layout().setContentsMargins(0, 0, 0, 0)
-        self.paramsWidget = ModelParametersWidget(self._params_initl_, 
-                                        parameterNames = self._params_names_,
+        # # NOTE: 2022-11-05 23:36:28 
+        # # add the paramsWidget to the placeholder
+        # self._paramsWidgetContainer.setLayout(QtWidgets.QGridLayout(self._paramsWidgetContainer))
+        # self._paramsWidgetContainer.layout().setSpacing(0)
+        # self._paramsWidgetContainer.layout().setContentsMargins(0, 0, 0, 0)
+        # self.paramsWidget = ModelParametersWidget(self._params_initl_, 
+        #                                 parameterNames = self._params_names_,
+        #                                 lower = self._params_lower_,
+        #                                 upper = self._params_upper_,
+        #                                 orientation="vertical", 
+        #                                 parent=self._paramsWidgetContainer)
+        # self._paramsWidgetContainer.layout().addWidget(self.paramsWidget, 0,0)
+        
+        self.paramsWidget.setParameters(self._params_initl_,
                                         lower = self._params_lower_,
                                         upper = self._params_upper_,
-                                        orientation="vertical", 
-                                        parent=self._paramsWidgetContainer)
-        self._paramsWidgetContainer.layout().addWidget(self.paramsWidget, 0,0)
+                                        names = self._params_names_,
+                                        refresh = True)
         
-        # NOTE: 2022-11-05 23:31:17 adding the SliderSpinBox widgets
-        # see # NOTE: 2022-11-05 23:26:25 in iv.ImageViewer for the logic of this.
-        self._frames_spinBoxSliderContainer.setLayout(QtWidgets.QGridLayout(self._frames_spinBoxSliderContainer))
-        self._frames_spinBoxSliderContainer.layout().setSpacing(0)
-        self._frames_spinBoxSliderContainer.layout().setContentsMargins(0, 0, 0, 0)
-        self.frames_spinBoxSlider = SpinBoxSlider(parent=self._frames_spinBoxSliderContainer)
-        self._frames_spinBoxSliderContainer.layout().addWidget(self.frames_spinBoxSlider, 0, 0)
-        # NOTE: 2022-11-05 13:20:35 TODO REMOVE
-        # For compatibility with older ScipyenFrameViewer API where the frames
-        # slider and frames spin box are managed separately
-        self._frames_spinner_ = self.frames_spinBoxSlider.framesQSpinBox
-        self._frames_slider_ = self.frames_spinBoxSlider.framesQSlider
+        # # NOTE: 2022-11-05 23:31:17 adding the SliderSpinBox widgets
+        # # see # NOTE: 2022-11-05 23:26:25 in iv.ImageViewer for the logic of this.
+        # self._frames_spinBoxSliderContainer.setLayout(QtWidgets.QGridLayout(self._frames_spinBoxSliderContainer))
+        # self._frames_spinBoxSliderContainer.layout().setSpacing(0)
+        # self._frames_spinBoxSliderContainer.layout().setContentsMargins(0, 0, 0, 0)
+        # self.frames_spinBoxSlider = SpinBoxSlider(parent=self._frames_spinBoxSliderContainer)
+        # self._frames_spinBoxSliderContainer.layout().addWidget(self.frames_spinBoxSlider, 0, 0)
+        # # NOTE: 2022-11-05 13:20:35 TODO REMOVE
+        # # For compatibility with older ScipyenFrameViewer API where the frames
+        # # slider and frames spin box are managed separately
+        # self._frames_spinner_ = self.frames_spinBoxSlider.framesQSpinBox
+        # self._frames_slider_ = self.frames_spinBoxSlider.framesQSlider
         self.frames_spinBoxSlider.label = "Sweep:"
         self.frames_spinBoxSlider.setRange(0, self._number_of_frames_)
-        self.frames_spinBoxSlider.valueChanged.connect(self.slot_setFrameNumber)
+        self.frames_spinBoxSlider.valueChanged.connect(self.slot_setFrameNumber) # slot inherited from ScipyenFrameViewer
         
-        # NOTE: 2022-11-05 23:32:32
-        # see NOTE: 2022-11-05 23:31:17
-        self._mPSC_spinBoxSliderContainer.setLayout(QtWidgets.QGridLayout(self._mPSC_spinBoxSliderContainer))
-        self._mPSC_spinBoxSliderContainer.layout().setSpacing(0)
-        self._mPSC_spinBoxSliderContainer.layout().setContentsMargins(0, 0, 0, 0)
-        self.mPSCSpinBoxSlider = SpinBoxSlider(parent=self._mPSC_spinBoxSliderContainer)
-        self._mPSC_spinBoxSliderContainer.layout().addWidget(self.mPSCSpinBoxSlider, 0, 0)
+        # # NOTE: 2022-11-05 23:32:32
+        # # see NOTE: 2022-11-05 23:31:17
+        # # self._mPSC_spinBoxSliderContainer.setLayout(QtWidgets.QGridLayout(self._mPSC_spinBoxSliderContainer))
+        # self._mPSC_spinBoxSliderContainer.layout().setSpacing(0)
+        # self._mPSC_spinBoxSliderContainer.layout().setContentsMargins(0, 0, 0, 0)
+        # self.mPSCSpinBoxSlider = SpinBoxSlider(parent=self._mPSC_spinBoxSliderContainer)
+        # self._mPSC_spinBoxSliderContainer.layout().addWidget(self.mPSCSpinBoxSlider, 0, 0)
         
-        self.mPSCSpinBoxSlider.label = "mPSC:"
-        self.mPSCSpinBoxSlider.setRange(0,0)
+        self.mPSC_spinBoxSlider.label = "mPSC:"
+        self.mPSC_spinBoxSlider.setRange(0,0)
+        self.mPSC_spinBoxSlider.valueChanged.connect(self._slot_setWaveFormIndex)
         
+        self.durationSpinBox.setDecimals(self.paramsWidget.spinDecimals)
+        self.durationSpinBox.setSingleStep(10**(-self.paramsWidget.spinDecimals))
+        self.durationSpinBox.units = pq.s
+        self.durationSpinBox.setRange(0*pq.s, 0.1*pq.s)
+        
+        self.openDataFileToolButton.triggered.connect(self._slot_openEphysDataFile)
+        self.importDataToolButton.triggered.connect(self._slot_importEphysData)
+        self.saveDataToolButton.triggered.connect(self._slot_saveEphysData)
+        self.exportDataToolButton.triggered.connect(self._slot_exportEphysData)
+        
+            
         
     def _set_data_(self, *args, **kwargs):
         if len(args):
@@ -349,6 +378,44 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 
         super().closeEvent(evt)
         
+    @pyqtSlot(object)
+    def _slot_openEphysDataFile(self, _):
+        fileName, fileFilter = self.chooseFile(caption="Open electrophysiology file",
+                                               single=True,
+                                               save=False,
+                                               fileFilter=";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)"]))
+        if isinstance(fileName, str) and os.path.isfile(fileName):
+            data = pio.loadAxonFile(fileName)
+            self._set_data_(data)
+            
+    @pyqtSlot(object)
+    def _slot_importEphysData(self, _):
+        vars_ = self.importWorkspaceData([neo.Block, neo.Segment, tuple, list],
+                                         title="Import electrophysiology",
+                                         single=True)
+        if len(vars_) = 1:
+            self._set_data_(vars_[0]) # will raise exception if data is wrong
+            self.metadataWidget.
+        
+    @pyqtSlot(int)
+    def _slot_setWaveFormIndex(self, value):
+        self.currentWaveformIndex = value
+        
+    @property
+    def currentWaveformIndex(self):
+        return self._currentWaveformIndex_
+    
+    @currentWaveformIndex.setter
+    def currentWaveformIndex(self, value):
+        self._currentWaveformIndex_ = value
+        if self._waveFormViewer_.isVisible():
+            if isinstance(self._mPSC_waveform_, neo.AnalogSignal):
+                self._waveFormViewer_.view(self._mPSC_waveform_)
+                self._currentWaveformIndex_ = 0
+                
+            elif isinstance(self._mPSC_waveform_, (tuple, list)) and all (isinstance(s, neo.AnalogSignal) for s in self._mPSC_waveform_):
+                if self._currentWaveformIndex_ in range(len(self._mPSC_waveform_)):
+                    self._waveFormViewer_.currentFrame = self._currentWaveformIndex_
         
     
 
@@ -1007,6 +1074,7 @@ class MPSCAnalysisDialog(qd.QuickDialog, WorkspaceGuiMixin):
                 self._ephysViewer_.refresh()
             else:
                 self._ephysViewer_.plot(self.ephysdata)
+                
                 
     @pyqtSlot()
     def slot_detect_in_frame(self):

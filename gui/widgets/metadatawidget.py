@@ -6,6 +6,7 @@ import numpy as np
 import quantities as pq
 from core import quantities as scq
 from core import strutils
+from core.datatypes import UnitType, GENOTYPES
 import pandas as pd
 
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -24,12 +25,37 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         
         self._dataVarName = kwargs.pop("varname", "")
         self._dataName = kwargs.pop("name", "")
-        self._source = kwargs.pop("source", pd.NA)
-        self._cell = kwargs.pop("cell", pd.NA)
-        self._field = kwargs.pop("field", pd.NA)
-        self._age = kwargs.pop("age", pd.NA)
         
-        self._default_genotypes_ = kwargs.pop("default_genotypes", ["NA", "wt", "het", "hom","+/+", "+/-", "-/-"])
+        for name in ("sourceID, cell, field, sex, genotype"):
+            val = kwargs.pop(name, pd.NA)
+            
+            if isinstance(val, str) and len(val.strip()):
+                setattr(self, f"_{name}", val)
+            else:
+                setattr(self, f"_{name}", pd.NA)
+        
+        val = kwargs.pop("age", pd.NA)
+        if isinstance(val, pq.Quantity) and scq.check_time_units(val):
+            self._age = val
+        else:
+            self._age = pd.NA
+        
+        self._available_genotypes_ = kwargs.pop("default_genotypes", GENOTYPES)
+        
+        if isinstance(self._genotype, str):
+            if len(self._genotype.strip()):
+                if self._genotype not in self._available_genotypes_:
+                    self._available_genotypes.append(self._genotype)
+                    
+                elif self._genotype in ("NA", "<NA>"):
+                    self._genotype = pd.NA
+                    
+            else:
+                self._genotype = pd.NA
+                
+        else:
+            self._genotype = pd.NA
+        
         
         self._biometrics_ = kwargs.pop("biometrics", dict())
         
@@ -38,8 +64,6 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         self._annotations_ = kwargs.pop("annotations", dict())
         
         self._data_description_ = kwargs.pop("description", "")
-        
-        self._available_genotypes = self._default_genotypes_
         
         if isinstance(self._age, pq.Quantity):
             if not scq.check_time_units(self._age):
@@ -57,45 +81,40 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         
     def _configureUI_(self):
         self.setupUi(self)
-        self.dataVarNameLabel.setText(self._dataVarName)
         
-        self.ageWidget.setLayout(QtWidgets.QGridLayout(self.ageWidget))
-        self.ageSpinBox = QuantitySpinBox(parent=self.ageWidget, 
-                                          unitsFamily="Time", 
-                                          units=pq.div,
-                                          singleStep = 1.0,
-                                          decimals=1)
-
-        self.ageSpinBox.setValue(self._age)
-        if isinstance(self._age, pq.Quantity):
-            self.ageSpinBox.units = self._age.units
-            
-        self.ageWidget.layout().addWidget(self.ageSpinBox)
+        self.dataVarNameLabel.setText(self._dataVarName)
         
         self.dataNameLineEdit.setClearButtonEnabled(True)
         self.dataNameLineEdit.undoAvailable = True
         self.dataNameLineEdit.redoAvailable =True
         self.dataNameLineEdit.setText(self._dataName)
+        self.dataNameLineEdit.editingFinished.connect(self._slot_setDataName)
         
+        self.sourceIDLineEdit.setText(f"{self._sourceID}")
         self.sourceIDLineEdit.setClearButtonEnabled(True)
         self.sourceIDLineEdit.undoAvailable = True
         self.sourceIDLineEdit.redoAvailable = True
+        self.sourceIDLineEdit.editingFinished.connect(self._slot_setSourceID)
         
+        self.cellIDLineEdit.setText(f"{self._cell}")
         self.cellIDLineEdit.setClearButtonEnabled(True)
         self.cellIDLineEdit.undoAvailable = True
         self.cellIDLineEdit.redoAvailable = True
+        self.cellIDLineEdit.editingFinished.connect(self._slot_setCell)
         
+        self.fieldIDLineEdit.setText(f"{self._field}")
         self.fieldIDLineEdit.setClearButtonEnabled(True)
         self.fieldIDLineEdit.undoAvailable = True
         self.fieldIDLineEdit.redoAvailable = True
+        self.fieldIDLineEdit.editingFinished.connect(self._slot_setField)
+        
+        self.ageSpinBox.unitsFamily = "Time"
+        self.ageSpinBox.units = self._age.units if isinstance(self._age, pq.Quantity) else pd.dimensionless
+        self.ageSpinBox.singleStep = 0.01
+        self.ageSpinBox.decimals = 2
+        self.ageSpinBox.setValue(self._age)
         
         sex = ["NA", "F", "M"]
-        
-        my_sex = str(self._sex).strip("<>")
-        if my_sex in sex:
-            sex_ndx = sex.index(my_sex)
-        else:
-            sex_ndx = 0 # → NA
         
         self.sexComboBox.setEditable(False)
         self.sexComboBox.addItems(sex)
@@ -105,8 +124,11 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         
         # NOTE: 2022-11-07 14:03:58
         # allow custom genotype strings
-        if my_genotype not in self._available_genotypes:
-            self._available_genotypes.append(my_genotype)
+        if self._genotype is pd.NA or self._genotype not in self._available_genotypes_:
+            genotype_ndx = 0
+        else:
+            genotype_ndx = self._available_genotypes_.index(self._genotype) + 1
+            
 
         genotype_ndx = self._available_genotypes.index(my_genotype)
             
@@ -128,7 +150,8 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         """Returns a dict with field values takes from individual children
         """
         ret = dict()
-        ret["VarName"] = strutils.str2symbol(self.dataNameLineEdit.text())
+        ret["VarName"] = strutils.str2symbol(self._dataVarName)
+        ret["Name"] = self.dataNameLineEdit.text()
         ret["Source"] = self.sourceIDLineEdit.text()
         ret["Cell"] = self.cellIDLineEdit.text()
         ret["Field"] = self.fieldIDLineEdit.text()
@@ -137,6 +160,28 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         ret["Genotype"] = self.genotypeComboBox.currentText()
         
         return ret
+    
+    @pyqtSLot()
+    def _slot_setDataName(self):
+        self._dataName = strutils.str2symbol(self.dataNameLineEdit.text())
+        
+    @pyqtSlot()
+    def _slot_setSourceID(self):
+        self._sourceID = self.sourceIDLineEdit.text()
+        if self._sourceID in ("NA", "<NA>"):
+            self._sourceID = pd.NA
+    
+    @pyqtSlot()
+    def _slot_setCell(self):
+        self._cell = self.cellIDLineEdit.text()
+        if self._cell in ("NA", "<NA>"):
+            self._cell = pd.NA
+    
+    @pyqtSlot()
+    def _slot_setField(self):
+        self._field = self.fieldIDLineEdit.text()
+        if self._field in ("NA", "<NA>"):
+            self._field = pd.NA
     
     @pyqtSlot()
     def _slot_editAnnotations(self):
@@ -194,3 +239,74 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         #
         # trigger detection ↔ is there ephysdata available
         pass    
+    
+    @property
+    def dataVarName(self):
+        return self._dataVarName
+    
+    @dataVarName.setter
+    def dataVarName(self, value:str):
+        if isinstance(value, str) and len(value.strip()):
+            val = strutils.str2symbol(value)
+            self._dataVarName = val
+            self.dataVarNameLabel.setText(val)
+    
+    @property
+    def dataName(self):
+        """Getter & setter for the data name"""
+        return self._dataName
+    
+    @dataName.setter
+    def dataName(self, value:str):
+        # WARNING: 2022-11-09 16:07:02 
+        # do NOT use this setter from within the slot connected to the
+        # dataNameLineEdit!
+        if isinstance(value, str):
+            self._dataName = strutils.str2symbol(value)
+            signalBlocker = QtCore.QSignalBlocker(self.dataNameLineEdit)
+            self.dataNameLineEdit.setText(self._dataName)
+            
+    @property
+    def sourceID(self, value:str):
+        return self._sourceID
+    
+    @sourceID.setter
+    def sourceID(self, value:typing.Union[str, type(pd.NA)]):
+        if isinstance(value, str) and len(value.strip()):
+            self._sourceID = value
+            if self._sourceID in ("NA", "<NA>"):
+                self._souceID = pd.NA
+        else:
+            self._sourceID = pd.NA
+            
+        signalBlocker = QtCore.QSignalBlocker(self.sourceIDLineEdit)
+        self.sourceIDLineEdit.setText(f"{self._sourceID}")
+            
+    @property
+    def cell(self):
+        return self._cell
+    
+    @cell.setter
+    def cell(self, value:typing.Union[str, type(pd.NA)]):
+        if isinstance(value, str) and len(value.strip()):
+            self._cell = value
+            if self._cell in ("NA", "<NA>"):
+                self._cell = pd.NA
+        else:
+            self._cell = pd.NA
+            
+        signalBlocker = QtCore.QSignalBlocker(self.cellIDLineEdit)
+        self.cellIDLineEdit.setText(f"{self._cell}")
+            
+    @property
+    def field(self):
+        return self._field
+    
+    @field.setter
+    def field(self, value:typing.Union[str, type(pd.NA)]):
+        if isinstance(value, str) and len(value.strip()):
+            self._field = value
+            if self._field in ("NA", "<NA>"):
+                self._field = pd.NA
+        else:
+            self._field = pd.NA

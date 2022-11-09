@@ -136,7 +136,7 @@ UnitTypes = collections.defaultdict(lambda: "NA",
                                      "s":"spine", "t":"terminal",
                                      "y":"astrocyte"})
                                     
-GENOTYPES = ["NA", "wt", "het", "hom"]
+GENOTYPES = ["NA", "wt", "het", "hom", "+/+", "+/-", "-/-"]
 
 
 RELATIVE_TOLERANCE = 1e-4

@@ -71,7 +71,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
                         values for the fit model;
             default: None
     
-            parameterNames: None (default) or a sequence of str with the names 
+            names: None (default) or a sequence of str with the names 
                         of the parameters (it must have same number of elements 
                         as `parameters`)
     
@@ -106,12 +106,12 @@ class ModelParametersWidget(QtWidgets.QWidget):
         QtWidgets.QWidget.__init__(self, parent=parent)
         
         parameters = kwargs.pop("parameters", [])
-        parameterNames = kwargs.pop("parameterNames", None)
+        names = kwargs.pop("names", None)
         spinStep = kwargs.pop("spinStep", None)
-        spinDecimals = kwargs.op("spinDecimals", None)
+        spinDecimals = kwargs.pop("spinDecimals", None)
         lower = kwargs.pop("lower", None)
         upper = kwargs.pop("upper", None)
-        orientation = kwargs.pop("orientation", "vertical")):
+        orientation = kwargs.pop("orientation", "vertical")
             
         if not isinstance(spinDecimals, int) or spinDecimals < 0:
             self._spinDecimals_ = self._default_spin_decimals_
@@ -133,80 +133,13 @@ class ModelParametersWidget(QtWidgets.QWidget):
         else:
             self._verticalLayout_ = True
             
-        self._parameters_ = self.setParameters(parameters, lower, upper, parameterNames)
+        self._parameters_ = self.setParameters(parameters, lower, upper, names,
+                                               refresh=False)
             
-#         if len(parameters):
-#             if all(isinstance(p, pq.Quantity) for p in parameters):
-#                 units = [p.units for p in parameters]
-#             else:
-#                 units = []
-#             
-#             if parameterNames is None:
-#                 parameterNames  = [f"parameter_{k}" for k in range(len(parameters))]
-#                 
-#             elif isinstance(parameterNames, (tuple,list)):
-#                 if not all(isinstance(s, str) for s in parameterNames):
-#                     raise TypeError("Expecting strings for parameter names")
-#                 
-#                 if any(len(s.strip()) == 0 for s in parameterNames):
-#                     raise TypeError("Cannot accept empty string for parameter names")
-#                 
-#                 if len(parameterNames) != len(parameters):
-#                     raise ValueError(f"When a sequence, parameterNames must have the same number of elements as parameters {len(parameters)}; instead, got {parameterNames}")
-#                 
-#             else:
-#                 raise TypeError(f"'parameterNames' must be a sequence or None; instead, got {parameterNames}")
-#                     
-#             if isinstance(lower, numbers.Number):
-#                 if len(units):
-#                     lower = [lower * u for u in units]
-#                 else:
-#                     lower = [lower] * len(parameters)
-#                     
-#             elif isinstance(lower, (tuple, list)):
-#                 if len(lower) != len(parameters):
-#                     raise TypeError(f"'lower' expected to be a sequence of {len(parameters)} elements; instead, got {lower}")
-#                 
-#                 if not all(isinstance(v, (numbers.Number, pq.Quantity)) for v in lower):
-#                     raise TypeError(f"'lower' expected to contain scalars or scalar Quantity; instead, got {lower}")
-#                 
-#                 if all(isinstance(v, pq.Quantity) for v in lower) and any(v.size != 1 for v in lower):
-#                     raise TypeError(f"'lower' expected to contain scalars or scalar Quantity; instead, got {lower}")
-#                 
-#             else:
-#                 raise TypeError(f"'lower' expected to be a scalar or a sequence of {len(parameters)} elements; instead, got {lower}")
-#             
-#             if isinstance(upper, numbers.Number):
-#                 if len(units):
-#                     upper = [upper * u for u in units]
-#                 else:
-#                     upper = [upper] * len(parameters)
-#                 
-#             elif isinstance(upper, (tuple, list)):
-#                 if len(upper) != len(parameters):
-#                     raise TypeError(f"'upper' expected to be a sequence of {len(parameters)} elements; instead, got {upper}")
-#                 
-#                 if not all(isinstance(v, (numbers.Number, pq.Quantity)) for v in upper):
-#                     raise TypeError(f"'upper' expected to contain scalars or scalar Quantities; instead, got {upper}")
-#                 
-#                 if all(isinstance(v, pq.Quantity) for v in upper) and any(v.size !=1 for v in upper):
-#                     raise TypeError(f"'upper' expected to contain scalars or scalar Quantities; instead, got {upper}")
-#                 
-#             else:
-#                 raise TypeError(f"'upper' expected to be a scalar or a sequence of {len(parameters)} elements; instead, got {upper}")
-#         
-#             self._parameters_ = pd.DataFrame({"Initial Value:": parameters,
-#                                               "Lower Bound:":lower,
-#                                               "Upper Bound:":upper},
-#                                               index = parameterNames)
-#             
-#         else:
-#             self._parameters_ = None
-            
-        if not self._verticalLayout_:
-            self._parameters_ = self._parameters_.T
+        # if not self._verticalLayout_:
+        #     self._parameters_ = self._parameters_.T
         
-        self._configureUI_()
+        self._configureUI_()# mus be called
         
     def _generate_widgets(self):
         if self._verticalLayout_:
@@ -279,8 +212,8 @@ class ModelParametersWidget(QtWidgets.QWidget):
         self.widgetsLayout = QtWidgets.QGridLayout()
         self.widgetsLayout.setObjectName(u"widgetsLayout")
         self.gridLayout.addLayout(self.widgetsLayout, 0, 0, 1, 1)
-        
-        self._generate_widgets()
+        if isinstance(self._parameters_, pd.DataFrame) and self._parameters_.size > 0:
+            self._generate_widgets()
             
     def _clear_widgets(self):
         to_remove = list()
@@ -366,7 +299,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
             self._clear_widgets()
             self._generate_widgets()
             
-    def setParameters(self, parameters:typing.Sequence, lower=None, upper=None, parameterNames=None, refresh = False):
+    def setParameters(self, parameters:typing.Sequence, lower=None, upper=None, names=None, refresh = False):
         """Generates new parameters data frame.
         
         Does not update the display UNLESS refresh is True. The display update
@@ -386,21 +319,21 @@ class ModelParametersWidget(QtWidgets.QWidget):
             else:
                 units = []
             
-            if parameterNames is None:
-                parameterNames  = [f"parameter_{k}" for k in range(len(parameters))]
+            if names is None:
+                names  = [f"parameter_{k}" for k in range(len(parameters))]
                 
-            elif isinstance(parameterNames, (tuple,list)):
-                if not all(isinstance(s, str) for s in parameterNames):
+            elif isinstance(names, (tuple,list)):
+                if not all(isinstance(s, str) for s in names):
                     raise TypeError("Expecting strings for parameter names")
                 
-                if any(len(s.strip()) == 0 for s in parameterNames):
+                if any(len(s.strip()) == 0 for s in names):
                     raise TypeError("Cannot accept empty string for parameter names")
                 
-                if len(parameterNames) != len(parameters):
-                    raise ValueError(f"When a sequence, parameterNames must have the same number of elements as parameters {len(parameters)}; instead, got {parameterNames}")
+                if len(names) != len(parameters):
+                    raise ValueError(f"When a sequence, names must have the same number of elements as parameters {len(parameters)}; instead, got {names}")
                 
             else:
-                raise TypeError(f"'parameterNames' must be a sequence or None; instead, got {parameterNames}")
+                raise TypeError(f"'names' must be a sequence or None; instead, got {names}")
                     
             if isinstance(lower, numbers.Number):
                 if len(units):
@@ -443,7 +376,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
             paramsDF = pd.DataFrame({"Initial Value:": parameters,
                                               "Lower Bound:":lower,
                                               "Upper Bound:":upper},
-                                              index = parameterNames)
+                                              index = names)
             
             if refresh:
                 if isinstance(self._parameters_, pd.DataFrame) and self._parameters_.shape == paramsDF.shape and np.all(self._parameters_index == paramsDF.index):

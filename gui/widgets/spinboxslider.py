@@ -17,19 +17,20 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
     """
     valueChanged = pyqtSignal(int, name="valueChanged")
     
-    def __init__(self, parent=None):
-        self._singleStep_ = 1
-        self._pageStep_ = 10
-        self._minimum_ = 0
-        self._maximum_ = 0
-        self._tracking_ = True
-        self._prefix_ = ""
-        self._label_ = "Frame:"
-        self._value_ = 0
-        self._toolTip_ = "Set current %s" if self._label_[:-1] is self._label_.endswith(":") else self._label_
+    def __init__(self, parent=None, **kwargs):
+        self._singleStep_ = kwargs.pop("singleStep", 1)
+        self._pageStep_ = kwargs.pop("pageStep", 10)
+        self._minimum_ = kwargs.pop("minimum", 0)
+        self._maximum_ = kwargs.pop("maximum", 0)
+        self._tracking_ = kwargs.pop("tracking", True)
+        self._prefix_ = kwargs.pop("prefix", "")
+        self._label_ = kwargs.pop("label", "Frame:")
+        self._value_ = kwargs.pop("value",0)
+        self._toolTip_ = kwargs.pop("toolTip", 
+                                    "Set current %s" if self._label_[:-1] is self._label_.endswith(":") else self._label_)
 
-        self._whatsThis_ = self._toolTip_
-        self._statusTip_ = self._toolTip_
+        self._whatsThis_ = kwargs.pop("whatsThis", self._toolTip_)
+        self._statusTip_ = kwargs.pop("statusTip", self._toolTip_)
 
         super().__init__(parent=parent)
         self._configureUI_()
@@ -39,7 +40,8 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         self.setupUi(self)
         self.descriptionLabel.setText(self._label_)
         self.totalFramesCountLabel.setText(f"of {self._maximum_}")
-        self.framesQSpinBox.setKeyboardTracking(False)
+        self.framesQSpinBox.setKeyboardTracking(self._tracking_)
+        self.framesQSlider.setTracking(self._tracking_)
         self.framesQSlider.valueChanged.connect(self.slot_setValue)
         self.framesQSpinBox.valueChanged.connect(self.slot_setValue)
         
@@ -115,9 +117,9 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
     @tracking.setter
     def tracking(self, value:bool):
         val = value == True
-        self._tracking_ = True
-        self.framesQSpinBox.setTracking(val)
-        self.framesQSlider.setTracking(val)
+        self._tracking_ = val
+        self.framesQSpinBox.setKeyboardTracking(self._tracking_)
+        self.framesQSlider.setTracking(self._tracking_)
         
     @property
     def prefix(self):

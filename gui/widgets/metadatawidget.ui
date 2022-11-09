@@ -204,17 +204,13 @@
        <property name="text">
         <string>Age:</string>
        </property>
+       <property name="buddy">
+        <cstring>ageSpinBox</cstring>
+       </property>
       </widget>
      </item>
      <item>
-      <widget class="QWidget" name="ageWidget" native="true">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-      </widget>
+      <widget class="QuantitySpinBox" name="ageSpinBox"/>
      </item>
      <item>
       <widget class="QLabel" name="sexLabel">
@@ -473,6 +469,13 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>QuantitySpinBox</class>
+   <extends>QDoubleSpinBox</extends>
+   <header location="global">gui.widgets.small_widgets</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>
