@@ -1,416 +1,189 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
+ <author>Cezar Tigaret</author>
  <class>mPSCDetectWindow</class>
  <widget class="QMainWindow" name="mPSCDetectWindow">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>526</width>
-    <height>666</height>
+    <width>530</width>
+    <height>636</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>mPSC Detect</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout_5">
+   <layout class="QVBoxLayout" name="verticalLayout_4">
     <item>
-     <widget class="MetaDataWidget" name="metaDataWidget" native="true"/>
-    </item>
-    <item>
-     <layout class="QHBoxLayout" name="horizontalLayout">
+     <layout class="QVBoxLayout" name="verticalLayout_2">
       <item>
-       <layout class="QVBoxLayout" name="verticalLayout">
+       <widget class="MetaDataWidget" name="metaDataWidget" native="true"/>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout">
         <item>
-         <widget class="QGroupBox" name="dataGroupBox">
-          <property name="toolTip">
-           <string>Electrophysiology record</string>
-          </property>
-          <property name="statusTip">
-           <string>Electrophysiology record</string>
-          </property>
-          <property name="whatsThis">
-           <string>Electrophysiology record</string>
-          </property>
-          <property name="title">
-           <string>Data</string>
-          </property>
-          <layout class="QGridLayout" name="gridLayout_2">
-           <item row="0" column="2" colspan="8">
-            <widget class="QComboBox" name="signalNameComboBox">
-             <property name="toolTip">
-              <string>Signal name</string>
-             </property>
-             <property name="statusTip">
-              <string>Signal name</string>
-             </property>
-             <property name="whatsThis">
-              <string>Signal name</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="2">
-            <widget class="QToolButton" name="openDataFileToolButton">
-             <property name="toolTip">
-              <string>Load electrophysiology data from file</string>
-             </property>
-             <property name="statusTip">
-              <string>Load electrophysiology data from file</string>
-             </property>
-             <property name="whatsThis">
-              <string>Load electrophysiology data from file</string>
-             </property>
-             <property name="text">
-              <string>Open data file</string>
-             </property>
-             <property name="icon">
-              <iconset theme="document-open">
-               <normaloff>.</normaloff>.</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="1">
-            <widget class="QLabel" name="signalNameLabel">
-             <property name="text">
-              <string>Signal:</string>
-             </property>
-             <property name="buddy">
-              <cstring>signalNameComboBox</cstring>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="6">
-            <widget class="QToolButton" name="exportDataToolButton">
-             <property name="toolTip">
-              <string>Export electrophysiology data to workspace</string>
-             </property>
-             <property name="statusTip">
-              <string>Export electrophysiology data to workspace</string>
-             </property>
-             <property name="whatsThis">
-              <string>Export electrophysiology data to workspace</string>
-             </property>
-             <property name="accessibleName">
-              <string/>
-             </property>
-             <property name="text">
-              <string>Export data</string>
-             </property>
-             <property name="icon">
-              <iconset theme="document-export">
-               <normaloff>.</normaloff>.</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="2" colspan="8">
-            <widget class="QComboBox" name="epochComboBox">
-             <property name="toolTip">
-              <string>Select mPSC epoch</string>
-             </property>
-             <property name="statusTip">
-              <string>Select mPSC epoch</string>
-             </property>
-             <property name="whatsThis">
-              <string>Select mPSC epoch</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="7">
-            <widget class="QToolButton" name="plotDataToolButton">
-             <property name="toolTip">
-              <string>Plot electrophysiology data</string>
-             </property>
-             <property name="statusTip">
-              <string>Plot electrophysiology data</string>
-             </property>
-             <property name="whatsThis">
-              <string>Plot electrophysiology data</string>
-             </property>
-             <property name="text">
-              <string>Plot</string>
-             </property>
-             <property name="icon">
-              <iconset theme="graphics">
-               <normaloff>.</normaloff>.</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="9">
-            <widget class="QToolButton" name="makeEpochToolButton">
-             <property name="toolTip">
-              <string>Make mPSC analysis epoch</string>
-             </property>
-             <property name="statusTip">
-              <string>Make mPSC analysis epoch</string>
-             </property>
-             <property name="whatsThis">
-              <string>Make mPSC analysis epoch</string>
-             </property>
-             <property name="text">
-              <string>Make epoch</string>
-             </property>
-             <property name="icon">
-              <iconset theme="select">
-               <normaloff>.</normaloff>.</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="4">
-            <widget class="QToolButton" name="saveDataToolButton">
-             <property name="toolTip">
-              <string>Save electrophysiology data to file</string>
-             </property>
-             <property name="statusTip">
-              <string>Save electrophysiology data to file</string>
-             </property>
-             <property name="whatsThis">
-              <string>Save electrophysiology data to file</string>
-             </property>
-             <property name="accessibleName">
-              <string/>
-             </property>
-             <property name="text">
-              <string>Save data</string>
-             </property>
-             <property name="icon">
-              <iconset theme="document-save">
-               <normaloff>.</normaloff>.</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="1">
-            <widget class="QLabel" name="label">
-             <property name="text">
-              <string>Epoch:</string>
-             </property>
-             <property name="buddy">
-              <cstring>epochComboBox</cstring>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="3">
-            <widget class="QToolButton" name="importDataToolButton">
-             <property name="toolTip">
-              <string>Import electropysiology data from workspace</string>
-             </property>
-             <property name="statusTip">
-              <string>Import electropysiology data from workspace</string>
-             </property>
-             <property name="whatsThis">
-              <string>Import electropysiology data from workspace</string>
-             </property>
-             <property name="accessibleName">
-              <string/>
-             </property>
-             <property name="text">
-              <string>Import data</string>
-             </property>
-             <property name="icon">
-              <iconset theme="document-import">
-               <normaloff>.</normaloff>.</iconset>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="useTemplateGroupBox">
-          <property name="toolTip">
-           <string>Use mPSC template</string>
-          </property>
-          <property name="statusTip">
-           <string>Use mPSC templat</string>
-          </property>
-          <property name="whatsThis">
-           <string>Use mPSC templat</string>
-          </property>
-          <property name="title">
-           <string>mPSC Template</string>
-          </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
-          <property name="checked">
-           <bool>false</bool>
-          </property>
-          <layout class="QVBoxLayout" name="verticalLayout_2">
-           <item>
-            <layout class="QHBoxLayout" name="horizontalLayout_4">
-             <item>
-              <widget class="QToolButton" name="open_mPSCtemplateButton">
-               <property name="text">
-                <string>Open</string>
-               </property>
-               <property name="icon">
-                <iconset theme="document-open">
-                 <normaloff>.</normaloff>.</iconset>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="import_mPSCtemplateButton">
-               <property name="text">
-                <string>Import template</string>
-               </property>
-               <property name="icon">
-                <iconset theme="document-import">
-                 <normaloff>.</normaloff>.</iconset>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="make_mPSCtemplateButton">
-               <property name="text">
-                <string>Create</string>
-               </property>
-               <property name="icon">
-                <iconset theme="template">
-                 <normaloff>.</normaloff>.</iconset>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="save_mPSCtemplateButton">
-               <property name="text">
-                <string>Save template</string>
-               </property>
-               <property name="icon">
-                <iconset theme="document-save">
-                 <normaloff>.</normaloff>.</iconset>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="export_mPSCtemplateButton">
-               <property name="text">
-                <string>Export template</string>
-               </property>
-               <property name="icon">
-                <iconset theme="document-export">
-                 <normaloff>.</normaloff>.</iconset>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="store_mPSCtemplateButton">
-               <property name="text">
-                <string>Remember</string>
-               </property>
-               <property name="icon">
-                <iconset theme="document-save-as-template">
-                 <normaloff>.</normaloff>.</iconset>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="forget_mPSCtemplateButton">
-               <property name="text">
-                <string>Forget</string>
-               </property>
-               <property name="icon">
-                <iconset theme="delete">
-                 <normaloff>.</normaloff>.</iconset>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="plot_mPSCWaveformPushButton">
-          <property name="toolTip">
-           <string>Plot mPSC template or model</string>
-          </property>
-          <property name="statusTip">
-           <string>Plot mPSC template or model</string>
-          </property>
-          <property name="whatsThis">
-           <string>Plot mPSC template or model</string>
-          </property>
+         <widget class="QLabel" name="signalNameLabel">
           <property name="text">
-           <string>Plot mPSC Template or Model</string>
+           <string>Signal:</string>
           </property>
-          <property name="icon">
-           <iconset theme="graphics">
-            <normaloff>.</normaloff>.</iconset>
+          <property name="buddy">
+           <cstring>signalNameComboBox</cstring>
           </property>
          </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="signalNameComboBox">
+          <property name="toolTip">
+           <string>Signal name</string>
+          </property>
+          <property name="statusTip">
+           <string>Signal name</string>
+          </property>
+          <property name="whatsThis">
+           <string>Signal name</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="label">
+          <property name="text">
+           <string>Epoch:</string>
+          </property>
+          <property name="buddy">
+           <cstring>epochComboBox</cstring>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="epochComboBox">
+          <property name="toolTip">
+           <string>Select mPSC epoch</string>
+          </property>
+          <property name="statusTip">
+           <string>Select mPSC epoch</string>
+          </property>
+          <property name="whatsThis">
+           <string>Select mPSC epoch</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer_2">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
         </item>
        </layout>
       </item>
-      <item>
-       <widget class="QGroupBox" name="mPSCmodelGroupBox">
-        <property name="toolTip">
-         <string>Parameters for mPSC model</string>
-        </property>
-        <property name="statusTip">
-         <string>Parameters for mPSC model</string>
-        </property>
-        <property name="whatsThis">
-         <string>Parameters for mPSC model</string>
-        </property>
-        <property name="title">
-         <string>mPSC Model</string>
-        </property>
-        <layout class="QVBoxLayout" name="verticalLayout_4">
+     </layout>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="mPSCmodelGroupBox">
+      <property name="toolTip">
+       <string>Parameters for mPSC model</string>
+      </property>
+      <property name="statusTip">
+       <string>Parameters for mPSC model</string>
+      </property>
+      <property name="whatsThis">
+       <string>Parameters for mPSC model</string>
+      </property>
+      <property name="title">
+       <string>mPSC Model</string>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <layout class="QVBoxLayout" name="verticalLayout_3">
          <item>
-          <layout class="QVBoxLayout" name="verticalLayout_3">
+          <widget class="ModelParametersWidget" name="paramsWidget" native="true">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+             <horstretch>1</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_5">
            <item>
-            <widget class="ModelParametersWidget" name="paramsWidget" native="true">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-               <horstretch>1</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
+            <widget class="QLabel" name="label_2">
+             <property name="toolTip">
+              <string>Duration of synthetic mPSC waveform</string>
+             </property>
+             <property name="statusTip">
+              <string>Duration of synthetic mPSC waveform</string>
+             </property>
+             <property name="whatsThis">
+              <string>Duration of synthetic mPSC waveform</string>
+             </property>
+             <property name="text">
+              <string>Duration:</string>
+             </property>
+             <property name="buddy">
+              <cstring>durationSpinBox</cstring>
              </property>
             </widget>
            </item>
            <item>
-            <layout class="QHBoxLayout" name="horizontalLayout_5">
-             <item>
-              <widget class="QLabel" name="label_2">
-               <property name="toolTip">
-                <string>Duration of synthetic mPSC waveform</string>
-               </property>
-               <property name="statusTip">
-                <string>Duration of synthetic mPSC waveform</string>
-               </property>
-               <property name="whatsThis">
-                <string>Duration of synthetic mPSC waveform</string>
-               </property>
-               <property name="text">
-                <string>Duration:</string>
-               </property>
-               <property name="buddy">
-                <cstring>durationSpinBox</cstring>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QuantitySpinBox" name="durationSpinBox">
-               <property name="toolTip">
-                <string>Duration of synthetic mPSC waveform</string>
-               </property>
-               <property name="statusTip">
-                <string>Duration of synthetic mPSC waveform</string>
-               </property>
-               <property name="whatsThis">
-                <string>Duration of synthetic mPSC waveform</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
+            <widget class="QuantitySpinBox" name="durationSpinBox">
+             <property name="toolTip">
+              <string>Duration of synthetic mPSC waveform</string>
+             </property>
+             <property name="statusTip">
+              <string>Duration of synthetic mPSC waveform</string>
+             </property>
+             <property name="whatsThis">
+              <string>Duration of synthetic mPSC waveform</string>
+             </property>
+            </widget>
            </item>
           </layout>
          </item>
         </layout>
-       </widget>
-      </item>
-     </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_2">
+         <item>
+          <widget class="QCheckBox" name="use_mPSCTemplate_CheckBox">
+           <property name="text">
+            <string>Use mPSC Template</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="plot_mPSCWaveformPushButton">
+           <property name="toolTip">
+            <string>Plot mPSC template or model</string>
+           </property>
+           <property name="statusTip">
+            <string>Plot mPSC template or model</string>
+           </property>
+           <property name="whatsThis">
+            <string>Plot mPSC template or model</string>
+           </property>
+           <property name="text">
+            <string>Plot mPSC</string>
+           </property>
+           <property name="icon">
+            <iconset theme="graphics">
+             <normaloff>.</normaloff>.</iconset>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
     </item>
     <item>
      <widget class="QGroupBox" name="detectionGroupBox">
@@ -481,7 +254,8 @@
             <string>Save results</string>
            </property>
            <property name="icon">
-            <iconset theme="document-save"/>
+            <iconset theme="document-save">
+             <normaloff>.</normaloff>.</iconset>
            </property>
           </widget>
          </item>
@@ -503,7 +277,8 @@
             <string>Save as</string>
            </property>
            <property name="icon">
-            <iconset theme="document-save-as"/>
+            <iconset theme="document-save-as">
+             <normaloff>.</normaloff>.</iconset>
            </property>
           </widget>
          </item>
@@ -522,7 +297,8 @@
             <string>Export results</string>
            </property>
            <property name="icon">
-            <iconset theme="document-export"/>
+            <iconset theme="document-export">
+             <normaloff>.</normaloff>.</iconset>
            </property>
           </widget>
          </item>
@@ -541,7 +317,8 @@
             <string>Clear results</string>
            </property>
            <property name="icon">
-            <iconset theme="delete"/>
+            <iconset theme="delete">
+             <normaloff>.</normaloff>.</iconset>
            </property>
           </widget>
          </item>
@@ -601,7 +378,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>526</width>
+     <width>530</width>
      <height>30</height>
     </rect>
    </property>
@@ -609,12 +386,48 @@
     <property name="title">
      <string>File</string>
     </property>
+    <widget class="QMenu" name="menumPSC_Template">
+     <property name="title">
+      <string>mPSC Template</string>
+     </property>
+     <addaction name="actionOpen_mPSCTemplate"/>
+     <addaction name="actionImport_mPSCTemplate"/>
+    </widget>
     <addaction name="actionOpen"/>
     <addaction name="actionImport"/>
+    <addaction name="separator"/>
+    <addaction name="menumPSC_Template"/>
+    <addaction name="actionSave"/>
+    <addaction name="actionExport"/>
    </widget>
    <addaction name="menuFile"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QToolBar" name="mainToolBar">
+   <property name="windowTitle">
+    <string>toolBar</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="actionOpen"/>
+   <addaction name="actionImport"/>
+   <addaction name="actionSave"/>
+   <addaction name="actionExport"/>
+   <addaction name="actionPlot_Data"/>
+   <addaction name="actionMake_mPSC_Epoch"/>
+   <addaction name="separator"/>
+   <addaction name="actionCreate_mPSC_Template"/>
+   <addaction name="actionOpen_mPSCTemplate"/>
+   <addaction name="actionImport_mPSCTemplate"/>
+   <addaction name="actionSave_mPSC_Template"/>
+   <addaction name="actionExport_mPSC_Template"/>
+   <addaction name="actionRemember_mPSC_Template"/>
+   <addaction name="actionForget_mPSC_Template"/>
+  </widget>
   <action name="actionOpen">
    <property name="icon">
     <iconset theme="document-open">
@@ -631,6 +444,118 @@
    </property>
    <property name="text">
     <string>Import</string>
+   </property>
+  </action>
+  <action name="actionOpen_mPSCTemplate">
+   <property name="icon">
+    <iconset theme="template"/>
+   </property>
+   <property name="text">
+    <string>Open</string>
+   </property>
+   <property name="toolTip">
+    <string>Open mPSC Template</string>
+   </property>
+  </action>
+  <action name="actionImport_mPSCTemplate">
+   <property name="icon">
+    <iconset theme="template"/>
+   </property>
+   <property name="text">
+    <string>Import</string>
+   </property>
+   <property name="toolTip">
+    <string>Import mPSC Template</string>
+   </property>
+  </action>
+  <action name="actionSave">
+   <property name="icon">
+    <iconset theme="document-save"/>
+   </property>
+   <property name="text">
+    <string>Save</string>
+   </property>
+  </action>
+  <action name="actionExport">
+   <property name="icon">
+    <iconset theme="document-export"/>
+   </property>
+   <property name="text">
+    <string>Export</string>
+   </property>
+  </action>
+  <action name="actionPlot_Data">
+   <property name="icon">
+    <iconset theme="graphics"/>
+   </property>
+   <property name="text">
+    <string>Plot Data</string>
+   </property>
+   <property name="toolTip">
+    <string>Plot electrophysiology</string>
+   </property>
+  </action>
+  <action name="actionMake_mPSC_Epoch">
+   <property name="icon">
+    <iconset theme="select"/>
+   </property>
+   <property name="text">
+    <string>Make mPSC Epoch</string>
+   </property>
+  </action>
+  <action name="actionSave_mPSC_Template">
+   <property name="icon">
+    <iconset theme="document-save-as"/>
+   </property>
+   <property name="text">
+    <string>Save mPSC Template</string>
+   </property>
+   <property name="toolTip">
+    <string>Save mPSC Template</string>
+   </property>
+  </action>
+  <action name="actionExport_mPSC_Template">
+   <property name="icon">
+    <iconset theme="document-export"/>
+   </property>
+   <property name="text">
+    <string>Export mPSC Template</string>
+   </property>
+   <property name="toolTip">
+    <string>Export mPSC Template to Workspace</string>
+   </property>
+  </action>
+  <action name="actionRemember_mPSC_Template">
+   <property name="icon">
+    <iconset theme="document-save-as-template"/>
+   </property>
+   <property name="text">
+    <string>Remember mPSC Template</string>
+   </property>
+   <property name="toolTip">
+    <string>Remember mPSC template across sections</string>
+   </property>
+  </action>
+  <action name="actionForget_mPSC_Template">
+   <property name="icon">
+    <iconset theme="delete"/>
+   </property>
+   <property name="text">
+    <string>Forget mPSC Template</string>
+   </property>
+   <property name="toolTip">
+    <string>Forget mPSC teplate</string>
+   </property>
+  </action>
+  <action name="actionCreate_mPSC_Template">
+   <property name="icon">
+    <iconset theme="project-development-new-template"/>
+   </property>
+   <property name="text">
+    <string>Create mPSC Template</string>
+   </property>
+   <property name="toolTip">
+    <string>Create a mPSC template from mPSCs</string>
    </property>
   </action>
  </widget>

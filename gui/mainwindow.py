@@ -3779,10 +3779,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.saveSettings()
         
-        open_windows = ((name, obj) for (name, obj) in self.workspace.items() if isinstance(obj, QtWidgets.QWidget))
-        for win in open_windows:
-            if win[1] is not self:
-                win[1].close()
+        # open_windows = ((name, obj) for (name, obj) in self.workspace.items() if isinstance(obj, QtWidgets.QWidget))
+        # for win in open_windows:
+        #     if win[1] is not self:
+        #         win[1].close()
             
         evt.accept()
         

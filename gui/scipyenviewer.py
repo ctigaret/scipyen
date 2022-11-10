@@ -13,6 +13,7 @@ from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 from core.utilities import safeWrapper
 # from core import workspacefunctions as wfunc
 from .workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
+from gui.widgets.spinboxslider import SpinBoxSlider
 from pandas import NA
 
 
@@ -908,7 +909,7 @@ class ScipyenFrameViewer(ScipyenViewer):
             if not all(isinstance(v, int) for v in value):
                 raise TypeError("'frameIndex' can only accept a sequence of int")
             
-            if not all(v in range(self.dataFrames) for v in value):
+            if len(range(self.dataFrames)) and not all(v in range(self.dataFrames) for v in value):
                 raise ValueError(f"'frameIndex' cannot contain values outside {range(self.dataFrames)}")
             
             if len(set(value)) != len(value):
@@ -958,7 +959,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         However derived subclasses may override this function to implement more
         specific functionality.
         """
-        print(f"{self.__class__.__name__}.currentFrame.setter({val}) ")
+        # print(f"{self.__class__.__name__}.currentFrame.setter({value}) ")
         if not isinstance(value, int) or value >= self._number_of_frames_ or value < 0:
             return
         
@@ -975,6 +976,9 @@ class ScipyenFrameViewer(ScipyenViewer):
         if isinstance(self._frames_spinner_, QtWidgets.QSpinBox):
             blocked_signal_emitters.append(self._frames_spinner_)
             
+        if isinstance(getattr(self, "_frames_spinBoxSlider_", None), SpinBoxSlider):
+            blocked_signal_emitters.append(self._frames_spinBoxSlider_)
+            
         if len(blocked_signal_emitters):
             signalBlockers = [QtCore.QSignalBlocker(w) for w in blocked_signal_emitters]
             
@@ -983,6 +987,9 @@ class ScipyenFrameViewer(ScipyenViewer):
                 
             if isinstance(self._frames_spinner_, QtWidgets.QSpinBox):
                 self._frames_spinner_.setValue(value)
+                
+            if isinstance(getattr(self, "_frames_spinBoxSlider_", None), SpinBoxSlider):
+                self._frames_spinBoxSlider_.setValue(value)
                 
         self.displayFrame()
             

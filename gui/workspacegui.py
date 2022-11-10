@@ -313,25 +313,8 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     
     _owncfg = Bunch()
     
-    @staticmethod
-    def appWindowStatic():
-        ws = user_workspace()
-        ret = None
-        if ws is not None:
-            ret = ws["mainWindow"]
-            
-        else:
-            frame_records = inspect.getouterframes(inspect.currentframe())
-            for (n,f) in enumerate(frame_records):
-                if "ScipyenWindow" in f[0].f_globals:
-                    ret = f[0].f_globals["ScipyenWindow"].instance()
-                    break
-            
-        return ret
-    
-    @staticmethod
-    def workspaceSymbolForData(data):
-        ws = WorkspaceGuiMixin.appWindowStatic().workspace
+    def workspaceSymbolForData(self, data):
+        ws = self.appWindow.workspace
         return get_symbol_in_namespace(data, ws)        
     
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None, title="", *args, **kwargs):

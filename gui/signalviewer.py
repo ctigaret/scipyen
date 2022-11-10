@@ -3919,6 +3919,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         vertAndCrossCursors = collections.ChainMap(self.crosshairSignalCursors, self.verticalSignalCursors)
         
         if len(vertAndCrossCursors) == 0:
+            self.criticalMessage("Make Epoch between cursors", "This operation needs two vertical or crosshair cursors")
             return
         
         d = qd.QuickDialog(self, "Make Epoch From Interval Between Cursors:")
@@ -7550,10 +7551,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.frameIndex = [0]
         self.signalIndex = 1 # NOTE: 2017-04-08 23:00:48 in effect number of signals /frame !!!
         
-        #self.guiSelectedSignals.clear()
         self.guiSelectedSignalNames.clear()
         
-        #self.guiSelectedIrregularSignals.clear()
         self.guiSelectedIrregularSignalNames.clear()
         
         self.y = None

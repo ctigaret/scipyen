@@ -112,7 +112,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         self.ageSpinBox.singleStep = 0.01
         self.ageSpinBox.decimals = 2
         self.ageSpinBox.setValue(self._age)
-        selg.ageSpinBox.valueChanged.connect(self._slot_setAge)
+        self.ageSpinBox.valueChanged.connect(self._slot_setAge)
         
         self.sexComboBox.setEditable(False)
         self.sexComboBox.addItems(self._available_sex_)
@@ -171,7 +171,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         
         return ret
     
-    def setVaue(self, data:dict):
+    def setValue(self, data:dict):
         if isinstance(data, dict):
             self.dataVarName = os.path.splitext(os.path.basename(fileName))
             self.dataName = data.get("Name", self.dataVarName)
@@ -181,6 +181,16 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             self.age = data.get("Age", pd.NA)
             self.sex = data.get("Sex", pd.NA)
             self.genotype = data.get("Genotype", pd.NA)
+            
+    def clear(self):
+        self.dataVarName = ""
+        self.dataName = ""
+        self.sourceID = pd.NA
+        self.cell = pd.NA
+        self.field = pd.NA
+        self.age = pd.NA
+        self.sex = pd.NA
+        self.genotype = pd.NA
             
     @pyqtSlot()
     def _slot_setDataName(self):
@@ -362,7 +372,10 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         if isinstance(value, str) and len(value.strip()):
             val = strutils.str2symbol(value)
             self._dataVarName = val
-            self.dataVarNameLabel.setText(val)
+        else:
+            self._dataVarName = ""
+            
+        self.dataVarNameLabel.setText(self._dataVarName)
     
     @property
     def dataName(self):
@@ -374,10 +387,13 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         # WARNING: 2022-11-09 16:07:02 
         # do NOT use this setter from within the slot connected to the
         # dataNameLineEdit!
-        if isinstance(value, str):
+        signalBlocker = QtCore.QSignalBlocker(self.dataNameLineEdit)
+        if isinstance(value, str) and len(value.strip()):
             self._dataName = strutils.str2symbol(value)
-            signalBlocker = QtCore.QSignalBlocker(self.dataNameLineEdit)
-            self.dataNameLineEdit.setText(self._dataName)
+        else:
+            self._dataName = ""
+        
+        self.dataNameLineEdit.setText(self._dataName)
             
     @property
     def sourceID(self, value:str):
@@ -385,6 +401,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     
     @sourceID.setter
     def sourceID(self, value:typing.Union[str, type(pd.NA)]):
+        signalBlocker = QtCore.QSignalBlocker(self.sourceIDLineEdit)
         if isinstance(value, str) and len(value.strip()):
             self._sourceID = value
             if self._sourceID in ("NA", "<NA>"):
@@ -392,7 +409,6 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         else:
             self._sourceID = pd.NA
             
-        signalBlocker = QtCore.QSignalBlocker(self.sourceIDLineEdit)
         self.sourceIDLineEdit.setText(f"{self._sourceID}")
             
     @property
@@ -401,6 +417,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     
     @cell.setter
     def cell(self, value:typing.Union[str, type(pd.NA)]):
+        signalBlocker = QtCore.QSignalBlocker(self.cellIDLineEdit)
         if isinstance(value, str) and len(value.strip()):
             self._cell = value
             if self._cell in ("NA", "<NA>"):
@@ -408,7 +425,6 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         else:
             self._cell = pd.NA
             
-        signalBlocker = QtCore.QSignalBlocker(self.cellIDLineEdit)
         self.cellIDLineEdit.setText(f"{self._cell}")
             
     @property
@@ -417,12 +433,15 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     
     @field.setter
     def field(self, value:typing.Union[str, type(pd.NA)]):
+        signalBlocker = QtCore.QSignalBlocker(self.fieldIDLineEdit)
         if isinstance(value, str) and len(value.strip()):
             self._field = value
             if self._field in ("NA", "<NA>"):
                 self._field = pd.NA
         else:
             self._field = pd.NA
+            
+        self.fieldIDLineEdit.setText(f"{self._field}")
             
     @property
     def genotype(self):
