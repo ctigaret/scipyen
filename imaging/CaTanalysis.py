@@ -3919,8 +3919,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 [self.sourceIDLineEdit.editingFinished,                 self.slot_gui_changed_source_ID,    QtCore.Qt.QueuedConnection],
                 [self.cellLineEdit.editingFinished,                     self.slot_gui_changed_cell_name,    QtCore.Qt.QueuedConnection],
                 [self.fieldLineEdit.editingFinished,                    self.slot_gui_changed_field_name,   QtCore.Qt.QueuedConnection],
-                [self.genotypeComboBox.currentIndexChanged[str],        self.slot_gui_changed_genotype,     QtCore.Qt.QueuedConnection],
-                [self.sexComboBox.currentIndexChanged[str],          self.slot_gui_changed_sex,       QtCore.Qt.QueuedConnection],
+                [self.genotypeComboBox.currentTextChanged[str],         self.slot_gui_changed_genotype,     QtCore.Qt.QueuedConnection],
+                [self.sexComboBox.currentIndexChanged[str],             self.slot_gui_changed_sex,       QtCore.Qt.QueuedConnection],
                 [self.ageLineEdit.editingFinished,                      self.slot_gui_age_changed,          QtCore.Qt.QueuedConnection]
             ]
         

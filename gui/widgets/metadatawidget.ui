@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>639</width>
-    <height>278</height>
+    <width>597</width>
+    <height>264</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -320,7 +320,7 @@
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_2">
      <item>
-      <widget class="QPushButton" name="biometricsPushButton">
+      <widget class="QToolButton" name="biometricsToolButton">
        <property name="toolTip">
         <string>Additional biometrics</string>
        </property>
@@ -340,7 +340,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="procedurePushButton">
+      <widget class="QToolButton" name="procedureToolButton">
        <property name="toolTip">
         <string>Procedure (treatment, etc)</string>
        </property>
@@ -360,27 +360,27 @@
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="triggersPushButton">
+      <widget class="QToolButton" name="triggersToolButton">
        <property name="toolTip">
-        <string>Trigger protocols</string>
+        <string>Detect and edit trigger protocols</string>
        </property>
        <property name="statusTip">
-        <string>Trigger protocols</string>
+        <string>Detect and edit trigger protocols</string>
        </property>
        <property name="whatsThis">
-        <string>Trigger protocols</string>
+        <string>Detect and edit trigger protocols</string>
        </property>
        <property name="text">
         <string>Triggers</string>
        </property>
        <property name="icon">
-        <iconset theme="configure">
+        <iconset theme="network-connect">
          <normaloff>.</normaloff>.</iconset>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="dateTimePushButton">
+      <widget class="QToolButton" name="dateTimeToolButton">
        <property name="toolTip">
         <string>Date &amp; time of file, recording, analysis</string>
        </property>
@@ -400,15 +400,15 @@
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="annotationsPushButton">
+      <widget class="QToolButton" name="annotationsToolButton">
        <property name="toolTip">
-        <string>Additional descriptors (structured)</string>
+        <string>Additional structured descriptors (key, value pairs)</string>
        </property>
        <property name="statusTip">
-        <string>Additional descriptors (structured)</string>
+        <string>Additional structured descriptors (key, value pairs)</string>
        </property>
        <property name="whatsThis">
-        <string>Additional descriptors (structured)</string>
+        <string>Additional structured descriptors (key, value pairs)</string>
        </property>
        <property name="text">
         <string>Annotations</string>
@@ -420,15 +420,15 @@
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="notesPushButton">
+      <widget class="QToolButton" name="notesToolButton">
        <property name="toolTip">
-        <string>Description</string>
+        <string>Edit description (notes)</string>
        </property>
        <property name="statusTip">
-        <string>Description</string>
+        <string>Edit description (notes)</string>
        </property>
        <property name="whatsThis">
-        <string>Description</string>
+        <string>Edit description (notes)</string>
        </property>
        <property name="text">
         <string>Notes</string>
@@ -436,6 +436,82 @@
        <property name="icon">
         <iconset theme="description">
          <normaloff>.</normaloff>.</iconset>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="exportToolButton">
+       <property name="toolTip">
+        <string>Export metadata to workspace object</string>
+       </property>
+       <property name="statusTip">
+        <string>Export metadata to workspace object</string>
+       </property>
+       <property name="whatsThis">
+        <string>Export metadata to workspace object</string>
+       </property>
+       <property name="text">
+        <string>Export</string>
+       </property>
+       <property name="icon">
+        <iconset theme="document-export"/>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="saveToolButton">
+       <property name="toolTip">
+        <string>Save metadata to file</string>
+       </property>
+       <property name="statusTip">
+        <string>Save metadata to file</string>
+       </property>
+       <property name="whatsThis">
+        <string>Save metadata to file</string>
+       </property>
+       <property name="text">
+        <string>Save</string>
+       </property>
+       <property name="icon">
+        <iconset theme="document-save"/>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="importToolButton">
+       <property name="toolTip">
+        <string>Import metadata from workspace object</string>
+       </property>
+       <property name="statusTip">
+        <string>Import metadata from workspace object</string>
+       </property>
+       <property name="whatsThis">
+        <string>Import metadata from workspace object</string>
+       </property>
+       <property name="text">
+        <string>Import</string>
+       </property>
+       <property name="icon">
+        <iconset theme="document-import"/>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="loadToolButton">
+       <property name="toolTip">
+        <string>Load meta-data from file</string>
+       </property>
+       <property name="statusTip">
+        <string>Load meta-data from file</string>
+       </property>
+       <property name="whatsThis">
+        <string>Load meta-data from file</string>
+       </property>
+       <property name="text">
+        <string>Load from file</string>
+       </property>
+       <property name="icon">
+        <iconset theme="document-open"/>
        </property>
       </widget>
      </item>

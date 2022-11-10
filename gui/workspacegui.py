@@ -159,7 +159,7 @@ class FileIOGui(object):
             dirName = str(QtWidgets.QFileDialog.getExistingDirectory(self, caption=caption))
             
         return dirName
-
+    
 class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     """Mixin type for windows that need to be aware of Scipyen's main workspace.
     

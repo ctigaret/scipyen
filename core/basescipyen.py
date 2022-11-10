@@ -93,6 +93,7 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
     _data_attributes_ = (
                             ("sourceID",            "NA"),
                             ("cell",                "NA"),
+                            ("field",               "NA"),
                             ("genotype",            "NA"),
                             ("sex",                 "NA"),
                             ("age",                 (0*pq.s, "NA")),

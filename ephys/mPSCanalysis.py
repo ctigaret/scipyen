@@ -378,24 +378,56 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 
         super().closeEvent(evt)
         
-    @pyqtSlot(object)
-    def _slot_openEphysDataFile(self, _):
+    @pyqtSlot()
+    def _slot_saveEphysData(self):
+        fileName, fileFilter = self.chooseFile(caption="Save electrophysiology data",
+                                               single=True,
+                                               save=True,
+                                               fileFilter=";;".join(["Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]))
+        if isinstance(fileName, str) and len(fileName.strip()):
+            if "HDF5" in fileFilter:
+                pio.saveHDF5(self._data_, fileName)
+            else:
+                pio.savePickleFile(self._data_, fileName)
+            
+        
+    @pyqtSlot()
+    def _slot_openEphysDataFile(self):
         fileName, fileFilter = self.chooseFile(caption="Open electrophysiology file",
                                                single=True,
                                                save=False,
-                                               fileFilter=";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)"]))
+                                               fileFilter=";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]))
         if isinstance(fileName, str) and os.path.isfile(fileName):
-            data = pio.loadAxonFile(fileName)
+            if "Axon" in fileFilter:
+                data = pio.loadAxonFile(fileName)
+            elif "HDF5" in fileFilter:
+                data = pio.loadHDF5File(fileName)
+            elif "Pickle" in fileFilter:
+                data = pio.loadPickleFile(fileName)
+            else:
+                return
+                
             self._set_data_(data)
             
-    @pyqtSlot(object)
-    def _slot_importEphysData(self, _):
-        vars_ = self.importWorkspaceData([neo.Block, neo.Segment, tuple, list],
+    @pyqtSlot()
+    def _slot_importEphysData(self):
+        objs = self.importWorkspaceData([neo.Block, neo.Segment, tuple, list],
                                          title="Import electrophysiology",
-                                         single=True)
-        if len(vars_) = 1:
-            self._set_data_(vars_[0]) # will raise exception if data is wrong
-            self.metadataWidget.
+                                         single=True,
+                                         with_varName=True)
+        
+        # NOTE: 2022-11-09 22:28:38
+        # since with_varName is set to True in importWorkspaceData, objs is a
+        # list of tuples (var_name, var_object)
+        # also, since, single is passed as True, we only get one element in objs
+        if len(objs) == 1:
+            self._set_data_(objs[0][1]) # will raise exception if data is wrong
+            self.metadataWidget.dataVarName = objs[0][0]
+            
+    @pyqtSlot()
+    def _slot_exportEphysData(self):
+        self.exportDataToWorkspace(self._data, self.metaDataWidget.dataVarName)
+    
         
     @pyqtSlot(int)
     def _slot_setWaveFormIndex(self, value):
