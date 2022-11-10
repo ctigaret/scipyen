@@ -152,6 +152,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._owns_viewer_ = True
             
         self.linkToViewers(self._ephysViewer_)
+        self._ephysViewer_.sig_newEpochInData.connect(self._slot_newEpochGenerated)
+        self._ephysViewer_.sig_axisActivated.connect(self._slot_newSignalViewerAxisSelected)
             
         if self._data_ is not None:
             self._ephysViewer_.plot(self._data_)
@@ -289,7 +291,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         # signal & epoch comboboxes
         self.signalNameComboBox.currentTextChanged.connect(self._slot_newTargetSignalSelected)
+        self.signalNameComboBox.currentIndexChanged.connect(self._slot_newTargetSignalIndexSelected)
         self.epochComboBox.currentTextChanged.connect(self._slot_new_mPSCEpochSelected)
+        # self.epochComboBox.currentIndexChanged.connect(self._slot_new_mPSCEpochIndexSelected)
         
         self.use_mPSCTemplate_CheckBox.stateChanged.connect(self._slot_use_mPSCTemplate)
         
@@ -448,7 +452,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.epochComboBox.clear()
         self.epochComboBox.addItems(epochnames)
         
-    def _refresh_signalNameComboBox(self):
+    def _refresh_signalNameComboBox(self, index:typing.Optional[int]=None):
         if isinstance(self._data_, neo.Block):
             segment = self._data_.segments[self.currentFrame]
         elif isinstance(self._data_, (tuple,list)) and all(isinstance(s, neo.Segment) in self._data_):
@@ -460,10 +464,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return
         
         signames = [s.name for s in segment.analogsignals]
-        signalBlocker = QtCore.QSignalBlocker(self.signalNameComboBox)
         self.signalNameComboBox.clear()
+        signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.signalNameComboBox, self._ephysViewer_)]
         if len(signames):
             self.signalNameComboBox.addItems(signames)
+            if index in range(len(signames)):
+                # print(f"\n{self.__class__.__name__}.signalNameComboBox → current index {index}")
+                self.signalNameComboBox.setCurrentIndex(index)
             
     def displayFrame(self):
         self._refresh_signalNameComboBox()
@@ -568,6 +575,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                                          single=True,
                                          with_varName=True)
         
+        if objs is None:
+            return
+        
         # NOTE: 2022-11-09 22:28:38
         # since with_varName is set to True in importWorkspaceData, objs is a
         # list of tuples (var_name, var_object)
@@ -595,16 +605,39 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             (isinstance(self, _data_, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self._data_)):
             self._plot_data()
             
+            # NOTE: 2022-11-10 23:10:25
+            # the call below will emit sig_newEpochInData# from the viewer
             self._ephysViewer_.slot_epochInDataBetweenCursors()
-            self._refresh_epochComboBox()
+            
+    @pyqtSlot()
+    def _slot_newEpochGenerated(self):
+        "Necessary to capture Epoch creation directly in the viewer"
+        self._refresh_epochComboBox()
+        
+    @pyqtSlot(int)
+    def _slot_newSignalViewerAxisSelected(self, index:int):
+        # print(f"{self.__class__.__name__}._slot_newSignalViewerAxisSelected {index}")
+        signalBlocker = QtCore.QSignalBlocker(self.signalNameComboBox)
+        self.signalNameComboBox.setCurrentIndex(index)
+        
             
     @pyqtSlot(str)
     def _slot_newTargetSignalSelected(self, value):
         self._detection_signal_name_ = value
     
+    @pyqtSlot(int)
+    def _slot_newTargetSignalIndexSelected(self, value):
+        if value in range(len(self._ephysViewer_.axes)):
+            signalBlockers = [QtCore.QSignalBlocker(w) for w in (self._ephysViewer_, self.signalNameComboBox)]
+            self._ephysViewer_.currentAxis=value
+    
     @pyqtSlot(str)
     def _slot_new_mPSCEpochSelected(self, value):
         self._detection_epoch_name_ = value
+                
+    # @pyqtSlot(int)
+    # def _slot_new_mPSCEpochIndexSelected(self, value):
+    #     self._detection_epoch_name_ = value
                 
     @pyqtSlot(int)
     def _slot_setWaveFormIndex(self, value):

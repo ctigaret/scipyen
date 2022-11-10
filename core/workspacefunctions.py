@@ -198,7 +198,7 @@ def getvarsbytype(vartype, ws=None):
             raise TypeError("Sequence in the first argument must contain only types")
         
         if isinstance(vartype, list):
-            vatrtype = tuple(vartype)
+            vartype = tuple(vartype)
         
     if ws is None:
         ws = user_workspace()

@@ -366,6 +366,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     sig_activated = pyqtSignal(int, name="sig_activated")
     sig_plot = pyqtSignal(dict, name="sig_plot")
+    sig_newEpochInData = pyqtSignal(name="sig_newEpochInData")
+    sig_axisActivated = pyqtSignal(int, name="sig_axisActivated")
     
     closeMe  = pyqtSignal(int)
     frameChanged = pyqtSignal(int)
@@ -3536,18 +3538,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
     @pyqtSlot()
     @safeWrapper
-    def selectSignals(self, index=None):
-        """
-        TODO
-        """
-        if index is None:
-            pass
-        
-        pass
-        
-    
-    @pyqtSlot()
-    @safeWrapper
     def slot_cursorsToEpoch(self):
         """Creates a neo.Epoch from existing cursors and exports it to the workspace.
         The epoch is NOT embedded in the plotted data.
@@ -3815,7 +3805,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if c1ID is None or len(c1ID) == 0:
                     return
                 
-                # c2ID = d.c2Prompt.text()
                 c2ID = d.c2Combo.text()
                 
                 if c2ID is None or len(c2ID) == 0:
@@ -3835,6 +3824,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                                  all_segments = toAllSegments,
                                                  relative_to_segment_start = relativeSweep,
                                                  overwrite = overwriteEpoch)
+                
+                self.sig_newEpochInData.emit()
                 
                 self.displayFrame()
                 
@@ -3926,23 +3917,33 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         d.promptWidgets = list()
         namePrompt=qd.StringInput(d, "Name:")
         namePrompt.setText("Epoch")
-        c1Prompt = qd.StringInput(d, "SignalCursor 1 ID:")
-        c2Prompt = qd.StringInput(d, "SignalCursor 2 ID:")
+   
+        c1Combo = qd.QuickDialogComboBox(d, "Select first cursor:")
+        c1Combo.setItems([c for c in vertAndCrossCursors])
+        c1Combo.setValue(0)
+        
+        c2Combo = qd.QuickDialogComboBox(d, "Select second cursor")
+        c2Combo.setItems([c for c in vertAndCrossCursors])
+        c1Combo.setValue(1)
+        
+        # c1Prompt = qd.StringInput(d, "SignalCursor 1 ID:")
+        # c2Prompt = qd.StringInput(d, "SignalCursor 2 ID:")
+        
         d.promptWidgets.append(namePrompt)
-        d.promptWidgets.append(c1Prompt)
-        d.promptWidgets.append(c2Prompt)
+        d.promptWidgets.append(c1Combo)
+        d.promptWidgets.append(c2Combo)
         
         if d.exec() == QtWidgets.QDialog.Accepted:
             name = namePrompt.text()
             if name is None or len(name) == 0:
                 return
             
-            c1ID = c1Prompt.text()
+            c1ID = c1Combo.text()
             
             if c1ID is None or len(c1ID) == 0:
                 return
             
-            c2ID = c2Prompt.text()
+            c2ID = c2Combo.text()
             
             if c2ID is None or len(c2ID) == 0:
                 return
@@ -5528,6 +5529,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @property
     def plotItemsWithLayoutPositions(self):
         """ A zipped list of tuples (PlotItem, grid coordinates).
+        Aliased to the axesWithLayoutPositions property
         
         The structure is derived from the dictionary
         pyqtgraph.graphicsItems.GraphicsLayout.GraphicsLayout.items:
@@ -5571,19 +5573,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         return self.plotItems
     
-    def axis(self, index: int):
-        """The axis (PlotItem) at the specified index.
-        
-        If index is not valid, returns None.
-        
-        """
-        try:
-            plotitem = self.signalsLayout.getItem(index,0)
-            
-        except:
-            pass
-        
-        return plotitem
+#     def axis(self, index: int):
+#         """The axis (PlotItem) at the specified index.
+#         
+#         If index is not valid, returns None.
+#         
+#         """
+#         try:
+#             plotitem = self.signalsLayout.getItem(index,0)
+#             
+#         except:
+#             pass
+#         
+#         return plotitem
     
     @safeWrapper
     def plotItem(self, index: int):
@@ -5620,8 +5622,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return self._current_plot_item_
     
     @currentPlotItem.setter
-    def currentPlotItem(self, index: int):
+    def currentPlotItem(self, index: typing.Union[int, pg.PlotItem]):
         """Sets the current plot item to the one at the specified index.
+        
+        Index: int index or a plotitem
         """
         plotitems_coords = self.axesWithLayoutPositions # a reference, so saves computations
         
@@ -5633,55 +5637,95 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         plotitems, _ = zip(*plotitems_coords)
         
-        if not isinstance(index, int):
-            raise TypeError("Expecting an int; got a %s instead" % type(index).__name__)
-        
-        if index < 0 or index >= len(plotitems):
-            raise ValueError("Expecting an int between 0 and %d inclusive; got %d" % (len(plotitems)-1, index))
+        if isinstance(index, int):
+            if index not in range(len(plotitems)):
+                raise TypeError(f"Expecting an int between 0 and {len(plotitems)}; got a {index}  instead")
         
         #system_palette = QtGui.QGuiApplication.palette()
         #default_border_color = self.axis(0).vb.border.color()
         
-        self._current_plot_item_ = plotitems[index]
-        self._current_plot_item_index_ = index
-        lbl = self._current_plot_item_.axes["left"]["item"].labelText
-        if any([s not in lbl for s in ("<B>", "</B>")]):
-            lbl = "<B>%s</B>" % lbl
-            self._current_plot_item_.setLabel("left", lbl)
+            self._current_plot_item_ = plotitems[index]
+            self._current_plot_item_index_ = index
             
-        #self._current_plot_item_.vb.border.setStyle(QtCore.Qt.SolidLine)
-        #self._current_plot_item_.vb.border.setColor(system_palette.highlight().color())
+        elif isinstance (index, pg.PlotItem) and index in self.axes:
+            self._current_plot_item_ = index
+            self._current_plot_item_index_ = plotitems.index(index)
+            
+        else:
+            return
+            
+        self._setAxisIsActive(self._current_plot_item_, True)
+        self._statusNotifyAxisSelection(index)
         
         for ax in self.axes:
             if ax is not self._current_plot_item_:
-                lbl = ax.axes["left"]["item"].labelText
-                
-                if lbl.startswith("<B>") and lbl.endswith("</B>"):
-                    lbl = lbl[3 : lbl.find("</B>")]
-                    ax.setLabel("left", lbl)
-                    
-                #ax.vb.border.setStyle(QtCore.Qt.NoPen)
-                #ax.vb.border.setColor(default_border_color)
+                self._setAxisIsActive(ax, False)
         
-        self.statusBar().showMessage("Selected axes: %d (%s)" % index, self._plot_names_.get(index))
+        # self.statusBar().showMessage(f"Selected axes: {index} ({self._plot_names_.get(index)})")
         
     @property
     def currentAxis(self):
         return self.currentPlotItem
     
     @currentAxis.setter
-    def currentAxis(self, index):
-        self.currentPlotItem = index
+    def currentAxis(self, axis:typing.Union[int, pg.PlotItem]):
+        self.currentPlotItem = axis
         
     @property
     def selectedAxis(self):
         """Alias to currentAxis"""
         return self.currentAxis
     
+    @property
+    def plotNames(self):
+        """A dict of int keys mapped to axes names (str).
+        The keys are the indices of the axes (with 0 being the first axis from 
+        the top).
+        The values (names) are the 'name' attribute (if it exists) of the plotted 
+        signal in the corresponding axis, or an empty string
+        """
+        return self._plot_names_
+    
     @selectedAxis.setter
     def selectedAxis(self, index):
         self.currentAxis = index
-    
+        
+    def _statusNotifyAxisSelection(self, index=None):
+        if index is None:
+            index = self._current_plot_item_index_
+        elif not isinstance(index, int) or index not in range(len(self.axes)):
+            return
+        
+        plot_name = self._plot_names_.get(index, "")
+                
+        if isinstance(plot_name, str) and len(plot_name.strip()):
+            self.statusBar().showMessage(f"Selected axes: {index} ({plot_name})")
+            
+        else:
+            self.statusBar().showMessage(f"Selected axes: {index}")
+            
+    def _setAxisIsActive(self, axis, active:False):
+        lblStyle = {"color":"#FF5500" if active else "#000000"}
+        # activeAxBorderPen = QtGui.QPen(QtGui.QColor("#AAAAAA"))
+        lbl = axis.axes["left"]["item"].labelText
+        if active:
+            if any([s not in lbl for s in ("<B>", "</B>")]):
+                lbl = "<B>%s</B>" % lbl
+                
+            # axis.vb.border.setStyle(activeAxBorderPen)
+            # print(f"{self.__class__.__name__}._setAxisIsActive {self.axes.index(axis)}")
+            self.sig_axisActivated.emit(self.axes.index(axis))
+        else:
+            if lbl.startswith("<B>") and lbl.endswith("</B>"):
+                lbl = lbl[3 : lbl.find("</B>")]
+                
+            # axis.vb.border.setStyle(QtCore.Qt.NoPen)
+            
+        axis.setLabel("left", lbl, **lblStyle)
+        
+        
+            
+        
     def dataCursor(self, ID):
         """Not to be confused with the Qt method self.cursor() !!!
         """
@@ -6047,19 +6091,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 self._current_plot_item_index_ = self.plotItems.index(self._current_plot_item_)
                 
-            lbl = self._current_plot_item_.axes["left"]["item"].labelText
-            
-            if any([s not in lbl for s in ("<B>", "</B>")]):
-                lbl = "<B>%s</B>" % lbl
-                self._current_plot_item_.setLabel("left", lbl)
-
-            for plotItem in self.plotItems:
-                if plotItem is not self._current_plot_item_:
-                    lbl = plotItem.axes["left"]["item"].labelText
-                    
-                    if lbl.startswith("<B>") and lbl.endswith("</B>"):
-                        lbl = lbl[3 : lbl.find("</B>")]
-                        plotItem.setLabel("left", lbl)
+            self._setAxisIsActive(self._current_plot_item_, True)
                     
         else:
             # have no axis selected as current, only when there are no axes
@@ -6807,6 +6839,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot(dict)
     def _slot_plot_numeric_data_thr_(self, data:dict):  
         """For dict's keys and values see parameters of self._plot_numeric_data_
+        For threading...
         """
         #print("_slot_plot_numeric_data_thr_")
         self.statusBar().showMessage("Working...")
@@ -7451,57 +7484,35 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             if len(focusedPlotItems):
                 self._current_plot_item_ = focusedPlotItems[0]
-                lbl = self._current_plot_item_.axes["left"]["item"].labelText
-                if any([s not in lbl for s in ("<B>", "</B>")]):
-                    lbl = "<B>%s</B>" % lbl
-                    self._current_plot_item_.setLabel("left", lbl)
-
                 plot_index = plotitems.index(self._current_plot_item_)
                 self._current_plot_item_index_ = plot_index
-                
-                plot_row = rc[plot_index][0][0]
-                
-                plot_name = self._plot_names_.get(plot_row, "")
-                
-                if isinstance(plot_name, str) and len(plot_name.strip()):
-                    self.statusBar().showMessage("Selected axes: %d (%s)" % (plotitems.index(self._current_plot_item_), plot_name))
-                    
-                else:
-                    self.statusBar().showMessage("Selected axes: %d" % plotitems.index(self._current_plot_item_))
+                self._setAxisIsActive(self._current_plot_item_, True)
+                self._statusNotifyAxisSelection(plot_index)
                     
                 for ax in self.axes:
                     if ax is not self._current_plot_item_:
-                        lbl = ax.axes["left"]["item"].labelText
-                        
-                        if lbl.startswith("<B>") and lbl.endswith("</B>"):
-                            lbl = lbl[3 : lbl.find("</B>")]
-                            ax.setLabel("left", lbl)
+                        self._setAxisIsActive(ax, False)
                             
             else:
                 self._current_plot_item_ = None
                 self._current_plot_item_index_ = -1
                 
                 for ax in self.axes:
-                    lbl = ax.axes["left"]["item"].labelText
-                    
-                    if lbl.startswith("<B>") and lbl.endswith("</B>"):
-                        lbl = lbl[3 : lbl.find("</B>")]
-                        ax.setLabel("left", lbl)
-                        
-                    ax.vb.border.setStyle(QtCore.Qt.NoPen)
+                    self._setAxisIsActive(ax, False)
 
         else:
             self._current_plot_item_ = None
             self._current_plot_item_index_ = -1
 
             for ax in self.axes:
-                lbl = ax.axes["left"]["item"].labelText
-                
-                if lbl.startswith("<B>") and lbl.endswith("</B>"):
-                    lbl = lbl[3 : lbl.find("</B>")]
-                    ax.setLabel("left", lbl)
-                    
-                ax.vb.border.setStyle(QtCore.Qt.NoPen)
+                self._setAxisIsActive(ax, False)
+#                 lbl = ax.axes["left"]["item"].labelText
+#                 
+#                 if lbl.startswith("<B>") and lbl.endswith("</B>"):
+#                     lbl = lbl[3 : lbl.find("</B>")]
+#                     ax.setLabel("left", lbl)
+#                     
+#                 ax.vb.border.setStyle(QtCore.Qt.NoPen)
             
     @safeWrapper
     def clearEpochs(self):
