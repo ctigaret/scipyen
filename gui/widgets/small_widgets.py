@@ -255,6 +255,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     By default, the 'minimum' property is set to -math.inf. 
         
     """
+    sig_valueChanged = pyqtSignal(object, name="sig_valueChanged")
+    
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, units:typing.Optional[pq.Quantity]=None, unitsFamily:typing.Optional[str]=None, singleStep:typing.Optional[float]=None, decimals:typing.Optional[int]=None):#, minimum:typing.Optional[typing.Union[pq.Quantity, float]]=None, maximum:typing.Optional[typing.Union[pq.Quantity, float]]=None):
         """
         Named parameters:
@@ -315,6 +317,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         self.setRange(self._internal_minimum, self._internal_maximum)
         
         self.setContextMenuPolicy(QtCore.Qt.DefaultContextMenu)
+        super().valueChanged.connect(self._slot_valueChanged)
         
     @property
     def units(self):
@@ -331,6 +334,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             super().setSuffix("")
         else:
             super().setSuffix(f" {self._units_.dimensionality.unicode}")
+            
+    @pyqtSlot(float)
+    def _slot_valueChanged(self, val):
+        self.sig_valueChanged.emit(self.value())
             
     def contextMenuEvent(self, evt):
         cm = QtWidgets.QMenu("Options", self)

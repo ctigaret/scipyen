@@ -5723,9 +5723,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         axis.setLabel("left", lbl, **lblStyle)
         
-        
-            
-        
     def dataCursor(self, ID):
         """Not to be confused with the Qt method self.cursor() !!!
         """

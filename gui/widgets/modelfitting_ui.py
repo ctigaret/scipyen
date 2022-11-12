@@ -107,8 +107,8 @@ class ModelParametersWidget(QtWidgets.QWidget):
         
         parameters = kwargs.pop("parameters", [])
         names = kwargs.pop("names", None)
-        spinStep = kwargs.pop("spinStep", None)
-        spinDecimals = kwargs.pop("spinDecimals", None)
+        spinStep = kwargs.pop("spinStep", self._default_spin_step_)
+        spinDecimals = kwargs.pop("spinDecimals", self._default_spin_decimals_)
         lower = kwargs.pop("lower", None)
         upper = kwargs.pop("upper", None)
         orientation = kwargs.pop("orientation", "vertical")
@@ -427,6 +427,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
             layout_row = index % self.widgetsLayout.rowCount()
 
             old_val = self._parameters_.iloc[layout_row-1, layout_col-1]
+            
             if isinstance(old_val, pq.Quantity):
                 self._parameters_.iloc[layout_row-1, layout_col-1] = value * old_val.units
             else:
@@ -442,6 +443,9 @@ class ModelParametersWidget(QtWidgets.QWidget):
         embedded in QuickDialog (which expects widgets with a `validate` method)
         """
         return True
+    
+    def value(self):
+        return self.parameters
     
     def getParameterValue(self, parameter_name:str, what:str):
         return self.parameters.loc[parameter_name, what]

@@ -7,8 +7,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>530</width>
-    <height>636</height>
+    <width>529</width>
+    <height>639</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -186,157 +186,11 @@
      </widget>
     </item>
     <item>
-     <widget class="QGroupBox" name="detectionGroupBox">
+     <widget class="QGroupBox" name="validateDetectionGroupBox">
       <property name="title">
-       <string>Detect mPSCs</string>
+       <string>Validate detection</string>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_6">
-       <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_3">
-         <item>
-          <widget class="QToolButton" name="detectInSweepToolButton">
-           <property name="text">
-            <string>Sweep</string>
-           </property>
-           <property name="icon">
-            <iconset theme="go-jump">
-             <normaloff>.</normaloff>.</iconset>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QToolButton" name="undoSweepToolButton">
-           <property name="text">
-            <string>Undo sweep</string>
-           </property>
-           <property name="icon">
-            <iconset theme="edit-undo">
-             <normaloff>.</normaloff>.</iconset>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QToolButton" name="detectInDataToolButton">
-           <property name="text">
-            <string>Data</string>
-           </property>
-           <property name="icon">
-            <iconset theme="edit-find">
-             <normaloff>.</normaloff>.</iconset>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QToolButton" name="undoDataToolButton">
-           <property name="text">
-            <string>Undo</string>
-           </property>
-           <property name="icon">
-            <iconset theme="edit-undo">
-             <normaloff>.</normaloff>.</iconset>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QToolButton" name="validate_mPSCsToolButton">
-           <property name="text">
-            <string>Validate</string>
-           </property>
-           <property name="icon">
-            <iconset theme="checkmark">
-             <normaloff>.</normaloff>.</iconset>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QToolButton" name="saveResultsToolButton">
-           <property name="text">
-            <string>Save results</string>
-           </property>
-           <property name="icon">
-            <iconset theme="document-save">
-             <normaloff>.</normaloff>.</iconset>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QToolButton" name="saveResultsAsToolButton">
-           <property name="acceptDrops">
-            <bool>false</bool>
-           </property>
-           <property name="toolTip">
-            <string>Save results as</string>
-           </property>
-           <property name="statusTip">
-            <string>Save results as</string>
-           </property>
-           <property name="whatsThis">
-            <string>Save results as</string>
-           </property>
-           <property name="text">
-            <string>Save as</string>
-           </property>
-           <property name="icon">
-            <iconset theme="document-save-as">
-             <normaloff>.</normaloff>.</iconset>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QToolButton" name="exportResultsToolButton">
-           <property name="toolTip">
-            <string>Export results to workspace</string>
-           </property>
-           <property name="statusTip">
-            <string>Export results to workspace</string>
-           </property>
-           <property name="whatsThis">
-            <string>Export results to workspace</string>
-           </property>
-           <property name="text">
-            <string>Export results</string>
-           </property>
-           <property name="icon">
-            <iconset theme="document-export">
-             <normaloff>.</normaloff>.</iconset>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QToolButton" name="clearResultsToolButton">
-           <property name="toolTip">
-            <string>Clear results</string>
-           </property>
-           <property name="statusTip">
-            <string>Clear results</string>
-           </property>
-           <property name="whatsThis">
-            <string>Clear results</string>
-           </property>
-           <property name="text">
-            <string>Clear results</string>
-           </property>
-           <property name="icon">
-            <iconset theme="delete">
-             <normaloff>.</normaloff>.</iconset>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="horizontalSpacer">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>40</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-        </layout>
-       </item>
        <item>
         <layout class="QHBoxLayout" name="_mPSCSpinBoxSliderLayout">
          <item>
@@ -378,8 +232,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>530</width>
-     <height>30</height>
+     <width>529</width>
+     <height>28</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -394,18 +248,73 @@
      <addaction name="actionImport_mPSCTemplate"/>
     </widget>
     <addaction name="actionOpen"/>
+    <addaction name="actionSave"/>
     <addaction name="actionImport"/>
+    <addaction name="actionExport"/>
     <addaction name="separator"/>
     <addaction name="menumPSC_Template"/>
-    <addaction name="actionSave"/>
-    <addaction name="actionExport"/>
+   </widget>
+   <widget class="QMenu" name="menuSettings">
+    <property name="title">
+     <string>Settings</string>
+    </property>
+    <widget class="QMenu" name="menuPersistent_mPSC_template_location">
+     <property name="title">
+      <string>Persistent mPSC template location</string>
+     </property>
+     <addaction name="actionUse_default_location_for_persistent_mPSC_template"/>
+     <addaction name="actionChoose_persistent_mPSC_template_file"/>
+    </widget>
+    <addaction name="menuPersistent_mPSC_template_location"/>
+   </widget>
+   <widget class="QMenu" name="menuDetect_mPSCs">
+    <property name="title">
+     <string>Detect mPSCs</string>
+    </property>
+    <widget class="QMenu" name="menuCurrent_Sweep">
+     <property name="title">
+      <string>Current Sweep</string>
+     </property>
+     <addaction name="actionDetect_in_current_sweep"/>
+     <addaction name="actionValidate_in_current_sweep"/>
+     <addaction name="actionUndo_current_sweep"/>
+    </widget>
+    <widget class="QMenu" name="menuEntire_Data">
+     <property name="title">
+      <string>Entire Data</string>
+     </property>
+     <addaction name="separator"/>
+     <addaction name="actionDetect"/>
+     <addaction name="actionUndo"/>
+     <addaction name="actionValidate"/>
+    </widget>
+    <widget class="QMenu" name="menuResults">
+     <property name="title">
+      <string>Results</string>
+     </property>
+     <addaction name="actionView_results"/>
+     <addaction name="actionClear_results"/>
+     <addaction name="actionSave_results"/>
+     <addaction name="actionExport_results"/>
+    </widget>
+    <addaction name="menuCurrent_Sweep"/>
+    <addaction name="menuEntire_Data"/>
+    <addaction name="menuResults"/>
    </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuDetect_mPSCs"/>
+   <addaction name="menuSettings"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QToolBar" name="mainToolBar">
    <property name="windowTitle">
-    <string>toolBar</string>
+    <string>Main Toolbar</string>
+   </property>
+   <property name="movable">
+    <bool>false</bool>
+   </property>
+   <property name="floatable">
+    <bool>false</bool>
    </property>
    <attribute name="toolBarArea">
     <enum>TopToolBarArea</enum>
@@ -427,6 +336,34 @@
    <addaction name="actionExport_mPSC_Template"/>
    <addaction name="actionRemember_mPSC_Template"/>
    <addaction name="actionForget_mPSC_Template"/>
+   <addaction name="separator"/>
+  </widget>
+  <widget class="QToolBar" name="detectionToolBar">
+   <property name="windowTitle">
+    <string>Detection Toolbar</string>
+   </property>
+   <property name="movable">
+    <bool>false</bool>
+   </property>
+   <property name="floatable">
+    <bool>false</bool>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>true</bool>
+   </attribute>
+   <addaction name="actionDetect_in_current_sweep"/>
+   <addaction name="actionUndo_current_sweep"/>
+   <addaction name="actionValidate_in_current_sweep"/>
+   <addaction name="actionDetect"/>
+   <addaction name="actionUndo"/>
+   <addaction name="actionValidate"/>
+   <addaction name="actionView_results"/>
+   <addaction name="actionSave_results"/>
+   <addaction name="actionExport_results"/>
+   <addaction name="actionClear_results"/>
   </widget>
   <action name="actionOpen">
    <property name="icon">
@@ -448,7 +385,8 @@
   </action>
   <action name="actionOpen_mPSCTemplate">
    <property name="icon">
-    <iconset theme="template"/>
+    <iconset theme="template">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Open</string>
@@ -459,7 +397,8 @@
   </action>
   <action name="actionImport_mPSCTemplate">
    <property name="icon">
-    <iconset theme="template"/>
+    <iconset theme="template">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Import</string>
@@ -470,7 +409,8 @@
   </action>
   <action name="actionSave">
    <property name="icon">
-    <iconset theme="document-save"/>
+    <iconset theme="document-save">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Save</string>
@@ -478,7 +418,8 @@
   </action>
   <action name="actionExport">
    <property name="icon">
-    <iconset theme="document-export"/>
+    <iconset theme="document-export">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Export</string>
@@ -486,7 +427,8 @@
   </action>
   <action name="actionPlot_Data">
    <property name="icon">
-    <iconset theme="graphics"/>
+    <iconset theme="graphics">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Plot Data</string>
@@ -497,7 +439,8 @@
   </action>
   <action name="actionMake_mPSC_Epoch">
    <property name="icon">
-    <iconset theme="select"/>
+    <iconset theme="select">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Make mPSC Epoch</string>
@@ -505,7 +448,8 @@
   </action>
   <action name="actionSave_mPSC_Template">
    <property name="icon">
-    <iconset theme="document-save-as"/>
+    <iconset theme="document-save-as">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Save mPSC Template</string>
@@ -516,7 +460,8 @@
   </action>
   <action name="actionExport_mPSC_Template">
    <property name="icon">
-    <iconset theme="document-export"/>
+    <iconset theme="document-export">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Export mPSC Template</string>
@@ -527,7 +472,8 @@
   </action>
   <action name="actionRemember_mPSC_Template">
    <property name="icon">
-    <iconset theme="document-save-as-template"/>
+    <iconset theme="document-save-as-template">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Remember mPSC Template</string>
@@ -538,7 +484,8 @@
   </action>
   <action name="actionForget_mPSC_Template">
    <property name="icon">
-    <iconset theme="delete"/>
+    <iconset theme="delete">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Forget mPSC Template</string>
@@ -549,13 +496,113 @@
   </action>
   <action name="actionCreate_mPSC_Template">
    <property name="icon">
-    <iconset theme="project-development-new-template"/>
+    <iconset theme="project-development-new-template">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Create mPSC Template</string>
    </property>
    <property name="toolTip">
     <string>Create a mPSC template from mPSCs</string>
+   </property>
+  </action>
+  <action name="actionDetect_in_current_sweep">
+   <property name="icon">
+    <iconset theme="edit-find-replace"/>
+   </property>
+   <property name="text">
+    <string>Detect in current sweep</string>
+   </property>
+  </action>
+  <action name="actionUndo_current_sweep">
+   <property name="icon">
+    <iconset theme="edit-undo"/>
+   </property>
+   <property name="text">
+    <string>Undo current sweep</string>
+   </property>
+  </action>
+  <action name="actionDetect">
+   <property name="icon">
+    <iconset theme="edit-find"/>
+   </property>
+   <property name="text">
+    <string>Detect</string>
+   </property>
+  </action>
+  <action name="actionUndo">
+   <property name="icon">
+    <iconset theme="edit-undo"/>
+   </property>
+   <property name="text">
+    <string>Undo</string>
+   </property>
+  </action>
+  <action name="actionValidate_in_current_sweep">
+   <property name="icon">
+    <iconset theme="go-jump"/>
+   </property>
+   <property name="text">
+    <string>Validate in current sweep</string>
+   </property>
+  </action>
+  <action name="actionValidate">
+   <property name="icon">
+    <iconset theme="checkmark"/>
+   </property>
+   <property name="text">
+    <string>Validate</string>
+   </property>
+  </action>
+  <action name="actionSave_results">
+   <property name="icon">
+    <iconset theme="document-save"/>
+   </property>
+   <property name="text">
+    <string>Save results</string>
+   </property>
+  </action>
+  <action name="actionExport_results">
+   <property name="icon">
+    <iconset theme="document-export"/>
+   </property>
+   <property name="text">
+    <string>Export results</string>
+   </property>
+  </action>
+  <action name="actionView_results">
+   <property name="icon">
+    <iconset theme="quickview"/>
+   </property>
+   <property name="text">
+    <string>View results</string>
+   </property>
+  </action>
+  <action name="actionClear_results">
+   <property name="icon">
+    <iconset theme="edit-clear-all"/>
+   </property>
+   <property name="text">
+    <string>Clear results</string>
+   </property>
+  </action>
+  <action name="actionUse_default_location_for_persistent_mPSC_template">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="mark-location"/>
+   </property>
+   <property name="text">
+    <string>Use default</string>
+   </property>
+  </action>
+  <action name="actionChoose_persistent_mPSC_template_file">
+   <property name="icon">
+    <iconset theme="document-save-as"/>
+   </property>
+   <property name="text">
+    <string>Choose file</string>
    </property>
   </action>
  </widget>
