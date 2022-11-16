@@ -1,0 +1,439 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SignalViewerWindow</class>
+ <widget class="QMainWindow" name="SignalViewerWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>726</width>
+    <height>366</height>
+   </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="windowTitle">
+   <string>Signal Viewer</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
+   <layout class="QGridLayout" name="gridLayout">
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <item row="0" column="0">
+     <widget class="QWidget" name="viewerWidgetContainer" native="true">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <horstretch>10</horstretch>
+        <verstretch>10</verstretch>
+       </sizepolicy>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0">
+     <layout class="QHBoxLayout" name="horizontalLayout">
+      <item>
+       <widget class="QCheckBox" name="plotAnalogSignalsCheckBox">
+        <property name="text">
+         <string>Analog:</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="selectSignalComboBox"/>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="plotIrregularSignalsCheckBox">
+        <property name="text">
+         <string>Irregular</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="selectIrregularSignalComboBox"/>
+      </item>
+      <item>
+       <widget class="QLabel" name="label">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="text">
+         <string>Frame:</string>
+        </property>
+        <property name="buddy">
+         <cstring>framesQSpinBox</cstring>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSpinBox" name="framesQSpinBox">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>48</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="mouseTracking">
+         <bool>true</bool>
+        </property>
+        <property name="toolTip">
+         <string>Select frame</string>
+        </property>
+        <property name="whatsThis">
+         <string>Current frame number</string>
+        </property>
+        <property name="buttonSymbols">
+         <enum>QAbstractSpinBox::UpDownArrows</enum>
+        </property>
+        <property name="keyboardTracking">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="nFramesLabel">
+        <property name="text">
+         <string>of: 0</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSlider" name="framesQSlider">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="mouseTracking">
+         <bool>true</bool>
+        </property>
+        <property name="toolTip">
+         <string>Select frame</string>
+        </property>
+        <property name="whatsThis">
+         <string>Frame selector slider</string>
+        </property>
+        <property name="autoFillBackground">
+         <bool>false</bool>
+        </property>
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>726</width>
+     <height>28</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>Fi&amp;le</string>
+    </property>
+    <widget class="QMenu" name="menuExport">
+     <property name="title">
+      <string>&amp;Export</string>
+     </property>
+     <addaction name="actionSVG"/>
+     <addaction name="actionTIFF"/>
+     <addaction name="actionPNG"/>
+    </widget>
+    <addaction name="actionOpen"/>
+    <addaction name="menuExport"/>
+    <addaction name="actionClose"/>
+    <addaction name="separator"/>
+    <addaction name="actionRefresh"/>
+   </widget>
+   <widget class="QMenu" name="menuTools">
+    <property name="title">
+     <string>Tools</string>
+    </property>
+    <addaction name="actionDetect_Triggers"/>
+   </widget>
+   <widget class="QMenu" name="menuCursors">
+    <property name="title">
+     <string>Cursors</string>
+    </property>
+    <widget class="QMenu" name="menuAdd_Cursors">
+     <property name="title">
+      <string>Add Cursors</string>
+     </property>
+     <widget class="QMenu" name="menuMulti_Axis_Cursors">
+      <property name="title">
+       <string>Multi-Axis Cursors</string>
+      </property>
+      <addaction name="actionVertical_3"/>
+      <addaction name="actionCrosshair_3"/>
+      <addaction name="actionDynamic_Vertical"/>
+      <addaction name="actionDynamic_Crosshair"/>
+     </widget>
+     <widget class="QMenu" name="menuDynamic">
+      <property name="title">
+       <string>Dynamic</string>
+      </property>
+      <addaction name="actionVertical_2"/>
+      <addaction name="actionHorizontal_2"/>
+      <addaction name="actionCrosshair_2"/>
+     </widget>
+     <addaction name="menuMulti_Axis_Cursors"/>
+     <addaction name="actionVertical"/>
+     <addaction name="actionHorizontal"/>
+     <addaction name="actionCrosshair"/>
+     <addaction name="menuDynamic"/>
+    </widget>
+    <addaction name="menuAdd_Cursors"/>
+   </widget>
+   <widget class="QMenu" name="menuEpochs">
+    <property name="title">
+     <string>Epochs</string>
+    </property>
+   </widget>
+   <widget class="QMenu" name="menuPanels">
+    <property name="title">
+     <string>Panels</string>
+    </property>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuTools"/>
+   <addaction name="menuCursors"/>
+   <addaction name="menuEpochs"/>
+   <addaction name="menuPanels"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QDockWidget" name="coordinatesDockWidget">
+   <property name="windowTitle">
+    <string>&amp;Coordinates</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
+   <widget class="QWidget" name="dockWidgetContents">
+    <layout class="QGridLayout" name="gridLayout_2">
+     <property name="leftMargin">
+      <number>0</number>
+     </property>
+     <property name="topMargin">
+      <number>0</number>
+     </property>
+     <property name="rightMargin">
+      <number>0</number>
+     </property>
+     <property name="bottomMargin">
+      <number>0</number>
+     </property>
+     <property name="spacing">
+      <number>0</number>
+     </property>
+     <item row="0" column="0">
+      <widget class="QPlainTextEdit" name="coordinatesViewer">
+       <property name="textInteractionFlags">
+        <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QToolBar" name="mainToolBar">
+   <property name="windowTitle">
+    <string>toolBar</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+  </widget>
+  <action name="actionClose">
+   <property name="text">
+    <string>&amp;Close</string>
+   </property>
+  </action>
+  <action name="actionColorMap">
+   <property name="text">
+    <string>&amp;Color Map</string>
+   </property>
+  </action>
+  <action name="actionImageScale">
+   <property name="text">
+    <string>&amp;Image Scale</string>
+   </property>
+  </action>
+  <action name="actionImageGamma">
+   <property name="text">
+    <string>Image &amp;Gamma</string>
+   </property>
+  </action>
+  <action name="actionOpen">
+   <property name="text">
+    <string>&amp;Open</string>
+   </property>
+  </action>
+  <action name="actionCrosshair_Cursor">
+   <property name="text">
+    <string>Crosshair</string>
+   </property>
+  </action>
+  <action name="actionVertical_Cursor">
+   <property name="text">
+    <string>Vertical</string>
+   </property>
+  </action>
+  <action name="actionHorizontal_Cursor">
+   <property name="text">
+    <string>Horizontal</string>
+   </property>
+  </action>
+  <action name="actionRemove_Cursor">
+   <property name="text">
+    <string>Remove Cursor...</string>
+   </property>
+  </action>
+  <action name="actionSVG">
+   <property name="text">
+    <string>&amp;SVG</string>
+   </property>
+  </action>
+  <action name="actionTIFF">
+   <property name="text">
+    <string>&amp;TIFF</string>
+   </property>
+  </action>
+  <action name="actionPNG">
+   <property name="text">
+    <string>&amp;PNG</string>
+   </property>
+  </action>
+  <action name="actionDetect_Triggers">
+   <property name="text">
+    <string>Detect Triggers</string>
+   </property>
+  </action>
+  <action name="actionRefresh">
+   <property name="text">
+    <string>Refresh</string>
+   </property>
+  </action>
+  <action name="actionVertical">
+   <property name="text">
+    <string>Vertical</string>
+   </property>
+  </action>
+  <action name="actionHorizontal">
+   <property name="text">
+    <string>Horizontal</string>
+   </property>
+  </action>
+  <action name="actionCrosshair">
+   <property name="text">
+    <string>Crosshair</string>
+   </property>
+  </action>
+  <action name="actionVertical_2">
+   <property name="text">
+    <string>Vertical</string>
+   </property>
+  </action>
+  <action name="actionHorizontal_2">
+   <property name="text">
+    <string>Horizontal</string>
+   </property>
+  </action>
+  <action name="actionCrosshair_2">
+   <property name="text">
+    <string>Crosshair</string>
+   </property>
+  </action>
+  <action name="actionVertical_3">
+   <property name="text">
+    <string>Vertical</string>
+   </property>
+  </action>
+  <action name="actionHorizontal_3">
+   <property name="text">
+    <string>Horizontal</string>
+   </property>
+  </action>
+  <action name="actionCrosshair_3">
+   <property name="text">
+    <string>Crosshair</string>
+   </property>
+  </action>
+  <action name="actionDynamic_Vertical">
+   <property name="text">
+    <string>Dynamic Vertical</string>
+   </property>
+  </action>
+  <action name="actionDynamic_Crosshair">
+   <property name="text">
+    <string>Dynamic Crosshair</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>actionClose</sender>
+   <signal>triggered()</signal>
+   <receiver>SignalViewerWindow</receiver>
+   <slot>close()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>233</x>
+     <y>176</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>

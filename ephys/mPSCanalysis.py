@@ -102,6 +102,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._data_ = None
         self._detection_epoch_name_ = None
         self._detection_signal_name_ = None
+        self._detection_epochs_ = list()
         
         self._template_file_ = self._default_template_file
         
@@ -136,6 +137,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # the realization of the mPSC model according to the parameters in the 
         # mPSC Model Groupbox
         self._mPSC_model_waveform_ = None
+        
+        self._result_ = None
 
         # NOTE: 2022-11-10 09:25:48
         # these three are set up by the super() initializer
@@ -145,10 +148,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         # NOTE: 2022-11-05 15:14:11
         # logic from TriggerDetectDialog: if this instance of MPSCAnalysis
-        # uses its own viewer then self._own_viewer_ will be set to True
+        # uses its own viewer then self._own_ephys_viewer_ will be set to True
         # This allows re-using a SignalViewer that already exists in the 
         # workspace.
-        self._own_viewer_ = False
+        # self._own_ephys_viewer_ = False # replacted with self._owns_viewer_ below
+        
         # NOTE: 2022-11-03 22:55:52 
         #### BEGIN these shouldn't be allowed to change
         self._params_names_ = self._default_params_names_
@@ -180,7 +184,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._ephysViewer_ = ephysViewer
             self._owns_viewer_ = False
         else:
-            self._ephysViewer_ = sv.SignalViewer(win_title=self._winTitle_, parent=self)
+            self._ephysViewer_ = sv.SignalViewer(win_title=self._winTitle_, 
+                                                 parent=self, configTag="DataViewer")
             self._owns_viewer_ = True
             
         self.linkToViewers(self._ephysViewer_)
@@ -193,9 +198,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # NOTE: 2022-11-05 15:09:59
         # will stay hidden until a waveform (either a mPSC model realisation or 
         # a template mPSC) or a sequence of detetected minis becomes available
-        self._waveFormViewer_ = sv.SignalViewer(win_title="mPSC waveform", parent=self)
+        self._waveFormViewer_ = sv.SignalViewer(win_title="mPSC waveform", 
+                                                parent=self, configTag="WaveformViewer")
         
-        self._detected_mPSCViewer_ = sv.SignalViewer(win_title="Detected mPSCs", parent=self)
+        self._detected_mPSCViewer_ = sv.SignalViewer(win_title="Detected mPSCs", 
+                                                     parent=self, configTag="mPSCViewer")
+        
+        self.loadSettings()
         
         self._set_data_(ephysdata)
         
@@ -336,7 +345,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.actionExport_mPSC_Template
         self.actionRemember_mPSC_Template
         self.actionForget_mPSC_Template
-        self.actionDetect_in_current_sweep
+        self.actionDetect_in_current_sweep.triggered.connect(self._slot_detect_sweep)
         self.actionValidate_in_current_sweep
         self.actionUndo_current_sweep
         self.actionDetect
@@ -558,19 +567,27 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._mPSCduration_ = self._default_duration_
         
     def closeEvent(self, evt):
-        if self._ephysViewer_.isVisible():
+        # if self._ephysViewer_.isVisible():
+        if isinstance(self._ephysViewer_, sv.SignalViewer):
             if self._owns_viewer_:
                 self._ephysViewer_.close()
+                self._ephysViewer_ = None
             else:
                 self._ephysViewer_.refresh()
                 
         self._waveFormViewer_.close()
+        self._waveFormViewer_.None
         self._detected_mPSCViewer_.close()
+        self._detected_mPSCViewer_=None
                 
         super().closeEvent(evt)
         
     def _plot_model_(self):
         self._generate_mPSCModelWaveform()
+        if not isinstance(self._waveFormViewer_, sv.SignalViewer):
+            self._waveFormViewer_ = sv.SignalViewer(win_title="mPSC waveform", 
+                                                    parent=self, configTag="WaveformViewer")
+        
         if isinstance(self._mPSC_model_waveform_, neo.AnalogSignal):
             self._waveFormViewer_.view(self._mPSC_model_waveform_)
         
@@ -584,20 +601,56 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._refresh_signalNameComboBox()
             self._refresh_epochComboBox()
             
-    def _get_selected_signal_(self):
-        if isinstance(self._data_, neo.Block):
-            segment = self._data_.segments[self.currentFrame]
-        elif isinstance(self._data_, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self._data_):
-            segment = self._data_[self.currentFrame]
-        elif isinstance(self._data_, neo.Segment):
-            segment = self._data_
-        else:
+    def _plot_detected_mPSCs(self):
+        if self._result_ is None:
             return
-        
+            
+    def _get_selected_signal_(self, segment):
         index = self.signalNameComboBox.currentIndex()
         if index in range(len(segment.analogsignals)):
             return segment.analogsignals[index]
         
+    def _get_data_segment_(self, index:typing.Optional[int] = None):
+        if index is None:
+            index = self.currentFrame
+        if isinstance(self._data_, neo.Block) and index in range(-len(self._data_.segments), len(self._data_.segments)):
+            segment = self._data_.segments[index]
+            
+        elif isinstance(self._data_, (tuple, list)) and index in range(-len(self._data_), len(self._data_)):
+            segment = self._data_[index]
+        elif isinstance(self._data_, neo.Segment):
+            segment = self._data_
+            
+        else:
+            return
+        
+        return segment
+    
+    def _get_signal_for_detection_(self, segment_index:typing.Optional[int] = None):
+        if self._data_ is None:
+            return
+        
+        segment = self._get_data_segment_(segment_index)
+        
+        if not isinstance(segment, neo.Segment):
+            return
+        
+        epochIndex = self.epochComboBox.currentIndex()
+        
+        if epochIndex > 0: # use the signal slice within selected epoch
+            if epochIndex in range(-len(segment.epochs), len(segment.epochs)):
+                epoch = segment.epochs[epochIndex-1]
+                
+                signal = self._get_selected_signal_(segment).time_slice(epoch.times[0], epochs.times[0]+epoch.durations[0])
+                
+                    
+        
+        signal = self._get_selected_signal_(self)
+        
+        return signal
+    
+    
+            
     # @pyqtSlot()
         
     @pyqtSlot(bool)
@@ -607,6 +660,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         else:
             self._slot_choosePersistentTemplateFile()
             
+    @pyqtSlot()
+    def _slot_detect_sweep(self):
+        
+        segment = self._get_data_segment_()
+        if not isinstance(segment, neo.Segment):
+            return
+        
+        
             
     @pyqtSlot()
     def _slot_choosePersistentTemplateFile(self):
@@ -685,7 +746,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     @pyqtSlot()
     def _slot_exportEphysData(self):
         if self._data_ is not None:
-            self.exportDataToWorkspace(self._data_, self.metaDataWidget.dataVarName)
+            self.exportDataToWorkspace(self._data_, var_name=self.metaDataWidget.dataVarName)
     
     @pyqtSlot()
     def _slot_plotData(self):

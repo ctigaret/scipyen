@@ -1633,7 +1633,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         Attempt to deal with situations where C/C++ objects are deleted before 
         their wrappers in pyqtgraph
         """
-        
+        # TODO/FIXME 2022-11-16 21:37:13
         pgmembers = inspect.getmembers(self, lambda x: isinstance(x, (pg.GraphicsItem, pg.GraphicsView, QtWidgets.QWidget)))
         
         super().closeEvent(evt)

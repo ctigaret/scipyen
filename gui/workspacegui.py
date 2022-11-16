@@ -16,7 +16,8 @@ from core.scipyen_config import (ScipyenConfigurable,
                                  loadWindowSettings,
                                  saveWindowSettings,
                                  confuse)
-
+from core import strutils
+from core.strutils import InflectEngine
 import gui.quickdialog as qd
 from gui.pictgui import ItemsListDialog
 
@@ -326,7 +327,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             self._scipyenWindow_   = parent
             
         else:
-            # NOTE: 2020-12-05 21:24:45
+            # NOTE: 2020-12-05 21:24:45 CAUTION FIXME/TODO
             # this successfully returns the user workspace ONLY when the 
             # constructor is invoked (directly or indirectly) from within
             # the console; otherwise, it is None
@@ -416,8 +417,10 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     
     @safeWrapper
     def exportDataToWorkspace(self, data:typing.Any, var_name:str, title:str="Export data to workspace"):
-            
-        newVarName = validate_varname(var_name)
+        
+        newVarName = strutils.str2symbol(var_name)
+        if self.appWindow:
+            newVarName = validate_varname(newVarName, ws = self.appWindow.workspace)
         
         dlg = qd.QuickDialog(self, title)
         namePrompt = qd.StringInput(dlg, "Export data as:")
