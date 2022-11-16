@@ -684,11 +684,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
     @pyqtSlot()
     def _slot_exportEphysData(self):
-        self.exportDataToWorkspace(self._data, self.metaDataWidget.dataVarName)
+        if self._data_ is not None:
+            self.exportDataToWorkspace(self._data_, self.metaDataWidget.dataVarName)
     
     @pyqtSlot()
     def _slot_plotData(self):
-        self._plot_data()
+        if self._data_ is not None:
+            self._plot_data()
         
     @pyqtSlot(float)
     def _slot_modelDurationChanged(self, val):

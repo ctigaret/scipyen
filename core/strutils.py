@@ -11,6 +11,9 @@ from numbers import (Number, Real,)
 import numpy as np
 import quantities as pq
 
+import inflect
+InflectEngine = inflect.engine()
+
 from PyQt5 import QtCore, QtGui
 
 __translation_table_to_identifier = str.maketrans(dict([(c_, "_") for c_ in string.punctuation + string.whitespace]))
@@ -28,7 +31,7 @@ def str2range(s):
         return range(*parts)
     else:
         return range(*parts[0:3])
-        
+    
 def is_pathname_valid(pathname: str):
     '''
     `True` if the passed pathname is a valid pathname for the current OS;

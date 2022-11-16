@@ -160,6 +160,8 @@ from core.workspacefunctions import validate_varname
 from core.scipyen_config import markConfigurable
 from core.traitcontainers import DataBag
 
+from core.strutils import InflectEngine
+
 
 from imaging.vigrautils import kernel2array
 
@@ -3760,8 +3762,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         vertAndCrossCursors = collections.ChainMap(self.crosshairSignalCursors, self.verticalSignalCursors)
         
         if len(vertAndCrossCursors) < 2:
+            a = 2 - len(vertAndCrossCursors)
             QtWidgets.QMessageBox.warning(self,"Attach epoch to data",
-                                          "There must be at least two vertical or croshair cursors")
+                                          f"Please add {a} vertical or crosshair {InflectEngine.plural('cursor', a)} first")
             return
         
         if isinstance(self.y, (neo.Block, neo.Segment)):
@@ -3772,16 +3775,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             d.namePrompt=qd.StringInput(d, "Name:")
             d.namePrompt.setText("Epoch")
             
-            # d.c1Prompt = qd.StringInput(d, "SignalCursor 1:")
-            # d.c2Prompt = qd.StringInput(d, "SignalCursor 2:")
-            
             d.c1Combo = qd.QuickDialogComboBox(d, "Select first cursor:")
             d.c1Combo.setItems([c for c in vertAndCrossCursors])
             d.c1Combo.setValue(0)
             
             d.c2Combo = qd.QuickDialogComboBox(d, "Select second cursor")
             d.c2Combo.setItems([c for c in vertAndCrossCursors])
-            d.c1Combo.setValue(1)
+            d.c2Combo.setValue(1)
             
             d.toAllSegmentsCheckBox = qd.CheckBox(d, "Embed in all segments")
             d.toAllSegmentsCheckBox.setChecked(True)
