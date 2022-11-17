@@ -576,9 +576,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._ephysViewer_.refresh()
                 
         self._waveFormViewer_.close()
-        self._waveFormViewer_.None
+        self._waveFormViewer_= None
         self._detected_mPSCViewer_.close()
-        self._detected_mPSCViewer_=None
+        self._detected_mPSCViewer_= None
                 
         super().closeEvent(evt)
         
@@ -798,9 +798,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     @pyqtSlot(str)
     def _slot_newTargetSignalSelected(self, value):
         self._detection_signal_name_ = value
-        sig = self._get_selected_signal_()
-        if isinstance(sig, neo.AnalogSignal) and sig.size > 1:
-            self.durationSpinBox.units = sig.times.units
+        seg = self._get_data_segment_()
+        if isinstance(seg, neo.Segment):
+            sig = self._get_selected_signal_(seg)
+            if isinstance(sig, neo.AnalogSignal) and sig.size > 1:
+                self.durationSpinBox.units = sig.times.units
         
     
     @pyqtSlot(int)

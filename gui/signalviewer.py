@@ -646,7 +646,26 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             *args, **kwargs)
         
     def _configureUI_(self):
-        """"""
+        """FIXME/TODO 2022-11-17 10:00:15
+        Move all UI definition to the designer UI file:
+        As it currently stands, this is a hotch-potch of widget creations with
+        both designer UI and manually added code.
+        
+        The up side is that the designer UI allows more tractable code and automates
+        sharing of actions between widgets (e.g. menus, toolbars, comboboxes)
+        
+        The down side (especially for toolbars) is that we will have to create 
+        some icons of our own (as stock icon themes do not provide everything we 
+        need).
+        
+        See signalviewer_2.ui file which goes some way towards that.
+        
+        BUG/FIXME/TODO 2022-11-17 10:05:21
+        An annoying bug is the disappearance of the menubar and its menus) when
+        the window is closed and then shown again (the underlying objectis still
+        alive) in the KDE desktop, when KDE operates the global menu service.
+        
+        """
         self.setupUi(self)
         
         # NOTE: 2021-11-13 23:24:12
@@ -668,7 +687,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.cursorsMenu = QtWidgets.QMenu("Cursors", self)
         self.epochsMenu = QtWidgets.QMenu("Epochs", self)
         
-        self.menubar.setNativeMenuBar(True)
+        # self.menubar.setNativeMenuBar(True)
 
         self.menubar.addMenu(self.cursorsMenu)
         self.menubar.addMenu(self.epochsMenu)
@@ -829,7 +848,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self._frames_spinner_ = self.framesQSpinBox
         
-        self.signalsMenu = QtWidgets.QMenu("Signals", self)
+        # FIXME/TODO? 2022-11-17 09:59:51
+        # what's this for?
+        # self.signalsMenu = QtWidgets.QMenu("Signals", self)
         
         self.selectSignalComboBox.clear()
         self.selectSignalComboBox.setCurrentIndex(0)
@@ -1626,6 +1647,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def setDataDisplayEnabled(self, value):
         self.viewerWidget.setEnabled(value is True)
         self.viewerWidget.setVisible(value is True)
+        
+    def showEvent(self, evt):
+        # print(f"{self.__class__.__name__} ({self.winTitle}) showEvent")
+        # print(f"{self.__class__.__name__} ({self.winTitle}) menubar visible: {self.menuBar().isVisible()}")
+        # for (mname, menu) in (("cursors menu", self.cursorsMenu), 
+        #                       ("epochs menu",self.epochsMenu)):
+        #     print(f"{mname} is visible: {menu.isVisible()}")
+        
+        super().showEvent(evt)
+        evt.accept()
             
         
     def closeEvent(self, evt):
@@ -1637,6 +1668,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         pgmembers = inspect.getmembers(self, lambda x: isinstance(x, (pg.GraphicsItem, pg.GraphicsView, QtWidgets.QWidget)))
         
         super().closeEvent(evt)
+        evt.accept()
 
     def addCursors(self, cursorType="c", *where, **kwargs):
         """Manually adds a set of cursors to the selected axes in the SignalViewer window.
