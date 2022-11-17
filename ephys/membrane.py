@@ -6623,12 +6623,15 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
     if isinstance(x, neo.Block):
         segments = x.segments
         data_name = x.name
+        
     elif isinstance(x, neo.Segment):
         segments = [x]
         data_name = x.name
+        
     elif isinstance(x, (tuple, list)) and all(isinstance(s, neo.Segment) for s in x):
         segments = x
         data_name = "Segments"
+        
     else:
         raise TypeError(f"Expecting a neo.Block, a neo.Segment, or a sequence of neo.Segments; got {type(x).__name__} instead")
     
@@ -6649,6 +6652,7 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
             else:
                 result.append(None)
                 continue
+            
         except:
             warnings.warn(f"No membrane current signal with index or name {Im} is found in segment {k}")
             result.append(None)

@@ -41,6 +41,7 @@ from gui.scipyenviewer import ScipyenFrameViewer
 import gui.signalviewer as sv
 from gui.signalviewer import SignalCursor as SignalCursor
 import gui.pictgui as pgui
+from gui.pictgui import ItemsListDialog
 from gui.workspacegui import (GuiMessages, WorkspaceGuiMixin)
 from gui.widgets.modelfitting_ui import ModelParametersWidget
 from gui.widgets.spinboxslider import SpinBoxSlider
@@ -100,7 +101,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._use_template_ = False
         
         self._data_ = None
-        self._detection_epoch_name_ = None
+        # self._detection_epoch_name_ = None
         self._detection_signal_name_ = None
         self._detection_epochs_ = list()
         
@@ -481,15 +482,17 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def _refresh_epochComboBox(self):
         if isinstance(self._data_, neo.Block):
             segment = self._data_.segments[self.currentFrame]
+            
         elif isinstance(self._data_, (tuple,list)) and all(isinstance(s, neo.Segment) in self._data_):
             segment = self._data_[self.currentFrame]
             
         elif isinstance(self._data_, neo.Segment):#
             segment = self._data_
+            
         else:
             return
         
-        epochnames = ["None"] + [e.name for e in segment.epochs]
+        epochnames = ["None"] + [e.name for e in segment.epochs] + ["Select..."]
         signalBlocker = QtCore.QSignalBlocker(self.epochComboBox)
         self.epochComboBox.clear()
         self.epochComboBox.addItems(epochnames)
@@ -540,7 +543,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._detected_mPSCViewer_.setVisible(False)
         self._cached_detection_ = None
         self._mPSC_detected_ = False
-        self._detection_epoch_name_ = None
+        # self._detection_epoch_name_ = None
         self._detection_signal_name_ = None
         
         self._data_ = None
@@ -613,11 +616,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def _get_data_segment_(self, index:typing.Optional[int] = None):
         if index is None:
             index = self.currentFrame
+        print(f"(_slot_new_mPSCEpochSelected {index})")
+            
         if isinstance(self._data_, neo.Block) and index in range(-len(self._data_.segments), len(self._data_.segments)):
             segment = self._data_.segments[index]
             
         elif isinstance(self._data_, (tuple, list)) and index in range(-len(self._data_), len(self._data_)):
             segment = self._data_[index]
+            
         elif isinstance(self._data_, neo.Segment):
             segment = self._data_
             
@@ -649,7 +655,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         return signal
     
-    
+    def _detect_sweep_(self, segment_index:typing.Optional[int]=None):
+        # TODO 2022-11-17 14:15:37
+        pass
+        
+        
             
     # @pyqtSlot()
         
@@ -813,12 +823,32 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
     @pyqtSlot(str)
     def _slot_new_mPSCEpochSelected(self, value):
-        self._detection_epoch_name_ = value
-                
-    # @pyqtSlot(int)
-    # def _slot_new_mPSCEpochIndexSelected(self, value):
-    #     self._detection_epoch_name_ = value
-                
+        print(f"(_slot_new_mPSCEpochSelected {value})")
+        segment = self._get_data_segment_()
+        
+        print(f"_slot_new_mPSCEpochSelected segment: {segment.name}")
+        
+        if not isinstance(segment, neo.Segment):
+            return
+        
+        existing_epoch_names = [e.name for e in segment.epochs]
+        print(f"(_slot_new_mPSCEpochSelected epoch names: {existing_epoch_names})")
+        
+        if value == "Select:" and len(existing_epoch_names):
+            dialog = ItemsListDialog(parent=self, title="Select epoch(s)",
+                                     itemsList = existing_epoch_names,
+                                     selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
+            
+            ans = dialog.exec()
+            
+            if ans == QtWidgets.QDialog.Accepted:
+                self._detection_epochs_.clear()
+                self._detection_epochs_ = [i for i in dialog.selectedItemsText]
+            
+        elif value in existing_epoch_names:
+            self._detection_epochs_.clear()
+            self._detection_epochs_.append(value)
+            
     @pyqtSlot(int)
     def _slot_setWaveFormIndex(self, value):
         self.currentWaveformIndex = value
