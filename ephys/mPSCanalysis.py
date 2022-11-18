@@ -296,7 +296,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # initialization of WorkspaceGuiMixin instance
         # self._data_var_name_ = self.getDataSymbolInWorkspace(self._data_)
         
-        self.resize(-1,-1)
+        # self.resize(-1,-1)
         
     def _configureUI_(self):
         self.setupUi(self)
@@ -431,7 +431,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.actionDetect_in_current_sweep.triggered.connect(self._slot_detect_sweep)
         self.actionValidate_in_current_sweep
         self.actionUndo_current_sweep
-        self.actionDetect
+        self.actionDetect.triggered.connect(self._slot_detect)
         self.actionValidate
         self.actionUndo
         self.actionView_results
@@ -628,6 +628,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def saveSettings(self):
         """temporarily bypass non Qt settings - remove when done"""
         self.saveWindowSettings()
+        
+    def processData(self, progressSignal = None, setMaxSignal=None, **kwargs):
+        pass
+        
         
     def clear(self):
         if isinstance(self._ephysViewer_,sv.SignalViewer):
@@ -893,6 +897,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         detection, template = self._detect_sweep_(waveform=waveform)
         self._result_ = (detection, template)
         self._plot_data()
+        
+    @pyqtSlot()
+    def _slot_detect(self):
+        waveform = self._get_mPSC_template_or_waveform_()
+        if waveform is None:
+            self.criticalMessage("Detect mPSC in current sweep",
+                                 "No mPSC waveform or template is available")
+            return
         
         
     @pyqtSlot()

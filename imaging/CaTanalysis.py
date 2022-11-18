@@ -11883,7 +11883,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             warnings.warn("Data contains no scans!")
                 
     @safeWrapper
-    def processData(self, scene=True, channel = None, progressSignal = None, setMaxSignal=None):
+    def processData(self, progressSignal = None, setMaxSignal=None, **kwargs):#scene=True, channel = None, ):
         """Applies 2D filters frame-wise to raw scene or scans image data subsets.
         
         The function is meant to be called by a ProgressWorker instance.
@@ -11915,7 +11915,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         ===========
         
         scene: boolean (default True).
-            When True (the default) the function processed the scene images;
+            When True (the default) the function processes the scene images;
             otherwise, it processed the scans images.
         
         channel: a str, an int, a sequence of str or a sequence of int, or None 
@@ -11926,6 +11926,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         """
         if not isinstance(self._data_, ScanData):
             return
+        
+        scene = kwargs.pop("scene", True)
+        channel = kwargs.pop("channel", None)
         
         # choose what to process: data.scene or data.scans
         if scene:

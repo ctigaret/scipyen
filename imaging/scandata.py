@@ -1332,7 +1332,8 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
                 self.obj.framesMap.map = newmap
 
 class ScanData(BaseScipyenData):
-    """An almost direct translation of matlab LSData data structure.
+    """Encapsulates data from laser scanning imaging and electrophysiology data.
+
     Work in progress.
     
     TODO/FIXME 2018-09-14 10:28:13 - place on back-burner...
@@ -1437,6 +1438,8 @@ class ScanData(BaseScipyenData):
         Where the did the 26 come from?
         
     """
+    #  An almost direct translation of my old matlab LSData data structure.
+    
     from gui import pictgui as pgui
     
     # NOTE: 2022-01-11 13:48:37
@@ -1503,7 +1506,7 @@ class ScanData(BaseScipyenData):
         ("type",                            ScanDataType.linescan),
         )
     
-    _descriptor_attributes_= _data_children_ + _derived_data_children_ + _result_data_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ + BaseScipyenData._descriptor_attributes_
+    _descriptor_attributes_ = _data_children_ + _derived_data_children_ + _result_data_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ + BaseScipyenData._descriptor_attributes_
     
     def _get_data_child_component_(self, component:str):
         """

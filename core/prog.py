@@ -81,7 +81,7 @@ class BaseDescriptorValidator(ABC):
         If the descriptor owner contains at least one of the dict attributes
         '_preset_hooks_' and '_postset_hooks_' mapping the descriptor's public
         name to an AttributeAdapter instance, then the adapter instance will be
-        called BEFORE (respectively, AFTER)  assignment of 'value' to descriptor.
+        called BEFORE (respectively, AFTER) assignment of 'value' to descriptor.
         
         """
         # NOTE: 2022-01-03 20:45:48
