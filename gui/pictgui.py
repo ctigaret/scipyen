@@ -190,6 +190,7 @@ class ProgressWorkerSignals(QtCore.QObject):
     signal_result = pyqtSignal(object)
     signal_progress = pyqtSignal(int)
     signal_setMaximum = pyqtSignal(int)
+    signal_canceled = pyqtSignal()
     
 class ProgressWorker(QtCore.QRunnable):
     """
@@ -214,6 +215,8 @@ class ProgressWorker(QtCore.QRunnable):
     progressDialog in the main (GUI) thread.
 
     """
+    canceled = pyqtSignal(name="canceled")
+    
     def __init__(self, fn, progressDialog, *args, **kwargs):
         """
         fn: callable
@@ -230,6 +233,7 @@ class ProgressWorker(QtCore.QRunnable):
         
         if isinstance(self.pd, QtWidgets.QProgressDialog):
             self.pd.setValue(0)
+            self.pd.canceled.connect(self.slot_canceled)
             self.signals.signal_progress.connect(self.pd.setValue)
             self.signals.signal_setMaximum.connect(self.pd.setMaximum)
             self.kwargs['progressSignal'] = self.signals.signal_progress
@@ -241,6 +245,10 @@ class ProgressWorker(QtCore.QRunnable):
         # Add the callback to our kwargs
         
         #print("ProgressWorker fn args", self.args)
+        
+    @pyqtSlot()
+    def slot_canceled(self):
+        self.signals.signal_canceled(emit)
 
     @pyqtSlot()
     def run(self):

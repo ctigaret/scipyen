@@ -19,6 +19,9 @@ import core.workspacefunctions as wf
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.models as models
+
+from core.datasignal import DataSignal
+
 from core.traitcontainers import DataBag
 from core.scipyen_config import (markConfigurable, get_config_file)
 
@@ -223,7 +226,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self._result_ = None
 
-        # NOTE: 2022-11-10 09:25:48
+        # NOTE: 2022-11-10 09:25:48 DO NOT DELETE:
         # these three are set up by the super() initializer
         # self._data_frames_ = 0
         # self._frameIndex_ = range(self._data_frames_)
@@ -690,9 +693,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if not isinstance(self._waveFormViewer_, sv.SignalViewer):
             self._waveFormViewer_ = sv.SignalViewer(win_title="mPSC waveform", 
                                                     parent=self, configTag="WaveformViewer")
-        
-        if isinstance(self._mPSC_model_waveform_, neo.AnalogSignal):
-            self._waveFormViewer_.view(self._mPSC_model_waveform_)
+        waveform = self._get_mPSC_template_or_waveform_()
+        if isinstance(waveform, (neo.AnalogSignal, DataSignal)):
+            self._waveFormViewer_.view(waveform)
             
     def _plot_template_(self):
         """Plots mPSC template"""
@@ -745,9 +748,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         return segment
     
-    def _get_mPSC_template_or_waveform_(self):
+    def _get_mPSC_template_or_waveform_(self, use_template:typing.Optional[bool]=None):
         # see NOTE: 2022-11-17 23:37:00 NOTE: 2022-11-11 23:04:37 NOTE: 2022-11-11 23:10:42
-        if self._use_template_: # return the cached template if it exists
+        if use_template is None:
+            use_template = self._use_template_
+            
+        if use_template == True: # return the cached template if it exists
             if isinstance(self._mPSC_template_, neo.AnalogSignal) and self._mPSC_template_.name == "mPSC Template":
                 return self._mPSC_template_
             else: # no template is loaded; get one from custom file or default file, or generate a synthetic waveform
@@ -783,9 +789,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             waveform  = self._get_mPSC_template_or_waveform_()
 
         self._result_ = list()
+        
         for frame in self._frameIndex_: # NOTE: _frameIndex_ is in ingerited from ScipyenFrameViewer
             detection, template = self._detect_sweep_(frame, waveform=waveform)
-            self._result_ = append((detection, template))
+            self._result_.append((detection, template))
             
             if progressSignal is not None:
                 progressSignal.emit(frame)
@@ -928,8 +935,21 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                                  "No mPSC waveform or template is available")
             return
         
+        if isinstance(self._data_, (neo.Block, neo.Segment)):
+            vartxt = f"in {self._data_.name}"
+        else:
+            vartxt = ""
+        progressDisplay = QtWidgets.QProgressDialog(f"Detecting mPSCS {vartxt}", "Abort", 0, self._number_of_frames_, self)
+        
+        worker = pgui.ProgressWorker(self._detect_all_, progressDisplay)
+        
+        worker.signals.signal_finished.connect(progressDisplay.reset)
+        worker.signals.signal_result[object].connect(self._slot_doneProcessing)
+        
+        self.threadpool.start(worker)
+        
     @pyqtSlot()
-    def slotProcessingDone():
+    def _slot_doneProcessing(self):
         self._plot_data()
         
         
@@ -1043,10 +1063,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         elif column == "Upper Bound:":
             self.mPSCParametersUpperBounds  = self.paramsWidget.parameters["Upper Bound:"]
             
-        if not self._use_template_:
-            # avoidn unneccessary replots when using the template
-            self._plot_model_()
-        
+        self._plot_model_()
         
     @pyqtSlot()
     def _slot_make_mPSCEpoch(self):

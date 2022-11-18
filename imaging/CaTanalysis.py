@@ -11962,12 +11962,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if len(processing) == 0:
             return
         
-        if channel is None:
+        # figure out the channels to process
+        if channel is None: 
+            # no specific channel to process ⟹ process all channels
             process_channel_names = source_chnames
             process_channel_ndx = [source_chnames.index(c) for c in process_channel_names]
             untouched_channels_ndx = list()
             
         elif isinstance(channel, int):
+            # channel specified by its index (int) ⟹ process indicated channel
             if channel < 0 or channel >= len(source_chnames):
                 raise ValueError("Invalid channel index specified (%d) in %s" % (channel, self._data_var_name_))
             
@@ -11976,6 +11979,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             untouched_channels_ndx = [[k for k in range(len(source_chnames)) if k != process_channel_ndx[0]]]
             
         elif isinstance(channel, str):
+            # channel specified by its name ⟹ process named channel
             if channel not in source_chnames:
                 raise ValueError("Channel %s not found in %s" % (channel, self._data_var_name_))
             
@@ -11984,7 +11988,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             untouched_channels_ndx = [k for k in range(len(source_chnames)) if k != process_channel_ndx[0]]
             
         elif isinstance(channel, (tuple, list)):
+            # specified a sequence of channel ⟹ process ONLY the channels specified
             if all([isinstance(c, str) for c in channel]):
+                # channels to process are specified by name
                 if any([c not in source_chnames for c in channel]):
                     raise ValueError("Not all specified channels (%s) were found in %s" % (channel, self._data_var_name_))
                 
@@ -11993,6 +11999,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 untouched_channels_ndx = [k for k in range(len(source_chnames)) if k not in process_channel_ndx]
                 
             elif all([isinstance(c, int) for c in channel]):
+                # channels to process are specified by int index
                 if any([c < 0 or c >= len(source_chnames) for c in channel]):
                     raise ValueError("Invalid channel indices specified (%s) in %s" % (channel, self._data_var_name_))
                 
@@ -12003,6 +12010,22 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             raise TypeError("Invalid channel specification: %s for %s" % (channel, self._data_var_name_))
         
+        # NOTE: 2022-11-18 22:05:54
+        # the specified channels names MUST be present in the processing dict, 
+        # as str keys, mapped to a dict with the following key/value pairs:
+        #
+        # "function" → the fully qualified name of the function (i.e. package.module.function_name)
+        #   the package/module MUST have been already imported in this module
+        #   FIXME/TODO: 2022-11-18 22:09:04 
+        #   when factorising this code do NOT expect the above to happen; implement
+        #   some dynamic module load/search rather than just going straight to eval
+        #
+        # "args" → a sequence (e.g. tuple, list) of positional (var-positional)
+        #   parameters to the function in "function" (see above)
+        #
+        # "kwargs" → a mapping (e.g. a dict) with the var-keyword parameters of
+        #   the function in "function" (see above)
+    
         if any([c not in processing for c in process_channel_names]):
             raise ValueError("Processing functions are not defined for all channels")
         
