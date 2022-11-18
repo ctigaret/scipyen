@@ -191,7 +191,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._waveform_frames = 0
         self._currentWaveformIndex_ = 0
         
-        
+          # 
         # NOTE: 2022-11-11 23:04:37
         # the mPSC template is an average of selected waveforms, that have,
         # typically, been detected using cros-correlation with a model mPSC
@@ -774,6 +774,22 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         else:
             self._generate_mPSCModelWaveform()
             return self._mPSC_model_waveform_
+        
+    def _detect_all_(self, waveform=None, progressSignal=None,**kwargs):
+        if self._data_ is None:
+            return
+        
+        if waveform is None:
+            waveform  = self._get_mPSC_template_or_waveform_()
+
+        self._result_ = list()
+        for frame in self._frameIndex_: # NOTE: _frameIndex_ is in ingerited from ScipyenFrameViewer
+            detection, template = self._detect_sweep_(frame, waveform=waveform)
+            self._result_ = append((detection, template))
+            
+            if progressSignal is not None:
+                progressSignal.emit(frame)
+        
                     
     def _detect_sweep_(self, segment_index:typing.Optional[int]=None, waveform=None):
         """ Returns a collection of detected mPSCs and the template used
@@ -900,11 +916,21 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
     @pyqtSlot()
     def _slot_detect(self):
+        if self._data_ is None:
+            self.criticalMessage("Detect mPSC in current sweep",
+                                 "No data!")
+            return
+    
+            
         waveform = self._get_mPSC_template_or_waveform_()
         if waveform is None:
             self.criticalMessage("Detect mPSC in current sweep",
                                  "No mPSC waveform or template is available")
             return
+        
+    @pyqtSlot()
+    def slotProcessingDone():
+        self._plot_data()
         
         
     @pyqtSlot()

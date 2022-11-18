@@ -1550,17 +1550,15 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
         
         return fitted_epscat #, src_base, src_peak
     
-def analyseFrame(lsdata, frame, unit=None, 
-                 indicator_channel_ndx=None, 
-                 reference_channel_ndx=None,
-                 detrend=False,
-                 gen_long_fits=False):
-    """Modifies ScanData in place !
+def analyseFrame(lsdata:ScanData, frame:int, unit=None, indicator_channel_ndx=None, reference_channel_ndx=None, detrend=False, gen_long_fits=False):
+    """Analyses a specific frame in a ScanData object.
+    See also the module-level function CaTanalysis.analyseFrame(...)
+    Modifies ScanData in place !
     Uses analysisOptions stored in lsdata.
     
     lsdata: a ScanData object
     
-    frame: index of the frame to be analysed
+    frame: int; index of the frame to be analysed
     
     unit: None, an AnalysisUnit, a vertical scan cursor used in an Analysis unit, or the name of such cursor
         
@@ -1807,9 +1805,7 @@ def analyseFrame(lsdata, frame, unit=None,
     lsdata.scansBlock.segments[frame].name = "%s" % protocol.name
         
 #@safeWrapper
-def computeLSCaT(roiRange, f0Range, ca_data, ref_data=None, detrend=False, 
-                 name=None, description=None, units=pq.dimensionless, #
-                 **annotations):
+def computeLSCaT(roiRange, f0Range, ca_data, ref_data=None, detrend=False, name=None, description=None, units=pq.dimensionless, **annotations):
     """
     Generates an EPSCaT trace by calculating df/a or df/f on a linescan time series.
     
@@ -1824,7 +1820,7 @@ def computeLSCaT(roiRange, f0Range, ca_data, ref_data=None, detrend=False,
     
     ref_data: 2D vigra.VigraArray with line scan series (reference dye channel e.g. alexa fluor)
     
-    detrend: boolean, defasult False; when True, tries to compensate for a sliding background
+    detrend: boolean, default False; when True, tries to compensate for a sliding background
     using scipy.signal.detrend ("linear" detrend type)
     
     discr_base: list of tuples (start, stop) in samples, or empty (default)
@@ -1991,8 +1987,6 @@ def computeLSCaT(roiRange, f0Range, ca_data, ref_data=None, detrend=False,
     
     return ret
 
-#"def" fitEPSCaT(data, p0, bounds, fitWindow = None, integration=None,
-             #amplitudeWindows = None, amplitudeMethod="direct"):
 #@safeWrapper
 def fitEPSCaT(data, p0, bounds, fitWindow = None, integration=None):
     """Fit EPSCaT model defined by p0 parameters through data.
@@ -2116,7 +2110,6 @@ def fitEPSCaT(data, p0, bounds, fitWindow = None, integration=None):
         y = models.compound_exp_rise_multi_decay(x, params)
         return y
     
-    #"def" _integrate_window_(x, window, params, name):
     def _integrate_window_(x, window, name, column = 1):
         # NOTE: 2018-02-03 21:46:38
         # column specifies which fitted curve we're integrating on
@@ -4454,9 +4447,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     def filterData(self, scene=True, scans=True):#, frames = None):
         """ Filters data with functions selected in the "Filters" tab.
         
-        Wraps processData() function in a separate pictgui.ProgressWorker thread.
+        Wraps processData() function in separate pictgui.ProgressWorker threads,
+        one for the scans and one for the scene ⟹ there will be two progressbars
+        showing.
         
-        data filtering function is associated with the individual ScanData object
+        Data filtering function is associated with the individual ScanData object
         because it allows the processing to be tractable to the particular
         ScanData instance (the processing function & parameters are included in 
         the "analysisOptions "property of the ScanData object)
@@ -4988,15 +4983,26 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         pvimp.open()
         
     def _analyzeFrames_(self, frames, progressSignal=None, setMaxSignal=None, **kwargs):
+        """Calls to the module-level analyseFrame() for each frame in frames.
+        This is meant to be executed in a separate GUI thread, (i.e. it is called 
+        by a ProgressWorker) emits progressSignal(int) pyqtSignal
+        
+        Parameters:
+        ==========
+        frames: a sequence of int: indices of the data frames to be analysed
+        progressSignal: a pyqtSignal with one int argument (the frame)
+            This signal is emitted after the processing of one frame.
+        
+        """
         if self._data_ is None:
             return
+        
+        frames = kwargs.pop(frames)
         
         #print("LSCaTWindow._analyzeFrames_ progressSignal", progressSignal, "**kwargs", kwargs)
         
         #detrend = self.detrendEPSCaTsCheckBox.isChecked()
-        
-        
-        
+#         
         for frame in frames:
             analyseFrame(self._data_, frame, **kwargs)
             #analyseFrame(self._data_, frame, detrend=detrend, 
@@ -11933,36 +11939,21 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         # choose what to process: data.scene or data.scans
         if scene:
             source = self._data_.scene
-            
             source_chnames = self._data_.sceneChannelNames
-            
             source_frames = self._data_.sceneFrames
-            
             source_frameaxis = self._data_.sceneFrameAxis
-            
             processing = self._scene_filters_
-            
             #target = self._data_.scene
-            
             #target_chnames = self._data_.sceneChannelNames
-            
-            calibrations = self._data_._scene_axis_calibrations_
             
         else:
             source = self._data_.scans
-            
             source_chnames = self._data_.scansChannelNames
-            
             source_frames = self._data_.scansFrames
-            
             source_frameaxis = self._data_.scansFrameAxis
-            
             processing = self._scans_filters_
-            
             #target = self._data_.scans
-            
             #target_chnames = self._data_.scansChannelNames
-            
             calibrations = self._data_._scans_axis_calibrations_
             
         if len(source) == 0:
