@@ -70,6 +70,28 @@
          </widget>
         </item>
         <item>
+         <widget class="QCheckBox" name="clearPreviousDetectionCheckBox">
+          <property name="toolTip">
+           <string>Replace previous detection</string>
+          </property>
+          <property name="statusTip">
+           <string>Replace previous detection</string>
+          </property>
+          <property name="whatsThis">
+           <string>Replace previous detection</string>
+          </property>
+          <property name="text">
+           <string>Replace previous detection</string>
+          </property>
+          <property name="icon">
+           <iconset theme="document-replace"/>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
          <spacer name="horizontalSpacer_2">
           <property name="orientation">
            <enum>Qt::Horizontal</enum>
@@ -233,7 +255,7 @@
      <x>0</x>
      <y>0</y>
      <width>529</width>
-     <height>28</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -336,7 +358,7 @@
    <addaction name="actionExport_mPSC_Template"/>
    <addaction name="actionRemember_mPSC_Template"/>
    <addaction name="actionRemove_default_mPSC_Template"/>
-   <addaction name="actionForget_mPSC_template"/>
+   <addaction name="actionForget_mPSC_Template"/>
    <addaction name="separator"/>
   </widget>
   <widget class="QToolBar" name="detectionToolBar">
@@ -624,9 +646,10 @@
     <string>Choose default mPSC template file</string>
    </property>
   </action>
-  <action name="actionForget_mPSC_template">
+  <action name="actionForget_mPSC_Template">
    <property name="icon">
-    <iconset theme="delete"/>
+    <iconset theme="delete">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Forget mPSC template</string>

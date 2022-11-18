@@ -3769,7 +3769,7 @@ def clear_spiketrains(data:typing.Union[neo.Segment, neo.Block, typing.Sequence[
             if isinstance(d, (neo.Segment, neo.Block)):
                 clear_spiketrains(d)
     
-def remove_spiketrain(segment:neo.Segment, index:typing.Union[int, typing.Sequence[int]]):
+def remove_spiketrain(segment:neo.Segment, index:typing.Union[int, str, typing.Sequence[int], typing.Sequence[str]]):
     """Remove the SpikeTrain at specified index from the segment's spiketrains.
     Raises an IndexError if the index is not appropriate.
     
@@ -3777,8 +3777,12 @@ def remove_spiketrain(segment:neo.Segment, index:typing.Union[int, typing.Sequen
     ==========
     segment: neo.Segment
     
-    index: int or a sequence (tuple, list) of int
+    index: int, str or a sequence (tuple, list) of int, or of str
         Any negative value will be normalized (i.e. incremented with len(segment.spiketrains))
+    
+    Returns:
+    =======
+    The segment (a reference)
     
     NOTE: The `spiketrains` property of a segment is a SpikeTrainList which is 
     typically invisible to the general user of the neo package (by design).
@@ -3818,21 +3822,36 @@ def remove_spiketrain(segment:neo.Segment, index:typing.Union[int, typing.Sequen
     # `all_channel_ids` property
     
     
+    # print(f"neoutils.remove_spiketrain index: {index}")
+    
     if isinstance(index, int):
         if index < 0:
             index += len(stl)
             
         trains = [s for k, s in enumerate(stl) if k != index]
         
-    elif isinstance(index, (tuple, list)) and all(isinstance(i, int) for i in index):
-        ndx = [i + len(stl) if i < 0 else i for i in index]
+    elif isinstance(index, str):
+        # print(f"{index} in trains: {index in [s.name for s in stl]}")
+        trains = [s for s in stl if s.name != index]
         
-        trains = [s for k, s in enumerate(stl) if k not in ndx]
+    elif isinstance(index, (tuple, list)):
+        if all(isinstance(i, int) for i in index):
+            ndx = [i + len(stl) if i < 0 else i for i in index]
+        
+            trains = [s for k, s in enumerate(stl) if k not in ndx]
+            
+        elif all(isinstance(i, str)):
+            trains = [s for s in stl if s.name not in ndx]
         
     
     if len(trains):
         stl2 = neo.core.spiketrainlist.SpikeTrainList(items=trains) # will set up channel ids
         segment.spiketrains = stl2
+    else:
+        # just st it to an empty spike train list
+        segment.spiketrains = neo.core.spiketrainlist.SpikeTrainList()
+        
+    return segment
     
     
 def remove_events(event, segment, byLabel=True):

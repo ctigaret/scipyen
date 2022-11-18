@@ -561,6 +561,22 @@ def fit_mPSC_model(data, p0, **kwargs):
     
     from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
     
+    jac         = kwargs.pop("jac",         "2-point")
+    bounds      = kwargs.pop("bounds",      (-np.inf, np.inf))
+    method      = kwargs.pop("method",      "trf")
+    ftol        = kwargs.pop("ftol",        1e-8)
+    xtol        = kwargs.pop("xtol",        1e-8)
+    gtol        = kwargs.pop("gtol",        1e-8)
+    x_scale     = kwargs.pop("x_scale",     1.0)
+    loss        = kwargs.pop("loss",        "linear")
+    f_scale     = kwargs.pop("f_scale",     1.0)
+    max_nfev    = kwargs.pop("max_nfev",    None)
+    diff_step   = kwargs.pop("diff_step",   None)
+    tr_solver   = kwargs.pop("tr_solver",   None)
+    tr_options  = kwargs.pop("tr_options",  {})
+    jac_sparsity= kwargs.pop("jac_sparsity",None)
+    verbose     = kwargs.pop("verbose",     0)
+    
     if not isinstance(data, (neo.AnalogSignal, DataSignal)):
         raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datatypes.DataSignal; got %s instead" % type(data).__name__)
     
@@ -579,22 +595,6 @@ def fit_mPSC_model(data, p0, **kwargs):
         ret = y-yf
         
         return ret
-    
-    jac         = kwargs.pop("jac",         "2-point")
-    bounds      = kwargs.pop("bounds",      (-np.inf, np.inf))
-    method      = kwargs.pop("method",      "trf")
-    ftol        = kwargs.pop("ftol",        1e-8)
-    xtol        = kwargs.pop("xtol",        1e-8)
-    gtol        = kwargs.pop("gtol",        1e-8)
-    x_scale     = kwargs.pop("x_scale",     1.0)
-    loss        = kwargs.pop("loss",        "linear")
-    f_scale     = kwargs.pop("f_scale",     1.0)
-    max_nfev    = kwargs.pop("max_nfev",    None)
-    diff_step   = kwargs.pop("diff_step",   None)
-    tr_solver   = kwargs.pop("tr_solver",   None)
-    tr_options  = kwargs.pop("tr_options",  {})
-    jac_sparsity= kwargs.pop("jac_sparsity",None)
-    verbose     = kwargs.pop("verbose",     0)
     
     # not used here, but remove it from kwargs anyway
     args        = kwargs.pop("args",        ()) 

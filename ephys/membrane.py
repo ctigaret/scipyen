@@ -6356,8 +6356,10 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     ATTENTION: When detection has failed, returns None
     
     """
-    if isinstance(waveform, np.ndarray) and not dt.is_vector(waveform):
-        raise TypeError("waveform expected to be a vector")
+    # print(f"membrane.detect_mPSC: waveform is a {type(waveform).__name__}")
+    if isinstance(waveform, (np.ndarray,neo.core.basesignal.BaseSignal)):
+        if not dt.is_vector(waveform):
+            raise TypeError("waveform expected to be a vector")
     
     elif isinstance(waveform, (tuple, list)):
         if len(waveform) == 6:
@@ -6367,6 +6369,7 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
                                      t_start = 0*x.times.units,
                                      duration = waveduration,
                                      sampling_rate = x.sampling_rate)
+            
     else:
         raise ValueError("Incorrect waveform specification")
     
@@ -6767,10 +6770,10 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
             # # waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
             # train.waveforms = waves
             train.annotations["peak_times"] = peak_times
-            train.annotations["source"] = "mPSC_detection"
+            train.annotations["source"] = "PSC_detection"
             
             if isinstance(template, neo.core.basesignal.BaseSignal):
-                train.annotations["mPSC_parameters"] = template.annotations["parameters"]
+                train.annotations["PSC_parameters"] = template.annotations["parameters"]
             # elif isinstance(waveform, neo.core.basesignal.BaseSignal):
             #     train.annotations["mPSC_parameters"] = waveform.annotations["parameters"]
             # elif isinstance(waveform, (tuple, list)) and len(waveform)==6:
@@ -6789,7 +6792,7 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
             train_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
             
             # a SpikeTrain expects (spike, channel, time) hence train_waves.T
-            train.waveforms = train_waves.T # 
+            train.waveforms = train_waves.T 
             
             s.spiketrains.append(train)
             

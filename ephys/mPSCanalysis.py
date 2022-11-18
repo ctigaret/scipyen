@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os, typing, math
+import os, typing, math, datetime
 from numbers import (Number, Real,)
 from itertools import chain
 
@@ -115,7 +115,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         # we can also remember a file elsewhere in the file system, other than
         # the one above. NOTE: this file name IS WRITTEN in the config.
-        self._custom_template_file_ = None
+        self._custom_template_file_ = ""
         
         # NOTE: 2022-11-17 23:37:00 
         # About mPSC template files
@@ -449,6 +449,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.use_mPSCTemplate_CheckBox.setChecked(self._use_template_ == True)
         self.use_mPSCTemplate_CheckBox.stateChanged.connect(self._slot_use_mPSCTemplate)
         
+        self.clearPreviousDetectionCheckBox.setChecked(self._clear_events_flag_ == True)
+        self.clearPreviousDetectionCheckBox.stateChanged.connect(self._slot_set_clear_events_flag_)
+        
         self.plot_mPSCWaveformPushButton.clicked.connect(self._slot_plot_mPSCWaveForm)
         
     def _set_data_(self, *args, **kwargs):
@@ -553,7 +556,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if self.mPSCDuration is pd.NA or (isinstance(self.mPSCDuration, pq.Quantity) and self.mPSCDuration.magnitude <= 0):
             return
         
-        signal = self._get_selected_signal_()
+        segment = self._get_data_segment_()
+        if not isinstance(segment, neo.Segment):
+            return
+        
+        signal = self._get_selected_signal_(segment)
         
         if isinstance(signal, neo.AnalogSignal) and signal.size > 1:
             sampling_rate = signal.sampling_rate
@@ -699,7 +706,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._ephysViewer_ = sv.SignalViewer(win_title=self._winTitle_, parent=self)
                 self._owns_viewer_ = True
                 
-            self._ephysViewer_.view(self._data_)
+            if self._ephysViewer_.y is None:
+                self._ephysViewer_.view(self._data_)
+            else:
+                self._ephysViewer_.displayFrame()
+                
             self._refresh_signalNameComboBox()
             self._refresh_epochComboBox()
             
@@ -732,9 +743,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
     def _get_mPSC_template_or_waveform_(self):
         # see NOTE: 2022-11-17 23:37:00 NOTE: 2022-11-11 23:04:37 NOTE: 2022-11-11 23:10:42
-        if self._use_template_:
-            # return the cached template if it exists
-            if isinstance(self._mPSC_template_, nwo.AnalogSignal) and self._mPSC_template_.name == "mPSC Template":
+        if self._use_template_: # return the cached template if it exists
+            if isinstance(self._mPSC_template_, neo.AnalogSignal) and self._mPSC_template_.name == "mPSC Template":
                 return self._mPSC_template_
             else: # no template is loaded; get one from custom file or default file, or generate a synthetic waveform
                 template_OK = False
@@ -762,11 +772,18 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return self._mPSC_model_waveform_
                     
     def _detect_sweep_(self, segment_index:typing.Optional[int]=None, waveform=None):
+        """ Returns a collection of detected mPSCs and the template used
+        If nothing was detected returns None, None
+        """
         # TODO 2022-11-17 14:15:37
         segment = self._get_data_segment_(segment_index)
-        
         if not isinstance(segment, neo.Segment):
             return
+        
+        if isinstance(self._data_, neo.Block):
+            dstring = f"PSCs detected in {self._data_.name } segment {segment.name}"
+        else:
+            dstring = f"PSCs detected in segment {segment.name}"
         
         signal = self._get_selected_signal_(segment)
         
@@ -780,17 +797,83 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         mini_waves  = list()
         
         if waveform is None:
-            waveform  = membrane.PSCwaveform()
+            waveform  = self._get_mPSC_template_or_waveform_()
         
-        if len(epochs)
+        if len(epochs):
+            mini_starts = list()
+            mini_peaks = list()
+            for epoch in epochs:
+                sig = signal.time_slice(epoch.times[0], epoch.times[0]+epoch.durations[0])
+                detection = membrane.detect_mPSC(sig, waveform)
+                if detection is None:
+                    continue
+                
+                template = detection["waveform"]
+                mini_waves.extend(detection["minis"])
+                mini_starts.append(detection["mini_starts"])
+                mini_peaks.append(detection["mini_peaks"])
+                if len(mini_starts) and len(mini_starts):
+                    start_times = np.hstack(mini_starts) * mini_starts[0].units
+                    peak_times = np.hstack(mini_peaks) * mini_peaks[0].units
+                    
+        else: # no epochs - detect in the whole signal
+            detection = membrane.detect_mPSC(signal, waveform)
+            if detection is None:
+                return None, None
             
+            start_times = detection["mini_starts"]
+            peak_times  = detection["mini_peaks"]
+            mini_waves  = detection["minis"]
             
-        
-        pass
-        
-        
+            template = detection["waveform"]
+                    
+        if len(start_times):
+            if isinstance(template, neo.core.basesignal.BaseSignal) and len(template.description.strip()):
+                dstring += f" using {template.description}"
+                
+            if isinstance(self._data_, neo.Block):
+                trname = f"{self._data_.name}_{segment.name}_PSCs"
+            else:
+                trname = f"{segment.name}_PSCs"
             
-    # @pyqtSlot()
+            mPSCtrain = neo.SpikeTrain(start_times, t_stop = signal.t_stop, units = signal.times.units,
+                                    t_start = signal.t_start, sampling_rate = signal.sampling_rate,
+                                    name = trname, description=dstring)
+            
+            mPSCtrain.annotations["peak_times"] = peak_times
+            mPSCtrain.annotations["source"] = "PSC_detection"
+            
+            if isinstance(template, neo.core.basesignal.BaseSignal):
+                mPSCtrain.annotations["PSC_parameters"] = template.annotations["parameters"]
+                mPSCtrain.annotations["datetime"] = datetime.datetime.now()
+            
+            # TODO revisit this design - you may want to avoid fitting.
+            # if fit_waves: # fit wave is alwys True for the GUI code 
+            model_params = self.paramsWidget.value()
+            init_params = tuple(p.magnitude for p in model_params["Initial Value:"])
+            lo = tuple(p.magnitude for p in model_params["Lower Bound:"])
+            up = tuple(p.magnitude for p in model_params["Upper Bound:"])
+            
+            for k,w in enumerate(mini_waves):
+                fw = membrane.fit_mPSC(w, template.annotations["parameters"], lo=lo, up=up)
+                mini_waves[k] = fw
+                
+            mPSCtrain_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
+            mPSCtrain.waveforms = mPSCtrain_waves.T
+            if self.clearPreviousDetectionCheckBox.isChecked():
+                self._clear_events_flag_ = True
+                
+            # print(f"clear prev {self._clear_events_flag_}")
+            if self._clear_events_flag_:
+                # remove old spike trains with mPSCs 
+                neoutils.remove_spiketrain(segment, mPSCtrain.name)
+
+            segment.spiketrains.append(mPSCtrain)
+            
+            return mini_waves, template
+        
+        else:
+            return None, None
         
     @pyqtSlot(bool)
     def _slot_useDefaultTemplateLocation(self, val):
@@ -801,13 +884,17 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
     @pyqtSlot()
     def _slot_detect_sweep(self):
-        
-        segment = self._get_data_segment_()
-        if not isinstance(segment, neo.Segment):
+        # refresh the template or waveform
+        waveform = self._get_mPSC_template_or_waveform_()
+        if waveform is None:
+            self.criticalMessage("Detect mPSC in current sweep",
+                                 "No mPSC waveform or template is available")
             return
+        detection, template = self._detect_sweep_(waveform=waveform)
+        self._result_ = (detection, template)
+        self._plot_data()
         
         
-            
     @pyqtSlot()
     def _slot_choosePersistentTemplateFile(self):
         targetDir = dirname(self.templateWaveFormFile)
@@ -830,7 +917,15 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
     @pyqtSlot(int)
     def _slot_use_mPSCTemplate(self, value):
+        # TODO: 2022-11-18 10:12:34 
+        # make configurable
         self._use_template_ = value == QtCore.Qt.Checked
+        
+    @pyqtSlot(int)
+    def _slot_set_clear_events_flag_(self, value):
+        # TODO: 2022-11-18 10:12:34 
+        # make configurable
+        self._clear_events_flag_ = value == QtCore.Qt.Checked
         
     @pyqtSlot()
     def _slot_saveEphysData(self):
@@ -910,7 +1005,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         elif column == "Upper Bound:":
             self.mPSCParametersUpperBounds  = self.paramsWidget.parameters["Upper Bound:"]
             
-        self._plot_model_()
+        if not self._use_template_:
+            # avoidn unneccessary replots when using the template
+            self._plot_model_()
         
         
     @pyqtSlot()
