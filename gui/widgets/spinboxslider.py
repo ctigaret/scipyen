@@ -69,6 +69,8 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
     
     @minimum.setter
     def minimum(self, value:int):
+        # avoid ∞ recursion
+        signalBlockers = [QtCore.QSignalBlocker(widget) for widget in (self, self.framesQSpinBox, self.framesQSlider)]
         val = int(value)
         self._minimum_ = val
         self.framesQSpinBox.setMinimum(val)
@@ -79,12 +81,14 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         """The maximum value in the spinbox and slider.
         Also sets up the value in the "of..." label.
         """
-        return self.maximum
+        return self._maximum_
     
     @maximum.setter
     def maximum(self, value:int):
         val = int(value)
         self._maximum_ = val
+        # avoid ∞ recursion
+        signalBlockers = [QtCore.QSignalBlocker(widget) for widget in (self, self.framesQSpinBox, self.framesQSlider)]
         self.framesQSpinBox.setMaximum(self._maximum_)
         self.framesQSlider.setMaximum(self._maximum_)
         self.totalFramesCountLabel.setText(f"of {self._maximum_}")
@@ -139,7 +143,11 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
     def value(self, value:int):
         # avoid ∞ recursion
         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in (self, self.framesQSpinBox, self.framesQSlider)]
-        self._slot_setValue(value)
+        self.slot_setValue(value)
+        
+    def setValue(self, value:int):
+        """Convenience setter method - sets the 'value' property to value"""
+        self.value = value
 
     def setMinimum(self, value:int):
         self.minimum = value

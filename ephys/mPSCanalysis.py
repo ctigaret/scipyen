@@ -99,16 +99,88 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._data_var_name_ = None
         self._cached_detection_ = None
         self._use_template_ = False
+        self._mPSC_template_ = None
         
         self._data_ = None
         # self._detection_epoch_name_ = None
         self._detection_signal_name_ = None
         self._detection_epochs_ = list()
         
+        # the template file where a mPSC template is stored across sessions
+        # this is located in the Scipyen's config directory
+        # (on Linux, this file is in $HOME/.config/Scipyen, and its name can be
+        # con figured by triggering the appropriate action in the Settings menu)
+        # NOTE: this file name is NOT written in the config file !!!
         self._template_file_ = self._default_template_file
         
+        # we can also remember a file elsewhere in the file system, other than
+        # the one above. NOTE: this file name IS WRITTEN in the config.
+        self._custom_template_file_ = None
+        
+        # NOTE: 2022-11-17 23:37:00 
+        # About mPSC template files
+        # The logic is as follows:
+        # • by default at startup, the mPSC template is read from the custom 
+        #   template file, if it is accessible (NOTE: the template file is NOT
+        #   actually read at __init__, but only when a detection is initiated,
+        #   or when the waveform template is plotted)
+        #
+        # • else the mPSC template is read from the default template file, if it
+        #   is accessible;
+        #
+        # • else, there is no mPSC template for the session.
+        #
+        # When the user MAKES a new template, or IMPORTS one from workspace:
+        # • the mPSC template will be stored in the default template file (overwriting it)
+        #   ONLY IF the user chooses to do so by triggering the action "Set Default mPSC Template"
+        #
+        # When the user OPENS (READS) an mPSC template from a file in the file system
+        # (other that the default template file):
+        # • the name of THIS file is stored as the custom template file in the
+        #   config
+        #
+        # • the mPSC template will be stored in the default template file (overwriting it)
+        #   ONLY IF the user chooses to do so by triggering the action "Set Default mPSC Template"
+        #
+        # When the user triggers "Forget mPSC template", then:
+        #   ∘ the mPSC template is cleared for the session and the template from
+        #       the default template file is loaded (is available)
+        #   ∘ the custom mPSC template file name is removed from the config (i.e. is set to "")
+        #   ∘ at the next session only the default mPSC template may be available
+        #
+        # When the user triggers "Remove default mPSC template", then:
+        #   ∘ the default mPSC template file is removed
+        #   ∘ the mPSC template of the session (if it exists) exists and can be 
+        #       used until Forget mPSC template is also triggered
+        #
+        # When there is no mPSC template loaded in the session, AND Use mPSC template
+        # is checked, then the session will proceed as:
+        # • load mPSC template from the custom file, if present
+        # • else load mPSC template from the default file, if present
+        # • else ask user to select a template from the workspace (if there is one)
+        #   NOTE: this is a single neo.AnalogSignal named "mPSC template" so it 
+        #   would be easy to "fool" the app simply by renaming ANY neo.AnalogSignal
+        #   in the workspace
+        # • if no template is chosen form workspace (or there is None available)
+        #   then user can choose a template file in the file system (not prompted;
+        #   the user must take this action independently)
+        #   
+        #   if no template has been loaded (either because user has cancelled the
+        #   dialogs, or whatever was loaded from the file system does NOT appear
+        #   to be an mPSC template) then Use mPSC Template is automatically unckeched
+        #   
+        # When a mPSC detect action is triggered, AND Use mPSC template is checked
+        #   proceed as above; if no templata has been loaded, then switch this 
+        #   flag off and proceed with a synthetic waveform generated on the fly
+        #
+        #
+        # when the user opens a mPSC template from the file system, the name of 
+        # THAT file is stored in the configuration as custom template file
+        
+        # 
+        
         # temporarily holds the file selected in _slot_editPreferences
-        self._cached_template_file_ =  self._default_template_file
+        # self._cached_template_file_ =  self._default_template_file
         
         # detected mPSC waveform(s) to validate
         # can be a single neo.AnalogSignal, or, usually, a sequence of
@@ -132,11 +204,21 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # However, the app offers the possibility to save the template to a user
         # file, such that the user can choose form a collection of templates
         # at any time.
+        #
+        # See also NOTE: 2022-11-17 23:37:00 
+        #
         self._mPSC_template_ = None
         
         # NOTE: 2022-11-11 23:10:42
         # the realization of the mPSC model according to the parameters in the 
         # mPSC Model Groupbox
+        # this serves as a cache for detecting mPSCs in a collection of segments
+        # (and thus to avoid generating a new waveform for every segment)
+        # HOWEVER, it is recommended to re-create this waveform from parameters
+        # every time a new detection starts (for a segment, when started manually
+        # or before the first segment when detection is started for a collection 
+        # of segments)
+        
         self._mPSC_model_waveform_ = None
         
         self._result_ = None
@@ -315,13 +397,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self.paramsWidget.sig_parameterChanged[str, str].connect(self._slot_modelParameterChanged)
         
-        self.frames_spinBoxSlider.label = "Sweep:"
-        self.frames_spinBoxSlider.setRange(0, self._number_of_frames_)
-        self.frames_spinBoxSlider.valueChanged.connect(self.slot_setFrameNumber) # slot inherited from ScipyenFrameViewer
+        self._frames_spinBoxSlider_.label = "Sweep:"
+        self._frames_spinBoxSlider_.setRange(0, self._number_of_frames_)
+        self._frames_spinBoxSlider_.valueChanged.connect(self.slot_setFrameNumber) # slot inherited from ScipyenFrameViewer
         
-        self.mPSC_spinBoxSlider.label = "mPSC:"
-        self.mPSC_spinBoxSlider.setRange(0,0)
-        self.mPSC_spinBoxSlider.valueChanged.connect(self._slot_setWaveFormIndex)
+        self._mPSC_spinBoxSlider_.label = "mPSC:"
+        self._mPSC_spinBoxSlider_.setRange(0,0)
+        self._mPSC_spinBoxSlider_.valueChanged.connect(self._slot_setWaveFormIndex)
         
         self.durationSpinBox.setDecimals(self.paramsWidget.spinDecimals)
         self.durationSpinBox.setSingleStep(10**(-self.paramsWidget.spinDecimals))
@@ -361,7 +443,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # signal & epoch comboboxes
         self.signalNameComboBox.currentTextChanged.connect(self._slot_newTargetSignalSelected)
         self.signalNameComboBox.currentIndexChanged.connect(self._slot_newTargetSignalIndexSelected)
-        self.epochComboBox.currentTextChanged.connect(self._slot_new_mPSCEpochSelected)
+        self.epochComboBox.currentTextChanged.connect(self._slot_epochComboBoxSelectionChanged)
         # self.epochComboBox.currentIndexChanged.connect(self._slot_new_mPSCEpochIndexSelected)
         
         self.use_mPSCTemplate_CheckBox.setChecked(self._use_template_ == True)
@@ -448,13 +530,19 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return
         
         vname = self.workspaceSymbolForData(self._data_)
+        
         if isinstance(vname, str):
             self.metaDataWidget.dataVarName = vname
             
         name = getattr(self._data_, "name", "")
+        
         self.metaDataWidget.dataName = name
         
+        self._frames_spinBoxSlider_.setRange(0, self._number_of_frames_)
+        
         self._plot_data()
+        
+        self._frames_spinBoxSlider_
         
         # NOTE: 2022-11-05 23:52:11
         # self._ephysViewer_ is not yet available when _set_data_ is called from __init__()
@@ -518,6 +606,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self.signalNameComboBox.setCurrentIndex(index)
             
     def displayFrame(self):
+        """Overloads ScipyenFrameViewer.displayFrame"""
         self._refresh_signalNameComboBox()
         self._refresh_epochComboBox()
         # TODO: 2022-11-10 11:02:17
@@ -559,7 +648,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._detected_mPSCs_ = None
         self._currentWaveformIndex_ = 0
         self._waveform_frames = 0
-        self.frames_spinBoxSlider.setRange(0, 0)
+        self._frames_spinBoxSlider_.setRange(0, 0)
         self.signalNameComboBox.clear()
         self.epochComboBox.clear()
         self.metaDataWidget.clear()
@@ -586,13 +675,23 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         super().closeEvent(evt)
         
     def _plot_model_(self):
-        self._generate_mPSCModelWaveform()
+        """Plots mPSC model waveform"""
         if not isinstance(self._waveFormViewer_, sv.SignalViewer):
             self._waveFormViewer_ = sv.SignalViewer(win_title="mPSC waveform", 
                                                     parent=self, configTag="WaveformViewer")
         
         if isinstance(self._mPSC_model_waveform_, neo.AnalogSignal):
             self._waveFormViewer_.view(self._mPSC_model_waveform_)
+            
+    def _plot_template_(self):
+        """Plots mPSC template"""
+        if not isinstance(self._waveFormViewer_, sv.SignalViewer):
+            self._waveFormViewer_ = sv.SignalViewer(win_title="mPSC waveform", 
+                                                    parent=self, configTag="WaveformViewer")
+        
+        if isinstance(self._mPSC_template_, neo.AnalogSignal):
+            self._waveFormViewer_.view(self._mPSC_template_)
+            
         
     def _plot_data(self):
         if self._data_ is not None:
@@ -616,7 +715,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def _get_data_segment_(self, index:typing.Optional[int] = None):
         if index is None:
             index = self.currentFrame
-        print(f"(_slot_new_mPSCEpochSelected {index})")
             
         if isinstance(self._data_, neo.Block) and index in range(-len(self._data_.segments), len(self._data_.segments)):
             segment = self._data_.segments[index]
@@ -632,31 +730,62 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         return segment
     
-    def _get_signal_for_detection_(self, segment_index:typing.Optional[int] = None):
-        if self._data_ is None:
-            return
-        
+    def _get_mPSC_template_or_waveform_(self):
+        # see NOTE: 2022-11-17 23:37:00 NOTE: 2022-11-11 23:04:37 NOTE: 2022-11-11 23:10:42
+        if self._use_template_:
+            # return the cached template if it exists
+            if isinstance(self._mPSC_template_, nwo.AnalogSignal) and self._mPSC_template_.name == "mPSC Template":
+                return self._mPSC_template_
+            else: # no template is loaded; get one from custom file or default file, or generate a synthetic waveform
+                template_OK = False
+                if os.path.isfile(self._custom_template_file_):
+                    tpl = pio.loadFile(self._custom_template_file_)
+                    if isinstance(tpl, neo.AnalogSignal) and tpl.name == "mPSC Template":
+                        self._mPSC_template_ = tpl
+                        return self._mPSC_template_
+                
+                if not template_OK and os.path.isfile(self._template_file_):
+                    tpl = pio.loadFile(self._template_file_)
+                    if isinstance(tpl, neo.AnalogSignal) and tpl.name == "mPSC Template":
+                        self._mPSC_template_ = tpl
+                        return self._mPSC_template_
+                
+                if not template_OK:
+                    signalBlocker = QtCore.QSignalBlocker(self.use_mPSCTemplate_CheckBox)
+                    self.use_mPSCTemplate_CheckBox.setChecked(False)
+                    self._use_template_ = False
+                    self._generate_mPSCModelWaveform()
+                    return self._mPSC_model_waveform_
+                            
+        else:
+            self._generate_mPSCModelWaveform()
+            return self._mPSC_model_waveform_
+                    
+    def _detect_sweep_(self, segment_index:typing.Optional[int]=None, waveform=None):
+        # TODO 2022-11-17 14:15:37
         segment = self._get_data_segment_(segment_index)
         
         if not isinstance(segment, neo.Segment):
             return
         
-        epochIndex = self.epochComboBox.currentIndex()
+        signal = self._get_selected_signal_(segment)
         
-        if epochIndex > 0: # use the signal slice within selected epoch
-            if epochIndex in range(-len(segment.epochs), len(segment.epochs)):
-                epoch = segment.epochs[epochIndex-1]
-                
-                signal = self._get_selected_signal_(segment).time_slice(epoch.times[0], epochs.times[0]+epoch.durations[0])
-                
-                    
+        if not isinstance(signal, neo.AnalogSignal):
+            return
         
-        signal = self._get_selected_signal_(self)
+        epochs = [e for e in segment.epochs if e.name in self._detection_epochs_]
         
-        return signal
-    
-    def _detect_sweep_(self, segment_index:typing.Optional[int]=None):
-        # TODO 2022-11-17 14:15:37
+        start_times = list()
+        peak_times  = list()
+        mini_waves  = list()
+        
+        if waveform is None:
+            waveform  = membrane.PSCwaveform()
+        
+        if len(epochs)
+            
+            
+        
         pass
         
         
@@ -693,7 +822,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
     @pyqtSlot()
     def _slot_plot_mPSCWaveForm(self):
-        self._plot_model_()
+        self._get_mPSC_template_or_waveform_()
+        if self._use_template_:
+            self._plot_template_()
+        else:
+            self._plot_model_()
             
     @pyqtSlot(int)
     def _slot_use_mPSCTemplate(self, value):
@@ -822,22 +955,24 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._ephysViewer_.currentAxis=value
     
     @pyqtSlot(str)
-    def _slot_new_mPSCEpochSelected(self, value):
-        print(f"(_slot_new_mPSCEpochSelected {value})")
+    def _slot_epochComboBoxSelectionChanged(self, value):
+        # print(f"_slot_epochComboBoxSelectionChanged value: {value}")
         segment = self._get_data_segment_()
         
-        print(f"_slot_new_mPSCEpochSelected segment: {segment.name}")
+        # print(f"_slot_epochComboBoxSelectionChanged segment: {segment.name}")
         
         if not isinstance(segment, neo.Segment):
             return
         
         existing_epoch_names = [e.name for e in segment.epochs]
-        print(f"(_slot_new_mPSCEpochSelected epoch names: {existing_epoch_names})")
+        # print(f"_slot_epochComboBoxSelectionChanged epoch names: {existing_epoch_names}")
         
-        if value == "Select:" and len(existing_epoch_names):
+        if value == "Select..." and len(existing_epoch_names):
             dialog = ItemsListDialog(parent=self, title="Select epoch(s)",
                                      itemsList = existing_epoch_names,
                                      selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
+            
+            # print(f"_slot_epochComboBoxSelectionChanged dialog: {dialog.__class__.__name__}")
             
             ans = dialog.exec()
             
@@ -846,8 +981,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._detection_epochs_ = [i for i in dialog.selectedItemsText]
             
         elif value in existing_epoch_names:
+            # print(f"_slot_epochComboBoxSelectionChanged selected: {value}")
+            
             self._detection_epochs_.clear()
             self._detection_epochs_.append(value)
+            
+        elif value == "None":
+            self._detection_epochs_.clear()
             
     @pyqtSlot(int)
     def _slot_setWaveFormIndex(self, value):

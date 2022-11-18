@@ -194,7 +194,7 @@
        <item>
         <layout class="QHBoxLayout" name="_mPSCSpinBoxSliderLayout">
          <item>
-          <widget class="SpinBoxSlider" name="mPSC_spinBoxSlider" native="true">
+          <widget class="SpinBoxSlider" name="_mPSC_spinBoxSlider_" native="true">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
              <horstretch>0</horstretch>
@@ -213,7 +213,7 @@
         </layout>
        </item>
        <item>
-        <widget class="SpinBoxSlider" name="frames_spinBoxSlider" native="true">
+        <widget class="SpinBoxSlider" name="_frames_spinBoxSlider_" native="true">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
            <horstretch>0</horstretch>
@@ -335,7 +335,8 @@
    <addaction name="actionSave_mPSC_Template"/>
    <addaction name="actionExport_mPSC_Template"/>
    <addaction name="actionRemember_mPSC_Template"/>
-   <addaction name="actionForget_mPSC_Template"/>
+   <addaction name="actionRemove_default_mPSC_Template"/>
+   <addaction name="actionForget_mPSC_template"/>
    <addaction name="separator"/>
   </widget>
   <widget class="QToolBar" name="detectionToolBar">
@@ -476,22 +477,22 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Remember mPSC Template</string>
+    <string>Set Default mPSC Template</string>
    </property>
    <property name="toolTip">
-    <string>Remember mPSC template across sections</string>
+    <string>Remember mPSC template as default across sections</string>
    </property>
   </action>
-  <action name="actionForget_mPSC_Template">
+  <action name="actionRemove_default_mPSC_Template">
    <property name="icon">
-    <iconset theme="delete">
+    <iconset theme="remove">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Forget mPSC Template</string>
+    <string>Remove default mPSC Template</string>
    </property>
    <property name="toolTip">
-    <string>Forget mPSC teplate</string>
+    <string>Remove default mPSC template</string>
    </property>
   </action>
   <action name="actionCreate_mPSC_Template">
@@ -508,7 +509,8 @@
   </action>
   <action name="actionDetect_in_current_sweep">
    <property name="icon">
-    <iconset theme="edit-find-replace"/>
+    <iconset theme="edit-find-replace">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Detect in current sweep</string>
@@ -516,7 +518,8 @@
   </action>
   <action name="actionUndo_current_sweep">
    <property name="icon">
-    <iconset theme="edit-undo"/>
+    <iconset theme="edit-undo">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Undo current sweep</string>
@@ -524,7 +527,8 @@
   </action>
   <action name="actionDetect">
    <property name="icon">
-    <iconset theme="edit-find"/>
+    <iconset theme="edit-find">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Detect</string>
@@ -532,7 +536,8 @@
   </action>
   <action name="actionUndo">
    <property name="icon">
-    <iconset theme="edit-undo"/>
+    <iconset theme="edit-undo">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Undo</string>
@@ -540,7 +545,8 @@
   </action>
   <action name="actionValidate_in_current_sweep">
    <property name="icon">
-    <iconset theme="go-jump"/>
+    <iconset theme="go-jump">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Validate in current sweep</string>
@@ -548,7 +554,8 @@
   </action>
   <action name="actionValidate">
    <property name="icon">
-    <iconset theme="checkmark"/>
+    <iconset theme="checkmark">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Validate</string>
@@ -556,7 +563,8 @@
   </action>
   <action name="actionSave_results">
    <property name="icon">
-    <iconset theme="document-save"/>
+    <iconset theme="document-save">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Save results</string>
@@ -564,7 +572,8 @@
   </action>
   <action name="actionExport_results">
    <property name="icon">
-    <iconset theme="document-export"/>
+    <iconset theme="document-export">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Export results</string>
@@ -572,7 +581,8 @@
   </action>
   <action name="actionView_results">
    <property name="icon">
-    <iconset theme="quickview"/>
+    <iconset theme="quickview">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>View results</string>
@@ -580,7 +590,8 @@
   </action>
   <action name="actionClear_results">
    <property name="icon">
-    <iconset theme="edit-clear-all"/>
+    <iconset theme="edit-clear-all">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Clear results</string>
@@ -591,18 +602,37 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="mark-location"/>
+    <iconset theme="mark-location">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Use default</string>
    </property>
+   <property name="toolTip">
+    <string>Use factory name for default mPSC template file (&quot;mPSCtemplate.h5&quot;)</string>
+   </property>
   </action>
   <action name="actionChoose_persistent_mPSC_template_file">
    <property name="icon">
-    <iconset theme="document-save-as"/>
+    <iconset theme="document-save-as">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Choose file</string>
+    <string>Default mPSC template file</string>
+   </property>
+   <property name="toolTip">
+    <string>Choose default mPSC template file</string>
+   </property>
+  </action>
+  <action name="actionForget_mPSC_template">
+   <property name="icon">
+    <iconset theme="delete"/>
+   </property>
+   <property name="text">
+    <string>Forget mPSC template</string>
+   </property>
+   <property name="toolTip">
+    <string>Forget mPSC template</string>
    </property>
   </action>
  </widget>

@@ -739,7 +739,20 @@ class ScipyenFrameViewer(ScipyenViewer):
         ∘ set the properties of the GUI widgets according to the instance 
             attributes listed above
         
-        ∘ assign values ot any instance attributes that 
+    • implement widgets for frame navigation; you need:
+        
+        ∘ EITHER one QSpinBox instance named '_frames_spinner_' AND 
+                 one QSlider  instance named '_frames_slider_'
+        
+        ∘ OR an instance of a SpinBoxSlider, named '_frames_spinBoxSlider_'
+        
+        These names are expected to be there among the instance attributes of 
+        the class derived from ScipyenFrameViewer.
+        
+    • If the derived class managed several instances of ScipyenFrameViewer (e.g.
+        several image and/or signal viewer instances that display one 'frame' at a
+        time from the same number of 'frames') then, in __init__ make sure you
+        call self.linkToViewers(...)
 
     • define (implement) `self._configureUI_()`, but do NOT call it directly:
         ∘ this method is called by the ScipyenFrameViewer __init__ (see above).
@@ -953,7 +966,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         currentFrame is an index into THAT subset, and not an index into all of
         the data frames.
         
-        Does not emit frameChanged signal.
+        Does NOT emit frameChanged signal.
         
         Developer information:
         ---------------------
@@ -961,7 +974,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         implemented in subclasses.
         
         However derived subclasses may override this function to implement more
-        specific functionality.
+        specific functionality (and call super().currentFrame setter)
         """
         # print(f"{self.__class__.__name__}.currentFrame.setter({value}) ")
         if not isinstance(value, int) or value >= self._number_of_frames_ or value < 0:
@@ -1119,8 +1132,6 @@ class ScipyenFrameViewer(ScipyenViewer):
             #if value not in self.frameIndex:
                 return
             
-            # NOTE: 2021-01-07 14:36:54
-            # subclasses should override this setter to emit frameChanged(int) signal
             self.currentFrame = value
             
             self.frameChanged.emit(value)
