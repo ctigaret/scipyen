@@ -14,11 +14,12 @@ the corresponding property setter (i.e. avoid modifying the collection instance
 in place)
 
 """
-import sys, typing
+import sys, typing, dataclasses
 from warnings import warn, warn_explicit
 from collections import deque
-import quantities as pq
 import numpy as np
+import quantities as pq
+import pandas as pd
 
 from traitlets.utils.bunch import Bunch
 from traitlets.utils.descriptions import describe, class_of, add_article, repr_type
@@ -157,8 +158,6 @@ class _NotifierDeque_(deque):
         else:
             super().rotate(n)
             
-        
-
 class QuantityTrait(Instance):
     info_text = "Trait for python quantities"
     default_value = pq.Quantity([]) # array([], dtype=float64) * dimensionless
@@ -173,7 +172,7 @@ class QuantityTrait(Instance):
                  **kwargs):
         self._minlen = minlen
         self._maxlen = maxlen
-        self.hashed = 0
+        # self.hashed = 0
     
         trait = kwargs.pop('trait', None)
         if trait is not None:
@@ -251,14 +250,20 @@ class QuantityTrait(Instance):
         obj._trait_values[self.name] = new_value
         
         try:
-            new_hash = gethash(new_value)
+            # new_hash = gethash(new_value)
+            old_units = getattr(old_value, "units", pq.dimensionless)
+            new_units = getattr(new_value, "units", pq.dimensionless)
+            old_magnitude = getattr(old_value, "magnitude", np.nan)
+            new_magnitude = getattr(new_value, "magnitude", np.nan)
+            
             if silent:
                 # so far silent is True when the observed knows about us
                 # check it we changed and notify
-                silent = (new_hash == self.hashed)
+                # silent = (new_hash == self.hashed)
+                silent = new_value == old_value
             
-            if not silent:
-                self.hashed = new_hash
+            # if not silent:
+            #     self.hashed = new_hash
                 
         except:
             traceback.print_exc()

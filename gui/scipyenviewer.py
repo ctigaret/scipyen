@@ -199,15 +199,16 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             
         else:
             self._ID_  = self.winId()
-
+            
         # NOTE: 2021-09-16 12:26:09
-        # This MUST be implemented in the derived :class:
+        # This SHOULD be implemented in the derived class
         self._configureUI_()
         
-        # GUI (Qt) settings saved in $HOME/.config/Scipyen/Scipyen.conf
-        #self.qsettings = QtCore.QSettings() 
+        # self.qsettings = QtCore.QSettings() 
         # NOTE: 2021-05-04 21:42:12 About settings
-        # handling settings in the superclass only works for window geometry
+        # GUI (Qt) settings saved are in $HOME/.config/Scipyen/Scipyen.conf
+        # 
+        # Hhandling settings in the superclass only works for window geometry
         # and related stuff on the Qt side.
         
         # Purely "pythonic" settings requires the subclass to be initialized in
@@ -222,13 +223,14 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # defined here and inherited by the subclass works fine.
         
         # NOTE: 2021-08-17 12:59:47
-        # it maybe tempting to call this from inside self._configureUI_()
+        # it maybe tempting to call this from inside self._configureUI_(), or 
+        # even before it.
         # HOWEVER: self.loadSettings() calls self.loadWindowSettings() then 
         # self.loadViewerSettings(), which MAY depend on some data being loaded
         # already in the viewer window.
         # Therefore, it is best to call self.loadSettings() now i.e., it at the 
         # very end of the __init__(), after all essential stuff is done.
-        self.loadSettings() # called from ScipyenConfigurable (via WorkspaceGuiMixin)
+        self.loadSettings() # inherited from ScipyenConfigurable (via WorkspaceGuiMixin)
             
         
         # NOTE: 2021-08-17 12:59:02

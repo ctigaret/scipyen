@@ -487,6 +487,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         """Also allows changing the units if not convertible to current ones.
         Otherwise the value will be rescales to current units.
         """
+        # print(f"{self.__class__.__name__}.setValue({value})")
         if isinstance(value, pq.Quantity):
             if value.size > 1:
                 raise TypeError("Only scalar quantities are allowed")

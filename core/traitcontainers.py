@@ -333,7 +333,7 @@ class DataBag(Bunch):
 
         # NOTE: 2022-11-03 09:50:59
         #### BEGIN Deal with the situation where a "hidden attribute" is being set
-        # i.e. wheh __setitem__ is invoked for assigning to a "hidden attribute"
+        # i.e. when __setitem__ is invoked for assigning to a "hidden attribute"
         # we look it up then return
         # see self._make_hidden for details
         try:

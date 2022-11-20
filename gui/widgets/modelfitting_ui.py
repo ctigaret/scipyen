@@ -2,8 +2,9 @@
 """Widgets for parameter inputs
 """
 import math, numbers, typing, os
-import pandas as pd
+import numpy as np
 import quantities as pq
+import pandas as pd
 from core.strutils import str2symbol
 from gui import guiutils
 import gui.quickdialog as qd
@@ -280,15 +281,18 @@ class ModelParametersWidget(QtWidgets.QWidget):
             
     @parameters.setter
     def parameters(self, params):
-        if isinstance(params, df.DataFrames) and all(s in params.columns for s in ("Initial Value:", "Lower Bound:", "Upper Bound:")):
-            if isinstance(self._parameters_, pd.DataFrame) and self._parameters_.shape == paramsDF.shape and np.all(self._parameters_index == paramsDF.index):
+        if isinstance(params, pd.DataFrame) and all(s in params.columns for s in ("Initial Value:", "Lower Bound:", "Upper Bound:")):
+            if isinstance(self._parameters_, pd.DataFrame) and self._parameters_.shape == params.shape and np.all(self._parameters_.index == params.index):
                 if self.isVertical:
-                    pDF = paramsDF
+                    pDF = params
                 else:
-                    pDF = paramsDF.T
+                    pDF = params.T
                     
                 for c in pDF.columns:
                     for r in pDF.index:
+                        # sb = self.getSpinBox(r, c)
+                        # sigblock = QtCore.QSignalBlocker(sb)
+                        # sb.setValue(pDF.loc[r,c])
                         self.getSpinBox(r, c).setValue(pDF.loc[r,c])
                         
             else:

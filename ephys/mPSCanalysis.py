@@ -90,13 +90,15 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
     _default_duration_ = 0.02*_default_time_units_
     
+    _default_sampling_rate_ = 1e4 * pq.Hz
+    
     _default_template_file = os.path.join(os.path.dirname(get_config_file()),"mPSCTemplate.h5" )
     
     def __init__(self, ephysdata=None, clearOldPSCs=False, ephysViewer:typing.Optional[sv.SignalViewer]=None, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="mPSC Detect", **kwargs):
         # NOTE: 2022-11-05 14:54:24
         # by default, frameIndex is set to all available frames - KISS
         self.threadpool = QtCore.QThreadPool()
-        
+        self._toolbars_locked_ = True
         self._clear_events_flag_ = clearOldPSCs == True
         self._mPSC_detected_ = False
         self._data_var_name_ = None
@@ -290,7 +292,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._detected_mPSCViewer_ = sv.SignalViewer(win_title="Detected mPSCs", 
                                                      parent=self, configTag="mPSCViewer")
         
-        self.loadSettings()
+        # self.loadSettings()
         
         self._set_data_(ephysdata)
         
@@ -302,6 +304,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # self.resize(-1,-1)
         
     def _configureUI_(self):
+        # print(f"{self.__class__.__name__}._configureUI_ start...")
         self.setupUi(self)
         
         # NOTE: 2022-11-08 22:55:24 Using custom widgets in Designer.
@@ -389,11 +392,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         #
         # Throughout, I use protocol (A) above in Designer UI forms
         #
-        self.paramsWidget.setParameters(self._params_initl_,
-                                        lower = self._params_lower_,
-                                        upper = self._params_upper_,
-                                        names = self._params_names_,
-                                        refresh = True)
+        
+        # NOTE: assign config values in loadSettings, not here
+        # self.paramsWidget.setParameters(self._params_initl_,
+        #                                 lower = self._params_lower_,
+        #                                 upper = self._params_upper_,
+        #                                 names = self._params_names_,
+        #                                 refresh = True)
         
         self.paramsWidget.spinStep = 1e-4
         self.paramsWidget.spinDecimals = 4
@@ -443,6 +448,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.actionClear_results
         self.actionUse_default_location_for_persistent_mPSC_template.toggled.connect(self._slot_useDefaultTemplateLocation)
         self.actionChoose_persistent_mPSC_template_file.triggered.connect(self._slot_choosePersistentTemplateFile)
+        self.actionLock_toolbars.setChecked(self._toolbars_locked_ == True)
+        self.actionLock_toolbars.triggered.connect(self._slot_lockToolbars)
         # signal & epoch comboboxes
         self.signalNameComboBox.currentTextChanged.connect(self._slot_newTargetSignalSelected)
         self.signalNameComboBox.currentIndexChanged.connect(self._slot_newTargetSignalIndexSelected)
@@ -456,6 +463,53 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.clearPreviousDetectionCheckBox.stateChanged.connect(self._slot_set_clear_events_flag_)
         
         self.plot_mPSCWaveformPushButton.clicked.connect(self._slot_plot_mPSCWaveForm)
+        
+        self.durationSpinBox.setValue(self._mPSCduration_)
+        
+        if self._toolbars_locked_:
+            for toolbar in (self.mainToolBar, self.detectionToolBar):
+                toolbar.setFloatable(not self._toolbars_locked_)
+                toolbar.setMovable(not self._toolbars_locked_)
+        
+        # print(f"{self.__class__.__name__}._configureUI_ end...")
+        
+    def loadSettings(self):
+        """Overrides ScipyenViewer.loadSettings
+        Applies values from config to correspondong widgets."""
+        super(WorkspaceGuiMixin, self).loadSettings()
+        
+        # asign values to input widgets:
+        ww = (self.paramsWidget, 
+              self.durationSpinBox,
+              self.clearPreviousDetectionCheckBox,
+              self.use_mPSCTemplate_CheckBox)
+        
+        sigblock = [QtCore.QSignalBlocker(w) for w in ww]
+        
+        # 1) assign values from config to paramsWidget
+        # p0 = self.mPSCParametersInitial
+        # l0 = self.mPSCParametersLowerBounds
+        # u0 = self.mPSCParametersUpperBounds
+        # names, values = zip(*[(k,v) for k,v in p0.items()])
+        # lower, upper = zip(*[(l0[k], u0[k]) for k in names])
+#         
+#         plu = {"Initial Value:":values, "Lower Bound:":lower, "Upper Bound:": upper}
+#         
+#         df = pd.DataFrame(plu, index = names)
+        # self.paramsWidget.parameters = df
+        self.paramsWidget.setParameters(self._params_initl_,
+                                        lower = self._params_lower_,
+                                        upper = self._params_upper_,
+                                        names = self._params_names_,
+                                        refresh = True)
+        
+        
+        # 2) assign model duration from config
+        self.durationSpinBox.setValue(self._mPSCduration_)
+        
+        # 3) set check boxes
+        self.use_mPSCTemplate_CheckBox.setChecked(self._use_template_ == True)
+        self.clearPreviousDetectionCheckBox.setChecked(self._clear_events_flag_ == True)
         
     def _set_data_(self, *args, **kwargs):
         # called by super() initializer; 
@@ -560,16 +614,40 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return
         
         segment = self._get_data_segment_()
-        if not isinstance(segment, neo.Segment):
-            return
         
-        signal = self._get_selected_signal_(segment)
-        
-        if isinstance(signal, neo.AnalogSignal) and signal.size > 1:
-            sampling_rate = signal.sampling_rate
+        if isinstance(segment, neo.Segment):
+            signal = self._get_selected_signal_(segment)
+            if isinstance(signal, neo.AnalogSignal) and signal.size > 1:
+                sampling_rate = signal.sampling_rate
+            else:
+                sampling_rate = self._default_sampling_rate_
         else:
-            sampling_rate = 1e4*pq.Hz
-            
+            sampling_rate = self._default_sampling_rate_
+        
+        # NOTE: 2022-11-19 12:14:44
+        # there should be no need to notify the user that the generated model
+        # PSC waveform might have a different sampling rate than the signal 
+        # where PSC are supposed to be detected; the model waveform is (re)created
+        # every time we start a detection, using the signal;
+        #
+        # FIXME? there are two issues with the approach outlined above:
+        #
+        # 1. if the generated model waveform is saved to disk then used as a 
+        #   template in another session - this is the same potential problem 
+        #   with any template use → should check that the template sampling_rate
+        #   matched that of the signal where the detection is done !!!
+        #
+        # 2. if the signals from a COLLECTION of segments do not have the 
+        #   same sampling rate (technically this is possible, although unlikely
+        #   to have occurred during an experiment, but rather when signals from
+        #   separate/independent recordings with different sampling rates were 
+        #   collected manually in one data block -  a contrived situation)
+        #   
+        #   In this case we need to notify the user that the template sampling
+        #   rate does not match that of the signal where the detection is done,
+        #   therefore the detection cannot continue.
+        
+        
         model_params = self.paramsWidget.value()
         init_params = tuple(p.magnitude for p in model_params["Initial Value:"])
             
@@ -624,17 +702,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # code to refresh the detected mPSC window 
         #
         
-    def loadSettings(self):
-        """temporarily bypass non Qt settings - remove when done"""
-        self.loadWindowSettings()
+    # def loadSettings(self):
+    #     """temporarily bypass non Qt settings - remove when done"""
+    #     self.loadWindowSettings()
     
-    def saveSettings(self):
-        """temporarily bypass non Qt settings - remove when done"""
-        self.saveWindowSettings()
-        
-    def processData(self, progressSignal = None, setMaxSignal=None, **kwargs):
-        pass
-        
+    # def saveSettings(self):
+    #     """temporarily bypass non Qt settings - remove when done"""
+    #     self.saveWindowSettings()
         
     def clear(self):
         if isinstance(self._ephysViewer_,sv.SignalViewer):
@@ -685,7 +759,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._waveFormViewer_= None
         self._detected_mPSCViewer_.close()
         self._detected_mPSCViewer_= None
-                
+        
+        # this one is also supposed to call saveSettings()
         super().closeEvent(evt)
         
     def _plot_model_(self):
@@ -753,7 +828,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if use_template is None:
             use_template = self._use_template_
             
-        if use_template == True: # return the cached template if it exists
+        if use_template: # return the cached template if it exists
             if isinstance(self._mPSC_template_, neo.AnalogSignal) and self._mPSC_template_.name == "mPSC Template":
                 return self._mPSC_template_
             else: # no template is loaded; get one from custom file or default file, or generate a synthetic waveform
@@ -781,9 +856,31 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._generate_mPSCModelWaveform()
             return self._mPSC_model_waveform_
         
-    def _detect_all_(self, waveform=None, progressSignal=None,**kwargs):
+    def _detect_all_(self, waveform:typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]=None, **kwargs):
+        """Detects mPSCs in all sweeps
+        
+        Parameters:
+        ==========
+        waveform: neo.AnalogSignal, DataSignal, or None
+                    The model PSC or template (optional, default is None )
+        
+        Var-keyword parameters:
+        =======================
+        NOTE: These do not need to be passed explicitly to the call; tyipically
+        they are supplied by an instance of pictgui.ProgressWorker.
+        
+        progressSignal: PyQt signal that will be emitted with each iteration
+        
+        progressUI: QtProgressDialog or None
+        
+        
+        """
         if self._data_ is None:
             return
+        
+        progressSignal = kwargs.pop("progressSignal", None)
+        setMaxSignal = kwargs.pop("setMaxSignal", None)
+        progressUI = kwargs.pop("progressDialog", None)
         
         if waveform is None:
             waveform  = self._get_mPSC_template_or_waveform_()
@@ -796,6 +893,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
             if progressSignal is not None:
                 progressSignal.emit(frame)
+                
+            if hasattr(progressUI, "wasCanceled"):
+                cncl = progressUI.wasCanceled()
+                if cncl:
+                    print("Aborted")
+                    
+                    return
         
                     
     def _detect_sweep_(self, segment_index:typing.Optional[int]=None, waveform=None):
@@ -903,8 +1007,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return None, None
         
     @pyqtSlot(bool)
-    def _slot_useDefaultTemplateLocation(self, val):
-        if val:
+    def _slot_useDefaultTemplateLocation(self, value):
+        if value:
             self.templateWaveFormFile = self._default_template_file
         else:
             self._slot_choosePersistentTemplateFile()
@@ -939,6 +1043,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             vartxt = f"in {self._data_.name}"
         else:
             vartxt = ""
+            
         progressDisplay = QtWidgets.QProgressDialog(f"Detecting mPSCS {vartxt}", "Abort", 0, self._number_of_frames_, self)
         
         worker = pgui.ProgressWorker(self._detect_all_, progressDisplay)
@@ -1050,7 +1155,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._plot_data()
         
     @pyqtSlot(float)
-    def _slot_modelDurationChanged(self, val):
+    def _slot_modelDurationChanged(self, value):
         self.mPSCDuration = self.durationSpinBox.value()
         self._plot_model_()
         
@@ -1064,6 +1169,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self.mPSCParametersUpperBounds  = self.paramsWidget.parameters["Upper Bound:"]
             
         self._plot_model_()
+        
+    @pyqtSlot(bool)
+    def _slot_lockToolbars(self, value):
+        self.toolbarsLocked = value
         
     @pyqtSlot()
     def _slot_make_mPSCEpoch(self):
@@ -1168,7 +1277,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     @markConfigurable("UseTemplateWaveForm")
     @useTemplateWaveForm.setter
     def useTemplateWaveForm(self, value):
+        print(f"{self.__class__.__name__} @useTemplateWaveForm.setter value: {value}")
         self._use_template_ = value == True
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["UseTemplateWaveForm"] = self._use_template_
         
     @property
     def templateWaveFormFile(self):
@@ -1177,6 +1289,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     @markConfigurable("TemplateWaveFormFile")
     @templateWaveFormFile.setter
     def templateWaveFormFile(self, value:str):
+        print(f"{self.__class__.__name__} @templateWaveFormFile.setter value: {value}")
         import os
         if isinstance(value, str) and os.path.isfile(value):
             self._template_file_ = value
@@ -1190,10 +1303,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
     @markConfigurable("ClearOldPSCsOnDetection")
     @clearOldPSCs.setter
-    def clearOldPSCs(self, val):
-        self._clear_events_flag_ = val == True
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["ClearOldPSCsOnDetection"] = self._clear_events_flag_
+    def clearOldPSCs(self, value):
+        # print(f"{self.__class__.__name__} @clearOldPSCs.setter value: {value}")
+        self._clear_events_flag_ = value == True
+        self.configurable_traits["ClearOldPSCsOnDetection"] = self._clear_events_flag_
+        # if isinstance(getattr(self, "configurable_traits", None), DataBag):
 
     @property
     def mPSCDuration(self):
@@ -1201,8 +1315,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
     @markConfigurable("mPSC_Duration")
     @mPSCDuration.setter
-    def mPSCDuration(self, val):
-        self._mPSCduration_ = val
+    def mPSCDuration(self, value):
+        # print(f"{self.__class__.__name__} @mPSCDuration.setter value: {value}")
+        self._mPSCduration_ = value
         self.configurable_traits["mPSC_Duration"] = self._mPSCduration_
 
     @property
@@ -1213,38 +1328,39 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
     @markConfigurable("mPSCParametersInitial")
     @mPSCParametersInitial.setter
-    def mPSCParametersInitial(self, val:typing.Union[pd.Series, tuple, list, dict]):
-        if isinstance(val, (pd.Series, tuple, list, dict)):
-            if len(val) != len(self._default_params_initl_):
-                val = self._default_params_initl_
+    def mPSCParametersInitial(self, value:typing.Union[pd.Series, tuple, list, dict]):
+        # print(f"{self.__class__.__name__} @mPSCParametersInitial.setter value: {value}")
+        if isinstance(value, (pd.Series, tuple, list, dict)):
+            if len(value) != len(self._default_params_initl_):
+                value = self._default_params_initl_
                 
-            elif isinstance(val, pd.Series):
-                val = list(val)
+            elif isinstance(value, pd.Series):
+                value = list(value)
                 
-            if isinstance(val, (tuple, list)):
-                if all(isinstance(s, pq.Quantity) for s in val):
-                    self._params_initl_ = [v for v in val]
+            if isinstance(value, (tuple, list)):
+                if all(isinstance(s, pq.Quantity) for s in value):
+                    self._params_initl_ = [v for v in value]
                     
-                elif all(isinstance(v, str) for v in val):
-                    self._params_initl_ = list(str2quantity(v) for v in val)
+                elif all(isinstance(v, str) for v in value):
+                    self._params_initl_ = list(str2quantity(v) for v in value)
 
                 else:
                     raise TypeError("Expecting a sequence of scalar quantities or their str representations")
                 
-            elif isinstance(val, dict):
-                assert set(val.keys()) == set(self._params_names_), f"Argument keys for initial values must match parameters names {self._params_names_}"
+            elif isinstance(value, dict):
+                assert set(value.keys()) == set(self._params_names_), f"Argument keys for initial values must match parameters names {self._params_names_}"
                 
-                for k, v in val.items():
+                for k, v in value.items():
                     self._params_initl_[self._params_names_.index(k)] = v
             
-        elif val in (None, np.nan, math.nan):
-            raise TypeError(f"Initial parameter values cannot be {val}")
+        elif value in (None, np.nan, math.nan):
+            raise TypeError(f"Initial parameter values cannot be {value}")
         
         else:
-            raise TypeError(f"Expecting a sequence of scalar quantities (or their str representations) for initial values; instead, got {type(val).__name__}:\n {val}")
+            raise TypeError(f"Expecting a sequence of scalar quantities (or their str representations) for initial values; instead, got {type(value).__name__}:\n {value}")
 
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["mPSCParametersInitial"] = dict(zip(self._params_names_, self._params_initl_))
+        self.configurable_traits["mPSCParametersInitial"] = dict(zip(self._params_names_, self._params_initl_))
+        # if isinstance(getattr(self, "configurable_traits", None), DataBag):
                 
     @property
     def mPSCParametersLowerBounds(self):
@@ -1252,39 +1368,40 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
     @markConfigurable("mPSCParametersLowerBounds")
     @mPSCParametersLowerBounds.setter
-    def mPSCParametersLowerBounds(self, val:typing.Union[pd.Series, tuple, list, dict]):
-        if isinstance(val, (pd.Series, tuple, list, dict)):
-            if len(val) not in (1, len(self._default_params_initl_)):
-                val = self._default_params_lower_
-                # raise ValueError(f"Expecting 1 or {len(self._default_params_initl_)} lower bounds; instead, got {len(val)}")
+    def mPSCParametersLowerBounds(self, value:typing.Union[pd.Series, tuple, list, dict]):
+        # print(f"{self.__class__.__name__} @mPSCParametersLowerBounds.setter value: {value}")
+        if isinstance(value, (pd.Series, tuple, list, dict)):
+            if len(value) not in (1, len(self._default_params_initl_)):
+                value = self._default_params_lower_
+                # raise ValueError(f"Expecting 1 or {len(self._default_params_initl_)} lower bounds; instead, got {len(value)}")
             
-        if isinstance(val, pd.Series):
-            val = list(val)
+        if isinstance(value, pd.Series):
+            value = list(value)
         
-        if isinstance(val, (tuple, list)):
-            if all(isinstance(v, pq.Quantity) for v in val):
-                self._params_lower_ = [v for v in val]
+        if isinstance(value, (tuple, list)):
+            if all(isinstance(v, pq.Quantity) for v in value):
+                self._params_lower_ = [v for v in value]
                 
-            elif all(isinstance(v, str) for v in val):
-                self._params_lower_ = list(str2quantity(v) for v in val)
+            elif all(isinstance(v, str) for v in value):
+                self._params_lower_ = list(str2quantity(v) for v in value)
                 
             else:
                 raise TypeError("Expecting a sequence of scalar quantities or their str representations")
             
-        elif isinstance(val, dict):
-            assert set(val.keys()) == set(self._params_names_), f"Argument keys for lower bounds must match parameters names {self._params_names_}"
+        elif isinstance(value, dict):
+            assert set(value.keys()) == set(self._params_names_), f"Argument keys for lower bounds must match parameters names {self._params_names_}"
             
-            for k, v in val.items():
+            for k, v in value.items():
                 self._params_lower_[self._params_names_.index(k)] = v
             
-        elif val in (None, np.nan, math.nan):
-            self._params_lower_ = val
+        elif value in (None, np.nan, math.nan):
+            self._params_lower_ = value
             
         else:
-            raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the lower bounds; instead, got {type(val).__name__}:\n {val}")
+            raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the lower bounds; instead, got {type(value).__name__}:\n {value}")
                 
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["mPSCParametersLowerBounds"] = dict(zip(self._params_names_, self._params_lower_))
+        self.configurable_traits["mPSCParametersLowerBounds"] = dict(zip(self._params_names_, self._params_lower_))
+        # if isinstance(getattr(self, "configurable_traits", None), DataBag):
                 
     @property
     def mPSCParametersUpperBounds(self):
@@ -1292,36 +1409,60 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
     @markConfigurable("mPSCParametersUpperBounds")
     @mPSCParametersUpperBounds.setter
-    def mPSCParametersUpperBounds(self, val:typing.Union[pd.Series, tuple, list, dict]):
-        if isinstance(val, (pd.Series, tuple, list, dict)):
-            if len(val) not in (1, len(self._default_params_initl_)):
-                val = self._default_params_upper_
+    def mPSCParametersUpperBounds(self, value:typing.Union[pd.Series, tuple, list, dict]):
+        # print(f"{self.__class__.__name__} @mPSCParametersUpperBounds.setter value: {value}")
+        if isinstance(value, (pd.Series, tuple, list, dict)):
+            if len(value) not in (1, len(self._default_params_initl_)):
+                value = self._default_params_upper_
             
-            elif isinstance(val, pd.Series):
-                val = list(val)
+            elif isinstance(value, pd.Series):
+                value = list(value)
             
-            if isinstance(val, (tuple, list)):
-                if all(isinstance(v, pq.Quantity) for v in val):
-                    self._params_upper_ = [v for v in val]
+            if isinstance(value, (tuple, list)):
+                if all(isinstance(v, pq.Quantity) for v in value):
+                    self._params_upper_ = [v for v in value]
                     
-                elif all(isinstance(v, str) for v in val):
-                    self._params_upper_ = list(str2quantity(v) for v in val)
+                elif all(isinstance(v, str) for v in value):
+                    self._params_upper_ = list(str2quantity(v) for v in value)
                     
                 else:
                     raise TypeError("Expecting a sequence of scalar quantities or their str representations")
                 
-            elif isinstance(val, dict):
-                assert set(val.keys()) == set(self._params_names_), f"Argument keys for upper bounds must match parameters names {self._params_names_}"
+            elif isinstance(value, dict):
+                assert set(value.keys()) == set(self._params_names_), f"Argument keys for upper bounds must match parameters names {self._params_names_}"
                 
-                for k, v in val.items():
+                for k, v in value.items():
                     self._params_upper_[self._params_names_.index(k)] = v
             
-        elif val in (None, np.nan, math.nan):
-            self._params_upper_ = val
+        elif value in (None, np.nan, math.nan):
+            self._params_upper_ = value
 
         else:
-            raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the upper bounds; instead, got {type(val).__name__}:\n {val}")
+            raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the upper bounds; instead, got {type(value).__name__}:\n {value}")
                 
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["mPSCParametersUpperBounds"] = dict(zip(self._params_names_, self._params_upper_))
+        self.configurable_traits["mPSCParametersUpperBounds"] = dict(zip(self._params_names_, self._params_upper_))
+        # if isinstance(getattr(self, "configurable_traits", None), DataBag):
                 
+    @property
+    def toolbarsLocked(self):
+        return self._toolbars_locked_
+    
+    @markConfigurable("ToolbarsLocked", conftype="Qt")
+    @toolbarsLocked.setter
+    def toolbarsLocked(self, value:typing.Union[str, bool]):
+        # NOTE: required because the QSettings do store bools as str ("true"
+        # or "false")
+        # print(f"toolbarsLocked.setter value = {value}")
+        if isinstance(value, str):
+            value = value.lower() == "true"
+
+        self._toolbars_locked_ = value == True
+        # print(f"toolbarsLocked.setter _toolbars_locked_ {self._toolbars_locked_}")
+        for toolbar in (self.mainToolBar, self.detectionToolBar):
+            toolbar.setFloatable(not self._toolbars_locked_)
+            toolbar.setMovable(not self._toolbars_locked_)
+            
+        signalBlocker = QtCore.QSignalBlocker(self.actionLock_toolbars)
+        self.actionLock_toolbars.setChecked(self._toolbars_locked_)
+        
+        

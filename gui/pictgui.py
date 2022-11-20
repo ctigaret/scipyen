@@ -190,7 +190,7 @@ class ProgressWorkerSignals(QtCore.QObject):
     signal_result = pyqtSignal(object)
     signal_progress = pyqtSignal(int)
     signal_setMaximum = pyqtSignal(int)
-    signal_canceled = pyqtSignal()
+    # signal_canceled = pyqtSignal()
     
 class ProgressWorker(QtCore.QRunnable):
     """
@@ -213,9 +213,11 @@ class ProgressWorker(QtCore.QRunnable):
     NOTE: the entire loop is executed in a separate thread and periodically
     signals its progress by emitting the progressSignal, connected to a 
     progressDialog in the main (GUI) thread.
+    
+    NOTE: because this inherits from a QRunnable, the operation cannot be aborted
 
     """
-    canceled = pyqtSignal(name="canceled")
+    # canceled = pyqtSignal(name="canceled")
     
     def __init__(self, fn, progressDialog, *args, **kwargs):
         """
@@ -230,14 +232,16 @@ class ProgressWorker(QtCore.QRunnable):
         self.kwargs = kwargs
         self.signals = ProgressWorkerSignals()
         self.pd = progressDialog
+        self.setAutoDelete(True)
         
         if isinstance(self.pd, QtWidgets.QProgressDialog):
             self.pd.setValue(0)
-            self.pd.canceled.connect(self.slot_canceled)
+            # self.pd.canceled.connect(self.slot_canceled)
             self.signals.signal_progress.connect(self.pd.setValue)
             self.signals.signal_setMaximum.connect(self.pd.setMaximum)
             self.kwargs['progressSignal'] = self.signals.signal_progress
             self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
+            self.kwargs["progressUI"] = self.pd
             
         #else:
             #self.pd = None
@@ -246,9 +250,9 @@ class ProgressWorker(QtCore.QRunnable):
         
         #print("ProgressWorker fn args", self.args)
         
-    @pyqtSlot()
-    def slot_canceled(self):
-        self.signals.signal_canceled(emit)
+    # @pyqtSlot()
+    # def slot_canceled(self):
+    #     self.signals.signal_canceled(emit)
 
     @pyqtSlot()
     def run(self):
