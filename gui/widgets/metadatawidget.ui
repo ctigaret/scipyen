@@ -382,13 +382,13 @@
      <item>
       <widget class="QToolButton" name="dateTimeToolButton">
        <property name="toolTip">
-        <string>Date &amp; time of file, recording, analysis</string>
+        <string>Date, time of recording and  analysis</string>
        </property>
        <property name="statusTip">
-        <string>Date &amp; time of file, recording, analysis</string>
+        <string>Date, time of recording and  analysis</string>
        </property>
        <property name="whatsThis">
-        <string>Date &amp; time of file, recording, analysis</string>
+        <string>Date, time of recording and  analysis</string>
        </property>
        <property name="text">
         <string>Date, time</string>
@@ -454,7 +454,8 @@
         <string>Export</string>
        </property>
        <property name="icon">
-        <iconset theme="document-export"/>
+        <iconset theme="document-export">
+         <normaloff>.</normaloff>.</iconset>
        </property>
       </widget>
      </item>
@@ -473,7 +474,8 @@
         <string>Save</string>
        </property>
        <property name="icon">
-        <iconset theme="document-save"/>
+        <iconset theme="document-save">
+         <normaloff>.</normaloff>.</iconset>
        </property>
       </widget>
      </item>
@@ -492,7 +494,8 @@
         <string>Import</string>
        </property>
        <property name="icon">
-        <iconset theme="document-import"/>
+        <iconset theme="document-import">
+         <normaloff>.</normaloff>.</iconset>
        </property>
       </widget>
      </item>
@@ -511,7 +514,8 @@
         <string>Load from file</string>
        </property>
        <property name="icon">
-        <iconset theme="document-open"/>
+        <iconset theme="document-open">
+         <normaloff>.</normaloff>.</iconset>
        </property>
       </widget>
      </item>

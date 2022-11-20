@@ -292,15 +292,20 @@ from imaging.axisutils import (axisTypeFromString,
                                 hasChannelAxis,
                                 )
 from imaging.axiscalibration import (AxesCalibration,
-                                        AxisCalibrationData, 
-                                        ChannelCalibrationData, 
-                                        CalibrationData)
+                                     AxisCalibrationData, 
+                                     ChannelCalibrationData, 
+                                     CalibrationData)
 
 from imaging.scandata import (AnalysisUnit, ScanData,)
 
 import imaging.CaTanalysis as CaTanalysis 
 if CaTanalysis.LSCaTWindow not in gui_viewers:
     gui_viewers += [CaTanalysis.LSCaTWindow]
+    
+import ephys.mPSCanalysis as mPSCanalysis
+if mPSCanalysis.MPSCAnalysis not in gui_viewers:
+    gui_viewers += [mPSCanalysis.MPSCAnalysis]
+    
 #if has_vigra:
     #from imaging import (imageprocessing as imgp, imgsim,)
     #from imaging import axisutils, vigrautils
@@ -2955,6 +2960,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #lscatWindow = CaTanalysis.LSCaTWindow(parent=self, win_title="LSCaT")
         lscatWindow.show()
         
+    @pyqtSlot()
+    @safeWrapper
+    def slot_launchMPSCDetection(self):
+        mPSCWindow = self._newViewer(mPSCanalysis.MPSCAnalysis, parent=self)
+        mPSCWindow.show()
+    
     def _getHistoryBlockAsCommand_(self, magic=None):
         cmd = ""
         selectedItems = self.historyTreeWidget.selectedItems()
@@ -3204,8 +3215,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 
             else:
                 for actionName in VTH.get_actionNames(varType):
-                    action = specialViewMenu.addAction(actionName)
-                    action.triggered.connect(self.slot_autoSelectViewer)
+                    # print(f"actionName {actionName} ({type(actionName).__name__})")
+                    if actionName is not None:
+                        action = specialViewMenu.addAction(actionName)
+                        action.triggered.connect(self.slot_autoSelectViewer)
                 
         else:
             # several variables selected
@@ -3911,9 +3924,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.applicationsMenu = QtWidgets.QMenu("Applications", self)
         self.menubar.insertMenu(self.menuHelp.menuAction(), self.applicationsMenu)
         
+        # TODO: 2022-11-20 13:18:01
+        # make applications as "plugins" and let this menu populate itself at
+        # session start
         self.CaTAnalysisAction = QtWidgets.QAction("LSCaT (CaT Analysis)", self)
         self.CaTAnalysisAction.triggered.connect(self.slot_launchCaTAnalysis)
         self.applicationsMenu.addAction(self.CaTAnalysisAction)
+        
+        self.MPSCAnalysisAction = QtWidgets.QAction("mPSC Detection", self)
+        self.MPSCAnalysisAction.triggered.connect(self.slot_launchMPSCDetection)
+        self.applicationsMenu.addAction(self.MPSCAnalysisAction)
         
         self.analyseAPtrainsAction = QtWidgets.QAction("test", self)
         self.analyseAPtrainsAction.triggered.connect(self.slot_launchTest)

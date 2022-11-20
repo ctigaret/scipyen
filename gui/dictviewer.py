@@ -529,6 +529,10 @@ class DataViewer(ScipyenViewer):
     closeMe  = pyqtSignal(int)
     signal_window_will_close = pyqtSignal()
     
+    # NOTE: 2022-11-20 22:09:07
+    # reserved for future developmet of editing capabilities TODO
+    sig_dataChanged = pyqtSignal(name = "sig_dataChanged")
+    
     # TODO: 2019-11-01 22:44:34
     # implement viewing of other data structures (e.g., viewing their __dict__
     # for the generic case, )

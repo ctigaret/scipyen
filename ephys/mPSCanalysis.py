@@ -102,7 +102,20 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._clear_events_flag_ = clearOldPSCs == True
         self._mPSC_detected_ = False
         self._data_var_name_ = None
-        self._cached_detection_ = None
+        
+        # NOTE: 2022-11-20 11:36:08
+        # For each segment in data, if there are spike trains with mPSC time
+        # stamps, store them here - see membrane.batch_mPSC() for how such a 
+        # spike train is identified
+        # Here, each element in _cached_detection_ is a possibly empty list of 
+        # spike trains (in case detection was run cumulatively, without 
+        # replacement). WARNING: this is a plain Python list, NOT a 
+        # neo.spiketrainlist.SpikeTrainList (which is the type of the segment's
+        # `spiketrains` attribute)
+        # 
+        self._cached_detection_ = list()
+        
+        
         self._use_template_ = False
         self._mPSC_template_ = None
         
@@ -436,9 +449,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.actionExport_mPSC_Template
         self.actionRemember_mPSC_Template
         self.actionForget_mPSC_Template
-        self.actionDetect_in_current_sweep.triggered.connect(self._slot_detect_sweep)
-        self.actionValidate_in_current_sweep
-        self.actionUndo_current_sweep
+        self.actionDetect_in_current_sweep.triggered.connect(self._slot_detectCurrentSweep)
+        self.actionValidate_in_current_sweep.triggered.connect(self._slot_validateSweep)
+        self.actionUndo_current_sweep.triggered.connect(self._slot_undoCurrentSweep)
         self.actionDetect.triggered.connect(self._slot_detect)
         self.actionValidate
         self.actionUndo
@@ -470,6 +483,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             for toolbar in (self.mainToolBar, self.detectionToolBar):
                 toolbar.setFloatable(not self._toolbars_locked_)
                 toolbar.setMovable(not self._toolbars_locked_)
+                
+        self.metaDataWidget.sig_valueChanged.connect(self._slot_metaDataChanged)
         
         # print(f"{self.__class__.__name__}._configureUI_ end...")
         
@@ -520,16 +535,19 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             data = kwargs.pop("data", None)
             
         if neoutils.check_ephys_data_collection(data): # and self._check_supports_parameter_type_(data):
-            self._cached_detection_ = list()
-            
             if isinstance(data, neo.Block):
+                self._cached_detection_ = [list() for s in data.segments]
                 for s in data.segments:
+                    # NOTE: 2022-11-20 11:54:02
+                    # cache any existing spike trains with PSC time stamps
+                    # as a list, at the corresponding element in self._cached_detection_
+                    # If there are none, just append an empty list to the cache!!!
                     if len(s.spiketrains):
-                        trains = [st for st in s.spiketrains if st.annotations.get("source", None)=="mPSC_detection"]
+                        trains = [st for st in s.spiketrains if st.annotations.get("source", None)=="PSC_detection"]
                         if len(trains):
-                            self._cached_detection_.append(trains[0])
-                        else:
-                            self._cached_detection_.append(None)
+                            self._cached_detection_[k].extend(trains)
+                        # else:
+                        #     self._cached_detection_.append(list())
                             
                 self._data_ = data
                 
@@ -539,7 +557,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                     time_units = pq.s
                     
                 self.durationSpinBox.units = time_units
-                        
                 
                 # NOTE: 2022-11-05 14:50:26
                 # although self._data_frames_ and self._number_of_frames_ end up
@@ -550,12 +567,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._number_of_frames_ = len(self._frameIndex_)
                             
             elif isinstance(data, neo.Segment):
+                self._cached_detection_ = [list()]
                 if len(data.spiketrains):
-                    trains = [st for st in data.spiketrains if st.annotations.get("source", None)=="mPSC_detection"]
+                    trains = [st for st in data.spiketrains if st.annotations.get("source", None)=="PSC_detection"]
                     if len(trains):
-                        self._cached_detection_.append(trains[0])
-                    else:
-                        self._cached_detection_.append(None)
+                        self._cached_detection_[0].extend(trains)
+                    # else:
+                    #     self._cached_detection_.append(list())
                             
                 self._data_ = data
                 self._data_frames_ = 1
@@ -563,13 +581,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._number_of_frames_ = len(self._frameIndex_)
                 
             elif isinstance(data, (tuple, list)) and all(isinstance(v, neo.Segment) for v in data):
-                for s in data.segments:
+                self._cached_detection_ = [list() for s in data]
+                for k,s in enumerate(data.segments):
                     if len(s.spiketrains):
-                        trains = [st for st in s.spiketrains if st.annotations.get("source", None)=="mPSC_detection"]
+                        trains = [st for st in s.spiketrains if st.annotations.get("source", None)=="PSC_detection"]
                         if len(trains):
-                            self._cached_detection_.append(trains[0])
-                        else:
-                            self._cached_detection_.append(None)
+                            self._cached_detection_[k].extend(trains)
+                        # else:
+                        #     self._cached_detection_.append(list())
                             
                 self._data_ = data
                 self._data_frames_ = len(self._data_)
@@ -598,11 +617,15 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self.metaDataWidget.dataName = name
         
+        description = getattr(self._data_, "desccription", "")
+        
+        self.metaDataWidget.dataDescription = description
+        
         self._frames_spinBoxSlider_.setRange(0, self._number_of_frames_)
         
         self._plot_data()
         
-        self._frames_spinBoxSlider_
+        # self._frames_spinBoxSlider_
         
         # NOTE: 2022-11-05 23:52:11
         # self._ephysViewer_ is not yet available when _set_data_ is called from __init__()
@@ -718,7 +741,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._waveFormViewer_.setVisible(False)
         self._detected_mPSCViewer_.clear()
         self._detected_mPSCViewer_.setVisible(False)
-        self._cached_detection_ = None
+        self._cached_detection_ = list()
         self._mPSC_detected_ = False
         # self._detection_epoch_name_ = None
         self._detection_signal_name_ = None
@@ -856,6 +879,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._generate_mPSCModelWaveform()
             return self._mPSC_model_waveform_
         
+    def _cache_sweep_detection_(self, segment_index:typing.Optional[int]=None):
+        if segment_index is None:
+            segment_index = self.currentFrame
+            
+        
+        
     def _detect_all_(self, waveform:typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]=None, **kwargs):
         """Detects mPSCs in all sweeps
         
@@ -901,10 +930,37 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                     
                     return
         
+    def _undo_sweep(self, segment_index:typing.Optional[int]=None):
+        if segment_index is None:
+            segment_index = self.currentFrame
+            
+        if segment_index not in range(len(self._cached_detection_)):
+            # just in case this happens, although it shouldn't
+            return
+        
+        segment = self._get_data_segment_(segment_index)
+        # restore the spiketrains as a spiketrainlist containing the current 
+        # non-PSC-detection spike trains and whatever is stored in the cache 
+        # for the current segment (ie., at segmentIndex = currentFrame index)
+        spikeTrains = [s for s in segment.spiketrains if s.annotations.get("source", None)!="PSC_detection"]
+        spikeTrains.extend(self._cached_detection_[self.currentFrame])
+        stl2 = neo.spiketrainlist.SpikeTrainList(spikeTrains)
+        segment.spiketrains = stl2
+        
+        
                     
     def _detect_sweep_(self, segment_index:typing.Optional[int]=None, waveform=None):
-        """ Returns a collection of detected mPSCs and the template used
-        If nothing was detected returns None, None
+        """ Returns PSC detection result (dict) and the waveform used for cross-correlation.
+        If nothing was detected returns None, None.
+        
+        NOTE For developers:
+        The function is called by 
+        • triggering `actionDetect_in_current_sweep` with the parameter `segment_index` 
+            set to the value of `self.currentFrame`.
+        • triggering `actionDetect` in a loop over all segments (with `segment_index`
+            parameter set inside the loop)
+        
+        
         """
         # TODO 2022-11-17 14:15:37
         segment = self._get_data_segment_(segment_index)
@@ -957,16 +1013,27 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             mini_waves  = detection["minis"]
             
             template = detection["waveform"]
-                    
+            
+        # NOTE: 2022-11-20 11:33:43
+        # set this here because it MAY be needed below (NOTE: 2022-11-20 11:30:15)
+        if isinstance(self._data_, neo.Block):
+            trname = f"{self._data_.name}_{segment.name}_PSCs"
+        else:
+            trname = f"{segment.name}_PSCs"
+        
+        # NOTE: 2022-11-20 11:30:15
+        # remove the previous detection if the appropriate widget is checked,
+        # REGARDLESS of whether anything was detected this time around, so that
+        # the spiketrains reflect the results of the detection with the CURRENT
+        # parameters
+        if self.clearPreviousDetectionCheckBox.isChecked():
+            self._clear_events_flag_ = True # to make sure this is up to date
+            neoutils.remove_spiketrain(segment, trname)
+
         if len(start_times):
             if isinstance(template, neo.core.basesignal.BaseSignal) and len(template.description.strip()):
                 dstring += f" using {template.description}"
                 
-            if isinstance(self._data_, neo.Block):
-                trname = f"{self._data_.name}_{segment.name}_PSCs"
-            else:
-                trname = f"{segment.name}_PSCs"
-            
             mPSCtrain = neo.SpikeTrain(start_times, t_stop = signal.t_stop, units = signal.times.units,
                                     t_start = signal.t_start, sampling_rate = signal.sampling_rate,
                                     name = trname, description=dstring)
@@ -987,18 +1054,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
             for k,w in enumerate(mini_waves):
                 fw = membrane.fit_mPSC(w, template.annotations["parameters"], lo=lo, up=up)
+                fw.annotations["t_peak"] = mPSCtrain.annotations["peak_times"][k]
                 mini_waves[k] = fw
                 
             mPSCtrain_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
             mPSCtrain.waveforms = mPSCtrain_waves.T
-            if self.clearPreviousDetectionCheckBox.isChecked():
-                self._clear_events_flag_ = True
-                
-            # print(f"clear prev {self._clear_events_flag_}")
-            if self._clear_events_flag_:
-                # remove old spike trains with mPSCs 
-                neoutils.remove_spiketrain(segment, mPSCtrain.name)
-
+            
             segment.spiketrains.append(mPSCtrain)
             
             return mini_waves, template
@@ -1014,15 +1075,35 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._slot_choosePersistentTemplateFile()
             
     @pyqtSlot()
-    def _slot_detect_sweep(self):
+    def _slot_validateSweep(self):
+        segment = self._get_data_segment_(self._data_)
+        if not isinstance(segment, neo.Segment):
+            return
+        
+        mPSCtrains = [st for st in segment.spiketrains if st.annotations.get("source", "") == "PSC_detection"]
+        
+        if len(mPSCtrains) == 0:
+            return
+            
+    @pyqtSlot()
+    def _slot_detectCurrentSweep(self):
         # refresh the template or waveform
         waveform = self._get_mPSC_template_or_waveform_()
         if waveform is None:
             self.criticalMessage("Detect mPSC in current sweep",
                                  "No mPSC waveform or template is available")
             return
+        
         detection, template = self._detect_sweep_(waveform=waveform)
         self._result_ = (detection, template)
+        self._plot_data()
+        
+    @pyqtSlot()
+    def _slot_undoCurrentSweep(self):
+        """Restores current segment spiketrains ot the state before last detection.
+        TODO: update result
+        """
+        self._undo_sweep(self.currentFrame)
         self._plot_data()
         
     @pyqtSlot()
@@ -1057,6 +1138,16 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def _slot_doneProcessing(self):
         self._plot_data()
         
+    @pyqtSlot()
+    def _slot_undoDetection(self):
+        """Restores spiketrains before detection, in all data.
+        TODO: update results
+        """
+        if isinstance(self._data_, neo.Block):
+            for k in range(len(self._data_segments_)):
+                self._undo_sweep(k)
+                
+        self._plot_data()
         
     @pyqtSlot()
     def _slot_choosePersistentTemplateFile(self):
@@ -1153,6 +1244,19 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def _slot_plotData(self):
         if self._data_ is not None:
             self._plot_data()
+            
+    @pyqtSlot()
+    def _slot_metaDataChanged(self):
+        if isinstance(self._data_, (neo.Block, neo.Segment)):
+            self._data_.name = self.metaDataWidget.dataName
+            self._data_.annotations["Source"] = self.metaDataWidget.sourceID
+            self._data_.annotations["Cell"] = self.metaDataWidget.cell
+            self._data_.annotations["Field"] = self.metaDataWidget.field
+            self._data_.annotations["Genotype"] = self.metaDataWidget.genotype
+            self._data_.annotations["Sex"] = self.metaDataWidget.sex
+            self._data_.annotations["Age"] = self.metaDataWidget.age
+            self._data_.annotations["analysis_datetime"] = self.metaDataWidget.analysisDateTime
+            
         
     @pyqtSlot(float)
     def _slot_modelDurationChanged(self, value):

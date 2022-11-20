@@ -6388,7 +6388,7 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     # 3) de-trend the cross-correlation signal (so that noise is almost about 0)
     dxc = scipy.signal.detrend(xc, type="constant", axis=0)
     
-    # 4) find out where cross-correlation is largers than its noise (root-mean-square)
+    # 4) find out where cross-correlation is larger than its noise (root-mean-square)
     flags = dxc > sigp.rms(dxc)
     
     # 5) find out starts and stops of those regions
@@ -6488,8 +6488,15 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
 
 def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), Im:typing.Union[int, str] = "IN0", epoch=None, clear_spiketrains:bool=True, fit_waves:bool=False):
     """Batch m(E/I)PSC analysis.
+    
     Detects and analyses mPSCs in a neo.Block, neo.Segment, or a sequence of 
     neo.Segment objects.
+    
+    Calls detect_mPSC for each segment in `x`, and generates a spiketrain with
+    the the stamps of the detected mPSCs. The spiketrain's annotation contain 
+    the mandatory key "source" mapped to the string "PSC_detection", in order
+    to identify this spike train among other (possible) spike trains held in the
+    segment.
     
     NOTE: a neo.Block already contains a collection of segments, see 
     neo API reference:
@@ -6518,11 +6525,11 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
     x: neo.Block or a sequence (tuple, list) of neo.Segments, where each segment
         contains:
 
-        • an analog signal identified by the `Im` parameter below, which 
+        • a neo.AnalogSignal identified by the `Im` parameter below, which 
         represents the recorded membrane current with putative miniature or 
         spontaneous post-synaptic currents (mEPSCs or mIPSCs) 
     
-        • an Epoch named "mPSC" or any name specified in the `epoh_name` parameter
+        • a neo.Epoch with the name specified in the `epoch_name` parameter
     
     waveform: numpy array (1D), or a sequence of six float scalars
         
@@ -6824,6 +6831,11 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
         
             τ₁, τ₂ = the "rise" and "decay" time constants, respectively, in [ms]
     
+        ATTENTION: Alternatively, the `params` may be an analog signal (a "template")
+            In this case, the `lo` and `up` parameters (see below) are ignored,
+            and only a R² value will be calculated between the experimental data
+            and the template.
+    
     lo, up: None, or a sequence of floats of the same length as params, with the
             the lower and upper bounds, respectively, for the model parameters.
     
@@ -6839,9 +6851,31 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
                 lo  = ( 0.,        0,        0.,     1.0e-4,   1.0e-4)
                 hi  = ( np.inf,    np.inf,   np.inf, 0.01,     0.01)
     
-    ATTENTION: the structure of the params lo and up sequences is NOT checked.  
+    WARNING: the structure of the params lo and up sequences is NOT checked.  
         If you feed garbage the function will either throw an exception, or will
         fail to give you what you want.
+    
+    Returns:
+    =======
+    An analog signal (neo.AnalogSignal) with two channels:
+    • the experimental data (the original waveform to which the fitting was performed)
+    • the fitted curve (optional; this IS NOT present when `params` is a template)
+    
+    Its `annotations` attribute (a dict) contains the following mapping:
+    • "mPSC_fit" → the fit result, an OrderedDict with the results of the 
+        fitting function, in this case: curvefitting.fit_mPSC_model, mapping:
+        ∘ "Fit"             → the result of scipy.optimize.least_squares
+        ∘ "Coefficients"    → the fitted parameters
+        ∘ "Rsq"             → The R² value of the fit (a.k.a goodness of fit)
+        ∘ "template"        → True when `params` is a template; False, otherwise
+    
+        NOTE: When `params` is a template waveform, only the "Rsq" mapping is present
+    
+    • "amplitude" → the amplitude of the original data (waveform)
+    • "fit_amplitude" → the amplitude of the fitted curve (typically, smaller 
+                    than the amplitude of the experimental waveform data, due to
+                    the noise in the latter)
+    
     """
     
     if not isinstance(x, (neo.AnalogSignal, DataSignal)):
@@ -6857,64 +6891,76 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
     
     l, c, e = sigp.state_levels(x[:,0])
     
-    # NOTE: 2022-10-27 22:53:50
-    # FYI these are:
-    # α, β, x₀, τ₁ and τ₂
-    # same structure for lower & upper bounds (respectively, lo & up)
-    params = list(params)
-    params[0] = l[1] # adapt the offset to the DC components in the waveform
-    
-    if lo is None:
-        if params[1] < 0:   # downward mPSC
-            lo = (0., -np.inf, 0., 1e-4, 1e-4)
-        else:               # upward mPSC
-            lo = (0., 0, 0., 1e-4, 1e-4)
+    if isinstance(params, neo.AnalogSignal):
+        if params.t_starts.magnitude != 0:
+            params = neoutils.set_relative_time_start(params)
             
-    if up is None:
-        if params[1] < 0:   # downward mPSC
-            up = (np.inf, 0., np.inf, 0.01, 0.01) # fix upper bounds for the time constants to 0.1.
-        else:
-            up = (np.inf, np.inf, np.inf, 0.01, 0.01) # fix upper bounds for the time constants to 0.1.
-            
-    
-    # NOTE: 2022-10-27 22:45:23
-    # Normally, the waveform has just one channel: the mPSC "cropped" out from 
-    # the signal it was detected in
-    #
-    # However, if the waveform was fitted before, the fitted curve is in the 2nd
-    # channel. To avoid appending further curves upon re-fitting, we use the 1st
-    # channel as data to fit, and overwrite the 2nd channel with the fitted curve
-    # if a 2nd channel exists, else we just append the newly fit curve as 2nd 
-    # channel
-    
-    xx = x[:,0] # this always works even if there is only one channel, 
-                # and returns an AnalogSignal
-                
-    fitresult = crvf.fit_mPSC_model(xx, params, bounds = [lo, up])
-    
-    fitted_x = type(x)(fitresult[0], units = x.units, t_start = x.t_start, sampling_rate = x.sampling_rate, name="mPSCfit")
-    
-    if x.shape[1] > 1:
-        x[:,1] = fitted_x # modifies x in-place
+        Rsq = crvf.fit_mPSC_wave(x, params)
+        x.annotations["mPSC_fit"] = {"Rsq": Rsq, "template": True}
+        x.annotations["amplitude"] = sigp.waveform_amplitude(x)
+        x.annotations["fit_amplitude"] = sigp.waveform_amplitude(params)
+        
     else:
-        for annkey in x.array_annotations:
-            if annkey == "channel_names":
-                fitted_x.array_annotations[annkey] = ["mPSCfit"]
-            elif annkey == "channel_ids":
-                fitted_x.array_annotations[annkey] = x.array_annotations[annkey][0] + "_fit"
+    
+        # NOTE: 2022-10-27 22:53:50
+        # FYI these are:
+        # α, β, x₀, τ₁ and τ₂
+        # same structure for lower & upper bounds (respectively, lo & up)
+        params = list(params)
+        params[0] = l[1] # adapt the offset to the DC components in the waveform
+        
+        if lo is None:
+            if params[1] < 0:   # downward mPSC
+                lo = (0., -np.inf, 0., 1e-4, 1e-4)
+            else:               # upward mPSC
+                lo = (0., 0, 0., 1e-4, 1e-4)
+                
+        if up is None:
+            if params[1] < 0:   # downward mPSC
+                up = (np.inf, 0., np.inf, 0.01, 0.01) # fix upper bounds for the time constants to 0.1.
             else:
-                fitted_x.array_annotations[annkey] = x.array_annotations[annkey]
+                up = (np.inf, np.inf, np.inf, 0.01, 0.01) # fix upper bounds for the time constants to 0.1.
                 
         
-        x = x.merge(fitted_x) # returns a new x
-    
-    # NOTE: 2022-10-27 22:44:50
-    # Restore the domain start of the waveform (see NOTE: 2022-10-27 22:44:40)
-    x.t_start = t_start
-    
-    x.annotations["mPSC_fit"] = fitresult[1]
-    x.annotations["amplitude"] = sigp.waveform_amplitude(x[:,0])
-    x.annotations["fit_amplitude"] = sigp.waveform_amplitude(x[:,1])
+        # NOTE: 2022-10-27 22:45:23
+        # Normally, the waveform has just one channel: the mPSC "cropped" out from 
+        # the signal it was detected in
+        #
+        # However, if the waveform was fitted before, the fitted curve is in the 2nd
+        # channel. To avoid appending further curves upon re-fitting, we use the 1st
+        # channel as data to fit, and overwrite the 2nd channel with the fitted curve
+        # if a 2nd channel exists, else we just append the newly fit curve as 2nd 
+        # channel
+        
+        xx = x[:,0] # this always works even if there is only one channel, 
+                    # and returns an AnalogSignal
+                    
+        fitresult = crvf.fit_mPSC_model(xx, params, bounds = [lo, up])
+        
+        fitted_x = type(x)(fitresult[0], units = x.units, t_start = x.t_start, sampling_rate = x.sampling_rate, name="mPSCfit")
+        
+        if x.shape[1] > 1:
+            x[:,1] = fitted_x # modifies x in-place
+        else:
+            for annkey in x.array_annotations:
+                if annkey == "channel_names":
+                    fitted_x.array_annotations[annkey] = ["mPSCfit"]
+                elif annkey == "channel_ids":
+                    fitted_x.array_annotations[annkey] = x.array_annotations[annkey][0] + "_fit"
+                else:
+                    fitted_x.array_annotations[annkey] = x.array_annotations[annkey]
+                    
+            
+            x = x.merge(fitted_x) # returns a new x
+        
+        # NOTE: 2022-10-27 22:44:50
+        # Restore the domain start of the waveform (see NOTE: 2022-10-27 22:44:40)
+        x.t_start = t_start
+        
+        x.annotations["mPSC_fit"] = fitresult[1]
+        x.annotations["mPSC_fit"]["template"] = False
+        x.annotations["amplitude"] = sigp.waveform_amplitude(x[:,0])
+        x.annotations["fit_amplitude"] = sigp.waveform_amplitude(x[:,1])
     
     return x
     

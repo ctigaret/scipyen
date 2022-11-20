@@ -1504,6 +1504,10 @@ def loadXMLFile(fileName):
         #raise OSError("File %s not found" % fileName)
 
 def loadTextFile(fileName, forceText=False):
+    """Reads a file as text, returns a string.
+    If the string contains <?xml version and forceText is False the result
+    is an xml Document.
+    """
     if os.path.isfile(fileName):
         # we may have been landed here from an Axon Text File
         root, ext = os.path.splitext(fileName)

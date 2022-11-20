@@ -1573,7 +1573,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.annotationsViewer.topLevelItem(0).setText(0, "Data")
         
     def _setup_signal_choosers_(self, analog = None, irregular = None):
-        """TODO/FIXME
+        """TODO/FIXME - where's the BUG?'
         """
         from core.utilities import unique
         sigBlock = [QtCore.QSignalBlocker(widget) for widget in (self.selectSignalComboBox, self.selectIrregularSignalComboBox)]
@@ -1605,8 +1605,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if new_ndx < 0:
                 new_ndx = 0
                 
-            #print("_setup_signal_choosers_ analog new_ndx", new_ndx)
-            
             self.selectSignalComboBox.clear()
             self.selectSignalComboBox.addItems(sig_names)
             self.selectSignalComboBox.setCurrentIndex(new_ndx)

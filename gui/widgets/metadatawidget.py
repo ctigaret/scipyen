@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Common widget for meta-information in results
 """
-import os, math, typing
+import os, math, typing, datetime
 import numpy as np
 import quantities as pq
 from core import quantities as scq
@@ -14,19 +14,25 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from PyQt5.uic import loadUiType
 
 from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
+from gui.textviewer import TextViewer
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 Ui_MetaDataWidget, QWidget = loadUiType(os.path.join(__module_path__, "metadatawidget.ui"))
 
 class MetaDataWidget(Ui_MetaDataWidget, QWidget):
-    sig_valueChanged = pyqtSlot(name="sig_valueChanged")
+    """Widget for displaying the most commonly used data attributes in Scipyen.
+    Where implemented, it also supports editing.
+    NOTE/WARNING: Under development
+    """
+    sig_valueChanged = pyqtSignal(name="sig_valueChanged")
     
     def __init__(self, parent=None, **kwargs):
         QWidget.__init__(self, parent=parent)
         
         self._dataVarName = kwargs.pop("varname", "")
         self._dataName = kwargs.pop("name", "")
+        self._dateTime = datetime.datetime.now()
         
         for name in ("sourceID","cell","field","sex","genotype"):
             val = kwargs.pop(name, pd.NA)
@@ -149,12 +155,20 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         self.triggersToolButton.triggered.connect(self._slot_editTriggers)
         self.dateTimeToolButton.triggered.connect(self._slot_editDateTime)
         self.annotationsToolButton.triggered.connect(self._slot_editAnnotations)
-        self.notesToolButton.triggered.connect(self._slot_editNotes)
+        self.notesToolButton.triggered.connect(self._slot_editDescription)
         
         self.exportToolButton.triggered.connect(self._slot_exportMetaData)
         self.saveToolButton.triggered.connect(self._slot_saveMetaData)
         self.importToolButton.triggered.connect(self._slot_importMetaData)
         self.loadToolButton.triggered.connect(self._slot_loadMetaData)
+        
+        self._descriptionEditor = TextViewer(self._data_description_, 
+                                             parent=self, edit=True, 
+                                             win_title="Edit description",
+                                             doc_title="Edit description",
+                                             title="mPSC Detect")
+        self._descriptionEditor.setVisible(False)
+        self._descriptionEditor.sig_textChanged.connect(self._slot_descriptionChanged)
         
     def value(self):
         """Returns a dict with field values takes from individual children
@@ -195,24 +209,31 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     @pyqtSlot()
     def _slot_setDataName(self):
         self._dataName = strutils.str2symbol(self.dataNameLineEdit.text())
+        self.sig_valueChanged.emit()
         
     @pyqtSlot()
     def _slot_setSourceID(self):
         self._sourceID = self.sourceIDLineEdit.text()
         if self._sourceID in ("NA", "<NA>"):
             self._sourceID = pd.NA
+            
+        self.sig_valueChanged.emit()
     
     @pyqtSlot()
     def _slot_setCell(self):
         self._cell = self.cellIDLineEdit.text()
         if self._cell in ("NA", "<NA>"):
             self._cell = pd.NA
+            
+        self.sig_valueChanged.emit()
     
     @pyqtSlot()
     def _slot_setField(self):
         self._field = self.fieldIDLineEdit.text()
         if self._field in ("NA", "<NA>"):
             self._field = pd.NA
+            
+        self.sig_valueChanged.emit()
             
     @pyqtSlot(str)
     def _slot_setGenotype(self, value:str):
@@ -228,12 +249,17 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             
         else:
             self._genotype = value
+
+        self.sig_valueChanged.emit()
             
     @pyqtSlot(float)
     def _slot_setAge(self, value):
         spinBox = self.sender()
         self._age = value * sender.units
         self._age_units = sender.units
+        
+        self.sig_valueChanged.emit()
+            
         # alternatively:
         # self._age = spinBox.value()
         # self._age_units = self._age.units
@@ -248,34 +274,61 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         else:
             self._sex = value
     
+        self.sig_valueChanged.emit()
+            
     @pyqtSlot()
     def _slot_editAnnotations(self):
         # TODO 2022-11-08 08:31:20
         # enable a scrollable view in GenericMappingDialog
         # when there are more than 5-6 entries in the mapping
         # use that to edit annotations
+        self.sig_valueChanged.emit()
+            
         print("edit annotations")
     
     @pyqtSlot()
     def _slot_editBiometrics(self):
         # TODO 2022-11-08 08:32:12
         # use GenericMappingDialog
+        self.sig_valueChanged.emit()
+            
         print("edit biometrics")
     
     @pyqtSlot()
     def _slot_editDateTime(self):
+        """Edits the date & time of analysis.
+        Recording date & time should be immutable
+        """
         # TODO 2022-11-08 08:32:23
         # create DateTimeInput widget in gui.quickdialog, use here wrapped
         # in a quickdialog
-        print("edit datetime")
-    
+        
+        from gui import quickdialog as qd
+
+        qde = QtWidgets.QDateTimeEdit(self._dateTime)
+        dfmt = qde.displayFormat()
+        dlg = qd.QuickDialog(parent=self, title = "Set analysis date and time")
+        dlg.addWidget(qde)
+        
+        ret = dlg.exec()
+        
+        if ret == QtWidgets.QDialog.Accepted:
+            self._dateTime = qde.dateTime().toPyDateTime()
+        
+        self.sig_valueChanged.emit()
+            
+        # print("edit datetime")
+        
     @pyqtSlot()
-    def _slot_editNotes(self):
-        # TODO: 
-        # create a simple (rich) text editor GUI, use here
-        # (check examples in Qt5 stack)
-        print("edit notes")
-    
+    def _slot_descriptionChanged(self):
+        self._data_description_ = self._descriptionEditor.text(True)
+        self.sig_valueChanged.emit()
+            
+    @pyqtSlot()
+    def _slot_editDescription(self):
+        self._descriptionEditor.setData(self._data_description_)
+        self._descriptionEditor.show()
+        
     @pyqtSlot()
     def _slot_editProcedures(self):
         # TODO: 2022-11-08 08:35:39 
@@ -294,6 +347,8 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         # TODO: 2022-11-08 08:37:39 (maybe)
         # create a Gantt chart-like widget viewer to include with the
         # epoch editor
+        
+        self.sig_valueChanged.emit()
         print("edit procedures")
     
     @pyqtSlot()
@@ -303,6 +358,8 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         # but with the following functions enabled conditionally: 
         #
         # trigger detection ↔ is there ephysdata available
+        
+        self.sig_valueChanged.emit()
         print("edit triggers")
     
     @pyqtSlot()
@@ -376,6 +433,17 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             self._dataVarName = ""
             
         self.dataVarNameLabel.setText(self._dataVarName)
+        
+    @property
+    def dataDescription(self):
+        return self._data_description_
+    
+    @dataDescription.setter
+    def dataDescription(self, value:typing.Optional[str] = None):
+        if value is None:
+            self._data_description_ = ""
+        else:
+            self._data_description_ = str(value)
     
     @property
     def dataName(self):
@@ -394,9 +462,11 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             self._dataName = ""
         
         self.dataNameLineEdit.setText(self._dataName)
+        
+        self.sig_valueChanged.emit()
             
     @property
-    def sourceID(self, value:str):
+    def sourceID(self):
         return self._sourceID
     
     @sourceID.setter
@@ -410,6 +480,8 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             self._sourceID = pd.NA
             
         self.sourceIDLineEdit.setText(f"{self._sourceID}")
+        
+        self.sig_valueChanged.emit()
             
     @property
     def cell(self):
@@ -426,6 +498,19 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             self._cell = pd.NA
             
         self.cellIDLineEdit.setText(f"{self._cell}")
+        
+        self.sig_valueChanged.emit()
+        
+    @property
+    def analysisDateTime(self):
+        return self._dateTime
+    
+    @analysisDateTime.setter
+    def analysisDateTime(self, value:datetime.datetime):
+        if not isinstance(value, datetime.datetime):
+            raise TypeError(f"Expecting a datetime.datetime; got {type(value).__name__} instead")
+        
+        self._dateTime = value
             
     @property
     def field(self):
@@ -442,6 +527,8 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             self._field = pd.NA
             
         self.fieldIDLineEdit.setText(f"{self._field}")
+        
+        self.sig_valueChanged.emit()
             
     @property
     def genotype(self):
@@ -475,6 +562,8 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             ndx = self._available_genotypes_.index(self._genotype)
             self.genotypeComboBox.setCurrentIndex(ndx)
             
+        self.sig_valueChanged.emit()
+        
     @property
     def sex(self):
         return self._sex
@@ -500,6 +589,8 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         signalBlocker = QtCore.QSignalBlocker(self.sexComboBox)
         self.sexComboBox.setCurrentIndex(sex_ndx)
         
+        self.sig_valueChanged.emit()
+        
     @property
     def age(self):
         return self._age
@@ -517,6 +608,8 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
 
         signalBlocker = QtCore.QSignalBlocker(self.ageSpinBox)
         self.ageSpinBox.setValue(self._age)
+        
+        self.sig_valueChanged.emit()
         
             
                 
