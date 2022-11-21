@@ -6,8 +6,9 @@ import collections, enum, numbers, typing
 from PyQt5 import (QtCore, QtGui, QtWidgets,) 
 from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
 
-import pyqtgraph as pg
-pg.Qt.lib = "PyQt5"
+# import pyqtgraph as pg
+# pg.Qt.lib = "PyQt5"
+from gui.pyqtgraph_patch import pyqtgraph as pg
 
 import numpy as np
 import quantities as pq

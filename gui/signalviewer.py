@@ -109,8 +109,9 @@ from PyQt5.uic import loadUiType as __loadUiType__
 import numpy as np
 import pandas as pd
 from pandas import NA
-import pyqtgraph as pg
-pg.Qt.lib = "PyQt5"
+# import pyqtgraph as pg
+# pg.Qt.lib = "PyQt5"
+from gui.pyqtgraph_patch import pyqtgraph as pg
 import quantities as pq
 import matplotlib as mpl
 from matplotlib import pyplot as plt
@@ -646,7 +647,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             *args, **kwargs)
         
     def _configureUI_(self):
-        """FIXME/TODO 2022-11-17 10:00:15
+        """
+        
+        NOTE: 2022-11-21 10:55:41
+        Brief description of the organisaiton of plot axes in the UI:
+        
+        • each "axis" is a pq.PlotItem; some relevant attributes :
+            ∘ vb → a pq.ViewBox
+        
+        FIXME/TODO 2022-11-17 10:00:15
         Move all UI definition to the designer UI file:
         As it currently stands, this is a hotch-potch of widget creations with
         both designer UI and manually added code.

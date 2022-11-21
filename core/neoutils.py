@@ -167,7 +167,7 @@ from neo.core.baseneo import (MergeError, merge_annotations, intersect_annotatio
                               _reference_name, _container_name)
 from neo.core.dataobject import (DataObject, ArrayDict)
 import matplotlib as mpl
-import pyqtgraph as pg
+# import pyqtgraph as pg
 
 try:
     import pyabf

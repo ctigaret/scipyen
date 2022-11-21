@@ -207,7 +207,8 @@ import numpy as np
 import quantities as pq
 import neo
 import matplotlib as mpl
-import pyqtgraph as pg
+# import pyqtgraph as pg
+from gui.pyqtgraph_patch import pyqtgraph as pg
 #### END 3rd party modules
 
 #### BEGIN pict.core modules

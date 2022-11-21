@@ -57,7 +57,8 @@ from dataclasses import MISSING
 from traitlets import Bunch
 import numpy as np
 import quantities as pq
-import pyqtgraph as pgraph
+# import pyqtgraph as pgraph
+from gui.pyqtgraph_patch import pyqtgraph as pgraph
 import neo
 import vigra
 from pandas import NA

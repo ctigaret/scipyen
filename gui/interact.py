@@ -1,8 +1,8 @@
 """A collection of functions to prompt user input using GUI
 """
 import typing, collections, dataclasses
-import pyqtgraph as pg # used throughout - based on Qt5 
-pg.Qt.lib = "PyQt5" # pre-empt the use of PyQt5
+# import pyqtgraph as pg # used throughout - based on Qt5 
+# pg.Qt.lib = "PyQt5" # pre-empt the use of PyQt5
 from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 from PyQt5.uic import loadUiType

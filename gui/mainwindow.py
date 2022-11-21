@@ -86,12 +86,13 @@ import seaborn as sb # statistical data visualization
 
 #### BEGIN migration to pyqtgraph -- setup global parameters
 # NOTE: 2019-01-24 21:40:45
-import pyqtgraph as pg # used throughout - based on Qt5 
-pg.Qt.lib = "PyQt5" # pre-empt the use of PyQt5
-# TODO make this peristent  user-modifiable configuration
-#pg.setConfigOptions(background="w", foreground="k", editorCommand="kwrite")
-pg.setConfigOptions(background="w", foreground="k", editorCommand="kate")
-#pg.setConfigOptions(editorCommand="kwrite")
+# import pyqtgraph as pg # used throughout - based on Qt5 
+# pg.Qt.lib = "PyQt5" # pre-empt the use of PyQt5
+# # TODO make this peristent  user-modifiable configuration
+# #pg.setConfigOptions(background="w", foreground="k", editorCommand="kwrite")
+# pg.setConfigOptions(background="w", foreground="k", editorCommand="kate")
+# #pg.setConfigOptions(editorCommand="kwrite")
+from gui.pyqtgraph_patch import pyqtgraph as pg
 #### END migration to pyqtgraph -- setup global parameters
 
 

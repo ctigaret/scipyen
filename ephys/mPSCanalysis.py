@@ -10,7 +10,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 import numpy as np
 import quantities as pq
 import neo
-import pyqtgraph as pg
+# import pyqtgraph as pg
 import pandas as pd
 
 from iolib import pictio as pio
@@ -1095,7 +1095,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return
         
         detection, template = self._detect_sweep_(waveform=waveform)
-        self._result_ = (detection, template)
+        self._result_ = [(detection, template)]
         self._plot_data()
         
     @pyqtSlot()

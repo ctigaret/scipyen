@@ -60,7 +60,8 @@ from copy import copy
 
 #### BEGIN 3rd party modules
 #import vigra.pyqt.quickdialog as quickdialog
-import pyqtgraph as pg
+# import pyqtgraph as pg
+from gui.pyqtgraph_patch import pyqtgraph as pg
 import numpy as np
 
 from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
