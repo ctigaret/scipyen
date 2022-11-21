@@ -107,20 +107,22 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # For each segment in data, if there are spike trains with mPSC time
         # stamps, store them here - see membrane.batch_mPSC() for how such a 
         # spike train is identified
-        # Here, each element in _cached_detection_ is a possibly empty list of 
+        # Here, each element in _undo_buffer_ is a possibly empty list of 
         # spike trains (in case detection was run cumulatively, without 
         # replacement). WARNING: this is a plain Python list, NOT a 
         # neo.spiketrainlist.SpikeTrainList (which is the type of the segment's
         # `spiketrains` attribute)
         # 
-        self._cached_detection_ = list()
+        self._undo_buffer_ = list()
+        
+        # holds onyl one round of undos
+        self._undo_buffer_= list() # FIXME 2022-11-21 17:49:05
         
         
         self._use_template_ = False
         self._mPSC_template_ = None
         
         self._data_ = None
-        # self._detection_epoch_name_ = None
         self._detection_signal_name_ = None
         self._detection_epochs_ = list()
         
@@ -536,18 +538,20 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
         if neoutils.check_ephys_data_collection(data): # and self._check_supports_parameter_type_(data):
             if isinstance(data, neo.Block):
-                self._cached_detection_ = [list() for s in data.segments]
+                self._undo_buffer_ = [list() for s in data.segments]
+                self._undo_buffer_ = [list() for s in data.segments]
+                self._result_ = [list() for s in data.segments]
                 for s in data.segments:
                     # NOTE: 2022-11-20 11:54:02
-                    # cache any existing spike trains with PSC time stamps
-                    # as a list, at the corresponding element in self._cached_detection_
+                    # store any existing spike trains with PSC time stamps
+                    # as a list, at the corresponding element in self._undo_buffer_
                     # If there are none, just append an empty list to the cache!!!
                     if len(s.spiketrains):
                         trains = [st for st in s.spiketrains if st.annotations.get("source", None)=="PSC_detection"]
                         if len(trains):
-                            self._cached_detection_[k].extend(trains)
+                            self._undo_buffer_[k].extend(trains)
                         # else:
-                        #     self._cached_detection_.append(list())
+                        #     self._undo_buffer_.append(list())
                             
                 self._data_ = data
                 
@@ -567,13 +571,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._number_of_frames_ = len(self._frameIndex_)
                             
             elif isinstance(data, neo.Segment):
-                self._cached_detection_ = [list()]
+                self._undo_buffer_ = [list()]
+                self._result_ = [list()]
                 if len(data.spiketrains):
                     trains = [st for st in data.spiketrains if st.annotations.get("source", None)=="PSC_detection"]
                     if len(trains):
-                        self._cached_detection_[0].extend(trains)
+                        self._undo_buffer_[0].extend(trains)
                     # else:
-                    #     self._cached_detection_.append(list())
+                    #     self._undo_buffer_.append(list())
                             
                 self._data_ = data
                 self._data_frames_ = 1
@@ -581,14 +586,15 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._number_of_frames_ = len(self._frameIndex_)
                 
             elif isinstance(data, (tuple, list)) and all(isinstance(v, neo.Segment) for v in data):
-                self._cached_detection_ = [list() for s in data]
+                self._undo_buffer_ = [list() for s in data]
+                self._result_ = [list() for s in data]
                 for k,s in enumerate(data.segments):
                     if len(s.spiketrains):
                         trains = [st for st in s.spiketrains if st.annotations.get("source", None)=="PSC_detection"]
                         if len(trains):
-                            self._cached_detection_[k].extend(trains)
+                            self._undo_buffer_[k].extend(trains)
                         # else:
-                        #     self._cached_detection_.append(list())
+                        #     self._undo_buffer_.append(list())
                             
                 self._data_ = data
                 self._data_frames_ = len(self._data_)
@@ -691,10 +697,15 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         else:
             return
         
-        epochnames = ["None"] + [e.name for e in segment.epochs] + ["Select..."]
+        segment_epoch_names = [e.name for e in segment.epochs]
+        epochnames = ["None"] + segment_epoch_names + ["Select..."]
         signalBlocker = QtCore.QSignalBlocker(self.epochComboBox)
         self.epochComboBox.clear()
         self.epochComboBox.addItems(epochnames)
+        if len(self._detection_epochs_) == 1:
+            if self._detection_epochs_[0] in segment_epoch_names:
+                ndx = segment_epoch_names.index(self._detection_epochs_[0])
+                self.epochComboBox.setCurrentIndex(ndx+1)
         
     def _refresh_signalNameComboBox(self, index:typing.Optional[int]=None):
         if isinstance(self._data_, neo.Block):
@@ -741,9 +752,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._waveFormViewer_.setVisible(False)
         self._detected_mPSCViewer_.clear()
         self._detected_mPSCViewer_.setVisible(False)
-        self._cached_detection_ = list()
+        self._undo_buffer_ = list()
         self._mPSC_detected_ = False
-        # self._detection_epoch_name_ = None
         self._detection_signal_name_ = None
         
         self._data_ = None
@@ -934,7 +944,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if segment_index is None:
             segment_index = self.currentFrame
             
-        if segment_index not in range(len(self._cached_detection_)):
+        if segment_index not in range(len(self._undo_buffer_)):
             # just in case this happens, although it shouldn't
             return
         
@@ -943,11 +953,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # non-PSC-detection spike trains and whatever is stored in the cache 
         # for the current segment (ie., at segmentIndex = currentFrame index)
         spikeTrains = [s for s in segment.spiketrains if s.annotations.get("source", None)!="PSC_detection"]
-        spikeTrains.extend(self._cached_detection_[self.currentFrame])
+        spikeTrains.extend(self._undo_buffer_[self.currentFrame])
         stl2 = neo.spiketrainlist.SpikeTrainList(spikeTrains)
         segment.spiketrains = stl2
-        
-        
+        self._undo_buffer_[segment_index] = 
                     
     def _detect_sweep_(self, segment_index:typing.Optional[int]=None, waveform=None):
         """ Returns PSC detection result (dict) and the waveform used for cross-correlation.
@@ -1095,7 +1104,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return
         
         detection, template = self._detect_sweep_(waveform=waveform)
-        self._result_ = [(detection, template)]
+        self._undo_buffer_[self.currentFrame] = self._result_[self.currentFrame]
+        self._result_[self.currentFrame] = (detection, template)
         self._plot_data()
         
     @pyqtSlot()
@@ -1329,12 +1339,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if not isinstance(segment, neo.Segment):
             return
         
-        existing_epoch_names = [e.name for e in segment.epochs]
-        # print(f"_slot_epochComboBoxSelectionChanged epoch names: {existing_epoch_names}")
+        segment_epoch_names = [e.name for e in segment.epochs]
+        # print(f"_slot_epochComboBoxSelectionChanged epoch names: {segment_epoch_names}")
         
-        if value == "Select..." and len(existing_epoch_names):
+        if value == "Select..." and len(segment_epoch_names):
             dialog = ItemsListDialog(parent=self, title="Select epoch(s)",
-                                     itemsList = existing_epoch_names,
+                                     itemsList = segment_epoch_names,
                                      selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
             
             # print(f"_slot_epochComboBoxSelectionChanged dialog: {dialog.__class__.__name__}")
@@ -1345,9 +1355,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._detection_epochs_.clear()
                 self._detection_epochs_ = [i for i in dialog.selectedItemsText]
             
-        elif value in existing_epoch_names:
+        elif value in segment_epoch_names:
             # print(f"_slot_epochComboBoxSelectionChanged selected: {value}")
-            
             self._detection_epochs_.clear()
             self._detection_epochs_.append(value)
             

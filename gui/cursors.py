@@ -124,7 +124,7 @@ class SignalCursor(QtCore.QObject):
                 if len(types):
                     return types[0].name
                 
-    def __init__(self, plot_item:typing.Union[pg.PlotItem, pg.GraphicsScene], x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, xwindow:float=0.0, ywindow:float=0.0, cursor_type:typing.Optional[typing.Union[str,SignalCursorTypes, tuple, list]] = None, cursorID:str="c", follower:bool=False, parent:typing.Optional[pg.GraphicsItem]=None, xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, pen:typing.Optional[QtGui.QPen]=None, hoverPen:typing.Optional[QtGui.QPen]=None, linkedPen:typing.Optional[QtGui.QPen]=None, movable_label:bool=True, show_value:bool=False, precision:int=3, **kwargs):
+    def __init__(self, plot_item:typing.Union[pg.PlotItem, pg.GraphicsScene], x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, xwindow:float=0.0, ywindow:float=0.0, cursor_type:typing.Optional[typing.Union[str,SignalCursorTypes, tuple, list]] = None, cursorID:str="c", follower:bool=False, relative:bool=False, parent:typing.Optional[pg.GraphicsItem]=None, xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, pen:typing.Optional[QtGui.QPen]=None, hoverPen:typing.Optional[QtGui.QPen]=None, linkedPen:typing.Optional[QtGui.QPen]=None, movable_label:bool=True, show_value:bool=False, precision:int=3, **kwargs):
         """ SignalCursor constructor.
             
             By default, this creates a crosshair cursor.
@@ -156,7 +156,23 @@ class SignalCursor(QtCore.QObject):
             
             cursor_ID: str; optional, default is "c"
             
-            follower
+            relative:bool, optional, default is False
+                
+                Because the cursor's coordinates and in the axes domains, when 
+                the plot item containing them changes data, the cursor MAY become
+                invisible if its coordinates fall outside the new axes domains.
+                
+                This is the default behaviour.
+            
+                This flags, when True, indicates that the cursors should stay
+                visible in the axes afte their domains have changed. This is to
+                be achieved by the user of the cursor, based on this flag, since
+                the cursor has no way of knowing that the axes domains are going
+                to change, and what the new domains are going to be.
+                
+            follower:bool, default is False.
+                When True, the cursor will follow the mouse pointer (a.k.a "dynamic"
+                cursor).
             
             parent: 
             
@@ -206,7 +222,9 @@ class SignalCursor(QtCore.QObject):
             
         self._cursorId_ = None
         
-        self._follows_mouse_ = False
+        self._relative_to_axes_ = relative
+        
+        self._follows_mouse_ = follower
         
         self._is_selected_ = False
         
@@ -262,7 +280,7 @@ class SignalCursor(QtCore.QObject):
         
         self._linked_ = False
         
-        # for static cursors only (see InifiniteLine for the logic)
+        # for static cursors only (see InfiniteLine for the logic)
         # to make the lines move in concert
         self._dragging_ = False
         
@@ -414,8 +432,16 @@ class SignalCursor(QtCore.QObject):
         self.update()
             
     def _get_plotitem_data_bounds_(self, item):
+        """Calculates actual data bounds (data domain, `X`, and data range, `Y`)
+        """
+        # NOTE: 2022-11-21 16:11:36
+        # Not relying on PlottItem.viewRange() becuase this extends outside
+        # of the data domain and data range which would allow a cursor to fall
+        # outside the data...
         plotDataItems = [i for i in item.listDataItems() if isinstance(i, pg.PlotDataItem)]
         
+        # NOTE: FIXME 2022-11-21 16:32:52
+        # code below does the same as item.viewRange() !!!
         mfun = lambda x: -np.inf if x is None else x
         pfun = lambda x: np.inf if x is None else x
         
@@ -431,8 +457,16 @@ class SignalCursor(QtCore.QObject):
         """Get the useful boundaries for cursor lines, from the host
         (unless they've been specified by caller)
         Boundaries returnes in same format as for PlotItem.viewRange()
+        
+        NOTE: Not relying on PlottItem.viewRange() becuase this extends outside
+        of the data domain and data range which would allow a cursor to fall
+        outside the data...
         """
         if isinstance(host, pg.PlotItem):
+            # NOTE: 2022-11-21 16:11:36
+            # Not relying on PlottItem.viewRange() becuase this extends outside
+            # of the data domain and data range which would allow a cursor to fall
+            # outside the data...
             return self._get_plotitem_data_bounds_(host)
         
         elif isinstance(host, pg.GraphicsScene):
@@ -559,41 +593,59 @@ class SignalCursor(QtCore.QObject):
                 self._vl_.setPos(pos.x())
                 
     def _update_labels_(self):
-        if isinstance(self._vl_, pg.InfiniteLine):
-            if isinstance(self._vl_.label, pg.InfLineLabel):
-                if self._show_value_:
-                    format_str = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_)
-                    #print(format_str)
-                    self._vl_.label.setFormat(format_str)
-                else:
-                    self._vl_.label.setFormat(self._cursorId_)
-                    
-        if isinstance(self._hl_, pg.InfiniteLine):
-            if isinstance(self._hl_.label, pg.InfLineLabel):
-                if self._show_value_:
-                    format_str = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_)
-                    self._hl_.label.setFormat(format_str)
-                else:
-                    self._hl_.label.setFormat(self._cursorId_)
+        for l in (self._hl_, self._vl_):
+            if isinstance(l, pg.InfiniteLine):
+                if isinstance(getattr(l, "label", None), pg.InfLineLabel):
+                    if self._show_value_:
+                        format_str = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_)
+                        l.label.setFormat(format_str)
+                    else:
+                        l.label.setFormat(self._cursorId_)
+                        
+#         if isinstance(self._vl_, pg.InfiniteLine):
+#             if isinstance(self._vl_.label, pg.InfLineLabel):
+#                 if self._show_value_:
+#                     format_str = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_)
+#                     #print(format_str)
+#                     self._vl_.label.setFormat(format_str)
+#                 else:
+#                     self._vl_.label.setFormat(self._cursorId_)
+#                     
+#         if isinstance(self._hl_, pg.InfiniteLine):
+#             if isinstance(self._hl_.label, pg.InfLineLabel):
+#                 if self._show_value_:
+#                     format_str = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_)
+#                     self._hl_.label.setFormat(format_str)
+#                 else:
+#                     self._hl_.label.setFormat(self._cursorId_)
                     
     def update(self):
-        if isinstance(self._vl_, pg.InfiniteLine):
-            self._vl_.update()
-            if isinstance(self._vl_.label, pg.InfLineLabel):
-                self._vl_.label.update()
-        if isinstance(self._hl_, pg.InfiniteLine):
-            self._hl_.update()
-            if isinstance(self._hl_.label, pg.InfLineLabel):
-                self._hl_.label.update()
+        for l in (self._hl_, self._vl_):
+            if isinstance(l, pg.InfiniteLine):
+                l.update()
+                if isinstance(getattr(l, "label", None), pg.InfLineLabel):
+                    l.label.update()
+        # if isinstance(self._vl_, pg.InfiniteLine):
+        #     self._vl_.update()
+        #     if isinstance(self._vl_.label, pg.InfLineLabel):
+        #         self._vl_.label.update()
+        # if isinstance(self._hl_, pg.InfiniteLine):
+        #     self._hl_.update()
+        #     if isinstance(self._hl_.label, pg.InfLineLabel):
+        #         self._hl_.label.update()
 
     def setMovableLabels(self, value):
-        if isinstance(self._vl_, pg.InfiniteLine):
-            if isinstance(self._vl_.label, pg.InfLineLabel):
-                self._vl_.label.setMovable(value==True)
-                
-        if isinstance(self._hl_, pg.InfiniteLine):
-            if isinstance(self._hl_.label, pg.InfLineLabel):
-                self._hl_.label.setMovable(value==True)
+        for l in (self._hl_, self._vl_):
+            if isinstance(l, pg.InfiniteLine):
+                if isinstance(getattr(l, "label", None), pg.InfLineLabel):
+                    l.label.setmovable(value==True)
+#         if isinstance(self._vl_, pg.InfiniteLine):
+#             if isinstance(self._vl_.label, pg.InfLineLabel):
+#                 self._vl_.label.setMovable(value==True)
+#                 
+#         if isinstance(self._hl_, pg.InfiniteLine):
+#             if isinstance(self._hl_.label, pg.InfLineLabel):
+#                 self._hl_.label.setMovable(value==True)
                 
                 
     def setShowValue(self, val:bool, precision:typing.Optional[int]=None):
@@ -624,6 +676,15 @@ class SignalCursor(QtCore.QObject):
         if not isinstance(val, int) or val < 0:
             raise TypeError("Precision must be an int > = 0; got %s instead" % val)
         self._value_precision_ = val
+        self._update_labels_()
+        
+    @property
+    def showsValue(self):
+        return self._show_value_
+    
+    @showsValue.setter
+    def showsValue(self, value:bool):
+        self._show_value_ = value == True
         self._update_labels_()
                     
     @pyqtSlot()
@@ -691,7 +752,6 @@ class SignalCursor(QtCore.QObject):
         else:
             self._x_range_ = hostBounds[0]
             
-        #if self._vl_: # ??? why doesn't this work ???
         if self._vl_ is not None:
             self._vl_.setBounds(self._x_range_)
 
@@ -714,9 +774,16 @@ class SignalCursor(QtCore.QObject):
         else:
             self._y_range_ = hostBounds[1]
             
-        #if self._hl_: #?? why doesn't this work ???
         if self._hl_ is not None:
             self._hl_.setBounds(self._y_range_)
+            
+    def yBounds(self):
+        if self._hl_ is not None:
+            return self._hl_.maxRange
+        
+    def xBounds(self):
+        if self._vl_ is not None:
+            return self._vl_.maxRange
             
     def linkTo(self, *other):
         """ Bidirectionally link this cursor to at least another one of the same type.
@@ -1529,6 +1596,65 @@ class SignalCursor(QtCore.QObject):
     def cursorTypeName(self):
         return self.cursorType.name
     
+    @property
+    def movable(self):
+        return any([l.movable if isinstance(l, pg.InfiniteLine) else False for l in (self._hl_, self._vl_)])
+    
+    @movable.setter
+    def movable(self, value:bool):
+        for l in (self._hl_, self._vl_):
+            if isinstance(l, pg.InfiniteLine):
+                l.setMovable(value==True)
+                if isinstance(getattr(l, "label", None), pg.InfLineLabel):
+                    l.label.setMovable(value==True)
+    
+    @property
+    def followsMouse(self):
+        return self._follows_mouse_
+    
+    @followsMouse.setter
+    def followsMouse(self, value:bool):
+        self._follows_mouse_ = value == True
+        
+        # for l in (self._hl_, self._vl_):
+        #     if isinstance(l, pg.InfiniteLine):
+        #         l.setMovable(self._follows_mouse_)
+        #         if isinstance(getattr(l,"label", None), pg.InfLineLabel):
+        #             l.label.setMovable(self._movable_label_)
+        
+        if self.ID is None or (isinstance(self.ID, str) and len(self.ID.strip())==0):
+            # by now self._cursor_type_ is a SignalCursor.SignalCursorTypes value
+            if self._cursor_type_ == SignalCursor.SignalCursorTypes.crosshair:
+                self.ID = "dc" if self._follows_mouse_ else "c"
+                
+            elif self._cursor_type_ == SignalCursor.SignalCursorTypes.horizontal:
+                self.ID = "dh" if self._follows_mouse_ else "h"
+        
+            else:
+                self.ID = "dv" if self._follows_mouse_ else "v"
+                
+        for l in (self._hl_, self._vl_):
+            if isinstance(l, pg.InfiniteLine):
+                if self._follows_mouse_:
+                    l.sigDragged.disconnect(self.slot_positionChanged)
+                    l.sigPositionChanged.disconnect(self.slot_positionChanged)
+                    l.sigPositionChangeFinished.disconnect(self.slot_positionChanged)
+                else:                    
+                    l.sigDragged.connect(self.slot_positionChanged)
+                    l.sigPositionChanged.connect(self.slot_positionChanged)
+                    l.sigPositionChangeFinished.connect(self.slot_positionChanged)
+                    self.hostScene.sigMouseMoved.connect(self._slot_mouse_event_)
+        
+        # self._cursorId_ = cursorID
+        
+    @property
+    def staysInAxes(self):
+        return self._relative_to_axes_
+    
+    @staysInAxes.setter
+    def staysInAxes(self, value:bool):
+        self._relative_to_axes_ = value == True
+        
     @property
     def cursorType(self):
         lines_tuple = (self._hl_ is not None, self._vl_ is not None)

@@ -2878,6 +2878,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                    hoverPen=hoverPen,
                                    parent = self, 
                                    follower = follows_mouse, 
+                                   relative = True,
                                    xBounds = xBounds,
                                    yBounds = yBounds,
                                    precision = precision,
@@ -3399,7 +3400,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         namePrompt.variable.undoAvailable=True
         
         d.namePrompt = namePrompt
-        
+       
         if cursor is not None:
             if cursor.cursorTypeName in ("vertical", "crosshair"):
                 promptX = qd.FloatInput(d, "X coordinate:")
@@ -3460,10 +3461,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
             d.promptYWindow = promptYWindow
                 
-            
         if not isinstance(crsId, str): # populate dialog fields w/ data
             crsId = [c for c in self._data_cursors_.keys()][0]
             
+        d.staysInAxesCheckBox = qd.CheckBox(d, "Stays in axis")
+        d.followMouseCheckBox = qd.CheckBox(d, "Follow Mouse")
+        d.showsValueCheckBox = qd.CheckBox(d, "Label shows value")
+        
         self._slot_updateCursorEditorDlg_(crsId, d)
             
         if d.exec() == QtWidgets.QDialog.Accepted:
@@ -3507,6 +3511,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 cursor.y = d.promptY.value()
                 cursor.ywindow = d.promptYWindow.value()
                 
+            cursor.staysInAxes  = d.staysInAxesCheckBox.isChecked()
+            cursor.followsMouse = d.followMouseCheckBox.isChecked()
+            cursor.showsValue   = d.showsValueCheckBox.isChecked()
+            
         if hasattr(d, "cursorComboBox"):
             d.cursorComboBox.disconnect()
                 
@@ -3515,7 +3523,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot(str)
     @safeWrapper
     def _slot_updateCursorEditorDlg_(self, cid, d):
-        
         if not isinstance(cid, str) or len(cid.strip()) == 0:
             if hasattr(d, "cursorComboBox"):
                 if d.cursorComboBox.variable.count() == 0:
@@ -3587,6 +3594,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 d.promptYWindow.variable.setEnabled(True)
                 d.promptYWindow.setValue(c.ywindow)
                 
+        if hasattr(d, "followMouseCheckBox"):
+            d.followMouseCheckBox.setChecked(c.followsMouse)
+            
+        if hasattr(d, "staysInAxesCheckBox"):
+            d.staysInAxesCheckBox.setChecked(c.staysInAxes)
+            
+        if hasattr(d, "showsValueCheckBox"):
+            d.showsValueCheckBox.setChecked(c.showsValue)
             
     @pyqtSlot()
     @safeWrapper
@@ -6160,12 +6175,43 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
         self._update_annotations_()
         
-        # finally, reset the curors bound for all axes
-        for k in range(len(self.axes)):
-            for c in self.cursorsInAxis(k):
-                c.setBounds()
-            
+        # finally, check if cusors want to stay in axis or stay with the domain
+        mfun = lambda x: -np.inf if x is None else x
+        pfun = lambda x: np.inf if x is None else x
         
+        for k, ax in enumerate(self.axes):
+            # TODO 2022-11-21 14:46:42 complete below
+            # FIXME: 2022-11-21 16:33:14
+            # code below does the same as ax.viewRange() !!!
+            plotDataItems = [i for i in ax.listDataItems()]
+            
+            dataxmin = min(map(mfun, [p.dataBounds(0)[0] for p in plotDataItems]))
+            dataxmax = max(map(pfun, [p.dataBounds(0)[1] for p in plotDataItems]))
+                    
+            dataymin = min(map(mfun, [p.dataBounds(1)[0] for p in plotDataItems]))
+            dataymax = max(map(pfun, [p.dataBounds(1)[1] for p in plotDataItems]))
+            
+            # if k in self._cached_cursors_:
+            #     for cursor in self._cached_cursors_[k]:
+            #         if cursor.x < dataxmin or cursor.x > dataxmax:
+            #             newX = 
+                
+            for c in self.cursorsInAxis(k):
+                if not c.staysInAxes:
+                    continue
+                
+                if not c.isHorizontal:
+                    relX = c.x-c.xBounds()[0]
+                    c.setBounds()
+                    c.x = dataxmin + relX
+                else:
+                    relX = 0
+                    
+                if not c.isVertical:
+                    relY = c.y - c.yBounds()[0]
+                    c.setBounds()
+                    c.y = dataymin+relY
+                    
     @safeWrapper
     def _plotSpikeTrains_(self, trains:typing.Optional[typing.Union[neo.SpikeTrain, tuple, list]] = None, clear:bool = False, **kwargs):
         """Plots stand-alone spike trains.
@@ -7216,7 +7262,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # see NOTE: 2019-03-08 13:20:50
             self._cached_cursors_[k] = cursors
                             
-        plotItem.vb.close()
+        # plotItem.vb.close()
         plotItem.close()
         self.signalsLayout.removeItem(plotItem)
            
@@ -7240,7 +7286,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             sigNames = ["signal_%d" % k for k in range(nRequiredAxes)]
             
         if nRequiredAxes == len(plotitems):
-            #### requires as many axes as there already are
+            #### requires as many axes as there already are;
             # number of axes not to be changed -- just update the names of the plotitems
             # see NOTE: 2019-03-07 09:53:38
             for k in range(len(plotitems)):
@@ -7267,6 +7313,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             sid = id(plotitem.vb)
                             plotitem.vb.destroyed.connect(lambda: plotitem.vb.forgetView(sid, name) if (plotitem.vb is not None and 'sid' in locals() and 'name' in locals()) else None)
                             
+                    # deal with any cursors that may exist here:
+                    cursors = self.cursorsInAxis(plotitem)
+                    self._cached_cursors_[k] = cursors
+                        
             return
             
         if nRequiredAxes == 0:
