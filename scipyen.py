@@ -38,6 +38,7 @@ if sys.platform == "win32" and sys.version_info.minor >= 9:
 #### BEGIN 3rd party modules
 
 from PyQt5 import (QtCore, QtWidgets, QtGui, )
+import sip
 #### END 3rd party modules
 
 #### BEGIN Scipyen modules
@@ -91,7 +92,7 @@ def main():
     faulthandler.enable()
 
     # NOTE: 2021-08-17 10:02:20
-    # thsi did not improve / prevent crashes when exiting NEURON - leave here so
+    # this does not prevent crashes when exiting NEURON - leave here so
     # that we know we tried and didn't work
     #if sys.platform == "linux":
         #import subprocess
@@ -100,7 +101,7 @@ def main():
     #sip.setdestroyonexit(True)
 
     try:
-        #sip.setdestroyonexit(False) # better leave to default
+        sip.setdestroyonexit(True) # better leave to default
         
         # NOTE: 2021-08-17 10:07:11 is this needed?
         QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)

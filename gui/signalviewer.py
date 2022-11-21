@@ -650,10 +650,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         
         NOTE: 2022-11-21 10:55:41
-        Brief description of the organisaiton of plot axes in the UI:
+        Brief description of the organisation of plot axes in the UI (to be completed):
+        
+        • all plots are contained in a pyqtgraph.GraphicsLayoutWidget which is 
+            contained in the generic QWidget self.viewerWidgetContainer
         
         • each "axis" is a pq.PlotItem; some relevant attributes :
             ∘ vb → a pq.ViewBox
+        • the axes are contained in 
+            ∘ contained in self.signalsLayout - a pg.GraphicsLayout()
+            ∘ 
+        
         
         FIXME/TODO 2022-11-17 10:00:15
         Move all UI definition to the designer UI file:
@@ -1436,6 +1443,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     @safeWrapper
     def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list], axis:typing.Optional[int]=None, **kwargs):
+        """For plotting events and spike trains on their own (separate) axis
+        Epochs & DataZones are represented as regions between vertical lines 
+        across all axes, and therefore they are not dealt with, here.
+        """
         if len(entities) == 0:
             return
         
@@ -1518,9 +1529,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                             symbol="event", 
                                             symbolcolorcycle=symbolcolors)
                 
-                entities_axis.axes["left"]["item"].setPen(None)
-                entities_axis.axes["left"]["item"].setLabel("Events", **labelStyle)
-                entities_axis.axes["left"]["item"].setStyle(showValues=False)
+                yLabel = "Events"
+                # entities_axis.axes["left"]["item"].setPen(None)
+                # entities_axis.axes["left"]["item"].setLabel(yLabel, **labelStyle)
+                # entities_axis.axes["left"]["item"].setStyle(showValues=False)
                 
             elif all(isinstance(v, neo.SpikeTrain) for v in entities_list):
                 trains_x_list = list()
@@ -1551,10 +1563,21 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                                 pen=None, name=data_name,
                                                 symbolPen=QtGui.QPen(QtGui.QColor(next(symbolcolors))))
                         
-                entities_axis.axes["left"]["item"].setPen(None)
-                entities_axis.axes["left"]["item"].setLabel("Spike Trains", **labelStyle)
-                entities_axis.axes["left"]["item"].setStyle(showValues=False)
+                yLabel = "Spike Trains"
+                # entities_axis.axes["left"]["item"].setPen(None)
+                # entities_axis.axes["left"]["item"].setLabel("Spike Trains", **labelStyle)
+                # entities_axis.axes["left"]["item"].setStyle(showValues=False)
                 
+            else:
+                return
+                
+            # NOTE: 2022-11-21 14:15:17
+            # this will PREVENT the dispay of Y grid lines (not essential, because
+            # the data plotted here has NO mangnitude information, unlike signals)
+            entities_axis.axes["left"]["item"].setPen(None)
+            entities_axis.axes["left"]["item"].setLabel(yLabel, **labelStyle)
+            entities_axis.axes["left"]["item"].setStyle(showValues=False)
+            
         except:
             traceback.print_exc()
         
@@ -6501,7 +6524,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         nIrregAxes = len(selected_irregs)
         
-        nAxes = nAnalogAxes + nIrregAxes
+        nRequiredAxes = nAnalogAxes + nIrregAxes
         # END   initial set up axes
         
         signames = selected_analog_names + selected_irregs_names # required for prepare axes and caching of cursors (see comments in _prepareAxes_())
@@ -6513,7 +6536,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # with separateSignalChannels set to True
         spiketrains = get_non_empty_spike_trains(seg.spiketrains)
         if len(spiketrains):
-            nAxes += 1
+            nRequiredAxes += 1
             signames += ["spike trains"]
         # END   prepare to plot spike trains
         
@@ -6521,12 +6544,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         events = get_non_empty_events(seg.events)
         
         if isinstance(events, (tuple, list)) and len(events):
-            nAxes += 1
+            nRequiredAxes += 1
             signames += ["events"]
         # END   prepare to plot events
            
         # BEGIN finalize set up axes
-        self._prepareAxes_(nAxes, sigNames=signames)
+        self._prepareAxes_(nRequiredAxes, sigNames=signames)
         
         axes = self.plotItems
         # END   finalize set up axes
@@ -6692,7 +6715,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         for k_ax in range(0, kAx-1):
             plotitem = self.signalsLayout.getItem(k_ax,0)
             if isinstance(plotitem, pg.PlotItem):
-                self.signalsLayout.getItem(k_ax,0).hideAxis("bottom")
+                # self.signalsLayout.getItem(k_ax,0).hideAxis("bottom")
+                # NOTE: 2022-11-21 13:32:52
+                # completely hiding the bottom axis prevents grid display on X
+                # because in PyQtGraph the grid is made of extended tickmarks;
+                # therefore keep this axis showing, but without axis label and
+                # without values attached to th tick marks
+                self.signalsLayout.getItem(k_ax,0).getAxis("bottom").showLabel(False)
+                self.signalsLayout.getItem(k_ax,0).getAxis("bottom").setStyle(showValues=False)
         
         if not isinstance(plotTitle, str) or len(plotTitle.strip()) == 0:
             if isinstance(seg.name, str) and len(seg.name.strip()):
@@ -6971,9 +7001,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
         
         return xx, yy
-    
-    def _generate_plot_data_items_(self, x, y, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
-        pass
+#     
+#     def _generate_plot_data_items_(self, x, y, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
+#         # TODO ?!?
+#         pass
                     
     @safeWrapper
     def _plot_numeric_data_(self, plotItem: pg.PlotItem, x:np.ndarray, y:np.ndarray, xlabel:(str, type(None))=None, ylabel:(str, type(None))=None, title:(str, type(None))=None, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
@@ -7149,8 +7180,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     else:
                         kwargs["symbolPen"] = symbolPen # same symbol pen as defined above!
                         
-                #print("xx.shape", xx.shape, "yy.shape", y.shape)
-                    
                 if k < len(plotDataItems):
                     plotDataItems[k].clear()
                     plotDataItems[k].setData(x = xx, y = yy, **kwargs)
@@ -7165,11 +7194,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         plotItem.replot()
         
-#         plotItemCursors = self.cursorsInAxis(plotItem)
-#         
-#         for c in plotItemCursors:
-#             c.setBounds()
-            
         if plotItem is self._current_plot_item_:
             lbl = "<B>%s</B>" % self._current_plot_item_.axes["left"]["item"].labelText
             self._current_plot_item_.setLabel("left", lbl)
@@ -7182,10 +7206,23 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 plotItem.setLabel("left", lbl)
         
         return plotItem
+    
+    def _remove_axes_(self, plotItem:pg.PlotItem):
+        cursors = self.cursorsInAxis(plotItem)
+        if len(cursors):
+            for cursor in cursors:
+                cursor.detach() # option (b)
+
+            # see NOTE: 2019-03-08 13:20:50
+            self._cached_cursors_[k] = cursors
+                            
+        plotItem.vb.close()
+        plotItem.close()
+        self.signalsLayout.removeItem(plotItem)
            
     @safeWrapper
-    def _prepareAxes_(self, nAxes, sigNames=list()):
-        """sigNames: a sequence of str or None objects - either empty, or with as many elements as nAxes
+    def _prepareAxes_(self, nRequiredAxes, sigNames=list()):
+        """sigNames: a sequence of str or None objects - either empty, or with as many elements as nRequiredAxes
         """
         plotitems = self.plotItems
         
@@ -7193,16 +7230,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             raise TypeError("Expecting sigNames to be a sequence; got %s instead" % type(sigNames).__name__)
         
         if len(sigNames):
-            if len(sigNames) != nAxes:
-                raise ValueError("mismatch between number of signal names in sigNames (%d) and the number of new axes (%d))" % (len(sigNames), nAxes))
+            if len(sigNames) != nRequiredAxes:
+                raise ValueError("mismatch between number of signal names in sigNames (%d) and the number of new axes (%d))" % (len(sigNames), nRequiredAxes))
             
             elif not all([isinstance(s, (str, type(None))) for s in sigNames]):
                 raise TypeError("sigNames sequence must contain only strings, or None objects")
             
         else: # enforce naming of plot items!!!
-            sigNames = ["signal_%d" % k for k in range(nAxes)]
+            sigNames = ["signal_%d" % k for k in range(nRequiredAxes)]
             
-        if nAxes == len(plotitems):
+        if nRequiredAxes == len(plotitems):
             #### requires as many axes as there already are
             # number of axes not to be changed -- just update the names of the plotitems
             # see NOTE: 2019-03-07 09:53:38
@@ -7232,7 +7269,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             
             return
             
-        if nAxes == 0:
+        if nRequiredAxes == 0:
             # no axes required => clear all plots
             if len(plotitems):
                 cursors = [c for c in self.crosshairSignalCursors.values()] + \
@@ -7252,7 +7289,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 #self.signalsLayout.clear()
                 
             for plotitem in plotitems:
-                self.signalsLayout.removeItem(plotitem)
+                self._remove_axes_(plotitem)
+                # self.signalsLayout.removeItem(plotitem)
                 
             self._plot_names_.clear()
                 
@@ -7263,12 +7301,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._cached_cursors_.clear()
             
         else:   # FIXME there are issues with ViewBox being deleted in pyqtgraph!
-            if nAxes < len(plotitems):
+            if nRequiredAxes < len(plotitems):
                 #### requires fewer axes than there currently are:
                 # adapt existing plotitems then remove extra axes (plot items)
                 
                 #### BEGIN adapt existing plot items
-                for k in range(nAxes): 
+                for k in range(nRequiredAxes): 
                     plotitem = self.signalsLayout.getItem(k, 0)
                     self._plot_names_[k] = sigNames[k]
                     # make sure no cached cursors exist for these plotitems
@@ -7333,7 +7371,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 # then attached the cached cursors to the corresponding (new) plot item
                 
                 #### BEGIN remove extra plot items
-                for k in range(nAxes, len(plotitems)):
+                for k in range(nRequiredAxes, len(plotitems)):
                     plotitem = self.signalsLayout.getItem(k, 0)
                     
                     if isinstance(plotitem, pg.PlotItem):# and plotitem in self.__plot_items__:
@@ -7346,12 +7384,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
                             # see NOTE: 2019-03-08 13:20:50
                             self._cached_cursors_[k] = cursors
-                                
-                        self.signalsLayout.removeItem(plotitem)
+                            
+                        self._remove_axes_(plotitem)
                         self._plot_names_.pop(k, None)
                 #### END remove extra plot items
                 
-            elif nAxes > len(plotitems):
+            elif nRequiredAxes > len(plotitems):
                 # requires more axes that there actually are:
                 # adapt existing plotitems then add new axes
                 
@@ -7364,7 +7402,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self._cached_cursors_.pop(k, None)
                     
                     # NOTE 2019-09-15 18:53:40:
-                    # FIXME: this creates a nasty flicker but is we don't call
+                    # FIXME: this creates a nasty flicker but if we don't call
                     # it we'll get a nasty stacking of curves
                     plotitem.clear()
                     
@@ -7386,7 +7424,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 #### END adapt existing plot items
                 
                 #### BEGIN add more plotitems as required
-                for k in range(len(plotitems), nAxes):
+                for k in range(len(plotitems), nRequiredAxes):
                     plotitem = self.signalsLayout.addPlot(row=k, col=0)
                     plotitem.register(sigNames[k])
                     self._plot_names_[k] = sigNames[k]
@@ -7419,7 +7457,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if self.signalsLayout.scene() is not None:
                 self.signalsLayout.scene().sigMouseClicked.connect(self._slot_mouseClickSelectPlotItem)
                 
-            if nAxes == 1:
+            if nRequiredAxes == 1:
                 p = self.signalsLayout.getItem(0,0)
                 #reattach multi-axes cursors
                 for c in [c for c in self._data_cursors_.values() if c.isDynamic]:
