@@ -112,10 +112,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # replacement). WARNING: this is a plain Python list, NOT a 
         # neo.spiketrainlist.SpikeTrainList (which is the type of the segment's
         # `spiketrains` attribute)
-        # 
-        self._undo_buffer_ = list()
+        # self._undo_buffer_ = list()
         
-        # holds onyl one round of undos
+        # holds only one round of undos
+        # this list hasone element for each segment in data;
+        # when detection is performed in a segment, any PSC_detection spiketrain 
+        # that exists in the segment is copied to the buffer's element corresponding
+        # to the segmennt; for it to be recalled when an "undo" operation
         self._undo_buffer_= list() # FIXME 2022-11-21 17:49:05
         
         
@@ -956,7 +959,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         spikeTrains.extend(self._undo_buffer_[self.currentFrame])
         stl2 = neo.spiketrainlist.SpikeTrainList(spikeTrains)
         segment.spiketrains = stl2
-        self._undo_buffer_[segment_index] = 
+        # self._undo_buffer_[segment_index] = 
                     
     def _detect_sweep_(self, segment_index:typing.Optional[int]=None, waveform=None):
         """ Returns PSC detection result (dict) and the waveform used for cross-correlation.

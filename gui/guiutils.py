@@ -7,6 +7,7 @@ from gui.painting_shared import (FontStyleType, standardQtFontStyles,
                                  FontWeightType, standardQtFontWeights)
 
 import quantities as pq
+from gui.pyqtgraph_patch import pyqtgraph as pg
 
 class UnitsStringValidator(QtGui.QValidator):
     def __init__(self, parent=None):
@@ -19,6 +20,28 @@ class UnitsStringValidator(QtGui.QValidator):
         
         except:
             return QtGui.QValidator.Invalid
+        
+def getPlotItemDataBoundaries(item:pg.PlotItem):
+    """Calculates actual data bounds (data domain, `X`, and data range, `Y`)
+    NOTE: 2022-11-21 16:11:36
+    Unless there is data plotted, this does not rely on PlotItem.viewRange()  
+    because this extends outside of the data domain and data range.
+    """
+    plotDataItems = [i for i in item.listDataItems() if isinstance(i, pg.PlotDataItem)]
+    if len(plotDataItems) == 0: # no data plotted
+        [[xmin, xmax], [ymin,ymax]] = item.viewRange()
+    else:
+        mfun = lambda x: -np.inf if x is None else x
+        pfun = lambda x: np.inf if x is None else x
+        
+        xmin = min(map(mfun, [min(p.xData) for p in plotDataItems]))
+        xmax = max(map(pfun, [max(p.xData) for p in plotDataItems]))
+                
+        ymin = min(map(mfun, [min(p.yData) for p in plotDataItems]))
+        ymax = max(map(pfun, [max(p.yData) for p in plotDataItems]))
+            
+    return [[xmin, xmax], [ymin, ymax]]
+    
         
 def get_QDoubleSpinBox_params(x:typing.Sequence):
     """Return stepSize and decimals for a QDoubleSpinBox given x.

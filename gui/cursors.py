@@ -9,6 +9,7 @@ from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
 # import pyqtgraph as pg
 # pg.Qt.lib = "PyQt5"
 from gui.pyqtgraph_patch import pyqtgraph as pg
+from gui import guiutils as guiutils
 
 import numpy as np
 import quantities as pq
@@ -431,43 +432,28 @@ class SignalCursor(QtCore.QObject):
         
         self.update()
             
-    def _get_plotitem_data_bounds_(self, item):
-        """Calculates actual data bounds (data domain, `X`, and data range, `Y`)
-        """
-        # NOTE: 2022-11-21 16:11:36
-        # Not relying on PlottItem.viewRange() becuase this extends outside
-        # of the data domain and data range which would allow a cursor to fall
-        # outside the data...
-        plotDataItems = [i for i in item.listDataItems() if isinstance(i, pg.PlotDataItem)]
-        
-        # NOTE: FIXME 2022-11-21 16:32:52
-        # code below does the same as item.viewRange() !!!
-        mfun = lambda x: -np.inf if x is None else x
-        pfun = lambda x: np.inf if x is None else x
-        
-        xmin = min(map(mfun, [p.dataBounds(0)[0] for p in plotDataItems]))
-        xmax = max(map(pfun, [p.dataBounds(0)[1] for p in plotDataItems]))
-                
-        ymin = min(map(mfun, [p.dataBounds(1)[0] for p in plotDataItems]))
-        ymax = max(map(pfun, [p.dataBounds(1)[1] for p in plotDataItems]))
-                
-        return [[xmin, xmax], [ymin, ymax]]
-        
     def _get_host_boundaries_(self, host):
         """Get the useful boundaries for cursor lines, from the host
         (unless they've been specified by caller)
-        Boundaries returnes in same format as for PlotItem.viewRange()
+        Boundaries are returned in the same format as from PlotItem.viewRange()
         
-        NOTE: Not relying on PlottItem.viewRange() becuase this extends outside
-        of the data domain and data range which would allow a cursor to fall
-        outside the data...
+        NOTE: 2022-11-21 22:04:49
+        Unless there is data plotted, this function does not rely on 
+        PlotItem.viewRange(), because this usually extends outside of the data 
+        domain and range, and thus would allow a cursor to fall outside the 
+        data...
+        
+        One should always check cursor's boundaries and coordinates against the 
+        data domain and range.
+        
         """
         if isinstance(host, pg.PlotItem):
             # NOTE: 2022-11-21 16:11:36
-            # Not relying on PlottItem.viewRange() becuase this extends outside
-            # of the data domain and data range which would allow a cursor to fall
-            # outside the data...
-            return self._get_plotitem_data_bounds_(host)
+            # Unless there is data plotted, this does not rely on PlotItem.viewRange()  
+            # because this extends outside of the data domain and data range which
+            # would allow a cursor to fall outside the data...
+            return guiutils.getPlotItemDataBoundaries(host)
+            # return self._get_plotitem_data_bounds_(host)
         
         elif isinstance(host, pg.GraphicsScene):
             # host is a graphics scene when the cursor is intended to span
@@ -539,6 +525,7 @@ class SignalCursor(QtCore.QObject):
         if isinstance(self._host_graphics_item_, pg.PlotItem):
             self._vl_.setPos(val)
             self._x_ = self._vl_.getXPos()
+            # print(f"{self.ID} _update_vline_position_ val = {val}, self._x_ = {self._x_}")
             
         else:
             if plotitem is None:
@@ -549,6 +536,7 @@ class SignalCursor(QtCore.QObject):
             
             new_X = plotItem.vb.mapViewToScene(QtCore.QPointF(val, 0.0)).x()
             
+            # print(f"{self.ID} _update_vline_position_ val = {val}, new_X = {newX}")
             if self._vl_ is not None:
                 self._vl_.setXPos(new_X)
                 self._x_ = self._vl_.getXPos()
@@ -733,6 +721,7 @@ class SignalCursor(QtCore.QObject):
             
         hostBounds = self._get_host_boundaries_(host) # [[xmin, xmax], [ymin, ymax]]
         
+        # set bounds for vertical line:
         if isinstance(xBounds, (tuple, list)) and len(xBounds) == 2:
             if all([isinstance(v, numbers.Number) for v in xBounds]):
                 self._x_range_ = xBounds
@@ -755,6 +744,7 @@ class SignalCursor(QtCore.QObject):
         if self._vl_ is not None:
             self._vl_.setBounds(self._x_range_)
 
+        # set bounds for horizontal line:
         if isinstance(yBounds, (tuple, list)) and len(yBounds) == 2:
             if all([isinstance(v, numbers.Number) for v in yBounds]):
                 self._y_range_ = yBounds

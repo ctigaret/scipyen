@@ -112,6 +112,7 @@ from pandas import NA
 # import pyqtgraph as pg
 # pg.Qt.lib = "PyQt5"
 from gui.pyqtgraph_patch import pyqtgraph as pg
+from gui import guiutils as guiutils
 import quantities as pq
 import matplotlib as mpl
 from matplotlib import pyplot as plt
@@ -976,11 +977,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("CursorsShowValue")
     @cursorsShowValue.setter
     def cursorsShowValue(self, val):
-        self._cursorsShowValue_ = val is True
+        self._cursorsShowValue_ = val == True
         signal_blocker = QtCore.QSignalBlocker(self.setCursorsShowValue)
         self.setCursorsShowValue.setChecked(self._cursorsShowValue_)
         for c in self.cursors:
             c.setShowValue(self._cursorsShowValue_, self._cursorLabelPrecision_)
+            
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits["CursorsShowValue"] = self._cursorsShowValue_
             
@@ -1939,7 +1941,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         # NOTE: 2020-02-26 14:23:40
         # creates the cursor DIRECTLY at the specified coordinates
-        kwargs["show_value"] = self.setCursorsShowValue.isChecked() == True
+        kwargs["show_value"] = self._cursorsShowValue_ == True
         
         crsID = self._addCursor_(cursor_type = cursorType,
                                 x = x, y = y, xwindow = xwindow, ywindow = ywindow,
@@ -2714,7 +2716,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if axis not in self.signalsLayout.items:
                 return
             
-            view_range = axis.viewRange() #  [[xmin, xmax], [ymin, ymax]]
+            # NOTE: don't use viewRange unless there is no data plotted
+            # guiutils.getPlotItemDataBoundaries retrieved the actual data 
+            # boundaries if there is any dtaa plotted, else returns the stock
+            # axis.viewRange()
+            view_range = guiutils.getPlotItemDataBoundaries(axis)
+#             pdis = [i for i in axis.listDataItems() if isinstance(i, pg.PlotDataItem)]
+#             if len(pdis) == 0:
+#                 view_range = axis.viewRange() #  [[xmin, xmax], [ymin, ymax]]
+#             else:
+#                 
             
             
             if x is None:
@@ -6175,21 +6186,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
         self._update_annotations_()
         
-        # finally, check if cusors want to stay in axis or stay with the domain
+        # finally, check if cursors want to stay in axis or stay with the domain
+        # and act accordingly
         mfun = lambda x: -np.inf if x is None else x
         pfun = lambda x: np.inf if x is None else x
         
         for k, ax in enumerate(self.axes):
-            # TODO 2022-11-21 14:46:42 complete below
-            # FIXME: 2022-11-21 16:33:14
-            # code below does the same as ax.viewRange() !!!
-            plotDataItems = [i for i in ax.listDataItems()]
-            
-            dataxmin = min(map(mfun, [p.dataBounds(0)[0] for p in plotDataItems]))
-            dataxmax = max(map(pfun, [p.dataBounds(0)[1] for p in plotDataItems]))
-                    
-            dataymin = min(map(mfun, [p.dataBounds(1)[0] for p in plotDataItems]))
-            dataymax = max(map(pfun, [p.dataBounds(1)[1] for p in plotDataItems]))
+            [[dataxmin, dataxmax], [dataymin, dataymax]] = guiutils.getPlotItemDataBoundaries(ax)
             
             # if k in self._cached_cursors_:
             #     for cursor in self._cached_cursors_[k]:
@@ -6201,11 +6204,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     continue
                 
                 if not c.isHorizontal:
-                    relX = c.x-c.xBounds()[0]
+                    relX = c.x - c.xBounds()[0]
                     c.setBounds()
                     c.x = dataxmin + relX
-                else:
-                    relX = 0
                     
                 if not c.isVertical:
                     relY = c.y - c.yBounds()[0]
