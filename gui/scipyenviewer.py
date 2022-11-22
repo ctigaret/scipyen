@@ -122,7 +122,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     by default, in that specialized viewer, instead of DataViewer.
     """
     sig_activated           = pyqtSignal(int, name="sig_activated")
-    sig_closeMe             = pyqtSignal(int)
+    sig_closeMe             = pyqtSignal()
     
     supported_types = (object, )
     view_action_name = None
@@ -533,13 +533,13 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def docTitle(self, value: (str, type(None)) = None):
         """Sets the display name of the data.
         
-        This is part of the pattern "document - window" used in the window title.
+        This is the "document" part of the pattern "document - window" used in the window title.
         
         Parameters:
         ----------
         value: str or None (default)
         
-            When None or an empty str, the data siaplay name will be removed from
+            When None or an empty str, the data display name will be removed from
             the window title.
             
             Calls self.update_title()
@@ -569,7 +569,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.saveSettings()
         # NOTE: 2021-07-08 12:07:35
         # also de-register the viewer with Scipyen's main window, if this viewer
-        # is NOT a client (child) of another Scypen app (e.g. LSCaTWindow)
+        # is NOT a client (child) of another Scipyen app (e.g. LSCaTWindow)
         
         if self.isTopLevel:
             # NOTE: 2021-07-11 09:48:50
@@ -587,7 +587,17 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # if self.close():
             #     evt.accept()
             # return
-            
+#             
+#             if self.close():
+#                 evt.accept()
+#             else:
+#                 evt.ignore()
+                
+        else:
+            self.sig_closeMe.emit()
+            # self.setVisible(False)
+            # evt.ignore()
+
         if self.close():
             evt.accept()
     
@@ -665,20 +675,24 @@ class ScipyenFrameViewer(ScipyenViewer):
         
     ATTENTION: Synchronizing frame navigation across instances of ScipyenFrameViewer.
     
-    1) Subclasses of ScipyenFrameViewer should define at least one of two QWidgets 
-    (a QSlider and a QSpinBox) used for frame navigation.
+    1) Subclasses of ScipyenFrameViewer should have at least one of the following
+    attributes (references to QWidgets) for frame nagivation:
+    • '_frames_slider_' → QSlider
+    • '_frames_spinner_' → QSpinBox
+    • '_frames_spinBoxSlider_' → SpinBoxSlider
     
     In the implementation of _configureUI_() these widgets should then be 
-    aliased to self._frames_slider_ and self._frames_spinner_, respectively, to 
-    allow for synchronization of frame navigation, e.g.:
+    aliased to self._frames_slider_, self._frames_spinner_, self._frames_spinBoxSlider_,
+    to  allow for synchronization of frame navigation, e.g.:
     
-        self._frame_slider_ = self.myQSliderQWidget
+        self._frames_slider_ = self.myQSliderQWidget
     
     2) To enable or disable synchronized frame navigation, use linkToViewers() or
     unlinkViewer() / unlinkFromViewers(), respectively.
     
     Synchronized viewers display the data frame with the same index (provided
     that the frame index is valid for their individually displayed data). 
+        
     Navigating across frames in one viewer is propagated to all viewers that
     are synchronized with it.
     
@@ -1059,6 +1073,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         viewers: Instances of ScipyenFrameViewer
         
         """
+        # print(len(viewers))
         if len(viewers) == 0:
             return
         

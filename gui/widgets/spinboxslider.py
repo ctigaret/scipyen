@@ -91,7 +91,13 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in (self, self.framesQSpinBox, self.framesQSlider)]
         self.framesQSpinBox.setMaximum(self._maximum_)
         self.framesQSlider.setMaximum(self._maximum_)
-        self.totalFramesCountLabel.setText(f"of {self._maximum_}")
+        if self._maximum_ == self._minimum_:
+            if self._maximum_ == 0:
+                self.totalFramesCountLabel.setText(f"of {0}")
+            else:
+                self.totalFramesCountLabel.setText(f"of {1}")
+        else:
+            self.totalFramesCountLabel.setText(f"of {self._maximum_+1}")
         
     @property
     def singleStep(self):

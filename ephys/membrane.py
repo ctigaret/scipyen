@@ -6950,8 +6950,9 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
                 else:
                     fitted_x.array_annotations[annkey] = x.array_annotations[annkey]
                     
-            
+            name = f"{x.name}_{fitted_x.name}"
             x = x.merge(fitted_x) # returns a new x
+            x.name = name
         
         # NOTE: 2022-10-27 22:44:50
         # Restore the domain start of the waveform (see NOTE: 2022-10-27 22:44:40)

@@ -442,6 +442,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # map plot item index (int) with list of cursors
         self._cached_cursors_ = dict()
         
+        self._target_overlays_ = dict()
+        
+        self._label_overlays_ = dict()
+        
         # NOTE: 2017-05-10 22:57:30
         # these are linked cursors in the same window
         self.linkedCrosshairCursors = []
@@ -1409,6 +1413,23 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         return ret
     
+    def _make_targetItem(self, data:typing.Union[tuple, list, QtCore.QPointF, QtCore.QPoint, pg.Point], **kwargs):
+        """Generates a pg.TargetItem
+        Parameters:
+        ==========
+        data: pair of coordinates (in the axis coordinate system), 
+            QPointF, QPoint or pg.Point
+        
+        Var-keyword parameters:
+        ======================
+        These are passed directly to the pg.TargetItem constructor,
+        see pyqtgraph documentation for details
+        
+        See also https://pyqtgraph.readthedocs.io/en/latest/api_reference/graphicsItems/targetitem.html
+        """
+        
+        return pg.TargetItem(data, **kwargs)
+    
     def _clear_lris_(self):
         for k, ax in enumerate(self.axes):
             lris = [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]
@@ -1570,6 +1591,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 # entities_axis.axes["left"]["item"].setLabel("Spike Trains", **labelStyle)
                 # entities_axis.axes["left"]["item"].setStyle(showValues=False)
                 
+            elif all(isinstance(v, pg.TargetItem) for v in entities_list):
+                self._clear_targets_overlay_(entities_axis)
+                for entity in entities_list:
+                    entities_axis.addItem(entity)
+                    
+                return
             else:
                 return
                 
@@ -1582,6 +1609,38 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         except:
             traceback.print_exc()
+            
+    def _clear_targets_overlay_(self, axis):
+        """Removes the targets overlay from this axis
+            Cached targets are left in place
+        """
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+        items = [i for i in axis.listDataItems() if isinstance(i, pg.TargetItem)]
+        for i in items:
+            axis.removeItem(i)
+                
+            
+    def _check_axis_spec_ndx_(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None):
+        if axis is None:
+            axis = self.currentAxis
+            axNdx = self.axes.index(axis)
+            
+        elif isinstance(axis, int):
+            if axis not in range(-len(self.axes), len(self.axes)):
+                raise ValueError(f"axis index {axis} ir out of range for {len(self.axes)} axes")
+            
+            axNdx = axis
+            axis = self.axes[axis]
+            
+        elif isinstance(axis, pg.PlotItem):
+            if axis not in self.axes:
+                raise ValueError(f"axis {axis} not found in this viewer")
+            axNdx = self.axes.index(axis)
+            
+        else:
+            raise TypeError(f"axis expected to be an int or pg.PlotItem; got {type(axis).__name__} instead.")
+        
+        return axis, axNdx
         
     def _update_annotations_(self, data=None):
         self.dataAnnotations.clear()
@@ -1690,6 +1749,93 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         super().showEvent(evt)
         evt.accept()
             
+    def overlayTargets(self, *args, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None, **kwargs):
+        """Overlays "target" glyphs on the given axis, for the current frame.
+        Targets are also added to an internal cache.
+        
+        Var-positional parameters (*args):
+        ==================================
+        A sequence of (x,y) coordinate pairs (numeric scalars) or (x,y, size)
+        triplets (where x, y are float scalars in the axis' coordinate system
+        and size is an int, default is 10)
+        
+        Named parameters:
+        =================
+        axis: int or PlotItem; when an int, this is the index of the axis in 
+                the axes collection of the viewer
+            This is optional (default is the currently selected axis)
+        
+        Var-keyword parameters:
+        =======================
+        Passed directly to PyQtGraph TargetItem constructor, see:
+        
+        https://pyqtgraph.readthedocs.io/en/latest/api_reference/graphicsItems/targetitem.html
+        
+        for details.
+        """
+        if len(args) == 0:
+            return
+        
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+        
+        targetItems = [self._make_targetItem(*args, **kwargs)]
+        cFrame = self.frameIndex[self.currentFrame]
+        
+        if cFrame not in self._target_overlays_:
+            self._target_overlays_[cFrame] = dict()
+            
+        self._target_overlays_[cFrame][axNdx] = targetItems
+        
+        self._plot_discrete_entities_(self._target_overlays_[cFrame][axNdx], axNdx)
+        
+    def removeTargetsOverlay(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None):
+        """Remove targets overlaid in this axis.
+        Target objects are also removed from the internal cache
+        """
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+        cFrame = self.frameIndex[self.currentFrame]
+        
+        if cFrame in self._target_overlays_:
+            if isinstance(self._target_overlays_[cFrame], dict):
+                if isinstance(self._target_overlays_[cFrame].get(axNdx, None), (tuple, list)):
+                    self._target_overlays_[cFrame][axNdx].clear()
+                else:
+                    self._target_overlays_[cFrame][axNdx] = list()
+                    
+        # cal this just in case we have overlays that escaped the cache mechanism
+        self._clear_targets_overlay_(axis)
+                
+    def addLabel(self, text:str, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None, **kwargs):
+        """Add a pg.TextItem to the specified axis (pg.PlotItem)
+        Parameters:
+        ===========
+        text: the label contents
+        axis: axis index, PlotItem, or None (meaning the label will be added to
+                the current axis)
+        
+        Var-keyword parameters:
+        =======================
+        Passed directly to pyqtgraph TextItem constructor, see below for details:
+        https://pyqtgraph.readthedocs.io/en/latest/api_reference/graphicsItems/textitem.html
+        """
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+        
+        textItem = pg.TextItem(text, **kwargs)
+        
+        cFrame = self.frameIndex[self.currentFrame]
+        
+        if cFrame not in self._label_overlays_:
+            self._label_overlays_[cFrame] = dict()
+            
+        self._label_overlays_[cFrame][axNdx] = textItem
+        
+        axis.addItem(textItem)
+        
+    def removeLabels(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None):
+        """ Removes ALL labels (TextItems) from the given axis
+        """
+        pass
+        
         
     def closeEvent(self, evt):
         """Override ScipyenViewer.closeEvent.
@@ -5105,6 +5251,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._plotEpochs_(clear=True)
                         
         elif isinstance(y, (tuple, list)) or hasattr(y, "__iter__"): # second condition to cover for new things like neo.SpikeTrainList (v >= 0.10.0)
+            if len(y) == 0:
+                self.clear()
+                return
             # python sequence of stuff to plot
             # TODO 2020-03-08 11:05:06
             # code for sequence of neo.SpikeTrain, and sequence of neo.Event
@@ -5752,6 +5901,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # self.statusBar().showMessage(f"Selected axes: {index} ({self._plot_names_.get(index)})")
         
     @property
+    def currentAxisIndex(self):
+        return self._current_plot_item_index_
+    
+    @currentAxisIndex.setter
+    def currentAxisIndex(self, index:int):
+        if index not in range(-len(self.axes), len(self.axes)):
+            raise ValueError(f"index {index} out range for {len(self.axes)}")
+        
+        self.currentAxis = self.axes[index]
+        
+    @property
     def currentAxis(self):
         return self.currentPlotItem
     
@@ -6186,7 +6346,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
         self._update_annotations_()
         
-        # finally, check if cursors want to stay in axis or stay with the domain
+        # Check if cursors want to stay in axis or stay with the domain
         # and act accordingly
         mfun = lambda x: -np.inf if x is None else x
         pfun = lambda x: np.inf if x is None else x
@@ -6213,6 +6373,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     c.setBounds()
                     c.y = dataymin+relY
                     
+        # NOTE: 2022-11-22 11:49:47
+        # Finally, check for target overlays
+        cFrame = self.frameIndex[self.currentFrame]
+        if len(self.axes) and cFrame in self._target_overlays_:
+            for axNdx, ax in enumerate(self.axes):
+                self._clear_targets_overlay_(ax)
+                targetItems = self._target_overlays_[cFrame].get(axNdx, list())
+                if len(targetItems):
+                    for tgt in targetItems:
+                        ax.addItem(tgt)
+                        
     @safeWrapper
     def _plotSpikeTrains_(self, trains:typing.Optional[typing.Union[neo.SpikeTrain, tuple, list]] = None, clear:bool = False, **kwargs):
         """Plots stand-alone spike trains.
@@ -6859,7 +7030,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @safeWrapper
     def _plotSignal_(self, signal, *args, **kwargs):
         """Plots individual signal objects.
-        Signal objects are thiose defined in the Neuralensemble's neo package 
+        
+        Called by self.displayFrame when self.y is a signal, or a sequence
+        of signals.
+        
+        Signal objects are those defined in the Neuralensemble's neo package 
         (neo.AnalogSignal, neo.IrregularlySampledSignal), and in the datatypes
         module (datatypes.DataSignal, datatypes.IrregularlySampledDataSignal).
         
@@ -6939,6 +7114,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                         ylabel="%s (%s)" % (signal_name, sig.units.dimensionality), 
                                         xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
                                         *args, **kwargs)
+                
+        self.docTitle = sig.name
             
     def _make_sig_plot_dict_(self,plotItem: pg.PlotItem, x:np.ndarray, y:np.ndarray, xlabel:(str, type(None))=None,  ylabel:(str, type(None))=None, title:(str, type(None))=None, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
         return {"plotItem":plotItem, 
@@ -7266,6 +7443,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # plotItem.vb.close()
         plotItem.close()
         self.signalsLayout.removeItem(plotItem)
+        if self.currentAxis == plotItem:
+            self.currentAxis = self.axes[0]
            
     @safeWrapper
     def _prepareAxes_(self, nRequiredAxes, sigNames=list()):
@@ -7657,7 +7836,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._focussed_plot_item_ = None
         
         for p in self.plotItems:
-            self.signalsLayout.removeItem(p)
+            self._remove_axes_(p)
+            # self.signalsLayout.removeItem(p)
 
         self.plotTitleLabel.setText("")
         
@@ -7670,8 +7850,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         for c in self.horizontalSignalCursors.values():
             c.detach()
             
-        for c in self._cached_cursors_.values():
-            c.detach()
+        for clist in self._cached_cursors_.values():
+            for c in clist:
+                c.detach()
             
         if not keepCursors:
             self.crosshairSignalCursors.clear() # a dict of SignalCursors mapping str name to cursor object
@@ -7699,16 +7880,25 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self._plotEpochs_()
         
+        self._number_of_frames_ = 0
+        
         # NOTE: 2018-09-25 23:12:46
         # recipe to block re-entrant signals in the code below
         # cleaner than manually docinenctign and re-connecting
         # and also exception-safe
         
         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in \
-            (self.selectSignalComboBox, self.selectIrregularSignalComboBox)]
+            (self.selectSignalComboBox, self.selectIrregularSignalComboBox,
+             self.framesQSlider, self.framesQSpinBox)]
         
         self.selectSignalComboBox.clear()
         self.selectIrregularSignalComboBox.clear()
+        self.framesQSlider.setMinimum(0)
+        self.framesQSlider.setMaximum(0)
+        self.framesQSpinBox.setMinimum(0)
+        self.framesQSpinBox.setMaximum(0)
+        self.nFramesLabel.setText(f"of {self._number_of_frames_}")
+        self.docTitle = None # to completely remove the data name from window title
         
     def setTitlePrefix(self, value):
         """Sets the window-specific prefix of the window title
