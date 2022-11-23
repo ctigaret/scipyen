@@ -317,7 +317,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         
         self.sig_valueChanged.emit()
             
-        # print("edit datetime")
+        print("edit datetime")
         
     @pyqtSlot()
     def _slot_descriptionChanged(self):

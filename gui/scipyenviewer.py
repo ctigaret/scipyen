@@ -982,7 +982,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         currentFrame is an index into THAT subset, and not an index into all of
         the data frames.
         
-        Does NOT emit frameChanged signal.
+        Should NOT emit frameChanged signal (exceptions are allowed with CAUTION).
         
         Developer information:
         ---------------------

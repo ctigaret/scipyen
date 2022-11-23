@@ -1594,9 +1594,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             elif all(isinstance(v, pg.TargetItem) for v in entities_list):
                 self._clear_targets_overlay_(entities_axis)
                 for entity in entities_list:
-                    entities_axis.addItem(entity)
-                    
-                return
+                    if entity not in entities_axis.items:
+                        entities_axis.addItem(entity)
+                return # job done here; return so we don't exec code further down'
             else:
                 return
                 
@@ -1615,9 +1615,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             Cached targets are left in place
         """
         axis, axNdx = self._check_axis_spec_ndx_(axis)
-        items = [i for i in axis.listDataItems() if isinstance(i, pg.TargetItem)]
+        items = [i for i in axis.items if isinstance(i, pg.TargetItem)]
         for i in items:
             axis.removeItem(i)
+            
+    def _clear_labels_overlay(self, axis):
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+        items = [i for i in axis.items if isinstance(i, pg.TextItem)]
+        for i in items:
+            axis.removeItem(i)
+        
                 
             
     def _check_axis_spec_ndx_(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None):
@@ -1805,7 +1812,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # cal this just in case we have overlays that escaped the cache mechanism
         self._clear_targets_overlay_(axis)
                 
-    def addLabel(self, text:str, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None, **kwargs):
+    def addLabel(self, text:str, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None, pos = None, **kwargs):
         """Add a pg.TextItem to the specified axis (pg.PlotItem)
         Parameters:
         ===========
@@ -1820,7 +1827,20 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         axis, axNdx = self._check_axis_spec_ndx_(axis)
         
+        if pos is None:
+            pos = pg.Point(0,0)
+            
+        elif isinstance(pos, (tuple, list)) and len(pos) == 2:
+            pos = pg.Point(*pos)
+            
+        elif isinstance(pos, (QtCore.QPoint, QtCore.QPointF)):
+            pos = pg.Point(pos.x(), pos.y())
+            
+        elif not isinstance(pos, pg.Point):
+            raise TypeError(f"pos expected a 2-tuple or number, QPoint, QPointF or pg.Point; got {type(pos).__name__} instead")
+        
         textItem = pg.TextItem(text, **kwargs)
+        textItem.setPos(pos)
         
         cFrame = self.frameIndex[self.currentFrame]
         
@@ -1836,6 +1856,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         pass
         
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+        cFrame = self.frameIndex[self.currentFrame]
+        
+        if cFrame in self._label_overlays_:
+            if isinstance(self._label_overlays_[cFrame], dict):
+                if isinstance(self._label_overlays_[cFrame].get(axNdx, None), (tuple, list)):
+                    self._label_overlays_[cFrame][axNdx].clear()
+                else:
+                    self._label_overlays_[cFrame][axNdx] = list()
+                    
+        # cal this just in case we have overlays that escaped the cache mechanism
+        self._clear_labels_overlay(axis)
+                
         
     def closeEvent(self, evt):
         """Override ScipyenViewer.closeEvent.
@@ -5735,7 +5768,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @currentFrame.setter
     def currentFrame(self, val:typing.Union[int, type(MISSING), type(NA), type(None), float]):
         """ Programmatically sets up the index of the displayed frame.
-        Emits self.frameChanged signal
+        CAUTION: emits self.frameChanged signal
         """
         missing = (isinstance(self._missing_frame_value_, (int, float)) and val == self._missing_frame_value_) or \
             self._missing_frame_value_ in (MISSING, NA) and val is self._missing_frame_value_

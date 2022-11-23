@@ -129,6 +129,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._data_ = None
         self._detection_signal_name_ = None
         self._detection_epochs_ = list()
+        self._signal_index_ = 0
         
         # the template file where a mPSC template is stored across sessions
         # this is located in the Scipyen's config directory
@@ -577,25 +578,41 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._data_frames_ = len(self._data_.segments)
                 self._frameIndex_ = range(self._data_frames_)
                 self._number_of_frames_ = len(self._frameIndex_)
+                
+                for k, segment in enumerate(self._data_.segments):
+                    self._result_[k] = self._get_previous_detection_(segment)
                             
             elif isinstance(data, neo.Segment):
                 self._undo_buffer_ = [None]
-                self._result_ = [None]
+                if len(data.analogsignals):
+                    time_units = data.analogsignals[0].times.units
+                else:
+                    time_units = pq.s
+                    
+                self.durationSpinBox.units = time_units
                 
                 self._data_ = data
                 self._data_frames_ = 1
                 self._frameIndex_ = range(self._data_frames_)
                 self._number_of_frames_ = len(self._frameIndex_)
+                self._result_ = [self._get_previous_detection_(segment)]
                 
             elif isinstance(data, (tuple, list)) and all(isinstance(v, neo.Segment) for v in data):
                 self._undo_buffer_ = [None for s in data]
-                self._result_ = [None for s in data]
                             
+                if len(data[0].analogsignals):
+                    time_units = data[0].analogsignals[0].times.units
+                else:
+                    time_units = pq.s
+                    
+                self.durationSpinBox.units = time_units
                 self._data_ = data
                 self._data_frames_ = len(self._data_)
                 self._frameIndex_ = range(self._data_frames_)
                 self._number_of_frames_ = len(self._frameIndex_)
-                            
+                
+                for k,s in enumerate(self._data_):
+                    self._result_[k] = self._get_previous_detection_(s)
             else:
                 self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects; got {type(data).__name__} instead")
                 return
@@ -718,9 +735,18 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.signalNameComboBox, self._ephysViewer_)]
         if len(signames):
             self.signalNameComboBox.addItems(signames)
-            if index in range(len(signames)):
+            if index in range(len(signames)) and index in range(len(segment.analogsignals)):
                 # print(f"\n{self.__class__.__name__}.signalNameComboBox → current index {index}")
                 self.signalNameComboBox.setCurrentIndex(index)
+                self._signal_index_ = index
+                
+    def displayDetectedWaveform(self, index:int):
+        self.currentWaveformIndex = index
+        
+        if isinstance(self._detected_mPSCViewer_, sv.SignalViewer):
+            self._detected_mPSCViewer_.currentFrame = index
+            self._indicate_mPSC_(self.currentWaveformIndex)
+        
             
     def displayFrame(self):
         """Overloads ScipyenFrameViewer.displayFrame"""
@@ -860,7 +886,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             # WARNING: 2022-11-22 17:46:17
             # make sure self._detected_mPSCs_ is not a mere reference
             # to the list in frameResult! Create a NEW list !
-            self._detected_mPSCs_ = [s for s in frameResult[1]]
+            self._detected_mPSCs_ = [neoutils.set_relative_time_start(s) for s in frameResult[1]]
             
             if not isinstance(self._detected_mPSCViewer_, sv.SignalViewer):
                 self._detected_mPSCViewer_ = sv.SignalViewer(win_title="Detected mPSCs", 
@@ -873,6 +899,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             # print(len(self._detected_mPSCs_))
             self._mPSC_spinBoxSlider_.setRange(0, len(self._detected_mPSCs_)-1)
             self._detected_mPSCViewer_.view(self._detected_mPSCs_)
+            
             self.accept_mPSCcheckBox.setEnabled(True)
             self._indicate_mPSC_(self._detected_mPSCViewer_.currentFrame)
             
@@ -882,6 +909,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._mPSC_spinBoxSlider_.setRange(0, 0)
                 self.accept_mPSCcheckBox.setEnabled(False)
                 self._detected_mPSCViewer_.clear()
+                
+            if isinstance(self._ephysViewer_, sv.SignalViewer):
+                self._ephysViewer_.removeTargetsOverlay(self._ephysViewer_.axes[self._signal_index_])
         
             
         # self._detected_mPSCViewer_.docTitle = "mPSCs"
@@ -889,29 +919,55 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # self._indicate_mPSC_(self._detected_mPSCViewer_.currentFrame)
         
     def _indicate_mPSC_(self, waveindex):
+        # print(f"_indicate_mPSC_ wave {waveindex} of {len(self._detected_mPSCs_)} waves")
         if not isinstance(self._ephysViewer_, sv.SignalViewer):
             return
         
         segment = self._get_data_segment_()
-        if not isinstance(segment, neo.Segment):
-            return
-        
-        signal = self._get_selected_signal_(segment)
-        
-        signal_index = segment.analogsignals.index(signal)
+        signal = segment.analogsignals[self._signal_index_]
+        axis = self._ephysViewer_.axes[self._signal_index_]
         
         if waveindex not in range(-len(self._detected_mPSCs_),len(self._detected_mPSCs_)):
-            return
+            waveindex = 0
         
         mPSC = self._detected_mPSCs_[waveindex]
         
-        peak_time = mPSC.annotations.get("peak_time", None)
+        peak_time = mPSC.annotations.get("t_peak", None)
+        
+        waveR2 = mPSC.annotations["mPSC_fit"]["Rsq"]
+        
+        if mPSC.annotations.get("Accept", False):
+            wavelabel = "R²=%.2f Accept" % waveR2
+        else:
+            wavelabel = "R²=%.2f Reject" % waveR2
+            
+        waxis = self._detected_mPSCViewer_.axis(0)
+        self._detected_mPSCViewer_.removeLabels(waxis)
+        [[x0,x1], [y0,y1]]  = waxis.viewRange()
+        
+        self._detected_mPSCViewer_.addLabel(wavelabel, 0, pos = (x0,y1), 
+                                            color=(0,0,0), anchor=(0,1))
+                
+        # print(f"peak_time {peak_time}")
         
         if isinstance(peak_time, pq.Quantity):
-            peak_value = neoutils.get_sample_at_domain(signal, peak_time)
-            self._ephysViewer_.removeTargetOverlay(signal_index)
+            peak_value = neoutils.get_sample_at_domain_value(signal, peak_time)
+            self._ephysViewer_.removeTargetsOverlay(axis)
+            valid = mPSC.annotations.get("Accept", False) == True
+            signalBlocker = QtCore.QSignalBlocker(self.accept_mPSCcheckBox)
+            self.accept_mPSCcheckBox.setChecked(valid)
+            if valid:
+                targetBrush = (255,0,0,50)
+                targetLabelColor = (128,0,0,255)
+            else:
+                targetBrush = (0,0,255,50)
+                targetLabelColor = (0,0,128,255)
+                
             self._ephysViewer_.overlayTargets((float(peak_time),float(peak_value)),
-                                                axis=signal_index, size=10, movable=False)
+                                                axis=axis, size=10, movable=False,
+                                                brush=targetBrush, label=f"{waveindex}",
+                                                labelOpts = {"color":targetLabelColor})
+            self._ephysViewer_.refresh()
        
     def _clear_detection_in_sweep_(self, segment:neo.Segment):
         mPSCtrains = [s for s in segment.spiketrains if s.annotations.get("source", None) == "PSC_detection"]
@@ -930,11 +986,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         if len(mPSCtrains):
             peak_times = mPSCtrains[0].annotations.get("peak_times", list())
+            accepted = mPSCtrains[0].annotations.get("Accept", list())
+            template = mPSCtrains[0].annotations.get("Template", list())
             
             if len(peak_times) == 0: # invalid data, so discard everything
                 return
             
             signal_units = mPSCtrains[0].annotations.get("signal_units", None)
+            
             if signal_units is None: # invalid data, so discard everything
                 return
             mPSCtrain = mPSCtrains[0]
@@ -948,6 +1007,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                         return
                     
                     peak_times.extend(ptimes)
+                    accpt = s.annotations.get("Accept", list())
+                    accepted.extend(accpt)
+                    tmpl = s.annotations.get("Template", list())
+                    template.extend(tmpl)
                     
                     
                 # NOTE:2022-11-22 12:48:54
@@ -958,6 +1021,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 mPSCtrain.annotations["source"] = "PSC_detection"
                 mPSCtrain.annotations["peak_times"] = peak_times
                 mPSCtrain.annotations["signal_units"] = signal_units
+                mPSCtrain.annotations["Accept"] = accepted
+                mPSCtrain.annotations["Template"] = template
                 
                 for t in mPSCtrains[1:]:
                     neoutils.remove_spiketrain(segment, t.name)
@@ -1069,18 +1134,27 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if waveform is None:
             waveform  = self._get_mPSC_template_or_waveform_()
 
-        self._result_ = list()
-        
-        for frame in self._frameIndex_: # NOTE: _frameIndex_ is in ingerited from ScipyenFrameViewer
+        for frame in self._frameIndex_: # NOTE: _frameIndex_ is in inherited from ScipyenFrameViewer
             segment = self._get_data_segment_(frame)
             prev_detect = self._get_previous_detection_(segment)
             self._undo_buffer_[frame] = prev_detect
-            mPSCtrain, detection = self._detect_sweep_(frame, waveform=waveform)
-            self._result_.append((mPSCtrain, detection))
+            res = self._detect_sweep_(frame, waveform=waveform)
+            if res is None:
+                continue
+            mPSCtrain, detection = res
+            self._result_[frame] = (mPSCtrain, [s for s in detection])
+            
+            if self.clearPreviousDetectionCheckBox.isChecked():
+                self._clear_detection_flag_ = True # to make sure this is up to date
+                self._clear_detection_in_sweep_(segment)
+                
+            segment.spiketrains.append(mPSCtrain)
             
             if progressSignal is not None:
                 progressSignal.emit(frame)
                 
+            # FIXME 2022-11-23 00:36:58
+            # use the two-part model with QThread instead of QRunnable
             if hasattr(progressUI, "wasCanceled"):
                 cncl = progressUI.wasCanceled()
                 if cncl:
@@ -1237,14 +1311,21 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             lo = tuple(p.magnitude for p in model_params["Lower Bound:"])
             up = tuple(p.magnitude for p in model_params["Upper Bound:"])
             
+            accepted = list()
+            template = list()
+            
             for k,w in enumerate(mini_waves):
                 fw = membrane.fit_mPSC(w, template.annotations["parameters"], lo=lo, up=up)
                 fw.annotations["t_peak"] = mPSCtrain.annotations["peak_times"][k]
                 fw.name = f"mPSC_{fw.name}_{k}"
                 mini_waves[k] = fw
+                accepted.append(fw.annotations["Accept"])
+                template.append(fw.annotations["mPSC_fit"]["template"])
                 
             mPSCtrain_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
             mPSCtrain.waveforms = mPSCtrain_waves.T
+            mPSCtrain.annotations["Accept"] = accepted
+            mPSCtrain.annotations["Template"] = template
             
             return mPSCtrain, mini_waves
         
@@ -1318,7 +1399,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
     @pyqtSlot()
     def _slot_undoCurrentSweep(self):
-        """Restores current segment spiketrains ot the state before last detection.
+        """Restores current segment spiketrains to the state before last detection.
         TODO: update result
         """
         self._undo_sweep(self.currentFrame)
@@ -1477,7 +1558,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._plot_data()
             
     @pyqtSlot()
-    def _slot_set_mPSC_accept(self, value:int):
+    def _slot_set_mPSC_accept(self):
         if len(self._detected_mPSCs_) == 0:
             return
         
@@ -1485,11 +1566,16 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                                                   len(self._detected_mPSCs_)):
             return
         
-        accept = value == QtCore.Qt.Checked
+        # accept = value == QtCore.Qt.Checked
+        accept = self.sender().checkState() == QtCore.Qt.Checked
         
-        self._detected_mPSCs_.annotations["Accept"] = value
+        self._detected_mPSCs_[self.currentWaveformIndex].annotations["Accept"] = accept
+        train = self._result_[self.currentFrame][0]
+        train.annotations["Accept"][self.currentWaveformIndex] = accept
+        self._indicate_mPSC_(self.currentWaveformIndex)
         
-            
+        
+        
             
     @pyqtSlot()
     def _slot_metaDataChanged(self):
@@ -1547,10 +1633,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # print(f"{self.__class__.__name__}._slot_newSignalViewerAxisSelected {index}")
         signalBlocker = QtCore.QSignalBlocker(self.signalNameComboBox)
         self.signalNameComboBox.setCurrentIndex(index)
+        self._signal_index_ = index
         
             
     @pyqtSlot(str)
-    def _slot_newTargetSignalSelected(self, value):
+    def _slot_newTargetSignalSelected(self, value:str):
         self._detection_signal_name_ = value
         seg = self._get_data_segment_()
         if isinstance(seg, neo.Segment):
@@ -1560,10 +1647,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
     
     @pyqtSlot(int)
-    def _slot_newTargetSignalIndexSelected(self, value):
+    def _slot_newTargetSignalIndexSelected(self, value:int):
         if value in range(len(self._ephysViewer_.axes)):
             signalBlockers = [QtCore.QSignalBlocker(w) for w in (self._ephysViewer_, self.signalNameComboBox)]
             self._ephysViewer_.currentAxis=value
+            self._signal_index_ = value
     
     @pyqtSlot(str)
     def _slot_epochComboBoxSelectionChanged(self, value):
@@ -1603,17 +1691,20 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def _slot_mPSCViewer_frame_changed(self, value):
         signal_blocker = QtCore.QSignalBlocker(self._mPSC_spinBoxSlider_)
         self._mPSC_spinBoxSlider_.value = value
+        self._currentWaveformIndex_ = value
+        self._indicate_mPSC_(self.currentWaveformIndex)
+        
+        # NOTE: avoid this because currentFrame setter in SignalViewer emits
+        # frameChanged, causing infinite recursion
+        # self.displayDetectedWaveform(value)
+        
             
     @pyqtSlot(int)
     def _slot_setWaveFormIndex(self, value):
         if value not in range(-len(self._detected_mPSCs_), len(self._detected_mPSCs_)):
             return
-        self.currentWaveformIndex = value
-        
-        if isinstance(self._detected_mPSCViewer_, sv.SignalViewer):
-            self._detected_mPSCViewer_.currentFrame = value
-            self._indicate_mPSC_(self.currentWaveformIndex)
-        
+        self.displayDetectedWaveform(value)
+
     @property
     def currentWaveformIndex(self):
         return self._currentWaveformIndex_
@@ -1823,3 +1914,65 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.actionLock_toolbars.setChecked(self._toolbars_locked_)
         
         
+    @property
+    def result(self):
+        if all(v is None for v in self._result_):
+            return
+        
+        psc_trains = list()
+        start_time = list()
+        peak_time = list()
+        amplitude = list()
+        from_template = list()
+        fit_amplitude = list()
+        r2 = list()
+        tau_rise = list()
+        tau_decay = list()
+        accept = list()
+        seg_index = list()
+        wave_index = list()
+        source_id = list()
+        cell_id = list()
+        sex = list()
+        genotype = list()
+        age = list()
+        datetime=list()
+        dataname = list()
+        field_id = list()
+        
+        for k, frameResult in enumerate(self._result_):
+            if frameResult is None:
+                continue
+            psc_trains.apend(frameResult[0])
+            for kw, w in enumerate(frameResult[1]):
+                seg_index.append(k)
+                wave_index.append(kw)
+                start_time.append(w.t_start)
+                peak_time.append(w.annotations["t_peak"])
+                amplitude.append(w.annotations["amplitude"])
+                from_template.append(w.annotations["mPSC_fit"]["template"])
+                fit_amplitude.append(w.annotations["mPSC_fit"]["amplitude"])
+                r2.append(w.annotations["mPSC_fit"]["Rsq"])
+                tau_rise.append(w.annotations["mPSC_fit"]["Coefficients"][3])
+                tau_decay.append(w.annotations["mPSC_fit"]["Coefficients"][4])
+                accept.append(w.annotations["Accept"])
+                source_id.append(self.metaDataWidget.sourceID)
+                cell_id.append(self.metaDataWidget.cell)
+                field_id.append(self.metaDataWidget.field)
+                age.append(self.metaDataWidget.age)
+                sex.append(self.metaDataWidget.sex)
+                genotype.append(self.metaDataWidget.genotype)
+                dataname.append(self.metaDataWidget.dataName)
+                datetime.append(self.self.metaDataWidget.analysisDateTime)
+                
+        res = {"Source":source_id, "Cell": cell_id, "Field": field_id,
+               "Age": age, "Sex": sex, "Genotype":genotype, 
+               "Data": dataname, "DateTime": datetime, "Accept":accept,
+               "Sweep": seg_index, "Wave": wave_index, "Start": start_time,
+               "Peak": peak_time, "Amplitude": amplitude,
+               "Template":from_template, "FitAmplitude": fit_amplitude,
+               "R²": r2, "RiseTime": tau_rise, "DecayTime": tau_decay}
+        
+        return pd.DataFrame(res), psc_trains
+    
+    

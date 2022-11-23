@@ -6896,9 +6896,8 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
             params = neoutils.set_relative_time_start(params)
             
         Rsq = crvf.fit_mPSC_wave(x, params)
-        x.annotations["mPSC_fit"] = {"Rsq": Rsq, "template": True}
+        x.annotations["mPSC_fit"] = {"Rsq": Rsq, "template": True, "amplitude":sigp.waveform_amplitude(params)}
         x.annotations["amplitude"] = sigp.waveform_amplitude(x)
-        x.annotations["fit_amplitude"] = sigp.waveform_amplitude(params)
         
     else:
     
@@ -6961,7 +6960,7 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
         x.annotations["mPSC_fit"] = fitresult[1]
         x.annotations["mPSC_fit"]["template"] = False
         x.annotations["amplitude"] = sigp.waveform_amplitude(x[:,0])
-        x.annotations["fit_amplitude"] = sigp.waveform_amplitude(x[:,1])
+        x.annotations["mPSC_fit"]["amplitude"] = sigp.waveform_amplitude(x[:,1])
     
     return x
     
