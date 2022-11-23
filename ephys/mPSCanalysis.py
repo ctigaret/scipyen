@@ -579,8 +579,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._frameIndex_ = range(self._data_frames_)
                 self._number_of_frames_ = len(self._frameIndex_)
                 
-                for k, segment in enumerate(self._data_.segments):
-                    self._result_[k] = self._get_previous_detection_(segment)
+                # for k, segment in enumerate(self._data_.segments):
+                #     self._result_[k] = self._get_previous_detection_(segment)
                             
             elif isinstance(data, neo.Segment):
                 self._undo_buffer_ = [None]
@@ -595,7 +595,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._data_frames_ = 1
                 self._frameIndex_ = range(self._data_frames_)
                 self._number_of_frames_ = len(self._frameIndex_)
-                self._result_ = [self._get_previous_detection_(segment)]
+                # self._result_ = [self._get_previous_detection_(segment)]
                 
             elif isinstance(data, (tuple, list)) and all(isinstance(v, neo.Segment) for v in data):
                 self._undo_buffer_ = [None for s in data]
@@ -611,8 +611,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._frameIndex_ = range(self._data_frames_)
                 self._number_of_frames_ = len(self._frameIndex_)
                 
-                for k,s in enumerate(self._data_):
-                    self._result_[k] = self._get_previous_detection_(s)
+                # for k,s in enumerate(self._data_):
+                #     self._result_[k] = self._get_previous_detection_(s)
             else:
                 self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects; got {type(data).__name__} instead")
                 return
@@ -1030,7 +1030,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return None
                 
         waves = mPSCtrain.waveforms
-        print(waves.shape)
+        # print(waves.shape)
         signal_units = mPSCtrain.annotations.get("signal_units", pq.pA)
         mini_waves = list()
         if waves.size > 0:
@@ -1313,7 +1313,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             up = tuple(p.magnitude for p in model_params["Upper Bound:"])
             
             accepted = list()
-            template = list()
+            templates = list()
             
             for k,w in enumerate(mini_waves):
                 fw = membrane.fit_mPSC(w, template.annotations["parameters"], lo=lo, up=up)
@@ -1321,12 +1321,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 fw.name = f"mPSC_{fw.name}_{k}"
                 mini_waves[k] = fw
                 accepted.append(fw.annotations["Accept"])
-                template.append(fw.annotations["mPSC_fit"]["template"])
+                templates.append(fw.annotations["mPSC_fit"]["template"])
                 
             mPSCtrain_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
             mPSCtrain.waveforms = mPSCtrain_waves.T
             mPSCtrain.annotations["Accept"] = accepted
-            mPSCtrain.annotations["Template"] = template
+            mPSCtrain.annotations["Template"] = templates
             
             return mPSCtrain, mini_waves
         
@@ -1914,8 +1914,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         signalBlocker = QtCore.QSignalBlocker(self.actionLock_toolbars)
         self.actionLock_toolbars.setChecked(self._toolbars_locked_)
         
-        
-    @property
     def result(self):
         if all(v is None for v in self._result_):
             return
@@ -1944,7 +1942,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         for k, frameResult in enumerate(self._result_):
             if frameResult is None:
                 continue
-            psc_trains.apend(frameResult[0])
+            psc_trains.append([s for s in frameResult[0]])
             for kw, w in enumerate(frameResult[1]):
                 seg_index.append(k)
                 wave_index.append(kw)
@@ -1964,7 +1962,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 sex.append(self.metaDataWidget.sex)
                 genotype.append(self.metaDataWidget.genotype)
                 dataname.append(self.metaDataWidget.dataName)
-                datetime.append(self.self.metaDataWidget.analysisDateTime)
+                datetime.append(self.metaDataWidget.analysisDateTime)
                 
         res = {"Source":source_id, "Cell": cell_id, "Field": field_id,
                "Age": age, "Sex": sex, "Genotype":genotype, 
