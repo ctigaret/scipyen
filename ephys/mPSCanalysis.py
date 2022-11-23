@@ -291,16 +291,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if isinstance(ephysViewer, sv.SignalViewer):
             self._ephysViewer_ = ephysViewer
             self._owns_viewer_ = False
+            self._ephysViewer_.sig_newEpochInData.connect(self._slot_newEpochGenerated)
+            self._ephysViewer_.sig_axisActivated.connect(self._slot_newSignalViewerAxisSelected)
+            self.linkToViewers(self._ephysViewer_)
         else:
-            self._ephysViewer_ = sv.SignalViewer(win_title=self._winTitle_, 
-                                                 parent=self, configTag="DataViewer")
-            self._owns_viewer_ = True
-            
-            self._ephysViewer_.sig_closeMe.connect(self._slot_ephysViewer_closed)
-            
-        self.linkToViewers(self._ephysViewer_)
-        self._ephysViewer_.sig_newEpochInData.connect(self._slot_newEpochGenerated)
-        self._ephysViewer_.sig_axisActivated.connect(self._slot_newSignalViewerAxisSelected)
+            self._init_ephysViewer_()
             
         if self._data_ is not None:
             self._ephysViewer_.plot(self._data_)
@@ -858,16 +853,21 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if isinstance(self._mPSC_template_, neo.AnalogSignal):
             self._waveFormViewer_.view(self._mPSC_template_)
             
+    def _init_ephysViewer_(self):
+        self._ephysViewer_ = sv.SignalViewer(win_title=self._winTitle_, 
+                                                parent=self, configTag="DataViewer")
+        self._owns_viewer_ = True
+        self._ephysViewer_.sig_closeMe.connect(self._slot_ephysViewer_closed)
+        self._ephysViewer_.sig_newEpochInData.connect(self._slot_newEpochGenerated)
+        self._ephysViewer_.sig_axisActivated.connect(self._slot_newSignalViewerAxisSelected)
+        self.linkToViewers(self._ephysViewer_)
+        
+        
         
     def _plot_data(self):
         if self._data_ is not None:
             if not isinstance(self._ephysViewer_,sv.SignalViewer):
-                self._ephysViewer_ = sv.SignalViewer(win_title=self._winTitle_, parent=self)
-                self._owns_viewer_ = True
-                self._ephysViewer_.sig_newEpochInData.connect(self._slot_newEpochGenerated)
-                self._ephysViewer_.sig_axisActivated.connect(self._slot_newSignalViewerAxisSelected)
-                self._ephysViewer_.sig_closeMe.connect(self._slot_ephysViewer_closed)
-                self.linkToViewers(self._ephysViewer_)
+                self._init_ephysViewer_()
                 
             self._ephysViewer_.view(self._data_)
             self._ephysViewer_.currentFrame = self.currentFrame
