@@ -7466,6 +7466,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     def _remove_axes_(self, plotItem:pg.PlotItem):
         cursors = self.cursorsInAxis(plotItem)
+        k = self.axes.index(plotItem)
         if len(cursors):
             for cursor in cursors:
                 cursor.detach() # option (b)

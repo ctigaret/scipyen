@@ -39,7 +39,7 @@ some of the lost variables across kill - restart cycles.
 import os
 import signal
 import json
-import sys, typing, traceback, itertools, subprocess
+import sys, typing, traceback, itertools, subprocess, asyncio
 # BEGIN NOTE: 2022-03-05 16:07:04 For execute_request
 import inspect, time
 from ipykernel.jsonutil import json_clean
@@ -205,6 +205,10 @@ class ScipyenInProcessKernel(InProcessKernel):
     
     def __init__(self, **traits):
         super().__init__(**traits)
+        
+    @asyncio.coroutine
+    def _abort_queues(self):
+        yield
     
     async def execute_request(self, stream, ident, parent):
         """handle an execute_request
