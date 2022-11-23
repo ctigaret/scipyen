@@ -1030,14 +1030,15 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return None
                 
         waves = mPSCtrain.waveforms
+        print(waves.shape)
         signal_units = mPSCtrain.annotations.get("signal_units", pq.pA)
         mini_waves = list()
         if waves.size > 0:
             for k in range(waves.shape[0]): # spike #
                 wave = neo.AnalogSignal(waves[k,:,:],
-                                        t_start = mPSC.train[k],
+                                        t_start = mPSCtrain[k],
                                         units = signal_units,
-                                        samplin_rate=mPSCtrain.sampling_rate)
+                                        sampling_rate = mPSCtrain.sampling_rate)
                 wave.annotations["Accept"] = True
                 mini_waves.append(wave)
             
