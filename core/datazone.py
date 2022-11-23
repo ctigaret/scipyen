@@ -47,10 +47,7 @@ class DataZone(DataObject):
                         ('durations', pq.Quantity, 1),
                         ('labels', np.ndarray, 1, np.dtype('U')))
 
-    def __new__(cls, places=None, times=None, extents=None, durations=None,
-                labels=None, units=None, name=None, 
-                description=None, file_origin=None, segment=None,
-                array_annotations=None, **annotations):
+    def __new__(cls, places=None, times=None, extents=None, durations=None,labels=None, units=None, name=None, description=None, file_origin=None, segment=None,array_annotations=None, **annotations):
         if places is None:
             if times is None:
                 places = np.array([])

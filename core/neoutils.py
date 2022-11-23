@@ -298,84 +298,110 @@ def segment_start(data:neo.Segment):
         
 
 def set_relative_time_start(data, t = 0 * pq.s):
-    """Returns a copy of the data where each signal starts at a specified time.
+    """Set the components in each segment to the same t_start.
+    WARNING: Modifies data in-place only for signals, because the `times` 
+    attribute is read-only for neo data objects, except analog signals and 
+    irregularly sampled signals.
+    
+    If this is NOT what you want, then make a deep copy first by calling:
+    
+    • copy_with_data_subset(...) if data is a neo container (e.g., Block, Segment)
+    • data.copy() if data is a neo data object (ie., a signal)
+    
+    See `copy_with_data_subset` in this module for details.
+    
+    TODO: 2022-11-23 23:02:19
+    Rewrite to use single dispatch
     """
     from neo.core.spiketrainlist import SpikeTrainList
+    
+    def _set_epoch_time(e, t):
+        if e.times.size > 0:
+            new_times = e.times - e.times[0] + t
+        else:
+            new_times = e.times
+            
+        epoch_klass = e.__class__ # might be a DataZone
+            
+        new_epoch = epoch_klass(new_times,
+                                durations = e.durations,
+                                labels = e.labels,
+                                units = e.units,
+                                name=e.name)
+        
+        new_epoch.annotations.update(e.annotations)
+        
+        return new_epoch
+    
+    def _set_event_time(e, t):
+        new_times = e.times - e.times[0] + t if e.times.size > 0 else e.times
+        
+        if isinstance(event, TriggerEvent):
+            new_event = TriggerEvent(times = new_times,
+                                        labels = e.labels,
+                                        units = e.units,
+                                        name = e.name,
+                                        description = e.description,
+                                        event_type = e.event_type)
+        else:
+            new_event = neo.Event(times = new_times,
+                                    labels = e.labels,
+                                    units = e.units,
+                                    name=e.name,
+                                    description=e.description)
+            
+        new_event.annotations.update(e.annotations)
+        
+        return new_event
+    
+    def _set_train_time(spiketrain):
+        if spiketrain.times.size > 0:
+            new_times = spiketrain.times - spiketrain.times[0] + t
+            
+        else:
+            new_times = spiketrain.times
+            
+        new_spiketrain = neo.SpikeTrain(new_times, 
+                                        t_start = spiketrain.t_start - spiketrain.times[0] + t,
+                                        t_stop = spiketrain.t_stop - spiketrain.times[0] + t,
+                                        units = spiketrain.units,
+                                        waveforms = spiketrain.waveforms,
+                                        sampling_rate = spiketrain.sampling_rate,
+                                        name=spiketrain.name,
+                                        description=spiketrain.description)
+        
+        new_spiketrain.annotations.update(spiketrain.annotations)
+        
+        return new_spiketrain
+    
     if isinstance(data, neo.Block):
         for segment in data.segments:
             for isig in segment.irregularlysampledsignals:
                 isig.times = isig.times-segment.analogsignals[0].t_start + t
-                
+
             for signal in segment.analogsignals:
                 signal.t_start = t
                 
             try:
+                # NOTE: 2022-11-23 22:39:24
+                # we take this approach because the `times` attribute is read-only
                 new_epochs = list()
-                
                 for epoch in segment.epochs:
-                    if epoch.times.size > 0:
-                        new_times = epoch.times - epoch.times[0] + t
-                        
-                    else:
-                        new_times = epoch.times
-                        
-                    new_epoch = neo.Epoch(new_times,
-                                          durations = epoch.durations,
-                                          labels = epoch.labels,
-                                          units = epoch.units,
-                                          name=epoch.name)
-                    
-                    new_epoch.annotations.update(epoch.annotations)
-                    
-                    new_epochs.append(new_epoch)
+                    e = _set_epoch_time(epoch, t)
+                    new_epochs.append(e)
                     
                 segment.epochs[:] = new_epochs
                     
-                new_trains = list()
-                
+                new_trains = list() # see NOTE: 2022-11-23 22:39:24 
                 for spiketrain in segment.spiketrains:
-                    if spiketrain.times.size > 0:
-                        new_times = spiketrain.times - spiketrain.times[0] + t
-                        
-                    else:
-                        new_times = spiketrain.times
-                        
-                    new_spiketrain = neo.SpikeTrain(new_times, 
-                                                    t_start = spiketrain.t_start - spiketrain.times[0] + t,
-                                                    t_stop = spiketrain.t_stop - spiketrain.times[0] + t,
-                                                    units = spiketrain.units,
-                                                    waveforms = spiketrain.waveforms,
-                                                    sampling_rate = spiketrain.sampling_rate,
-                                                    name=spiketrain.name,
-                                                    description=spiketrain.description)
-                    
-                    new_spiketrain.annotations.update(spiketrain.annotations)
-                        
-                    new_trains.append(spiketrain)
+                    new_spiketrain = _set_train_time(spiektrain, t)
+                    new_trains.append(new_spiketrain)
                         
                 segment.spiketrains = SpikeTrainList(items=new_trains)
                     
-                new_events = list()
-                
+                new_events = list() # NOTE: 2022-11-23 22:39:24
                 for event in segment.events:
-                    new_times = event.times - event.times[0] + t if event.times.size > 0 else event.times
-                    
-                    if isinstance(event, TriggerEvent):
-                        new_event = TriggerEvent(times = new_times,
-                                                    labels = event.labels,
-                                                    units = event.units,
-                                                    name = event.name,
-                                                    description = event.description,
-                                                    event_type = event.event_type)
-                    else:
-                        new_event = neo.Event(times = new_times,
-                                              labels = event.labels,
-                                              units = event.units,
-                                              name=event.name,
-                                              description=event.description)
-                        
-                        new_event.annotations.update(event.annotations)
-                        
+                    new_event = _set_event_time(event, t)
                     new_events.append(new_event)
 
                 segment.events[:] = new_events
@@ -392,14 +418,24 @@ def set_relative_time_start(data, t = 0 * pq.s):
                 for signal in s.analogsignals:
                     signal.t_start = t
                     
+                new_epochs = list() # see NOTE: 2022-11-23 22:39:24
                 for epoch in s.epochs:
-                    epoch.times = epoch.times - epoch.times[0] + t
+                    new_epoch = _set_epoch_time(epoch, s)
+                    new_epochs.append(new_epoch)
+                s.epochs[:] = new_epochs
+                
+                new_trains = list() # see NOTE: 2022-11-23 22:39:24 
+                for spiketrain in s.spiketrains:
+                    new_spiketrain = _set_train_time(spiketrain, t)
+                    new_trains.append(spiketrain)
+                        
+                s.spiketrains = SpikeTrainList(items=new_trains)
                     
-                for strain in s.spiketrains:
-                    strain.times = strain.times - strain.times[0] + t
-                    
+                new_events = list() # NOTE: 2022-11-23 22:39:24
                 for event in s.events:
-                    event.times = event.times - event.times[0] + t
+                    new_event = _set_event_time(event, t)
+                    new_events.append(new_event)
+                s.events[:] = new_events
                 
         elif all([isinstance(x, (neo.AnalogSignal, DataSignal)) for x in data]):
             for s in data:
@@ -421,14 +457,14 @@ def set_relative_time_start(data, t = 0 * pq.s):
         for signal in data.analogsignals:
             signal.t_start = t
             
-        for epoch in data.epochs:
-            epoch.times = epoch.times - epoch.times[0] + t
+        new_epochs = [_set_epoch_time(e, t) for e in data.epochs]
+        data.epochs[:] = new_epochs
+
+        new_trains = [_set_train_time(s,t) for s in data.spiketrains]
+        data.spiketrains = SpikeTrainList(items = new_trains)
             
-        for strain in data.spiketrains:
-            strain.times = strain.times - strain.times[0] + t
-            
-        for event in data.events:
-            event.times = event.times - event.times[0] + t
+        new_events = [_set_event_time(e, t) for e in data.events]
+        data,events[:] = new_events
                 
     elif isinstance(data, (neo.AnalogSignal, DataSignal)):
         data.t_start = t
@@ -437,6 +473,7 @@ def set_relative_time_start(data, t = 0 * pq.s):
         data.times = data.times - data.times[0] + t
         
     elif isinstance(data, (neo.SpikeTrain, neo.Event, neo.Epoch)):
+        # FIXME: use single dispatch
         data.times = data.times = data.times[0] + t
         
     else:

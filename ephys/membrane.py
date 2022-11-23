@@ -6427,7 +6427,7 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     # ATTENTION: these maxima correspond to samples where the model or template 
     # fits best with the signal data; theo DO NOT correspond to the "peak" (or
     # trough) of the actual mini EPSC!!!
-    xcmaxima = [np.argmax(xc[v[0]:v[1]]) + v[0] for v in zip(peak_begins, peak_ends) if len(xc[v[0]:v[1]]) > 0]
+    xcmaxima = [np.argmax(xc[v[0]:v[1],0]) + v[0] for v in zip(peak_begins, peak_ends) if len(xc[v[0]:v[1],0]) > 0]
     
     # 7) locate the actual peaks (for positive waveform) or troughs (negative waveforms)
     if sigp.is_positive_waveform(waveform):
@@ -6435,7 +6435,7 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     else:
         peakfunc = np.argmin
     
-    peaks = [peakfunc(x.magnitude[v[0]:v[1]]) + v[0] for v in zip(peak_begins, peak_ends) if len(x.magnitude[v[0]:v[1]]) > 0]
+    peaks = [peakfunc(x.magnitude[v[0]:v[1],0]) + v[0] for v in zip(peak_begins, peak_ends) if len(x.magnitude[v[0]:v[1],0]) > 0]
 
     # 8) get the start & end of the signal's regions where putative minis were found
     

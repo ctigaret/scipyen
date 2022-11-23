@@ -886,7 +886,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             # WARNING: 2022-11-22 17:46:17
             # make sure self._detected_mPSCs_ is not a mere reference
             # to the list in frameResult! Create a NEW list !
-            self._detected_mPSCs_ = [neoutils.set_relative_time_start(s) for s in frameResult[1]]
+            # self._detected_mPSCs_ = [neoutils.set_relative_time_start(s) for s in frameResult[1]]
+            self._detected_mPSCs_ = [s for s in frameResult[1]]
             
             if not isinstance(self._detected_mPSCViewer_, sv.SignalViewer):
                 self._detected_mPSCViewer_ = sv.SignalViewer(win_title="Detected mPSCs", 
@@ -950,6 +951,20 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 
         # print(f"peak_time {peak_time}")
         
+        if isinstance(self._mPSC_model_waveform_, neo.core.basesignal.BaseSignal):
+            upward = sigp.is_positive_waveform(self._mPSC_model_waveform_)
+        elif isinstance(self._mPSC_template_, neo.core.basesignal.BaseSignal):
+            upward = sigp.is_positive_waveform(self._mPSC_template_)
+        else:
+            upward = False
+        
+        targetSize = 15
+        # NOTE: 2022-11-23 21:47:29
+        # below, the offset of the label to its target is given as (x,y) with
+        # x positive left → right
+        # y positive bottom → top (like the axis)
+        targetLabelOffset = (0, -20) if upward else (0, 20)
+        
         if isinstance(peak_time, pq.Quantity):
             peak_value = neoutils.get_sample_at_domain_value(signal, peak_time)
             self._ephysViewer_.removeTargetsOverlay(axis)
@@ -964,9 +979,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 targetLabelColor = (0,0,128,255)
                 
             self._ephysViewer_.overlayTargets((float(peak_time),float(peak_value)),
-                                                axis=axis, size=10, movable=False,
-                                                brush=targetBrush, label=f"{waveindex}",
-                                                labelOpts = {"color":targetLabelColor})
+                                                axis=axis, size=targetSize, 
+                                                movable=False,
+                                                brush=targetBrush, 
+                                                label=f"{waveindex}",
+                                                labelOpts = {"color":targetLabelColor,
+                                                             "offset":targetLabelOffset})
             self._ephysViewer_.refresh()
        
     def _clear_detection_in_sweep_(self, segment:neo.Segment):
@@ -1496,6 +1514,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
     @pyqtSlot()
     def _slot_saveEphysData(self):
+        if self._data_ is None:
+            return
+        
         fileName, fileFilter = self.chooseFile(caption="Save electrophysiology data",
                                                single=True,
                                                save=True,
@@ -1550,8 +1571,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
     @pyqtSlot()
     def _slot_exportEphysData(self):
-        if self._data_ is not None:
-            self.exportDataToWorkspace(self._data_, var_name=self.metaDataWidget.dataVarName)
+        if self._data_ is None:
+            return
+        
+        self.exportDataToWorkspace(self._data_, var_name=self.metaDataWidget.dataVarName)
     
     @pyqtSlot()
     def _slot_plotData(self):
@@ -1919,6 +1942,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return
         
         psc_trains = list()
+        all_waves = list()
+        
         start_time = list()
         peak_time = list()
         amplitude = list()
@@ -1944,6 +1969,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 continue
             psc_trains.append([s for s in frameResult[0]])
             for kw, w in enumerate(frameResult[1]):
+                all_waves.append(w)
                 seg_index.append(k)
                 wave_index.append(kw)
                 start_time.append(w.t_start)
@@ -1972,6 +1998,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                "Template":from_template, "FitAmplitude": fit_amplitude,
                "R²": r2, "RiseTime": tau_rise, "DecayTime": tau_decay}
         
-        return pd.DataFrame(res), psc_trains
+        res_df = pd.DataFrame(res)
+        
+        return res_df, psc_trains, all_waves
     
     
