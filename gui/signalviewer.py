@@ -378,7 +378,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     # TODO: 2019-11-01 22:43:50
     # implement viewing for all these
-    supported_types = (neo.Block, neo.Segment, neo.AnalogSignal, DataSignal, 
+    supported_types = (neo.Block, neo.Segment, 
+                       neo.AnalogSignal, DataSignal, 
                        neo.IrregularlySampledSignal,
                        IrregularlySampledDataSignal,
                        neo.SpikeTrain, 

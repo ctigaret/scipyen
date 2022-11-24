@@ -14,7 +14,7 @@ the corresponding property setter (i.e. avoid modifying the collection instance
 in place)
 
 """
-import sys, typing, dataclasses
+import sys, typing, dataclasses, traceback
 from warnings import warn, warn_explicit
 from collections import deque
 import numpy as np
@@ -262,9 +262,6 @@ class QuantityTrait(Instance):
                 # silent = (new_hash == self.hashed)
                 silent = new_value == old_value
             
-            # if not silent:
-            #     self.hashed = new_hash
-                
         except:
             traceback.print_exc()
             silent = False

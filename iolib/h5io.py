@@ -2028,16 +2028,19 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
     """
     Encodes Python objects into a HDF5 entity (Group or Dataset).
     
+    This is the "entry point" for encoding (writing) a Python object as a HDF5
+    data structure (file), in Scipyen.
+    
     Depending on the type of Python object, the object's data are stored as one
     or more HDF5 entities collected in a tree-like structure, in a parent HDF5
-    Group. The tree-like layout is characteristic to the Python's type.
+    Group. The tree-like layout is characteristic to the Python data type.
     
     As a rule of thumb, numeric scalars, arrays and other plain old data types
-    (str, bool, bytes, bytearray) are stored in Dataset "leaves".
+    (str, bool, bytes, bytearray) are stored as HDF5 Dataset "leaves".
     
-    Iterable objects, as well as more complex object types are stored as a Group
-    containing (sub)Group or Dataset children that correspond to specific attributes
-    of the Python object.
+    Iterable objects, as well as more complex object types are stored as HDF5
+    Group objects, containing children (HDF5 Group or Dataset) that correspond 
+    to specific attributes of the Python object.
     
     Information about the Python object's class and, where necessary, about any
     specific attributes of the Python's object, are stored in the 'attrs' property
