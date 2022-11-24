@@ -359,7 +359,7 @@ def _(data, t = 0 * pq.s):
 @set_relative_time_start.register(neo.AnalogSignal)
 @set_relative_time_start.register(DataSignal)
 def _(data, t = 0*pq.s):
-    ret = make_neo_obj(data, units = data.units, time_units = data.time_units,
+    ret = make_neo_object(data, units = data.units, time_units = data.time_units,
                        t_start = t, sampling_rate = data.sampling_rate,
                        name=data.name)
     ret.times = ret.times - ret.times[0] + t
@@ -368,15 +368,15 @@ def _(data, t = 0*pq.s):
 @set_relative_time_start.register(neo.Segment)
 def _(data, t = 0*pq.s):
     from neo.core.spiketrainlist import SpikeTrainList
-    ret = make_neo_obj(data)
+    ret = make_neo_object(data)
     ret.annotations.update(data.annotations)
     
-    isigs = [set_relative_time_start(make_neo_obj(s), t) for s in data.irregularlysampledsignals]
+    isigs = [set_relative_time_start(make_neo_object(s), t) for s in data.irregularlysampledsignals]
     ret.irregularlysampledsignals[:] = isigs
     
     # for isig in segment.irregularlysampledsignals:
     #     isig.times = isig.times-segment.analogsignals[0].t_start + t
-    sigs = [set_relative_time_start(make_neo_obj(s), t) for s in data.analogsignals]
+    sigs = [set_relative_time_start(make_neo_object(s), t) for s in data.analogsignals]
     ret.analogsignals[:] = sigs
     
     epochs = [set_relative_time_start(e, t) for e in data.epochs]
@@ -434,7 +434,7 @@ def _(data, t = 0 * pq.s):
     See `copy_with_data_subset` in this module for details.
     
     """
-    ret = make_neo_obj(data)
+    ret = make_neo_object(data)
     ret.segments = [set_relative_time_start(s, t) for s in data.segments]
     return ret
     
@@ -657,7 +657,7 @@ def merge_array_annotations(a0:ArrayDict, a1:ArrayDict):
     return ret
     
 @singledispatch
-def make_neo_obj(obj, /, **kwargs):
+def make_neo_object(obj, /, **kwargs):
     """Generic (copy) constructor for neo objects.
     
     For containers, generates an empty container of the same type as 'obj'; 
@@ -678,7 +678,7 @@ def make_neo_obj(obj, /, **kwargs):
     """
     raise NotImplementedError
 
-@make_neo_obj.register(neo.core.container.Container)
+@make_neo_object.register(neo.core.container.Container)
 def _(obj,/,**kwargs):
     """Generic (copy) constructor for neo's Container-like objects.
     
@@ -732,7 +732,7 @@ def _(obj,/,**kwargs):
     
     return factory()
 
-@make_neo_obj.register(neo.core.dataobject.DataObject)
+@make_neo_object.register(neo.core.dataobject.DataObject)
 def _(obj,/,**kwargs):
     """Generic (copy) constructor for objects of types inheriting neo.DataObject.
     Initialization based on half-educated guess, for code refactoring.
@@ -2781,7 +2781,7 @@ def _(obj, **kwargs):
     annotations = kwargs.pop("annotations", dict())
     
     indexing = dict((s, kwargs.pop(s, None)) for s in obj._child_containers)
-    ret = make_neo_obj(obj)
+    ret = make_neo_object(obj)
     
     # NOTE: 2021-11-23 14:56:56
     # groups organize data orthogonally to the segments;
@@ -2881,14 +2881,14 @@ def _(obj, **kwargs):
     
     indexing = dict((_container_name(s), kwargs.pop(_container_name(s), None)) for s in obj._data_child_objects)
         
-    ret = make_neo_obj(obj)
+    ret = make_neo_object(obj)
     
     for container_name, indices in indexing.items():
         # NOTE: 2021-11-23 13:39:15
         # the conversion to list also takes care of SpikeTrainList object
         container = list(getattr(obj, container_name))
         keep_ndx = normalized_index(container, indices)
-        keep_data = list(make_neo_obj(container[k]) for k in keep_ndx) # copy c'tor
+        keep_data = list(make_neo_object(container[k]) for k in keep_ndx) # copy c'tor
         for d in keep_data:
             d.segment = ret
             

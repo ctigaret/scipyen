@@ -187,6 +187,7 @@ import core.tiwt as tiwt
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.strutils as strutils
+from core.strutils import InflectEngine
 #import core.simulations as sim
 import core.data_analysis as anl
 
@@ -1181,7 +1182,7 @@ class VTH(object):
     gui_handlers = deepcopy(default_handlers)
 
     @safeWrapper
-    def register(viewerClass, dataTypes, actionName=None):
+    def register(viewerClass, dataTypes, actionName=None):#, priority:int=-1):
         """Modifies data handling by viewers or registers a new viewer type.
         Viewers are user-designed windows for data display.
         Parameters:
@@ -1258,45 +1259,55 @@ class VTH(object):
         #viewers = [viewer_type for viewer_type in VTH.gui_handlers.keys() if VTH.is_supported_type(obj_type, viewer_type)]
         #mro_viewers = [viewer_type for viewer_type in VTH.gui_handlers.keys() if VTH.is_supported_ancestor_type(obj_type, viewer_type)]
         
-        viewers_types = [(viewer_type, VTH.gui_handlers[viewer_type]["types"]) for viewer_type in VTH.gui_handlers.keys() if VTH.is_supported_type(obj_type, viewer_type)]
-        
-        viewers_mro = [(viewer_type, VTH.gui_handlers[viewer_type]["types"]) for viewer_type in VTH.gui_handlers.keys() if VTH.is_supported_ancestor_type(obj_type, viewer_type)]
-        
-        viewer_priorities = list()
-        
-        for v_t in viewers_types:
-            if obj_type in v_t[1]:
-                for k, type_obj in enumerate(v_t[1]):
-                    if obj_type is type_obj:
-                        viewer_priorities.append((k, v_t[0]))
-                        
-            else: #  look for ancestor types only if the object type is not explicitly listed in the viewer's supported_types'
-                for k, type_obj in enumerate(v_t[1]):
-                    if type_obj in obj_type.mro():
-                        viewer_priorities.append((k, v_t[0]))
+        vartypemro = inspect.getmro(obj_type)
+        viewers_types  = list()
+        for vtype in vartypemro:
+            viewers = [key for key, value in VTH.gui_handlers.items() if vtype in value["types"]]
+            for viewer in viewers:
+                if viewer not in viewers_types:
+                    viewers_types.append(viewer)  
                     
-        if len(viewer_priorities):
-            viewer_priorities = sorted(viewer_priorities, key=lambda x: x[0])
-            
-        n_direct = len(viewer_priorities)
-        
-        for v_t in viewers_mro:
-            if obj_type in v_t[1]:
-                for k, type_obj in enumerate(v_t[1]):
-                    if obj_type is type_obj: # or type_obj in obj_type.mro():
-                        if v_t[0] not in [v_[1] for v_ in viewer_priorities]:
-                            viewer_priorities.append((n_direct+k, v_t[0]))
-                        
-            else: #  look for ancestor types only if the object type is not explicitly listed in the viewer's supported_types'
-                for k, type_obj in enumerate(v_t[1]):
-                    if type_obj in obj_type.mro():
-                        if v_t[0] not in [v_[1] for v_ in viewer_priorities]:
-                            viewer_priorities.append((n_direct+k, v_t[0]))
+        return viewers_types
                     
-        if len(viewer_priorities):
-            viewer_priorities = sorted(viewer_priorities, key=lambda x: x[0])
-            
-        return viewer_priorities
+        # viewers_types = [(viewer_type, VTH.gui_handlers[viewer_type]["types"]) for viewer_type in VTH.gui_handlers.keys() if VTH.is_supported_type(obj_type, viewer_type)]
+        
+#         viewers_mro = [(viewer_type, VTH.gui_handlers[viewer_type]["types"]) for viewer_type in VTH.gui_handlers.keys() if VTH.is_supported_ancestor_type(obj_type, viewer_type)]
+#         
+#         viewer_priorities = list()
+#         
+#         for v_t in viewers_types:
+#             if obj_type in v_t[1]:
+#                 for k, type_obj in enumerate(v_t[1]):
+#                     if obj_type is type_obj:
+#                         viewer_priorities.append((k, v_t[0]))
+#                         
+#             else: #  look for ancestor types only if the object type is not explicitly listed in the viewer's supported_types'
+#                 for k, type_obj in enumerate(v_t[1]):
+#                     if type_obj in obj_type.mro():
+#                         viewer_priorities.append((k, v_t[0]))
+#                     
+#         if len(viewer_priorities):
+#             viewer_priorities = sorted(viewer_priorities, key=lambda x: x[0])
+#             
+#         n_direct = len(viewer_priorities)
+#         
+#         for v_t in viewers_mro:
+#             if obj_type in v_t[1]:
+#                 for k, type_obj in enumerate(v_t[1]):
+#                     if obj_type is type_obj: # or type_obj in obj_type.mro():
+#                         if v_t[0] not in [v_[1] for v_ in viewer_priorities]:
+#                             viewer_priorities.append((n_direct+k, v_t[0]))
+#                         
+#             else: #  look for ancestor types only if the object type is not explicitly listed in the viewer's supported_types'
+#                 for k, type_obj in enumerate(v_t[1]):
+#                     if type_obj in obj_type.mro():
+#                         if v_t[0] not in [v_[1] for v_ in viewer_priorities]:
+#                             viewer_priorities.append((n_direct+k, v_t[0]))
+#                     
+#         if len(viewer_priorities):
+#             viewer_priorities = sorted(viewer_priorities, key=lambda x: x[0])
+#             
+#         return viewer_priorities
     
     def get_view_actions(variable):
         #if isinstance(variable, (type, sip.wrappertype)):
@@ -1321,8 +1332,16 @@ class VTH(object):
             
         if vartype in VTH.gui_handlers.keys() or QtWidgets.QWidget in inspect.getmro(vartype):
             return 
+        
+        vartypemro = inspect.getmro(vartype)
+        actionNames  = list()
+        for vtype in vartypemro:
+            actions = [value["action"] for key, value in VTH.gui_handlers.items() if vtype in value["types"]]
+            for a in actions:
+                if a not in actionNames:
+                    actionNames.append(a)        
             
-        actionNames = [value["action"] for key, value in VTH.gui_handlers.items() if any([v in value["types"] for v in inspect.getmro(vartype)])]
+        # actionNames = [value["action"] for key, value in VTH.gui_handlers.items() if any([v in value["types"] for v in inspect.getmro(vartype)])]
         
         return actionNames
     
@@ -3156,17 +3175,19 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if not cm.isEmpty():
             cm.addSeparator()
             
-        copyVarNames = cm.addAction("Copy name(s)")
-        copyVarNames.setToolTip("Copy variable names to clipboard.\nPress SHIFT to quote the names; press CTRL to have one name per line")
-        copyVarNames.setStatusTip("Copy variable names to clipboard.\nPress SHIFT to quote the names; press CTRL to have one name per line")
-        copyVarNames.setWhatsThis("Copy variable names to clipboard.\nPress SHIFT to quote the names; press CTRL to have one name per line")
+        namestr = InflectEngine.plural('name', len(indexList))
+            
+        copyVarNames = cm.addAction(f"Copy {namestr}")
+        copyVarNames.setToolTip(f"Copy variable {namestr} to clipboard.\nPress SHIFT to quote the {namestr}; press CTRL to have one name per line")
+        copyVarNames.setStatusTip(f"Copy variable {namestr} to clipboard.\nPress SHIFT to quote the {namestr}; press CTRL to have one name per line")
+        copyVarNames.setWhatsThis(f"Copy variable {namestr} to clipboard.\nPress SHIFT to quote the {namestr}; press CTRL to have one name per line")
         copyVarNames.triggered.connect(self.slot_copyWorkspaceSelection)
         copyVarNames.hovered.connect(self._slot_showActionStatusMessage_)
     
-        varNamesToConsole = cm.addAction("Send name(s) to console")
-        varNamesToConsole.setToolTip("Copy & paste variable names directly to console.\nPress SHIFT to quote the names; press CTRL to have one name per line")
-        varNamesToConsole.setStatusTip("Copy & paste variable names directly to console.\nPress SHIFT to quote the names; press CTRL to have one name per line")
-        varNamesToConsole.setWhatsThis("Copy & paste variable names directly to console.\nPress SHIFT to quote the names; press CTRL to have one name per line")
+        varNamesToConsole = cm.addAction(f"Send {namestr} to console")
+        varNamesToConsole.setToolTip(f"Copy & paste variable {namestr} directly to console.\nPress SHIFT to quote the {namestr}; press CTRL to have one name per line")
+        varNamesToConsole.setStatusTip(f"Copy & paste variable {namestr} directly to console.\nPress SHIFT to quote the {namestr}; press CTRL to have one name per line")
+        varNamesToConsole.setWhatsThis(f"Copy & paste variable {namestr} directly to console.\nPress SHIFT to quote the {namestr}; press CTRL to have one name per line")
         varNamesToConsole.triggered.connect(self.slot_pasteWorkspaceSelection)
         varNamesToConsole.hovered.connect(self._slot_showActionStatusMessage_)
         
@@ -3200,12 +3221,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 clearWs.hovered.connect(self._slot_showActionStatusMessage_)
                 return
                 
-            
-#             actionNames = VTH.get_actionNames(varType)
-#             
-#             if actionNames is None:
-#                 return
-            
             #cm.addSeparator()
             
             specialViewMenu = cm.addMenu("View")
@@ -6430,7 +6445,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if len(viewers_type_list) == 0:
                 return False
             
-            winType = viewers_type_list[0][1]
+            # winType = viewers_type_list[0][1]
+            winType = viewers_type_list[0]
             
         else:
             return False

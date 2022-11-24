@@ -106,7 +106,7 @@ class DataSignal(BaseSignal):
     
     _recommended_attrs = neo.baseneo.BaseNeo._recommended_attrs
 
-    def __new__(cls, signal, units=None, domain_units=None, dtype=np.dtype("float64"), copy=True, t_start=0*pq.dimensionless, sampling_period=None, sampling_rate=None, name=None, domain_name=None, file_origin=None, description=None, array_annotations=None, **annotations):
+    def __new__(cls, signal, units=None, domain_units=None, time_units = None, dtype=np.dtype("float64"), copy=True, t_start=0*pq.dimensionless, sampling_period=None, sampling_rate=None, name=None, domain_name=None, file_origin=None, description=None, array_annotations=None, **annotations):
         # NOTE: 2021-12-09 21:45:08 try & sort out the mess from pickles saved with prev APIs
         # WARNING: This is NOT guaranteed to succeed
         # if trying to load an old pickle fails, you're better off going to the
@@ -183,7 +183,7 @@ class DataSignal(BaseSignal):
 
         return obj
     
-    def __init__(self, signal, units=None, domain_units = None, dtype=None, copy=True, t_start=0*pq.dimensionless, sampling_rate=None, sampling_period=None, name=None, domain_name = None, file_origin=None, description=None, array_annotations=None, **annotations):
+    def __init__(self, signal, units=None, domain_units = None, time_units = None, dtype=None, copy=True, t_start=0*pq.dimensionless, sampling_rate=None, sampling_period=None, name=None, domain_name = None, file_origin=None, description=None, array_annotations=None, **annotations):
         
         """DataSignal constructor.
         """
@@ -198,7 +198,7 @@ class DataSignal(BaseSignal):
         
         strings  = {"name":None, "domain_name":None, "file_origin":None, "description": None}
         
-        quants = {"units": None, "domain_units": None}
+        quants = {"units": None, "domain_units": None, "time_units": None}
         
         domainargs = {"t_start": None, "sampling_period":None, "sampling_rate":None}
         
@@ -208,7 +208,7 @@ class DataSignal(BaseSignal):
         
         bools = {"copy": None} # dealt with in __new__
         
-        call_arg_names = ("units", "domain_units", "dtype", "t_start",
+        call_arg_names = ("units", "domain_units", "time_units", "dtype", "t_start",
                           "sampling_period", "sampling_rate", "name", 
                           "file_origin", "description", "array_annotations",
                           "annotations")
@@ -287,11 +287,14 @@ class DataSignal(BaseSignal):
             elif isinstance(v, pq.Quantity):
                 if v.size == 1: # a scalar ; note signal is treated from the outset
                     # precedence: units, domain_units, t_start, sampling_period, sampling_rate
-                    if k in ("units", "domain_units"):
+                    if k in ("units", "domain_units", "time_units"):
                         quants[k] = v.units # not needed -- supplied at __new__
                     elif k in ("t_start", "sampling_period", "sampling_rate"):
                         domainargs[k] = v
                         
+        # harmonize time_units with domain_units
+        if quants["domain_units"] is None:
+            quants["domain_units"] = quants["time_units"]
         # print(f"{self.__class__.__name__}.__init__ call_args {call_args}\n")
         # print(f"{self.__class__.__name__}.__init__ strings {strings}\n")
         # print(f"{self.__class__.__name__}.__init__ quants {quants}\n")
@@ -1190,7 +1193,7 @@ class IrregularlySampledDataSignal(BaseSignal):
 
     _recommended_attrs = neo.baseneo.BaseNeo._recommended_attrs
 
-    def __new__(cls, domain, signal, units=None, domain_units=None, dtype=np.dtype("float64"), domain_dtype = np.dtype("float64"), domain_name = None, copy=True, name=None, file_origin=None, description=None, array_annotations=None, **annotations):
+    def __new__(cls, domain, signal, units=None, domain_units=None, time_units=None, dtype=np.dtype("float64"), domain_dtype = np.dtype("float64"), domain_name = None, copy=True, name=None, file_origin=None, description=None, array_annotations=None, **annotations):
         # NOTE: 2022-11-24 15:49:27
         # see NOTE: 2021-12-09 21:45:08
         #
@@ -1204,7 +1207,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         
         bools = {"copy": True}
         
-        call_arg_names = ("units", "dtype", "domain_units", "domain_dtype")
+        call_arg_names = ("units", "dtype", "domain_units", "time_units", "domain_dtype")
         
         segment = None
         
@@ -1238,14 +1241,17 @@ class IrregularlySampledDataSignal(BaseSignal):
 
             elif isinstance(v, pq.Quantity):
                 if v.size == 1: # a scalar ; note signal is treated from the outset
-                    if k in ("units", "domain_units"):
+                    if k in ("units", "domain_units", "time_units"):
                         quants[k] = v
                     
         if quants["units"] is None:
             quants["units"] = pq.dimensionless
             
         if quants["domain_units"] is None:
-            quants["domain_units"] = pq.dimensionless
+            if quants["time_units"] is None:
+                quants["domain_units"] = pq.dimensionless
+            else:
+                quants["domain_units"] = quants["time_units"]
             
         if isinstance(signal, pq.Quantity):
             if signal.units != quants["units"]:
@@ -1280,7 +1286,7 @@ class IrregularlySampledDataSignal(BaseSignal):
 
         return obj
                 
-    def __init__(self, domain, signal, units=None, domain_units=None, dtype=None, domain_dtype=None, domain_name=None, copy=True, name=None, file_origin=None, description=None,array_annotations=None, **annotations):
+    def __init__(self, domain, signal, units=None, domain_units=None, time_units=None, dtype=None, domain_dtype=None, domain_name=None, copy=True, name=None, file_origin=None, description=None,array_annotations=None, **annotations):
         """IrregularlySampledDataSignal constructor
         Similar to the neo.IrregularlySampledSignal but not restricted to the 
         time domain.

@@ -389,6 +389,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                        TriggerEvent,
                        TriggerProtocol,
                        vigra.filters.Kernel1D, 
+                       pq.Quantity,
                        np.ndarray,
                        tuple, list)
     
