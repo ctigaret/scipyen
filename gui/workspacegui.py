@@ -19,7 +19,7 @@ from core.scipyen_config import (ScipyenConfigurable,
 from core import strutils
 from core.strutils import InflectEngine
 import gui.quickdialog as qd
-from gui.pictgui import ItemsListDialog
+from gui.itemslistdialog import ItemsListDialog
 
 #ScipyenConfigurable = ScipyenConfigurable2 # NOTE remove before release
 

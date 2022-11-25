@@ -44,7 +44,7 @@ from gui.scipyenviewer import ScipyenFrameViewer
 import gui.signalviewer as sv
 from gui.signalviewer import SignalCursor as SignalCursor
 import gui.pictgui as pgui
-from gui.pictgui import ItemsListDialog
+from gui.itemslistdialog import ItemsListDialog
 from gui.workspacegui import (GuiMessages, WorkspaceGuiMixin)
 from gui.widgets.modelfitting_ui import ModelParametersWidget
 from gui.widgets.spinboxslider import SpinBoxSlider
@@ -321,6 +321,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._reportWindow_.setVisible(False)
         
         self._set_data_(ephysdata)
+        
+        self.workerThread = QtCore.QThread()
         
         # NOTE: 2022-11-05 23:08:01
         # this is inherited from WorkspaceGuiMixin therefore it needs full
@@ -1648,13 +1650,22 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             vartxt = ""
             
         progressDisplay = QtWidgets.QProgressDialog(f"Detecting mPSCS {vartxt}", "Abort", 0, self._number_of_frames_, self)
+
+        # TODO
+        # worker = pgui.ProgressThreadWorker(self._detect_all_, progressDisplay)
+        # worker.moveToThread(self.workerThread)
+        # self.workerThread.finished.connect(worker.deleteLater)
+        # self.
         
+        # NOTE: 2022-11-25 22:15:47
+        # this cannot abort
         worker = pgui.ProgressRunnableWorker(self._detect_all_, progressDisplay)
         
         worker.signals.signal_finished.connect(progressDisplay.reset)
         worker.signals.signal_result[object].connect(self._slot_detectionDone)
         
-        self.threadpool.start(worker)
+        # NOTE: 2022-11-25 22:16:15 see NOTE: 2022-11-25 22:15:47
+        # self.threadpool.start(worker)
         
     @pyqtSlot()
     def _slot_detectionDone(self):
