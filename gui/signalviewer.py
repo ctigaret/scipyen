@@ -183,6 +183,8 @@ from .dictviewer import (InteractiveTreeWidget, DataViewer,)
 from .cursors import SignalCursor
 from gui.widgets.colorwidgets import ColorSelectionWidget, quickColorDialog
 from gui.pictgui import GuiWorker
+from gui.itemslistdialog import ItemsListDialog
+
 #### END pict.gui modules
 
 # each spike is a small vertical line centered at 0.0, height of 1
@@ -2401,7 +2403,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 preSelected = None
                 
-            dlg = pgui.ItemsListDialog(parent=self,
+            dlg = ItemsListDialog(parent=self,
                                        itemsList = available,
                                        preSelected=preSelected,
                                        title="Select Analog Signals to Plot",
@@ -2611,7 +2613,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 preSelected=None
             
-            dlg = pgui.ItemsListDialog(parent=self, 
+            dlg = ItemsListDialog(parent=self, 
                                        itemsList = available, 
                                        preSelected = preSelected,
                                        title="Select Irregular Signals to Plot", 
@@ -3823,12 +3825,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         elif len(vertAndCrossCursors) > 1:
             # dialog to select cursors
             if isinstance(self.selectedDataCursor, SignalCursor) and self.selectedDataCursor in vertAndCrossCursors.values():
-                cseldlg = pgui.ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
+                cseldlg = ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
                                             title="Select cursors", 
                                             selectmode = QtWidgets.QAbstractItemView.ExtendedSelection,
                                             preSelected=self.selectedDataCursor.name)
             else:
-                cseldlg = pgui.ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
+                cseldlg = ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
                                             title="Select cursors",
                                             selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
             ans = cseldlg.exec_()
@@ -3894,12 +3896,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         elif len(vertAndCrossCursors) > 1:
             # dialog to select cursors
             if isinstance(self.selectedDataCursor, SignalCursor) and self.selectedDataCursor in vertAndCrossCursors.values():
-                cseldlg = pgui.ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
+                cseldlg = ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
                                                title="Select cursors", 
                                                selectmode = QtWidgets.QAbstractItemView.ExtendedSelection,
                                                preSelected=self.selectedDataCursor.name)
             else:
-                cseldlg = pgui.ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
+                cseldlg = ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
                                                 title="Select cursors",
                                                 selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
             ans = cseldlg.exec_()

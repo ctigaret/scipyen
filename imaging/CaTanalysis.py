@@ -201,6 +201,7 @@ import gui.quickdialog as qd
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import (ScipyenViewer, ScipyenFrameViewer)
 from gui.workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
+from gui.itemslistdialog import ItemsListDialog
 #### END pict.gui modules
 
 #### BEGIN imaging modules
@@ -4939,7 +4940,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             pre_selected = None
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, 
+        choiceDialog = ItemsListDialog(parent=self, 
                                             title="Import Data-wide Descriptors From:", 
                                             itemsList = name_list, 
                                             preSelected = pre_selected)
@@ -5093,7 +5094,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
 
         name_list = sorted([name for name in scandata_name_vars.keys() if self._check_for_linescan_data_(scandata_name_vars[name])])
         
-        choiceDialog = pgui.ItemsListDialog(title="Append ScanData Object", 
+        choiceDialog = ItemsListDialog(title="Append ScanData Object", 
                                             parent=self, 
                                             itemsList = name_list)
         
@@ -5136,7 +5137,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
 
         name_list = sorted([name for name in scandata_name_vars.keys() if self._check_for_linescan_data_(scandata_name_vars[name])])
         
-        choiceDialog = pgui.ItemsListDialog(title="Concatenate ScanData Objects", 
+        choiceDialog = ItemsListDialog(title="Concatenate ScanData Objects", 
                                             parent=self, itemsList = name_list, 
                                             selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
         
@@ -5179,7 +5180,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             pre_selected = None
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, 
+        choiceDialog = ItemsListDialog(parent=self, 
                                             itemsList = name_list, 
                                             preSelected = pre_selected)
         
@@ -5222,7 +5223,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             else:
                 pre_selected = None
             
-            choiceDialog = pgui.ItemsListDialog(parent=self, 
+            choiceDialog = ItemsListDialog(parent=self, 
                                                 itemsList = name_list, 
                                                 preSelected = pre_selected)
             
@@ -5273,7 +5274,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             else:
                 pre_selected = None
             
-            choiceDialog = pgui.ItemsListDialog(parent=self, 
+            choiceDialog = ItemsListDialog(parent=self, 
                                                 itemsList = name_list, 
                                                 preSelected = pre_selected)
             
@@ -5323,7 +5324,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             else:
                 pre_selected = None
             
-            choiceDialog = pgui.ItemsListDialog(parent=self, 
+            choiceDialog = ItemsListDialog(parent=self, 
                                                 itemsList = name_list, 
                                                 preSelected = pre_selected)
             
@@ -5374,7 +5375,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         name_list = sorted(name for name in neo_block_name_vars.keys())
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = name_list)
+        choiceDialog = ItemsListDialog(parent=self, itemsList = name_list)
         
         ans = choiceDialog.exec()
         
@@ -6827,7 +6828,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         unit_names = sorted([u.name for u in self._data_.analysisUnits])
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = unit_names,
+        choiceDialog = ItemsListDialog(parent=self, itemsList = unit_names,
                                             selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
         
         ans = choiceDialog.exec()
@@ -7190,7 +7191,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
 
         name_list = sorted([name for name in scandata_name_vars.keys() if self._check_for_linescan_data_(scandata_name_vars[name])])
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = name_list, 
+        choiceDialog = ItemsListDialog(parent=self, itemsList = name_list, 
                                             selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
         
         ans = choiceDialog.exec()
@@ -7268,7 +7269,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         try:
             # NOTE: 2018-12-14 16:46:03
             # offer these in a list dialog -- allow the user to pick & choose
-            choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = [item[0] for item in vars_list], 
+            choiceDialog = ItemsListDialog(parent=self, itemsList = [item[0] for item in vars_list], 
                                                 selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
             
             ans = choiceDialog.exec()
@@ -7463,7 +7464,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
 
         name_list = sorted([name for name in scandata_name_vars.keys() if self._check_for_linescan_data_(scandata_name_vars[name])])
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = name_list, 
+        choiceDialog = ItemsListDialog(parent=self, itemsList = name_list, 
                                             selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
         
         ans = choiceDialog.exec()

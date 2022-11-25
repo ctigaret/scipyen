@@ -644,6 +644,7 @@ import gui.textviewer as tv
 import gui.tableeditor as te
 import gui.matrixviewer as matview
 import gui.pictgui as pgui
+from gui.itemslistdialog import ItemsListDialog
 import gui.quickdialog as quickdialog
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import ScipyenViewer, ScipyenFrameViewer
@@ -1088,7 +1089,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
         else:
             nameList = [b.name for b in self._baseline_source_data_]
-            choiceDialog = pgui.ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
+            choiceDialog = ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
             
             ans = choiceDialog.exec()
             
@@ -1118,7 +1119,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
         else:
             nameList = [b.name for b in self._chase_source_data_]
-            choiceDialog = pgui.ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
+            choiceDialog = ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
             
             ans = choiceDialog.exec()
             
@@ -1149,7 +1150,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
         else:
             nameList = [b.name for b in self._conditioning_source_data_]
-            choiceDialog = pgui.ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
+            choiceDialog = ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
             
             ans = choiceDialog.exec()
             
@@ -1179,7 +1180,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
         else:
             nameList = [b.name for b in self._path_xtalk_source_data_]
-            choiceDialog = pgui.ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
+            choiceDialog = ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
             
             ans = choiceDialog.exec()
             

@@ -256,15 +256,15 @@ from .widgets import colorwidgets
 from .widgets import stylewidgets
 from .widgets import gradientwidgets
 from . import interact
-from gui.interact import (getInput, getInputs, packInputs, selectWSData)
-
+from .interact import (getInput, getInputs, packInputs, selectWSData)
+from .itemslistdialog import ItemsListDialog
 from .triggerdetectgui import guiDetectTriggers
 
 from .workspacegui import (WorkspaceGuiMixin)
 from .workspacemodel import WorkspaceModel
 
 # qtconsole.styles and pygments.styles, respectively:
-from gui.consoles import styles, pstyles 
+from .consoles import styles, pstyles 
 #### END scipyen gui modules
 
 
@@ -2924,7 +2924,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         """Slot for opening a list of viewer types (no used)
         """
         viewer_type_names = [v.__name__ for v in gui_viewers]
-        dlg = pgui.ItemsListDialog(parent=self, itemsList=viewer_type_names,
+        dlg = ItemsListDialog(parent=self, itemsList=viewer_type_names,
                                    title="Viewer type", modal=True)
         
         if dlg.exec() == 1:

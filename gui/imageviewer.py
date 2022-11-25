@@ -113,6 +113,7 @@ from . import pictgui as pgui
 from . import scipyen_colormaps as colormaps 
 from . import quickdialog
 from . import painting_shared
+from gui.itemslistdialog import ItemsListDialog
 #### END scipyen gui modules
 
 mpl.rcParams['backend']='Qt5Agg'
@@ -811,7 +812,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         else:
             dlgTitle = "Remove %ss" % "cursor" if cursors else "ROI"
             
-            selectionDialog = pgui.ItemsListDialog(self, objNames,
+            selectionDialog = ItemsListDialog(self, objNames,
                                                 title = dlgTitle,
                                                 selectmode = QtWidgets.QAbstractItemView.MultiSelection)
             
@@ -846,7 +847,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             return
         
         if not isinstance(crsId, str) or len(crsId.strip()) == 0:
-            selectionDialog = pgui.ItemsListDialog(self, sorted([c.name for c in self.dataCursors]), "Select cursor")
+            selectionDialog = ItemsListDialog(self, sorted([c.name for c in self.dataCursors]), "Select cursor")
             
             a = selectionDialog.exec_()
             
@@ -3362,7 +3363,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         name_list = sorted([name for name in img_vars.keys()])
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = name_list)
+        choiceDialog = ItemsListDialog(parent=self, itemsList = name_list)
         
         ans = choiceDialog.exec()
         
@@ -4062,12 +4063,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         colormapnames = sorted([n for n in mpl.colormaps.keys()])
         
         if isinstance(self._colorMap, colormaps.colors.Colormap):
-            d = pgui.ItemsListDialog(self, itemsList=colormapnames,
+            d = ItemsListDialog(self, itemsList=colormapnames,
                                      title="Select color map",
                                      preSelected=self._colorMap.name)
             
         else:
-            d = pgui.ItemsListDialog(self, itemsList=colormapnames, 
+            d = ItemsListDialog(self, itemsList=colormapnames, 
                                      title="Select color map", 
                                      preSelected="None")
             

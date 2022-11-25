@@ -96,9 +96,9 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 #Ui_EditColorMapWidget, QWidget = __loadUiType__(os.path.join(__module_path__,"widgets","editcolormap2.ui"))
 
-Ui_ItemsListDialog, QDialog = __loadUiType__(os.path.join(__module_path__,"itemslistdialog.ui"))
+# Ui_ItemsListDialog, QDialog = __loadUiType__(os.path.join(__module_path__,"itemslistdialog.ui"))
 
-Ui_LinearRangeMappingWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "linearrangemappingwidget.ui"))
+# Ui_LinearRangeMappingWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "linearrangemappingwidget.ui"))
 
 def generateColorCycle():
     pass
@@ -329,169 +329,159 @@ class MouseEventSink(QtCore.QObject):
         self.itemSelected.emit(item.text())
         self.close()
 
-class ItemsListDialog(QDialog, Ui_ItemsListDialog):
-    itemSelected = QtCore.pyqtSignal(str)
-
-    def __init__(self, parent = None, itemsList=None, title=None, preSelected=None, modal=False, selectmode=QtWidgets.QAbstractItemView.SingleSelection):
-        super(ItemsListDialog, self).__init__(parent)
-        self.setupUi(self)
-        self.setModal(modal)
-        self.preSelected = list()
-        
-        self.searchLineEdit.undoAvailable=True
-        self.searchLineEdit.redoAvailable=True
-        self.searchLineEdit.setClearButtonEnabled(True)
-        
-        self.searchLineEdit.textEdited.connect(self.slot_locateSelectName)
-        
-        if isinstance(selectmode, str):
-            if selectmode.lower == "single":
-                selectmode = QtWidgets.QAbstractItemView.SingleSelection
-            elif selectmode.lower == "contiguous":
-                selectmode = QtWidgets.QAbstractItemView.ContiguousSelection
-            elif selectmode.lower == "extended":
-                selectmode = QtWidgets.QAbstractItemView.ExtendedSelection
-            elif selectmode.lower == "multi":
-                selectmode = QtWidgets.QAbstractItemView.MultiSelection
-            else:
-                warnings.warn(f"I don't know what '{selectmode}' selection means...")
-                selectmode = QtWidgets.QAbstractItemView.SingleSelection
-                
-            
-        if not isinstance(selectmode, QtWidgets.QAbstractItemView.SelectionMode):
-            selectmode = QtWidgets.QAbstractItemView.SingleSelection
-        
-        self.listWidget.setSelectionMode(selectmode)
-    
-        if title is not None:
-            self.setWindowTitle(title)
-    
-        self.listWidget.itemClicked.connect(self.selectItem)
-        self.listWidget.itemDoubleClicked.connect(self.selectAndGo)
-
-        self.selectionMode = selectmode
-        
-        if isinstance(itemsList, (tuple, list)) and \
-            all([isinstance(i, str) for i in itemsList]):
-            
-            if isinstance(preSelected, str) and preSelected in itemsList:
-                self.preSelected = [preSelected]
-                
-            elif isinstance(preSelected, (tuple, list)) and all([(isinstance(s, str) and len(s.strip()) and s in itemsList) for s in preSelected]):
-                self.preSelected = preSelected
-                
-            self.setItems(itemsList)
-            
-    @pyqtSlot(str)
-    def slot_locateSelectName(self, txt):
-        found_items = self.listWidget.findItems(txt, QtCore.Qt.MatchContains | QtCore.Qt.MatchCaseSensitive)
-        if len(found_items):
-            for row in range(self.listWidget.count()):
-                self.listWidget.item(row).setSelected(False)
-                
-            for k, item in enumerate(found_items):
-                item.setSelected(True)
-                self.itemSelected.emit(str(item.text()))
-                
-            sel_indexes = self.listWidget.selectedIndexes()
-            
-            if len(sel_indexes):
-                self.listWidget.scrollTo(sel_indexes[0])
-                if len(sel_indexes) == 1:
-                    self.itemSelected.emit(str(found_items[0].text()))
-                #self.itemSelected.emit()
-            
-    def validateItems(self, itemsList):
-        # 2016-08-10 11:51:07
-        # NOTE: in python3 all str are unicode
-        if itemsList is None or isinstance(itemsList, list) and (len(itemsList) == 0 or not all([isinstance(x,(str)) for x in itemsList])):
-            QtWidgets.QMessageBox.critical(None, "Error", "Argument must be a list of string or unicode items.")
-            return False
-        return True
-
-    @property
-    def selectedItemsText(self):
-        """A a list of str - text of selected items, which may be empty
-        """
-        return [str(i.text()) for i in self.listWidget.selectedItems()]
-        
-    @property
-    def selectionMode(self):
-        return self.listWidget.selectionMode()
-    
-    @selectionMode.setter
-    def selectionMode(self, selectmode):
-        if not isinstance(selectmode, (int, QtWidgets.QAbstractItemView.SelectionMode, str)):
-            raise TypeError("Expecting an int or a QtWidgets.QAbstractItemView.SelectionMode; got %s instead" % type(selectmode).__name__)
-        
-        if isinstance(selectmode, int):
-            if selectmode not in range(5):
-                raise ValueError("Invalid selection mode:  %d" % selectmode)
-            
-        elif isinstance(selectmode, str):
-            if selectmode.strip().lower() not in ("single", "multi"):
-                raise ValueError("Invalid selection mode %s", selectmode)
-            
-            if selectmode == single:
-                selectmode = QtWidgets.QAbstractItemView.SingleSelection
-                
-            else:
-                selectmode = QtWidgets.QAbstractItemView.MultiSelection
-            
-        self.listWidget.setSelectionMode(selectmode)
-                
-    def setItems(self, itemsList, preSelected=None):
-        """Populates the list dialog with a list of strings :-)
-        
-        itemsList: a python list of python strings :-)
-        """
-        if self.validateItems(itemsList):
-            self.listWidget.clear()
-            self.listWidget.addItems(itemsList)
-            
-            if isinstance(preSelected, (tuple, list)) and len(preSelected) and all([(isinstance(s, str) and len(s.strip()) and s in itemsList) for s in preSelected]):
-                self.preSelected=preSelected
-                
-            elif isinstance(preSelected, str) and len(preSelected.strip()) and preSelected in itemsList:
-                self.preSelected = [preSelected]
-            
-            longestItemNdx = np.argmax([len(i) for i in itemsList])
-            longestItem = itemsList[longestItemNdx]
-            
-            for k, s in enumerate(self.preSelected):
-                ndx = itemsList.index(s)
-                item = self.listWidget.item(ndx)
-                self.listWidget.setCurrentItem(item)
-                self.listWidget.scrollToItem(item)
-                
-            fm = QtGui.QFontMetrics(self.listWidget.font())
-            w = fm.width(longestItem) * 1.1
-            
-            if self.listWidget.verticalScrollBar():
-                w += self.listWidget.verticalScrollBar().sizeHint().width()
-                
-            self.listWidget.setMinimumWidth(int(w))
-
-    @pyqtSlot(QtWidgets.QListWidgetItem)
-    def selectItem(self, item):
-        self.itemSelected.emit(str(item.text())) # this is a QString !!!
-        
-    @pyqtSlot(QtWidgets.QListWidgetItem)
-    def selectAndGo(self, item):
-        self.itemSelected.emit(item.text())
-        self.accept()
-        
-    @property
-    def selectedItems(self):
-        return self.listWidget.selectedItems()
-        
-class SelectablePlotItem(pg.PlotItem):
-    itemClicked = pyqtSignal()
-    
-    def __init__(self, **kwargs):
-        super(SelectablePlotItem, self).__init__(**kwargs)
-        
-    def mousePressEvent(self, ev):
-        super(SelectablePlotItem, self).mousePressEvent(ev)
-        self.itemClicked.emit()
-        
+# class ItemsListDialog(QDialog, Ui_ItemsListDialog):
+#     itemSelected = QtCore.pyqtSignal(str)
+# 
+#     def __init__(self, parent = None, itemsList=None, title=None, preSelected=None, modal=False, selectmode=QtWidgets.QAbstractItemView.SingleSelection):
+#         super(ItemsListDialog, self).__init__(parent)
+#         self.setupUi(self)
+#         self.setModal(modal)
+#         self.preSelected = list()
+#         
+#         self.searchLineEdit.undoAvailable=True
+#         self.searchLineEdit.redoAvailable=True
+#         self.searchLineEdit.setClearButtonEnabled(True)
+#         
+#         self.searchLineEdit.textEdited.connect(self.slot_locateSelectName)
+#         
+#         if isinstance(selectmode, str):
+#             if selectmode.lower == "single":
+#                 selectmode = QtWidgets.QAbstractItemView.SingleSelection
+#             elif selectmode.lower == "contiguous":
+#                 selectmode = QtWidgets.QAbstractItemView.ContiguousSelection
+#             elif selectmode.lower == "extended":
+#                 selectmode = QtWidgets.QAbstractItemView.ExtendedSelection
+#             elif selectmode.lower == "multi":
+#                 selectmode = QtWidgets.QAbstractItemView.MultiSelection
+#             else:
+#                 warnings.warn(f"I don't know what '{selectmode}' selection means...")
+#                 selectmode = QtWidgets.QAbstractItemView.SingleSelection
+#                 
+#             
+#         if not isinstance(selectmode, QtWidgets.QAbstractItemView.SelectionMode):
+#             selectmode = QtWidgets.QAbstractItemView.SingleSelection
+#         
+#         self.listWidget.setSelectionMode(selectmode)
+#     
+#         if title is not None:
+#             self.setWindowTitle(title)
+#     
+#         self.listWidget.itemClicked.connect(self.selectItem)
+#         self.listWidget.itemDoubleClicked.connect(self.selectAndGo)
+# 
+#         self.selectionMode = selectmode
+#         
+#         if isinstance(itemsList, (tuple, list)) and \
+#             all([isinstance(i, str) for i in itemsList]):
+#             
+#             if isinstance(preSelected, str) and preSelected in itemsList:
+#                 self.preSelected = [preSelected]
+#                 
+#             elif isinstance(preSelected, (tuple, list)) and all([(isinstance(s, str) and len(s.strip()) and s in itemsList) for s in preSelected]):
+#                 self.preSelected = preSelected
+#                 
+#             self.setItems(itemsList)
+#             
+#     @pyqtSlot(str)
+#     def slot_locateSelectName(self, txt):
+#         found_items = self.listWidget.findItems(txt, QtCore.Qt.MatchContains | QtCore.Qt.MatchCaseSensitive)
+#         if len(found_items):
+#             for row in range(self.listWidget.count()):
+#                 self.listWidget.item(row).setSelected(False)
+#                 
+#             for k, item in enumerate(found_items):
+#                 item.setSelected(True)
+#                 self.itemSelected.emit(str(item.text()))
+#                 
+#             sel_indexes = self.listWidget.selectedIndexes()
+#             
+#             if len(sel_indexes):
+#                 self.listWidget.scrollTo(sel_indexes[0])
+#                 if len(sel_indexes) == 1:
+#                     self.itemSelected.emit(str(found_items[0].text()))
+#                 #self.itemSelected.emit()
+#             
+#     def validateItems(self, itemsList):
+#         # 2016-08-10 11:51:07
+#         # NOTE: in python3 all str are unicode
+#         if itemsList is None or isinstance(itemsList, list) and (len(itemsList) == 0 or not all([isinstance(x,(str)) for x in itemsList])):
+#             QtWidgets.QMessageBox.critical(None, "Error", "Argument must be a list of string or unicode items.")
+#             return False
+#         return True
+# 
+#     @property
+#     def selectedItemsText(self):
+#         """A a list of str - text of selected items, which may be empty
+#         """
+#         return [str(i.text()) for i in self.listWidget.selectedItems()]
+#         
+#     @property
+#     def selectionMode(self):
+#         return self.listWidget.selectionMode()
+#     
+#     @selectionMode.setter
+#     def selectionMode(self, selectmode):
+#         if not isinstance(selectmode, (int, QtWidgets.QAbstractItemView.SelectionMode, str)):
+#             raise TypeError("Expecting an int or a QtWidgets.QAbstractItemView.SelectionMode; got %s instead" % type(selectmode).__name__)
+#         
+#         if isinstance(selectmode, int):
+#             if selectmode not in range(5):
+#                 raise ValueError("Invalid selection mode:  %d" % selectmode)
+#             
+#         elif isinstance(selectmode, str):
+#             if selectmode.strip().lower() not in ("single", "multi"):
+#                 raise ValueError("Invalid selection mode %s", selectmode)
+#             
+#             if selectmode == single:
+#                 selectmode = QtWidgets.QAbstractItemView.SingleSelection
+#                 
+#             else:
+#                 selectmode = QtWidgets.QAbstractItemView.MultiSelection
+#             
+#         self.listWidget.setSelectionMode(selectmode)
+#                 
+#     def setItems(self, itemsList, preSelected=None):
+#         """Populates the list dialog with a list of strings :-)
+#         
+#         itemsList: a python list of python strings :-)
+#         """
+#         if self.validateItems(itemsList):
+#             self.listWidget.clear()
+#             self.listWidget.addItems(itemsList)
+#             
+#             if isinstance(preSelected, (tuple, list)) and len(preSelected) and all([(isinstance(s, str) and len(s.strip()) and s in itemsList) for s in preSelected]):
+#                 self.preSelected=preSelected
+#                 
+#             elif isinstance(preSelected, str) and len(preSelected.strip()) and preSelected in itemsList:
+#                 self.preSelected = [preSelected]
+#             
+#             longestItemNdx = np.argmax([len(i) for i in itemsList])
+#             longestItem = itemsList[longestItemNdx]
+#             
+#             for k, s in enumerate(self.preSelected):
+#                 ndx = itemsList.index(s)
+#                 item = self.listWidget.item(ndx)
+#                 self.listWidget.setCurrentItem(item)
+#                 self.listWidget.scrollToItem(item)
+#                 
+#             fm = QtGui.QFontMetrics(self.listWidget.font())
+#             w = fm.width(longestItem) * 1.1
+#             
+#             if self.listWidget.verticalScrollBar():
+#                 w += self.listWidget.verticalScrollBar().sizeHint().width()
+#                 
+#             self.listWidget.setMinimumWidth(int(w))
+# 
+#     @pyqtSlot(QtWidgets.QListWidgetItem)
+#     def selectItem(self, item):
+#         self.itemSelected.emit(str(item.text())) # this is a QString !!!
+#         
+#     @pyqtSlot(QtWidgets.QListWidgetItem)
+#     def selectAndGo(self, item):
+#         self.itemSelected.emit(item.text())
+#         self.accept()
+#         
+#     @property
+#     def selectedItems(self):
+#         return self.listWidget.selectedItems()
+#         
