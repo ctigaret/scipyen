@@ -233,6 +233,22 @@
            </property>
           </widget>
          </item>
+         <item>
+          <widget class="QPushButton" name="reFitPushButton">
+           <property name="toolTip">
+            <string>Re-fit current mPSC</string>
+           </property>
+           <property name="statusTip">
+            <string>Re-fit current mPSC</string>
+           </property>
+           <property name="whatsThis">
+            <string>Re-fit current mPSC</string>
+           </property>
+           <property name="text">
+            <string>Fit</string>
+           </property>
+          </widget>
+         </item>
         </layout>
        </item>
       </layout>
@@ -270,10 +286,10 @@
      <addaction name="actionOpen_mPSCTemplate"/>
      <addaction name="actionImport_mPSCTemplate"/>
     </widget>
-    <addaction name="actionOpenEphysData"/>
-    <addaction name="actionSaveEphysData"/>
-    <addaction name="actionImportEphysData"/>
-    <addaction name="actionExportEphysData"/>
+    <addaction name="actionOpen"/>
+    <addaction name="actionSave"/>
+    <addaction name="actionImport"/>
+    <addaction name="actionExport"/>
     <addaction name="separator"/>
     <addaction name="menumPSC_Template"/>
    </widget>
@@ -300,6 +316,7 @@
       <string>Current Sweep</string>
      </property>
      <addaction name="actionDetect_in_current_sweep"/>
+     <addaction name="actionValidate_in_current_sweep"/>
      <addaction name="actionUndo_current_sweep"/>
     </widget>
     <widget class="QMenu" name="menuEntire_Data">
@@ -309,6 +326,7 @@
      <addaction name="separator"/>
      <addaction name="actionDetect"/>
      <addaction name="actionUndo"/>
+     <addaction name="actionValidate"/>
     </widget>
     <widget class="QMenu" name="menuResults">
      <property name="title">
@@ -317,11 +335,7 @@
      <addaction name="actionView_results"/>
      <addaction name="actionClear_results"/>
      <addaction name="actionSave_results"/>
-     <addaction name="actionSave_mPSC_trains"/>
-     <addaction name="actionSave_mPSC_waves"/>
      <addaction name="actionExport_results"/>
-     <addaction name="actionExport_mPSC_trains"/>
-     <addaction name="actionExport_mPSC_waves"/>
     </widget>
     <addaction name="menuCurrent_Sweep"/>
     <addaction name="menuEntire_Data"/>
@@ -348,10 +362,10 @@
    <attribute name="toolBarBreak">
     <bool>false</bool>
    </attribute>
-   <addaction name="actionOpenEphysData"/>
-   <addaction name="actionImportEphysData"/>
-   <addaction name="actionSaveEphysData"/>
-   <addaction name="actionExportEphysData"/>
+   <addaction name="actionOpen"/>
+   <addaction name="actionImport"/>
+   <addaction name="actionSave"/>
+   <addaction name="actionExport"/>
    <addaction name="actionPlot_Data"/>
    <addaction name="actionMake_mPSC_Epoch"/>
    <addaction name="separator"/>
@@ -383,14 +397,16 @@
    </attribute>
    <addaction name="actionDetect_in_current_sweep"/>
    <addaction name="actionUndo_current_sweep"/>
+   <addaction name="actionValidate_in_current_sweep"/>
    <addaction name="actionDetect"/>
    <addaction name="actionUndo"/>
+   <addaction name="actionValidate"/>
    <addaction name="actionView_results"/>
    <addaction name="actionSave_results"/>
    <addaction name="actionExport_results"/>
    <addaction name="actionClear_results"/>
   </widget>
-  <action name="actionOpenEphysData">
+  <action name="actionOpen">
    <property name="icon">
     <iconset theme="document-open">
      <normaloff>.</normaloff>.</iconset>
@@ -399,7 +415,7 @@
     <string>Open</string>
    </property>
   </action>
-  <action name="actionImportEphysData">
+  <action name="actionImport">
    <property name="icon">
     <iconset theme="document-import">
      <normaloff>.</normaloff>.</iconset>
@@ -432,7 +448,7 @@
     <string>Import mPSC Template</string>
    </property>
   </action>
-  <action name="actionSaveEphysData">
+  <action name="actionSave">
    <property name="icon">
     <iconset theme="document-save">
      <normaloff>.</normaloff>.</iconset>
@@ -441,7 +457,7 @@
     <string>Save</string>
    </property>
   </action>
-  <action name="actionExportEphysData">
+  <action name="actionExport">
    <property name="icon">
     <iconset theme="document-export">
      <normaloff>.</normaloff>.</iconset>
@@ -664,60 +680,8 @@
    <property name="checkable">
     <bool>true</bool>
    </property>
-   <property name="icon">
-    <iconset theme="lock"/>
-   </property>
    <property name="text">
     <string>Lock toolbars</string>
-   </property>
-  </action>
-  <action name="actionElectrophysiology_data">
-   <property name="text">
-    <string>Results</string>
-   </property>
-  </action>
-  <action name="actionSave_mPSC_trains">
-   <property name="icon">
-    <iconset theme="document-save"/>
-   </property>
-   <property name="text">
-    <string>Save PSC trains</string>
-   </property>
-   <property name="toolTip">
-    <string>Save mPSC trains to file</string>
-   </property>
-  </action>
-  <action name="actionSave_mPSC_waves">
-   <property name="icon">
-    <iconset theme="document-save"/>
-   </property>
-   <property name="text">
-    <string>Save mPSC waves</string>
-   </property>
-   <property name="toolTip">
-    <string>Save mSPC waves to file</string>
-   </property>
-  </action>
-  <action name="actionExport_mPSC_trains">
-   <property name="icon">
-    <iconset theme="document-export"/>
-   </property>
-   <property name="text">
-    <string>Export mPSC trains</string>
-   </property>
-   <property name="toolTip">
-    <string>Export mPSC trains to workspace</string>
-   </property>
-  </action>
-  <action name="actionExport_mPSC_waves">
-   <property name="icon">
-    <iconset theme="document-export"/>
-   </property>
-   <property name="text">
-    <string>Export mPSC waves</string>
-   </property>
-   <property name="toolTip">
-    <string>Export mPSC waves to workspace</string>
    </property>
   </action>
  </widget>

@@ -1,4 +1,7 @@
 import typing, warnings, math, os
+import numpy as np
+import quantities as pq
+import pandas as pd
 from core.utilities import get_least_pwr10
 from PyQt5 import (QtCore, QtWidgets, QtGui)
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
@@ -7,11 +10,9 @@ from gui.painting_shared import (FontStyleType, standardQtFontStyles,
                                  FontWeightType, standardQtFontWeights)
 
 from gui import quickdialog as qd
-from gui.quickdialog import (InftyDoubleValidator, ComplexValidator)
+from gui.guiutils import (InftyDoubleValidator, ComplexValidator, validatorString)
 
-import quantities as pq
 from core import quantities as scq
-import pandas as pd
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -80,7 +81,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         self.unitComboBox.currentIndexChanged.connect(self._slot_unitComboNewIndex)
         
         self._currentUnit = self._currentFamilyUnits[self._selectedUnitIndex]
-    
+        
     def _generateCurrentFamilyUnits(self):
         combo_units = list()
         unscalables = set()
@@ -258,6 +259,11 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     """
     sig_valueChanged = pyqtSignal(object, name="sig_valueChanged")
     
+    _default_units_             =  pq.dimensionless
+    _default_internal_minimum   = -math.inf
+    _default_internal_maximum   =  math.inf
+        
+    
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, units:typing.Optional[pq.Quantity]=None, unitsFamily:typing.Optional[str]=None, singleStep:typing.Optional[float]=None, decimals:typing.Optional[int]=None):#, minimum:typing.Optional[typing.Union[pq.Quantity, float]]=None, maximum:typing.Optional[typing.Union[pq.Quantity, float]]=None):
         """
         Named parameters:
@@ -276,7 +282,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         # to minimum - what do we do if minimum is set to 0 which is a valid value?
         # super().setSpecialValueText("NA") # shown when value is at minimum
         
-        self._default_units_ = pq.dimensionless
+        # self._default_units_ = pq.dimensionless
         
         if isinstance(units, pq.Quantity):
             self._units_ = units.units
@@ -306,9 +312,6 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             
         else:
             raise TypeError(f"decimals expected to be an int >= 0 or None; instead, got {decimals}")
-        
-        self._default_internal_minimum = -math.inf
-        self._default_internal_maximum = math.inf
         
         self._internal_minimum = self._default_internal_minimum
         self._internal_maximum = self._default_internal_maximum
@@ -470,7 +473,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         return super().maximum() * self.units
     
     def value(self):
-        """ Overloads QDoubleSpinBox.value() to return a quantity
+        """ Reimplements QDoubleSpinBox.value() to return a quantity
         """
         # NOTE: use NA as a volatile; once we've moved away from it we're done
         # by the way, one can only move away from NA by entering a numeric value 
@@ -486,9 +489,46 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     
     def validate(self, text, pos):
         validator = InftyDoubleValidator(parent=self)
+        validator.suffix = self.suffix()
         validator.setDecimals(self.decimals()) # self.decimals() inherited from QDoubleSpinBox
         valid = validator.validate(text, pos)
+        validstr = validatorString(valid[0])
+        # print(f"{self.__class__.__name__}[{self.objectName()}].validate text: {text}, pos: {pos} ⇒ {validstr}")
         return valid
+    
+    def valueFromText(self, text:str):
+        suffix = self.suffix()
+        if suffix in text:
+            s = text.strip(suffix)
+        else:
+            s = text
+            
+        ret = super().valueFromText(s)
+        return ret * self.units
+
+        # unit = scq.unit_quantity_from_name_or_symbol(self.suffix)
+        # return ret*unit
+    
+    def textFromValue(self, value:typing.Union[float, pq.Quantity, np.ndarray]):
+        units = value.units if isinstance(value, pq.Quantity) else pq.dimensionless
+        sfx = "" if units == pq.dimensionality else f" {units.dimensionality.unicode}"
+        
+        if isinstance(value, (pq.Quantity, np.ndarray)):
+            if value.size > 1:
+                ret = "NA"
+                
+        elif isinstance(value, float):
+            ret = super().textFromValue(value)
+
+        else:
+            ret = "NA"
+            
+        # self.units = units
+        # self.setSuffix(sfx)
+        
+        return ret
+                
+                
         
         
     def setValue(self, value:typing.Union[pq.Quantity, float, type(pd.NA)]):
@@ -498,10 +538,15 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         # print(f"{self.__class__.__name__}.setValue({value})")
         if isinstance(value, pq.Quantity):
             if value.size > 1:
-                raise TypeError("Only scalar quantities are allowed")
+                return # Only scalar quantities are allowed
+                # raise TypeError("Only scalar quantities are allowed")
             
             if scq.units_convertible(self.units, value.units):
-                val = float(value.rescale(self.units).magnitude)
+                fval = float(value.magnitude)
+                if fval > -math.inf and fval < math.inf:
+                    val = float(value.rescale(self.units).magnitude)
+                else:
+                    val = float(value.magnitude)
             else:
                 self.units = value.units
                 val = float(value.magnitude)
@@ -511,10 +556,11 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         # FIXME/TODO: 2022-11-07 13:51:37
         # at the moment, this will fail silently; find a way to notify user/caller
         if isinstance(val, float):
-            if val > self._internal_minimum:
-                super().setMinimum(self._internal_minimum)
-                super().setValue(val)
-                super().setSpecialValueText("")
+            super().setValue(val)
+            super().setSpecialValueText("")
+            # if val < self._internal_minimum:
+            #     self.setMinimum(val)
+            #     super().setMinimum(self._internal_minimum)
             # else:
             #     QtWidgets.QMessageBox.critical(self, "Value is too small", text)
             

@@ -156,7 +156,7 @@ class ColorMapEditor(QWidget, Ui_EditColorMapWidget):
 
     
 class ComplexDisplay(Enum):
-    """
+    """TODO
     """
     real  = 1
     imag  = 2

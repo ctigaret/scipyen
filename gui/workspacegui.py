@@ -238,13 +238,13 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         
         NOTE: By inheriting from WorkspaceGuiMixin (and, thus from
         ScipyenConfigurable) loadSettings() is called automatically. Nevertheless,
-        this method may be overridden in the derived :class:.
+        this method may be reimplemented in the derived :class:.
         
     3) Call self.saveSetting() at an appropriate point during the life-time of 
         the instance of the :class:. 
         
         For Qt-based settings ('qtconfigurables') this is typically called upon
-        closing the window or widget. A convenient way is to override the 
+        closing the window or widget. A convenient way is to reimplement the 
         'closeEvent' method of the Qt base :class: to call saveSettings from
         within the new closeEvent body.
         
@@ -255,7 +255,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         non-Qt configurables are saved to the config.yaml file.
         
         NOTE: As the loadSettings() method, the saveSetting() method is also 
-        inherited from ScipyenConfigurable, but it may be overridden in the
+        inherited from ScipyenConfigurable, but it may be reimplemented in the
         derived :class:
         
     """
@@ -417,7 +417,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     
     @safeWrapper
     def exportDataToWorkspace(self, data:typing.Any, var_name:str, title:str="Export data to workspace"):
-        
         newVarName = strutils.str2symbol(var_name)
         if self.appWindow:
             newVarName = validate_varname(newVarName, ws = self.appWindow.workspace)

@@ -58,6 +58,9 @@ class ModelParametersWidget(QtWidgets.QWidget):
     
     _default_spin_decimals_ = 4
     _default_spin_step_ = 1e-4
+    _spin_min_ = -math.inf
+    _spin_max_ =  math.inf
+    
     _mandatory_columns_ = ("Initial Value:", "Lower Bound:", "Upper Bound:")
     
     def __init__(self, parent:QtWidgets.QWidget=None, **kwargs):
@@ -127,9 +130,6 @@ class ModelParametersWidget(QtWidgets.QWidget):
         else:
             self._spinStep_ = spinStep
         
-        self._spin_min_ = -math.inf
-        self._spin_max_ =  math.inf
-        
         self.spinBoxes = list()
         
         if orientation.lower() == "horizontal":
@@ -164,6 +164,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
 
             self.widgetsLayout.addWidget(w, 0, layout_col, 1, 1)
 
+            # print(f"{self.__class__}._generate_widgets")
             for ki, i in enumerate(paramsDF.index): # row index into the DataFrame
                 layout_row = ki + 1
 
@@ -173,7 +174,9 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     
                 else:
                     p = paramsDF.loc[i,c]
+                    # print(f"\tparam {i} {c} = {p}")
                     w = QuantitySpinBox(self)
+                    w.setObjectName(f"{str2symbol(i)}_{str2symbol(c)}_spinBox")
                     
                     # WARNING: 2022-11-03 23:39:21
                     # This is for general case.
@@ -189,13 +192,14 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     
                     w.setDecimals(self.spinDecimals)
                     w.setSingleStep(self.spinStep)
-                    w.valueChanged[float].connect(self._slot_newvalue)
+                    w.setStepType(QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+                    # w.setCorrectionMode(QtWidgets.QAbstractSpinBox.CorrectToNearestValue)
+                    w.valueChanged[float].connect(self._slot_newValue)
                     w.setAccelerated(True)
                     w.setValue(p)
                     
                     t = w.text()
                     minSpinWidth.append(guiutils.get_text_width(t))
-                    w.setObjectName(f"{str2symbol(i)}_{str2symbol(c)}_spinBox")
                     self.spinBoxes.append(w)
                     
                 self.widgetsLayout.addWidget(w, layout_row, layout_col, 1, 1)
@@ -224,7 +228,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
         to_remove = list()
         for w in self.spinBoxes:
             w.setParent(None)
-            w.valueChanged[float].disconnect(self._slot_newvalue)
+            w.valueChanged[float].disconnect(self._slot_newValue)
             self.widgetsLayout.removeWidget(w)
             to_remove.append(w)
             
@@ -310,7 +314,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
     def setParameters(self, parameters:typing.Sequence, lower=None, upper=None, names=None, refresh = True):
         """Generates new parameters data frame.
         
-        The diusplay is refreshed UNLESS refresh is False. The display update
+        The display is refreshed UNLESS refresh is False. The display update
         either changes individual values in the spin boxes (if the new parameters
         names match the current ones) or repopulates the widget with a new set 
         of spin boxes.
@@ -323,6 +327,13 @@ class ModelParametersWidget(QtWidgets.QWidget):
         
         
         """
+        
+        # print(f"{self.__class__}.setParameters:")
+        # print(f"\tinitl = {parameters}")
+        # print(f"\tlower = {lower}")
+        # print(f"\tupper = {upper}")
+        # print(f"\tnames = {names}")
+        
         paramsDF = None
         
         if isinstance(parameters, (tuple, list)) and len(parameters):
@@ -389,6 +400,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
                                      "Lower Bound:":lower,
                                      "Upper Bound:":upper},
                                      index = names)
+            
         elif isinstance(parameters, pd.DataFrame):
             if any(c not in parameters.columns for c in self._mandatory_columns_):
                 raise ValueError(f"Dataframe lacks mandatory columns {self._mandatory_columns_}")
@@ -410,15 +422,18 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     up = paramsDF.loc[i, "Lower Bound:"]
                     paramsDF.loc[i, "Lower Bound:"] = lo
                     paramsDF.loc[i, "Upper Bound:"] = up
-                    sig_badBounds.emit(str(i))
+                    
+                    # sig_badBounds.emit(str(i))
                     
                 if paramsDF.loc[i, "Lower Bound:"] > paramsDF.loc[i, "Initial Value:"]:
                     paramsDF.loc[i, "Lower Bound:"] = paramsDF.loc[i, "Initial Value:"]
-                    sig_infeasible_x0.emit(str(i))
+                    
+                    # sig_infeasible_x0.emit(str(i))
                     
                 if paramsDF.loc[i, "Upper Bound:"] < paramsDF.loc[i, "Initial Value:"]:
                     paramsDF.loc[i, "Upper Bound:"] = paramsDF.loc[i, "Initial Value:"]
-                    sig_infeasible_x0.emit(str(i))
+                    
+                    # sig_infeasible_x0.emit(str(i))
             
             if refresh:
                 if isinstance(self._parameters_, pd.DataFrame) and self._parameters_.shape == paramsDF.shape and np.all(self._parameters_index == paramsDF.index):
@@ -429,6 +444,13 @@ class ModelParametersWidget(QtWidgets.QWidget):
                         
                     for c in pDF.columns:
                         for r in pDF.index:
+                            # value = pDF.loc[r,c]
+                            # sb = self.getSpinBox(r, c)
+                            # if value < sb.minimum():
+                            #     sb.setMinimum(value)
+                            # elif value > sb.maximum()
+                            #     sb.setMaximum(value)
+                                
                             self.getSpinBox(r, c).setValue(pDF.loc[r,c])
                             
                 else:
@@ -458,7 +480,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
         self._spinStep_ = float(value)
     
     @pyqtSlot(float)
-    def _slot_newvalue(self, value):
+    def _slot_newValue(self, value):
         widget = self.sender()
         if self.isVertical: # FIXME/TODO/BUG
             paramsDF = self._parameters_
@@ -482,6 +504,11 @@ class ModelParametersWidget(QtWidgets.QWidget):
                 new_val = value * old_val.units
             else:
                 new_val = value
+                
+            # print(f"{self.__class__.__name__}._slot_newValue row = {param_row}; col = {param_col}; old = {old_val}; new = {new_val}")
+            
+            if new_val == old_val:
+                return
                 
             if param_col == "Lower Bound:":
                 init_val = self._parameters_.loc[param_row, "Initial Value:"]
@@ -510,33 +537,36 @@ class ModelParametersWidget(QtWidgets.QWidget):
             elif param_col == "Initial Value:":
                 lower_val = self._parameters_.loc[param_row, "Lower Bound:"]
                 upper_val = self._parameters_.loc[param_row, "Upper Bound:"]
+                
                 if new_val < lower_val:
                     # adjust lower bound:
                     lower_val = new_val
-                    sb = self.getSpinBox(str(param_row), "Lower Bound:")
-                    signalBlocker = QtCore.QSignalBlocker(sb)
-                    sb.setMinimum(lower_val)
-                    self._parameters_.loc[param_row, "Lower Bound:"] = lower_val
+                    # sb = self.getSpinBox(str(param_row), "Lower Bound:")
+                    # signalBlocker = QtCore.QSignalBlocker(sb)
+                    # sb.setMinimum(lower_val)
+                    # self._parameters_.loc[param_row, "Lower Bound:"] = lower_val
                     
                 if new_val > upper_val:
-                    # adjust lower bound:
+                    # adjust upper bound:
                     upper_val = new_val
-                    sb = self.getSpinBox(str(param_row), "Upper Bound:")
-                    signalBlocker = QtCore.QSignalBlocker(sb)
-                    sb.setMaximum(upper_val)
-                    self._parameters_.loc[param_row, "Upper Bound:"] = upper_val
+                    # sb = self.getSpinBox(str(param_row), "Upper Bound:")
+                    # signalBlocker = QtCore.QSignalBlocker(sb)
+                    # sb.setMaximum(upper_val)
+                    # self._parameters_.loc[param_row, "Upper Bound:"] = upper_val
                     
             if new_val != value:
                 sb = self.getSpinBox(str(param_row), str(param_col))
                 signalBlocker = QtCore.QSignalBlocker(sb)
                 sb.setValue(new_val)
                 
+            # print(f"\tcorrected = {new_val}")
+                
             self._parameters_.iloc[layout_row-1, layout_col-1] = new_val
                     
-            # if isinstance(old_val, pq.Quantity):
-            #     self._parameters_.iloc[layout_row-1, layout_col-1] = value * old_val.units
-            # else:
-            #     self._parameters_.iloc[layout_row-1, layout_col-1] = value
+            if isinstance(old_val, pq.Quantity):
+                self._parameters_.iloc[layout_row-1, layout_col-1] = value * old_val.units
+            else:
+                self._parameters_.iloc[layout_row-1, layout_col-1] = value
                 
             self.sig_dataChanged.emit()
             self.sig_parameterChanged.emit(self._parameters_.index[layout_row-1], 

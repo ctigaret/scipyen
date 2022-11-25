@@ -77,7 +77,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     
         loadViewerSettings() -- loads viewer class-specific settings
         
-    The other methods may be overridden in the derived classes.
+    The other methods may be reimplemented in the derived classes.
     
     The python data types that the viewer subclass is specialized for, are
     specified in the class attribute "supported_types". This attribute is a 
@@ -238,8 +238,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # it is called here, AFTER self._configureUI_()
         if data is not None:
             # NOTE: 2022-01-17 12:39:49 this will call _set_data_
-            # subclasses can override this by defining their own setData()
-            # see, e.g., SignalViewer
+            # subclasses can override this by implementing their own setData()
+            # see e.g., SignalViewer
             self.setData(data = data, doc_title = doc_title)
             
         else:
@@ -361,7 +361,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     
     def view(self, data: (object, type(None)), doc_title: (str, type(None)) = None, *args, **kwargs):
         """Set the data to be displayed by this viewer.
-        NOTE: Must be defined (overridden) in the derived :class:.
+        NOTE: Should be reimplemented in the derived :class:.
         In the derived class, the function binds the data to the actual data
         model used by the concrete viewer :class:.
         In addition, the implementation may choose to set the doc title and other
@@ -374,7 +374,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             return isinstance(value, self.supported_types) or any([t in type(value).mro() for t in self.supported_types])
             
         if isinstance(value, (tuple, list)):
-            return all(__check_val_type_is_supprted__(v) for v in value)
+            return all(__check_val_type_is_supported__(v) for v in value)
         else:
             return __check_val_type_is_supported__(value)
         
@@ -386,7 +386,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         Sets up the window title based on doc_title.
         
-        May/should be overridden in the derived viewer type.
+        May/should be reimplemented in the derived viewer type.
         
         Parameters:
         ----------
@@ -403,7 +403,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             is (e.g. behind other windows) - useful when the windowing system of 
             the operating system does not implement a focus stealing mechanism.
             
-            Subclasses can enforce their own behaviour by overriding this.
+            Subclasses can enforce their own behaviour by reimplementing this
+            method.
             
         """
         
@@ -411,8 +412,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # 
         # This function does the following:
         #
-        # 1. delegates to _set_data_(...) -- which does nothing here and MUST be
-        #   overridden (see below).
+        # 1. delegates to _set_data_(...) -- which does nothing here and SHOULD
+        #   be reimplemented (see below).
         #
         # 2. sets up the window title
         #
@@ -422,8 +423,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # to set up their own instance variables and data model according to 
         # their deisgned functionality.
         #
-        # Subclasses may also override this method if necessary, but then call
-        # super().setData(...) from within their own setData()
+        # Subclasses may also reimplement this method if necessary, but then
+        # call super().setData(...) from within their own setData()
         #
         
         if len(args):
@@ -460,7 +461,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
     @abstractmethod
     def _set_data_(self, data: object, *args, **kwargs):
-        """Must override in the subclass
+        """Must implement in the subclass
         """
         pass
     
@@ -562,7 +563,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
     def closeEvent(self, evt:QtCore.QEvent):
         """All viewers in Scipyen should behave consistently.
-        However, this may by overridden in derived classes.
+        However, this may by reimplemented in derived classes.
         """
         # print(f"ScipyenViewer<{self.__class__.__name__}>.closeEvent {self.winTitle}: isTopLevel {self.isTopLevel}")
         
@@ -603,7 +604,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     
     def event(self, evt:QtCore.QEvent):
         """Generic event handler
-        NOTE: This can be overriden in the derived :class:
+        NOTE: This can be reimplemented in the derived :class:
         """
         evt.accept()
             
@@ -989,7 +990,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         Deliberately NOT an abstract method therefore it does not need to be 
         implemented in subclasses.
         
-        However derived subclasses may override this function to implement more
+        However derived subclasses may reimplement this function for more
         specific functionality (and call super().currentFrame setter)
         """
         # print(f"{self.__class__.__name__}.currentFrame.setter({value}) ")
@@ -1139,7 +1140,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         The valueChanged signal of the widget used to select the index of the 
         displayed data frame should be connected to this slot in _configureUI_()
         
-        NOTE: Subclasses can override this function.
+        NOTE: Subclasses can reimplement this function.
         """
         #print(f"ScipyenFrameViewer<{self.__class__.__name__}> slot_setFrameNumber {value}")
         

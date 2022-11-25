@@ -13,6 +13,7 @@ import os, sys, traceback, warnings, numbers, collections
 #### BEGIN 3rd party modules
 import numpy as np
 import quantities as pq
+import pandas as pd
 from scipy import cluster, optimize, signal, integrate #, where
 import vigra
 import neo
@@ -558,7 +559,7 @@ def fit_mPSC_model(data, p0, **kwargs):
     """
     # TODO/FIXME: 2022-10-25 23:33:58
     # allow lower/upper bounds individually for each parameter
-    
+    from core import datatypes as dt
     from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
     
     jac         = kwargs.pop("jac",         "2-point")
@@ -628,28 +629,84 @@ def fit_mPSC_model(data, p0, **kwargs):
     
 
     x0 = p0
-#     lo = list()
-#     up = list()
-#     
-#     l0 = bounds[0]
-#     u0 = bounds[1]
-#     
-#     if isinstance(l0, numbers.Real):
-#         lo = [l0] * len(p0)
-#         
-#     elif isinstance(l0, (tuple, list)) and len(l0) == len(x0) and all(isinstance(l, numbers.Real) for l in l0):
-#         lo = [l for l in l0]
-#     else:
-#         raise ValueError(f"Incorrect lower bounds specified {l0}")
-#     
-#     if isinstance(u0, numbers.Real):
-#         up = [u0] * len(p0)
-#     elif isinstance(u0, (tuple, list)) and len(u0) == len(x0) and all(isinstance(l, numbers.Real) for l in u0):
-#         up = [l for l in u0]
-#     else:
-#         raise ValueError(f"Incorrect upper bounds specified {l0}")
-#     
-#     bnds = (lo, up)
+    lo = list()
+    up = list()
+    
+    l0 = bounds[0]
+    u0 = bounds[1]
+    
+    if isinstance(l0, numbers.Real):
+        lo = [l0] * len(p0)
+        
+    elif isinstance(l0, (tuple, list)):
+        if len(l0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {len(l0)} instead")
+
+        if all(isinstance(l, numbers.Real) for l in l0):
+            if len(l0) == 1:
+                lo = [l0[0]] * len(p0)
+            else:
+                lo = [l for l in l0]
+
+        elif all(isinstance(l, np.ndarray) and l.size == 1 and l.dtype == np.dtype(float) for l in l0):
+            if len(l0) == 1:
+                lo = [float(l)] * len(p0)
+            else:
+                lo = [float(l) for l in l0]
+                
+    elif isinstance(l0, np.ndarray):
+        if l0.size not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
+        
+        if not dt.is_vector(l0):
+            raise ValueError("Lower bounds must be a vector")
+        
+    elif isinstance(l0, pd.Series):
+        if len(l0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
+        
+        lo = [float(l.magnitude) if isinstance(l, pq.Quantity) else float(l) for l in l0]
+            
+    else:
+        raise ValueError(f"Incorrect lower bounds specified {l0}")
+    
+    if isinstance(u0, numbers.Real):
+        up = [u0] * len(p0)
+        
+    elif isinstance(u0, (tuple, list)):
+        if len(u0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {len(u0)} instead")
+
+        if all(isinstance(l, numbers.Real) for l in u0):
+            if len(u0) == 1:
+                up = [u0[0]] * len(p0)
+            else:
+                up = [l for l in u0]
+
+        elif all(isinstance(l, np.ndarray) and l.size == 1 and l.dtype == np.dtype(float) for l in u0):
+            if len(u0) == 1:
+                up = [float(l)] * len(p0)
+            else:
+                up = [float(l) for l in u0]
+                
+    elif isinstance(u0, np.ndarray):
+        if u0.size not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
+        
+        if not dt.is_vector(u0):
+            raise ValueError("Lower bounds must be a vector")
+        
+    elif isinstance(u0, pd.Series):
+        if len(u0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
+        
+        up = [float(l.magnitude) if isinstance(l, pq.Quantity) else float(l) for l in u0]
+            
+    else:
+        raise ValueError(f"Incorrect upper bounds specified {u0}")
+    
+    
+    bnds = (lo, up)
     
     # NOTE: 2022-10-30 14:39:57
     # solve a non-linear least-squares problem with bounds on the variables

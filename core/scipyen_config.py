@@ -291,7 +291,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
         (a) and (b) options, or the option (c), below:
         
         a) override the 'configurable_traits' DataBag attribute in the :class:
-        b) override the '_observe_configurables_' method in the :class:
+        b) reimplement the '_observe_configurables_' method in the :class:
         c) outside the :class:, define a DataBag trait notifier and a handler, 
             register the handler with the notifier (notifier.observe(...)) then
             pass the notifier as parameter to this decorator.
@@ -1064,7 +1064,7 @@ class ScipyenConfigurable(object):
         via ScipyenFrameViewer).
     
         The consequence that an UI class inheriting from ScipyenConfigurable may
-        need to override the `loadSettings` method.
+        need to reimplement the `loadSettings` method.
     
         The `loadSettings` method defined here only reads the values for
         configurables from the config file(s). Therefore, it should be called 
@@ -1077,8 +1077,8 @@ class ScipyenConfigurable(object):
         `super(WorkspaceGuiMixin, self).loadSettings()`
     
         If the derived class does not store default values for its UI widgets
-        in the config file then it does not need to override this method. This
-        is what SignalViewer does, because it stores in the config file only
+        in the config file then it does not need to reimplement this method. 
+        This is what SignalViewer does, because it stores in the config file only
         data that is associated with objects that are NOT initialized during
         __init__ (sich as the colours of various cursor types).
     
@@ -1356,7 +1356,7 @@ class ScipyenConfigurable(object):
             self.loadWindowSettings() 
             
     def saveSettings(self):
-        """ Must be called with super() if overridden in subclasses
+        """ Must be called with super() if reimplemented in subclasses
         
         NOTE: 2022-11-01 22:13:57 Does not support mapping collections as
         configuration settings. In other words, an individual setting cannot be
@@ -1775,7 +1775,7 @@ def saveWindowSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QM
     group_name:str, optional, default is None. The qsettings group name under 
         which the settings will be saved.
         
-        When specified, this will override the automatically determined group 
+        When specified, this will reimplement the automatically determined group 
         name (see below).
     
         When group_name is None, the group name is determined from win's type 

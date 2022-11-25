@@ -21,6 +21,71 @@ class UnitsStringValidator(QtGui.QValidator):
         except:
             return QtGui.QValidator.Invalid
         
+class InftyDoubleValidator(QtGui.QDoubleValidator):
+    def __init__(self, bottom:float=-math.inf, top:float=math.inf, decimals:int=4, suffix:str="", parent=None):
+        QtGui.QDoubleValidator.__init__(self,parent)
+        self.setBottom(bottom)
+        self.setTop(top)
+        self.setDecimals(decimals)
+        self.suffix = suffix if isinstance(suffix, str) else ""
+        
+    def validate(self, s:str, pos:int):
+        ss = s.strip(self.suffix)
+        
+        if ss.lower() in ("-", "-i", "i", "-in", "in"):
+            ret = (QtGui.QValidator.Intermediate, ss, pos)
+        elif ss.lower() in ("-inf", "inf"):
+            ret = (QtGui.QValidator.Acceptable, ss, pos)
+        else:
+            # return (QtGui.QValidator.Invalid, s, pos)
+            ret = super().validate(ss, pos)
+            
+        result = (ret[0], ret[1] + self.suffix, ret[2])
+        
+        return result
+        
+class ComplexValidator(InftyDoubleValidator):
+    def __init__(self, bottom:float=-math.inf, top:float=math.inf, decimals:int=4, parent=None):
+        InftyDoubleValidator.__init__(self, bottom, top, decimals, parent)
+        self.setBottom(bottom)
+        self.setTop(top)
+        self.setDecimals(decimals)
+        
+    def validate(self, s:str, pos:int):
+        valid = super().validate(s, pos)
+        if valid[0] not in (QtGui.QValidator.Intermediate, QtGui.QValidator.Acceptable):
+            s_ = s.strip("()") # strip away the parantheses & any space
+            s_parts = s.split("+") # is it canonical form?
+            if len(s_parts) == 2:
+                real = s_parts[0]
+                imag = s_parts[1]
+            elif len(s_parts) == 1:
+                real = s_parts[1]
+                imag = None
+            
+            real_valid = super().validate(real, pos)
+            
+            if real_valid[0] in (QtGui.QValidator.Intermediate, QtGui.QValidator.Acceptable):
+                if imag is None:
+                    return (real_valid[0], s, pos)
+                else:
+                    if imag.lower().endswith("j"):
+                        imag = imag.lower().strip("j")
+                        
+                    imag_valid = super().validate(imag, pos)
+                    return (imag_valid[0], s, pos)
+                
+            else:
+                return (QtGui.QValidator.Invalid, s, pos)
+                        
+def validatorString(val:typing.Union[QtGui.QValidator.State, int]):
+    """String representation of a QValidator.State value
+    """
+    if not isinstance(val, (QtGui.QValidator.State, int)):
+        return "Invalid"
+    
+    return "Acceptable" if val == QtGui.QValidator.Acceptable else "Intermediate" if val == QtGui.QValidator.Intermediate else "Invalid"
+
 def getPlotItemDataBoundaries(item:pg.PlotItem):
     """Calculates actual data bounds (data domain, `X`, and data range, `Y`)
     NOTE: 2022-11-21 16:11:36
@@ -59,7 +124,7 @@ def csqueeze(s:str, w:int):
     """
     if len(s) > w and w > 3:
         part = (w-3)/2
-        return s[0:part] + "get_QDoubleSpinBox_params..."
+        return s[0:part] + "..."
     return s
 
 def rsqueeze(s:str, w:int):

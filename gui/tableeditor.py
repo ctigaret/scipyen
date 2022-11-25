@@ -1226,6 +1226,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
 class TableEditor(ScipyenViewer):#, Ui_TableEditor):
     """Viewer/Editor for tabular data
     """
+    # TODO: 2022-11-25 15:11:59
+    # inherit from WorkspaceGuiMixin for messages and data I/O
     # TODO: 2019-09-09 22:40:36
     # implement plotting -- via the plots module
     sig_activated               = pyqtSignal(int)
@@ -1312,8 +1314,9 @@ class TableEditor(ScipyenViewer):#, Ui_TableEditor):
         #self.framesSpinBox.valueChanged.connect(self.slot_setFrameNumber)
         
         self.fileMenu = self.menuBar().addMenu("&File")
-        csvExportAction = self.fileMenu.addAction("&Export As CSV...")
+        csvExportAction = self.fileMenu.addAction("&Save As CSV...")
         csvExportAction.triggered.connect(self.slot_exportAsCSVFile)
+        
         self.viewMenu = self.menuBar().addMenu("&View")
         resizeCandH_Action = self.viewMenu.addAction("Resize Columns And Rows to Content")
         resizeCandH_Action.triggered.connect(self.slot_resizeAllColumnsAndRowsToContents)

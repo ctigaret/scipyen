@@ -6443,6 +6443,10 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     
     mini_ends = mini_starts + mini_duration
     
+    # TODO: 2022-11-25 16:51:31 FIXME
+    # get the miniwaves aligned on peak start (rising phase)
+    wave_windows = [(t0,t1) for (t0,t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
+    
     # 8) extract the minis as separate waveforms (signals) - DO NOT set relative t_start
     # minis = neoutils.set_relative_time_start([x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop])
     minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
@@ -6452,6 +6456,7 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
         peakfunc = np.argmax
     else:
         peakfunc = np.argmin
+        
     mini_peaks = np.array([w.times[peakfunc(w[:,0])] for w in minis])*x.times.units
     
     # peaks = [peakfunc(x.magnitude[v[0]:v[1],0]) + v[0] for v in zip(peak_begins, peak_ends) if len(x.magnitude[v[0]:v[1],0]) > 0]
@@ -6866,15 +6871,17 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
     # but cache the original t_start to restore afterwards
     t_start = x.t_start
     if x.t_start.magnitude != 0:
-        x = neoutils.set_relative_time_start(x)
+        x_ = neoutils.set_relative_time_start(x)
+    else:
+        x_ = x
     
-    l, c, e = sigp.state_levels(x[:,0])
+    l, c, e = sigp.state_levels(x_[:,0])
     
-    if isinstance(params, neo.AnalogSignal):
+    if isinstance(params, neo.AnalogSignal): # template waveform given
         if params.t_starts.magnitude != 0:
             params = neoutils.set_relative_time_start(params)
             
-        Rsq = crvf.fit_mPSC_wave(x, params)
+        Rsq = crvf.fit_mPSC_wave(x_, params)
         x.annotations["mPSC_fit"] = {"Rsq": Rsq, "template": True, "amplitude":sigp.waveform_amplitude(params)}
         x.annotations["amplitude"] = sigp.waveform_amplitude(x)
         
@@ -6910,7 +6917,7 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
         # if a 2nd channel exists, else we just append the newly fit curve as 2nd 
         # channel
         
-        xx = x[:,0] # this always works even if there is only one channel, 
+        xx = x_[:,0] # this always works even if there is only one channel, 
                     # and returns an AnalogSignal
                     
         fitresult = crvf.fit_mPSC_model(xx, params, bounds = [lo, up])

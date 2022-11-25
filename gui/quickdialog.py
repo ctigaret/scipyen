@@ -48,6 +48,8 @@ import PyQt5.QtGui as QtGui
 import PyQt5.QtWidgets as QtWidgets
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 
+from gui.guiutils import(InftyDoubleValidator, ComplexValidator, UnitsStringValidator)
+
 def alignLabels(*args):
     m = 0
     for dialogElement in args:
@@ -192,60 +194,6 @@ class IntegerInput(OptionalIntegerInput):
     def value(self):
         return int(self.text())
     
-class InftyDoubleValidator(QtGui.QDoubleValidator):
-    def __init__(self, bottom:float=-math.inf, top:float=math.inf, decimals:int=4, parent=None):
-        QtGui.QDoubleValidator.__init__(self,parent)
-        self.setBottom(bottom)
-        self.setTop(top)
-        self.setDecimals(decimals)
-        
-    def validate(self, s:str, pos:int):
-        valid = super().validate(s, pos)
-        # print(f"InftyDoubleValidator.validate s: {s}, pos: {pos}, valid {valid}, type: {type(valid).__name__}")
-        if valid[0] not in (QtGui.QValidator.Intermediate, QtGui.QValidator.Acceptable):
-            if s.lower() in ("-i", "i", "-in", "in"):
-                return (QtGui.QValidator.Intermediate, s, pos)
-            elif s.lower() in ("-inf", "inf"):
-                return (QtGui.QValidator.Acceptable, s, pos)
-            else:
-                return (QtGui.QValidator.Invalid, s, pos)
-            
-        return valid
-    
-class ComplexValidator(InftyDoubleValidator):
-    def __init__(self, bottom:float=-math.inf, top:float=math.inf, decimals:int=4, parent=None):
-        InftyDoubleValidator.__init__(self, bottom, top, decimals, parent)
-        self.setBottom(bottom)
-        self.setTop(top)
-        self.setDecimals(decimals)
-        
-    def validate(self, s:str, pos:int):
-        valid = super().validate(s, pos)
-        if valid[0] not in (QtGui.QValidator.Intermediate, QtGui.QValidator.Acceptable):
-            s_ = s.strip("()") # strip away the parantheses & any space
-            s_parts = s.split("+") # is it canonical form?
-            if len(s_parts) == 2:
-                real = s_parts[0]
-                imag = s_parts[1]
-            elif len(s_parts) == 1:
-                real = s_parts[1]
-                imag = None
-            
-            real_valid = super().validate(real, pos)
-            
-            if real_valid[0] in (QtGui.QValidator.Intermediate, QtGui.QValidator.Acceptable):
-                if imag is None:
-                    return (real_valid[0], s, pos)
-                else:
-                    if imag.lower().endswith("j"):
-                        imag = imag.lower().strip("j")
-                        
-                    imag_valid = super().validate(imag, pos)
-                    return (imag_valid[0], s, pos)
-                
-            else:
-                return (QtGui.QValidator.Invalid, s, pos)
-                        
     
 class ComplexInput(_OptionalValueInput):
     _QValidator = ComplexValidator
