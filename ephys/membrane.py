@@ -6429,15 +6429,7 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     # trough) of the actual mini EPSC!!!
     xcmaxima = [np.argmax(xc[v[0]:v[1],0]) + v[0] for v in zip(peak_begins, peak_ends) if len(xc[v[0]:v[1],0]) > 0]
     
-    # 7) locate the actual peaks (for positive waveform) or troughs (negative waveforms)
-    if sigp.is_positive_waveform(waveform):
-        peakfunc = np.argmax
-    else:
-        peakfunc = np.argmin
-    
-    peaks = [peakfunc(x.magnitude[v[0]:v[1],0]) + v[0] for v in zip(peak_begins, peak_ends) if len(x.magnitude[v[0]:v[1],0]) > 0]
-
-    # 8) get the start & end of the signal's regions where putative minis were found
+    # 7) get the start & end of the signal's regions where putative minis were found
     
     if isinstance(waveform, neo.core.basesignal.BaseSignal):
         mini_duration = waveform.duration
@@ -6451,38 +6443,25 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     
     mini_ends = mini_starts + mini_duration
     
-    mini_peaks = x.times[peaks]
-    
+    # 8) extract the minis as separate waveforms (signals) - DO NOT set relative t_start
     # minis = neoutils.set_relative_time_start([x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop])
     minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
     
+    # 9) locate the actual peaks (for positive waveform) or troughs (negative waveforms)
+    if sigp.is_positive_waveform(waveform):
+        peakfunc = np.argmax
+    else:
+        peakfunc = np.argmin
+    mini_peaks = np.array([w.times[peakfunc(w[:,0])] for w in minis])*x.times.units
     
+    # peaks = [peakfunc(x.magnitude[v[0]:v[1],0]) + v[0] for v in zip(peak_begins, peak_ends) if len(x.magnitude[v[0]:v[1],0]) > 0]
+    # mini_peaks = w.times[peaks]
+    
+
+    # 10) accept all minis at this stage; will change upon individual validation in GUI
     for m in minis:
         m.annotations["Accept"] = True
     
-    # NOTE: 2022-10-26 22:22:37
-    # reconstruct this in the caller so that we can use several epochs on the
-    # same signal/segment
-    # FIXME/TODO: 2022-10-25 18:25:48
-    # a neo.SpikeTrain is defined in the time domain only !!!
-    # MUST create a SpikeTrain-like signal object type for anything else
-    
-#     dstring = f"mEPSC detected in {x.name}"
-#     
-#     if isinstance(waveform, neo.core.basesignal.BaseSignal) and len(waveform.description.strip()):
-#         dstring += f" using {waveform.description}"
-        
-#     waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
-#     
-#     ret = neo.SpikeTrain(mini_starts, t_stop = x.t_stop, units = x.times.units,
-#                          t_start = x.t_start, sampling_rate = x.sampling_rate,
-#                          name=f"{x.name}_mEPSCs", description=dstring)
-#     
-#     ret.waveforms = waves
-#     ret.annotations["peak_times"] = mini_peaks
-#     ret.annotations["mEPSC_parameters"] = waveform.annotations["parameters"]
-    
-    # return ret, mini_peaks, minis
     return {"mini_starts":mini_starts, "mini_peaks":mini_peaks, "minis":minis,
             "waveform":waveform}
 

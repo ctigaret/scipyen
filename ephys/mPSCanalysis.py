@@ -426,6 +426,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.paramsWidget.spinDecimals = 4
         
         self.paramsWidget.sig_parameterChanged[str, str].connect(self._slot_modelParameterChanged)
+        self.paramsWidget.sig_badBounds[str].connect(self._slot_badBounds)
+        self.paramsWidget.sig_infeasible_x0[str].connect(self._slot_infeasible_x0s)
         
         self._frames_spinBoxSlider_.label = "Sweep:"
         self._frames_spinBoxSlider_.setRange(0, self._number_of_frames_)
@@ -497,6 +499,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self.accept_mPSCcheckBox.setEnabled(False)
         self.accept_mPSCcheckBox.stateChanged.connect(self._slot_set_mPSC_accept)
+        self.reFitPushButton.clicked.connect(self._slot_refit_mPSC)
         
         # print(f"{self.__class__.__name__}._configureUI_ end...")
         
@@ -1334,7 +1337,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             templates = list()
             
             for k,w in enumerate(mini_waves):
-                fw = membrane.fit_mPSC(w, template.annotations["parameters"], lo=lo, up=up)
+                # FIXME: 2022-11-25 00:50:11
+                # when template is NOt a model where are the params taken from?
+                fw = membrane.fit_mPSC(w, init_params, lo=lo, up=up)
+                # fw = membrane.fit_mPSC(w, template.annotations["parameters"], lo=lo, up=up)
                 fw.annotations["t_peak"] = mPSCtrain.annotations["peak_times"][k]
                 fw.name = f"mPSC_{fw.name}_{k}"
                 mini_waves[k] = fw
@@ -1347,6 +1353,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             mPSCtrain.annotations["Template"] = templates
             
             return mPSCtrain, mini_waves
+        
+    @pyqtSlot(str)
+    def _slot_badBounds(self, param):
+        self.errorMessage("Model Parameters", f"Lower bound > upper bound for {param}")
+        
+    @pyqtSlot(str)
+    def _slot_infeasible_x0s(self, param):
+        self.errorMessage("Model Parameters", f"Initial value for {param} infeasible")
         
     @pyqtSlot(bool)
     def _slot_useDefaultTemplateLocation(self, value):
@@ -1596,6 +1610,30 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._detected_mPSCs_[self.currentWaveformIndex].annotations["Accept"] = accept
         train = self._result_[self.currentFrame][0]
         train.annotations["Accept"][self.currentWaveformIndex] = accept
+        self._indicate_mPSC_(self.currentWaveformIndex)
+        
+    @pyqtSlot()
+    def _slot_refit_mPSC(self):
+        if len(self._detected_mPSCs_) == 0:
+            return
+        
+        if self.currentWaveformIndex not in range(-len(self._detected_mPSCs_),
+                                                  len(self._detected_mPSCs_)):
+            return
+        
+        mini = self._detected_mPSCs_[self.currentWaveformIndex]
+        
+        w = mini[:,0]
+        model_params = self.paramsWidget.value()
+        init_params = tuple(p.magnitude for p in model_params["Initial Value:"])
+        lo = tuple(p.magnitude for p in model_params["Lower Bound:"])
+        up = tuple(p.magnitude for p in model_params["Upper Bound:"])
+        fw = membrane.fit_mPSC(w, init_params, lo=lo, up=up)
+        fw.annotations["t_peak"]=mini.annotations["t_peak"]
+        # don;t change accept state here, do it manually in gui if fitting got better
+        fw.annotations["Accept"]=mini.annotations["Accept"]
+        fw.name = mini.name
+        self._detected_mPSCs_[self.currentWaveformIndex] = fw
         self._indicate_mPSC_(self.currentWaveformIndex)
         
         

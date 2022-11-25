@@ -5493,6 +5493,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         try:
             # remove gremlins from previous plot
             self._plotEpochs_(clear=True)
+            self._cached_epochs_.pop(self.currentFrame, None)
 
             dataOK = self._parse_data_(x=x,
                                        y=y, 
@@ -6604,7 +6605,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     ax.removeItem(l)
         # END clear current epoch display if requested
         
-        epoch_seq = None
+        epoch_seq = list()
         # END plot supplied epoch
         
         if epochs is None or len(epochs) == 0:
@@ -6613,15 +6614,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._prepareAxes_(1) # use a brand new single axis
                 epoch_seq = [self.y]
                 
-            elif isinstance(self.y, typing.Sequence) and all([isinstance(y_, neo.Epoch) for y_ in self.y]):
+            elif isinstance(self.y, typing.Sequence) and all([isinstance(y_, (neo.Epoch, DataZone)) for y_ in self.y]):
                 self._prepareAxes_(1) # use a brand new single axis
                 epoch_seq = self.y
                 
-        elif isinstance(epochs, neo.Epoch):
+        elif isinstance(epochs, (neo.Epoch, DataZone)):
             epoch_seq = [epochs]
             
         elif isinstance(epochs, typing.Sequence):
-            if all([isinstance(e, neo.Epoch) for e in epochs]):
+            if all([isinstance(e, (neo.Epoch, DataZone)) for e in epochs]):
                 epoch_seq = epochs
                 
             else:
@@ -6631,20 +6632,20 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 epoch_seq = list()
                 
                 for e in epochs:
-                    if isinstance(e, neo.Epoch):
+                    if isinstance(e, (neo.Epoch, DataZone)):
                         epoch_seq.append(e)
                         
-                    elif type(e).__name__ == "Epoch":
-                        epoch_seq.append(neo.Epoch(times=e.times,durations=e.durations,
-                                                   labels=e.labels, name=e.name,
-                                                   units=e.units, description=e.description,
-                                                   file_origin=e.file_origin,
-                                                   **e.annotations))
+                    # elif type(e).__name__ == "Epoch":
+                    #     epoch_seq.append(neo.Epoch(times=e.times,durations=e.durations,
+                    #                                labels=e.labels, name=e.name,
+                    #                                units=e.units, description=e.description,
+                    #                                file_origin=e.file_origin,
+                    #                                **e.annotations))
             
         else:
             raise TypeError("Expecting a neo.Epoch or a Sequence of neo.Epoch objects; got %s instead" % type(epochs).__name__)
         
-        if epoch_seq is not None:
+        if len(epoch_seq):
             self._plot_epochs_seq_(*epoch_seq, **kwargs)
             
             if self.currentFrame in self._cached_epochs_:
@@ -6656,6 +6657,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         self._cached_epochs_[self.currentFrame] += epoch_seq
                         
         else:
+            # clear cache when no epochs were passed
             self._cached_epochs_.pop(self.currentFrame, None)
                     
     @safeWrapper

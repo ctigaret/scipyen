@@ -233,6 +233,22 @@
            </property>
           </widget>
          </item>
+         <item>
+          <widget class="QPushButton" name="reFitPushButton">
+           <property name="toolTip">
+            <string>Re-fit current mPSC</string>
+           </property>
+           <property name="statusTip">
+            <string>Re-fit current mPSC</string>
+           </property>
+           <property name="whatsThis">
+            <string>Re-fit current mPSC</string>
+           </property>
+           <property name="text">
+            <string>Fit</string>
+           </property>
+          </widget>
+         </item>
         </layout>
        </item>
       </layout>

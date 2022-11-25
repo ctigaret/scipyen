@@ -27,10 +27,8 @@ def getPlotItemDataBoundaries(item:pg.PlotItem):
     Unless there is data plotted, this does not rely on PlotItem.viewRange()  
     because this extends outside of the data domain and data range.
     """
-    plotDataItems = [i for i in item.listDataItems() if isinstance(i, pg.PlotDataItem)]
-    if len(plotDataItems) == 0: # no data plotted
-        [[xmin, xmax], [ymin,ymax]] = item.viewRange()
-    else:
+    plotDataItems = [i for i in item.listDataItems() if isinstance(i, pg.PlotDataItem) and all(v is not None for v in (i.xData, i.yData))]
+    if len(plotDataItems): # no data plotted
         mfun = lambda x: -np.inf if x is None else x
         pfun = lambda x: np.inf if x is None else x
         
@@ -40,6 +38,9 @@ def getPlotItemDataBoundaries(item:pg.PlotItem):
         ymin = min(map(mfun, [min(p.yData) for p in plotDataItems]))
         ymax = max(map(pfun, [max(p.yData) for p in plotDataItems]))
             
+    else:
+        [[xmin, xmax], [ymin,ymax]] = item.viewRange()
+        
     return [[xmin, xmax], [ymin, ymax]]
     
         

@@ -53,9 +53,12 @@ class ModelParametersWidget(QtWidgets.QWidget):
     sig_dataChanged = pyqtSignal(name="sig_dataChanged")
     #                                 index(row), column name
     sig_parameterChanged = pyqtSignal(str,        str,        name="sig_parameterChanged")
+    sig_badBounds = pyqtSignal(str, name="sig_badBounds")
+    sig_infeasible_x0 = pyqtSignal(str, name="sig_infeasible_x0")
     
     _default_spin_decimals_ = 4
     _default_spin_step_ = 1e-4
+    _mandatory_columns_ = ("Initial Value:", "Lower Bound:", "Upper Bound:")
     
     def __init__(self, parent:QtWidgets.QWidget=None, **kwargs):
         """ Constructor of ModelParametersWidget.
@@ -143,10 +146,11 @@ class ModelParametersWidget(QtWidgets.QWidget):
         self._configureUI_()# mus be called
         
     def _generate_widgets(self):
-        if self._verticalLayout_:
-            paramsDF = self._parameters_
-        else:
-            paramsDF = self._parameters_.T
+        paramsDF = self._parameters_
+        # if self._verticalLayout_:
+        #     paramsDF = self._parameters_
+        # else:
+        #     paramsDF = self._parameters_.T
             
         header = ["Parameters:"] + [c for c in self._parameters_.columns]
         minSpinWidth = list()
@@ -266,6 +270,21 @@ class ModelParametersWidget(QtWidgets.QWidget):
     def isVertical(self):
         return self._verticalLayout_
     
+    def setVertical(self, value:bool):
+        # TODO/FIXME 2022-11-24 23:57:52
+        if value == True:
+            if not self.isVertical:
+                self._verticalLayout_ = True
+                self._clear_widgets()
+                self._generate_widgets()
+                
+        else:
+            if self.isVertical:
+                self._verticalLayout_ = False
+                self._clear_widgets()
+                self._generate_widgets()
+                
+    
     @property
     def parameters(self):
         """A pandas DataFrame with model parameters, lower and upper bounds.
@@ -282,31 +301,16 @@ class ModelParametersWidget(QtWidgets.QWidget):
     @parameters.setter
     def parameters(self, params):
         if isinstance(params, pd.DataFrame) and all(s in params.columns for s in ("Initial Value:", "Lower Bound:", "Upper Bound:")):
-            if isinstance(self._parameters_, pd.DataFrame) and self._parameters_.shape == params.shape and np.all(self._parameters_.index == params.index):
-                if self.isVertical:
-                    pDF = params
-                else:
-                    pDF = params.T
-                    
-                for c in pDF.columns:
-                    for r in pDF.index:
-                        # sb = self.getSpinBox(r, c)
-                        # sigblock = QtCore.QSignalBlocker(sb)
-                        # sb.setValue(pDF.loc[r,c])
-                        self.getSpinBox(r, c).setValue(pDF.loc[r,c])
-                        
-            else:
-                self._parameters_ = params
-                self._clear_widgets()
-                self._generate_widgets()
-                        
-            self._clear_widgets()
-            self._generate_widgets()
+            self.setParameters(params["Initial Value:"], 
+                               lower = params["Lower Bound:"], 
+                               upper = params["Upper Bound:"],
+                               names = params.index,
+                               refresh=True)
             
-    def setParameters(self, parameters:typing.Sequence, lower=None, upper=None, names=None, refresh = False):
+    def setParameters(self, parameters:typing.Sequence, lower=None, upper=None, names=None, refresh = True):
         """Generates new parameters data frame.
         
-        Does not update the display UNLESS refresh is True. The display update
+        The diusplay is refreshed UNLESS refresh is False. The display update
         either changes individual values in the spin boxes (if the new parameters
         names match the current ones) or repopulates the widget with a new set 
         of spin boxes.
@@ -314,10 +318,14 @@ class ModelParametersWidget(QtWidgets.QWidget):
         In either case, the refresh uses the current orientation (vertical or 
         horizontal) of the data layout.
         
-        If a different orientation is requiredm then it must be set BEFORE 
+        If a different orientation is required, then it must be set BEFORE 
         setting the new parameters.
+        
+        
         """
-        if len(parameters):
+        paramsDF = None
+        
+        if isinstance(parameters, (tuple, list)) and len(parameters):
             if all(isinstance(p, pq.Quantity) for p in parameters):
                 units = [p.units for p in parameters]
             else:
@@ -378,9 +386,39 @@ class ModelParametersWidget(QtWidgets.QWidget):
                 raise TypeError(f"'upper' expected to be a scalar or a sequence of {len(parameters)} elements; instead, got {upper}")
         
             paramsDF = pd.DataFrame({"Initial Value:": parameters,
-                                              "Lower Bound:":lower,
-                                              "Upper Bound:":upper},
-                                              index = names)
+                                     "Lower Bound:":lower,
+                                     "Upper Bound:":upper},
+                                     index = names)
+        elif isinstance(parameters, pd.DataFrame):
+            if any(c not in parameters.columns for c in self._mandatory_columns_):
+                raise ValueError(f"Dataframe lacks mandatory columns {self._mandatory_columns_}")
+            
+            if any (c not in self._mandatory_columns_ for c in parameters.columns):
+                raise ValueError(f"Dataframe has unexpected columns; they should be: {self._mandatory_columns_}")
+                
+            paramsDF = parameters
+            
+        # else:
+        #     raise TypeError(f"Expecting sequences 'parameters', 'lower', 'upper', 'names' or a DataFrame with appropriate layout; got {(type(parameters).__name__)} instead")
+            
+        if isinstance(paramsDF, pd.DataFrame):
+            # NOTE: 2022-11-24 23:14:36
+            # perform sanity checks on bounds
+            for i in paramsDF.index:
+                if paramsDF.loc[i, "Lower Bound:"] > paramsDF.loc[i, "Upper Bound:"]:
+                    lo = paramsDF.loc[i, "Upper Bound:"]
+                    up = paramsDF.loc[i, "Lower Bound:"]
+                    paramsDF.loc[i, "Lower Bound:"] = lo
+                    paramsDF.loc[i, "Upper Bound:"] = up
+                    sig_badBounds.emit(str(i))
+                    
+                if paramsDF.loc[i, "Lower Bound:"] > paramsDF.loc[i, "Initial Value:"]:
+                    paramsDF.loc[i, "Lower Bound:"] = paramsDF.loc[i, "Initial Value:"]
+                    sig_infeasible_x0.emit(str(i))
+                    
+                if paramsDF.loc[i, "Upper Bound:"] < paramsDF.loc[i, "Initial Value:"]:
+                    paramsDF.loc[i, "Upper Bound:"] = paramsDF.loc[i, "Initial Value:"]
+                    sig_infeasible_x0.emit(str(i))
             
             if refresh:
                 if isinstance(self._parameters_, pd.DataFrame) and self._parameters_.shape == paramsDF.shape and np.all(self._parameters_index == paramsDF.index):
@@ -398,8 +436,8 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     self._clear_widgets()
                     self._generate_widgets()
                         
-                    
-            
+                        
+                
             return paramsDF
         
     
@@ -422,6 +460,11 @@ class ModelParametersWidget(QtWidgets.QWidget):
     @pyqtSlot(float)
     def _slot_newvalue(self, value):
         widget = self.sender()
+        if self.isVertical: # FIXME/TODO/BUG
+            paramsDF = self._parameters_
+        else:
+            paramsDF = self._parameters_.T
+            
         if isinstance(widget, QtWidgets.QDoubleSpinBox):
             index = self.widgetsLayout.indexOf(widget)
             if index == -1: # this should never happen
@@ -429,13 +472,71 @@ class ModelParametersWidget(QtWidgets.QWidget):
 
             layout_col = index // self.widgetsLayout.rowCount()
             layout_row = index % self.widgetsLayout.rowCount()
+            
+            param_col = self._parameters_.columns[layout_col-1]
+            param_row = self._parameters_.index[layout_row-1]
 
             old_val = self._parameters_.iloc[layout_row-1, layout_col-1]
             
             if isinstance(old_val, pq.Quantity):
-                self._parameters_.iloc[layout_row-1, layout_col-1] = value * old_val.units
+                new_val = value * old_val.units
             else:
-                self._parameters_.iloc[layout_row-1, layout_col-1] = value
+                new_val = value
+                
+            if param_col == "Lower Bound:":
+                init_val = self._parameters_.loc[param_row, "Initial Value:"]
+                upper_val = self._parameters_.loc[param_row, "Upper Bound:"]
+                
+                if new_val > init_val:
+                    # self.sig_badBounds.emit(str(param_row))
+                    new_val = init_val
+                    
+                if new_val > upper_val:
+                    # self.sig_badBounds.emit(str(param_row))
+                    new_val = upper_val
+                    
+            elif param_col == "Upper Bound:":
+                init_val = self._parameters_.loc[param_row, "Initial Value:"]
+                lower_val = self._parameters_.loc[param_row, "Lower Bound:"]
+                
+                if new_val < init_val:
+                    # self.sig_badBounds.emit(str(param_row))
+                    new_val = init_val
+                    
+                if new_val < lower_val:
+                    # self.sig_badBounds.emit(str(param_row))
+                    new_val = upper_val
+                    
+            elif param_col == "Initial Value:":
+                lower_val = self._parameters_.loc[param_row, "Lower Bound:"]
+                upper_val = self._parameters_.loc[param_row, "Upper Bound:"]
+                if new_val < lower_val:
+                    # adjust lower bound:
+                    lower_val = new_val
+                    sb = self.getSpinBox(str(param_row), "Lower Bound:")
+                    signalBlocker = QtCore.QSignalBlocker(sb)
+                    sb.setMinimum(lower_val)
+                    self._parameters_.loc[param_row, "Lower Bound:"] = lower_val
+                    
+                if new_val > upper_val:
+                    # adjust lower bound:
+                    upper_val = new_val
+                    sb = self.getSpinBox(str(param_row), "Upper Bound:")
+                    signalBlocker = QtCore.QSignalBlocker(sb)
+                    sb.setMaximum(upper_val)
+                    self._parameters_.loc[param_row, "Upper Bound:"] = upper_val
+                    
+            if new_val != value:
+                sb = self.getSpinBox(str(param_row), str(param_col))
+                signalBlocker = QtCore.QSignalBlocker(sb)
+                sb.setValue(new_val)
+                
+            self._parameters_.iloc[layout_row-1, layout_col-1] = new_val
+                    
+            # if isinstance(old_val, pq.Quantity):
+            #     self._parameters_.iloc[layout_row-1, layout_col-1] = value * old_val.units
+            # else:
+            #     self._parameters_.iloc[layout_row-1, layout_col-1] = value
                 
             self.sig_dataChanged.emit()
             self.sig_parameterChanged.emit(self._parameters_.index[layout_row-1], 

@@ -7,6 +7,7 @@ from gui.painting_shared import (FontStyleType, standardQtFontStyles,
                                  FontWeightType, standardQtFontWeights)
 
 from gui import quickdialog as qd
+from gui.quickdialog import (InftyDoubleValidator, ComplexValidator)
 
 import quantities as pq
 from core import quantities as scq
@@ -482,6 +483,13 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         super().setSpecialValueText("")
         
         return val * self.units
+    
+    def validate(self, text, pos):
+        validator = InftyDoubleValidator(parent=self)
+        validator.setDecimals(self.decimals()) # self.decimals() inherited from QDoubleSpinBox
+        valid = validator.validate(text, pos)
+        return valid
+        
         
     def setValue(self, value:typing.Union[pq.Quantity, float, type(pd.NA)]):
         """Also allows changing the units if not convertible to current ones.

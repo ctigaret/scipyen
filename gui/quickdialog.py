@@ -212,9 +212,9 @@ class InftyDoubleValidator(QtGui.QDoubleValidator):
             
         return valid
     
-class ComplexValidator(QtGui.QDoubleValidator):
+class ComplexValidator(InftyDoubleValidator):
     def __init__(self, bottom:float=-math.inf, top:float=math.inf, decimals:int=4, parent=None):
-        QtGui.QDoubleValidator.__init__(self, parent)
+        InftyDoubleValidator.__init__(self, bottom, top, decimals, parent)
         self.setBottom(bottom)
         self.setTop(top)
         self.setDecimals(decimals)

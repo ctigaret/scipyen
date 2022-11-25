@@ -192,8 +192,7 @@ from .datatypes import (is_string, is_vector,
 from .quantities import units_convertible, check_time_units
 from .datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from .datazone import DataZone
-
-from .triggerevent import (TriggerEvent, TriggerEventType,)
+from .triggerevent import (DataMark, TriggerEvent, TriggerEventType,)
 
 from . import workspacefunctions
 from . import signalprocessing as sigp
@@ -211,7 +210,8 @@ ephys_data = (neo.Block, neo.Segment, neo.AnalogSignal, neo.IrregularlySampledSi
               neo.SpikeTrain, DataSignal, IrregularlySampledDataSignal,
               )
 
-ancillary_neo_data = (neo.ImageSequence, neo.Event, neo.Epoch)
+ancillary_neo_data = (neo.ImageSequence, neo.Event, neo.Epoch,
+                      DataZone, DataMark, TriggerEvent)
 
 ephys_data_collection = (neo.Block, neo.Segment)
 
@@ -299,12 +299,17 @@ def segment_start(data:neo.Segment):
                [min(s.times) for s in data.irregularlysampledsignals])
         
 @singledispatch
-def set_relative_time_start(data, t = 0 * pq.s):
+def set_relative_time_start(data, t = 0):
+    # TODO: dispatch for neo.ImageSequence; neo.Group; neo.ChannelView;
     raise NotImplementedError
 
 @set_relative_time_start.register(neo.Epoch)
 @set_relative_time_start.register(DataZone)
-def _(data, t = 0 * pq.s):
+def _(data, t = 0):
+    if isinstance(t, pq.Quantity):
+        t.rescale(data.times.units) # will raise if unist wrong wrt signal's domin
+    elif isinstance(t, numbers.Number):
+        t = t * data.times.units
     klass = data.__class__
     times = data.times - data.times[0] + t if len(data.times) else data.times
     ret = klass(times,
@@ -316,8 +321,13 @@ def _(data, t = 0 * pq.s):
     return ret
 
 @set_relative_time_start.register(neo.Event)
+@set_relative_time_start.register(DataMark)
 @set_relative_time_start.register(TriggerEvent)
-def _(data, t = 0 * pq.s):
+def _(data, t = 0):
+    if isinstance(t, pq.Quantity):
+        t.rescale(data.times.units) # will raise if unist wrong wrt signal's domin
+    elif isinstance(t, numbers.Number):
+        t = t * data.times.units
     times = data.times - data.times[0] + t if len(data.times) else data.times
     if isinstance(data, TriggerEvent):
         ret = TriggerEvent(times = times,
@@ -338,7 +348,11 @@ def _(data, t = 0 * pq.s):
     return ret
             
 @set_relative_time_start.register(neo.SpikeTrain)
-def _(data, t = 0 * pq.s):
+def _(data, t = 0):
+    if isinstance(t, pq.Quantity):
+        t.rescale(data.times.units) # will raise if unist wrong wrt signal's domin
+    elif isinstance(t, numbers.Number):
+        t = t * data.times.units
     
     times = data.times - data.times[0] + t if len(data.times) else data.times
     
@@ -358,15 +372,30 @@ def _(data, t = 0 * pq.s):
     return ret
 @set_relative_time_start.register(neo.AnalogSignal)
 @set_relative_time_start.register(DataSignal)
-def _(data, t = 0*pq.s):
-    ret = make_neo_object(data, units = data.units, time_units = data.time_units,
+def _(data, t = 0):
+    if isinstance(t, pq.Quantity):
+        t.rescale(data.times.units) # will raise if unist wrong wrt signal's domin
+    elif isinstance(t, numbers.Number):
+        t = t * data.times.units
+    ret = make_neo_object(data, units = data.units,
                        t_start = t, sampling_rate = data.sampling_rate,
                        name=data.name)
-    ret.times = ret.times - ret.times[0] + t
+    # ret.times = ret.times - ret.times[0] + t
+    return ret
+
+@set_relative_time_start.register(neo.IrregularlySampledSignal)
+@set_relative_time_start.register(IrregularlySampledDataSignal)
+def _(data, t = 0):
+    if isinstance(t, pq.Quantity):
+        t.rescale(data.times.units) # will raise if unist wrong wrt signal's domin
+    elif isinstance(t, numbers.Number):
+        t = t * data.times.units
+    times = data.times - data_times + t if len(data.times) else data.times
+    ret = make_neo_object(times, data)
     return ret
 
 @set_relative_time_start.register(neo.Segment)
-def _(data, t = 0*pq.s):
+def _(data, t = 0):
     from neo.core.spiketrainlist import SpikeTrainList
     ret = make_neo_object(data)
     ret.annotations.update(data.annotations)
@@ -389,8 +418,8 @@ def _(data, t = 0*pq.s):
     
     ret.spiketrains = SpikeTrainList(items = spiketrains)
     
-    for signal in segment.analogsignals:
-        signal.t_start = t
+    # for signal in segment.analogsignals:
+    #     signal.t_start = t
         
 #     try:
 #         # NOTE: 2022-11-23 22:39:24
@@ -675,6 +704,7 @@ def make_neo_object(obj, /, **kwargs):
         `obj` (CAUTION: except for basic Python data types, these are shallow 
         copies!)
 
+    TODO: dispatch for neo.ImageSequence, neo.ChannelView, neo.Group
     """
     raise NotImplementedError
 
