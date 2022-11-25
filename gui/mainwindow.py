@@ -6076,7 +6076,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def _slot_runPythonSource(self):
         if isinstance(self._temp_python_filename_, str) and len(self._temp_python_filename_.strip()) and os.path.isfile(self._temp_python_filename_):
             
-            #worker = pgui.ProgressWorker(self._run_python_source_code_, None, self._temp_python_filename_, {'paste': False})
+            #worker = pgui.ProgressRunnableWorker(self._run_python_source_code_, None, self._temp_python_filename_, {'paste': False})
             
             #self.threadpool.start(worker)
             
@@ -6768,7 +6768,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
         pdlg = QtWidgets.QProgressDialog(title, "Cancel", 0,1000, self)
         
-        worker = pgui.ProgressWorker(fn, pdlg, *args, **kwargs)
+        worker = pgui.ProgressRunnableWorker(fn, pdlg, *args, **kwargs)
         worker.signals.signal_finished.connect(pdlg.reset)
         worker.signals.signal_result.connect(self.slot_loop_process_result)
             

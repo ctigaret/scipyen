@@ -1168,7 +1168,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         Var-keyword parameters:
         =======================
         NOTE: These do not need to be passed explicitly to the call; tyipically
-        they are supplied by an instance of pictgui.ProgressWorker.
+        they are supplied by an instance of pictgui.ProgressRunnableWorker.
         
         progressSignal: PyQt signal that will be emitted with each iteration
         
@@ -1649,7 +1649,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
         progressDisplay = QtWidgets.QProgressDialog(f"Detecting mPSCS {vartxt}", "Abort", 0, self._number_of_frames_, self)
         
-        worker = pgui.ProgressWorker(self._detect_all_, progressDisplay)
+        worker = pgui.ProgressRunnableWorker(self._detect_all_, progressDisplay)
         
         worker.signals.signal_finished.connect(progressDisplay.reset)
         worker.signals.signal_result[object].connect(self._slot_detectionDone)

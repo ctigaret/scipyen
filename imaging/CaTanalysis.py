@@ -4448,7 +4448,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     def filterData(self, scene=True, scans=True):#, frames = None):
         """ Filters data with functions selected in the "Filters" tab.
         
-        Wraps processData() function in separate pictgui.ProgressWorker threads,
+        Wraps processData() function in separate pictgui.ProgressRunnableWorker threads,
         one for the scans and one for the scene ⟹ there will be two progressbars
         showing.
         
@@ -4595,7 +4595,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
             pdlg = QtWidgets.QProgressDialog("De-noising scene data...", "Abort", 0, self._data_.sceneFrames, self)
 
-            sceneWorker = pgui.ProgressWorker(self.processData, pdlg,
+            sceneWorker = pgui.ProgressRunnableWorker(self.processData, pdlg,
                                       channel = [self._data_.analysisOptions["Channels"]["Reference"], 
                                                  self._data_.analysisOptions["Channels"]["Indicator"]],
                                       scene=True)
@@ -4613,7 +4613,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
             pdlg = QtWidgets.QProgressDialog("De-noising scans data...", "Abort", 0, self._data_.scansFrames, self)
             
-            scansWorker = pgui.ProgressWorker(self.processData, pdlg,
+            scansWorker = pgui.ProgressRunnableWorker(self.processData, pdlg,
                                       channel = [self._data_.analysisOptions["Channels"]["Reference"], 
                                                  self._data_.analysisOptions["Channels"]["Indicator"]],
                                       scene=False)
@@ -4986,7 +4986,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     def _analyzeFrames_(self, frames, progressSignal=None, setMaxSignal=None, **kwargs):
         """Calls to the module-level analyseFrame() for each frame in frames.
         This is meant to be executed in a separate GUI thread, (i.e. it is called 
-        by a ProgressWorker) emits progressSignal(int) pyqtSignal
+        by a ProgressRunnableWorker) emits progressSignal(int) pyqtSignal
         
         Parameters:
         ==========
@@ -5152,7 +5152,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         pd = QtWidgets.QProgressDialog("Concatenating LSCaT data (ScanData) objects in Workspace", "Abort", 0, len(selected_names), self)
         
-        worker = pgui.ProgressWorker(self.concatenateScanData,  pd, selected_names)
+        worker = pgui.ProgressRunnableWorker(self.concatenateScanData,  pd, selected_names)
         
         worker.signals.signal_finished.connect(pd.reset)
         worker.signals.result[object].connect(self.slot_concatenateLSDataDone)
@@ -5808,7 +5808,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         pd = QtWidgets.QProgressDialog("EPSCaT Analysis...", "Abort", 0, self._data_.scansFrames, self)
         
-        worker = pgui.ProgressWorker(self._analyzeFrames_, pd,
+        worker = pgui.ProgressRunnableWorker(self._analyzeFrames_, pd,
                              frames=range(self._data_.scansFrames),
                              detrend = self.detrendEPSCaTsCheckBox.isChecked(),
                              gen_long_fits=self.actionPlot_long_fits.isChecked())
@@ -5944,7 +5944,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         pd = QtWidgets.QProgressDialog("EPSCaT Analysis...", "Abort", 0, self._data_.scansFrames, self)
         
-        worker = pgui.ProgressWorker(self._analyzeUnitInFrames_, pd,
+        worker = pgui.ProgressRunnableWorker(self._analyzeUnitInFrames_, pd,
                              frames=frames, unit=unit)
         
         worker.signals.signal_finished.connect(pd.reset)
@@ -7479,7 +7479,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         pd = QtWidgets.QProgressDialog("Collecting Analysis Units from ScanData in Workspace", 
                                        "Abort", 0, len(selected_names), self)
         
-        worker = pgui.ProgressWorker(self.collectAnalysisUnits,  pd, selected_names)
+        worker = pgui.ProgressRunnableWorker(self.collectAnalysisUnits,  pd, selected_names)
         
         worker.signals.signal_finished.connect(pd.reset)
         worker.signals.signal_result[object].connect(self.slot_collectAnalysisDone)
@@ -11893,7 +11893,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     def processData(self, progressSignal = None, setMaxSignal=None, **kwargs):#scene=True, channel = None, ):
         """Applies 2D filters frame-wise to raw scene or scans image data subsets.
         
-        The function is meant to be called by a ProgressWorker instance.
+        The function is meant to be called by a ProgressRunnableWorker instance.
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray

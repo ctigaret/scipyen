@@ -132,6 +132,8 @@ class GuiWorkerSignals(QtCore.QObject):
     sig_error = pyqtSignal(tuple, name="sig_error")
     signal_result = pyqtSignal(object, name="signal_result")
     
+
+    
 class GuiWorker(QtCore.QRunnable):
     def __init__(self, fn, *args, **kwargs):
         super(GuiWorker, self).__init__()
@@ -164,7 +166,7 @@ class GuiWorker(QtCore.QRunnable):
         finally:
             self.signals.signal_finished.emit()  # Done
 
-class ProgressWorkerSignals(QtCore.QObject):
+class ProgressRunnableWorkerSignals(QtCore.QObject):
     """See Martin Fitzpatrick's tutorial on Multithreading PyQt applications with QThreadPool 
     https://martinfitzpatrick.name/article/multithreading-pyqt-applications-with-qthreadpool/
     
@@ -193,9 +195,9 @@ class ProgressWorkerSignals(QtCore.QObject):
     signal_setMaximum = pyqtSignal(int)
     # signal_canceled = pyqtSignal()
     
-class ProgressWorker(QtCore.QRunnable):
+class ProgressRunnableWorker(QtCore.QRunnable):
     """
-    ProgressWorker thread
+    ProgressRunnableWorker thread
 
     Inherits from QRunnable to handler worker thread setup, signals and wrap-up.
 
@@ -226,12 +228,12 @@ class ProgressWorker(QtCore.QRunnable):
         progressDialog: QtWidgets.QProgressDialog
         *args, **kwargs are passed to fn
         """
-        super(ProgressWorker, self).__init__()
+        super(ProgressRunnableWorker, self).__init__()
         # Store constructor arguments (re-used for processing)
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
-        self.signals = ProgressWorkerSignals()
+        self.signals = ProgressRunnableWorkerSignals()
         self.pd = progressDialog
         self.setAutoDelete(True)
         
@@ -249,7 +251,7 @@ class ProgressWorker(QtCore.QRunnable):
 
         # Add the callback to our kwargs
         
-        #print("ProgressWorker fn args", self.args)
+        #print("ProgressRunnableWorker fn args", self.args)
         
     # @pyqtSlot()
     # def slot_canceled(self):
