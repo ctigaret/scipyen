@@ -256,17 +256,12 @@ class DataBag(Bunch):
         super().__init__(**dd)
         
     def _light_trait_(self, obj):
-        # NOTE: 2021-09-14 13:00:51 
-        # Might have to change traiturils.dynamic_trait to force dictionaries to 
-        # behave as traitlets.Any because of the long processing times
-        
-        
         # NOTE: 2022-01-29 19:29:56 dynamic_trait is from traitutils
         if obj is self:
             dtrait = partial(dynamic_trait, 
                              allow_none=self.__hidden__.allow_none, 
-                             content_traits=False,
-                             force_trait=traitlets.Any)
+                             content_traits=False)#,
+                             # force_trait=traitlets.Any) # 2022-11-26 23:06:46 we use DataBagTrait
             
         else:
             dtrait = partial(dynamic_trait, 

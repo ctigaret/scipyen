@@ -80,8 +80,8 @@ TRAITSMAP = {           # use casting versions
     float:      (CFloat,),
     complex:    (CComplex,),
     bytes:      (CBytes,),
-    str:        (Unicode,),
-    #str:        (CUnicode,),
+    # str:        (Unicode,),
+    str:        (CUnicode,),
     list:       (List,),
     #deque:      (List,),
     set:        (Set,),
@@ -128,7 +128,7 @@ def enhanced_traitlet_set(instance, obj, value):
         new_hash = gethash(new_value)
         #print("\told %s (hash %s)\n\tnew %s (hash %s)" % (old_value, instance.hashed, new_value, new_hash))
         #print(instance.name, "old hashed", instance.hashed, "new_hash", new_hash)
-        silent = (new_hash == instance.hashed)
+        silent = bool(new_hash == instance.hashed)
         
         if not silent:
             instance.hashed = new_hash
@@ -441,7 +441,7 @@ def dynamic_trait(x, *args, **kwargs):
     
     elif issubclass(myclass, pq.Quantity):
         return QuantityTrait(default_value = x)
-#     
+
     elif issubclass(myclass, list):
         return ListTrait(x)
     
@@ -451,14 +451,17 @@ def dynamic_trait(x, *args, **kwargs):
     elif issubclass(myclass, dict):
         return Dict(x)
     
+    # elif issubclass(myclass, str):
+    #     return StringTrait(x)
+    
     if isclass(force_trait) and issubclass(force_trait, traitlets.TraitType):
         traitclass = (force_trait, )
         
     else:
         # NOTE: 2021-08-20 12:22:12 For a finer granularity
-        # traitclass = TRAITSMAP.get(myclass, (Any, ))
-        traitclass = (Any,)
-        
+        traitclass = TRAITSMAP.get(myclass, (Any, ))
+        # traitclass = (Any,)
+    print(f"dynamic_trait traitclass = {traitclass[0]} for {x} ({type(x).__name__})")
     if traitclass[0] is None:
         # NOTE: 2021-10-10 17:10:02
         # when 'x' is a DataBag, the line below always returns 'dict'
@@ -688,12 +691,9 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
     default_value = []
     klass = list
     _valid_defaults = (list,tuple)
-    # _cast_types = (list, tuple)
     
     info_text = "Trait for lists that is sensitive to changes in content"
     
-    # def __init__(self, trait=None, traits=None, default_value=None, **kwargs):
-    # def __init__(self, trait=typing.Any, traits=None, default_value=None, **kwargs):
     def __init__(self, trait=None, traits=None, default_value=Undefined, **kwargs):
         """
         trait: in the super() List traitype, `traits` restricts the type of elements
@@ -813,6 +813,27 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
         if silent is not True:
             # we explicitly compare silent to True just in case the equality
             # comparison above returns something other than True/False
+            obj._notify_trait(self.name, old_value, new_value)
+            
+class StringTrait(CUnicode):
+    def __init__(self, default_value=Undefined, allow_none=True, read_only=None,help=None,config=None, **kwargs):
+        super(StringTrait, self).__init__(default_value=default_value,
+                                          allow_none=allow_none,
+                                          read_only=read_only,
+                                          help=help,
+                                          config=config,
+                                          **kwargs)
+        
+    def set(self, obj, value):
+        new_value = self._validate(obj, value)
+        try:
+            old_value = obj._trait_values[self.name]
+        except KeyError:
+            old_value = self.default_value
+
+        obj._trait_values[self.name] = new_value
+        
+        if bool(old_value != new_value) is not True:
             obj._notify_trait(self.name, old_value, new_value)
         
 class ArrayTrait(Instance):

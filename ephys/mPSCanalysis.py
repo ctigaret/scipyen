@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os, typing, math, datetime
+import os, typing, math, datetime, logging
 from numbers import (Number, Real,)
 from itertools import chain
 
@@ -99,11 +99,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def __init__(self, ephysdata=None, clearOldPSCs=False, ephysViewer:typing.Optional[sv.SignalViewer]=None, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="mPSC Detect", **kwargs):
         # NOTE: 2022-11-05 14:54:24
         # by default, frameIndex is set to all available frames - KISS
-        self.threadpool = QtCore.QThreadPool()
         self._toolbars_locked_ = True
         self._clear_detection_flag_ = clearOldPSCs == True
         self._mPSC_detected_ = False
         self._data_var_name_ = None
+        self._last_used_file_save_filter_ = None
+        self._last_used_file_open_filter_ = None
         
         # NOTE: 2022-11-20 11:36:08
         # For each segment in data, if there are spike trains with mPSC time
@@ -322,6 +323,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self._set_data_(ephysdata)
 
+        # NOTE: 2022-11-26 21:41:50
+        # using the QRunnable paradigm works, but can't abort'
+        self.threadpool = QtCore.QThreadPool()
+        
         # NOTE: 2022-11-26 11:22:38
         # this works, but still needs to be made abortable
         # self._detectController_ = pgui.ProgressThreadController(self._detect_all_)
@@ -332,6 +337,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # https://realpython.com/python-pyqt-qthread/#using-qthread-to-prevent-freezing-guis
         self._detectThread_ = None
         self._detectWorker_ = None
+        
+        # NOTE: 2022-11-26 21:42:48
+        # mutable control data for the detection loop, to communicate with the
+        # worker thread
+        self.loopControl = {"break":False}
         
         # NOTE: 2022-11-05 23:08:01
         # this is inherited from WorkspaceGuiMixin therefore it needs full
@@ -1184,7 +1194,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         =======================
         NOTE: These do not need to be passed explicitly to the call; they are
         supposed to be supplied by an instance of a worker in the pictgui 
-        module (e.g. ProgressRunnableWorker, or ProgressThreadWorker)
+        module (e.g. ProgressWorkerRunnable, or ProgressWorkerThreaded)
         
         progressSignal: PyQt signal that will be emitted with each iteration
         
@@ -1195,10 +1205,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if self._data_ is None:
             return
         
+        clear_prev_detection = kwargs.pop("clearLastDetection", True)
+        loopControl = kwargs.pop("loopControl", None)
         progressSignal = kwargs.pop("progressSignal", None)
-        setMaxSignal = kwargs.pop("setMaxSignal", None)
         finished = kwargs.pop("finished", None)
-        progressUI = kwargs.pop("progressDialog", None)
+        # setMaxSignal = kwargs.pop("setMaxSignal", None)
+        # canceled = kwargs.pop("canceled", None)
+        # progressUI = kwargs.pop("progressDialog", None)
         
         if waveform is None:
             waveform  = self._get_mPSC_template_or_waveform_()
@@ -1218,21 +1231,24 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             mPSCtrain, detection = res
             self._result_[frame] = (mPSCtrain, [s for s in detection])
             
-            if self.clearPreviousDetectionCheckBox.isChecked():
-                self._clear_detection_flag_ = True # to make sure this is up to date
+            if clear_prev_detection:
                 self._clear_detection_in_sweep_(segment)
+                
+            # if self.clearPreviousDetectionCheckBox.isChecked():
+            #     self._clear_detection_flag_ = True # to make sure this is up to date
+            #     self._clear_detection_in_sweep_(segment)
                 
             segment.spiketrains.append(mPSCtrain)
             
             if isinstance(progressSignal, QtCore.pyqtBoundSignal):
                 progressSignal.emit(frame)
                 
-            # if isinstance(progressUI, QtWidgets.QProgressDialog) and progressUI.wasCanceled():
-            #     print(f"{self.__class__.__name__} {progressUI.__class__.__name__}.wasCanceled")
-            #     break
-            
-        # if isinstance(finished, QtCore.pyqtBoundSignal):
-        #     finished.emit()
+            if isinstance(loopControl, dict) and loopControl.get("break",  None) == True:
+                break
+                
+#             
+#         if isinstance(finished, QtCore.pyqtBoundSignal):
+#             finished.emit()
                 
     def _undo_sweep(self, segment_index:typing.Optional[int]=None):
         if segment_index is None:
@@ -1666,7 +1682,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         #### BEGIN using QRunnable paradigm
         # NOTE: 2022-11-25 22:15:47
         # this cannot abort
-        worker = pgui.ProgressRunnableWorker(self._detect_all_, progressDisplay)
+        worker = pgui.ProgressWorkerRunnable(self._detect_all_, progressDisplay)
         
         worker.signals.signal_Finished.connect(progressDisplay.reset)
         worker.signals.signal_Result[object].connect(self._slot_detectionDone)
@@ -1683,12 +1699,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     @pyqtSlot()
     def _slot_detect_thread_(self):
         # NOTE: 2022-11-26 10:24:01 IT WORKS !!!
+        # but still no Abort
         if self._data_ is None:
             self.criticalMessage("Detect mPSC in current sweep",
                                  "No data!")
             return
             
         waveform = self._get_mPSC_template_or_waveform_()
+        
         if waveform is None:
             self.criticalMessage("Detect mPSC in current sweep",
                                  "No mPSC waveform or template is available")
@@ -1698,8 +1716,67 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             vartxt = f"in {self._data_.name}"
         else:
             vartxt = ""
+
+        self._clear_detection_flag_ = self.clearPreviousDetectionCheckBox.isChecked() # to make sure this is up to date
             
-        progressDisplay = QtWidgets.QProgressDialog(f"Detecting mPSCS {vartxt}", "Abort", 0, self._number_of_frames_, self)
+        progressDisplay = QtWidgets.QProgressDialog(f"Detecting mPSCS {vartxt}", 
+                                                    "Abort", 
+                                                    0, self._number_of_frames_, 
+                                                    self)
+        
+        # NOTE: 2022-11-26 21:48:56 - This is CRUCIAL:
+        # the canceled signal from the progress dialog MUST be outside of the 
+        # loop inside the worker thread; we control the loop execution using the 
+        # mutable self.loopControl which we change in a  slot connected to the 
+        # progressDialog.canceled() signal.
+        # 
+        # Throughout, progressDisplay (a GUI object) stays in the main thread
+        # and in the main event loop) while the execution of the detection loop
+        # (_detect_all_) takes place inside a QThread (self._detectThread_).
+        #
+        # To the loop execution can be stopped from OUTSIDE its thread, using a 
+        # shared variable `self.loopControl`
+        #
+        # Here, self.loopControl is a dict with the mapping "break" ↦ False
+        # This mapping is changed to "break" ↦ True in `self._slot_breakLoop`
+        # called when progressDisplay.canceled() is emitted in the main thread.
+        #
+        # Because self.loopControl is shared with the worker thread, it is polled
+        # at every loop cycle, thus breaking the loop when "break" ↦ True; once
+        # the loop breaks, and the function executing the loop returns early,
+        # causing the worker thread to finish naturally BEFORE the entire loop
+        # has run its course.
+        #
+        # Of course, self.loopControl can be a bool instead of a dict with a
+        # mapping to a bool. However, using a dict to wrap various flags is a 
+        # generalizable paradigm (one can send other control data to the
+        # worker thread, as long as the data is not an immutable state)
+        #
+        # To update the progress from INSIDE the worker thread, we use 
+        # the worker's progress signal (here, `worker.signals.signal_Progress`)
+        # connected to `progressDisplay.setValue` slot. 
+        #
+        # The function executing the loop (the worker function) needs the 
+        # following parameters, for this mechanism to work:
+        # • a reference to the self.loopControl loop control flag
+        #
+        # • a reference to a signal that, when emitted, increments (or sets) the 
+        #   value in the progressDisplay; this should be emitted by the worker
+        #   function after each cycle in the loop
+        #
+        # • a reference to a signal that should be emitted right before the 
+        #   worker function returns; when emitted, it should cause the worker 
+        #   thread to quit
+        #
+        # • any other var-positional, named and var-keyword parameters
+        #
+        # These parameters are NOT passed to the working function directly, but 
+        # only indirectly via the `worker``instance of ProgressWorkerThreaded, 
+        # and therefore they are supplied to its constructor
+        #
+        # In particular, the ProgressWorkerThreaded provides the incrementing
+        # and the execution finished signals
+        progressDisplay.canceled.connect(self._slot_breakLoop)
         
         # NOTE: 2022-11-26 11:24:32 see NOTE: 2022-11-26 11:22:38
         # self._detectController_.setProgressDialog(progressDisplay)
@@ -1707,28 +1784,50 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         # NOTE: 2022-11-26 11:24:51 see NOTE: 2022-11-26 11:23:21
         self._detectThread_ = QtCore.QThread()
-        self._detectWorker_ = pgui.ProgressThreadWorker(self._detect_all_, progressDisplay)
+        self._detectWorker_ = pgui.ProgressWorkerThreaded(self._detect_all_,
+                                                        loopControl = self.loopControl,
+                                                        clearLastDetection=self._clear_detection_flag_)
+        self._detectWorker_.signals.signal_Progress.connect(progressDisplay.setValue)
+        
+        # self._detectWorker_ = pgui.ProgressWorkerThreaded(self._detect_all_, 
+        #                                                 progressDisplay, 
+        #                                                 clearLastDetection=self._clear_detection_flag_)
+        
         self._detectWorker_.moveToThread(self._detectThread_)
-        self._detectThread_.started.connect(self._detectWorker_.run)
-        self._detectWorker_.signals.signal_Canceled.connect(self._detectThread_.quit)
-        self._detectWorker_.signals.signal_Canceled.connect(self._detectWorker_.deleteLater)
+        self._detectThread_.started.connect(self._detectWorker_.run) # see NOTE: 2022-11-26 16:56:19 below
         self._detectWorker_.signals.signal_Finished.connect(self._detectThread_.quit)
         self._detectWorker_.signals.signal_Finished.connect(self._detectWorker_.deleteLater)
+        self._detectWorker_.signals.signal_Finished.connect(self._detectThread_.deleteLater)
+        self._detectWorker_.signals.signal_Finished.connect(lambda : progressDisplay.setValue(progressDisplay.maximum()))
         self._detectWorker_.signals.signal_Result[object].connect(self._slot_detectThread_ready)
+        
+        # self._detectWorker_.signals.signal_Canceled.connect(self._detectThread_.quit)
+        # self._detectWorker_.signals.signal_Canceled.connect(self._detectWorker_.deleteLater)
+        
         self._detectThread_.finished.connect(self._detectWorker_.deleteLater)
         self._detectThread_.finished.connect(self._detectThread_.deleteLater)
-        # self._detectWorker_.signals.signal_Progress.connect()
-        self._detectThread_.start()
+        
+        # progressDisplay.setValue(0) # causes the progres dialog to show imemdiately
+        
+        self._detectThread_.start() # ↯ _detectThread_.started ↣ _detectWorker_.run NOTE: 2022-11-26 16:56:19
+        self.actionDetect.setEnabled(False)
+        self.actionUndo.setEnabled(False)
+        self.actionDetect_in_current_sweep.setEnabled(False)
+        self.actionUndo_current_sweep.setEnabled(False)
         
     @pyqtSlot(object)
     def _slot_detectThread_ready(self, result:object):
         print(f"{self.__class__.__name__}._slot_detectThread_ready(result = {result})")
         self._plot_data()
-#         if isinstance(self._detectWorker_, pgui.ProgressThreadWorker):
-#             self._detectWorker_ = None
-#             
-#         if isinstance(self._detectThread_, QtCore.QThread):
-#             self._detectThread_ = None
+        self.actionDetect.setEnabled(True)
+        self.actionUndo.setEnabled(True)
+        self.actionDetect_in_current_sweep.setEnabled(True)
+        self.actionUndo_current_sweep.setEnabled(True)
+        self.loopControl["break"] = False
+        
+    @pyqtSlot()
+    def _slot_breakLoop(self):
+        self.loopControl["break"] = True
         
     @pyqtSlot()
     def _slot_undoDetection(self):
@@ -1798,22 +1897,43 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if self._data_ is None:
             return
         
+        fileFilters = ["Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]
+        
+        if self._last_used_file_save_filter_ in fileFilters:
+            fileFilters = [self._last_used_file_save_filter_] + [f for f in fileFilters if f != self._last_used_file_save_filter_]
+            
         fileName, fileFilter = self.chooseFile(caption="Save electrophysiology data",
                                                single=True,
                                                save=True,
-                                               fileFilter=";;".join(["Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]))
+                                               fileFilter=";;".join(fileFilters))
+        
+        # print(f"{self.__class__.__name__} _slot_saveEphysData fileFilter = {fileFilter}, type = {type(fileFilter).__name__}")
+        if isinstance(fileFilter, str) and len(fileFilter.strip()):
+            self.lastUsedFileSaveFilter = fileFilter
+            
         if isinstance(fileName, str) and len(fileName.strip()):
             if "HDF5" in fileFilter:
                 pio.saveHDF5(self._data_, fileName)
             else:
                 pio.savePickleFile(self._data_, fileName)
+                
             
     @pyqtSlot()
     def _slot_openEphysDataFile(self):
+        fileFilters = ["Axon files (*.abf)", "Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]
+        if self._last_used_file_open_filter_ in fileFilters:
+            fileFilters = [self._last_used_file_open_filter_] + [f for f in fileFilters if f != self._last_used_file_open_filter_]
+            
+        
         fileName, fileFilter = self.chooseFile(caption="Open electrophysiology file",
                                                single=True,
                                                save=False,
-                                               fileFilter=";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]))
+                                               fileFilter=";;".join(fileFilters))
+        
+        # print(f"{self.__class__.__name__} _slot_openEphysDataFile fileFilter = {fileFilter}, type = {type(fileFilter).__name__}")
+        if isinstance(fileFilter, str) and len(fileFilter.strip()):
+            self.lastUsedFileOpenFilter = fileFilter
+        
         if isinstance(fileName, str) and os.path.isfile(fileName):
             if "Axon" in fileFilter:
                 data = pio.loadAxonFile(fileName)
@@ -1823,6 +1943,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 data = pio.loadPickleFile(fileName)
             else:
                 return
+            
                 
             self._set_data_(data)
             self.metaDataWidget.dataVarName = os.path.splitext(os.path.basename(fileName))[0]
@@ -2058,7 +2179,38 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._plot_detected_mPSCs()
         else:
             self._currentWaveformIndex_ = 0
+            
+    @property
+    def lastUsedFileSaveFilter(self):
+        return self._last_used_file_save_filter_
     
+    @markConfigurable("FileSaveFilter", trait_notifier=True)
+    @lastUsedFileSaveFilter.setter
+    def lastUsedFileSaveFilter(self, value:str):
+        # FIXME/BUG 2022-11-26 17:34:21 called twice, second time with the type of value
+        # print(f"{self.__class__.__name__}. @lastUsedFileSaveFilter.setter value = {value}")
+        self._last_used_file_save_filter_ = value
+#         if isinstance(value, str) and len(value.strip()):
+#             self._last_used_file_save_filter_ = value
+#             
+#         else:
+#             self._last_used_file_save_filter_ = None
+            
+    @property
+    def lastUsedFileOpenFilter(self):
+        return self._last_used_file_open_filter_
+    
+    @markConfigurable("FileOpenFilter", trait_notifier=True)
+    @lastUsedFileOpenFilter.setter
+    def lastUsedFileOpenFilter(self, value:str):
+        # FIXME/BUG: 2022-11-26 17:35:08 see FIXME/BUG 2022-11-26 17:34:21 
+        # print(f"{self.__class__.__name__}. @lastUsedFileOpenFilter.setter value = {value}")
+        self._last_used_file_open_filter_ = value
+        # if isinstance(value, str) and len(value.strip()):
+        #     self._last_used_file_open_filter_ = value
+        # else:
+        #     self._last_used_file_open_filter_ = None
+            
     @property
     def useTemplateWaveForm(self):
         return self._use_template_

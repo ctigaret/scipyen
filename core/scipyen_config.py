@@ -1120,13 +1120,20 @@ class ScipyenConfigurable(object):
         
         cfg = self._make_confuse_config_data_(change, isTop, parent, tag)
         #### BEGIN debug - comment out when done
-        # if self.__class__.__name__ == "MPSCAnalysis":
-        #     print(f"ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_():")
-        #     print(f"\tchange.name = {change.name}")
-        #     print(f"\tchange.type = {change.type}")
-        #     print(f"\tchange.old = {change.old} ({type(change.old).__name__})")
-        #     print(f"\tchange.new = {change.new} ({type(change.new).__name__})")
-        #     print(f"\tconfig = {cfg}")
+#         if self.__class__.__name__ == "MPSCAnalysis":
+#             print(f"ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_():")
+#             stack = inspect.stack()
+#             for s in stack:
+#                 print(f"\t\tcaller {s.function}")
+#             # currentexecframe = inspect.currentframe()
+#             # outerframes = inspect.getouterframes(currentexecframe, 2)
+#             # print(f"\tcaller {callframe[1][3]}")
+#             print(f"\tchange.name = {change.name}")
+#             print(f"\tchange.type = {change.type}")
+#             print(f"\tchange.old = {change.old} ({type(change.old).__name__})")
+#             print(f"\tchange.new = {change.new} ({type(change.new).__name__})")
+#             print(f"\tconfig = {cfg}")
+#         
             # print("\ttraits observer state:") 
             # for k, v in self.configurable_traits.__observer__.__getstate__().items():
             #     if isinstance(v, dict):

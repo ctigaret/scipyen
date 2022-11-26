@@ -45,7 +45,7 @@
 
 #### BEGIN core python modules
 # NOTE: use Python re instead of QRegExp
-import sys, os, re, numbers, itertools, warnings, traceback
+import sys, os, re, numbers, itertools, warnings, traceback, logging
 import typing
 import math
 from collections import (ChainMap, namedtuple, defaultdict, OrderedDict,)
@@ -195,9 +195,9 @@ class ProgressWorkerSignals(QtCore.QObject):
     signal_setMaximum = pyqtSignal(int)
     signal_Canceled = pyqtSignal()
     
-class ProgressRunnableWorker(QtCore.QRunnable):
+class ProgressWorkerRunnable(QtCore.QRunnable):
     """
-    ProgressRunnableWorker thread
+    ProgressWorkerRunnable thread
 
     Inherits from QRunnable to handler worker thread setup, signals and wrap-up.
 
@@ -228,7 +228,7 @@ class ProgressRunnableWorker(QtCore.QRunnable):
         progressDialog: QtWidgets.QProgressDialog
         *args, **kwargs are passed to fn
         """
-        super(ProgressRunnableWorker, self).__init__()
+        super(ProgressWorkerRunnable, self).__init__()
         # Store constructor arguments (re-used for processing)
         self.fn = fn
         self.args = args
@@ -251,7 +251,7 @@ class ProgressRunnableWorker(QtCore.QRunnable):
 
         # Add the callback to our kwargs
         
-        #print("ProgressRunnableWorker fn args", self.args)
+        #print("ProgressWorkerRunnable fn args", self.args)
         
     # @pyqtSlot()
     # def slot_canceled(self):
@@ -331,51 +331,67 @@ class MouseEventSink(QtCore.QObject):
         self.itemSelected.emit(item.text())
         self.close()
 
-class ProgressThreadWorker(QtCore.QObject):
-    def __init__(self, fn, /, progressDialog=None, *args, **kwargs):
+class ProgressWorkerThreaded(QtCore.QObject):
+    """Calls a worker function in a separate QThread.
+        The worker function is typically executing a time-consuming loop (such
+        as an iteration through some data, where each cycle involves a time-
+        consuming operation).
+        
+        The worker instance should be `moved` to a QThread instance, and the 
+        thread's `started` signal must be connected to this worker's `run` slot
+        which then calls the worker function.
+        
+        The worker function is called from within the run 
+        
+    """
+    # def __init__(self, fn, /, *args, **kwargs):
+    # def __init__(self, fn, /, progressDialog=None, refreshTime=200, *args, **kwargs):
+    def __init__(self, fn, /, progressDialog=None, loopControl=None, *args, **kwargs):
         """
         fn: callable
-        progressDialog: QtWidgets.QProgressDialog
+        progressDialog: QtWidgets.QProgressDialog - REMOVED !!!
         *args, **kwargs are passed to fn
         """
-        super(ProgressThreadWorker, self).__init__()
+        super(ProgressWorkerThreaded, self).__init__()
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
         self.signals = ProgressWorkerSignals()
         self.pd = None
-        self.poller = QtCore.QTimer(self)
+        self.loopControl = loopControl
+        self.kwargs['progressSignal'] = self.signals.signal_Progress
+        self.kwargs["finished"] = self.signals.signal_Finished
+        self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
+        self.kwargs["loopControl"] = self.loopControl
+        
+        # self.loopControl = {"break":False}
+        # self.poller = QtCore.QTimer(self)
+        # self.refreshTime = refreshTime
         # self.poller.setInterval(200)
-        self.poller.timeout.connect(self.progress_poll)
+        # self.poller.timeout.connect(self.progress_poll)
         
         if isinstance(progressDialog, QtWidgets.QProgressDialog):
             self.setProgressDialog(progressDialog)
-            # self.pd = progressDialog
-            # self.pd.setValue(0)
-            # self.pd.canceled.connect(self.slot_canceled)
-            # self.signals.signal_Progress.connect(self.pd.setValue)
-            # self.signals.signal_setMaximum.connect(self.pd.setMaximum)
-            # self.kwargs['progressSignal'] = self.signals.signal_Progress
-            # self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
-            # self.kwargs["progressUI"] = self.pd
-        # else:
-        #     self.pd = None
             
-        print(f"{self.__class__.__name__}.__init__(fn = {fn}, progressDialog = {progressDialog})")
+        # print(f"{self.__class__.__name__}.__init__(fn = {fn}, progressDialog = {progressDialog})")
             
     def setProgressDialog(self, progressDialog:QtWidgets.QProgressDialog):
         if isinstance(progressDialog, QtWidgets.QProgressDialog):
             self.pd = progressDialog
             self.pd.setValue(0)
-            # slot_canceled emits signal_Canceled
-            self.pd.canceled.connect(self.slot_canceled)
             self.signals.signal_Progress.connect(self.pd.setValue)
             self.signals.signal_setMaximum.connect(self.pd.setMaximum)
             self.signals.signal_Finished.connect(self.pd.reset)
-            self.kwargs['progressSignal'] = self.signals.signal_Progress
-            self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
-            self.kwargs["progressUI"] = self.pd
-            self.kwargs["finished"] = self.signals.signal_Finished
+            # self.kwargs['progressSignal'] = self.signals.signal_Progress
+            # self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
+            # self.kwargs["finished"] = self.signals.signal_Finished
+            # self.kwargs["loopControl"] = self.loopControl
+            
+            # self.kwargs["progressUI"] = self.pd
+            # self.kwargs["canceled"] = self.signals.signal_Canceled
+            # self.kwargs["poller"] = self.poller
+            # slot_canceled emits signal_Canceled
+            # self.pd.canceled.connect(self.slot_canceled)
         else:
             self.pd is None
             
@@ -383,21 +399,20 @@ class ProgressThreadWorker(QtCore.QObject):
     def progressDialog(self):
         return self.pd
     
-    @pyqtSlot()
-    def slot_canceled(self):
-        print(f"{self.__class__.__name__}.slot_canceled")
-        self.signals.signal_Canceled.emit()
+    # @pyqtSlot()
+    # def slot_canceled(self):
+    #     print(f"{self.__class__.__name__}.slot_canceled")
+    #     self.thread().quit()
+    #     self.loopControl["break"] = True
+    #     self.signals.signal_Canceled.emit()
         
     @pyqtSlot()
-    def progress_poll(self):
-        if isinstance(self.pd, QtWidgets.QProgressDialog):
-            if self.pd.wasCanceled():
-                self.signals.signal_Canceled.emit()
-            
-    @pyqtSlot()
     def run(self):
-        print(f"{self.__class__.__name__}.run()")
-        self.poller.start(200)
+        # print(f"{self.__class__.__name__}.run()")
+        # self.poller.start(self.refreshTime)
+        # result = self.fn(*self.args, **self.kwargs)
+        # self.signals.signal_Result.emit(result)  # Return the result of the processing
+        # self.signals.signal_Finished.emit()  # Done
         try:
             result = self.fn(*self.args, **self.kwargs)
             
@@ -412,7 +427,6 @@ class ProgressThreadWorker(QtCore.QObject):
         finally:
             self.signals.signal_Finished.emit()  # Done
         
-        
 class ProgressThreadController(QtCore.QObject):
     sig_start = pyqtSignal(name="sig_start")
     sig_ready = pyqtSignal(object, name="sig_ready")
@@ -421,7 +435,7 @@ class ProgressThreadController(QtCore.QObject):
         super().__init__()
         print(f"{self.__class__.__name__}.__init__(fn={fn}, progressDialog = {progressDialog})")
         self.workerThread = QtCore.QThread()
-        self.worker = ProgressThreadWorker(fn, progressDialog, *args, **kwargs)
+        self.worker = ProgressWorkerThreaded(fn, progressDialog, *args, **kwargs)
         self.worker.moveToThread(self.workerThread)
         self.workerThread.finished.connect(self.worker.deleteLater)
         self.sig_start.connect(self.worker.run)
