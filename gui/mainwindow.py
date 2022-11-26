@@ -6769,8 +6769,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         pdlg = QtWidgets.QProgressDialog(title, "Cancel", 0,1000, self)
         
         worker = pgui.ProgressRunnableWorker(fn, pdlg, *args, **kwargs)
-        worker.signals.signal_finished.connect(pdlg.reset)
-        worker.signals.signal_result.connect(self.slot_loop_process_result)
+        worker.signals.signal_Finished.connect(pdlg.reset)
+        worker.signals.signal_Result.connect(self.slot_loop_process_result)
             
         if worker is not None:
             self.threadpool.start(worker)

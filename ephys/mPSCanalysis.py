@@ -62,7 +62,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __Ui_mPSDDetectWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__, "mPSCDetectWindow.ui"))
 
 class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
-    
+    sig_AbortDetection = pyqtSignal(name="sig_AbortDetection")
     # NOTE: this refers to the type of data where mPSC detection is done.
     # The mPSC waveform viewer only expects neo.AnalogSignal
     supported_types = (neo.Block, neo.Segment, type(None))
@@ -321,10 +321,17 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._reportWindow_.setVisible(False)
         
         self._set_data_(ephysdata)
+
+        # NOTE: 2022-11-26 11:22:38
+        # this works, but still needs to be made abortable
+        # self._detectController_ = pgui.ProgressThreadController(self._detect_all_)
+        # self._detectController_.sig_ready.connect(self._slot_detectThread_ready)
         
-        # self._detectWorker_ = pgui.ProgressThreadWorker(self._detect_all_)
-        self._detectController_ = pgui.ProgressThreadController(self._detect_all_)
-        self._detectController_.sig_ready.connect(self._slot_detectThread_ready)
+        # NOTE: 2022-11-26 11:23:21
+        # alternative from below:
+        # https://realpython.com/python-pyqt-qthread/#using-qthread-to-prevent-freezing-guis
+        self._detectThread_ = None
+        self._detectWorker_ = None
         
         # NOTE: 2022-11-05 23:08:01
         # this is inherited from WorkspaceGuiMixin therefore it needs full
@@ -1175,12 +1182,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         Var-keyword parameters:
         =======================
-        NOTE: These do not need to be passed explicitly to the call; tyipically
-        they are supplied by an instance of pictgui.ProgressRunnableWorker.
+        NOTE: These do not need to be passed explicitly to the call; they are
+        supposed to be supplied by an instance of a worker in the pictgui 
+        module (e.g. ProgressRunnableWorker, or ProgressThreadWorker)
         
         progressSignal: PyQt signal that will be emitted with each iteration
         
-        progressUI: QtProgressDialog or None
+        progressUI: QtWidgets.QProgressDialog or None
         
         
         """
@@ -1189,6 +1197,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         progressSignal = kwargs.pop("progressSignal", None)
         setMaxSignal = kwargs.pop("setMaxSignal", None)
+        finished = kwargs.pop("finished", None)
         progressUI = kwargs.pop("progressDialog", None)
         
         if waveform is None:
@@ -1215,20 +1224,16 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 
             segment.spiketrains.append(mPSCtrain)
             
-            if progressSignal is not None:
+            if isinstance(progressSignal, QtCore.pyqtBoundSignal):
                 progressSignal.emit(frame)
                 
-            # FIXME 2022-11-23 00:36:58
-            # use the two-part model with QThread instead of QRunnable
-            if hasattr(progressUI, "wasCanceled"):
-                cncl = progressUI.wasCanceled()
-                if cncl:
-                    print("Aborted")
-                    
-                    return
+            # if isinstance(progressUI, QtWidgets.QProgressDialog) and progressUI.wasCanceled():
+            #     print(f"{self.__class__.__name__} {progressUI.__class__.__name__}.wasCanceled")
+            #     break
+            
+        # if isinstance(finished, QtCore.pyqtBoundSignal):
+        #     finished.emit()
                 
-        
-        
     def _undo_sweep(self, segment_index:typing.Optional[int]=None):
         if segment_index is None:
             segment_index = self.currentFrame
@@ -1616,7 +1621,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._result_ = [None for s in self._data_.segments]
             for s in self._data_.segments:
                 self._clear_detection_in_sweep_(s)
-                
             
         elif isinstance(self._data_, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self._data_):
             self._undo_buffer_ = [None for s in self._data_]
@@ -1632,6 +1636,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         else:
             self._result_ = None
             self._undo_buffer_ = None
+            
+        self._plot_data()
             
         
     @pyqtSlot()
@@ -1662,8 +1668,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # this cannot abort
         worker = pgui.ProgressRunnableWorker(self._detect_all_, progressDisplay)
         
-        worker.signals.signal_finished.connect(progressDisplay.reset)
-        worker.signals.signal_result[object].connect(self._slot_detectionDone)
+        worker.signals.signal_Finished.connect(progressDisplay.reset)
+        worker.signals.signal_Result[object].connect(self._slot_detectionDone)
         # NOTE: 2022-11-25 22:16:15 see NOTE: 2022-11-25 22:15:47
         self.threadpool.start(worker)
         #### END using QRunnable paradigm
@@ -1676,12 +1682,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
     @pyqtSlot()
     def _slot_detect_thread_(self):
-        # TODO
+        # NOTE: 2022-11-26 10:24:01 IT WORKS !!!
         if self._data_ is None:
             self.criticalMessage("Detect mPSC in current sweep",
                                  "No data!")
             return
-    
             
         waveform = self._get_mPSC_template_or_waveform_()
         if waveform is None:
@@ -1695,13 +1700,35 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             vartxt = ""
             
         progressDisplay = QtWidgets.QProgressDialog(f"Detecting mPSCS {vartxt}", "Abort", 0, self._number_of_frames_, self)
-        self._detectController_.setProgressDialog(progressDisplay)
-        self._detectController_.sig_start.emit()
+        
+        # NOTE: 2022-11-26 11:24:32 see NOTE: 2022-11-26 11:22:38
+        # self._detectController_.setProgressDialog(progressDisplay)
+        # self._detectController_.sig_start.emit()
+        
+        # NOTE: 2022-11-26 11:24:51 see NOTE: 2022-11-26 11:23:21
+        self._detectThread_ = QtCore.QThread()
+        self._detectWorker_ = pgui.ProgressThreadWorker(self._detect_all_, progressDisplay)
+        self._detectWorker_.moveToThread(self._detectThread_)
+        self._detectThread_.started.connect(self._detectWorker_.run)
+        self._detectWorker_.signals.signal_Canceled.connect(self._detectThread_.quit)
+        self._detectWorker_.signals.signal_Canceled.connect(self._detectWorker_.deleteLater)
+        self._detectWorker_.signals.signal_Finished.connect(self._detectThread_.quit)
+        self._detectWorker_.signals.signal_Finished.connect(self._detectWorker_.deleteLater)
+        self._detectWorker_.signals.signal_Result[object].connect(self._slot_detectThread_ready)
+        self._detectThread_.finished.connect(self._detectWorker_.deleteLater)
+        self._detectThread_.finished.connect(self._detectThread_.deleteLater)
+        # self._detectWorker_.signals.signal_Progress.connect()
+        self._detectThread_.start()
         
     @pyqtSlot(object)
     def _slot_detectThread_ready(self, result:object):
         print(f"{self.__class__.__name__}._slot_detectThread_ready(result = {result})")
         self._plot_data()
+#         if isinstance(self._detectWorker_, pgui.ProgressThreadWorker):
+#             self._detectWorker_ = None
+#             
+#         if isinstance(self._detectThread_, QtCore.QThread):
+#             self._detectThread_ = None
         
     @pyqtSlot()
     def _slot_undoDetection(self):
@@ -1709,7 +1736,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         TODO: update results
         """
         if isinstance(self._data_, neo.Block):
-            for k in range(len(self._data_segments_)):
+            for k in range(len(self._data_.segments)):
+                self._undo_sweep(k)
+                
+        elif isinstance(self._data_, neo.Segment):
+            self._undo_sweep(0)
+            
+        elif isinstance(self._data_, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self._data_):
+            for k in range(len(self._data_)):
                 self._undo_sweep(k)
                 
         self._plot_data()

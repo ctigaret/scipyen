@@ -4600,9 +4600,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                                                  self._data_.analysisOptions["Channels"]["Indicator"]],
                                       scene=True)
             
-            sceneWorker.signals.signal_finished.connect(pdlg.reset)
-            #sceneWorker.signals.signal_finished.connect(self.slot_sceneProcessingDone)
-            sceneWorker.signals.signal_result[object].connect(self.slot_sceneProcessingDone)
+            sceneWorker.signals.signal_Finished.connect(pdlg.reset)
+            #sceneWorker.signals.signal_Finished.connect(self.slot_sceneProcessingDone)
+            sceneWorker.signals.signal_Result[object].connect(self.slot_sceneProcessingDone)
                 
         else:
             self._scene_processing_idle_ = True
@@ -4618,9 +4618,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                                                  self._data_.analysisOptions["Channels"]["Indicator"]],
                                       scene=False)
             
-            scansWorker.signals.signal_finished.connect(pdlg.reset)
-            #scansWorker.signals.signal_finished.connect(self.slot_scansProcessingDone)
-            scansWorker.signals.signal_result[object].connect(self.slot_scansProcessingDone)
+            scansWorker.signals.signal_Finished.connect(pdlg.reset)
+            #scansWorker.signals.signal_Finished.connect(self.slot_scansProcessingDone)
+            scansWorker.signals.signal_Result[object].connect(self.slot_scansProcessingDone)
             
         else:
             self._scans_processing_idle_ = True
@@ -5154,7 +5154,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         worker = pgui.ProgressRunnableWorker(self.concatenateScanData,  pd, selected_names)
         
-        worker.signals.signal_finished.connect(pd.reset)
+        worker.signals.signal_Finished.connect(pd.reset)
         worker.signals.result[object].connect(self.slot_concatenateLSDataDone)
         
         self.threadpool.start(worker)
@@ -5813,8 +5813,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                              detrend = self.detrendEPSCaTsCheckBox.isChecked(),
                              gen_long_fits=self.actionPlot_long_fits.isChecked())
         
-        worker.signals.signal_finished.connect(pd.reset)
-        worker.signals.signal_finished.connect(self.slot_analyseFramesDone)
+        worker.signals.signal_Finished.connect(pd.reset)
+        worker.signals.signal_Finished.connect(self.slot_analyseFramesDone)
         
         self.threadpool.start(worker)
         
@@ -5947,8 +5947,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         worker = pgui.ProgressRunnableWorker(self._analyzeUnitInFrames_, pd,
                              frames=frames, unit=unit)
         
-        worker.signals.signal_finished.connect(pd.reset)
-        worker.signals.signal_finished.connect(self.slot_analyseFramesDone)
+        worker.signals.signal_Finished.connect(pd.reset)
+        worker.signals.signal_Finished.connect(self.slot_analyseFramesDone)
         
         self.threadpool.start(worker)
         
@@ -7481,8 +7481,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         worker = pgui.ProgressRunnableWorker(self.collectAnalysisUnits,  pd, selected_names)
         
-        worker.signals.signal_finished.connect(pd.reset)
-        worker.signals.signal_result[object].connect(self.slot_collectAnalysisDone)
+        worker.signals.signal_Finished.connect(pd.reset)
+        worker.signals.signal_Result[object].connect(self.slot_collectAnalysisDone)
         
         self.threadpool.start(worker)
         

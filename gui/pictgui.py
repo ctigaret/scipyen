@@ -128,9 +128,9 @@ def genColorTable(cmap, ncolors=256):
     return colortable
 
 class GuiWorkerSignals(QtCore.QObject):
-    signal_finished = pyqtSignal(name="signal_finished")
+    signal_Finished = pyqtSignal(name="signal_Finished")
     sig_error = pyqtSignal(tuple, name="sig_error")
-    signal_result = pyqtSignal(object, name="signal_result")
+    signal_Result = pyqtSignal(object, name="signal_Result")
     
 
     
@@ -150,7 +150,7 @@ class GuiWorker(QtCore.QRunnable):
     def run(self):
         try:
             self.result = self.fn(*self.args, **self.kwargs)
-            self.signals.signal_result.emit(self.result)  # Return the result of the processing
+            self.signals.signal_Result.emit(self.result)  # Return the result of the processing
             
         except:
             traceback.print_exc()
@@ -160,11 +160,11 @@ class GuiWorker(QtCore.QRunnable):
             self.signals.sig_error.emit((exc_type, value, traceback.format_exc()))
             
         else:
-            #self.signals.signal_result.emit(self.result)  # Return the result of the processing
-            self.signals.signal_finished.emit()  # Done
+            #self.signals.signal_Result.emit(self.result)  # Return the result of the processing
+            self.signals.signal_Finished.emit()  # Done
             
         finally:
-            self.signals.signal_finished.emit()  # Done
+            self.signals.signal_Finished.emit()  # Done
 
 class ProgressWorkerSignals(QtCore.QObject):
     """See Martin Fitzpatrick's tutorial on Multithreading PyQt applications with QThreadPool 
@@ -174,26 +174,26 @@ class ProgressWorkerSignals(QtCore.QObject):
 
     Supported signals are:
 
-    signal_finished
+    signal_Finished
         No data
 
     sig_error
         `tuple` (exctype, value, traceback.format_exc() )
 
-    signal_result
+    signal_Result
         `object` data returned from processing, anything
 
-    signal_progress
+    signal_Progress
         `int` indicating % progress
 
     """
     
-    signal_finished = pyqtSignal()
+    signal_Finished = pyqtSignal()
     sig_error = pyqtSignal(tuple)
-    signal_result = pyqtSignal(object)
-    signal_progress = pyqtSignal(int)
+    signal_Result = pyqtSignal(object)
+    signal_Progress = pyqtSignal(int)
     signal_setMaximum = pyqtSignal(int)
-    # signal_canceled = pyqtSignal()
+    signal_Canceled = pyqtSignal()
     
 class ProgressRunnableWorker(QtCore.QRunnable):
     """
@@ -240,9 +240,9 @@ class ProgressRunnableWorker(QtCore.QRunnable):
         if isinstance(self.pd, QtWidgets.QProgressDialog):
             self.pd.setValue(0)
             # self.pd.canceled.connect(self.slot_canceled)
-            self.signals.signal_progress.connect(self.pd.setValue)
+            self.signals.signal_Progress.connect(self.pd.setValue)
             self.signals.signal_setMaximum.connect(self.pd.setMaximum)
-            self.kwargs['progressSignal'] = self.signals.signal_progress
+            self.kwargs['progressSignal'] = self.signals.signal_Progress
             self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
             self.kwargs["progressUI"] = self.pd
             
@@ -255,7 +255,7 @@ class ProgressRunnableWorker(QtCore.QRunnable):
         
     # @pyqtSlot()
     # def slot_canceled(self):
-    #     self.signals.signal_canceled(emit)
+    #     self.signals.signal_Canceled(emit)
 
     @pyqtSlot()
     def run(self):
@@ -273,10 +273,10 @@ class ProgressRunnableWorker(QtCore.QRunnable):
             self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
             
         else:
-            self.signals.signal_result.emit(result)  # Return the result of the processing
+            self.signals.signal_Result.emit(result)  # Return the result of the processing
             
         finally:
-            self.signals.signal_finished.emit()  # Done
+            self.signals.signal_Finished.emit()  # Done
             
 def checkboxDialogPrompt(parent, title, slist):
     if not all([isinstance(s, str) for s in slist]):
@@ -343,17 +343,23 @@ class ProgressThreadWorker(QtCore.QObject):
         self.args = args
         self.kwargs = kwargs
         self.signals = ProgressWorkerSignals()
+        self.pd = None
+        self.poller = QtCore.QTimer(self)
+        # self.poller.setInterval(200)
+        self.poller.timeout.connect(self.progress_poll)
+        
         if isinstance(progressDialog, QtWidgets.QProgressDialog):
-            self.pd = progressDialog
-            self.pd.setValue(0)
+            self.setProgressDialog(progressDialog)
+            # self.pd = progressDialog
+            # self.pd.setValue(0)
             # self.pd.canceled.connect(self.slot_canceled)
-            self.signals.signal_progress.connect(self.pd.setValue)
-            self.signals.signal_setMaximum.connect(self.pd.setMaximum)
-            self.kwargs['progressSignal'] = self.signals.signal_progress
-            self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
-            self.kwargs["progressUI"] = self.pd
-        else:
-            self.pd = None
+            # self.signals.signal_Progress.connect(self.pd.setValue)
+            # self.signals.signal_setMaximum.connect(self.pd.setMaximum)
+            # self.kwargs['progressSignal'] = self.signals.signal_Progress
+            # self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
+            # self.kwargs["progressUI"] = self.pd
+        # else:
+        #     self.pd = None
             
         print(f"{self.__class__.__name__}.__init__(fn = {fn}, progressDialog = {progressDialog})")
             
@@ -361,22 +367,37 @@ class ProgressThreadWorker(QtCore.QObject):
         if isinstance(progressDialog, QtWidgets.QProgressDialog):
             self.pd = progressDialog
             self.pd.setValue(0)
-            # self.pd.canceled.connect(self.slot_canceled)
-            self.signals.signal_progress.connect(self.pd.setValue)
+            # slot_canceled emits signal_Canceled
+            self.pd.canceled.connect(self.slot_canceled)
+            self.signals.signal_Progress.connect(self.pd.setValue)
             self.signals.signal_setMaximum.connect(self.pd.setMaximum)
-            self.kwargs['progressSignal'] = self.signals.signal_progress
+            self.signals.signal_Finished.connect(self.pd.reset)
+            self.kwargs['progressSignal'] = self.signals.signal_Progress
             self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
             self.kwargs["progressUI"] = self.pd
+            self.kwargs["finished"] = self.signals.signal_Finished
         else:
             self.pd is None
             
     @property
     def progressDialog(self):
         return self.pd
+    
+    @pyqtSlot()
+    def slot_canceled(self):
+        print(f"{self.__class__.__name__}.slot_canceled")
+        self.signals.signal_Canceled.emit()
+        
+    @pyqtSlot()
+    def progress_poll(self):
+        if isinstance(self.pd, QtWidgets.QProgressDialog):
+            if self.pd.wasCanceled():
+                self.signals.signal_Canceled.emit()
             
     @pyqtSlot()
     def run(self):
         print(f"{self.__class__.__name__}.run()")
+        self.poller.start(200)
         try:
             result = self.fn(*self.args, **self.kwargs)
             
@@ -386,10 +407,10 @@ class ProgressThreadWorker(QtCore.QObject):
             self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
             
         else:
-            self.signals.signal_result.emit(result)  # Return the result of the processing
+            self.signals.signal_Result.emit(result)  # Return the result of the processing
             
         finally:
-            self.signals.signal_finished.emit()  # Done
+            self.signals.signal_Finished.emit()  # Done
         
         
 class ProgressThreadController(QtCore.QObject):
@@ -404,7 +425,8 @@ class ProgressThreadController(QtCore.QObject):
         self.worker.moveToThread(self.workerThread)
         self.workerThread.finished.connect(self.worker.deleteLater)
         self.sig_start.connect(self.worker.run)
-        self.worker.signals.signal_result.connect(self.handleResult)
+        self.worker.signals.signal_Result.connect(self.handleResult)
+        self.worker.signals.signal_Canceled.connect(self.abort)
         self.workerThread.start()
         
     def __del__(self):
@@ -421,6 +443,11 @@ class ProgressThreadController(QtCore.QObject):
         if isinstance(self.worker.progressDialog, QtWidgets.QProgressDialog):
             self.worker.progressDialog.setValue(self.worker.progressDialog.maximum())
         self.sig_ready.emit(result)
+        
+    @pyqtSlot()
+    def abort(self):
+        print(f"{self.__class__.__name__}.abort")
+        self.sig_ready.emit(None)
         
         
         

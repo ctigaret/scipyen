@@ -524,15 +524,15 @@ class NavigatorButton(NavigatorButtonBase):
         self._subDirs.clear()
         
         # NOTE: 2022-05-02 11:18:07
-        # GuiWorker signal_result is connected to self.slotSubDirsJobFinished,
+        # GuiWorker signal_Result is connected to self.slotSubDirsJobFinished,
         # which then calls self.addEntriesToSubDirs
-        #self._subDirsJob.signal_finished.connect(self.slotSubDirsJobFinished)
-        self._subDirsJob.signal_result.connect(self.slotSubDirsJobFinished)
+        #self._subDirsJob.signal_Finished.connect(self.slotSubDirsJobFinished)
+        self._subDirsJob.signal_Result.connect(self.slotSubDirsJobFinished)
         
         if self._replaceButton:
-            self._subDirsJob.signal_finished.connect(self.replaceButton)
+            self._subDirsJob.signal_Finished.connect(self.replaceButton)
         else:
-            self._subDirsJob.signal_finished.connect(self.openSubdirsMenu)
+            self._subDirsJob.signal_Finished.connect(self.openSubdirsMenu)
             
         self.threadpool.start(self._subDirsJob)
             
