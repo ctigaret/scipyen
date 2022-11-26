@@ -352,8 +352,12 @@ class ProgressThreadWorker(QtCore.QObject):
             self.kwargs['progressSignal'] = self.signals.signal_progress
             self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
             self.kwargs["progressUI"] = self.pd
+        else:
+            self.pd = None
             
-    def setProgressDialog(self, progressDialog):
+        print(f"{self.__class__.__name__}.__init__(fn = {fn}, progressDialog = {progressDialog})")
+            
+    def setProgressDialog(self, progressDialog:QtWidgets.QProgressDialog):
         if isinstance(progressDialog, QtWidgets.QProgressDialog):
             self.pd = progressDialog
             self.pd.setValue(0)
@@ -363,12 +367,16 @@ class ProgressThreadWorker(QtCore.QObject):
             self.kwargs['progressSignal'] = self.signals.signal_progress
             self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
             self.kwargs["progressUI"] = self.pd
+        else:
+            self.pd is None
             
-        
-        
+    @property
+    def progressDialog(self):
+        return self.pd
             
     @pyqtSlot()
     def run(self):
+        print(f"{self.__class__.__name__}.run()")
         try:
             result = self.fn(*self.args, **self.kwargs)
             
@@ -386,14 +394,33 @@ class ProgressThreadWorker(QtCore.QObject):
         
 class ProgressThreadController(QtCore.QObject):
     sig_start = pyqtSignal(name="sig_start")
+    sig_ready = pyqtSignal(object, name="sig_ready")
     
     def __init__(self, fn, /, progressDialog=None, *args, **kwargs):
         super().__init__()
+        print(f"{self.__class__.__name__}.__init__(fn={fn}, progressDialog = {progressDialog})")
         self.workerThread = QtCore.QThread()
         self.worker = ProgressThreadWorker(fn, progressDialog, *args, **kwargs)
-        self.worker.moveToThread(workerThread)
+        self.worker.moveToThread(self.workerThread)
         self.workerThread.finished.connect(self.worker.deleteLater)
         self.sig_start.connect(self.worker.run)
+        self.worker.signals.signal_result.connect(self.handleResult)
+        self.workerThread.start()
+        
+    def __del__(self):
+        self.workerThread.quit()
+        self.workerThread.wait()
+        # super().__del__()
+        
+    def setProgressDialog(self, progressDialog):
+        if isinstance(progressDialog, QtWidgets.QProgressDialog):
+            self.worker.setProgressDialog(progressDialog)
+            
+    @pyqtSlot(object)
+    def handleResult(self, result:object):
+        if isinstance(self.worker.progressDialog, QtWidgets.QProgressDialog):
+            self.worker.progressDialog.setValue(self.worker.progressDialog.maximum())
+        self.sig_ready.emit(result)
         
         
         

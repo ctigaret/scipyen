@@ -322,7 +322,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self._set_data_(ephysdata)
         
-        self.workerThread = QtCore.QThread()
+        # self._detectWorker_ = pgui.ProgressThreadWorker(self._detect_all_)
+        self._detectController_ = pgui.ProgressThreadController(self._detect_all_)
+        self._detectController_.sig_ready.connect(self._slot_detectThread_ready)
         
         # NOTE: 2022-11-05 23:08:01
         # this is inherited from WorkspaceGuiMixin therefore it needs full
@@ -469,9 +471,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.actionDetect_in_current_sweep.triggered.connect(self._slot_detectCurrentSweep)
         # self.actionValidate_in_current_sweep.triggered.connect(self._slot_validateSweep)
         self.actionUndo_current_sweep.triggered.connect(self._slot_undoCurrentSweep)
-        self.actionDetect.triggered.connect(self._slot_detect)
+        
+        # self.actionDetect.triggered.connect(self._slot_detect)
+        # TODO/FIXME 2022-11-26 09:10:33 for testing
+        self.actionDetect.triggered.connect(self._slot_detect_thread_)
+        
         # self.actionValidate
-        self.actionUndo
+        self.actionUndo.triggered.connect(self._slot_undoDetection)
         self.actionView_results.triggered.connect(self.slot_showReportWindow)
         self.actionSave_results.triggered.connect(self._slot_saveResults)
         self.actionExport_results.triggered.connect(self._slot_exportPSCresult)
@@ -1606,15 +1612,15 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._undo_buffer_ = None
             
         elif isinstance(self._data_, neo.Block):
-            self._undo_buffer_ = [None for s in data.segments]
-            self._result_ = [None for s in data.segments]
+            self._undo_buffer_ = [None for s in self._data_.segments]
+            self._result_ = [None for s in self._data_.segments]
             for s in self._data_.segments:
                 self._clear_detection_in_sweep_(s)
                 
             
         elif isinstance(self._data_, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self._data_):
-            self._undo_buffer_ = [None for s in data]
-            self._result_ = [None for s in data]
+            self._undo_buffer_ = [None for s in self._data_]
+            self._result_ = [None for s in self._data_]
             for s in self._data_:
                 self._clear_detection_in_sweep_(s)
             
@@ -1626,8 +1632,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         else:
             self._result_ = None
             self._undo_buffer_ = None
-            
-            
             
         
     @pyqtSlot()
@@ -1651,24 +1655,52 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
         progressDisplay = QtWidgets.QProgressDialog(f"Detecting mPSCS {vartxt}", "Abort", 0, self._number_of_frames_, self)
 
-        # TODO
-        # worker = pgui.ProgressThreadWorker(self._detect_all_, progressDisplay)
-        # worker.moveToThread(self.workerThread)
-        # self.workerThread.finished.connect(worker.deleteLater)
-        # self.
         
+        # NOTE: 2022-11-26 09:06:16
+        #### BEGIN using QRunnable paradigm
         # NOTE: 2022-11-25 22:15:47
         # this cannot abort
         worker = pgui.ProgressRunnableWorker(self._detect_all_, progressDisplay)
         
         worker.signals.signal_finished.connect(progressDisplay.reset)
         worker.signals.signal_result[object].connect(self._slot_detectionDone)
-        
         # NOTE: 2022-11-25 22:16:15 see NOTE: 2022-11-25 22:15:47
-        # self.threadpool.start(worker)
+        self.threadpool.start(worker)
+        #### END using QRunnable paradigm
         
     @pyqtSlot()
     def _slot_detectionDone(self):
+        # NOTE: 2022-11-26 09:06:05
+        # QRunnable paradigm, see # NOTE: 2022-11-26 09:06:16
+        self._plot_data()
+        
+    @pyqtSlot()
+    def _slot_detect_thread_(self):
+        # TODO
+        if self._data_ is None:
+            self.criticalMessage("Detect mPSC in current sweep",
+                                 "No data!")
+            return
+    
+            
+        waveform = self._get_mPSC_template_or_waveform_()
+        if waveform is None:
+            self.criticalMessage("Detect mPSC in current sweep",
+                                 "No mPSC waveform or template is available")
+            return
+        
+        if isinstance(self._data_, (neo.Block, neo.Segment)):
+            vartxt = f"in {self._data_.name}"
+        else:
+            vartxt = ""
+            
+        progressDisplay = QtWidgets.QProgressDialog(f"Detecting mPSCS {vartxt}", "Abort", 0, self._number_of_frames_, self)
+        self._detectController_.setProgressDialog(progressDisplay)
+        self._detectController_.sig_start.emit()
+        
+    @pyqtSlot(object)
+    def _slot_detectThread_ready(self, result:object):
+        print(f"{self.__class__.__name__}._slot_detectThread_ready(result = {result})")
         self._plot_data()
         
     @pyqtSlot()
