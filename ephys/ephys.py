@@ -2642,23 +2642,16 @@ def average_signals(*args, fun=np.mean):
     if any([s.shape[1]>1 for s in args]):
         raise ValueError("Expecting single-channel signals only")
     
-    ret_signal = fun(np.concatenate(args, axis=1), axis=1)
+    data = fun(np.concatenate(args, axis=1), axis=1).magnitude
+    
+    # if not isinstance(ret_signal, neo.AnalogSignal):
+    ret_signal = neo.AnalogSignal(data, 
+                                units = args[0].units,
+                                t_start = args[0].t_start,
+                                sampling_rate = args[0].sampling_rate,
+                                description = "Averaged signal")
     
     return ret_signal
-    #if all([sig.shape == args[0].shape for sig in args[1:]]):
-        #ret_signal = fun(np.concatenate(args, axis=1), axis=1)
-        #return ret_signal
-        
-        ##for sig in args[1:]:
-            ##ret += sig
-            
-        ##ret /= len(args)
-        
-    #else:
-        #raise ValueError("Cannot average AnalogSignal objects of different shapes")
-        
-    
-    return ret
 
 @safeWrapper
 def aggregate_signals(*args, name_prefix:str, collectSD:bool=True, collectSEM:bool=True):

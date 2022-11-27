@@ -195,7 +195,7 @@
             <string>Plot mPSC template or model</string>
            </property>
            <property name="text">
-            <string>Plot mPSC</string>
+            <string>Plot mPSC model</string>
            </property>
            <property name="icon">
             <iconset theme="graphics">
@@ -267,8 +267,15 @@
      <property name="title">
       <string>mPSC Template</string>
      </property>
+     <addaction name="actionCreate_mPSC_Template"/>
+     <addaction name="actionPlot_mPSC_template"/>
      <addaction name="actionOpen_mPSCTemplate"/>
+     <addaction name="actionSave_mPSC_Template"/>
      <addaction name="actionImport_mPSCTemplate"/>
+     <addaction name="actionExport_mPSC_Template"/>
+     <addaction name="actionRemember_mPSC_Template"/>
+     <addaction name="actionRemove_default_mPSC_Template"/>
+     <addaction name="actionForget_mPSC_Template"/>
     </widget>
     <addaction name="actionOpenEphysData"/>
     <addaction name="actionSaveEphysData"/>
@@ -314,11 +321,14 @@
      <property name="title">
       <string>Results</string>
      </property>
+     <addaction name="actionPlot_detected_mPSCs"/>
      <addaction name="actionView_results"/>
      <addaction name="actionClear_results"/>
+     <addaction name="separator"/>
      <addaction name="actionSave_results"/>
      <addaction name="actionSave_mPSC_trains"/>
      <addaction name="actionSave_mPSC_waves"/>
+     <addaction name="separator"/>
      <addaction name="actionExport_results"/>
      <addaction name="actionExport_mPSC_trains"/>
      <addaction name="actionExport_mPSC_waves"/>
@@ -355,14 +365,6 @@
    <addaction name="actionPlot_Data"/>
    <addaction name="actionMake_mPSC_Epoch"/>
    <addaction name="separator"/>
-   <addaction name="actionCreate_mPSC_Template"/>
-   <addaction name="actionOpen_mPSCTemplate"/>
-   <addaction name="actionImport_mPSCTemplate"/>
-   <addaction name="actionSave_mPSC_Template"/>
-   <addaction name="actionExport_mPSC_Template"/>
-   <addaction name="actionRemember_mPSC_Template"/>
-   <addaction name="actionRemove_default_mPSC_Template"/>
-   <addaction name="actionForget_mPSC_Template"/>
    <addaction name="separator"/>
   </widget>
   <widget class="QToolBar" name="detectionToolBar">
@@ -385,10 +387,32 @@
    <addaction name="actionUndo_current_sweep"/>
    <addaction name="actionDetect"/>
    <addaction name="actionUndo"/>
+   <addaction name="actionPlot_detected_mPSCs"/>
    <addaction name="actionView_results"/>
    <addaction name="actionSave_results"/>
    <addaction name="actionExport_results"/>
    <addaction name="actionClear_results"/>
+  </widget>
+  <widget class="QToolBar" name="templateToolBar">
+   <property name="windowTitle">
+    <string>Template ToolBar</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="actionCreate_mPSC_Template"/>
+   <addaction name="actionPlot_mPSC_template"/>
+   <addaction name="actionPlot_mPSCs_for_template"/>
+   <addaction name="actionOpen_mPSCTemplate"/>
+   <addaction name="actionImport_mPSCTemplate"/>
+   <addaction name="actionSave_mPSC_Template"/>
+   <addaction name="actionExport_mPSC_Template"/>
+   <addaction name="actionRemember_mPSC_Template"/>
+   <addaction name="actionRemove_default_mPSC_Template"/>
+   <addaction name="actionForget_mPSC_Template"/>
   </widget>
   <action name="actionOpenEphysData">
    <property name="icon">
@@ -665,20 +689,17 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="lock"/>
+    <iconset theme="lock">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Lock toolbars</string>
    </property>
   </action>
-  <action name="actionElectrophysiology_data">
-   <property name="text">
-    <string>Results</string>
-   </property>
-  </action>
   <action name="actionSave_mPSC_trains">
    <property name="icon">
-    <iconset theme="document-save"/>
+    <iconset theme="document-save">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Save PSC trains</string>
@@ -689,7 +710,8 @@
   </action>
   <action name="actionSave_mPSC_waves">
    <property name="icon">
-    <iconset theme="document-save"/>
+    <iconset theme="document-save">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Save mPSC waves</string>
@@ -700,7 +722,8 @@
   </action>
   <action name="actionExport_mPSC_trains">
    <property name="icon">
-    <iconset theme="document-export"/>
+    <iconset theme="document-export">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Export mPSC trains</string>
@@ -711,13 +734,47 @@
   </action>
   <action name="actionExport_mPSC_waves">
    <property name="icon">
-    <iconset theme="document-export"/>
+    <iconset theme="document-export">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Export mPSC waves</string>
    </property>
    <property name="toolTip">
     <string>Export mPSC waves to workspace</string>
+   </property>
+  </action>
+  <action name="actionPlot_detected_mPSCs">
+   <property name="icon">
+    <iconset theme="graphics"/>
+   </property>
+   <property name="text">
+    <string>Plot detected mPSCs</string>
+   </property>
+   <property name="toolTip">
+    <string>Plot detected mPSCs</string>
+   </property>
+  </action>
+  <action name="actionPlot_mPSC_template">
+   <property name="icon">
+    <iconset theme="graphics"/>
+   </property>
+   <property name="text">
+    <string>Plot mPSC template</string>
+   </property>
+   <property name="toolTip">
+    <string>Plot mPSC template</string>
+   </property>
+  </action>
+  <action name="actionPlot_mPSCs_for_template">
+   <property name="icon">
+    <iconset theme="graphics"/>
+   </property>
+   <property name="text">
+    <string>Plot mPSCs for template</string>
+   </property>
+   <property name="toolTip">
+    <string>Plot selected mPSCs for template</string>
    </property>
   </action>
  </widget>

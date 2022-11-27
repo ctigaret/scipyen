@@ -433,10 +433,11 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         if dlg.exec() == QtWidgets.QDialog.Accepted:
             newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
             
-            self._scipyenWindow_.assignToWorkspace(newVarName, self._data_)
+            self._scipyenWindow_.assignToWorkspace(newVarName, data)
             
-            self._data_.modified=False
-            self.displayFrame()
+            if hasattr(data, "modified") and isinstance(data.modified, bool):
+                data.modified=False
+            # self.displayFrame()
             
             self.statusBar().showMessage("Done!")
         
