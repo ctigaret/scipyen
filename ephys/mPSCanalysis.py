@@ -976,7 +976,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if not isinstance(self._ephysViewer_, sv.SignalViewer):
             return
         
-        # self._detected_mPSCs_ = self._result_[self.currentFrame]
+        self._detected_mPSCs_ = self._result_[self.currentFrame]
         
         if len(self._detected_mPSCs_) == 0:
             return
@@ -1817,7 +1817,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
     @pyqtSlot(object)
     def _slot_detectThread_ready(self, result:object):
-        print(f"{self.__class__.__name__}._slot_detectThread_ready(result = {result})")
+        """Called when threaded detection finished naturally or was interrupted.
+        The parameter `result` is ignored.
+        """
+        # print(f"{self.__class__.__name__}._slot_detectThread_ready(result = {result})")
         self._plot_data()
         self.actionDetect.setEnabled(True)
         self.actionUndo.setEnabled(True)
@@ -1827,6 +1830,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
     @pyqtSlot()
     def _slot_breakLoop(self):
+        """To be connected to the `canceled` signal of a progress dialog.
+        Modifies the loopControl variable to interrrup a worker loop gracefully.
+        """
         self.loopControl["break"] = True
         
     @pyqtSlot()
@@ -1917,7 +1923,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             else:
                 pio.savePickleFile(self._data_, fileName)
                 
-            
     @pyqtSlot()
     def _slot_openEphysDataFile(self):
         fileFilters = ["Axon files (*.abf)", "Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]

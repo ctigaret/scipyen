@@ -7,6 +7,7 @@ import sys
 import typing
 import keyword
 import string
+import ast
 from numbers import (Number, Real,)
 import numpy as np
 import quantities as pq
@@ -21,7 +22,60 @@ __translation_table_to_identifier = str.maketrans(dict([(c_, "_") for c_ in stri
 __translation_table_to_R_identifier = str.maketrans(dict([(c_, ".") for c_ in string.punctuation + string.whitespace]))
 
 import errno, os
-
+def is_sequence(s:str):
+    possibleSequence = False
+    if s.startswith('(') and s.endswith(')'):
+        possibleSequence = True
+        seqStart = '('
+        seqEnd = ')'
+        
+    elif s.startswith('[') and s.endswith(']'):
+        possibleSequence = True
+        seqStart = '['
+        seqEnd = ']'
+        
+    if possibleSequence:
+        ss = s[1:-1].replace(" ", "")
+        if ',' in ss:
+            if len(ss.split('.')):
+                return True
+            
+    return False
+            
+        
+def str2sequence(s:str):
+    possibleSequence = False
+    
+    if s.startswith('(') and s.endswith(')'):
+        possibleSequence = True
+        seqStart = '('
+        seqEnd = ')'
+        
+    elif s.startswith('[') and s.endswith(']'):
+        possibleSequence = True
+        seqStart = '['
+        seqEnd = ']'
+        
+    if possibleSequence:
+        ss = s[1:-1].replace(" ", "")
+        delim = None
+        if ',' in ss:
+            delim = ','
+        elif ';' in ss:
+            delim = ';'
+        else:
+            return s
+        
+        if delim is not None:
+            if seqStart == '(' and seqEnd == ')':
+                return tuple(ss.split(delim))
+            else:
+                return ss.split # a list
+        else:
+            return s
+        
+    return s
+            
 def is_path(s:str):
     return any(c in s for c in (os.sep, os.pathsep, ";", "\\"))
     
@@ -283,23 +337,8 @@ def numbers2str(value:typing.Optional[typing.Union[Number, np.ndarray, tuple, li
     else:
         txt = ", ".join([fmt % i for i in val])
         
-    #if len(val) == 1:
-        #if show_units and isinstance(val, pq.Quantity):
-            #txt = quantity2str(val[0], precision=precision, format=format)
-        #else:
-            #txt = fmt % val[0]
-        
-    #elif len(val) > 1:
-        #if show_units and all([isinstance(v, pq.Quantity) for v in val]):
-            #txt = ", ".join([quantity2str(i, precision=precision, format=format) for i in val])
-        #else:
-            #txt = ", ".join([fmt % i for i in val])
-        
-    #else:
-        #txt = ""
-        
     return txt
-    
+
 def str2float(s):
     if not isinstance(s, str):
         return np.nan

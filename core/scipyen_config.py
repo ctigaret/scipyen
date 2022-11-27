@@ -82,8 +82,7 @@ are configuration settings for various Scipyen functionalities:
 
 """
 #import base64
-import os
-import inspect, typing, types, math, numbers
+import os, inspect, typing, types, math, numbers, ast, json
 import yaml
 import dataclasses
 from copy import (copy, deepcopy,)
@@ -106,7 +105,7 @@ import traitlets
 from traitlets.utils.bunch import Bunch
 import traitlets.config
 from .traitcontainers import DataBag
-from core import traitutils
+from core import (traitutils, strutils)
 from core.prog import safeWrapper
 from core.workspacefunctions import user_workspace
 from core.quantities import(quantity2str, str2quantity)
@@ -1113,7 +1112,6 @@ class ScipyenConfigurable(object):
         return parent
 
     def _observe_configurables_(self, change):
-        # change;
         isTop = hasattr(self, "isTopLevel") and self.isTopLevel
         parent = self._get_parent_()
         tag = self.configTag
@@ -1134,20 +1132,20 @@ class ScipyenConfigurable(object):
 #             print(f"\tchange.new = {change.new} ({type(change.new).__name__})")
 #             print(f"\tconfig = {cfg}")
 #         
-            # print("\ttraits observer state:") 
-            # for k, v in self.configurable_traits.__observer__.__getstate__().items():
-            #     if isinstance(v, dict):
-            #         print(f"\t\t{k}:")
-            #         for kk, vv in v.items():
-            #             print(f"\t\t\t{kk} = {vv}")
-            #     else:
-            #         print(f"\t\t{k} = {v}")
-            # print("\tobserver class traits:")
-            # for k, v in self.configurable_traits.__observer__.class_traits().items():
-            #     print(f"\t\t{k} = {v}")
-            # print("\tobserver class own traits")
-            # for k, v in self.configurable_traits.__observer__.class_own_traits().items():
-            #     print(f"\t\t{k} = {v}")
+#             print("\ttraits observer state:") 
+#             for k, v in self.configurable_traits.__observer__.__getstate__().items():
+#                 if isinstance(v, dict):
+#                     print(f"\t\t{k}:")
+#                     for kk, vv in v.items():
+#                         print(f"\t\t\t{kk} = {vv}")
+#                 else:
+#                     print(f"\t\t{k} = {v}")
+#             print("\tobserver class traits:")
+#             for k, v in self.configurable_traits.__observer__.class_traits().items():
+#                 print(f"\t\t{k} = {v}")
+#             print("\tobserver class own traits")
+#             for k, v in self.configurable_traits.__observer__.class_own_traits().items():
+#                 print(f"\t\t{k} = {v}")
         #### END debug - comment out when done
                 
         
@@ -1307,9 +1305,29 @@ class ScipyenConfigurable(object):
         #### END debug - comment out when done
         setter = inspect.getattr_static(self, settername, None)
         
-        if isinstance(val, str) and any(c in val for c in ("()")):
-            # this is a string rep of a basic Pyton sequence
-            val = tuple(v_.strip() for v_ in val.strip("()").split(","))
+        if isinstance(val, str):
+            # NOTE: 2022-11-27 12:46:17 POSSIBLE NEW BUG
+            # The json library will help identify string representation of 
+            # sequences but fail in any other case. 
+            # HOWEVER:
+            # What if we WANT to store a str representation of a sequence, 
+            # and retrieve it as such, instead of retrieving the original
+            # sequence represented here?
+            #
+            # The answer to that is to enclose the whole string in double or
+            # single quotes at writing time; then, here, let the caller deal
+            # with the result...
+            try:
+                val = json.loads(val)
+            except:
+                val = strutils.str2sequence(val)
+        
+        # FIXME BUG 2022-11-27 12:33:35
+        # this messes up string that may contain parantheses inside (such as a
+        # file filter specification !!!!)
+        # if isinstance(val, str) and any(c in val for c in ("()")):
+        #     # this is a string rep of a basic Pyton sequence such as a tuple or list
+        #     val = tuple(v_.strip() for v_ in val.strip("()").split(","))
         
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             with self.configurable_traits.observer.hold_trait_notifications():
@@ -1416,7 +1434,7 @@ class ScipyenConfigurable(object):
 
                     #### BEGIN debug - comment out when done
                     # if self.__class__.__name__ == "MPSCAnalysis":
-                        # print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings(), getter={gettername} → {k}={val} ({type(val).__name__}), v {v} ({type(v).__name__})")
+                    #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings(), getter={gettername} → {k}={val} ({type(val).__name__}), v {v} ({type(v).__name__})")
                     #### END debug - comment out when done
                     
                     if val != v:
@@ -1932,12 +1950,13 @@ def loadWindowSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QM
     return syncQtSettings(qsettings, win, group_name, prefix, False)
 
 
-# def data2confuse(x):
-#     """Filter to convert some special data to str for yaml representation.
-#     Uses iolib.jonsio to enable storage of more specialized /complex data types
-#     with the confuse framework.
-#     """
-#     return object2JSON(x)
+def data2confuse(x):
+    """Filter to convert some special data to str for yaml representation.
+    Uses iolib.jonsio to enable storage of more specialized /complex data types
+    with the confuse framework.
+    A bit expensive, though... Therefore not sure I will use it...
+    """
+    return object2JSON(x)
 
 # Some yaml representers and constructors for special object types
 

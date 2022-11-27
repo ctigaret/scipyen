@@ -506,6 +506,7 @@ class DataBag(Bunch):
         obs.__setstate__(observer_state)
             
     def __coerce_trait__(self, obs, key, val):
+        # print(f"{self.__class__.__name__}.__coerce_trait__ obs = {obs}, key = {key}, val = {val} (type = {type(val).__name__})")
         old_trait = obs.traits()[key]
         old_type = type(object.__getattribute__(obs, key))
         
@@ -513,15 +514,17 @@ class DataBag(Bunch):
         new_trait = self._light_trait_(val)
         new_type = type(val)
         
+        # NOTE 2020-07-05 16:17:27
+        # signal the change of trait type
+        if new_type != old_type:
+            obs._notify_trait(key, old_type, new_type)
+        
         obs.remove_traits(**{key:old_trait})
         
         obs.add_traits(**{key:new_trait})
         
         object.__setattr__(obs, key, val)
             
-        # NOTE 2020-07-05 16:17:27
-        # signal the change of trait type
-        obs._notify_trait(key, old_type, new_type)
         
     @property
     def observer(self):

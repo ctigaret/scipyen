@@ -80,8 +80,8 @@ TRAITSMAP = {           # use casting versions
     float:      (CFloat,),
     complex:    (CComplex,),
     bytes:      (CBytes,),
-    # str:        (Unicode,),
-    str:        (CUnicode,),
+    str:        (Unicode,),
+    # str:        (CUnicode,),
     list:       (List,),
     #deque:      (List,),
     set:        (Set,),
@@ -339,7 +339,8 @@ def adapt_args_kw(x, args, kw, allow_none):
         kw["default_value"] = x
         
         kw["allow_none"] = allow_none
-        
+
+        # print(f"adapt_args_kw args = {args}, kw = {kw}")
 
     return args, kw
     
@@ -455,13 +456,24 @@ def dynamic_trait(x, *args, **kwargs):
     #     return StringTrait(x)
     
     if isclass(force_trait) and issubclass(force_trait, traitlets.TraitType):
-        traitclass = (force_trait, )
+        traitclass = TRAITSMAP.get(myclass, (force_trait, ))
+        # traitclass = (force_trait, )
         
     else:
         # NOTE: 2021-08-20 12:22:12 For a finer granularity
         traitclass = TRAITSMAP.get(myclass, (Any, ))
         # traitclass = (Any,)
-    print(f"dynamic_trait traitclass = {traitclass[0]} for {x} ({type(x).__name__})")
+        
+#     if isclass(force_trait) and issubclass(force_trait, traitlets.TraitType):
+#         traitclass = (force_trait, )
+#         
+#     else:
+#         # NOTE: 2021-08-20 12:22:12 For a finer granularity
+#         traitclass = TRAITSMAP.get(myclass, (Any, ))
+#         # traitclass = (Any,)
+        
+        
+    # print(f"dynamic_trait traitclass = {traitclass[0]} for {x} ({type(x).__name__})")
     if traitclass[0] is None:
         # NOTE: 2021-10-10 17:10:02
         # when 'x' is a DataBag, the line below always returns 'dict'
