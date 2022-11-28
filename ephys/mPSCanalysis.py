@@ -508,6 +508,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # TODO/FIXME 2022-11-26 09:10:33 for testing
         self.actionDetect.triggered.connect(self._slot_detect_thread_)
         
+        self.actionClose.triggered.connect(self._slot_Close)
+        
         # self.actionValidate
         self.actionUndo.triggered.connect(self._slot_undoDetection)
         self.actionView_results.triggered.connect(self.slot_showReportWindow)
@@ -876,6 +878,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._params_lower_ = self._default_params_lower_
         self._params_upper_ = self._default_params_upper_
         self._mPSCduration_ = self._default_duration_
+        
+    @pyqtSlot()
+    def _slot_Close(self):
+        self.close()
         
     def closeEvent(self, evt):
         # if self._ephysViewer_.isVisible():

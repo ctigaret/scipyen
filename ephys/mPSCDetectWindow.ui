@@ -283,6 +283,8 @@
     <addaction name="actionExportEphysData"/>
     <addaction name="separator"/>
     <addaction name="menumPSC_Template"/>
+    <addaction name="separator"/>
+    <addaction name="actionClose"/>
    </widget>
    <widget class="QMenu" name="menuSettings">
     <property name="title">
@@ -786,13 +788,19 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="graphics"/>
+    <iconset theme="graphics">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Overlay Template with Model</string>
    </property>
    <property name="toolTip">
     <string>Plot mPSC template overlaid with model mPSC</string>
+   </property>
+  </action>
+  <action name="actionClose">
+   <property name="text">
+    <string>Close</string>
    </property>
   </action>
  </widget>
