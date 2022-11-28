@@ -906,7 +906,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def alignWaves(self):
         """
         Aligns detected mPSC waveforms on the onset. 
-        Useful in order to create a mPSC template waveform form their average.
+        Useful in order to create a mPSC template waveform from their average.
         """
         if self._data_ is None:
             return
@@ -975,6 +975,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 t0 = new_start_times[k]
                 t1 = stop_times[k]
                 wave = signal.time_slice(t0, t1)
+                # 1) Remove the DC component - signal average beween t0 and onset
+                t_onset = t0+maxOnset
+                baseline = signal.time_slice(t0, t_onset)
+                dc = np.mean(baseline, axis=0)
+                wave -= dc
+                # 2) set relatime time start to 0
+                wave = neoutils.set_relative_time_start(wave[:,0])
                 waves_list.append(neoutils.set_relative_time_start(wave[:,0]))
                 
         # print(len(waves_list))
@@ -1058,7 +1065,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
 
                 self._detected_mPSCViewer_.frameChanged.connect(self._slot_mPSCViewer_frame_changed)
                 
-            self._detected_mPSCViewer_.removeLabels(self._detected_mPSCViewer_.axis(0))
+            self._detected_mPSCViewer_.removeLabels(0)
             self._mPSC_spinBoxSlider_.setRange(0, len(self._mPSCs_for_template_)-1)
             self._detected_mPSCViewer_.view(self._mPSCs_for_template_)
             
@@ -1644,7 +1651,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             for k,w in enumerate(mini_waves):
                 # FIXME: 2022-11-25 00:50:11
                 # when template is Not a model where are the params taken from?
-                fw = membrane.fit_mPSC(w, init_params, lo=lo, up=up)
+                if self._use_template_:
+                    fw = membrane.fit_mPSC(w, self._mPSC_template_)
+                else:
+                    fw = membrane.fit_mPSC(w, init_params, lo=lo, up=up)
                 # fw = membrane.fit_mPSC(w, template.annotations["parameters"], lo=lo, up=up)
                 fw.annotations["t_peak"] = mPSCtrain.annotations["peak_times"][k]
                 fw.name = f"mPSC_{fw.name}_{k}"

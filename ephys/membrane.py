@@ -6878,7 +6878,7 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
     l, c, e = sigp.state_levels(x_[:,0])
     
     if isinstance(params, neo.AnalogSignal): # template waveform given
-        if params.t_starts.magnitude != 0:
+        if params.t_start.magnitude != 0:
             params = neoutils.set_relative_time_start(params)
             
         Rsq = crvf.fit_mPSC_wave(x_, params)

@@ -24,6 +24,7 @@ import neo
 #import signalviewer as sv
 from . import tiwt
 from . import models
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 #from . import datatypes as dt
 #from .patchneo import *
 #### END pict.core modules
@@ -765,7 +766,7 @@ def fit_mPSC_wave(data, wave):
     if not isinstance(wave, (neo.AnalogSignal, DataSignal)):
         raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datatypes.DataSignal; got %s instead" % type(data).__name__)
     
-    if wave.ndim == 2 and save.shape[1] > 1:
+    if wave.ndim == 2 and wave.shape[1] > 1:
         raise ValueError("Data must contain a single channel")
     
     if data.size != wave.size:
