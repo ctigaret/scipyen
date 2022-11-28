@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os, typing, math, datetime, logging
+import os, typing, math, datetime, logging, traceback
 from numbers import (Number, Real,)
 from itertools import chain
 
@@ -95,7 +95,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
     _default_sampling_rate_ = 1e4 * pq.Hz
     
-    _default_template_file = os.path.join(os.path.dirname(get_config_file()),"mPSCTemplate.h5" )
+    _default_template_file = os.path.join(os.path.dirname(get_config_file()),"mPSCTemplate.pkl" )
     
     def __init__(self, ephysdata=None, clearOldPSCs=False, ephysViewer:typing.Optional[sv.SignalViewer]=None, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="mPSC Detect", **kwargs):
         # NOTE: 2022-11-05 14:54:24
@@ -126,8 +126,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # operation is triggered
         self._undo_buffer_= list() # FIXME 2022-11-21 17:49:05
         
-        
         self._use_template_ = False
+        self._overlayTemplateModel = False
         self._mPSC_template_ = None
         self._template_showing_ = False
         
@@ -332,7 +332,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
 
         # NOTE: 2022-11-26 21:41:50
         # using the QRunnable paradigm works, but can't abort'
-        self.threadpool = QtCore.QThreadPool()
+        # self.threadpool = QtCore.QThreadPool()
         
         # NOTE: 2022-11-26 11:22:38
         # this works, but still needs to be made abortable
@@ -356,6 +356,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # self._data_var_name_ = self.getDataSymbolInWorkspace(self._data_)
         
         # self.resize(-1,-1)
+        if not isinstance(self._mPSC_template_, neo.AnalogSignal):
+            self._use_template_ = False
+            self.use_mPSCTemplate_CheckBox.setEnabled(False)
         
     def _configureUI_(self):
         # print(f"{self.__class__.__name__}._configureUI_ start...")
@@ -497,6 +500,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.actionForget_mPSC_Template.triggered.connect(self._slot_forgetTemplate)
         self.actionDetect_in_current_sweep.triggered.connect(self._slot_detectCurrentSweep)
         self.actionRemove_default_mPSC_Template
+        self.actionOverlay_Template_with_Model.triggered.connect(self._slot_setOverlayTemplateModel)
         # self.actionValidate_in_current_sweep.triggered.connect(self._slot_validateSweep)
         self.actionUndo_current_sweep.triggered.connect(self._slot_undoCurrentSweep)
         
@@ -1014,10 +1018,25 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                                                     parent=self, configTag="WaveformViewer")
             self._waveFormViewer_.sig_closeMe.connect(self._slot_waveFormViewer_closed)
             
-        waveform = self._get_mPSC_template_or_waveform_()
-        
-        if isinstance(waveform, (neo.AnalogSignal, DataSignal)):
-            self._waveFormViewer_.view(waveform)
+        if self._overlayTemplateModel and isinstance(self._mPSC_template_, neo.AnalogSignal):
+            modelwave = self._get_mPSC_template_or_waveform_(use_template = False)
+            maxLen = max(modelwave.shape[0], self._mPSC_template_.shape[0])
+            combinedWaves = np.full((maxLen, 2), fill_value = np.nan)
+            combinedWaves[0:self._mPSC_template_.shape[0],0] = self._mPSC_template_[:,0].flatten().magnitude
+            combinedWaves[0:modelwave.shape[0],1] = modelwave[:,0].flatten().magnitude
+            merged = neo.AnalogSignal(combinedWaves, 
+                                      units = self._mPSC_template_.units, 
+                                      t_start = 0*pq.s,
+                                      sampling_rate = self._mPSC_template_.sampling_rate,
+                                      name = self._mPSC_template_.name,
+                                      description = self._mPSC_template_.description)
+            merged.annotations.update(self._mPSC_template_.annotations)
+            self._waveFormViewer_.view(merged)
+        else:
+            waveform = self._get_mPSC_template_or_waveform_()
+            
+            if isinstance(waveform, (neo.AnalogSignal, DataSignal)):
+                self._waveFormViewer_.view(waveform)
             
     def _plot_template_(self):
         """Plots mPSC template"""
@@ -1028,7 +1047,22 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._waveFormViewer_.sig_closeMe.connect(self._slot_waveFormViewer_closed)
 
         if isinstance(self._mPSC_template_, neo.AnalogSignal):
-            self._waveFormViewer_.view(self._mPSC_template_)
+            if self.overlayTemplateModel:
+                modelwave = self._get_mPSC_template_or_waveform_(use_template = False)
+                maxLen = max(modelwave.shape[0], self._mPSC_template_.shape[0])
+                combinedWaves = np.full((maxLen, 2), fill_value = np.nan)
+                combinedWaves[0:self._mPSC_template_.shape[0],0] = self._mPSC_template_[:,0].flatten().magnitude
+                combinedWaves[0:modelwave.shape[0],1] = modelwave[:,0].flatten().magnitude
+                merged = neo.AnalogSignal(combinedWaves, 
+                                        units = self._mPSC_template_.units, 
+                                        t_start = 0*pq.s,
+                                        sampling_rate = self._mPSC_template_.sampling_rate,
+                                        name = self._mPSC_template_.name,
+                                        description = self._mPSC_template_.description)
+                merged.annotations.update(self._mPSC_template_.annotations)
+                self._waveFormViewer_.view(merged)
+            else:
+                self._waveFormViewer_.view(self._mPSC_template_)
             
     def _init_ephysViewer_(self):
         self._ephysViewer_ = sv.SignalViewer(win_title=self._winTitle_, 
@@ -1428,7 +1462,15 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             segment = self._get_data_segment_(frame)
             prev_detect = self._get_previous_detection_(segment)
             self._undo_buffer_[frame] = prev_detect
-            res = self._detect_sweep_(frame, waveform=waveform)
+            try:
+                res = self._detect_sweep_(frame, waveform=waveform)
+            except Exception as exc:
+                excstr = traceback.format_exception(exc)
+                msg = f"In sweep{frame}:\n{excstr[-1]}"
+                self.criticalMessage("Detect mPSCs in current sweep",
+                                     excstr)
+                return
+                
             if res is None:
                 continue
             mPSCtrain, detection = res
@@ -1537,9 +1579,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 dataOriginName = f"List of segments {dateTimeStr}"
             else:
                 dataOriginName = f"Data {dateTimeStr}"
-            
-        
-        
+
         # NOTE: 2022-11-22 08:57:22
         # • returns a spiketrain, a detection dict and the waveform used in detection
         # • does NOT ember the spiketrain in the analysed segment anymore - this 
@@ -1648,11 +1688,43 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             templates = list()
             mPSC_fits = list()
             
+            # fit the template then use the fitted params to fit the detected mPSCs
+            # if using a template
+            template_init_params = None
+            
+            # NOTE: 2022-11-28 17:10:56 
+            # FIX for FIXME: 2022-11-25 00:50:11:
+            # 1) The template is first fitted with the model params (initial,
+            # lower & upper bounds) using the values from the parameters 
+            # fields in the app window ⇒ template_fit
+            #
+            # 2) The result of the template fit is then used to provide initial
+            #  parameters `template_init_params` for fitting detected putative 
+            # mPSCs individually in the loop below
+            #
+            # TODO: 2022-11-28 17:15:49
+            # consider taking this calculation out of this method, or better,
+            # cache the template_init_params so that they are re-used inside the 
+            # loop in self._detect_all_
+            #
+            if self._use_template_ and isinstance(self._mPSC_template_, neo.AnalogSignal):
+                template_fit = membrane.fit_mPSC(self._mPSC_template_, init_params, lo, up)
+                template_init_params = template_fit.annotations["mPSC_fit"]["Coefficients"]
+                
             for k,w in enumerate(mini_waves):
                 # FIXME: 2022-11-25 00:50:11
                 # when template is Not a model where are the params taken from?
-                if self._use_template_:
-                    fw = membrane.fit_mPSC(w, self._mPSC_template_)
+                # FIXED, see NOTE: 2022-11-28 17:10:56
+                if self._use_template_ and template_init_params is not None:
+                    fw = membrane.fit_mPSC(w, template_init_params, lo=lo, up=up)
+                    sigblock = QtCore.QSignalBlocker(self.paramsWidget)
+                    self.paramsWidget.setParameters(template_init_params,
+                                                lower = [float(v) for v in lo],
+                                                upper = [float(v) for v in up],
+                                                names = self._params_names_,
+                                                refresh = True)
+                
+                    # fw = membrane.fit_mPSC(w, self._mPSC_template_)
                 else:
                     fw = membrane.fit_mPSC(w, init_params, lo=lo, up=up)
                 # fw = membrane.fit_mPSC(w, template.annotations["parameters"], lo=lo, up=up)
@@ -1674,6 +1746,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     @pyqtSlot()
     def _slot_create_mPSC_template(self):
         self.alignWaves()
+        if isinstance(self._mPSC_template_, neo.AnalogSignal):
+            self.use_mPSCTemplate_CheckBox.setEnabled(True)
         
     @pyqtSlot(str)
     def _slot_badBounds(self, param):
@@ -1689,20 +1763,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self.templateWaveFormFile = self._default_template_file
         else:
             self._slot_choosePersistentTemplateFile()
-            
-#     @pyqtSlot()
-#     def _slot_validateSweep(self):
-#         segment = self._get_data_segment_()
-#         if not isinstance(segment, neo.Segment):
-#             return
-#         
-#         if self.currentFrame in range(-len(self._result_), len(self._result_)):
-#             frameResults = self._result_[self.currentFrame]
-#             
-#             if isinstance(frameResults, (tuple, list)) and len(frameResults)== 2:
-#                 waves = frameResults[1]
-                
-            
             
     @pyqtSlot()
     def _slot_detectCurrentSweep(self):
@@ -1724,7 +1784,15 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             # _detect_sweep_ returns a dict and an AnalogSignal but also has the 
             # side effect of embedding a spiketrain with the event time stamps in
             # the segment.
-            detection_result = self._detect_sweep_(waveform=waveform)
+            try:
+                detection_result = self._detect_sweep_(waveform=waveform)
+            except Exception as exc:
+                execstr = traceback.format_exception(exc)
+                msg = execstr[-1]
+                self.criticalMessage("Detect mPSCs in current sweep",
+                                     msg)
+                return
+            
             if detection_result is None:
                 return
             mPSCtrain, detection = self._detect_sweep_(waveform=waveform)
@@ -1866,6 +1934,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     @pyqtSlot()
     def slot_showReportWindow(self):
         self._update_report_()
+        
+    @pyqtSlot(bool)
+    def _slot_setOverlayTemplateModel(self, value):
+        self.overlayTemplateModel = value
+        self._plot_model_()
         
     @pyqtSlot()
     def _slot_clearResults(self):
@@ -2059,6 +2132,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                              self.actionView_results,
                              self.actionExport_results,
                              self.actionSave_results,
+                             self.use_mPSCTemplate_CheckBox,
+                             self.actionCreate_mPSC_Template,
+                             self.actionOpen_mPSCTemplate,
+                             self.actionImport_mPSCTemplate,
                              enable=False)
         
         self._detectThread_.start() # ↯ _detectThread_.started ↣ _detectWorker_.run NOTE: 2022-11-26 16:56:19
@@ -2079,6 +2156,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                              self.actionView_results,
                              self.actionExport_results,
                              self.actionSave_results,
+                             self.use_mPSCTemplate_CheckBox,
+                             self.actionCreate_mPSC_Template,
+                             self.actionOpen_mPSCTemplate,
+                             self.actionImport_mPSCTemplate,
                              enable=True)
         
         self.loopControl["break"] = False
@@ -2204,6 +2285,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._mPSC_template_ = data
                 self._plot_template_()
                 
+        if isinstance(self._mPSC_template_, neo.AnalogSignal):
+            self.use_mPSCTemplate_CheckBox.setEnabled(True)
+        
     @pyqtSlot()
     def _slot_saveTemplateFile(self):
         if not isinstance(self._mPSC_template_, neo.AnalogSignal):
@@ -2270,6 +2354,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._mPSC_template_ = objs[0]
             self._plot_template_()
             
+        if isinstance(self._mPSC_template_, neo.AnalogSignal):
+            self.use_mPSCTemplate_CheckBox.setEnabled(True)
+        
             
     @pyqtSlot()
     def _slot_importEphysData(self):
@@ -2299,7 +2386,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         # TODO: 2022-11-27 22:04:11
         # see TODO: 2022-11-27 22:03:10 and TODO 2022-11-27 22:03:34
-        pio.saveHDF5(self._mPSC_template_, self._template_file_)
+        # pio.saveHDF5(self._mPSC_template_, self._template_file_)
+        pio.savePickleFile(self._mPSC_template_, self._template_file_)
         
     @pyqtSlot()
     def _slot_forgetTemplate(self):
@@ -2578,22 +2666,31 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def useTemplateWaveForm(self):
         return self._use_template_
     
-    @markConfigurable("UseTemplateWaveForm")
+    @markConfigurable("UseTemplateWaveForm", trait_notifier=True)
     @useTemplateWaveForm.setter
     def useTemplateWaveForm(self, value):
-        print(f"{self.__class__.__name__} @useTemplateWaveForm.setter value: {value}")
+        # print(f"{self.__class__.__name__} @useTemplateWaveForm.setter value: {value}")
         self._use_template_ = value == True
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["UseTemplateWaveForm"] = self._use_template_
+        # if isinstance(getattr(self, "configurable_traits", None), DataBag):
+        #     self.configurable_traits["UseTemplateWaveForm"] = self._use_template_
+            
+    @property
+    def overlayTemplateModel(self):
+        return self._overlayTemplateModel
+    
+    @markConfigurable("OverlayTemplateModel", trait_notifier=True)
+    @overlayTemplateModel.setter
+    def overlayTemplateModel(self, value):
+        self._overlayTemplateModel = value == True
         
     @property
     def templateWaveFormFile(self):
         return self._template_file_
     
-    @markConfigurable("TemplateWaveFormFile")
+    @markConfigurable("TemplateWaveFormFile", trait_notifier=True)
     @templateWaveFormFile.setter
     def templateWaveFormFile(self, value:str):
-        print(f"{self.__class__.__name__} @templateWaveFormFile.setter value: {value}")
+        # print(f"{self.__class__.__name__} @templateWaveFormFile.setter value: {value}")
         import os
         if isinstance(value, str) and os.path.isfile(value):
             self._template_file_ = value
@@ -2605,24 +2702,24 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def clearOldPSCs(self):
         return self._clear_detection_flag_
     
-    @markConfigurable("ClearOldPSCsOnDetection")
+    @markConfigurable("ClearOldPSCsOnDetection", trait_notifier=True)
     @clearOldPSCs.setter
     def clearOldPSCs(self, value):
         # print(f"{self.__class__.__name__} @clearOldPSCs.setter value: {value}")
         self._clear_detection_flag_ = value == True
-        self.configurable_traits["ClearOldPSCsOnDetection"] = self._clear_detection_flag_
+        # self.configurable_traits["ClearOldPSCsOnDetection"] = self._clear_detection_flag_
         # if isinstance(getattr(self, "configurable_traits", None), DataBag):
 
     @property
     def mPSCDuration(self):
         return self._mPSCduration_
     
-    @markConfigurable("mPSC_Duration")
+    @markConfigurable("mPSC_Duration", trait_notifier=True)
     @mPSCDuration.setter
     def mPSCDuration(self, value):
         # print(f"{self.__class__.__name__} @mPSCDuration.setter value: {value}")
         self._mPSCduration_ = value
-        self.configurable_traits["mPSC_Duration"] = self._mPSCduration_
+        # self.configurable_traits["mPSC_Duration"] = self._mPSCduration_
 
     @property
     def mPSCParametersInitial(self):
@@ -2630,7 +2727,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         """
         return dict(zip(self._params_names_, self._params_initl_))
     
-    @markConfigurable("mPSCParametersInitial")
+    # NOTE: 2022-11-28 16:40:23
+    # Bypass default traut_nptofoer, since confuse / yaml cannot cope with a pandas Series
+    @markConfigurable("mPSCParametersInitial") # , trait_notifier=True) bypass default mechanism!
     @mPSCParametersInitial.setter
     def mPSCParametersInitial(self, value:typing.Union[pd.Series, tuple, list, dict]):
         # print(f"{self.__class__.__name__} @mPSCParametersInitial.setter value: {value}")
@@ -2670,7 +2769,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def mPSCParametersLowerBounds(self):
         return dict(zip(self._params_names_, self._params_lower_))
     
-    @markConfigurable("mPSCParametersLowerBounds")
+    @markConfigurable("mPSCParametersLowerBounds")# , trait_notifier=True) see NOTE: 2022-11-28 16:40:23
     @mPSCParametersLowerBounds.setter
     def mPSCParametersLowerBounds(self, value:typing.Union[pd.Series, tuple, list, dict]):
         # print(f"{self.__class__.__name__} @mPSCParametersLowerBounds.setter value: {value}")
@@ -2704,14 +2803,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         else:
             raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the lower bounds; instead, got {type(value).__name__}:\n {value}")
                 
-        self.configurable_traits["mPSCParametersLowerBounds"] = dict(zip(self._params_names_, self._params_lower_))
+        # self.configurable_traits["mPSCParametersLowerBounds"] = dict(zip(self._params_names_, self._params_lower_))
         # if isinstance(getattr(self, "configurable_traits", None), DataBag):
                 
     @property
     def mPSCParametersUpperBounds(self):
         return dict(zip(self._params_names_, self._params_upper_))
     
-    @markConfigurable("mPSCParametersUpperBounds")
+    @markConfigurable("mPSCParametersUpperBounds") # , trait_notifier=True) see NOTE: 2022-11-28 16:40:23
     @mPSCParametersUpperBounds.setter
     def mPSCParametersUpperBounds(self, value:typing.Union[pd.Series, tuple, list, dict]):
         # print(f"{self.__class__.__name__} @mPSCParametersUpperBounds.setter value: {value}")
@@ -2744,7 +2843,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         else:
             raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the upper bounds; instead, got {type(value).__name__}:\n {value}")
                 
-        self.configurable_traits["mPSCParametersUpperBounds"] = dict(zip(self._params_names_, self._params_upper_))
+        # self.configurable_traits["mPSCParametersUpperBounds"] = dict(zip(self._params_names_, self._params_upper_))
         # if isinstance(getattr(self, "configurable_traits", None), DataBag):
                 
     @property

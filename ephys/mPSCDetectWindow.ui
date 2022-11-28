@@ -296,6 +296,7 @@
      <addaction name="actionChoose_persistent_mPSC_template_file"/>
     </widget>
     <addaction name="menuPersistent_mPSC_template_location"/>
+    <addaction name="actionOverlay_Template_with_Model"/>
     <addaction name="actionLock_toolbars"/>
    </widget>
    <widget class="QMenu" name="menuDetect_mPSCs">
@@ -746,7 +747,8 @@
   </action>
   <action name="actionPlot_detected_mPSCs">
    <property name="icon">
-    <iconset theme="graphics"/>
+    <iconset theme="graphics">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Plot detected mPSCs</string>
@@ -757,7 +759,8 @@
   </action>
   <action name="actionPlot_mPSC_template">
    <property name="icon">
-    <iconset theme="graphics"/>
+    <iconset theme="graphics">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Plot mPSC template</string>
@@ -768,13 +771,28 @@
   </action>
   <action name="actionPlot_mPSCs_for_template">
    <property name="icon">
-    <iconset theme="graphics"/>
+    <iconset theme="graphics">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Plot mPSCs for template</string>
    </property>
    <property name="toolTip">
     <string>Plot selected mPSCs for template</string>
+   </property>
+  </action>
+  <action name="actionOverlay_Template_with_Model">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="graphics"/>
+   </property>
+   <property name="text">
+    <string>Overlay Template with Model</string>
+   </property>
+   <property name="toolTip">
+    <string>Plot mPSC template overlaid with model mPSC</string>
    </property>
   </action>
  </widget>

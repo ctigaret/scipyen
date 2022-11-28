@@ -436,7 +436,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     # sig_infeasible_x0.emit(str(i))
             
             if refresh:
-                if isinstance(self._parameters_, pd.DataFrame) and self._parameters_.shape == paramsDF.shape and np.all(self._parameters_index == paramsDF.index):
+                if isinstance(self._parameters_, pd.DataFrame) and self._parameters_.shape == paramsDF.shape and np.all(self._parameters_.index == paramsDF.index):
                     if self.isVertical:
                         pDF = paramsDF
                     else:

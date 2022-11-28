@@ -248,7 +248,7 @@ def pandasDtype2HF5Dtype(dtype, col, categorical_info:dict=None):
                 categorical_info[col_name] = {"categories": np.array(categories, dtype=col_dtype),
                                               "ordered": 1 if dtype.ordered else 0, 
                                              }
-        elif "datetime" in str(dtype):
+        elif "datetime" in str(dtype): # FIXME: 2022-11-28 17:53:57 = done? in NOTE: 2022-11-28 17:54:36
             col_dtype = h5py.string_dtype() # remember to convert datetime data to str!!!
         else:
             col_dtype = dtype
@@ -557,8 +557,9 @@ def makeAttr(x:typing.Optional[typing.Union[str, list, tuple, dict, deque, np.nd
         
         return x
     
+    # NOTE: 2022-11-28 17:54:36
     if isinstance(x, datetime.datetime):
-        return str(x)
+        return x.isoformat()
         
     if isinstance(x, (list, tuple, dict)): 
         # will raise exception if elements or values are not json-able
@@ -1202,6 +1203,14 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
                 
             elif target_class == str:
                 obj = dataset2string(entity)
+                
+            elif target_class == datetime.datetime:
+                try:
+                    val = str(entity)
+                    obj = datetime.datetime(val)
+                except Exception as e:
+                    traceback.print_exc()
+                
                 
             elif any(k in inspect.getmro(target_class) for k in (int, float, complex)):
                 # NOTE: 2022-10-08 13:20:20
@@ -2501,6 +2510,14 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     storeEntityInCache(entity_cache, obj, dset)
     return dset
     
+@makeDataset.register(datetime.datetime)
+def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
+    cached_entity = getCachedEntity(entity_cache, obj)
+    if isinstance(cached_entity, h5py.Dataset):
+        group[target_name] = cached_entity # make a hard link
+        return cached_entity
+    
+@makeDataset.register(datetime.timedelta)
             
 @makeDataset.register(str)
 def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
