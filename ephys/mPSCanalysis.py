@@ -95,7 +95,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
     _default_sampling_rate_ = 1e4 * pq.Hz
     
-    _default_template_file = os.path.join(os.path.dirname(get_config_file()),"mPSCTemplate.pkl" )
+    _default_template_file = os.path.join(os.path.dirname(get_config_file()),"mPSCTemplate.h5" )
     
     def __init__(self, ephysdata=None, clearOldPSCs=False, ephysViewer:typing.Optional[sv.SignalViewer]=None, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="mPSC Detect", **kwargs):
         # NOTE: 2022-11-05 14:54:24
@@ -150,6 +150,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # TODO 2022-11-27 22:03:34
         # make configurable
         self._custom_template_file_ = ""
+        
+        # last used template file - a template file other than the default
+        self._last_used_template_file_name = ""
         
         # NOTE: 2022-11-17 23:37:00 
         # About mPSC template files
@@ -496,11 +499,15 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.actionImport_mPSCTemplate.triggered.connect(self._slot_importTemplate)
         self.actionSave_mPSC_Template.triggered.connect(self._slot_saveTemplateFile)
         self.actionExport_mPSC_Template.triggered.connect(self._slot_exportTemplate)
-        self.actionRemember_mPSC_Template.triggered.connect(self._slot_storeTemplate)
+        self.actionRemember_mPSC_Template.triggered.connect(self._slot_storeTemplateAsDefault)
         self.actionForget_mPSC_Template.triggered.connect(self._slot_forgetTemplate)
         self.actionDetect_in_current_sweep.triggered.connect(self._slot_detectCurrentSweep)
-        self.actionRemove_default_mPSC_Template
+        self.actionClear_default.triggered.connect(self._slot_clearFactoryDefaultTemplateFile)
+        self.actionChoose_persistent_mPSC_template_file.triggered.connect(self._slot_choosePersistentTemplateFile)
+        self.actionReset_to_factory.triggered.connect(self._slot_revertToFactoryDefaultTemplateFile)
         self.actionOverlay_Template_with_Model.triggered.connect(self._slot_setOverlayTemplateModel)
+        self.actionLoad_default_mPSC_Template.triggered.connect(self._slot_loadDefaultTemplate)
+        self.actionLoad_last_used_mPSC_template.triggered.connect(self._slot_loadLastUsedTemplate)
         # self.actionValidate_in_current_sweep.triggered.connect(self._slot_validateSweep)
         self.actionUndo_current_sweep.triggered.connect(self._slot_undoCurrentSweep)
         
@@ -520,8 +527,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.actionSave_mPSC_waves.triggered.connect(self._slot_savePSCwaves)
         self.actionExport_mPSC_waves.triggered.connect(self._slot_exportPSCwaves)
         self.actionClear_results.triggered.connect(self._slot_clearResults)
-        self.actionUse_default_location_for_persistent_mPSC_template.toggled.connect(self._slot_useDefaultTemplateLocation)
-        self.actionChoose_persistent_mPSC_template_file.triggered.connect(self._slot_choosePersistentTemplateFile)
+        self.actionUse_default_location_for_persistent_mPSC_template.triggered.connect(self._slot_useDefaultTemplateLocation)
+        # self.actionChoose_persistent_mPSC_template_file.triggered.connect(self._slot_choosePersistentTemplateFile)
         self.actionLock_toolbars.setChecked(self._toolbars_locked_ == True)
         self.actionLock_toolbars.triggered.connect(self._slot_lockToolbars)
         # signal & epoch comboboxes
@@ -726,6 +733,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 sampling_rate = signal.sampling_rate
             else:
                 sampling_rate = self._default_sampling_rate_
+        elif isinstance(self._mPSC_template_, neo.AnalogSignal):
+            sampling_rate = self._mPSC_template_.sampling_rate
         else:
             sampling_rate = self._default_sampling_rate_
         
@@ -1771,6 +1780,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._slot_choosePersistentTemplateFile()
             
     @pyqtSlot()
+    def _slot_useDefaultTemplateLocation(self):
+        self.templateWaveFormFile = self._default_template_file
+            
+    @pyqtSlot()
     def _slot_detectCurrentSweep(self):
         # refresh the template or waveform
         waveform = self._get_mPSC_template_or_waveform_()
@@ -2290,9 +2303,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             if isinstance(data, neo.AnalogSignal):
                 self._mPSC_template_ = data
                 self._plot_template_()
+                self.use_mPSCTemplate_CheckBox.setEnabled(True)
+                self.lastUsedTemplateFile = fileName
                 
-        if isinstance(self._mPSC_template_, neo.AnalogSignal):
-            self.use_mPSCTemplate_CheckBox.setEnabled(True)
+            # if isinstance(self._mPSC_template_, neo.AnalogSignal):
         
     @pyqtSlot()
     def _slot_saveTemplateFile(self):
@@ -2385,20 +2399,108 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self.metaDataWidget.dataName = name
             
     @pyqtSlot()
-    def _slot_storeTemplate(self):
+    def _slot_storeTemplateAsDefault(self):
         """Stores mPSC template in the default template file"""
         if not isinstance(self._mPSC_template_, neo.AnalogSignal):
             return
         
         # TODO: 2022-11-27 22:04:11
         # see TODO: 2022-11-27 22:03:10 and TODO 2022-11-27 22:03:34
-        # pio.saveHDF5(self._mPSC_template_, self._template_file_)
-        pio.savePickleFile(self._mPSC_template_, self._template_file_)
-        
+        if os.path.isfile(self.templateWaveFormFile):
+            fn, ext = os.path.splitext(self.templateWaveFormFile)
+            if "pkl" in ext:
+                pio.savePickleFile(self._mPSC_template_, self.templateWaveFormFile)
+            else:
+                pio.saveHDF5(self._mPSC_template_, self.templateWaveFormFile)
+                
     @pyqtSlot()
     def _slot_forgetTemplate(self):
-        if os.path.isfile(self._template_file_):
-            os.remove(self._template_file_)
+        self._mPSC_template_ = None
+        
+    @pyqtSlot()
+    def _slot_clearFactoryDefaultTemplateFile(self):
+        if os.path.isfile(self._default_template_file):
+            os.remove(self._default_template_file)
+            
+#     @pyqtSlot()
+#     def _slot_chooseDefaultTemplateFile(self):
+#         fileFilters = ["Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]
+#         # NOTE 2022-11-27 22:16:24
+#         # we only operate with pickle and HDF5 files for template
+#         # so we use _last_used_file_save_filter_ for that purpose (KISS)
+#         if self._last_used_file_save_filter_ in fileFilters:
+#             fileFilters = [self._last_used_file_save_filter_] + [f for f in fileFilters if f != self._last_used_file_save_filter_]
+#             
+#         fileName, fileFilter = self.chooseFile(caption="Open mPSC template file",
+#                                                single=True,
+#                                                save=False,
+#                                                fileFilter=";;".join(fileFilters))
+#         
+#         if isinstance(fileName, str) and os.path.isfile(fileName):
+#             self.customDefaultTemplateFile = fileName
+
+    @pyqtSlot()
+    def _slot_loadDefaultTemplate(self):
+        if os.path.isfile(self.customDefaultTemplateFile):
+            template_file = self.customDefaultTemplateFile
+        elif os.path.isfile(self._template_file_):
+            template_file = self._template_file_
+        else:
+            self.errorMessage("Load default mPSC template",
+                              "No default template file was found.\nCreate a template and save as one of the defaults")
+            return
+        
+        fn, ext = os.path.splitext(template_file)
+            
+        if "pkl" in ext:
+            data = pio.loadPickleFile(template_file)
+        elif any(s in ext for s in ("h5", "hdf5")):
+            data = pio.loadHDF5File(template_file)
+        else:
+            self.errorMessage("Load default mPSC template",
+                              f"Check the template file name; expecting a pickle or a HDF5 file, but got {template_file} instead")
+            return
+        
+        if isinstance(data, neo.AnalogSignal):
+            self._mPSC_template_ = data
+            self._plot_template_()
+            self.use_mPSCTemplate_CheckBox.setEnabled(True)
+        else:
+            self.errorMessage("Load default mPSC template",
+                              "Default template file does not contain a signal")
+            
+            
+    @pyqtSlot()
+    def _slot_loadLastUsedTemplate(self):
+        if os.path.isfile(self.lastUsedTemplateFile):
+            fn, ext = os.path.splitext(self.lastUsedTemplateFile)
+            if "pkl" in ext:
+                data = pio.loadPickleFile(self.lastUsedTemplateFile)
+            elif any(s in ext for s in ("h5", "hdf5")):
+                data = pio.loadHDF5File(self.lastUsedTemplateFile)
+            else:
+                self.errorMessage("Load last used mPSC template",
+                                f"Check the template file name; expecting a pickle or a HDF5 file, but got {self.lastUsedTemplateFile} instead")
+                return
+            
+            if isinstance(data, neo.AnalogSignal):
+                self._mPSC_template_ = data
+                self._plot_template_()
+                self.use_mPSCTemplate_CheckBox.setEnabled(True)
+                
+            else:
+                self.errorMessage("Load last used mPSC template",
+                                 f"Template file {self.lastUsedTemplateFile} does not contain a signal")
+                return
+            
+        else:
+            self.errorMessage("Load last used mPSC template",
+                             f"Template file {self.lastUsedTemplateFile} not found!")
+            
+        
+    @pyqtSlot()
+    def _slot_revertToFactoryDefaultTemplateFile(self):
+        self._template_file_ = self._default_template_file
             
     @pyqtSlot()
     def _slot_exportTemplate(self):
@@ -2656,6 +2758,28 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # FIXME/BUG 2022-11-26 17:34:21 called twice, second time with the type of value
         # print(f"{self.__class__.__name__}. @lastUsedFileSaveFilter.setter value = {value}")
         self._last_used_file_save_filter_ = value
+        
+    @property
+    def lastUsedTemplateFile(self):
+        return self._last_used_template_file_name
+    
+    @markConfigurable("LastUsedTemplateFile")#, trait_notifier=True)
+    @lastUsedTemplateFile.setter
+    def lastUsedTemplateFile(self, value):
+        if os.path.isfile(value):
+            self._last_used_template_file_name = value
+            self.configurable_traits["LastUsedTemplateFile"] = self._last_used_template_file_name
+        
+    @property
+    def customDefaultTemplateFile(self):
+        return self._custom_template_file_
+    
+    @markConfigurable("CustomDefaultTemplateFile")
+    @customDefaultTemplateFile.setter
+    def customDefaultTemplateFile(self, value):
+        if os.path.isfile(value):
+            self._custom_template_file_ = value
+            self.configurable_traits["CustomDefaultTemplateFile"] = self._custom_template_file_
             
     @property
     def lastUsedFileOpenFilter(self):

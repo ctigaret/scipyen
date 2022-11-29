@@ -7,7 +7,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>529</width>
+    <width>636</width>
     <height>639</height>
    </rect>
   </property>
@@ -255,7 +255,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>529</width>
+     <width>636</width>
      <height>28</height>
     </rect>
    </property>
@@ -274,7 +274,7 @@
      <addaction name="actionImport_mPSCTemplate"/>
      <addaction name="actionExport_mPSC_Template"/>
      <addaction name="actionRemember_mPSC_Template"/>
-     <addaction name="actionRemove_default_mPSC_Template"/>
+     <addaction name="actionClear_default_mPSC_Template"/>
      <addaction name="actionForget_mPSC_Template"/>
     </widget>
     <addaction name="actionOpenEphysData"/>
@@ -291,11 +291,29 @@
      <string>Settings</string>
     </property>
     <widget class="QMenu" name="menuPersistent_mPSC_template_location">
+     <property name="toolTip">
+      <string>Manage default mPSC template</string>
+     </property>
+     <property name="statusTip">
+      <string>Manage default mPSC template</string>
+     </property>
+     <property name="whatsThis">
+      <string>Manage default mPSC template</string>
+     </property>
+     <property name="accessibleName">
+      <string/>
+     </property>
      <property name="title">
-      <string>Persistent mPSC template location</string>
+      <string>Persistent mPSC Template File</string>
+     </property>
+     <property name="icon">
+      <iconset theme="template">
+       <normaloff>.</normaloff>.</iconset>
      </property>
      <addaction name="actionUse_default_location_for_persistent_mPSC_template"/>
      <addaction name="actionChoose_persistent_mPSC_template_file"/>
+     <addaction name="actionReset_to_factory"/>
+     <addaction name="actionClear_default"/>
     </widget>
     <addaction name="menuPersistent_mPSC_template_location"/>
     <addaction name="actionOverlay_Template_with_Model"/>
@@ -409,12 +427,13 @@
    <addaction name="actionCreate_mPSC_Template"/>
    <addaction name="actionPlot_mPSC_template"/>
    <addaction name="actionPlot_mPSCs_for_template"/>
+   <addaction name="actionLoad_last_used_mPSC_template"/>
    <addaction name="actionOpen_mPSCTemplate"/>
    <addaction name="actionImport_mPSCTemplate"/>
+   <addaction name="actionLoad_default_mPSC_Template"/>
    <addaction name="actionSave_mPSC_Template"/>
    <addaction name="actionExport_mPSC_Template"/>
    <addaction name="actionRemember_mPSC_Template"/>
-   <addaction name="actionRemove_default_mPSC_Template"/>
    <addaction name="actionForget_mPSC_Template"/>
   </widget>
   <action name="actionOpenEphysData">
@@ -534,7 +553,7 @@
     <string>Remember mPSC template as default across sections</string>
    </property>
   </action>
-  <action name="actionRemove_default_mPSC_Template">
+  <action name="actionClear_default_mPSC_Template">
    <property name="icon">
     <iconset theme="remove">
      <normaloff>.</normaloff>.</iconset>
@@ -649,18 +668,15 @@
    </property>
   </action>
   <action name="actionUse_default_location_for_persistent_mPSC_template">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
    <property name="icon">
     <iconset theme="mark-location">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Use default</string>
+    <string>Use factory default file</string>
    </property>
    <property name="toolTip">
-    <string>Use factory name for default mPSC template file (&quot;mPSCtemplate.h5&quot;)</string>
+    <string>Use default mPSC template file (&quot;mPSCtemplate.h5&quot;) in Scipyen config</string>
    </property>
   </action>
   <action name="actionChoose_persistent_mPSC_template_file">
@@ -669,7 +685,7 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Default mPSC template file</string>
+    <string>Choose default mPSC template</string>
    </property>
    <property name="toolTip">
     <string>Choose default mPSC template file</string>
@@ -799,8 +815,58 @@
    </property>
   </action>
   <action name="actionClose">
+   <property name="icon">
+    <iconset theme="window-close">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
    <property name="text">
     <string>Close</string>
+   </property>
+  </action>
+  <action name="actionReset_to_factory">
+   <property name="icon">
+    <iconset theme="document-revert">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Revert to factory default template file</string>
+   </property>
+   <property name="toolTip">
+    <string>Revert to using factory default template file</string>
+   </property>
+  </action>
+  <action name="actionClear_default">
+   <property name="icon">
+    <iconset theme="edit-clear-all">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Clear factory default template file</string>
+   </property>
+   <property name="toolTip">
+    <string>Clear factory default template file</string>
+   </property>
+  </action>
+  <action name="actionLoad_default_mPSC_Template">
+   <property name="icon">
+    <iconset theme="template"/>
+   </property>
+   <property name="text">
+    <string>Load default mPSC Template</string>
+   </property>
+   <property name="toolTip">
+    <string>Load mPSC template from default file</string>
+   </property>
+  </action>
+  <action name="actionLoad_last_used_mPSC_template">
+   <property name="icon">
+    <iconset theme="document-open-recent"/>
+   </property>
+   <property name="text">
+    <string>Load last used mPSC template</string>
+   </property>
+   <property name="toolTip">
+    <string>Open last used mPSC template file</string>
    </property>
   </action>
  </widget>
