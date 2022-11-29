@@ -3054,11 +3054,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 # psc train for the parent sweep, but no programmatic checks
                 # are made (although the train's times ARE set to be the 
                 # detection start times, see self._detect_sweep_)
-                start_time.append(w.t_start) 
-                peak_time.append(w.annotations["t_peak"])
-                amplitude.append(w.annotations["amplitude"])
+                start_time.append(float(w.t_start)) 
+                peak_time.append(float(w.annotations["t_peak"]))
+                amplitude.append(float(w.annotations["amplitude"]))
                 from_template.append(w.annotations["mPSC_fit"]["template"])
-                fit_amplitude.append(w.annotations["mPSC_fit"]["amplitude"])
+                fit_amplitude.append(float(w.annotations["mPSC_fit"]["amplitude"]))
                 r2.append(w.annotations["mPSC_fit"]["Rsq"])
                 offset.append(w.annotations["mPSC_fit"]["Coefficients"][0])
                 scale.append(w.annotations["mPSC_fit"]["Coefficients"][1])
