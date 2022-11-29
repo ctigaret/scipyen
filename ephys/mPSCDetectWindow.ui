@@ -7,8 +7,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>636</width>
-    <height>639</height>
+    <width>587</width>
+    <height>638</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -184,6 +184,33 @@
           </widget>
          </item>
          <item>
+          <widget class="QCheckBox" name="rsqThresholdCheckBox">
+           <property name="text">
+            <string>Threshold on R²</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="rsqThresholdLabel">
+           <property name="text">
+            <string>Minimum R²</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QDoubleSpinBox" name="rsqThresholdDoubleSpinBox">
+           <property name="decimals">
+            <number>3</number>
+           </property>
+           <property name="maximum">
+            <double>1.000000000000000</double>
+           </property>
+           <property name="stepType">
+            <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
           <widget class="QPushButton" name="plot_mPSCWaveformPushButton">
            <property name="toolTip">
             <string>Plot mPSC template or model</string>
@@ -255,7 +282,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>636</width>
+     <width>587</width>
      <height>28</height>
     </rect>
    </property>
@@ -849,7 +876,8 @@
   </action>
   <action name="actionLoad_default_mPSC_Template">
    <property name="icon">
-    <iconset theme="template"/>
+    <iconset theme="template">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Load default mPSC Template</string>
@@ -860,7 +888,8 @@
   </action>
   <action name="actionLoad_last_used_mPSC_template">
    <property name="icon">
-    <iconset theme="document-open-recent"/>
+    <iconset theme="document-open-recent">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Load last used mPSC template</string>

@@ -1471,7 +1471,7 @@ class TableEditor(ScipyenViewer):#, Ui_TableEditor):
         if len(filePath) > 0:
             pio.writeCsv(self._data_, filePath)
             
-        QtWidgets.QApplication.setOverrideCursor(self._defaultCursor)
+        # QtWidgets.QApplication.setOverrideCursor(self._defaultCursor)
                         
             
     @pyqtSlot()

@@ -127,6 +127,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._undo_buffer_= list() # FIXME 2022-11-21 17:49:05
         
         self._use_template_ = False
+        self._use_threshold_on_rsq_ = False
+        self._rsq_threshold_ = 0.
+        self._accept_waves_cache_ = list() # a set for each segment
         self._overlayTemplateModel = False
         self._mPSC_template_ = None
         self._template_showing_ = False
@@ -482,6 +485,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.durationSpinBox.setValue(self._mPSCduration_)
         self.durationSpinBox.valueChanged.connect(self._slot_modelDurationChanged)
         
+        self.rsqThresholdDoubleSpinBox.setValue(self._rsq_threshold_)
+        self.rsqThresholdDoubleSpinBox.valueChanged.connect(self._slot_rsqThresholdChanged)
+        
         # actions (shared among menu and toolbars):
         self.actionOpenEphysData.triggered.connect(self._slot_openEphysDataFile)
         self.actionImportEphysData.triggered.connect(self._slot_importEphysData)
@@ -490,8 +496,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.actionPlot_Data.triggered.connect(self._slot_plotData)
         self.actionPlot_detected_mPSCs.triggered.connect(self._plot_detected_mPSCs)
         self.actionMake_mPSC_Epoch.triggered.connect(self._slot_make_mPSCEpoch)
-        # TODO: 2022-11-11 23:38:20
-        # connections and slots for the actions below
         self.actionOpen_mPSCTemplate.triggered.connect(self._slot_openTemplateFile)
         self.actionCreate_mPSC_Template.triggered.connect(self._slot_create_mPSC_template)
         self.actionPlot_mPSC_template.triggered.connect(self._plot_template_)
@@ -540,12 +544,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.use_mPSCTemplate_CheckBox.setChecked(self._use_template_ == True)
         self.use_mPSCTemplate_CheckBox.stateChanged.connect(self._slot_use_mPSCTemplate)
         
+        self.rsqThresholdCheckBox.setChecked(self._use_threshold_on_rsq_)
+        self.rsqThresholdCheckBox.stateChanged.connect(self._slot_useThresholdOnRsquared)
+        
         self.clearPreviousDetectionCheckBox.setChecked(self._clear_detection_flag_ == True)
         self.clearPreviousDetectionCheckBox.stateChanged.connect(self._slot_setClearDetectionFlag_)
         
         self.plot_mPSCWaveformPushButton.clicked.connect(self._slot_plot_mPSCWaveForm)
         
-        self.durationSpinBox.setValue(self._mPSCduration_)
         
         if self._toolbars_locked_:
             for toolbar in (self.mainToolBar, self.detectionToolBar):
@@ -623,6 +629,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             if isinstance(data, neo.Block):
                 self._undo_buffer_ = [None for s in data.segments]
                 self._result_ = [None for s in data.segments]
+                self._accept_waves_cache_ = [set() for s in data.segments]
                 # for k,s in enumerate(data.segments):
                 #     # NOTE: 2022-11-20 11:54:02
                 #     # store any existing spike trains with PSC time stamps
@@ -649,10 +656,16 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 
                 for k, segment in enumerate(self._data_.segments):
                     self._result_[k] = self._get_previous_detection_(segment)
+                    if self._result_[k] is not None:
+                        for kw, w in enumerate(self._result_[k][1]):
+                            if w.annotations["Accept"] == True:
+                                self._accept_waves_cache_[k].add(kw) 
                             
             elif isinstance(data, neo.Segment):
                 self._undo_buffer_ = [None]
                 self._result_ = [None]
+                self._accept_waves_cache_ = [set()]
+                
                 if len(data.analogsignals):
                     time_units = data.analogsignals[0].times.units
                 else:
@@ -665,10 +678,15 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._frameIndex_ = range(self._data_frames_)
                 self._number_of_frames_ = len(self._frameIndex_)
                 self._result_ = [self._get_previous_detection_(segment)]
+                if self._result_[0] is not None:
+                    for kw, w in enumerate(self._result_[1]):
+                        if w.annotations["Accept"] == True:
+                            self._accept_waves_cache_[0].add(kw) 
                 
             elif isinstance(data, (tuple, list)) and all(isinstance(v, neo.Segment) for v in data):
                 self._undo_buffer_ = [None for s in data]
                 self._result_ = [None for s in data]
+                self._accept_waves_cache_ = [set() for s in data]
                             
                 if len(data[0].analogsignals):
                     time_units = data[0].analogsignals[0].times.units
@@ -683,6 +701,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 
                 for k,s in enumerate(self._data_):
                     self._result_[k] = self._get_previous_detection_(s)
+                    if self._result_[k] is not None:
+                        for kw, w in enumerate(self._result_[k][1]):
+                            if w.annotations["Accept"] == True:
+                                self._accept_waves_cache_[k].add(kw) 
                     
             else:
                 self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects; got {type(data).__name__} instead")
@@ -859,7 +881,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._detected_mPSCViewer_.clear()
             self._detected_mPSCViewer_.close()
             self._detected_mPSCViewer_ = None
-        self._undo_buffer_ = list()
+            
         self._mPSC_detected_ = False
         self._detection_signal_name_ = None
         
@@ -875,6 +897,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self._detected_mPSCs_ = list()
         self._result_ = list()
+        self._accept_waves_cache_ = list()
         self._undo_buffer_ = list()
         self._currentWaveformIndex_ = 0
         self._waveform_frames = 0
@@ -1538,6 +1561,83 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if segment_index in range(-len(self._result_), len(self._result_)):
             self._result_[segment_index] = None
             
+    def _apply_Rsq_threshold(self, value:float, sweep:int=None, wave:int=None):
+        if self._data_ is None:
+            return
+        
+        if all(v is None for v in self._result_):
+            return 
+        
+        if isinstance(sweep, int) and sweep in range(-self.nFrames, self.nFrames):
+            result = self._result_[sweep]
+            if result is None:
+                return
+            
+            st = result[0]
+            
+            if isinstance(st, (tuple, list)) and all(isinstance(v, neo.SpikeTrain) for v in st):
+                if len(st) == 1:
+                    psc_trains.append(st[0])
+                else:
+                    # merge spike trains
+                    train = st[0].merge(st[1:])
+                    result[0] = train
+                    
+            if isinstance(wave, int) and wave in range(-len(train), len(train)):
+                w = result[1][wave]
+                if self.useThresholdOnRsquared:
+                    w.annotations["Accept"] = w.annotations["mPSC_fit"]["Rsq"] >= self.rSqThreshold
+                    # train.annotations["Accept"][wave] = w.annotations["Accept"]
+                else:
+                    if kw in self._accept_waves_cache_[k]:
+                        w.annotations["Accept"] = True
+                    # else:
+                    #     w.annotations["Accept"] = False
+                        
+                train.annotations["Accept"][wave] = w.annotations["Accept"]
+                
+            else:
+                for kw, w in enumerate(result[1]):
+                    if self.useThresholdOnRsquared:
+                        w.annotations["Accept"] = w.annotations["mPSC_fit"]["Rsq"] >= self.rSqThreshold
+                        # train.annotations["Accept"][kw] = w.annotations["Accept"]
+                    else:
+                        if kw in self._accept_waves_cache_[k]:
+                            w.annotations["Accept"] = True
+                        else:
+                            w.annotations["Accept"] = False
+                            
+                    train.annotations["Accept"][kw] = w.annotations["Accept"]
+
+            
+        
+        for k, result in enumerate(self._result_):
+            if result is None:
+                continue
+            
+            st = result[0]
+            
+            if isinstance(st, (tuple, list)) and all(isinstance(v, neo.SpikeTrain) for v in st):
+                if len(st) == 1:
+                    psc_trains.append(st[0])
+                else:
+                    # merge spike trains
+                    train = st[0].merge(st[1:])
+                    result[0] = train
+                    
+            for kw, w in enumerate(result[1]):
+                if self.useThresholdOnRsquared:
+                    w.annotations["Accept"] = w.annotations["mPSC_fit"]["Rsq"] >= self.rSqThreshold
+                else:
+                    if kw in self._accept_waves_cache_[k]:
+                        w.annotations["Accept"] = True
+                    else:
+                        w.annotations["Accept"] = False
+
+        self._plot_data()
+        if self._reportWindow_.isVisible():
+            self._update_report_()
+                 
     def _update_report_(self):
         if self._data_ is None:
             return
@@ -1747,6 +1847,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 fw.name = f"mPSC_{fw.name}_{k}"
                 mini_waves[k] = fw
                 mPSC_fits.append(fw.annotations["mPSC_fit"])
+                
+                if self._use_threshold_on_rsq_:
+                    fw.annotations["Accept"] = fw.annotations["mPSC_fit"]["Rsq"] >= self.rSqThreshold
+                
+                if fw.annotations["Accept"]:
+                    self._accept_waves_cache_[segment_index].add(k)
+                
                 accepted.append(fw.annotations["Accept"])
                 templates.append(fw.annotations["mPSC_fit"]["template"]) # flag indicating if a template or a model was used
                 
@@ -2242,10 +2349,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._plot_model_()
             
     @pyqtSlot(int)
+    def _slot_useThresholdOnRsquared(self, value):
+        self.useThresholdOnRsquared = value == QtCore.Qt.Checked
+        if self.useThresholdOnRsquared:
+            self._apply_Rsq_threshold(self.rSqThreshold, self.currentFrame, self.currentWaveformIndex)
+            
+    @pyqtSlot(int)
     def _slot_use_mPSCTemplate(self, value):
-        # TODO: 2022-11-18 10:12:34 
-        # make configurable
-        self._use_template_ = value == QtCore.Qt.Checked
+        self.useTemplateWaveForm = value == QtCore.Qt.Checked
         
     @pyqtSlot(int)
     def _slot_setClearDetectionFlag_(self, value):
@@ -2541,12 +2652,21 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # On the other hand, the results table HAS TO be updated manually.
         # (it is a DataFrame storing plain values, NOT references)
         #
+        # • store previous accepted result in cache
+        #
+        if accept:
+            self._accept_waves_cache_[self.currentFrame].add(self.currentWaveformIndex)
+        else:
+            if self.currentWaveformIndex in self._accept_waves_cache_[self.currentFrame]:
+                self._accept_waves_cache_[self.currentFrame].remove(self.currentWaveformIndex)
+        #
         # • update the Accept state in the wave annotations
         self._detected_mPSCs_[self.currentWaveformIndex].annotations["Accept"] = accept
         #
         # • update the Accept state for the corresponding time stamp in the mPSC
         #   spike train
         train = self._result_[self.currentFrame][0]
+        
         train.annotations["Accept"][self.currentWaveformIndex] = accept
         #
         # • refresh mPSC indicator on the main data plot
@@ -2614,9 +2734,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._data_.annotations["Age"] = self.metaDataWidget.age
             self._data_.annotations["analysis_datetime"] = self.metaDataWidget.analysisDateTime
             
+    @pyqtSlot(float)
+    def _slot_rsqThresholdChanged(self, value:float):
+        self.rSqThreshold = self.rsqThresholdDoubleSpinBox.value()
+        if self.useThresholdOnRsquared:
+            self._apply_Rsq_threshold(self.rSqThreshold)
         
     @pyqtSlot(float)
-    def _slot_modelDurationChanged(self, value):
+    def _slot_modelDurationChanged(self, value:float):
         self.mPSCDuration = self.durationSpinBox.value()
         self._plot_model_()
         
@@ -2791,7 +2916,27 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # FIXME/BUG: 2022-11-26 17:35:08 see FIXME/BUG 2022-11-26 17:34:21 
         # print(f"{self.__class__.__name__}. @lastUsedFileOpenFilter.setter value = {value}")
         self._last_used_file_open_filter_ = value
+        
+    @property
+    def useThresholdOnRsquared(self):
+        return self._use_threshold_on_rsq_
             
+    @markConfigurable("UseThresholdOnRsquared", trait_notifier=True)
+    @useThresholdOnRsquared.setter
+    def useThresholdOnRsquared(self, value):
+        self._use_threshold_on_rsq_ = value == True
+        
+    @property
+    def rSqThreshold(self):
+        return self._rsq_threshold_
+    
+    @markConfigurable("RsquaredThreshold")# , trait_notifier=True)
+    @rSqThreshold.setter
+    def rSqThreshold(self, value:float):
+        if isinstance(value, float) and value >=0. and value <= 1.:
+            self._rsq_threshold_ = value
+            self.configurable_traits["RsquaredThreshold"] = value
+        
     @property
     def useTemplateWaveForm(self):
         return self._use_template_
@@ -2999,6 +3144,60 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.actionLock_toolbars.setChecked(self._toolbars_locked_)
         
     def result(self):
+        """Retrieve the detection result.
+        The result is output as a tuple with three elements:
+        
+        • mPSC table (a pandas.DataFrame object)
+            This contains the start time, peak time, fitted parameters and R² 
+            goodness of fit for ALL detected mPSC waveforms in the data regardless
+            of whether they have been manually accepted or not (their accepted 
+            status is indicated in the "Accept" column of the DataFrame object).
+        
+            The columns of the DataFrame object are:
+        
+           "Source", "Cell", "Field", "Age", "Sex", "Genotype" → with the values
+                shown inthe top half of the mPSC Detect window
+        
+            "Data": the name of the electrophysiology record used for detection
+            "Date Time": date & time of detection
+            "Accept": value of the Accept flag
+            "Sweep": index of the sweep (data segment) where the mPSC wave was 
+                    detected
+            "Wave": index of the mPSC wave in the list of mPSCs in the sweep
+                    (see above)
+            "Start Time": start time of the mPSC waveform including its initial
+                baseline; these are NOT the times of the onset of the rising
+                phase. The latter cann be calculated as start time + onset (see 
+                below).
+        
+            "Peak Time": time of the mPSC peak (for outward currents) or trough
+                        (for inward currents)
+            "Amplitude": amplitude of the mPSC waveform,
+            "Template": whether a template mPSC was used in detection
+            "Fit Amplitude": amplitue of the fitted curve
+            "R²": goodnesss of fit
+        
+            The following are the fitted model parameters for each wave:
+            "α": offset (DC component), 
+            "β": scale, 
+            "Onset (x₀)": onset of the 'rising' phase, 
+            "Rise Time (τ₁)": rising phase time constant
+            "Decay Time (τ₂)": decay phase time constant
+        
+        
+        • mPSC spiketrains (a list of neo.SpikeTrain objects), each containing
+            the time stamps for the start of the mPSCs (one spike train per
+            sweep of recording). The 'annotations' attributes of the spike train
+            contains the peak times of the mPSC waves (as an array), and the
+            'waveforms' attribute contains the actual detected mPSC waveforms.
+        
+        • the detected mPSC waveforms (a list of one neo.AnalogSignal object 
+            
+            representing detected mPSC waveform, with the membrane current in channel 0 and
+            the fitted curve in channel 1)
+        
+        
+        """
         if all(v is None for v in self._result_):
             return
         
@@ -3081,7 +3280,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                "Sweep": seg_index, "Wave": wave_index, "Start Time": start_time,
                "Peak Time": peak_time, "Amplitude": amplitude,
                "Template":from_template, "Fit Amplitude": fit_amplitude,
-               "R²": r2, "α":onset, "β": scale, "Onset (x₀)": onset, "Rise Time (τ₁)": tau_rise, "Decay Time (τ₂)": tau_decay}
+               "R²": r2, "α":offset, "β": scale, "Onset (x₀)": onset, "Rise Time (τ₁)": tau_rise, "Decay Time (τ₂)": tau_decay}
         
         res_df = pd.DataFrame(res)
         
