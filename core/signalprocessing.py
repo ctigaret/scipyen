@@ -848,12 +848,12 @@ def rms(x:np.ndarray, **kwargs):
     
     return np.sqrt(np.linalg.norm(x)/x.size)
     
-    if isinstance(x, pq.Quantity):
-        xdot = np.dot(np.abs(x.magnitude).T, np.abs(x.magnitude))
-    else:
-        xdot = np.dot(x.T, x)
-        
-    return np.sqrt(xdot/x.size)
+#     if isinstance(x, pq.Quantity):
+#         xdot = np.dot(np.abs(x.magnitude).T, np.abs(x.magnitude))
+#     else:
+#         xdot = np.dot(x.T, x)
+#         
+#     return np.sqrt(xdot/x.size)
 
 #     if isinstance(xsq, pq.Quantity):
 #         return np.sqrt(xsq.magnitude/x.size)
