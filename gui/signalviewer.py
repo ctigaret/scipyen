@@ -6925,6 +6925,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # plot all spike trains in this segment stacked in a single axis
             spike_train_axis = self.signalsLayout.getItem(kAx,0)
             
+            # NOTE: 2022-11-29 23:09:46
+            # try to see if we can set this to a smaller height; currently it has the same expanding policy as axes for signals
+            spike_train_axis.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
+                                                                 QtWidgets.QSizePolicy.Minimum, 
+                                                                 QtWidgets.QSizePolicy.Frame))
+            
             symbolcolors = cycle(self.defaultLineColorsList)
             symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
             symbolPen.setCosmetic(True)
@@ -6945,6 +6951,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # plot all event arrays in this segment stacked in a single axis
             #print("_plotSegment_ events", kAx)
             event_axis = self.signalsLayout.getItem(kAx, 0)
+            
+            # NOTE: 2022-11-29 23:14:42 see NOTE: 2022-11-29 23:09:46
+            event_axis.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
+                                                           QtWidgets.QSizePolicy.Minimum, 
+                                                           QtWidgets.QSizePolicy.Frame))
             
             symbolcolors = cycle(self.defaultLineColorsList)
             symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
@@ -7554,7 +7565,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 for c in clist:
                     c.detach()
                 
-            # FIXME there are issues in pyqtgraph when ViewBox objects are deleted from "outside"
+            # FIXME there are issues in pyqtgraph when ViewBox objects are deleted from "outside" - maybe fixed already ?!?
             #if self.signalsLayout.scene() is not None:
                 #self.signalsLayout.clear()
                 
@@ -7570,7 +7581,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             self._cached_cursors_.clear()
             
-        else:   # FIXME there are issues with ViewBox being deleted in pyqtgraph!
+        else:   # FIXME there are issues with ViewBox being deleted in pyqtgraph! - maybe fixed already - ?!?
             if nRequiredAxes < len(plotitems):
                 #### requires fewer axes than there currently are:
                 # adapt existing plotitems then remove extra axes (plot items)

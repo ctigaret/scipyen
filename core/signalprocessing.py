@@ -840,13 +840,25 @@ def rms(x:np.ndarray, **kwargs):
     x: 1D numpy array
     
     """
+    from core import datatypes as dt
+    if not isinstance(x, np.ndarray):
+        raise TypeError(f"Expecting a numpy array; got {type(x).__name__} instead")
+    if not dt.is_vector(x):
+        raise ValueError(f"Expecting a vector; instead, got data with shape: {x.shape}")
     
-    xsq = np.dot(x.T, x)
+    return np.sqrt(np.linalg.norm(x)/x.size)
     
-    if isinstance(xsq, pq.Quantity):
-        return np.sqrt(xsq.magnitude/x.size)
-    
-    return np.sqrt(xsq/x.size)
+    if isinstance(x, pq.Quantity):
+        xdot = np.dot(np.abs(x.magnitude).T, np.abs(x.magnitude))
+    else:
+        xdot = np.dot(x.T, x)
+        
+    return np.sqrt(xdot/x.size)
+
+#     if isinstance(xsq, pq.Quantity):
+#         return np.sqrt(xsq.magnitude/x.size)
+#     
+#     return np.sqrt(xsq/x.size)
 
 
 

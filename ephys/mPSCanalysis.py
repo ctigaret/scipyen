@@ -1456,7 +1456,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             segment_index = self.currentFrame
             
         
-        
     def _detect_all_(self, waveform:typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]=None, **kwargs):
         """Detects mPSCs in all sweeps
         
@@ -1503,6 +1502,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             try:
                 res = self._detect_sweep_(frame, waveform=waveform)
             except Exception as exc:
+                traceback.print_exc()
                 excstr = traceback.format_exception(exc)
                 msg = f"In sweep{frame}:\n{excstr[-1]}"
                 self.criticalMessage("Detect mPSCs in current sweep",
@@ -1511,15 +1511,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 
             if res is None:
                 continue
+            
             mPSCtrain, detection = res
+            
             self._result_[frame] = (mPSCtrain, [s for s in detection])
             
             if clear_prev_detection:
                 self._clear_detection_in_sweep_(segment)
-                
-            # if self.clearPreviousDetectionCheckBox.isChecked():
-            #     self._clear_detection_flag_ = True # to make sure this is up to date
-            #     self._clear_detection_in_sweep_(segment)
                 
             segment.spiketrains.append(mPSCtrain)
             
@@ -1528,10 +1526,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 
             if isinstance(loopControl, dict) and loopControl.get("break",  None) == True:
                 break
-                
-#             
-#         if isinstance(finished, QtCore.pyqtBoundSignal):
-#             finished.emit()
                 
     def _undo_sweep(self, segment_index:typing.Optional[int]=None):
         if segment_index is None:
@@ -1576,38 +1570,36 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             st = result[0]
             
             if isinstance(st, (tuple, list)) and all(isinstance(v, neo.SpikeTrain) for v in st):
-                if len(st) == 1:
-                    psc_trains.append(st[0])
-                else:
+                if len(st) > 1:
                     # merge spike trains
                     train = st[0].merge(st[1:])
-                    result[0] = train
+                else:
+                    train = st[0]
                     
-            if isinstance(wave, int) and wave in range(-len(train), len(train)):
+                result[0] = train
+                st = train
+                    
+            if isinstance(wave, int) and wave in range(-len(st), len(st)):
                 w = result[1][wave]
                 if self.useThresholdOnRsquared:
                     w.annotations["Accept"] = w.annotations["mPSC_fit"]["Rsq"] >= self.rSqThreshold
-                    # train.annotations["Accept"][wave] = w.annotations["Accept"]
                 else:
                     if kw in self._accept_waves_cache_[k]:
                         w.annotations["Accept"] = True
-                    # else:
-                    #     w.annotations["Accept"] = False
                         
-                train.annotations["Accept"][wave] = w.annotations["Accept"]
+                st.annotations["Accept"][wave] = w.annotations["Accept"]
                 
             else:
                 for kw, w in enumerate(result[1]):
                     if self.useThresholdOnRsquared:
                         w.annotations["Accept"] = w.annotations["mPSC_fit"]["Rsq"] >= self.rSqThreshold
-                        # train.annotations["Accept"][kw] = w.annotations["Accept"]
                     else:
                         if kw in self._accept_waves_cache_[k]:
                             w.annotations["Accept"] = True
                         else:
                             w.annotations["Accept"] = False
                             
-                    train.annotations["Accept"][kw] = w.annotations["Accept"]
+                    st.annotations["Accept"][kw] = w.annotations["Accept"]
 
             
         
@@ -1699,6 +1691,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # • returns a spiketrain, a detection dict and the waveform used in detection
         # • does NOT ember the spiketrain in the analysed segment anymore - this 
         #   should be done in the caller, as necessary
+        if segment_index is None:
+            segment_index = self.currentFrame
+            
         segment = self._get_data_segment_(segment_index)
         if isinstance(segment.name, str) and len(segment.name.strip()):
             segmentName = segment.name
@@ -1912,7 +1907,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             # the segment.
             try:
                 detection_result = self._detect_sweep_(waveform=waveform)
+                
             except Exception as exc:
+                traceback.print_exc()
                 execstr = traceback.format_exception(exc)
                 msg = execstr[-1]
                 self.criticalMessage("Detect mPSCs in current sweep",
@@ -1921,6 +1918,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
             if detection_result is None:
                 return
+            
             mPSCtrain, detection = self._detect_sweep_(waveform=waveform)
             # NOTE: 2022-11-22 17:47:15
             # see WARNING: 2022-11-22 17:46:17
@@ -2925,6 +2923,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     @useThresholdOnRsquared.setter
     def useThresholdOnRsquared(self, value):
         self._use_threshold_on_rsq_ = value == True
+        signalBlock = QtCore.QSignalBlocker(self.rsqThresholdCheckBox)
+        self.rsqThresholdCheckBox.setChecked(self._use_threshold_on_rsq_)
         
     @property
     def rSqThreshold(self):
@@ -2935,6 +2935,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def rSqThreshold(self, value:float):
         if isinstance(value, float) and value >=0. and value <= 1.:
             self._rsq_threshold_ = value
+            signalBlocker = QtCore.QSignalBlocker(self.rsqThresholdDoubleSpinBox)
+            self.rsqThresholdDoubleSpinBox.setValue(self._rsq_threshold_)
             self.configurable_traits["RsquaredThreshold"] = value
         
     @property
@@ -3142,6 +3144,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
         signalBlocker = QtCore.QSignalBlocker(self.actionLock_toolbars)
         self.actionLock_toolbars.setChecked(self._toolbars_locked_)
+        
+    def modelWave(self):
+        return self._get_mPSC_template_or_waveform_(use_template = False)
+    
+    def templateWave(self):
+        if isinstance(self._mPSC_template_, neo.AnalogSignal) and self._mPSC_template_.name == "mPSC Template":
+            return self._mPSC_template_
+        
         
     def result(self):
         """Retrieve the detection result.
