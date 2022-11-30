@@ -6381,6 +6381,9 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     if mdl.shape[1] > 1:
         mdl = mdl.T
         
+    # 2) detrend the signal (also removes its offset)
+    x_detrend = scipy.signal.detrend(x, type="constant", axis=0)
+        
     # 2) cross-correlate the signal with the normalized model waveform
     
     xc = scipy.signal.correlate(x, mdl, mode="valid")

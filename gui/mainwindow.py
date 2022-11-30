@@ -249,7 +249,7 @@ from . import resources_rc as resources_rc
 from . import quickdialog as qd
 from . import scipyenviewer
 from . import consoles
-from . import gui_viewers
+from . import gui_viewers # list defined in gui.__init__.py !!!
 from . import scipyen_colormaps as colormaps
 # colormaps.registerCustomColorMaps()
 from .widgets import colorwidgets
@@ -2578,6 +2578,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # __module_file_name__ is "pict" so we take all its contents into the kernel
             # namespace (they're just references to those objects)
             self.workspace = self.ipkernel.shell.user_ns
+            
+            # populate workspace with the gui viewer classes, for convenience
+            for viewer in gui_viewers:
+                self.workspace[viewer.__name__] = viewer
             
             # NOTE: 2020-11-12 12:51:36
             # used by %scipyen_debug line magic

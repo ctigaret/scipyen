@@ -82,7 +82,7 @@ are configuration settings for various Scipyen functionalities:
 
 """
 #import base64
-import os, inspect, typing, types, math, numbers, ast, json
+import os, inspect, typing, types, math, numbers, ast, json, traceback
 import yaml
 import dataclasses
 from copy import (copy, deepcopy,)
@@ -176,39 +176,6 @@ if not scipyen_config._materialized:# make sure this is done only once
 #print(f"scipyen_config module: global qsettings {qsettings.fileName()}")
 scipyen_user_config_source = [s for s in scipyen_config.sources if not s.default][0]
 
-# def _cfg_exec_body_(ns, supplement={}):
-#     print("_cfg_exec_body_ supplement")
-#     ns.update(supplement)
-#     
-#     if not isinstance(ns.get("_scipyen_settings_", None), confuse.Configuration):
-#         ns["_scipyen_settings_"] = scipyen_config
-#         
-#     if not isinstance(ns.get("_user_settings_src_", None), confuse.ConfigSource):
-#         ns["_user_settings_src_"] = scipyen_user_config_source
-#         
-#     if not isinstance(ns.get("qsettings", None), QtCore.QSettings):
-#         ns["qsettings"] = QtCore.QSettings("Scipyen", "Scipyen") # user scope, application-level
-#         
-#     if not isinstance(ns.get("configurables", None), property):
-#         ns["configurables"] = property(fget = _configurables, doc = "All configurables")
-#         
-#     if not isinstance(ns.get("qtconfigurables", None), property):
-#         ns["qtconfigurables"] = property(fget = _qtconfigurables, doc = "QSettings configurables")
-#         
-#     if not isinstance(ns.get("clsconfigurables", None), property):
-#         ns["clsconfigurables"] = property(fget = _clsconfigurables, doc = "Class configurables")
-#         
-#     if not inspect.isfunction(ns.get("_observe_configurables_", None)):
-#         ns["_observe_configurables_"] = _observe_configurables_
-#         
-#     if not isinstance (ns.get("configurable_traits", None), DataBag):
-#         ns["configurable_traits"] = DataBag()
-#         
-#     ns["configurable_traits"].observe(ns["_observe_configurables_"])
-#     
-#     if not inspect.isfunction(ns.get("loadSettings", None)):
-#         ns["loadSettings"] = _loadSettings_
-                
 def configsrc2bunch(src:typing.Union[confuse.ConfigSource, Bunch]):
     """Creates a nested Bunch from this confuse.ConfigSource
     
