@@ -26,7 +26,7 @@ clear_events
 remove_events
 clear_spiketrains
 remove_spiketrain
-get_epoch_named_interval
+get_epoch_interval
 get_non_empty_epochs
 get_non_empty_events
 get_non_empty_spike_trains
@@ -1980,24 +1980,37 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
         raise TypeError("First argument must be a neo.Block object, a list of neo.Segment objects, or a neo.Segment object; got %s instead" % type(src).__name__)
 
 @safeWrapper
-def get_epoch_named_interval(epoch: neo.Epoch, label: typing.Union[str, bytes], duration:bool=False):
-    """Returns a tuple of time quantities for the epoch interval having a specific label.
+def get_epoch_interval(epoch: neo.Epoch, index: typing.Union[str, bytes, np.str_, int], duration:bool=False):
+    """Returns a tuple of time quantities for a specific epoch interval
     
     Parameters:
     ----------
-    epoch: neo.Epoch - Its intervals should each carry a label
+    epoch: neo.Epoch
     
-    label: str or bytes - The label of the interval that is requested
+    index: str, bytes, numpy.str_, or int
+        When a str, or bytes, this specifies the interval by its label 
+        (NOTE: this only works when the epoch's `labels` attribute, an numpy 
+        array, is not empty)
         When bytes, it must an utf-8 - encoded bytes string (i.e., identical to
-            the result of calling bytes("xx", "utf-8") where "xx" is a str
-            
+            the result of calling bytes("xx", "utf-8") where "xx" is a str.
+    
         This must not be empty, and must be present in the epoch's "labels" array.
         This implies epoch.labels.size == epoch.times.size == epoch.size
+    
+        When an int, this is the index of the interval in the epoch.
+    
+        NOTE: The kᵗʰ interval of an epoch is defined by two quantities:
+        epoch[k] or epoch.times[k]  ⇾ start of the kᵗʰ interval
+        epoch.durations[k]          ⇾ duration of the kᵗʰ interval
+    
+            
         
     duration: bool Optional (default is False)
-        When True, returns the (time, duration) tuple for the specified interval.
+        When True, returns the (time, duration) tuple for the specified interval
+        (see above)
+    
         When False (default), returns the (time, time + duration) tuple corresponding
-        to the specified interval.
+        to the specified interval (i.e., start & stop).
         
     Returns:
     --------
@@ -2014,25 +2027,26 @@ def get_epoch_named_interval(epoch: neo.Epoch, label: typing.Union[str, bytes], 
     
     """
     if not isinstance(epoch, neo.Epoch):
-        raise TypeError("'epoch' expected to be a neo.Epoch; got %s instead" % type(epoch).__name__)
+        raise TypeError(f"'epoch' expected to be a neo.Epoch; got {type(epoch).__name__} instead")
     
-    if not isinstance(label, (str, bytes)):
-        raise TypeError("'label' expected to be a str or bytes; got %s instead" % type(label).__name__)
+    if isinstance(index, (str, bytes, np.str_)):
+        # if len(index.strip()) == 0:
+        #     raise ValueError("'index' is empty!")
     
-    if len(label.strip()) == 0:
-        raise ValueError("'label' is empty!")
-    
-    if isinstance(label, bytes):
-        if not label.isalnum():
-            raise ValueError("'labe' expected to be alphanumeric; got %s instead" % label)
-    
-    if isinstance(label, str):
-        label = bytes(label, "utf-8")
+        if index not in epoch.labels:
+            raise ValueError(f"Interval label {index} not found")
         
-    if label not in epoch.labels:
-        raise KeyError("Interval labelled %s not found" % label.decode("utf-8"))
     
-    ndx = int(np.where(epoch.labels == label)[0])
+        ndx = int(np.where(epoch.labels == index)[0])
+        
+    elif isinstance(index, int):
+        if index not in range(-len(epoch), len(epoch)):
+            raise ValueError(f"Invalid index {index} for an epoch with {len(epoch)} intervals")
+        ndx = index
+        
+    else:
+        raise TypeError(f"Index expected to be a bytes, str, or int; got {type(index).__name__} instead")
+            
     
     return (epoch.times[ndx], epoch.durations[ndx]) if duration else (epoch.times[ndx], epoch.times[ndx]+epoch.durations[ndx])
     
