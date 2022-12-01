@@ -7373,7 +7373,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 yy = y
                 if x is not None:
-                    xx = x[:,0]
+                    if x.ndim > 1:
+                        xx = x[:,0]
+                    else:
+                        xx = x
                 else:
                     xx = None
                 
