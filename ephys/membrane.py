@@ -6280,6 +6280,72 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     
     
     return ret
+
+def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal]):
+    if isinstance(x, pq.Quantity):
+        xx = x.magnitude[:,0]
+    else:
+        xx = x
+        
+    if isinstance(waveform, pq.Quantity):
+        h = waveform.magnitude[:,0]
+    else:
+        h = waveform[:,0]
+        
+    
+    N = len(h)
+    
+    M = len(xx)
+    
+    # pad xx with nans of size h
+    
+    pad = xx[M-N:]
+    
+    xx_ = np.concatenate([xx, pad])
+    
+    sum_h = np.sum(h)
+    sum_h2 = sum_h**2
+    sum_h2_N = sum_h2/N
+    
+    h_dot = np.dot(h, h)
+    
+    
+    α  = np.full_like(xx, fill_value = np.nan) # offset
+    β  = np.full_like(xx, fill_value = np.nan) # scale
+    ε  = np.full_like(xx, fill_value = np.nan) # sse
+    σ  = np.full_like(xx, fill_value = np.nan) # standard error
+    θ  = np.full_like(xx, fill_value = np.nan) # criterion   
+    
+    b_denom = N*sum_h2 - h_dot
+    
+    sum_y = np.sum(xx[0:N])
+    
+    for k in range(M):
+        l = k + N - 1
+        # if l >= M:
+        #     l = M
+        # if l > 
+        if k > 1:
+            sum_y = sum_y - xx_[k-1] + xx_[l]
+            
+        y = xx_[k:k+N]
+            
+        hy_dot = np.dot(h, y)
+        
+        β[k]  = N*hy_dot - sum_h * sum_y/N / (h_dot - sum_h2_N)
+        
+        α[k] = (sum_y - β[k]*sum_h)/N
+        
+        y_dot = np.dot(y,y)
+        
+        ε[k] = y_dot + β[k]**2 * h_dot + N*α[k]**2 - 2 * (β[k]*hy_dot + α[k]*sum_y - α[k]*β[k]*sum_h)
+        
+        σ[k] = np.sqrt(ε[k]/(N-1))
+        
+        θ[k] = β[k] / σ[k]
+        
+        
+    return θ, α, β, ε, σ 
     
 def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02)):
     """Detect miniature or spontaneous PSCs by cross-correlation with a waveform.
