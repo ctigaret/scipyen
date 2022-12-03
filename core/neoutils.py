@@ -2221,11 +2221,13 @@ def get_time_slice(data, t0, t1=None, window=0, segment_index=None, analog_index
     # get_time_slice (2) check for t0, override t1 if t0 is an epoch
     
     if isinstance(t0, neo.Epoch):
-        if t0.size != 1:
-            raise ValueError("When given as a neo Epoch, t0 must have size 1; instead it has %d" % (t0.size))
+        if t0.size > 1:
+            warnings.warn(f"The epoch {t0} has more than one interval; the first interval will be used")
+        elif t0.size == 0:
+            raise ValueError(f"the epoch {t0} is empty!")
         
-        t1 = t0.times + t0.durations
-        t0 = t0.times
+        t1 = t0.times[0] + t0.durations[0]
+        t0 = t0.times[0]
     
     elif isinstance(t0, pq.Quantity):
         _d_ = [k for k in t0.dimensionality.keys()][0]

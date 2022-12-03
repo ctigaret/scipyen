@@ -6329,11 +6329,11 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
     
     b_denom = N*sum_h2 - h_dot
     
-    y = xx[0:n]
+    y = xx[0:N]
     sum_y = np.sum(y)
     y_dot = np.dot(y,y)
     
-    for k in range(M):
+    for k in range(1,M):
         # y = xx_[k:k+N]
         # sum_y = np.sum(y)       # Σ data
         # y_dot = np.dot(y,y)     # Σ(data²)
