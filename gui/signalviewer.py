@@ -6470,7 +6470,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
         # NOTE: 2022-11-22 11:49:47
         # Finally, check for target overlays
-        cFrame = self.frameIndex[self.currentFrame]
+        try:
+            cFrame = self.frameIndex[self.currentFrame]
+        except:
+            cFrame = self.frameIndex[0]
+            
         if len(self.axes) and cFrame in self._target_overlays_:
             for axNdx, ax in enumerate(self.axes):
                 self._clear_targets_overlay_(ax)

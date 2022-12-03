@@ -551,7 +551,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.clearPreviousDetectionCheckBox.stateChanged.connect(self._slot_setClearDetectionFlag_)
         
         self.plot_mPSCWaveformPushButton.clicked.connect(self._slot_plot_mPSCWaveForm)
-        
+        self.exportModelWaveToolButton.clicked.connect(self._slot_exportModelWaveformToWorkspace)
         
         if self._toolbars_locked_:
             for toolbar in (self.mainToolBar, self.detectionToolBar):
@@ -2624,6 +2624,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return
         
         self.exportDataToWorkspace(self._data_, var_name=self.metaDataWidget.dataVarName)
+    
+    @pyqtSlot()
+    def _slot_exportModelWaveformToWorkspace(self):
+        modelWave = self.modelWave()
+        self.exportDataToWorkspace(modelWave, var_name = "modelWaveform")
     
     @pyqtSlot()
     def _slot_plotData(self):

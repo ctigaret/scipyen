@@ -211,7 +211,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="plot_mPSCWaveformPushButton">
+          <widget class="QToolButton" name="plot_mPSCWaveformToolButton">
            <property name="toolTip">
             <string>Plot mPSC template or model</string>
            </property>
@@ -227,6 +227,25 @@
            <property name="icon">
             <iconset theme="graphics">
              <normaloff>.</normaloff>.</iconset>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="exportModelWaveToolButton">
+           <property name="toolTip">
+            <string>Export model wavefomr to workspace</string>
+           </property>
+           <property name="statusTip">
+            <string>Export model wavefomr to workspace</string>
+           </property>
+           <property name="whatsThis">
+            <string>Export model wavefomr to workspace</string>
+           </property>
+           <property name="text">
+            <string>...</string>
+           </property>
+           <property name="icon">
+            <iconset theme="document-export"/>
            </property>
           </widget>
          </item>

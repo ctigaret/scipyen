@@ -6285,29 +6285,40 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
     if isinstance(x, pq.Quantity):
         xx = x.magnitude[:,0]
     else:
-        xx = x
+        if x.ndim > 1:
+            xx = x[:,0]
+        else:
+            xx = x
         
     if isinstance(waveform, pq.Quantity):
         h = waveform.magnitude[:,0]
     else:
-        h = waveform[:,0]
+        if waveform.ndim > 1:
+            h = waveform[:,0]
+        else:
+            h = waveform
+        
+        
+    # normalize the waveform !
         
     
     N = len(h)
     
     M = len(xx)
     
-    # pad xx with nans of size h
+    # pad xx with a vector of size h, by duplicating last size(h) elements
     
     pad = xx[M-N:]
     
     xx_ = np.concatenate([xx, pad])
     
-    sum_h = np.sum(h)
-    sum_h2 = sum_h**2
-    sum_h2_N = sum_h2/N
+    sum_h = np.sum(h)           # Σ template
+    sum_h2 = sum_h**2           # (Σ template)²
+    sum_h2_N = sum_h2/N         # (Σ template)² / N
     
-    h_dot = np.dot(h, h)
+    h_dot = np.dot(h, h)        # Σ(template²)
+    
+    beta_denom = h_dot - sum_h2_N
     
     
     α  = np.full_like(xx, fill_value = np.nan) # offset
@@ -6318,31 +6329,45 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
     
     b_denom = N*sum_h2 - h_dot
     
-    sum_y = np.sum(xx[0:N])
+    # sum_y = np.sum(xx[0:N])
     
     for k in range(M):
-        l = k + N - 1
+        # l = k + N - 1
         # if l >= M:
         #     l = M
         # if l > 
-        if k > 1:
-            sum_y = sum_y - xx_[k-1] + xx_[l]
+        # if k > 1:
+        #     sum_y = sum_y - xx_[k-1] + xx_[l]
             
         y = xx_[k:k+N]
-            
-        hy_dot = np.dot(h, y)
         
-        β[k]  = N*hy_dot - sum_h * sum_y/N / (h_dot - sum_h2_N)
+        sum_y = np.sum(y)       # Σ data
+            
+        hy_dot = np.dot(h, y)   # Σ(template * data)
+        
+        β[k]  = hy_dot - sum_h * sum_y/N / beta_denom
         
         α[k] = (sum_y - β[k]*sum_h)/N
         
         y_dot = np.dot(y,y)
         
-        ε[k] = y_dot + β[k]**2 * h_dot + N*α[k]**2 - 2 * (β[k]*hy_dot + α[k]*sum_y - α[k]*β[k]*sum_h)
+        # the scaled template:
+        h_ = h*β[k] + α[k]
         
+        y_h = y - h_ # the error error
+        
+        # the SSE
+        ε[k] = np.dot(y_h, y_h) # explicit
+        
+        # ε[k] = y_dot + β[k]**2 * h_dot + N*α[k]**2 - 2 * (β[k]*hy_dot + α[k]*sum_y - α[k]*β[k]*sum_h)
+        
+        # the standard error
         σ[k] = np.sqrt(ε[k]/(N-1))
         
+        # the detection criterion
         θ[k] = β[k] / σ[k]
+        
+        
         
         
     return θ, α, β, ε, σ 
