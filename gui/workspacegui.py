@@ -32,25 +32,22 @@ class GuiMessages(object):
         
     @safeWrapper
     def criticalMessage(self, title, text, default=QtWidgets.QMessageBox.No):
-        QtWidgets.QMessageBox.critical(self, title, text)
+        return QtWidgets.QMessageBox.critical(self, title, text)
         
     @safeWrapper
     def informationMessage(self, title, text, default=QtWidgets.QMessageBox.No):
-        QtWidgets.QMessageBox.information(self, title, text)
+        return QtWidgets.QMessageBox.information(self, title, text)
         
     @safeWrapper
     def questionMessage(self, title, text, default=QtWidgets.QMessageBox.No):
-        QtWidgets.QMessageBox.question(self, title, text)
+        return QtWidgets.QMessageBox.question(self, title, text)
         
     @safeWrapper
     def warningMessage(self, title, text, default=QtWidgets.QMessageBox.No):
-        QtWidgets.QMessageBox.warning(self, title, text)
+        return QtWidgets.QMessageBox.warning(self, title, text)
         
     @safeWrapper
-    def detailedMessage(self, title:str, text:str, 
-                        info:typing.Optional[str]="", 
-                        detail:typing.Optional[str]="", 
-                        msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):
+    def detailedMessage(self, title:str, text:str, info:typing.Optional[str]="", detail:typing.Optional[str]="", msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):
         """Detailed generic message dialog box
         title: str  = dialog title
         text:str =  main message
@@ -65,19 +62,27 @@ class GuiMessages(object):
         """
         if isinstance(msgType, str) and len(msgType.strip()):
             if getattr(QtWidgets.QMessageBox.Icon, msgType, None) is not None:
-                msgbox.setIcon(getattr(QtWidgets.QMessageBox.Icon, msgType))
+                icon = getattr(QtWidgets.QMessageBox.Icon, msgType, QtWidgets.QMessageBox.NoIcon)
             else:
                 try:
                     if os.path.isfile(msgType):
-                        pix = QtGui.QtGui.QPixmap(msgType)
+                        pix = QtGui.QPixmap(msgType)
                     else:
-                        pix = QtGui.Icon.fromTheme(msgType).pixmap(QtWidgets.QStyle.PM_MEssageBoxIconSize)
+                        pix = QtGui.Icon.fromTheme(msgType).pixmap(QtWidgets.QStyle.PM_MessageBoxIconSize)
                         msgBox.setIconPixmap(pix)
                         
                 except:
-                    msgBox.setIcon("NoIcon")
+                    icon = QtWidgets.QMessageBox.NoIcon
         
-        msgbox = QtWidgets.QMessageBox()
+        msgbox = QtWidgets.QMessageBox(parent=self)
+        msgbox.addButton(QtWidgets.QMessageBox.Ok)
+        if isinstance(icon, QtGui.QPixmap):
+            msgbox.setIconPixmap(icon)
+        elif isinstance(icon, QtWidgets.QMessageBox.Icon):
+            msgbox.setIcon(icon)
+        else:
+            msgbox.setIcon(QtWidgets,QMessageBox.NoIcon)
+            
         msgbox.setSizeGripEnabled(True)
         msgbox.setWindowTitle(title)
         msgbox.setText(text)
@@ -88,7 +93,7 @@ class GuiMessages(object):
         if isinstance(detail, str) and len(detail.strip()):
             msgbox.setDetailedText(detail)
             
-        msgbox.exec()
+        return msgbox.exec()
         
 class FileIOGui(object):
     @safeWrapper
@@ -431,8 +436,13 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         namePrompt.setText(newVarName)
         
         if dlg.exec() == QtWidgets.QDialog.Accepted:
-            newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
-            
+            newVarName = namePrompt.text()
+            # newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
+            if newVarName in self._scipyenWindow_.workspace:
+                accept = self.questionMessage("Export to workspace", f"A variable named {newVarName} exists in the workspace. Overwrite?")
+                if accept not in (QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Yes):
+                    return
+                
             self._scipyenWindow_.assignToWorkspace(newVarName, data)
             
             if hasattr(data, "modified") and isinstance(data.modified, bool):

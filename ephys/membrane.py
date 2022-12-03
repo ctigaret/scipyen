@@ -6329,19 +6329,20 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
     
     b_denom = N*sum_h2 - h_dot
     
-    # sum_y = np.sum(xx[0:N])
+    y = xx[0:n]
+    sum_y = np.sum(y)
+    y_dot = np.dot(y,y)
     
     for k in range(M):
-        # l = k + N - 1
-        # if l >= M:
-        #     l = M
-        # if l > 
-        # if k > 1:
-        #     sum_y = sum_y - xx_[k-1] + xx_[l]
-            
-        y = xx_[k:k+N]
+        # y = xx_[k:k+N]
+        # sum_y = np.sum(y)       # Σ data
+        # y_dot = np.dot(y,y)     # Σ(data²)
         
-        sum_y = np.sum(y)       # Σ data
+        l = k + N - 1
+        if k > 1:
+            sum_y = sum_y + xx_[l] - xx_[k-1]       # Σ data
+            y_dot = y_dot + xx_[l]**2 - xx_[k-1]**2 # Σ(data²)
+            
             
         hy_dot = np.dot(h, y)   # Σ(template * data)
         
@@ -6349,7 +6350,6 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
         
         α[k] = (sum_y - β[k]*sum_h)/N
         
-        y_dot = np.dot(y,y)
         
         # the scaled template:
         h_ = h*β[k] + α[k]
