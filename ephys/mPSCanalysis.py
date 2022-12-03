@@ -550,7 +550,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.clearPreviousDetectionCheckBox.setChecked(self._clear_detection_flag_ == True)
         self.clearPreviousDetectionCheckBox.stateChanged.connect(self._slot_setClearDetectionFlag_)
         
-        self.plot_mPSCWaveformPushButton.clicked.connect(self._slot_plot_mPSCWaveForm)
+        self.plot_mPSCWaveformToolButton.clicked.connect(self._slot_plot_mPSCWaveForm)
         self.exportModelWaveToolButton.clicked.connect(self._slot_exportModelWaveformToWorkspace)
         
         if self._toolbars_locked_:
