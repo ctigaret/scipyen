@@ -170,6 +170,22 @@
              </property>
             </widget>
            </item>
+           <item>
+            <widget class="QPushButton" name="makeUnitAmplitudePushButton">
+             <property name="toolTip">
+              <string>Adjust β such that the model has unit amplitude</string>
+             </property>
+             <property name="statusTip">
+              <string>Adjust β such that the model has unit amplitude</string>
+             </property>
+             <property name="whatsThis">
+              <string>Adjust β such that the model has unit amplitude</string>
+             </property>
+             <property name="text">
+              <string>Unit Amplitude</string>
+             </property>
+            </widget>
+           </item>
           </layout>
          </item>
         </layout>
@@ -245,7 +261,8 @@
             <string>...</string>
            </property>
            <property name="icon">
-            <iconset theme="document-export"/>
+            <iconset theme="document-export">
+             <normaloff>.</normaloff>.</iconset>
            </property>
           </widget>
          </item>
@@ -302,7 +319,7 @@
      <x>0</x>
      <y>0</y>
      <width>587</width>
-     <height>28</height>
+     <height>20</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

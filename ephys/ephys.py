@@ -2860,7 +2860,7 @@ def parse_step_waveform_signal(sig, method="state_levels", **kwargs):
         adcrange = kwargs.pop("adcrange", 10)
         adcscale = kwargs.pop("adcrange", 1e3)
     
-        centroids, cnt, edg = sigp.state_levels(sig_flt.magnitude, levels = levels, 
+        centroids, cnt, edg, rng = sigp.state_levels(sig_flt.magnitude, levels = levels, 
                                     adcres = adcres, 
                                     adcrange = adcrange, 
                                     adcscale = adcscale)

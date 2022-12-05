@@ -3,15 +3,18 @@
 For signal processing on elecctorphysiology signal types (e.g. neo.AnalogSignals or datatypes.DataSignal)
 please use the "ephys" module.
 """
-
+import typing, numbers
 #### BEGIN 3rd party modules
 import numpy as np
 import pandas as pd
 import quantities as pq
+import neo
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
 from . import curvefitting as crvf
+from . import quantities as scq
+from . import datasignal as sds
 #### END pict.core modules
 
 def simplify_2d_shape(xy:np.ndarray, max_points:int = 5, k:int = 3):
@@ -307,6 +310,8 @@ def normalise_waveform(x:np.ndarray):
     
     Numpy array (vector) with values of `x` normalized between max and min
     
+    NOTE: when x is a Python Quantity, normalization will make it dimensionless
+    
     """
     
     if is_positive_waveform(x):
@@ -388,7 +393,7 @@ def waveform_amplitude(x:np.ndarray, method:str="direct", axis=None):
         # CAUTION is we preserve the shape of the array, sl will be we'll get 
         sl = state_levels(x, axis=axis)
         
-        return np.abs(np.diff(sl))
+        return np.abs(np.diff(sl[0]))
         
 def shorth_estimator(x:np.ndarray):
     """Shorth estimator for step-like waveforms.
@@ -539,7 +544,7 @@ def state_levels(x:np.ndarray, **kwargs):
             
             number of bins (default: 100)
             
-            When None is passed herem, the function attempts to calculate the 
+            When None is passed here, the function attempts to calculate the 
             numbr of histogram bins according to ADC parameters specified , as
             described below.
             
@@ -648,7 +653,7 @@ def state_levels(x:np.ndarray, **kwargs):
         
         bw = x_range/bins
         
-    #print("state_levels bins:", bins)
+    print("state_levels bins:", bins)
             
     sLevels = list()
         
@@ -673,7 +678,192 @@ def state_levels(x:np.ndarray, **kwargs):
     else:
         raise TypeError("Moment must be specified by a string ('mean' or 'mode') or a unary function; got %s instead" % type(moment).__name__)
     
-    return sLevels, counts, edges
+    return sLevels, counts, edges, ranges
+
+def remove_dc(x, channel:typing.Optional[int] = None, value:typing.Optional[typing.Union[float, pq.Quantity, np.ndarray]] = None):
+    """Returns a copy of x with DC offset removed.
+    
+    This provides a similar functionality to scipy.signal.detrend with parameters
+    `axis`= 0 and `type` = "constant", except that the offset value can be either
+    passed manually, or determined from the state levels of the signal (see below).
+    
+    NOTE: 
+    • scipy.signal.detrend with `type` = "constant" just removes the signal's 
+        mean value
+    • unlike scipy.signal.detrend, this function ALWAYS works on axis 0 i.e., it
+        accepts 1D signals with shape (N, ) and 2D signals with shape (N,M),
+        where:
+
+        N is the number of samples in the signal
+        M is the number of channels (the channels in 2D signals are columns)
+    
+    Parameters:
+    ===========
+    x: numpy ndarray with maximum two dimesions.
+    
+        1D signal with possibly more than one channel
+    
+    channel: int, sequence of int or None (default); when None, removes offset 
+            from all channels; otherwise, channel must be a valid index (or a 
+            sequence of unique valid indices) in the half open interval 
+    
+            [ -x.size[1], x.size[1] )
+    
+    value: scalar float, python Quantity, numpy array, sequence of float, or None (default)
+            The constant value (DC) to subtract from the signal x
+    
+            When array-like, it must have size of 1 or as many channel indices were specvified
+    
+            When None, the DC level is estimated using the following algorithm:
+    
+            1) the signal (or specified channel) is parsed to determine two
+            state levels (low and high)
+    
+            2) the state level where most of the signal's samples belong is 
+                taken as the "DC" or "baseline" level, based on the assumption
+                than most of the signal is composed of this level
+    
+            WARNING: This breaks down if the assumption above does not hold.
+    
+    Returns:
+    ========
+    
+    A copy of the signal `x` with the DC ("baseline") removed.
+    
+    """
+    if not isinstance(x, np.ndarray):
+        raise TypeError(f"Expecting a numpy array; got {type(x).__name__} instead")
+    if x.ndim > 2:
+        raise ValueError(f"Expecting an array of maximum 2D; instead, got an array with {x.ndim} dimensions")
+    
+    if isinstance(x, pq.Quantity):
+        xx = x.magnitude
+        
+    else:
+        xx = x
+        
+        
+    def __guess_dc_(x_):
+        levels, counts, edges, ranges = state_levels(x_)
+        
+        levelSizes = [np.sum(counts[level_range]) for level_range in ranges]
+    
+        ndx = np.argmax(levelSizes)
+        val = levels[ndx]
+            
+        return val
+        
+    yy = np.full_like(xx, np.nan)
+    
+    if xx.ndim ==2:
+        if isinstance(channel, int) and channel not in range(-x.shape[1], x.shape[1]):
+            raise ValueError(f"Channel index {channel} outside range ({-x.shape[1]}, {x.shape[1]})")
+        
+        elif isinstance(channel, (tuple, int)) and all(isinstance(c, int) for c in channel):
+            if any(c not in range(-x.shape[1], x.shape[1])):
+                raise ValueError(f"At leqsty one channel index in {channel} is outside the range ({-x.shape[1]}, {x.shape[1]})")
+            
+        elif channel is not None:
+            raise TypeError(f"Channel expected to be an int or None; got {type(channel).__name__} instead")
+        
+        if isinstance(value, (pq.Quantity, np.ndarray)):
+            if isinstance(channel, int) and len(value) > 1:
+                raise ValueError(f"Value must be a scalar")
+            
+            elif isinstance(channel, (tuple, list)) and len(value) not in (1, len(channel)):
+                raise ValueError(f"Mismatch between number of values and specified channels")
+            
+            elif channel is None and len(value) not in (1, x.shape[1]):
+                raise ValueError(f"Mismatch between number of values and signal channels")
+            
+            if isinstance(value, pq.Quantity) and isinstance(x, pq.Quantity):
+                if not scq.units_convertible(value, x):
+                    raise TypeError(f"Value units {value.units} are incompatible with signal units {x.units}")
+                value = value.rescale(x.units)
+                
+        elif isinstance(value, (tuple, list)):
+            if not all(isinstance(v, number.number) for v in value):
+                raise TypeError(f"When a regular sequence, value must contain numbers")
+            
+            if isinstance(channel, (tuple, list)) and len(value) not in (1, len(channel)):
+                raise ValueError(f"Mismatch between number of values and specified channels")
+            
+            elif channel is None and len(value) not in (1, x.shape[1]):
+                raise ValueError(f"Mismatch between number of values and specified channels")
+            
+                
+            
+        if channel is None:
+            for k in range(xx.shape[1]):
+                if isinstance(value, float):
+                    val = value
+                    
+                elif isinstance(value, (tuple, list, np.ndarray)):
+                    val = value[0] if len(value)==1 else value[k]
+                    
+                else:
+                    val = __guess_dc_(xx[:,k])
+                    
+                yy[:,k] = xx[:,k] - val
+
+        elif isinstance(channel, int):
+            yy[:,:] = xx[:,:]
+            
+            if isinstance(value, float):
+                val = value
+                
+            elif isinstance(value, (tuple, list, np.ndarray)):
+                val = value[0]
+                
+            else:
+                val = __guess_dc_(xx[:,channel])
+                
+            yy[:,channel] = xx[:,channel] - val
+            
+        elif isinstance(channel, (tuple, list)):
+            yy[:,:] = xx[:,:]
+            
+            for k,c in enumerate(channel):
+                if isinstance(value, float):
+                    val = value
+                    
+                elif isinstance(value, (tuple, list, np.ndarray)):
+                    val = value[0] if len(value)==1 else value[k]
+                    
+                else:
+                    val = __guess_dc_(xx[:,c])
+                    
+                yy[:,c] = xx[:,c] - val
+            
+    else:
+        if isinstance(value, float):
+            val = value
+            
+        elif isinstance(value, (tuple, list, np.ndarray)):
+            val = value[0]
+            
+        else:
+            val = __guess_dc_(xx)
+                
+        yy = xx - val
+        
+
+    if isinstance(x, (neo.AnalogSignal, sds.DataSignal)):
+        klass = x.__class__
+        
+        ret = klass(yy, units = x.units, t_start=x.t_start, sampling_rate=x.sampling_rate)
+        
+    elif isinstance(x, pq.Quantity):
+        ret = yy * x.units
+        
+    else:
+        ret = yy
+        
+    return ret
+        
+        
+        
+    
 
 def nansize(x, **kwargs):
     """

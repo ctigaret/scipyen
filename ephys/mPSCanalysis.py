@@ -282,6 +282,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._params_names_ = self._default_params_names_
         #### END these shouldn't be allowed to change
         
+        self._time_units_ = self._default_time_units_
+        self._signal_units_ = self._default_model_units_
         self._params_initl_ = self._default_params_initl_
         self._params_lower_ = self._default_params_lower_
         self._params_upper_ = self._default_params_upper_
@@ -562,6 +564,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self.accept_mPSCcheckBox.setEnabled(False)
         self.accept_mPSCcheckBox.stateChanged.connect(self._slot_set_mPSC_accept)
+        
+        self.makeUnitAmplitudePushButton.clicked.connect(self._slot_makeUnitAmplitudeModel)
         # self.reFitPushButton.clicked.connect(self._slot_refit_mPSC)
         
         # print(f"{self.__class__.__name__}._configureUI_ end...")
@@ -641,10 +645,16 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 
                 if len(self._data_.segments) and len(self._data_.segments[0].analogsignals):
                     time_units = self._data_.segments[0].analogsignals[0].times.units
-                else:
-                    time_units = pq.s
+                    signal_units = self._data_.segments[0].analogsignals[0].units
                     
-                self.durationSpinBox.units = time_units
+                else:
+                    time_units = self._default_time_units_
+                    signal_units = self._default_model_units_
+                    
+                self._time_units_ = time_units
+                self._signal_units_ = signal_units
+                    
+                self.durationSpinBox.units = self._time_units_
                 
                 # NOTE: 2022-11-05 14:50:26
                 # although self._data_frames_ and self._number_of_frames_ end up
@@ -668,10 +678,15 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 
                 if len(data.analogsignals):
                     time_units = data.analogsignals[0].times.units
+                    signal_units = data.analogsignals[0].units
                 else:
-                    time_units = pq.s
+                    time_units = self._default_time_units_
+                    signal_units = self._default_model_units_
                     
-                self.durationSpinBox.units = time_units
+                self._time_units_ = time_units
+                self._signal_units_ = signal_units
+                    
+                self.durationSpinBox.units = self._time_units_
                 
                 self._data_ = data
                 self._data_frames_ = 1
@@ -690,10 +705,16 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                             
                 if len(data[0].analogsignals):
                     time_units = data[0].analogsignals[0].times.units
+                    signal_units = data[0].analogsignals[0].units
                 else:
-                    time_units = pq.s
+                    time_units = self._default_time_units_
+                    signal_units = self._default_model_units_
                     
-                self.durationSpinBox.units = time_units
+                self._time_units_ = time_units
+                self._signal_units_ = signal_units
+                    
+                self.durationSpinBox.units = self._time_units_
+                
                 self._data_ = data
                 self._data_frames_ = len(self._data_)
                 self._frameIndex_ = range(self._data_frames_)
@@ -785,7 +806,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         
         model_params = self.paramsWidget.value()
-        init_params = tuple(p.magnitude for p in model_params["Initial Value:"])
+        init_params = tuple(float(p.magnitude) for p in model_params["Initial Value:"])
             
         self._mPSC_model_waveform_ = membrane.PSCwaveform(init_params, 
                                              duration=self.mPSCDuration,
@@ -2530,6 +2551,29 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def _slot_clearFactoryDefaultTemplateFile(self):
         if os.path.isfile(self._default_template_file):
             os.remove(self._default_template_file)
+            
+    @pyqtSlot()
+    def _slot_makeUnitAmplitudeModel(self):
+        α, β, x0, τ1, τ2 = [float(v) for v in self.mPSCParametersInitial.values()]
+        
+        β = models.get_CB_scale_for_unit_amplitude(β, τ1, τ2) # do NOT add x0 here because we only work on xx>=0
+        
+        init_params = [α * self._signal_units_, β * pq.dimensionless,
+                       x0 * self._time_units_, 
+                       τ1 * self._time_units_, τ2 * self._time_units_]
+        
+        lb = [float(v) for v in self.mPSCParametersLowerBounds.values()]
+        ub = [float(v) for v in self.mPSCParametersUpperBounds.values()]
+        
+        sigBlock = QtCore.QSignalBlocker(self.paramsWidget)
+        
+        self.paramsWidget.setParameters(init_params,
+                                        lower = lb,
+                                        upper = ub,
+                                        names = self._params_names_,
+                                        refresh = True)
+        
+        self._plot_model_()
             
 #     @pyqtSlot()
 #     def _slot_chooseDefaultTemplateFile(self):

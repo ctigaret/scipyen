@@ -4608,6 +4608,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         Works across sessions.
         
         TODO option to search in a selected session only
+        FIXME: 2022-12-04 11:32:06 Too slow !
         """
         from fnmatch import translate
         # FIXME TODO find across sessions

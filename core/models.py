@@ -95,7 +95,7 @@ def alphaFunction(x, parameters):
     
     return y
 
-def Clements_Bekkers_97(x, parameters):
+def Clements_Bekkers_97(x, parameters, unit_amplitude:bool=False):
     """
     Clements & Bekkers 1997 mEPSC waveform.
 
@@ -116,7 +116,7 @@ def Clements_Bekkers_97(x, parameters):
     
     Parameters:
     ============
-    x: predictor (independent variable) - 1D numpy ndarray
+    x: predictor (independent variable e.g., time) - 1D numpy ndarray
 
     parameters: 1D sequence (tuple, list, numpy array) of five float scalars:
                 α, β, x₀, τ₁ and τ₂
@@ -128,26 +128,65 @@ def Clements_Bekkers_97(x, parameters):
     
                 and τ₁ > 0 τ₂ > 0
     
+    unit_amplitude: optional, default is False
+        When True, return a waveform with baseline 0 and peak value +1 , using 
+        the given time constants τ₁ and τ₂
+    
     Returns:
     ========
     1D numpy array (vector)
     
     
     """
+    if isinstance(x, pq.Quantity):
+        x = x.magnitude
+        
     x = x.flatten()
     
-    a, b, x0, t1, t2 = parameters
+    α, β, x0, τ1, τ2 = parameters
     
     xx = x-x0
     
-    y = np.full_like(xx, a)
+    efunc       = lambda x, τ: np.exp(-x/τ)
+    risefunc    = lambda x, τ: 1-efunc(x,τ)
+    decayfunc   = efunc
     
-    if any(v ==0 for v in (t1, t2)):
+    y = np.full_like(xx, 0.)
+    
+    
+    if any(v == 0 for v in (τ2, τ2)):
+        y += α
         y[xx>=0] = np.nan
     else:
-        y[xx>=0] = a + b * (1 - np.exp(-xx[xx>=0]/t1)) * np.exp(-xx[xx>=0]/t2)
+        rise = risefunc(xx[xx>=0], τ1)
+        decay = decayfunc(xx[xx>=0], τ2)
+        
+        if unit_amplitude:
+            # xₘ = -τ1*np.log(τ1/(τ1+τ2))# + x0 # do NOT add x0 here because we only work on xx>=0
+            # yₘ = risefunc(xₘ, τ1) * decayfunc(xₘ, τ2)
+            # peak = -1. if β < 0 else 1.
+            # β = peak/yₘ
+            β = get_CB_scale_for_unit_amplitude(β, τ1, τ2)# + x0 # do NOT add x0 here because we only work on xx>=0
+            # print(f"yₘ {yₘ}, β {β}")
+            
+        y[xx>=0] = β * rise * decay
+        y += α
+        # y[xx>=0] = α + β * (1 - np.exp(-xx[xx>=0]/τ₁)) * np.exp(-xx[xx>=0]/τ₂)
     
     return y
+
+def get_CB_scale_for_unit_amplitude(β, τ_rise, τ_decay, x0=0.):
+    efunc       = lambda x, τ: np.exp(-x/τ)
+    risefunc    = lambda x, τ: 1-efunc(x,τ)
+    decayfunc   = efunc
+    
+    xₘ = -τ_rise * np.log(τ_rise/(τ_rise + τ_decay)) + x0
+    
+    yₘ = risefunc(xₘ, τ_rise) * decayfunc(xₘ, τ_decay)
+    peak = -1. if β < 0 else 1.
+    
+    return peak/yₘ
+    
 
 def exp_rise_multi_decay(x, parameters, returnDecays = False):
     """ Realization of a transient signal with a single exponential rise (r) and

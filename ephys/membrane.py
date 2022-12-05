@@ -1330,7 +1330,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None, steadyStateDuratio
         #
         #   the high state is the actual pulse
         #
-        centroids, cnt, edg = sigp.state_levels(im, levels = 0.5)
+        centroids, cnt, edg, rng = sigp.state_levels(im, levels = 0.5)
         centroids = np.array(centroids).T[:,np.newaxis]
         
         #[low, high]
@@ -3931,7 +3931,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
                 # (b) determine a "pseudo-baseline" and use that as the onset Vm on the 
                 # decay side
                 else:
-                    [lo, hi] = sigp.state_levels(w)
+                    [lo, hi], _,_,_ = sigp.state_levels(w)
                     _,_,_,decay_onset_Vm_x,decay_onset_Vm_y,decay_onset_slope = ap_waveform_roots(w, lo)
                 
                 #print("estimated decay_onset_Vm_x", decay_onset_Vm_x)
@@ -4250,7 +4250,7 @@ def ap_duration_at_Vm(ap, value, **kwargs): #decay_ref, decay_intercept_approx="
             decay_time = (value - ref_decay_value)/ref_decay_slope + ref_decay_time
             
         else:
-            [lo, hi] = sigp.state_levels(ap)
+            [lo, hi], _, _, _ = sigp.state_levels(ap)
             _,_,_, decay_time, decay_value, decay_slope = ap_waveform_roots(ap, lo, interpolate=interpolate)
             
     ret = dt.DataBag()
@@ -6258,7 +6258,7 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     x = np.linspace(t_start, t_start + duration, num=int(sampling_rate * duration))
     
     if all(isinstance(p, pq.Quantity) for p in model_parameters):
-        model_parameters = tuple(p.magnitude for p in model_parameters)
+        model_parameters = tuple(float(p.magnitude) for p in model_parameters)
     
     y = models.Clements_Bekkers_97(x.magnitude, model_parameters)
     
@@ -6281,7 +6281,7 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     
     return ret
 
-def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal]):
+def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal], removeDC:bool=True):
     if isinstance(x, pq.Quantity):
         xx = x.magnitude[:,0]
     else:
@@ -6298,9 +6298,10 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
         else:
             h = waveform
         
-        
-    # normalize the waveform !
-        
+    # remove DC offset from signal
+    # CAUTION/WARNING This might breakdown for signals without mPSCs
+    if removeDC:
+        xx = sigp.remove_dc(xx)
     
     N = len(h)
     
@@ -6310,7 +6311,9 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
     
     pad = xx[M-N:]
     
-    xx_ = np.concatenate([xx, pad])
+    xx_ = np.concatenate([xx, pad], axis=0)
+    
+    # print(np.any(np.isnan(xx_)))
     
     sum_h = np.sum(h)           # Σ template
     sum_h2 = sum_h**2           # (Σ template)²
@@ -6333,12 +6336,14 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
     sum_y = np.sum(y)
     y_dot = np.dot(y,y)
     
-    for k in range(1,M):
+    for k in range(M):
         # y = xx_[k:k+N]
-        # sum_y = np.sum(y)       # Σ data
-        # y_dot = np.dot(y,y)     # Σ(data²)
+        # sum_y = np.sum(y, axis=0) # Σ data
+        # y_dot = np.dot(y,y)       # Σ(data²)
         
         l = k + N - 1
+        # if l >= M:
+        #     l = M-1
         if k > 1:
             sum_y = sum_y + xx_[l] - xx_[k-1]       # Σ data
             y_dot = y_dot + xx_[l]**2 - xx_[k-1]**2 # Σ(data²)
@@ -6366,11 +6371,10 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
         
         # the detection criterion
         θ[k] = β[k] / σ[k]
+    
+    # θ = sigp.remove_dc(θ)
         
-        
-        
-        
-    return θ, α, β, ε, σ 
+    return θ , α, β, ε, σ 
     
 def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02)):
     """Detect miniature or spontaneous PSCs by cross-correlation with a waveform.
@@ -6969,7 +6973,7 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
     else:
         x_ = x
     
-    l, c, e = sigp.state_levels(x_[:,0])
+    l, c, e, _ = sigp.state_levels(x_[:,0])
     
     if isinstance(params, neo.AnalogSignal): # template waveform given
         if params.t_start.magnitude != 0:
