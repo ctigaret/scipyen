@@ -95,6 +95,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
     _default_sampling_rate_ = 1e4 * pq.Hz
     
+    _default_detection_threshold_ = 0.
+    _detection_threshold_linear_range_min_ = 0.
+    _detection_threshold_linear_range_max_ = 100.
+    _default_noise_cutoff_frequency_ = 5e2
+    _default_DC_offset_ = 0
+    
     _default_template_file = os.path.join(os.path.dirname(get_config_file()),"mPSCTemplate.h5" )
     
     def __init__(self, ephysdata=None, clearOldPSCs=False, ephysViewer:typing.Optional[sv.SignalViewer]=None, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="mPSC Detect", **kwargs):
@@ -135,6 +141,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._template_showing_ = False
         
         self._data_ = None
+        self._filter_signal_first_ = False
+        self._noise_cutoff_frequency_ = self._default_noise_cutoff_frequency_
+        self._remove_DC_offset_first = False
+        
+        self._dc_offset_ = self._default_DC_offset_
         self._detection_signal_name_ = None
         self._detection_epochs_ = list()
         self._signal_index_ = 0
@@ -288,6 +299,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._params_lower_ = self._default_params_lower_
         self._params_upper_ = self._default_params_upper_
         self._mPSCduration_ = self._default_duration_
+        self._detection_threshold_ = self._default_detection_threshold_
         
         # NOTE: 2022-11-10 09:22:35
         # the super initializer calls:
@@ -566,6 +578,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.accept_mPSCcheckBox.stateChanged.connect(self._slot_set_mPSC_accept)
         
         self.makeUnitAmplitudePushButton.clicked.connect(self._slot_makeUnitAmplitudeModel)
+        
+        self.detectionThresholdSpinBox.setMinimum(self._detection_threshold_linear_range_min_)
+        self.detectionThresholdSpinBox,setMaximum(self._detection_threshold_linear_range_min_)
+        self.detectionThresholdSpinBox.setValue(self._detection_threshold_)
+        self.detectionThresholdSpinBox.valuechanges.connect(self._slot_detectionThresholdChanged)
         # self.reFitPushButton.clicked.connect(self._slot_refit_mPSC)
         
         # print(f"{self.__class__.__name__}._configureUI_ end...")
@@ -646,6 +663,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 if len(self._data_.segments) and len(self._data_.segments[0].analogsignals):
                     time_units = self._data_.segments[0].analogsignals[0].times.units
                     signal_units = self._data_.segments[0].analogsignals[0].units
+                    self._noise_cutoff_default_ = float(self._data_.segments[0].analogsignals[0].sampling_rate)/4
                     
                 else:
                     time_units = self._default_time_units_
@@ -1716,6 +1734,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             segment_index = self.currentFrame
             
         segment = self._get_data_segment_(segment_index)
+        
         if isinstance(segment.name, str) and len(segment.name.strip()):
             segmentName = segment.name
         else:
@@ -2786,6 +2805,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.rSqThreshold = self.rsqThresholdDoubleSpinBox.value()
         if self.useThresholdOnRsquared:
             self._apply_Rsq_threshold(self.rSqThreshold)
+            
+    @pyqtSlot(float)
+    def _slot_detectionThresholdChanged(self, value:float):
+        self.detectionThreshold = value
         
     @pyqtSlot(float)
     def _slot_modelDurationChanged(self, value:float):
@@ -3035,6 +3058,26 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._clear_detection_flag_ = value == True
         # self.configurable_traits["ClearOldPSCsOnDetection"] = self._clear_detection_flag_
         # if isinstance(getattr(self, "configurable_traits", None), DataBag):
+
+    @property
+    def detectionThreshold(self):
+        return self._detection_threshold_
+    
+    @markConfigurable("DetectionThreshold")
+    @detectionThreshold.setter
+    def detectionThreshold(self, value:float):
+        if value < self._detection_threshold_linear_range_min_:
+            value = self._detection_threshold_linear_range_min_
+            
+        if value > self._detection_threshold_linear_range_max_:
+            value = self._detection_threshold_linear_range_max_
+            
+        self._detection_threshold_ = value
+        self.configurable_traits["DetectionThreshold"] = value
+        
+        if value != self.detectionThresholdSpinBox.value():
+            sigBlock = QtCore.QSignalBlocker(self.detectionThresholdSpinBox)
+            self.detectionThresholdSpinBox.setValue(self._detection_threshold_)
 
     @property
     def mPSCDuration(self):

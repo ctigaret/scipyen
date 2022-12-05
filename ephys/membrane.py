@@ -6369,14 +6369,14 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
         # the standard error
         σ[k] = np.sqrt(ε[k]/(N-1))
         
-        # the detection criterion
+        # the detection criterion: scale / standard error
         θ[k] = β[k] / σ[k]
     
     # θ = sigp.remove_dc(θ)
         
-    return θ , α, β, ε, σ 
+    return θ, α, β, ε, σ 
     
-def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02)):
+def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typin.Optional[float]=None, removeDC:typing.Union[bool, float]=True):
     """Detect miniature or spontaneous PSCs by cross-correlation with a waveform.
     
     Parameters:
@@ -6429,6 +6429,34 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     As a convenience, you can use PSCwaveform(...) function in this module to
     generate a synthetic  waveform as a neo.AnalogSignal.
     
+    useCBsliding:bool, default is False
+        When True (the default), uses the Clements & Bekkers optimally scaled 
+        template sliding detection, with the waveform as a template.
+    
+        When False, uses cross-correlation between the signal and the waveform 
+    
+    threshold: float; optional, default None.
+        This value is the threshold for the detection criterion used in the 
+        Clements & Bekkers 1997 Biophys J paper
+    
+        When threshold is None, the threshold of detection is the calculated 
+        root-mean-square of the detection criterion signal output by the sliding
+        template detection method.
+    
+        This parameter is only used when useCBsliding is True.
+        
+    removeDC:bool or float, used with Clements & Bekkers sliding template method
+        (see detect_mPSC_CBsliding)
+    
+        When True (the default) the DC offset is calculated from the signal's
+        histogram, then subtracted from the signal `x` before applying the sliding 
+        template detection method.
+    
+        When a float, that specific valuse is subtracted from the signal `x`
+        before applying the sliding template detection method.
+    
+        This parameter is only used when useCBsliding is True.
+        
     Returns:
     ========
     A dict with keys:
@@ -6468,26 +6496,52 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     else:
         raise ValueError("Incorrect waveform specification")
     
-    # 1) normalize the model waveform
-    mdl = sigp.normalise_waveform(waveform)
-    
-    mdl = np.atleast_2d(mdl)
-    
-    if mdl.shape[1] > 1:
-        mdl = mdl.T
+    if useCBsliding:
+        θ, α, β, ε, σ = detect_mPSC_CBsliding(x, waveform, removeDC = removeDC)
+        if not sigp.is_positive_waveform(waveform):
+            θ = -θ
         
-    # 2) detrend the signal (also removes its offset)
-    # x_detrend = scipy.signal.detrend(x, type="constant", axis=0)
+        # remove DC offset from the detection criteria based on heuristic
+        # see sigp.remove_dc
+        θ_dc = sigp.remove_dc(θ) 
         
-    # 2) cross-correlate the signal with the normalized model waveform
-    
-    xc = scipy.signal.correlate(x, mdl, mode="valid")
-    
-    # 3) de-trend the cross-correlation signal (so that noise is almost about 0)
-    dxc = scipy.signal.detrend(xc, type="constant", axis=0)
-    
-    # 4) find out where cross-correlation is larger than its noise (root-mean-square)
-    flags = dxc > sigp.rms(dxc)
+        # the detection criterion can still be high if signal is too noisy
+        min_threshold = sigp.rms(θ_dc) 
+        
+        if threshold is None:
+            threshold = min_threshold
+        elif not isinstance(threshold, float):
+            raise TypeError(f"The template sliding method expects threshold to be a float or None; got {type(threshold).__name__} instead")
+            
+        if threshold < min_threshold:
+            warnings.warn(f"Threshold {threshold} is within the RMS noise {min_threshold}")
+            
+        flags = θ_dc > threshold
+        
+            
+    else:
+    # 1) normalize the model waveform - only for the cross-correlation method
+    # if not useCBsliding:
+        mdl = sigp.normalise_waveform(waveform)
+        
+        mdl = np.atleast_2d(waveform)
+        
+        if mdl.shape[1] > 1:
+            mdl = mdl.T
+        
+        
+        # 2) detrend the signal (also removes its offset)
+        # x_detrend = scipy.signal.detrend(x, type="constant", axis=0)
+            
+        # 2) cross-correlate the signal with the normalized model waveform
+        
+        xc = scipy.signal.correlate(x, mdl, mode="valid")
+        
+        # 3) de-trend the cross-correlation signal (so that noise is almost about 0)
+        dxc = scipy.signal.detrend(xc, type="constant", axis=0)
+        
+        # 4) find out where cross-correlation is larger than its noise (root-mean-square)
+        flags = dxc > sigp.rms(dxc)
     
     # 5) find out starts and stops of those regions
     # NOTE: 2022-10-25 16:44:58

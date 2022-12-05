@@ -110,15 +110,125 @@
      </layout>
     </item>
     <item>
+     <layout class="QHBoxLayout" name="horizontalLayout_3">
+      <item>
+       <widget class="QCheckBox" name="removeDCCheckBox">
+        <property name="toolTip">
+         <string>Remove signal offset (DC)</string>
+        </property>
+        <property name="statusTip">
+         <string>Remove signal offset (DC)</string>
+        </property>
+        <property name="whatsThis">
+         <string>Remove signal offset (DC)</string>
+        </property>
+        <property name="text">
+         <string>Offset</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="autoOffsetCheckBox">
+        <property name="toolTip">
+         <string>Auto-offset</string>
+        </property>
+        <property name="statusTip">
+         <string>Auto-offset</string>
+        </property>
+        <property name="whatsThis">
+         <string>Auto-offset</string>
+        </property>
+        <property name="text">
+         <string>Auto</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="label_5">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="toolTip">
+         <string>Use custom offset value</string>
+        </property>
+        <property name="statusTip">
+         <string>Use custom offset value</string>
+        </property>
+        <property name="whatsThis">
+         <string>Use custom offset value</string>
+        </property>
+        <property name="text">
+         <string>Offset value:</string>
+        </property>
+        <property name="buddy">
+         <cstring>dcValueSpinBox</cstring>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QDoubleSpinBox" name="dcValueSpinBox">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="noiseFilterCheckBox">
+        <property name="toolTip">
+         <string>De-noise signal with a low pass digital filter (Hamming window)</string>
+        </property>
+        <property name="statusTip">
+         <string>De-noise signal with a low pass digital filter (Hamming window)</string>
+        </property>
+        <property name="whatsThis">
+         <string>De-noise signal with a low pass digital filter (Hamming window)</string>
+        </property>
+        <property name="text">
+         <string>Noise filter</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="label_4">
+        <property name="text">
+         <string>Cutoff:</string>
+        </property>
+        <property name="buddy">
+         <cstring>doubleSpinBox</cstring>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QDoubleSpinBox" name="doubleSpinBox"/>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_4">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+     </layout>
+    </item>
+    <item>
      <widget class="QGroupBox" name="mPSCmodelGroupBox">
       <property name="toolTip">
-       <string>Parameters for mPSC model</string>
+       <string>mPSC model and mPSC detection parameters</string>
       </property>
       <property name="statusTip">
-       <string>Parameters for mPSC model</string>
+       <string>mPSC model and mPSC detection parameters</string>
       </property>
       <property name="whatsThis">
-       <string>Parameters for mPSC model</string>
+       <string>mPSC model and mPSC detection parameters</string>
       </property>
       <property name="title">
        <string>mPSC Model</string>
@@ -171,6 +281,19 @@
             </widget>
            </item>
            <item>
+            <spacer name="horizontalSpacer">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
             <widget class="QPushButton" name="makeUnitAmplitudePushButton">
              <property name="toolTip">
               <string>Adjust β such that the model has unit amplitude</string>
@@ -194,27 +317,98 @@
         <layout class="QHBoxLayout" name="horizontalLayout_2">
          <item>
           <widget class="QCheckBox" name="use_mPSCTemplate_CheckBox">
+           <property name="toolTip">
+            <string>Use mPSC template waveform instead of model-generated waveform</string>
+           </property>
+           <property name="statusTip">
+            <string>Use mPSC template waveform instead of model-generated waveform</string>
+           </property>
+           <property name="whatsThis">
+            <string>Use mPSC template waveform instead of model-generated waveform</string>
+           </property>
            <property name="text">
             <string>Use mPSC Template</string>
            </property>
           </widget>
          </item>
          <item>
+          <spacer name="horizontalSpacer_3">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_3">
+           <property name="toolTip">
+            <string>Detection threshold [0 - 100]</string>
+           </property>
+           <property name="statusTip">
+            <string>Detection threshold [0 - 100]</string>
+           </property>
+           <property name="whatsThis">
+            <string>Detection threshold [0 - 100]</string>
+           </property>
+           <property name="text">
+            <string>θ</string>
+           </property>
+           <property name="buddy">
+            <cstring>detectionThresholdSpinBox</cstring>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QDoubleSpinBox" name="detectionThresholdSpinBox">
+           <property name="toolTip">
+            <string>Detection threshold [0 - 100]</string>
+           </property>
+           <property name="statusTip">
+            <string>Detection threshold [0 - 100]</string>
+           </property>
+           <property name="whatsThis">
+            <string>Detection threshold [0 - 100]</string>
+           </property>
+           <property name="maximum">
+            <double>100.000000000000000</double>
+           </property>
+           <property name="stepType">
+            <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
           <widget class="QCheckBox" name="rsqThresholdCheckBox">
+           <property name="toolTip">
+            <string>Threshold on R²</string>
+           </property>
+           <property name="statusTip">
+            <string>Threshold on R²</string>
+           </property>
+           <property name="whatsThis">
+            <string>Threshold on R²</string>
+           </property>
            <property name="text">
             <string>Threshold on R²</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QLabel" name="rsqThresholdLabel">
-           <property name="text">
+          <widget class="QDoubleSpinBox" name="rsqThresholdDoubleSpinBox">
+           <property name="toolTip">
             <string>Minimum R²</string>
            </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QDoubleSpinBox" name="rsqThresholdDoubleSpinBox">
+           <property name="statusTip">
+            <string>Minimum R²</string>
+           </property>
+           <property name="whatsThis">
+            <string>Minimum R²</string>
+           </property>
            <property name="decimals">
             <number>3</number>
            </property>
@@ -249,13 +443,13 @@
          <item>
           <widget class="QToolButton" name="exportModelWaveToolButton">
            <property name="toolTip">
-            <string>Export model wavefomr to workspace</string>
+            <string>Export model waveform to workspace</string>
            </property>
            <property name="statusTip">
-            <string>Export model wavefomr to workspace</string>
+            <string>Export model waveform to workspace</string>
            </property>
            <property name="whatsThis">
-            <string>Export model wavefomr to workspace</string>
+            <string>Export model waveform to workspace</string>
            </property>
            <property name="text">
             <string>...</string>
@@ -319,7 +513,7 @@
      <x>0</x>
      <y>0</y>
      <width>587</width>
-     <height>20</height>
+     <height>28</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

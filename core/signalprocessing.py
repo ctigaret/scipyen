@@ -230,6 +230,28 @@ def value_crossings(x:np.ndarray, value:float):
     x_ = x - value
     
     return zero_crossings(x_)
+
+def linear_range_map(x, range_max, ymin, ymax):
+    yrange = ymax-ymin
+    if x > range_max:
+        x = range_max
+        
+    if x < 0:
+        x = 0
+        
+    return ymin + yrange * x/range_max
+
+def inverse_linear_range_map(y, range_max, ymin, ymax):
+    yrange = ymax-ymin
+    
+    if y > ymax:
+        y = ymax
+        
+    if y < ymin:
+        y = ymin
+        
+    return (y - ymin) * range_max / yrange
+    
                                         
 def generate_bin_width(adcres:float=15, adcrange:float=10, adcscale:float=1):
     """Define a histogram bin width according to the ADC used to collect the data.
@@ -653,7 +675,7 @@ def state_levels(x:np.ndarray, **kwargs):
         
         bw = x_range/bins
         
-    print("state_levels bins:", bins)
+    # print("state_levels bins:", bins)
             
     sLevels = list()
         
