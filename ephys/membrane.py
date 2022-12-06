@@ -6376,7 +6376,7 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
         
     return θ, α, β, ε, σ 
     
-def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typin.Optional[float]=None, removeDC:typing.Union[bool, float]=True):
+def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typing.Optional[float]=None, removeDC:typing.Union[bool, float]=True):
     """Detect miniature or spontaneous PSCs by cross-correlation with a waveform.
     
     Parameters:

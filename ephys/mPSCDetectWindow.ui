@@ -110,116 +110,6 @@
      </layout>
     </item>
     <item>
-     <layout class="QHBoxLayout" name="horizontalLayout_3">
-      <item>
-       <widget class="QCheckBox" name="removeDCCheckBox">
-        <property name="toolTip">
-         <string>Remove signal offset (DC)</string>
-        </property>
-        <property name="statusTip">
-         <string>Remove signal offset (DC)</string>
-        </property>
-        <property name="whatsThis">
-         <string>Remove signal offset (DC)</string>
-        </property>
-        <property name="text">
-         <string>Offset</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="autoOffsetCheckBox">
-        <property name="toolTip">
-         <string>Auto-offset</string>
-        </property>
-        <property name="statusTip">
-         <string>Auto-offset</string>
-        </property>
-        <property name="whatsThis">
-         <string>Auto-offset</string>
-        </property>
-        <property name="text">
-         <string>Auto</string>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLabel" name="label_5">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-        <property name="toolTip">
-         <string>Use custom offset value</string>
-        </property>
-        <property name="statusTip">
-         <string>Use custom offset value</string>
-        </property>
-        <property name="whatsThis">
-         <string>Use custom offset value</string>
-        </property>
-        <property name="text">
-         <string>Offset value:</string>
-        </property>
-        <property name="buddy">
-         <cstring>dcValueSpinBox</cstring>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QDoubleSpinBox" name="dcValueSpinBox">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="noiseFilterCheckBox">
-        <property name="toolTip">
-         <string>De-noise signal with a low pass digital filter (Hamming window)</string>
-        </property>
-        <property name="statusTip">
-         <string>De-noise signal with a low pass digital filter (Hamming window)</string>
-        </property>
-        <property name="whatsThis">
-         <string>De-noise signal with a low pass digital filter (Hamming window)</string>
-        </property>
-        <property name="text">
-         <string>Noise filter</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLabel" name="label_4">
-        <property name="text">
-         <string>Cutoff:</string>
-        </property>
-        <property name="buddy">
-         <cstring>doubleSpinBox</cstring>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QDoubleSpinBox" name="doubleSpinBox"/>
-      </item>
-      <item>
-       <spacer name="horizontalSpacer_4">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-     </layout>
-    </item>
-    <item>
      <widget class="QGroupBox" name="mPSCmodelGroupBox">
       <property name="toolTip">
        <string>mPSC model and mPSC detection parameters</string>
@@ -310,6 +200,123 @@
             </widget>
            </item>
           </layout>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_3">
+         <item>
+          <widget class="QCheckBox" name="removeDCCheckBox">
+           <property name="toolTip">
+            <string>Remove signal offset (DC) before detection</string>
+           </property>
+           <property name="statusTip">
+            <string>Remove signal offset (DC) before detection</string>
+           </property>
+           <property name="whatsThis">
+            <string>Remove signal offset (DC) before detection</string>
+           </property>
+           <property name="text">
+            <string>Offset</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="autoOffsetCheckBox">
+           <property name="toolTip">
+            <string>When checked, offset will be adapted from the current signal</string>
+           </property>
+           <property name="statusTip">
+            <string>When checked, offset will be adapted from the current signal</string>
+           </property>
+           <property name="whatsThis">
+            <string>When checked, offset will be adapted from the current signal</string>
+           </property>
+           <property name="text">
+            <string>Auto</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="offsetLabel">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="toolTip">
+            <string>Use custom offset value</string>
+           </property>
+           <property name="statusTip">
+            <string>Use custom offset value</string>
+           </property>
+           <property name="whatsThis">
+            <string>Use custom offset value</string>
+           </property>
+           <property name="text">
+            <string>Offset:</string>
+           </property>
+           <property name="buddy">
+            <cstring>dcValueSpinBox</cstring>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QDoubleSpinBox" name="dcValueSpinBox">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="noiseFilterCheckBox">
+           <property name="toolTip">
+            <string>De-noise signal before detection</string>
+           </property>
+           <property name="statusTip">
+            <string>De-noise signal before detection</string>
+           </property>
+           <property name="whatsThis">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Before detection, de-noise signal using a low pass digital filter (Hamming window).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
+           <property name="text">
+            <string>Filter</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="freqCutoffLabel">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="text">
+            <string>Cutoff:</string>
+           </property>
+           <property name="buddy">
+            <cstring>cutoffFrequencySpinBox</cstring>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QDoubleSpinBox" name="cutoffFrequencySpinBox">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer_4">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
          </item>
         </layout>
        </item>
@@ -513,7 +520,7 @@
      <x>0</x>
      <y>0</y>
      <width>587</width>
-     <height>28</height>
+     <height>20</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -615,7 +622,17 @@
     <addaction name="menuEntire_Data"/>
     <addaction name="menuResults"/>
    </widget>
+   <widget class="QMenu" name="menuFilter_data">
+    <property name="title">
+     <string>Filter data</string>
+    </property>
+    <addaction name="actionApply_with_detection"/>
+    <addaction name="actionFilter_whole_data"/>
+    <addaction name="actionUndo_filter_whole_data"/>
+    <addaction name="actionPreview_filtered_signal"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuFilter_data"/>
    <addaction name="menuDetect_mPSCs"/>
    <addaction name="menuSettings"/>
   </widget>
@@ -692,6 +709,21 @@
    <addaction name="actionExport_mPSC_Template"/>
    <addaction name="actionRemember_mPSC_Template"/>
    <addaction name="actionForget_mPSC_Template"/>
+  </widget>
+  <widget class="QToolBar" name="filterToolBar">
+   <property name="windowTitle">
+    <string>toolBar</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="actionApply_with_detection"/>
+   <addaction name="actionFilter_whole_data"/>
+   <addaction name="actionUndo_filter_whole_data"/>
+   <addaction name="actionPreview_filtered_signal"/>
   </widget>
   <action name="actionOpenEphysData">
    <property name="icon">
@@ -1126,6 +1158,58 @@
    </property>
    <property name="toolTip">
     <string>Open last used mPSC template file</string>
+   </property>
+  </action>
+  <action name="actionUndo_filter_data">
+   <property name="icon">
+    <iconset theme="edit-undo"/>
+   </property>
+   <property name="text">
+    <string>Undo filter data</string>
+   </property>
+  </action>
+  <action name="actionApply_with_detection">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="go-jump"/>
+   </property>
+   <property name="text">
+    <string>Apply with detection</string>
+   </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;• If checked:&lt;/span&gt;&lt;span style=&quot; font-weight:400;&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;Each sweep in the data is filtered &lt;/span&gt;&lt;span style=&quot; font-weight:400; font-style:italic;&quot;&gt;during&lt;/span&gt;&lt;span style=&quot; font-weight:400;&quot;&gt; detection.&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&amp;quot;Undo detection&amp;quot; also restores the original (unfiltered) data.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;• If unchecked:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;The original data is left unchanged.&lt;/p&gt;&lt;p&gt;If any of Offset and Filter check boxes are &lt;span style=&quot; font-style:italic;&quot;&gt;checked&lt;/span&gt;, the detection of mPSC time stamps is performed on a filtered copy of the signal, but &lt;span style=&quot; font-style:italic;&quot;&gt;the resulting mPSCs are extracted from the original (unfiltered)  data&lt;/span&gt;.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&amp;quot;Undo detection&amp;quot; only restores previous detection; the original data stays unchanged.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
+  </action>
+  <action name="actionFilter_whole_data">
+   <property name="icon">
+    <iconset theme="go-next"/>
+   </property>
+   <property name="text">
+    <string>Filter whole data</string>
+   </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;Filter whole data &lt;/span&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;BEFORE&lt;/span&gt;&lt;span style=&quot; font-weight:400;&quot;&gt; detection (&lt;/span&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;CAUTION&lt;/span&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;, it takes time).&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;Subsequent detection uses filtered data; to restore the original data, click &amp;quot;Undo filter data&amp;quot;&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
+  </action>
+  <action name="actionUndo_filter_whole_data">
+   <property name="icon">
+    <iconset theme="edit-undo"/>
+   </property>
+   <property name="text">
+    <string>Undo filter whole data</string>
+   </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;Restores original data after it has been filtered BEFORE detection.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
+  </action>
+  <action name="actionPreview_filtered_signal">
+   <property name="icon">
+    <iconset theme="image-x-generic"/>
+   </property>
+   <property name="text">
+    <string>Preview filtered signal</string>
    </property>
   </action>
  </widget>
