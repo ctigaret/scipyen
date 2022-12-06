@@ -6281,7 +6281,7 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     
     return ret
 
-def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal], removeDC:bool=True):
+def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal]):
     if isinstance(x, pq.Quantity):
         xx = x.magnitude[:,0]
     else:
@@ -6298,10 +6298,10 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
         else:
             h = waveform
         
-    # remove DC offset from signal
-    # CAUTION/WARNING This might breakdown for signals without mPSCs
-    if removeDC:
-        xx = sigp.remove_dc(xx)
+    # # remove DC offset from signal
+    # # CAUTION/WARNING This might breakdown for signals without mPSCs
+    # if removeDC:
+    #     xx = sigp.remove_dc(xx)
     
     N = len(h)
     

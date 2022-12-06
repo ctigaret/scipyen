@@ -702,7 +702,7 @@ def state_levels(x:np.ndarray, **kwargs):
     
     return sLevels, counts, edges, ranges
 
-def remove_dc(x, channel:typing.Optional[int] = None, value:typing.Optional[typing.Union[float, pq.Quantity, np.ndarray]] = None):
+def remove_dc(x, value:typing.Optional[typing.Union[float, pq.Quantity, np.ndarray]] = None, channel:typing.Optional[int] = None):
     """Returns a copy of x with DC offset removed.
     
     This provides a similar functionality to scipy.signal.detrend with parameters
@@ -725,12 +725,6 @@ def remove_dc(x, channel:typing.Optional[int] = None, value:typing.Optional[typi
     
         1D signal with possibly more than one channel
     
-    channel: int, sequence of int or None (default); when None, removes offset 
-            from all channels; otherwise, channel must be a valid index (or a 
-            sequence of unique valid indices) in the half open interval 
-    
-            [ -x.size[1], x.size[1] )
-    
     value: scalar float, python Quantity, numpy array, sequence of float, or None (default)
             The constant value (DC) to subtract from the signal x
     
@@ -746,6 +740,12 @@ def remove_dc(x, channel:typing.Optional[int] = None, value:typing.Optional[typi
                 than most of the signal is composed of this level
     
             WARNING: This breaks down if the assumption above does not hold.
+    
+    channel: int, sequence of int or None (default); when None, removes offset 
+            from all channels; otherwise, channel must be a valid index (or a 
+            sequence of unique valid indices) in the half open interval 
+    
+            [ -x.size[1], x.size[1] )
     
     Returns:
     ========
@@ -795,13 +795,17 @@ def remove_dc(x, channel:typing.Optional[int] = None, value:typing.Optional[typi
             elif isinstance(channel, (tuple, list)) and len(value) not in (1, len(channel)):
                 raise ValueError(f"Mismatch between number of values and specified channels")
             
-            elif channel is None and len(value) not in (1, x.shape[1]):
+            elif channel is None and value.size not in (1, x.shape[1]):
                 raise ValueError(f"Mismatch between number of values and signal channels")
             
             if isinstance(value, pq.Quantity) and isinstance(x, pq.Quantity):
-                if not scq.units_convertible(value, x):
-                    raise TypeError(f"Value units {value.units} are incompatible with signal units {x.units}")
-                value = value.rescale(x.units)
+                if isinstance(x, pq.Quantity):
+                    if not scq.units_convertible(value, x):
+                        raise TypeError(f"Value units {value.units} are incompatible with signal units {x.units}")
+                    value = float(value.rescale(x.units))
+                else:
+                    value = float(value)
+                
                 
         elif isinstance(value, (tuple, list)):
             if not all(isinstance(v, number.number) for v in value):
@@ -813,17 +817,34 @@ def remove_dc(x, channel:typing.Optional[int] = None, value:typing.Optional[typi
             elif channel is None and len(value) not in (1, x.shape[1]):
                 raise ValueError(f"Mismatch between number of values and specified channels")
             
-                
-            
         if channel is None:
             for k in range(xx.shape[1]):
                 if isinstance(value, float):
                     val = value
                     
-                elif isinstance(value, (tuple, list, np.ndarray)):
-                    val = value[0] if len(value)==1 else value[k]
+                elif isinstance(value, pq.Quantity):
+                    if value.size != 1:
+                        raise TypeError("When channel is not specified, value must be a scalar")
                     
-                else:
+                    if isinstance(x, pq.Quantity):
+                        if not scq.units_convertible(value, x):
+                            raise TypeError(f"Value units {value.units} are incompatible with signal units {x.units}")
+                        
+                        val = float(value.rescale(x.units))
+                        
+                    else:
+                        val = float(value)
+                    
+                elif isinstance(value, np.ndarray):
+                    if value.size != 1:
+                        raise TypeError("When channel is not specified, value must be a scalar")
+                    
+                    val = float(value)
+                    
+                elif isinstance(value, (tuple, list)) and all(isinstance(v, float) for v in value):
+                    val = value[0]
+                        
+                elif value is None:
                     val = __guess_dc_(xx[:,k])
                     
                 yy[:,k] = xx[:,k] - val
@@ -874,6 +895,8 @@ def remove_dc(x, channel:typing.Optional[int] = None, value:typing.Optional[typi
         klass = x.__class__
         
         ret = klass(yy, units = x.units, t_start=x.t_start, sampling_rate=x.sampling_rate)
+        ret.segment = x.segment
+        ret.array_annotations = x.array_annotations
         
     elif isinstance(x, pq.Quantity):
         ret = yy * x.units

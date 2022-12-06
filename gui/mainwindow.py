@@ -2539,7 +2539,31 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             for session, line, inline in hist:
                 if sessionNo is None or sessionNo != session:
                     sessionNo = session  #cache the session
-                    sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [repr(sessionNo)])
+                    sessionInfo = self.historyAccessor.get_session_info(sessionNo)
+                    if isinstance(sessionInfo[1], datetime.datetime):
+                        startDateTime = f"{sessionInfo[1].date().isoformat()} {sessionInfo[1].time().isoformat()}"
+                    else:
+                        startDateTime = ""
+                        
+                    if isinstance(sessionInfo[2], datetime.datetime):
+                        stopDateTime = f"{sessionInfo[2].date().isoformat()} {sessionInfo[2].time().isoformat()}"
+                    else:
+                        stopDateTime = ""
+                        
+                    sessionTimes = " "
+                    
+                    if len(startDateTime):
+                        sessionTimes = f"{startDateTime} - "
+                        if len(stopDateTime):
+                            sessionTimes  = f"{startDateTime} - {stopDateTime}"
+                            
+                    elif len(stopDateTime):
+                        sessionTimes = f" - {stopDateTime}"
+                    
+                    sessionInfoText = f"{sessionInfo[0]}"
+                    # sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [repr(sessionNo)])
+                    # sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [sessionInfoText, sessionTimes])
+                    sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [sessionInfoText, "", startDateTime, stopDateTime])
                     items.append(sessionItem)
 
                 lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [repr(line), inline])
@@ -4107,7 +4131,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #### END workspace view
         
         #### BEGIN command history view
-        self.historyTreeWidget.setHeaderLabels(["Session, line:", "Statement:"])
+        self.historyTreeWidget.setHeaderLabels(["Session, line:", "Statement", "Start date & time","Stop date & time"])
         self.historyTreeWidget.itemActivated[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemActivated)
         self.historyTreeWidget.customContextMenuRequested[QtCore.QPoint].connect(self.slot_historyContextMenuRequest)
         self.historyTreeWidget.itemClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemSelected)
@@ -4608,7 +4632,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         Works across sessions.
         
         TODO option to search in a selected session only
-        FIXME: 2022-12-04 11:32:06 Too slow !
+        
+        FIXME: 2022-12-04 11:32:06 Too slow !!!!
         """
         from fnmatch import translate
         # FIXME TODO find across sessions

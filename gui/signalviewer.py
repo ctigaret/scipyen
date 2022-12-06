@@ -6483,6 +6483,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     for tgt in targetItems:
                         ax.addItem(tgt)
                         
+        if len(self.axes):
+            self.axes[-1].showAxis("bottom", True)
+            self.axes[-1].showAxes([True, False, False, True], showValues=[True, False, False, True])
+            
+            
+                        
     @safeWrapper
     def _plotSpikeTrains_(self, trains:typing.Optional[typing.Union[neo.SpikeTrain, tuple, list]] = None, clear:bool = False, **kwargs):
         """Plots stand-alone spike trains.

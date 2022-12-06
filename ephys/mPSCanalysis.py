@@ -8,6 +8,7 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from PyQt5.uic import loadUiType as __loadUiType__
 
 import numpy as np
+import scipy
 import quantities as pq
 import neo
 # import pyqtgraph as pg
@@ -96,10 +97,16 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     _default_sampling_rate_ = 1e4 * pq.Hz
     
     _default_detection_threshold_ = 0.
+    
     _detection_threshold_linear_range_min_ = 0.
+    
     _detection_threshold_linear_range_max_ = 100.
-    _default_noise_cutoff_frequency_ = 5e2
-    _default_DC_offset_ = 0
+    
+    _default_noise_cutoff_frequency_ = 5e2*pq.Hz
+    
+    _default_DC_offset_ = 0*pq.pA
+    
+    _available_filters_ = ("Butterworth", "Hamming")
     
     _default_template_file = os.path.join(os.path.dirname(get_config_file()),"mPSCTemplate.h5" )
     
@@ -143,13 +150,17 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._data_ = None
         self._filtered_data_ = None
         # self._fs_ = None
+        self._filter_type_ = "Butterworth"
+        self._filter_function_ = None
         self._filter_signal_ = False
+        self._apply_filter_upon_detection = False
         self._noise_cutoff_frequency_ = self._default_noise_cutoff_frequency_
         self._remove_DC_offset_ = False
         self._use_auto_offset_ = True
         self._lowpass_ = None
         
         self._dc_offset_ = self._default_DC_offset_
+        
         self._detection_signal_name_ = None
         self._detection_epochs_ = list()
         self._signal_index_ = 0
@@ -382,7 +393,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if not isinstance(self._mPSC_template_, neo.AnalogSignal):
             self._use_template_ = False
             self.use_mPSCTemplate_CheckBox.setEnabled(False)
-        
+
+#### BEGIN _configureUI_
     def _configureUI_(self):
         # print(f"{self.__class__.__name__}._configureUI_ start...")
         self.setupUi(self)
@@ -534,7 +546,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         # self.actionDetect.triggered.connect(self._slot_detect)
         # TODO/FIXME 2022-11-26 09:10:33 for testing
-        self.actionDetect.triggered.connect(self._slot_detect_thread_)
+        self.actionDetect.triggered.connect(self._slot_detectThread)
         
         self.actionClose.triggered.connect(self._slot_Close)
         
@@ -582,7 +594,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.makeUnitAmplitudePushButton.clicked.connect(self._slot_makeUnitAmplitudeModel)
         
         self.detectionThresholdSpinBox.setMinimum(self._detection_threshold_linear_range_min_)
-        self.detectionThresholdSpinBox,setMaximum(self._detection_threshold_linear_range_min_)
+        self.detectionThresholdSpinBox.setMaximum(self._detection_threshold_linear_range_min_)
         self.detectionThresholdSpinBox.setValue(self._detection_threshold_)
         self.detectionThresholdSpinBox.valueChanged.connect(self._slot_detectionThresholdChanged)
         # self.reFitPushButton.clicked.connect(self._slot_refit_mPSC)
@@ -590,12 +602,31 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self.removeDCCheckBox.stateChanged.connect(self._slot_set_removeDC)
         self.autoOffsetCheckBox.stateChanged.connect(self._slot_setAutoOffset)
-        self.dcValueSpinBox.valueChanged.connect(self._slot_DCOffsetChanged)
+        
+        self.dcValueSpinBox.setMinimum(-math.inf*pq.pA)
+        self.dcValueSpinBox.setMaximum(math.inf*pq.pA)
+        self.dcValueSpinBox.setValue(self._dc_offset_)
+        self.dcValueSpinBox.sig_valueChanged.connect(self._slot_DCOffsetChanged)
+        
         self.noiseFilterCheckBox.stateChanged.connect(self._slot_set_useLowPassFilter)
-        self.cutoffFrequencySpinBox.valueChanged.connect(self._slot_cutoffFreqChanged)
+        
+        self.cutoffFrequencySpinBox.setMinimum(0*pq.Hz)
+        self.cutoffFrequencySpinBox.setMaximum(math.inf*pq.Hz)
+        self.cutoffFrequencySpinBox.setValue(self._noise_cutoff_frequency_)
+        
+        self.cutoffFrequencySpinBox.sig_valueChanged.connect(self._slot_cutoffFreqChanged)
+        
         self.actionApply_with_detection.triggered.connect(self._slot_applyFilters_with_detection)
-        # self.applyFiltersToOriginalSignalCheckBox.stateChanged.connect(self._slot_filterData)
+        
+        self.filterTypeComboBox.clear()
+        self.filterTypeComboBox.addItems(["Butterworth", "Hamming"])
+        self.filterTypeComboBox.currentTextChanged.connect(self._slot_filterTypeChanged)
+        
+        self.actionPreview_filtered_signal.triggered.connect(self._slot_previewFilteredSignal)
+        
+        # self.noiseFilterCheckBox.stateChanged.connect(self._slot_filterData)
         # print(f"{self.__class__.__name__}._configureUI_ end...")
+#### END _configureUI_        
         
     def loadSettings(self):
         """Overrides ScipyenViewer.loadSettings
@@ -673,7 +704,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 if len(self._data_.segments) and len(self._data_.segments[0].analogsignals):
                     time_units = self._data_.segments[0].analogsignals[0].times.units
                     signal_units = self._data_.segments[0].analogsignals[0].units
-                    self._noise_cutoff_default_ = float(self._data_.segments[0].analogsignals[0].sampling_rate)/4
+                    # sampling_rate = self._data_.segments[0].analogsignals[0].sampling_rate
+                    # self.noiseCutoffFreq = sampling_rate/4
                     
                 else:
                     time_units = self._default_time_units_
@@ -683,6 +715,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._signal_units_ = signal_units
                     
                 self.durationSpinBox.units = self._time_units_
+                self.dcValueSpinBox.units = self._signal_units_
                 
                 # NOTE: 2022-11-05 14:50:26
                 # although self._data_frames_ and self._number_of_frames_ end up
@@ -707,6 +740,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 if len(data.analogsignals):
                     time_units = data.analogsignals[0].times.units
                     signal_units = data.analogsignals[0].units
+                    # sampling_rate = data.analogsignals[0].sampling_rate
+                    # self.noiseCutoffFreq = sampling_rate/4
                 else:
                     time_units = self._default_time_units_
                     signal_units = self._default_model_units_
@@ -715,6 +750,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._signal_units_ = signal_units
                     
                 self.durationSpinBox.units = self._time_units_
+                self.dcValueSpinBox.units = self._signal_units_
                 
                 self._data_ = data
                 self._data_frames_ = 1
@@ -734,6 +770,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 if len(data[0].analogsignals):
                     time_units = data[0].analogsignals[0].times.units
                     signal_units = data[0].analogsignals[0].units
+                    # sampling_rate = data[0].analogsignals[0].sampling_rate
+                    # self.noiseCutoffFreq = sampling_rate/4
                 else:
                     time_units = self._default_time_units_
                     signal_units = self._default_model_units_
@@ -742,6 +780,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._signal_units_ = signal_units
                     
                 self.durationSpinBox.units = self._time_units_
+                self.dcValueSpinBox.units = self._signal_units_
                 
                 self._data_ = data
                 self._data_frames_ = len(self._data_)
@@ -913,6 +952,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 if isinstance(frameResults[1], (tuple, list)) and all(isinstance(s, neo.AnalogSignal) for s in frameResults[1]):
                     self._detected_mPSCs_ = frameResults[1]
             
+        # segment = self._get_data_segment_(self.currentFrame)
+        # signal = self._get_selected_signal_(segment)
+        
         self._plot_detected_mPSCs()
         
     def clear(self):
@@ -1172,6 +1214,37 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._refresh_epochComboBox()
             
             self._plot_detected_mPSCs()
+            
+    @pyqtSlot()
+    def _slot_previewFilteredSignal(self):
+        if self._data_ is None:
+            return
+        segment = self._get_data_segment_(self.currentFrame)
+        signal = self._get_selected_signal_(segment)
+        
+        epochs = [e for e in segment.epochs if e.name in self._detection_epochs_]
+        if len(epochs):
+            sig = neoutils.get_time_slice(signal,epochs[0])
+            sig.segment = segment
+            sig.description = ""
+        else:
+            sig = signal
+            
+            
+        klass = signal.__class__
+        
+        processed = self._process_signal_(sig, newFilter=True)
+        processed.segment = segment
+        
+        
+        testsig = sig.merge(processed)
+        testsig.description = f"{sig.description} filtered with {self._filter_type_}, cutoff: {self._noise_cutoff_frequency_}"
+        
+        if not isinstance(self._ephysViewer_,sv.SignalViewer):
+            self._init_ephysViewer_()
+            
+        self._ephysViewer_.plot(testsig)
+        
             
     def _plot_waves_for_template(self):
         if len(self._mPSCs_for_template_):
@@ -2144,40 +2217,40 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._plot_data()
             
         
-    @pyqtSlot()
-    def _slot_detect(self):
-        if self._data_ is None:
-            self.criticalMessage("Detect mPSC in current sweep",
-                                 "No data!")
-            return
-    
-            
-        waveform = self._get_mPSC_template_or_waveform_()
-        if waveform is None:
-            self.criticalMessage("Detect mPSC in current sweep",
-                                 "No mPSC waveform or template is available")
-            return
-        
-        if isinstance(self._data_, (neo.Block, neo.Segment)):
-            vartxt = f"in {self._data_.name}"
-        else:
-            vartxt = ""
-            
-        progressDisplay = QtWidgets.QProgressDialog(f"Detecting mPSCS {vartxt}", "Abort", 0, self._number_of_frames_, self)
-
-        
-        # NOTE: 2022-11-26 09:06:16
-        #### BEGIN using QRunnable paradigm
-        # NOTE: 2022-11-25 22:15:47
-        # this cannot abort
-        worker = pgui.ProgressWorkerRunnable(self._detect_all_, progressDisplay)
-        
-        worker.signals.signal_Finished.connect(progressDisplay.reset)
-        worker.signals.signal_Result[object].connect(self._slot_detectionDone)
-        # NOTE: 2022-11-25 22:16:15 see NOTE: 2022-11-25 22:15:47
-        self.threadpool.start(worker)
-        #### END using QRunnable paradigm
-        
+#     @pyqtSlot()
+#     def _slot_detect(self):
+#         if self._data_ is None:
+#             self.criticalMessage("Detect mPSC in current sweep",
+#                                  "No data!")
+#             return
+#     
+#             
+#         waveform = self._get_mPSC_template_or_waveform_()
+#         if waveform is None:
+#             self.criticalMessage("Detect mPSC in current sweep",
+#                                  "No mPSC waveform or template is available")
+#             return
+#         
+#         if isinstance(self._data_, (neo.Block, neo.Segment)):
+#             vartxt = f"in {self._data_.name}"
+#         else:
+#             vartxt = ""
+#             
+#         progressDisplay = QtWidgets.QProgressDialog(f"Detecting mPSCS {vartxt}", "Abort", 0, self._number_of_frames_, self)
+# 
+#         
+#         # NOTE: 2022-11-26 09:06:16
+#         #### BEGIN using QRunnable paradigm
+#         # NOTE: 2022-11-25 22:15:47
+#         # this cannot abort
+#         worker = pgui.ProgressWorkerRunnable(self._detect_all_, progressDisplay)
+#         
+#         worker.signals.signal_Finished.connect(progressDisplay.reset)
+#         worker.signals.signal_Result[object].connect(self._slot_detectionDone)
+#         # NOTE: 2022-11-25 22:16:15 see NOTE: 2022-11-25 22:15:47
+#         self.threadpool.start(worker)
+#         #### END using QRunnable paradigm
+#         
     @pyqtSlot()
     def _slot_detectionDone(self):
         # NOTE: 2022-11-26 09:06:05
@@ -2185,9 +2258,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._plot_data()
         
     @pyqtSlot()
-    def _slot_detect_thread_(self):
+    def _slot_detectThread(self):
         # NOTE: 2022-11-26 10:24:01 IT WORKS !!!
-        # but still no Abort
         if self._data_ is None:
             self.criticalMessage("Detect mPSC in current sweep",
                                  "No data!")
@@ -2339,7 +2411,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.loopControl["break"] = False
         
     @pyqtSlot(object)
-    sef _slot_filterThread_ready(self, obj):
+    def _slot_filterThread_ready(self, obj):
         self._plot_data()
         self.loopControl["break"] = False
         
@@ -2724,25 +2796,28 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         value = self.sender().checkState() == QtCore.Qt.Checked
         self.useAutoOffset = value
         
-    @pyqtSlot(float)
-    def _slot_DCOffsetChanged(self, val:float):
-        self.signalDCOffset = value
+        
+    @pyqtSlot(object)
+    def _slot_DCOffsetChanged(self, val):
+        self.signalDCOffset = val
         
     @pyqtSlot()
     def _slot_set_useLowPassFilter(self):
         val = self.sender().checkState() == QtCore.Qt.Checked
         self.useLowPassFilter = val
+        filterType = self.filterTypeComboBox.currentText()
         
-    @pyqtSlot(float)
-    def _slot_cutoffFreqChanged(self, val:float):
+        
+    @pyqtSlot(object)
+    def _slot_cutoffFreqChanged(self, val):
         self.noiseCutoffFreq = val
         
-    @pyqtSot()
+    @pyqtSlot()
     def _slot_applyFilters_with_detection(self):
-        if self.sender().checkState() == QtCore.QtChecked
+        self.filterDataUponDetection = self.sender().checkState() == QtCore.QtChecked
         
     @pyqtSlot()
-    self._slot_filterData(self):
+    def _slot_filterData(self):
         if self._data_ is None:
             self.criticalMessage("Detect mPSC in current sweep",
                                  "No data!")
@@ -2776,7 +2851,21 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._filterThread_.finished.connect(self._filterThread_.deleteLater)
         
         self._filterThread_.start()
-    
+        
+    def _process_signal_(self, sig, newFilter:bool=False):
+        if self._remove_DC_offset_:
+            if self._use_auto_offset_:
+                ret = sigp.remove_dc(sig)
+            else:
+                ret = sigp.remove_dc(sig, self._dc_offset_)
+        else:
+            ret = sig
+                
+        if self._filter_signal_:
+            ret = self._lowpass_filter_signal(ret, makeFilter=newFilter)
+            
+        return ret
+        
     def _filter_all_(self, **kwargs):
         if self._data_ is None:
             return
@@ -2794,16 +2883,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
             for k in range(len(segment.analogsignals)):
                 signal = segment.analogsignals[k]
-                new_sig = neoutils.make_neo_object(signal)
                 if k == signal_index:
-                    if self._remove_DC_offset_:
-                        if self._use_auto_offset_:
-                            new_sig = sigp.remove_dc(signal)
-                        else:
-                            new_sig = sigp.remove_dc(signal, offset)
-                            
-                    if self._filter_signal_:
-                        new_sig = self._lowpass_filter_signal(signal)
+                    new_sig = self._process_signal_(neoutils.make_neo_object(signal))
+                else:
+                    new_sig = neoutils.make_neo_object(signal)
+                    
+                new_sig.segment = new_seg
                         
                 new_seg.analogsignals.append(new_sig)
                 
@@ -2816,8 +2901,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 break
             
         if isinstance(self._data_, neo.Block):
-            self._filtered_data_ = neo.Block
-            self._filtered_data_.segments.extend(new_segments)
+            self._filtered_data_ = neo.Block()
+            for s in new_segments:
+                s.block = self._filtered_data_
+                self._filtered_data_.segments.append(s)
             
         elif isinstance(self._data_, neo.Segment):
             self._filtered_data_ = new_segments[0]
@@ -2999,6 +3086,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             signalBlockers = [QtCore.QSignalBlocker(w) for w in (self._ephysViewer_, self.signalNameComboBox)]
             self._ephysViewer_.currentAxis=value
             self._signal_index_ = value
+            
+    @pyqtSlot(str)
+    def _slot_filterTypeChanged(self, val:str):
+        if val in self._available_filters_:
+            self.filterType = val
+            
     
     @pyqtSlot(str)
     def _slot_epochComboBoxSelectionChanged(self, value):
@@ -3151,20 +3244,24 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         for w in (self.offsetLabel, self.dcValueSpinBox):
             w.setEnabled(not self._use_auto_offset_)
         
-        self.applyFiltersToOriginalSignalCheckBox.setEnabled(self._filter_signal_ == True or self._remove_DC_offset_ == True)
+        self.noiseFilterCheckBox.setEnabled(self._filter_signal_ == True or self._remove_DC_offset_ == True)
+        if self.actionLive_filter_preview.isChecked():
+            self._slot_previewFilteredSignal()
         
     @property
-    def autoOffset(self):
+    def useAutoOffset(self):
         return self._use_auto_offset_
     
-    @markConfigurable("UseAutoDCOFfset", trait_notifier=True)
-    @autoOffset.setter
-    def autoOffset(self, val:bool):
+    @markConfigurable("UseAutoDCOffset", trait_notifier=True)
+    @useAutoOffset.setter
+    def useAutoOffset(self, val:bool):
         self._use_auto_offset_ = val == True
         sigBlock = QtCore.QSignalBlocker(self.autoOffsetCheckBox)
         self.autoOffsetCheckBox.setChecked(self._use_auto_offset_)
         for w in (self.offsetLabel, self.dcValueSpinBox):
             w.setEnabled(not self._use_auto_offset_)
+        if self.actionLive_filter_preview.isChecked():
+            self._slot_previewFilteredSignal()
         
     @property
     def signalDCOffset(self):
@@ -3172,12 +3269,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
     @markConfigurable("SignalDCOffset", trait_notifier=True)
     @signalDCOffset.setter
-    def signalDCOffset(self, val:float):
+    def signalDCOffset(self, val):
         self._dc_offset_ = val
-        sigBlock = QtCore.QSignalBlocker(self.autoOffsetCheckBox)
-        self.autoOffsetCheckBox.setEnabled(self.signalDCOffset)
-        for w in (self.offsetLabel, self.dcValueSpinBox):
-            w.setEnabled(not self.useAutoOffset)
+        sigBlock = QtCore.QSignalBlocker(self.dcValueSpinBox)
+        self.dcValueSpinBox.setValue(val)
+        if self.actionLive_filter_preview.isChecked():
+            self._slot_previewFilteredSignal()
             
     @property
     def noiseCutoffFreq(self):
@@ -3185,10 +3282,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
     @markConfigurable("NoiseFrequencyCutoff",trait_notifier=True)
     @noiseCutoffFreq.setter
-    def noiseCutoffFreq(self, val:float):
+    def noiseCutoffFreq(self, val):
         self._noise_cutoff_frequency_ = val
+        # print(f"NoiseFrequencyCutoff = {val}")
         sigBlock = QtCore.QSignalBlocker(self.cutoffFrequencySpinBox)
         self.cutoffFrequencySpinBox.setValue(self._noise_cutoff_frequency_)
+        if self.actionLive_filter_preview.isChecked():
+            self._slot_previewFilteredSignal()
         
     @property
     def useLowPassFilter(self):
@@ -3201,9 +3301,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         sigBlock = QtCore.QSignalBlocker(self.noiseFilterCheckBox)
         self.noiseFilterCheckBox.setChecked(self._filter_signal_ == True)
         for w in (self.freqCutoffLabel, self.cutoffFrequencySpinBox):
-            w.setEnabled(self._filter_signal_ = True)
+            w.setEnabled(self._filter_signal_ == True)
             
-        self.applyFiltersToOriginalSignalCheckBox.setEnabled(self._filter_signal_ == True or self._remove_DC_offset_ == True)
+        self.noiseFilterCheckBox.setEnabled(self._filter_signal_ == True or self._remove_DC_offset_ == True)
+        if self.actionLive_filter_preview.isChecked():
+            self._slot_previewFilteredSignal()
         
     @property
     def rSqThreshold(self):
@@ -3421,6 +3523,24 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.configurable_traits["mPSCParametersUpperBounds"] = dict(zip(self._params_names_, self._params_upper_))
                 
     @property
+    def filterType(self):
+        return self._filter_type_
+    
+    @markConfigurable("FilterType", trait_notifier=True)
+    @filterType.setter
+    def filterType(self, val:str):
+        if val in self._available_filters_:
+            self._filter_type_ = val
+            ndx = self._available_filters_.index(val)
+            sigBlock = QtCore.QSignalBlocker(self.filterTypeComboBox)
+            self.filterTypeComboBox.setCurrentIndex(ndx)
+
+        if self.actionLive_filter_preview.isChecked():
+            self._slot_previewFilteredSignal()
+            
+            # self._make_filter(self._filter_type_)
+            
+    @property
     def toolbarsLocked(self):
         return self._toolbars_locked_
     
@@ -3449,35 +3569,74 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if isinstance(self._mPSC_template_, neo.AnalogSignal) and self._mPSC_template_.name == "mPSC Template":
             return self._mPSC_template_
         
-    def _lowpass_filter_signal(self, sig, makefilter:bool=False):
-        if self._lowpass_ is None or makefilter == True:
-            self._lowpass_ = self._make_lowpass(sig)
+    def _lowpass_filter_signal(self, sig, makeFilter:bool=False):
+        if self._lowpass_ is None or makeFilter == True:
+            self._make_lowpass(sig)
+
+        # print(f"_lowpass_ {self._lowpass_}")
             
         if isinstance(sig, (neo.AnalogSignal, DataSignal)):
-            ret = scipy.signal.sosfiltfilt(self._lowpass_, sig.magnitude, axis=0)
+            if self._filter_type_ == "Butterworth":
+                ret = scipy.signal.sosfiltfilt(self._lowpass_, sig.magnitude, axis=0)
+            else:
+                ret = scipy.signal.convolve(sig.magnitude[:,0], self._lowpass_, mode="same")
+                
             klass = sig.__class__
-            ret = klass(ret, units = signal.units, t_start =  signal.t_start,
-                                sampling_rate = signal.sampling_rate,
-                                name=signal.name, description = signal.description + f"Lowpass Butterworth {self._noise_cutoff_frequency_} Hz")
+            ret = klass(ret, units = sig.units, t_start =  sig.t_start,
+                                sampling_rate = sig.sampling_rate,
+                                name=sig.name, 
+                                description = f"{sig.description} Lowpass {self._filter_type_} cutoff {self._noise_cutoff_frequency_}")
+            ann = sig.array_annotations
+            for key in ann:
+                if key == "channel_names":
+                    val = f"{ann[key]} filtered"
+                else:
+                    val = ann[key]
+                ret.array_annotations[key] = val
             
         else:
-            ret = scipy.signal.sosfiltfilt(self._lowpass_, sig, axis=0)
+            if self._filter_type_ == "Butterworth":
+                ret = scipy.signal.sosfiltfilt(self._lowpass_, sig, axis=0)
+            else:
+                if sig.ndims == 2:
+                    sig = sig[:,0]
+                    
+                ret = scipy.signal.convolve(sig, self._lowpass_, mode="same")
+                
         return ret
     
     def _make_lowpass(self, sig, fs=None):
         if isinstance(sig, (neo.AnalogSignal, DataSignal)):
             fs = float(sig.sampling_rate)
+            
         elif not isinstance(fs, float):
             raise TypeError("For numpy arrays, sampling frequencye (fs) must be specified")
         
-        lporder = scipy.signal.buttord(self._noise_cutoff_frequency_,
-                                       1.25 * self._noise_cutoff_frequency_,
+        if self._filter_type_ == "Butterworth":
+            self._make_butterworth(fs)
+        else:
+            self._make_hamming(fs)
+        
+    def _make_butterworth(self, fs):
+        lporder = scipy.signal.buttord(float(self._noise_cutoff_frequency_),
+                                       1.25 * float(self._noise_cutoff_frequency_),
                                        1, 50, fs=fs)
         
-        lowpass = scipy.signal.butter(*lporder, btype="lowpass", fs=fs, axis=0)
+        lowpass = scipy.signal.butter(*lporder, btype="lowpass", 
+                                      fs=fs, output="sos")
         
         self._lowpass_ = lowpass
         
+    def _make_hamming(self, fs):
+        ntaps = int(50 * fs / (22 * float(self._noise_cutoff_frequency_)* 0.5))
+        if ntaps % 2 == 0:
+            ntaps += 1
+            
+        lowpass = scipy.signal.firwin(ntaps, float(self._noise_cutoff_frequency_),
+                                      window="hamming", pass_zero="lowpass",
+                                      fs=fs)
+        
+        self._lowpass_ = lowpass
         
     def result(self):
         """Retrieve the detection result.
