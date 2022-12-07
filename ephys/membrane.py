@@ -6282,13 +6282,86 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     return ret
 
 def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal]):
+    
+    def __slide_detect__(x_, h_, M, N):
+        sum_h = np.sum(h_)           # Σ template
+        sum_h2 = sum_h**2           # (Σ template)²
+        sum_h2_N = sum_h2/N         # (Σ template)² / N
+        
+        # h_dot = np.dot(h_, h_)        # Σ(template²)
+        h_dot = np.sum(h_ * h_)        # Σ(template²)
+        
+        beta_denom = h_dot - sum_h2_N
+        
+        
+        α  = np.full((M,), fill_value = np.nan) # offset
+        β  = np.full((M,), fill_value = np.nan) # scale
+        ε  = np.full((M,), fill_value = np.nan) # sse
+        σ  = np.full((M,), fill_value = np.nan) # standard error
+        θ  = np.full((M,), fill_value = np.nan) # criterion   
+        
+        # α  = np.full_like(x_, fill_value = np.nan) # offset
+        # β  = np.full_like(x_, fill_value = np.nan) # scale
+        # ε  = np.full_like(x_, fill_value = np.nan) # sse
+        # σ  = np.full_like(x_, fill_value = np.nan) # standard error
+        # θ  = np.full_like(x_, fill_value = np.nan) # criterion   
+        
+        b_denom = N*sum_h2 - h_dot
+        
+        # y = x_[0:N]
+        # sum_y = np.sum(y)
+        # y_dot = np.dot(y,y)
+        
+        for k in range(M):
+            y = x_[k:k+N]
+            sum_y = np.sum(y) # Σ data
+            # y_dot = np.dot(y,y)       # Σ(data²)
+            y_dot = np.sum(y*y)       # Σ(data²)
+            
+            # l = k + N - 1
+            # if k > 1:
+            #     y = x_[k:k+N]
+            #     sum_y = sum_y + x_[l] - x_[k-1]       # Σ data
+            #     y_dot = y_dot + x_[l]**2 - x_[k-1]**2 # Σ(data²)
+                
+                
+            # hy_dot = np.dot(h_, y)   # Σ(template * data)
+            hy_dot = np.sum(h_ * y)   # Σ(template * data)
+            
+            β[k]  = hy_dot - sum_h * sum_y/N / beta_denom
+            
+            α[k] = (sum_y - β[k]*sum_h)/N
+            
+            
+            # the scaled template:
+            hs = h*β[k] + α[k]
+            
+            y_h = y - hs # the error 
+            
+            # the SSE
+            # ε[k] = np.dot(y_h, y_h) # explicit
+            
+            ε[k] = y_dot + β[k]**2 * h_dot + N*α[k]**2 - 2 * (β[k]*hy_dot + α[k]*sum_y - α[k]*β[k]*sum_h)
+            
+            # the standard error
+            σ[k] = np.sqrt(ε[k]/(N-1))
+            
+            # the detection criterion: scale / standard error
+            θ[k] = β[k] / σ[k]
+        
+            
+        return θ, α, β, ε, σ 
+        
+    if x.ndim not in (1,2):
+        raise TypeError(f"Signla must be a 1D or 2D array; got shape {x.shape} instead")
+    
     if isinstance(x, pq.Quantity):
-        xx = x.magnitude[:,0]
-    else:
-        if x.ndim > 1:
-            xx = x[:,0]
-        else:
-            xx = x
+        xx = x.magnitude
+    # else:
+    #     if x.ndim > 1:
+    #         xx = x[:,0]
+    #     else:
+    #         xx = x
         
     if isinstance(waveform, pq.Quantity):
         h = waveform.magnitude[:,0]
@@ -6303,17 +6376,41 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
     # if removeDC:
     #     xx = sigp.remove_dc(xx)
     
-    N = len(h)
+    N = h.shape[0]
     
-    M = len(xx)
+    M = xx.shape[0]
     
     # pad xx with a vector of size h, by duplicating last size(h) elements
     
-    pad = xx[M-N:]
+    pad = xx[M-N:,:]
     
     xx_ = np.concatenate([xx, pad], axis=0)
     
+    if xx_.ndim == 1:
+        theta =  __slide_detect__(xx_, h, M, N)
+        θ = theta[0]
+        
+    else:
+        thetas = [__slide_detect__(xx_[:,k], h, M, N)[:,np.newaxis] for k in range(xx.shape[1])]
+        θ = np.concatenate([t[0] for t in thetas], axis=1)
+    
+    return θ
+    
     # print(np.any(np.isnan(xx_)))
+    
+    
+def slide_detect(x,h):
+    if any(v.ndim != 1 for v in (x,h)):
+        raise TypeError("Expecting two 1D vectors")
+    N = h.shape[0]
+    
+    M = x.shape[0]
+    
+    # pad xx with a vector of size h, by duplicating last size(h) elements
+    
+    pad = x[M-N:]
+    
+    xx = np.concatenate([x, pad], axis=0)
     
     sum_h = np.sum(h)           # Σ template
     sum_h2 = sum_h**2           # (Σ template)²
@@ -6324,11 +6421,11 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
     beta_denom = h_dot - sum_h2_N
     
     
-    α  = np.full_like(xx, fill_value = np.nan) # offset
-    β  = np.full_like(xx, fill_value = np.nan) # scale
-    ε  = np.full_like(xx, fill_value = np.nan) # sse
-    σ  = np.full_like(xx, fill_value = np.nan) # standard error
-    θ  = np.full_like(xx, fill_value = np.nan) # criterion   
+    α  = np.full_like(x, fill_value = np.nan) # offset
+    β  = np.full_like(x, fill_value = np.nan) # scale
+    ε  = np.full_like(x, fill_value = np.nan) # sse
+    σ  = np.full_like(x, fill_value = np.nan) # standard error
+    θ  = np.full_like(x, fill_value = np.nan) # criterion   
     
     b_denom = N*sum_h2 - h_dot
     
@@ -6337,7 +6434,7 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
     y_dot = np.dot(y,y)
     
     for k in range(M):
-        # y = xx_[k:k+N]
+        y = xx[k:k+N]
         # sum_y = np.sum(y, axis=0) # Σ data
         # y_dot = np.dot(y,y)       # Σ(data²)
         
@@ -6345,8 +6442,10 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
         # if l >= M:
         #     l = M-1
         if k > 1:
-            sum_y = sum_y + xx_[l] - xx_[k-1]       # Σ data
-            y_dot = y_dot + xx_[l]**2 - xx_[k-1]**2 # Σ(data²)
+            sum_y = sum_y + y[-1] - xx[k-1]       # Σ data
+            y_dot = y_dot + y[-1]**2 - xx[k-1]**2 # Σ(data²)
+            # sum_y = sum_y + xx[l] - xx[k-1]       # Σ data
+            # y_dot = y_dot + xx[l]**2 - xx[k-1]**2 # Σ(data²)
             
             
         hy_dot = np.dot(h, y)   # Σ(template * data)
@@ -6359,11 +6458,12 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
         # the scaled template:
         h_ = h*β[k] + α[k]
         
-        y_h = y - h_ # the error error
         
         # the SSE
-        ε[k] = np.dot(y_h, y_h) # explicit
+        # y_h = y - h_ # the error
+        # ε[k] = np.dot(y_h, y_h) # explicit
         
+        ε[k] = y_dot + β[k]*β[k] * h_dot + N*α[k]*α[k] - 2 * (β[k]*hy_dot + α[k]*sum_y - α[k]*β[k]*sum_h)
         # ε[k] = y_dot + β[k]**2 * h_dot + N*α[k]**2 - 2 * (β[k]*hy_dot + α[k]*sum_y - α[k]*β[k]*sum_h)
         
         # the standard error
@@ -6372,9 +6472,9 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
         # the detection criterion: scale / standard error
         θ[k] = β[k] / σ[k]
     
-    # θ = sigp.remove_dc(θ)
         
-    return θ, α, β, ε, σ 
+    return θ , α, β, ε, σ 
+    
     
 def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typing.Optional[float]=None, removeDC:typing.Union[bool, float]=True):
     """Detect miniature or spontaneous PSCs by cross-correlation with a waveform.

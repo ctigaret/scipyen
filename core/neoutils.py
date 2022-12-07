@@ -4668,7 +4668,7 @@ def detrend(x:typing.Union[neo.AnalogSignal, DataSignal], **kwargs):
     """
     axis = kwargs.pop("axis", 0)
     detrend_type = kwargs.pop("type", "constant")
-    bp = kwargs.pop("bp", None)
+    bp = kwargs.pop("bp", 0)
     # overwrite_data = kwargs.pop("overwrite_data", True)
     
     func = partial(scipy.signal.detrend, axis=axis, bp=bp,
@@ -4698,6 +4698,7 @@ def detrend(x:typing.Union[neo.AnalogSignal, DataSignal], **kwargs):
                     file_origin = x.file_origin, 
                     name=x.name, description = x.description)
     
+    ret.segment = x.segment
     ret.array_annotations = x.array_annotations
     ret.annotations.update(x.annotations)
     

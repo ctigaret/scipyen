@@ -7,224 +7,236 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>587</width>
-    <height>638</height>
+    <width>714</width>
+    <height>682</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>mPSC Detect</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout_4">
+   <layout class="QVBoxLayout" name="verticalLayout_5">
     <item>
-     <layout class="QVBoxLayout" name="verticalLayout_2">
+     <layout class="QVBoxLayout" name="verticalLayout_4">
       <item>
        <widget class="MetaDataWidget" name="metaDataWidget" native="true"/>
       </item>
       <item>
        <layout class="QHBoxLayout" name="horizontalLayout">
         <item>
-         <widget class="QLabel" name="signalNameLabel">
-          <property name="text">
-           <string>Signal:</string>
-          </property>
-          <property name="buddy">
-           <cstring>signalNameComboBox</cstring>
-          </property>
-         </widget>
+         <layout class="QVBoxLayout" name="verticalLayout_2">
+          <item>
+           <widget class="QLabel" name="signalNameLabel">
+            <property name="text">
+             <string>Signal:</string>
+            </property>
+            <property name="buddy">
+             <cstring>signalNameComboBox</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="signalNameComboBox">
+            <property name="toolTip">
+             <string>Signal name</string>
+            </property>
+            <property name="statusTip">
+             <string>Signal name</string>
+            </property>
+            <property name="whatsThis">
+             <string>Signal name</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label">
+            <property name="text">
+             <string>Epoch:</string>
+            </property>
+            <property name="buddy">
+             <cstring>epochComboBox</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="epochComboBox">
+            <property name="toolTip">
+             <string>Select mPSC epoch</string>
+            </property>
+            <property name="statusTip">
+             <string>Select mPSC epoch</string>
+            </property>
+            <property name="whatsThis">
+             <string>Select mPSC epoch</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="clearPreviousDetectionCheckBox">
+            <property name="toolTip">
+             <string>Replace previous detection</string>
+            </property>
+            <property name="statusTip">
+             <string>Replace previous detection</string>
+            </property>
+            <property name="whatsThis">
+             <string>Replace previous detection</string>
+            </property>
+            <property name="text">
+             <string>Replace</string>
+            </property>
+            <property name="icon">
+             <iconset theme="document-replace">
+              <normaloff>.</normaloff>.</iconset>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </item>
         <item>
-         <widget class="QComboBox" name="signalNameComboBox">
-          <property name="toolTip">
-           <string>Signal name</string>
+         <widget class="QGroupBox" name="groupBox">
+          <property name="title">
+           <string>Signal Treatment</string>
           </property>
-          <property name="statusTip">
-           <string>Signal name</string>
-          </property>
-          <property name="whatsThis">
-           <string>Signal name</string>
-          </property>
+          <layout class="QGridLayout" name="gridLayout">
+           <item row="0" column="0">
+            <widget class="QCheckBox" name="linearDetrendCheckBox">
+             <property name="toolTip">
+              <string>Linear detrending - remove drift</string>
+             </property>
+             <property name="statusTip">
+              <string>Linear detrending - remove drift</string>
+             </property>
+             <property name="whatsThis">
+              <string>Linear detrending - remove drift</string>
+             </property>
+             <property name="text">
+              <string>Detrend</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QCheckBox" name="removeDCCheckBox">
+             <property name="toolTip">
+              <string>Remove signal offset (DC) before detection</string>
+             </property>
+             <property name="statusTip">
+              <string>Remove signal offset (DC) before detection</string>
+             </property>
+             <property name="whatsThis">
+              <string>Remove signal offset (DC) before detection</string>
+             </property>
+             <property name="text">
+              <string>Offset</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QCheckBox" name="autoOffsetCheckBox">
+             <property name="toolTip">
+              <string>When checked, offset will be adapted from the current signal</string>
+             </property>
+             <property name="statusTip">
+              <string>When checked, offset will be adapted from the current signal</string>
+             </property>
+             <property name="whatsThis">
+              <string>When checked, offset will be adapted from the current signal</string>
+             </property>
+             <property name="text">
+              <string>Auto</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="2">
+            <widget class="QLabel" name="offsetLabel">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="toolTip">
+              <string>Use custom offset value</string>
+             </property>
+             <property name="statusTip">
+              <string>Use custom offset value</string>
+             </property>
+             <property name="whatsThis">
+              <string>Use custom offset value</string>
+             </property>
+             <property name="text">
+              <string>Offset:</string>
+             </property>
+             <property name="buddy">
+              <cstring>dcValueSpinBox</cstring>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="3">
+            <widget class="QuantitySpinBox" name="dcValueSpinBox">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QCheckBox" name="noiseFilterCheckBox">
+             <property name="toolTip">
+              <string>De-noise signal before detection</string>
+             </property>
+             <property name="statusTip">
+              <string>De-noise signal before detection</string>
+             </property>
+             <property name="whatsThis">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Before detection, de-noise signal using a low pass digital filter (Hamming window).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+             <property name="text">
+              <string>Smooth</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QComboBox" name="filterTypeComboBox"/>
+           </item>
+           <item row="2" column="2">
+            <widget class="QLabel" name="freqCutoffLabel">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="text">
+              <string>Cutoff:</string>
+             </property>
+             <property name="buddy">
+              <cstring>cutoffFrequencySpinBox</cstring>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="3">
+            <widget class="QuantitySpinBox" name="cutoffFrequencySpinBox">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </widget>
-        </item>
-        <item>
-         <widget class="QLabel" name="label">
-          <property name="text">
-           <string>Epoch:</string>
-          </property>
-          <property name="buddy">
-           <cstring>epochComboBox</cstring>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QComboBox" name="epochComboBox">
-          <property name="toolTip">
-           <string>Select mPSC epoch</string>
-          </property>
-          <property name="statusTip">
-           <string>Select mPSC epoch</string>
-          </property>
-          <property name="whatsThis">
-           <string>Select mPSC epoch</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QCheckBox" name="clearPreviousDetectionCheckBox">
-          <property name="toolTip">
-           <string>Replace previous detection</string>
-          </property>
-          <property name="statusTip">
-           <string>Replace previous detection</string>
-          </property>
-          <property name="whatsThis">
-           <string>Replace previous detection</string>
-          </property>
-          <property name="text">
-           <string>Replace previous detection</string>
-          </property>
-          <property name="icon">
-           <iconset theme="document-replace">
-            <normaloff>.</normaloff>.</iconset>
-          </property>
-          <property name="checked">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <spacer name="horizontalSpacer_2">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
         </item>
        </layout>
-      </item>
-     </layout>
-    </item>
-    <item>
-     <layout class="QHBoxLayout" name="horizontalLayout_3">
-      <item>
-       <widget class="QCheckBox" name="removeDCCheckBox">
-        <property name="toolTip">
-         <string>Remove signal offset (DC) before detection</string>
-        </property>
-        <property name="statusTip">
-         <string>Remove signal offset (DC) before detection</string>
-        </property>
-        <property name="whatsThis">
-         <string>Remove signal offset (DC) before detection</string>
-        </property>
-        <property name="text">
-         <string>Offset</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="autoOffsetCheckBox">
-        <property name="toolTip">
-         <string>When checked, offset will be adapted from the current signal</string>
-        </property>
-        <property name="statusTip">
-         <string>When checked, offset will be adapted from the current signal</string>
-        </property>
-        <property name="whatsThis">
-         <string>When checked, offset will be adapted from the current signal</string>
-        </property>
-        <property name="text">
-         <string>Auto</string>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLabel" name="offsetLabel">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-        <property name="toolTip">
-         <string>Use custom offset value</string>
-        </property>
-        <property name="statusTip">
-         <string>Use custom offset value</string>
-        </property>
-        <property name="whatsThis">
-         <string>Use custom offset value</string>
-        </property>
-        <property name="text">
-         <string>Offset:</string>
-        </property>
-        <property name="buddy">
-         <cstring>dcValueSpinBox</cstring>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QuantitySpinBox" name="dcValueSpinBox">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="noiseFilterCheckBox">
-        <property name="toolTip">
-         <string>De-noise signal before detection</string>
-        </property>
-        <property name="statusTip">
-         <string>De-noise signal before detection</string>
-        </property>
-        <property name="whatsThis">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Before detection, de-noise signal using a low pass digital filter (Hamming window).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-        </property>
-        <property name="text">
-         <string>Filter</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QComboBox" name="filterTypeComboBox"/>
-      </item>
-      <item>
-       <widget class="QLabel" name="freqCutoffLabel">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-        <property name="text">
-         <string>Cutoff:</string>
-        </property>
-        <property name="buddy">
-         <cstring>cutoffFrequencySpinBox</cstring>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QuantitySpinBox" name="cutoffFrequencySpinBox">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-       </widget>
       </item>
      </layout>
     </item>
@@ -521,7 +533,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>587</width>
+     <width>714</width>
      <height>28</height>
     </rect>
    </property>
@@ -1225,7 +1237,8 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="graphics"/>
+    <iconset theme="graphics">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Live filter preview</string>

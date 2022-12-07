@@ -157,7 +157,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._noise_cutoff_frequency_ = self._default_noise_cutoff_frequency_
         self._remove_DC_offset_ = False
         self._use_auto_offset_ = True
+        self._use_signal_linear_detrend_ = False
         self._lowpass_ = None
+        
         
         self._dc_offset_ = self._default_DC_offset_
         
@@ -623,6 +625,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.filterTypeComboBox.currentTextChanged.connect(self._slot_filterTypeChanged)
         
         self.actionPreview_filtered_signal.triggered.connect(self._slot_previewFilteredSignal)
+        
+        self.linearDetrendCheckBox.setChecked(False)
+        self.linearDetrendCheckBox.stateChanged.connect(self._slot_useSignalDetrend)
         
         # self.noiseFilterCheckBox.stateChanged.connect(self._slot_filterData)
         # print(f"{self.__class__.__name__}._configureUI_ end...")
@@ -2787,6 +2792,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._plot_data()
             
     @pyqtSlot()
+    def _slot_useSignalDetrend(self):
+        value = self.sender().checkState() == QtCore.Qt.Checked
+        self.useSignalDetrend = value
+            
+    @pyqtSlot()
     def _slot_set_removeDC(self):
         removeDC = self.sender().checkState() == QtCore.Qt.Checked
         self.removeDCOffset = removeDC
@@ -2814,7 +2824,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
     @pyqtSlot()
     def _slot_applyFilters_with_detection(self):
-        self.filterDataUponDetection = self.sender().checkState() == QtCore.QtChecked
+        self.filterDataUponDetection = self.sender().checkState() == QtCore.Qt.Checked
         
     @pyqtSlot()
     def _slot_filterData(self):
@@ -2853,16 +2863,32 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._filterThread_.start()
         
     def _process_signal_(self, sig, newFilter:bool=False):
+        if isinstance(sig, (neo.AnalogSignal, DataSignal)):
+            fs = float(sig.sampling_rate)
+        else:
+            fs = float(self._default_sampling_rate_)
+            
+        ret = sig
+        
+        processed=False
+        
+        if self._use_signal_linear_detrend_:
+            ret = neoutils.detrend(ret, axis=0, bp = [0, ret.shape[0]], type="linear")
+            processed=True
+
         if self._remove_DC_offset_:
             if self._use_auto_offset_:
-                ret = sigp.remove_dc(sig)
+                ret = sigp.remove_dc(ret)
             else:
-                ret = sigp.remove_dc(sig, self._dc_offset_)
-        else:
-            ret = sig
+                ret = sigp.remove_dc(ret, self._dc_offset_)
+            processed=True
                 
         if self._filter_signal_:
             ret = self._lowpass_filter_signal(ret, makeFilter=newFilter)
+            processed=True
+            
+        if processed:
+            ret.name = "processed"
             
         return ret
         
@@ -3306,6 +3332,18 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.noiseFilterCheckBox.setEnabled(self._filter_signal_ == True or self._remove_DC_offset_ == True)
         if self.actionLive_filter_preview.isChecked():
             self._slot_previewFilteredSignal()
+            
+    @property
+    def useSignalDetrend(self):
+        return self._use_signal_linear_detrend_
+    
+    @markConfigurable("UseLinearDetrend", trait_notifier=True)
+    @useSignalDetrend.setter
+    def useSignalDetrend(self, value:bool):
+        self._use_signal_linear_detrend_ = value == True
+        sigBlock = QtCore.QSignalBlocker(self.linearDetrendCheckBox)
+        self.linearDetrendCheckBox.setChecked(self._use_signal_linear_detrend_)
+        
         
     @property
     def rSqThreshold(self):
@@ -3569,9 +3607,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if isinstance(self._mPSC_template_, neo.AnalogSignal) and self._mPSC_template_.name == "mPSC Template":
             return self._mPSC_template_
         
-    def _lowpass_filter_signal(self, sig, makeFilter:bool=False):
+    def _lowpass_filter_signal(self, sig, makeFilter:bool=False, fs=None):
         if self._lowpass_ is None or makeFilter == True:
-            self._make_lowpass(sig)
+            if fs is None:
+                fs = float(self._default_sampling_rate_)
+            self._make_lowpass(sig, fs)
 
         # print(f"_lowpass_ {self._lowpass_}")
             
@@ -3610,7 +3650,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             fs = float(sig.sampling_rate)
             
         elif not isinstance(fs, float):
-            raise TypeError("For numpy arrays, sampling frequencye (fs) must be specified")
+            raise TypeError("For numpy arrays, sampling frequency (fs) must be specified")
         
         if self._filter_type_ == "Butterworth":
             self._make_butterworth(fs)

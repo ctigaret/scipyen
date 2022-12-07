@@ -5165,6 +5165,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             #
             if y.ndim > 3: 
                 raise ValueError('\nCannot plot data with more than 3 dimensions\n')
+            
             self.xData = None
             self.yData = y
             self.docTitle = "Numpy array"
@@ -5199,6 +5200,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             signalChannelAxis = self.yData.channelIndex
                     else:
                         signalChannelAxis = 1 # by defult we consider channels as column vectors
+                        
                         
                         # raise TypeError("signalChannelAxis must be specified when plotting numpy arrays")
                     
@@ -5290,15 +5292,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 # (when separateSignalChannels is True)
                 self.separateSignalChannels = separateSignalChannels
                 
-#             if x is None:
-#                 xx = np.linspace(0, self.yData.shape[self.dataAxis], self.yData.shape[self.dataAxis], 
-#                                 endpoint=False)[:, np.newaxis]
-#                     
-#                 self.xData = xx
             if x is not None:
                 if isinstance(x, (tuple, list)):
                     if len(x) != self.yData.shape[self.dataAxis]:
-                        raise TypeError("The supplied signal domain (x) must have the same size as the data axis %s" % dataAxis)
+                        raise TypeError("The supplied signal domain (x) must have the same size as the data axis %s" % self.dataAxis)
                     
                     self.xData = np.array(x)
                     
@@ -5307,7 +5304,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         raise TypeError("The supplied signal domain (x) must be a vector")
                     
                     if len(x) != self.yData.shape[self.dataAxis]:
-                        raise TypeError("The supplied signal domain (x) must have the same size as the data axis %s" % dataAxis)
+                        raise TypeError("The supplied signal domain (x) must have the same size as the data axis %s" % self.dataAxis)
                         
                     if is_column_vector(x):
                         self.xData = x
