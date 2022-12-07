@@ -942,6 +942,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.actionRefresh.triggered.connect(self.slot_refreshDataDisplay)
         
+        self.actionData_to_workspace.setIcon(QtGui.QIcon.fromTheme("document-export"))
+        self.actionData_to_workspace.triggered.connect(self.slot_exportDataToWorkspace)
+        
     # ### BEGIN properties
     @property
     def dockWidgets(self):
@@ -3116,13 +3119,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         cm = QtWidgets.QMenu("Data operations", self)
         
         copyItemData = cm.addAction("Copy to workspace")
-        copyItemData.triggered.connect(self.slot_exportItemDataToWorkspace)
+        copyItemData.triggered.connect(self.slot_exportAnnotationDataToWorkspace)
         
         cm.popup(self.annotationsViewer.mapToGlobal(point), copyItemData)
         
     @pyqtSlot()
     @safeWrapper
-    def slot_exportItemDataToWorkspace(self):
+    def slot_exportAnnotationDataToWorkspace(self):
         if self._scipyenWindow_ is None:
             return
         
@@ -3132,6 +3135,25 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             return
         
         self._export_data_items_(items)
+        
+    @pyqtSlot()
+    def slot_exportDataToWorkspace(self):
+        if self.yData is None:
+            return
+        
+        if self.xData is None:
+            var_name = getattr(self.yData, "name", None)
+            if not isinstance(var_name, str) or len(var_name.strip()) == 0:
+                var_name = "data"
+            
+            self.exportDataToWorkspace(self.yData, var_name)
+            
+        else:
+            data = (self.xData, self.yData)
+            var_name ="data"
+            self.exportDataToWorkspace(data, var_name)
+        
+        
         
     @safeWrapper
     def _export_data_items_(self, items):

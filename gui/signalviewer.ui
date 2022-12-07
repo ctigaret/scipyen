@@ -169,7 +169,7 @@
      <x>0</x>
      <y>0</y>
      <width>726</width>
-     <height>28</height>
+     <height>20</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -183,6 +183,7 @@
      <addaction name="actionSVG"/>
      <addaction name="actionTIFF"/>
      <addaction name="actionPNG"/>
+     <addaction name="actionData_to_workspace"/>
     </widget>
     <addaction name="actionOpen"/>
     <addaction name="menuExport"/>
@@ -302,6 +303,11 @@
   <action name="actionRefresh">
    <property name="text">
     <string>Refresh</string>
+   </property>
+  </action>
+  <action name="actionData_to_workspace">
+   <property name="text">
+    <string>Data to workspace</string>
    </property>
   </action>
  </widget>

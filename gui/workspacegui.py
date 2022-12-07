@@ -390,8 +390,17 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         """
         from core.workspacefunctions import getvarsbytype
         #print("dataTypes", dataTypes)
+        if self.isTopLevel and self.appWindow:
+            scipyenWindow = self.appWindow
+        else:
+            parent = self.parent()
+            if getattr(parent, "isTopLevel", None) == True:
+                scipyenWindow = parent.appWindow
+            else:
+                return
+
         
-        user_ns_visible = dict([(k,v) for k,v in self._scipyenWindow_.workspace.items() if k not in self._scipyenWindow_.workspaceModel.user_ns_hidden])
+        user_ns_visible = dict([(k,v) for k,v in scipyenWindow.workspace.items() if k not in scipyenWindow.workspaceModel.user_ns_hidden])
         
         name_vars = getvarsbytype(dataTypes, ws = user_ns_visible)
         
@@ -414,17 +423,25 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         
         if ans == QtWidgets.QDialog.Accepted:
             if with_varName:
-                return [(i, self._scipyenWindow_.workspace[i]) for i in dialog.selectedItemsText]
+                return [(i, scipyenWindow.workspace[i]) for i in dialog.selectedItemsText]
             else:
-                return [self._scipyenWindow_.workspace[i] for i in dialog.selectedItemsText]
+                return [scipyenWindow.workspace[i] for i in dialog.selectedItemsText]
             
         return list()
     
     @safeWrapper
     def exportDataToWorkspace(self, data:typing.Any, var_name:str, title:str="Export data to workspace"):
         newVarName = strutils.str2symbol(var_name)
-        if self.appWindow:
-            newVarName = validate_varname(newVarName, ws = self.appWindow.workspace)
+        if self.isTopLevel and self.appWindow:
+            scipyenWindow = self.appWindow
+        else:
+            parent = self.parent()
+            if getattr(parent, "isTopLevel", None) == True:
+                scipyenWindow = parent.appWindow
+            else:
+                return
+
+        newVarName = validate_varname(newVarName, ws = scipyenWindow.workspace)
         
         dlg = qd.QuickDialog(self, title)
         namePrompt = qd.StringInput(dlg, "Export data as:")
@@ -437,13 +454,13 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         
         if dlg.exec() == QtWidgets.QDialog.Accepted:
             newVarName = namePrompt.text()
-            # newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
-            if newVarName in self._scipyenWindow_.workspace:
+            # newVarName = validate_varname(namePrompt.text(), scipyenWindow.workspace)
+            if newVarName in scipyenWindow.workspace:
                 accept = self.questionMessage("Export to workspace", f"A variable named {newVarName} exists in the workspace. Overwrite?")
                 if accept not in (QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Yes):
                     return
                 
-            self._scipyenWindow_.assignToWorkspace(newVarName, data)
+            scipyenWindow.assignToWorkspace(newVarName, data)
             
             if hasattr(data, "modified") and isinstance(data.modified, bool):
                 data.modified=False
@@ -454,10 +471,20 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     def getDataSymbolInWorkspace_(self, data=None):
         """Calls workspacefunctions.get_symbol_in_namespace for the data.
         """
+        if self.isTopLevel and self.appWindow:
+            scipyenWindow = self.appWindow
+        else:
+            parent = self.parent()
+            if getattr(parent, "isTopLevel", None) == True:
+                scipyenWindow = parent.appWindow
+            else:
+                return
+            
         if data is None:
             data = self._data_
-        if data is not None and isinstance(self._scipyenWindow_, QtWidgets.QMainWindow) and self._scipyenWindow_.__class__.__name__.startswith("ScipyenWindow"):
-            return get_symbol_in_namespace(data, self._scipyenWindow_.workspace)
+            
+        if data is not None and isinstance(scipyenWindow, QtWidgets.QMainWindow) and scipyenWindow.__class__.__name__.startswith("ScipyenWindow"):
+            return get_symbol_in_namespace(data, scipyenWindow.workspace)
     
             
         
