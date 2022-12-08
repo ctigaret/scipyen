@@ -6402,6 +6402,9 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
 def slide_detect(x,h):
     if any(v.ndim != 1 for v in (x,h)):
         raise TypeError("Expecting two 1D vectors")
+    print(f"x.shape {x.shape}")
+    print(f"h.shape {h.shape}")
+    
     N = h.shape[0]
     
     M = x.shape[0]
@@ -6411,15 +6414,17 @@ def slide_detect(x,h):
     pad = x[M-N:]
     
     xx = np.concatenate([x, pad], axis=0)
+    print(f"xx.shape {xx.shape}")
     
-    sum_h = np.sum(h)           # Σ template
-    sum_h2 = sum_h**2           # (Σ template)²
-    sum_h2_N = sum_h2/N         # (Σ template)² / N
+    sum_h = np.sum(h)           # Σ TEMPLATE
+    sum_h2 = sum_h*sum_h        # Σ TEMPLATE * Σ TEMPLATE = (Σ TEMPLATE)²
+    sum_h2_N = sum_h2/N         # (Σ TEMPLATE)² / N
     
-    h_dot = np.dot(h, h)        # Σ(template²)
+    h_dot = np.dot(h, h)        # Σ TEMPLATE²
     
-    beta_denom = h_dot - sum_h2_N
-    
+    beta_denom = h_dot - sum_h2_N #  Σ TEMPLATE² - Σ TEMPLATE * Σ TEMPLATE/N
+    # N_b_denom = N (beta_denom)
+#     
     
     α  = np.full_like(x, fill_value = np.nan) # offset
     β  = np.full_like(x, fill_value = np.nan) # scale
@@ -6427,43 +6432,52 @@ def slide_detect(x,h):
     σ  = np.full_like(x, fill_value = np.nan) # standard error
     θ  = np.full_like(x, fill_value = np.nan) # criterion   
     
-    b_denom = N*sum_h2 - h_dot
+    # b_denom = h_dot - sum_h2_N  
     
-    y = xx[0:N]
-    sum_y = np.sum(y)
-    y_dot = np.dot(y,y)
+    
+    # y = xx[0:N]
+    # print(f"y.shape {y.shape}")
+    # sum_y = np.sum(y)
+    # sum_y_N = sum_y / N
+    # y_dot = np.dot(y,y)
     
     for k in range(M):
         y = xx[k:k+N]
-        # sum_y = np.sum(y, axis=0) # Σ data
-        # y_dot = np.dot(y,y)       # Σ(data²)
+        sum_y = np.sum(y) # Σ data
+        sum_y_N = sum_y / N
+        y_dot = np.dot(y,y)       # Σ(data²)
         
-        l = k + N - 1
+        # l = k + N - 1
         # if l >= M:
         #     l = M-1
-        if k > 1:
-            sum_y = sum_y + y[-1] - xx[k-1]       # Σ data
-            y_dot = y_dot + y[-1]**2 - xx[k-1]**2 # Σ(data²)
-            # sum_y = sum_y + xx[l] - xx[k-1]       # Σ data
-            # y_dot = y_dot + xx[l]**2 - xx[k-1]**2 # Σ(data²)
+#         if k > 1:
+#             sum_y = sum_y + y[-1] - xx[k-1]       # Σ DATA
+#             sum_y_N = sum_y / N
+#             
+#             y_dot = y_dot + y[-1]**2 - xx[k-1]**2 # Σ DATA²
+            
+            # sum_y = sum_y + xx[l] - xx[k-1]       # Σ DATA
+            # y_dot = y_dot + xx[l]**2 - xx[k-1]**2 # Σ DATA²
             
             
-        hy_dot = np.dot(h, y)   # Σ(template * data)
+        hy_dot = np.dot(h, y)   # Σ(TEMPLATE * DATA)
         
-        β[k]  = hy_dot - sum_h * sum_y/N / beta_denom
+        # SCALE = [Σ(TEMPLATE * DATA) - Σ TEMPLATE * Σ DATA /N] / (Σ TEMPLATE² - Σ TEMPLATE * Σ TEMPLATE / N)
+        
+        β[k]  = hy_dot - sum_h * sum_y_N / beta_denom
         
         α[k] = (sum_y - β[k]*sum_h)/N
         
         
-        # the scaled template:
+        
+        
+        # Calculate the SSE
+        # the scaled (fitted) template:
         h_ = h*β[k] + α[k]
+        y_h = y - h_ # the error
+        ε[k] = np.dot(y_h, y_h) # explicit
         
-        
-        # the SSE
-        # y_h = y - h_ # the error
-        # ε[k] = np.dot(y_h, y_h) # explicit
-        
-        ε[k] = y_dot + β[k]*β[k] * h_dot + N*α[k]*α[k] - 2 * (β[k]*hy_dot + α[k]*sum_y - α[k]*β[k]*sum_h)
+        # ε[k] = y_dot + β[k]*β[k] * h_dot + N*α[k]*α[k] - 2 * (β[k]*hy_dot + α[k]*sum_y - α[k]*β[k]*sum_h)
         # ε[k] = y_dot + β[k]**2 * h_dot + N*α[k]**2 - 2 * (β[k]*hy_dot + α[k]*sum_y - α[k]*β[k]*sum_h)
         
         # the standard error
@@ -6472,8 +6486,12 @@ def slide_detect(x,h):
         # the detection criterion: scale / standard error
         θ[k] = β[k] / σ[k]
     
+    Result = collections.namedtuple("Result", ["θ", "α", "β", "ε", "σ", "xx", "x"])
+    
+    ret = Result(θ , α, β, ε, σ, xx, x)
+    return ret
         
-    return θ , α, β, ε, σ 
+    # return θ , α, β, ε, σ, xx
     
     
 def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typing.Optional[float]=None, removeDC:typing.Union[bool, float]=True):

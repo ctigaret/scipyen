@@ -63,6 +63,7 @@ class SignalCursor(QtCore.QObject):
     sig_reportPosition = pyqtSignal(str, name="sig_reportPosition")
     #sig_reportDynamicPosition = pyqtSignal(str, name="sig_reportDynamicPosition")
     sig_doubleClicked = pyqtSignal(str, name = "sig_doubleClicked")
+    sig_lineContextMenuRequested(str, name = "sig_lineContextMenuRequested")
     
     sig_axisPositionChanged = pyqtSignal(tuple, name="sig_axisPositionChanged")
 
@@ -328,6 +329,7 @@ class SignalCursor(QtCore.QObject):
                                             hoverPen = self._hoverPen_)
                 
                 self._hl_.sig_double_clicked.connect(self.slot_line_doubleClicked)
+                self._hl_sigClicked.connect(self.slot_line_Clicked)
             
                 if not self._follows_mouse_:
                     if self._cursor_type_ == SignalCursor.SignalCursorTypes.horizontal:
@@ -378,6 +380,7 @@ class SignalCursor(QtCore.QObject):
                                             hoverPen = self._hoverPen_)
                 
                 self._vl_.sig_double_clicked.connect(self.slot_line_doubleClicked)
+                self._vl_sigClicked.connect(self.slot_line_Clicked)
             
                 if not self._follows_mouse_: 
                     if self._cursor_type_ == SignalCursor.SignalCursorTypes.vertical:
@@ -1054,6 +1057,12 @@ class SignalCursor(QtCore.QObject):
         if (self.vline is not None and self.vline in items) or \
             (self.hline is not None and self.hline in items):
             self.sig_cursorSelected.emit(self.ID)
+            
+    @pyqtSlot(object)
+    def slot_line_Clicked(self, evt):
+        print(f"{self.__class__.__name__}.slot_line_Clicked evt {evt}")
+        if evt.button() == QtCore.Qt.MouseButton.RightButton:
+            self.sig_lineContextMenuRequested.emit(self.ID)
             
     @pyqtSlot()
     def slot_line_doubleClicked(self):

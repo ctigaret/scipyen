@@ -424,8 +424,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     defaultCursorHoverColor = "red"
 
-    def __init__(self, x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, y: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, frameAxis:(int, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelAxis:(int, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, interval:(tuple, list) = None, channelIndex:object = None, currentFrame:(int, type(None)) = None, plotStyle: str = "plot", *args, **kwargs):
+    def __init__(self, x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, y: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, frameAxis:(int, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelAxis:(int, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, singleFrame:bool=False, interval:(tuple, list) = None, channelIndex:object = None, currentFrame:(int, type(None)) = None, plotStyle: str = "plot", *args, **kwargs):
         """SignalViewer constructor.
+        TODO: Write docstring!
         """
         super(QMainWindow, self).__init__(parent)
         
@@ -653,6 +654,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             irregularSignalChannelAxis = irregularSignalChannelAxis,
                             irregularSignalChannelIndex = irregularSignalChannelIndex,
                             separateSignalChannels = separateSignalChannels,
+                            singleFrame = singleFrame,
                             interval = interval,
                             channelIndex = channelIndex,
                             currentFrame = currentFrame,
@@ -3088,6 +3090,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         cursorDict[crsId].sig_cursorSelected[str].connect(self.slot_selectCursor)
         cursorDict[crsId].sig_reportPosition[str].connect(self.slot_reportCursorPosition)
         cursorDict[crsId].sig_doubleClicked[str].connect(self.slot_editCursor)
+        cursorDict[srcId].sig_lineContextMenuRequested[str].connect(self.slot_cursorMenu)
         cursorDict[crsId].sig_editMe[str].connect(self.slot_editCursor)
         
         return crsId
@@ -3572,6 +3575,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 self.selectedDataCursor = None
                 
+    @pyqtSlot(str)
+    def slot_cursorMenu(self, crsId):
+        print(f"{self.__class__.__name__} ({self.windowTitle()}) slot_cursorMenu RMB click on {crsId}")
     @pyqtSlot(str)
     @pyqtSlot(bool)
     @safeWrapper
@@ -4914,7 +4920,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return True
 
     @safeWrapper
-    def _parse_data_old_(self, x, y, frameIndex, frameAxis, signalChannelAxis, signalIndex, signalChannelIndex, irregularSignalIndex, irregularSignalChannelAxis, irregularSignalChannelIndex, separateSignalChannels):
+    def _parse_data_old_(self, x, y, frameIndex, frameAxis, signalChannelAxis, signalIndex, signalChannelIndex, irregularSignalIndex, irregularSignalChannelAxis, irregularSignalChannelIndex, separateSignalChannels, singleFrame):
         """Sets up the data model, essentially -- "interprets" the data 
         structure such that plotting of different types of objects containing
         numeric data sequences is made possible.
@@ -4935,6 +4941,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.separateSignalChannels = False
         self.signalChannelAxis = 1
         self.dataAxis = 0 # data as column vectors
+        self.singleFrame = False
             
         if isinstance(y, neo.baseneo.BaseNeo):
             self.globalAnnotations = {type(y).__name__ : y.annotations}
@@ -5325,6 +5332,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # TODO 2020-03-08 11:05:06
             # code for sequence of neo.SpikeTrain, and sequence of neo.Event
             self.separateSignalChannels         = separateSignalChannels
+            self.singleFrame                    = singleFrame # force all arrays in a sequence as a multiaxis single frame
+            if self.singleFrame:
+                self.separateSignalChannels = False # avoid any confusions
             self.signalChannelAxis              = signalChannelAxis 
 
             if np.all([isinstance(i, vigra.filters.Kernel1D) for i in y]):
@@ -5406,8 +5416,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.irregularSignalIndex           = irregularSignalIndex
                 self.docTitle = "Neo blocks"
                 
-            elif all([isinstance(i, (neo.core.AnalogSignal, neo.core.IrregularlySampledSignal,  
-                                     DataSignal, IrregularlySampledDataSignal)) for i in y]):
+            elif all([isinstance(i, (neo.core.AnalogSignal, neo.core.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)) for i in y]):
                 # NOTE: 2019-11-30 09:42:27
                 # Treat this as a segment, EXCEPT that each signal is plotted
                 # in its own frame. This is because in a generic container
@@ -5457,7 +5466,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.dataAxis = 1 if self.signalChannelAxis == 0 else 0
                     
                 self._plotEpochs_(clear=True)
-                self.frameIndex = range(len(y))
+                self.frameIndex = range(1) if self.singleFrame else range(len(y))
                 self._number_of_frames_ = len(self.frameIndex)
                 self.signalIndex = 1
 
@@ -5499,7 +5508,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     _parse_data_ = _parse_data_old_
     
     @safeWrapper
-    def _set_data_(self, x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)),  y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, doc_title:(str, type(None)) = None, frameAxis:(int, str, vigra.AxisInfo, type(None)) = None, signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, interval:(tuple, list, neo.Epoch, type(None)) = None, plotStyle:str = "plot", showFrame:int = None, *args, **kwargs):
+    def _set_data_(self, x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)),  y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, doc_title:(str, type(None)) = None, frameAxis:(int, str, vigra.AxisInfo, type(None)) = None, signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, singleFrame:bool=False, interval:(tuple, list, neo.Epoch, type(None)) = None, plotStyle:str = "plot", showFrame:int = None, *args, **kwargs):
         self.plot_start = None
         self.plot_stop = None
         
@@ -5538,7 +5547,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                        irregularSignalIndex=irregularSignalIndex,
                                        irregularSignalChannelAxis=irregularSignalChannelAxis,
                                        irregularSignalChannelIndex=irregularSignalChannelIndex,
-                                       separateSignalChannels=separateSignalChannels)
+                                       separateSignalChannels=separateSignalChannels,
+                                       singleFrame=singleFrame)
             
             self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self.yData))
                         
@@ -5586,7 +5596,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             traceback.print_exc()
             
     @safeWrapper
-    def setData(self, x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), /, y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,doc_title:(str, type(None)) = None, frameAxis:(int, str, vigra.AxisInfo, type(None)) = None, signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, interval:(tuple, list, neo.Epoch, type(None)) = None, plotStyle:str = "plot", get_focus:bool = False, showFrame = None, *args, **kwargs):
+    def setData(self, x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), /, y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,doc_title:(str, type(None)) = None, frameAxis:(int, str, vigra.AxisInfo, type(None)) = None, signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, singleFrame:bool=False, interval:(tuple, list, neo.Epoch, type(None)) = None, plotStyle:str = "plot", get_focus:bool = False, showFrame = None, *args, **kwargs):
         """Plot data in SignalViewer.
         
         Positional parameters:
@@ -6359,11 +6369,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else: # accepts sequence of np.ndarray or VigraKernel1D objects
                 self._setup_signal_choosers_(self.yData)
                 
-                if isinstance(self.xData, list):
-                    self._plotNumpyArray_(self.xData[self._current_frame_index_], self.yData[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+                if self.singleFrame == True:
+                    self._plotNumpyArrays_(self.xData, self.yData, *self.plot_args, **self.plot_kwargs)
                     
                 else:
-                    self._plotNumpyArray_(self.xData, self.yData[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+                
+                    if isinstance(self.xData, list):
+                        self._plotNumpyArray_(self.xData[self._current_frame_index_], self.yData[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+                        
+                    else:
+                        self._plotNumpyArray_(self.xData, self.yData[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
                     
         #### END self.yData is a sequence of objects
         
@@ -7088,9 +7103,33 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             self.plotTitleLabel.setText(plotTitle, color = "#000000")
             
+    @safeWrapper
+    def _plotNumpyArrays_(self, x, y, *args, **kwargs):
+        """Plots several signals in one frame"""
+        self._setup_signal_choosers_(y) # FIXME for a list of signals
+        
+        if not isinstance(y, (tuple, list)) or not all(isinstance(v, np.ndarray) for v in y):
+            raise TypeError(f"_plotNumpyArrays_ expects a seuence (tuple, list) of numpy arrays")
+        
+        if isinstance (x, (tuple, list)):
+            if len(x) not in (1,len(y)):
+                raise ValueError(f"x sequence does not match y sequence")
+            
+        else:
+            x = [x]
+            
+        self._prepareAxes_(len(y))
+        
+        for k, y_ in enumerate(y):
+            if len(x) == 1:
+                self._plotNumpyArray_(x[0], y_, self.plotItem(k))
+                
+            else:
+                self._plotNumpyArray_(x[k], y_, self.plotItem(k))
+            
         
     @safeWrapper
-    def _plotNumpyArray_(self, x, y, *args, **kwargs):
+    def _plotNumpyArray_(self, x, y, axis = None, *args, **kwargs):
         """Called to plot a numpy array of up to three dimensions
         """
 #         print(f"{self.__class__.__name__} _plotNumpyArray_ call stack:")
@@ -7102,8 +7141,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._setup_signal_choosers_(y)
         
         if y.ndim == 1:
-            self._prepareAxes_(1)
-            self._plot_numeric_data_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs)
+            if not isinstance(axis, pg.PlotItem):
+                self._prepareAxes_(1)
+                self._plot_numeric_data_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs)
+            else:
+                self._plot_numeric_data_(axis, x, y, name="Analog signal", *args, **kwargs)
             #self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs))
             
         elif y.ndim == 2:
@@ -7124,22 +7166,40 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         
                 else:
                     # plot everything in the same axis
-                    self._prepareAxes_(1)
-                    if y.shape[self.signalChannelAxis] > 10:
-                        self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs))
+                    if not isinstance(axis, pg.PlotItem):
+                        self._prepareAxes_(1)
+                        if y.shape[self.signalChannelAxis] > 10:
+                            self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs))
+                        else:
+                            self._plot_numeric_data_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs)
                     else:
-                        self._plot_numeric_data_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs)
+                        if y.shape[self.signalChannelAxis] > 10:
+                            self.sig_plot.emit(self._make_sig_plot_dict_(axis, x, y, name="Analog signal", *args, **kwargs))
+                        else:
+                            self._plot_numeric_data_(axis, x, y, name="Analog signal", *args, **kwargs)
+                        
                     
             else:
-                self._prepareAxes_(1) # one axis per frame: one channel per frame
-                y_ = y[array_slice(y, {self.frameAxis:self.currentFrame})]
-                if y_.shape[self.signalChannelAxis] > 10:
-                    self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), 
-                                            x, y_,
-                                            *args, **kwargs))
+                if not isinstance(axis, pg.PlotItem):
+                    self._prepareAxes_(1) # one axis per frame: one channel per frame
+                    y_ = y[array_slice(y, {self.frameAxis:self.currentFrame})]
+                    if y_.shape[self.signalChannelAxis] > 10:
+                        self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), 
+                                                x, y_,
+                                                *args, **kwargs))
+                    else:
+                            
+                        self._plot_numeric_data_(self.plotItem(0), x, y_, *args, **kwargs)
                 else:
-                        
-                    self._plot_numeric_data_(self.plotItem(0), x, y_, *args, **kwargs)
+                    y_ = y[array_slice(y, {self.frameAxis:self.currentFrame})]
+                    if y_.shape[self.signalChannelAxis] > 10:
+                        self.sig_plot.emit(self._make_sig_plot_dict_(axis, 
+                                                x, y_,
+                                                *args, **kwargs))
+                    else:
+                            
+                        self._plot_numeric_data_(axis, x, y_, *args, **kwargs)
+                    
                 
         elif y.ndim == 3:
             # the number of frame is definitely > 1 and there are more than
@@ -7156,14 +7216,23 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                                 x, y_, *args, **kwargs)
                 
             else:
-                self._prepareAxes_(1)
-                y_ = y[array_slice(y, {self.frameAxis:self.currentFrame})]
-                if y_.shape[self.signalChannelAxis] > 10:
-                    self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), 
-                                            x, y_, *args, **kwargs))
+                if not isinistance(axis, pg.PlotItem):
+                    self._prepareAxes_(1)
+                    y_ = y[array_slice(y, {self.frameAxis:self.currentFrame})]
+                    if y_.shape[self.signalChannelAxis] > 10:
+                        self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), 
+                                                x, y_, *args, **kwargs))
+                    else:
+                        self._plot_numeric_data_(self.plotItem(0), 
+                                                x, y_, *args, **kwargs)
                 else:
-                    self._plot_numeric_data_(self.plotItem(0), 
-                                            x, y_, *args, **kwargs)
+                    y_ = y[array_slice(y, {self.frameAxis:self.currentFrame})]
+                    if y_.shape[self.signalChannelAxis] > 10:
+                        self.sig_plot.emit(self._make_sig_plot_dict_(axis, 
+                                                x, y_, *args, **kwargs))
+                    else:
+                        self._plot_numeric_data_(axis, 
+                                                x, y_, *args, **kwargs)
                     
         else:
             raise TypeError("numpy arrays with more than three dimensions are not supported")
