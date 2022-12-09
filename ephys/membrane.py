@@ -6353,7 +6353,7 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
         return θ, α, β, ε, σ 
         
     if x.ndim not in (1,2):
-        raise TypeError(f"Signla must be a 1D or 2D array; got shape {x.shape} instead")
+        raise TypeError(f"Signal must be a 1D or 2D array; got shape {x.shape} instead")
     
     if isinstance(x, pq.Quantity):
         xx = x.magnitude

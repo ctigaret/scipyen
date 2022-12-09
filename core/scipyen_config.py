@@ -101,6 +101,8 @@ from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 from PyQt5.QtWidgets import (QWidget, QMainWindow)
 from PyQt5.QtCore import (QSettings, QVariant)
 
+from IPython.lib.pretty import pprint
+
 import traitlets
 from traitlets.utils.bunch import Bunch
 import traitlets.config
@@ -168,6 +170,7 @@ confuse.yaml_util.Loader.add_constructor("tag:pq.Quantity", quantity_constructor
 application_name = "Scipyen"
 organization_name = "Scipyen"
 
+global scipyen_config
 scipyen_config = confuse.LazyConfig(application_name, "scipyen_defaults")
 
 if not scipyen_config._materialized:# make sure this is done only once
@@ -1177,7 +1180,7 @@ class ScipyenConfigurable(object):
     def _get_config_view_(self, isTop=True, parent=None, tag=None):
         """
         If isTop, returns the confuse config section for the class of this instance:
-                scipyen_config → thic class name
+                scipyen_config → this class name
         Else:
             If parent is not None:
                 If tag is not None (or an empty str)
@@ -1189,6 +1192,9 @@ class ScipyenConfigurable(object):
                 return the same thing as if isTop were True ('cause there's no parent, let alone a tag)
                     
         """
+        if self.__class__.__name__ == "MPSCAnalysis":
+            print(f"scipyen_config {scipyen_config}")
+            
         if isTop: 
             return scipyen_config[self.__class__.__name__].get(None)
             
@@ -1315,7 +1321,6 @@ class ScipyenConfigurable(object):
                 setter(val)
     
     def loadSettings(self):
-        print(f"ScipyenConfigurable<{self.__class__.__name__}.loadSettings()")
         cfg = self.clsconfigurables
             
         # NOTE 2021-09-06 17:37:14
@@ -1325,11 +1330,15 @@ class ScipyenConfigurable(object):
             parent = self._get_parent_()
             tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
             
+            if self.__class__.__name__ == "MPSCAnalysis":
+                print(f"isTop: {isTop}, parent = {parent}, tag = {tag}")
+                
             user_conf = self._get_config_view_(isTop, parent, tag)
             
             #### BEGIN debug - comment out when done
-            # if self.__class__.__name__ == "MPSCAnalysis":
-            #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings() user_conf {user_conf}")
+            if self.__class__.__name__ == "MPSCAnalysis":
+                print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings() to load user_conf:")
+                pprint(user_conf)
             #### END debug - comment out when done
 
             if isinstance(user_conf, dict):
@@ -1358,7 +1367,7 @@ class ScipyenConfigurable(object):
         On the other hand, individual settings can be organized hierarchically
         by collecting them in a dict (or dict-like) object.
         """
-        print(f"ScipyenConfigurable<{self.__class__.__name__}.saveSettings()")
+        # print(f"ScipyenConfigurable<{self.__class__.__name__}.saveSettings()")
         # NOTE: 2021-05-04 21:53:04
         # This saveSettings has access to all the subclass attributes (with the
         # subclass being  fully initialized by the time this is called).
@@ -1372,14 +1381,20 @@ class ScipyenConfigurable(object):
         
         if len(cfg):
             isTop = hasattr(self, "isTopLevel") and self.isTopLevel
+                
             parent = self._get_parent_()
             tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
             
+            if self.__class__.__name__ == "MPSCAnalysis":
+                print(f"isTop, {isTop}, parent, {parent}, tag {tag}")
+                
             user_conf = self._get_config_view_(isTop, parent, tag)
             
             #### BEGIN debug - comment out when done
-            # if self.__class__.__name__ == "MPSCAnalysis":
-            #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf {user_conf}")
+            if self.__class__.__name__ == "MPSCAnalysis":
+                print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf:")
+                pprint(user_conf)
+                
             #### END debug - comment out when done
             
             changed = False
@@ -1402,8 +1417,8 @@ class ScipyenConfigurable(object):
                         val  = getter()
 
                     #### BEGIN debug - comment out when done
-                    # if self.__class__.__name__ == "MPSCAnalysis":
-                    #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings(), getter={gettername} → {k}={val} ({type(val).__name__}), v {v} ({type(v).__name__})")
+                    if self.__class__.__name__ == "MPSCAnalysis":
+                        print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings(), getter={gettername} → {k}={val} ({type(val).__name__}), v {v} ({type(v).__name__})")
                     #### END debug - comment out when done
                     
                     if val != v:
