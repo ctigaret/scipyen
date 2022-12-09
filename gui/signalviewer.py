@@ -7456,6 +7456,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             kwargs["pen"] = None
             kwargs["symbolPen"] = symbolPen
         
+        # NOTE: 2022-12-09 09:22:09
+        # rewriting into a pg.PlotDataItem needs vector (array with shape (N,))
+        # OR array with shape (N,2); 
+        # "vectors" with shape (N,1) won't do
         plotDataItems = [i for i in plotItem.listDataItems() if isinstance(i, pg.PlotDataItem)]
 
         if "name" not in kwargs:
@@ -7467,7 +7471,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if any(y_nan_ndx):
                 yy = y[~y_nan_ndx]
                 if x is not None:
-                    xx = x[~y_nan_ndx,0]
+                    if x.ndim == 1:
+                        xx = x[~y_nan_ndx]
+                    else:
+                        xx = x[~y_nan_ndx,0]
                 else:
                     xx =  None
                 

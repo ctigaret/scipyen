@@ -6399,7 +6399,7 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
     # print(np.any(np.isnan(xx_)))
     
     
-def slide_detect(x,h):
+def slide_detect(x,h, padding:bool=False):
     if any(v.ndim != 1 for v in (x,h)):
         raise TypeError("Expecting two 1D vectors")
     print(f"x.shape {x.shape}")
@@ -6409,13 +6409,27 @@ def slide_detect(x,h):
     
     M = x.shape[0]
     
-    # pad xx with a vector of size h, by duplicating last size(h) elements
-    
-    pad = x[M-N:]
-    
-    xx = np.concatenate([x, pad], axis=0)
-    print(f"xx.shape {xx.shape}")
-    
+    if padding:
+        # pad xx with a vector of size h, by duplicating last size(h) elements
+        
+        pad = x[M-N:]
+        
+        time_range = range(M)
+        
+        xx = np.concatenate([x, pad], axis=0)
+        # print(f"xx.shape {xx.shape}")
+        
+        α  = np.full_like(x, fill_value = np.nan) # offset
+        β  = np.full_like(x, fill_value = np.nan) # scale
+        ε  = np.full_like(x, fill_value = np.nan) # sse
+    else:
+        xx = x
+        time_range = range(M-N)
+        α  = np.full((M, ), fill_value = np.nan) # offset
+        β  = np.full((M,), fill_value = np.nan) # scale
+        ε  = np.full((M,), fill_value = np.nan) # sse
+        
+        
     sum_h = np.sum(h)           # Σ TEMPLATE
     sum_h2 = sum_h*sum_h        # Σ TEMPLATE * Σ TEMPLATE = (Σ TEMPLATE)²
     sum_h2_N = sum_h2/N         # (Σ TEMPLATE)² / N
@@ -6426,9 +6440,6 @@ def slide_detect(x,h):
     # N_b_denom = N (beta_denom)
 #     
     
-    α  = np.full_like(x, fill_value = np.nan) # offset
-    β  = np.full_like(x, fill_value = np.nan) # scale
-    ε  = np.full_like(x, fill_value = np.nan) # sse
     # σ  = np.full_like(x, fill_value = np.nan) # standard error
     # θ  = np.full_like(x, fill_value = np.nan) # criterion   
     
@@ -6441,7 +6452,7 @@ def slide_detect(x,h):
     # sum_y_N = sum_y / N
     # y_dot = np.dot(y,y)
     
-    for k in range(M):
+    for k in time_range:
         y = xx[k:k+N]
         sum_y = np.sum(y) # Σ data
         sum_y_N = sum_y / N

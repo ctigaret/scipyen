@@ -1315,6 +1315,7 @@ class ScipyenConfigurable(object):
                 setter(val)
     
     def loadSettings(self):
+        print(f"ScipyenConfigurable<{self.__class__.__name__}.loadSettings()")
         cfg = self.clsconfigurables
             
         # NOTE 2021-09-06 17:37:14
@@ -1357,6 +1358,7 @@ class ScipyenConfigurable(object):
         On the other hand, individual settings can be organized hierarchically
         by collecting them in a dict (or dict-like) object.
         """
+        print(f"ScipyenConfigurable<{self.__class__.__name__}.saveSettings()")
         # NOTE: 2021-05-04 21:53:04
         # This saveSettings has access to all the subclass attributes (with the
         # subclass being  fully initialized by the time this is called).
