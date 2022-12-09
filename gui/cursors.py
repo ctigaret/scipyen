@@ -16,11 +16,23 @@ import quantities as pq
 
 from core.prog import safeWrapper
 
-class ClickableInfiniteLine(pg.InfiniteLine):
+class CursorLine(pg.InfiniteLine):
     sig_double_clicked = pyqtSignal()
+    
     
     def _init__(self, **kwargs):
         super().__init__(**kwargs)
+        
+    # def mouseClickevent(self, evt):
+    #     self.sigClicked.emit(self, ev)
+    #     if self.moving and ev.button() == QtCore.Qt.MouseButton.RightButton:
+    #         ev.accept()
+    #         self.setPos(self.startPosition)
+    #         self.moving = False
+    #         self.sigDragged.emit(self)
+    #         self.sigPositionChangeFinished.emit(self)
+    #     # if evt.button() == QtCore.Qt.MouseButton.RightButton:
+            
         
     def mouseDoubleClickEvent(self, ev):
         if ev.button() == QtCore.Qt.LeftButton:
@@ -63,7 +75,7 @@ class SignalCursor(QtCore.QObject):
     sig_reportPosition = pyqtSignal(str, name="sig_reportPosition")
     #sig_reportDynamicPosition = pyqtSignal(str, name="sig_reportDynamicPosition")
     sig_doubleClicked = pyqtSignal(str, name = "sig_doubleClicked")
-    sig_lineContextMenuRequested(str, name = "sig_lineContextMenuRequested")
+    sig_lineContextMenuRequested = pyqtSignal(str, name = "sig_lineContextMenuRequested")
     
     sig_axisPositionChanged = pyqtSignal(tuple, name="sig_axisPositionChanged")
 
@@ -319,7 +331,7 @@ class SignalCursor(QtCore.QObject):
                 else:
                     label = None
                 
-                self._hl_ = ClickableInfiniteLine(pos=pos, 
+                self._hl_ = CursorLine(pos=pos, 
                                             angle=0, 
                                             movable=not self._follows_mouse_, 
                                             name="%s_h" % name, 
@@ -329,7 +341,7 @@ class SignalCursor(QtCore.QObject):
                                             hoverPen = self._hoverPen_)
                 
                 self._hl_.sig_double_clicked.connect(self.slot_line_doubleClicked)
-                self._hl_sigClicked.connect(self.slot_line_Clicked)
+                self._hl_.sigClicked.connect(self.slot_line_Clicked)
             
                 if not self._follows_mouse_:
                     if self._cursor_type_ == SignalCursor.SignalCursorTypes.horizontal:
@@ -370,7 +382,7 @@ class SignalCursor(QtCore.QObject):
             if not isinstance(self._vl_, pg.InfiniteLine):
                 label = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_) if self._show_value_ else self._cursorId_
                 #print(self._value_precision_)
-                self._vl_ = ClickableInfiniteLine(pos=pos, 
+                self._vl_ = CursorLine(pos=pos, 
                                             angle=90, 
                                             movable=not self._follows_mouse_,
                                             name="%s_v" % name, 
@@ -380,7 +392,7 @@ class SignalCursor(QtCore.QObject):
                                             hoverPen = self._hoverPen_)
                 
                 self._vl_.sig_double_clicked.connect(self.slot_line_doubleClicked)
-                self._vl_sigClicked.connect(self.slot_line_Clicked)
+                self._vl_.sigClicked.connect(self.slot_line_Clicked)
             
                 if not self._follows_mouse_: 
                     if self._cursor_type_ == SignalCursor.SignalCursorTypes.vertical:
@@ -1058,9 +1070,10 @@ class SignalCursor(QtCore.QObject):
             (self.hline is not None and self.hline in items):
             self.sig_cursorSelected.emit(self.ID)
             
-    @pyqtSlot(object)
-    def slot_line_Clicked(self, evt):
-        print(f"{self.__class__.__name__}.slot_line_Clicked evt {evt}")
+    @pyqtSlot(object, object)
+    def slot_line_Clicked(self, obj, evt):
+        # print(f"{self.__class__.__name__}.slot_line_Clicked evt {evt}")
+        # print(f"host item {self._host_graphics_item_}")
         if evt.button() == QtCore.Qt.MouseButton.RightButton:
             self.sig_lineContextMenuRequested.emit(self.ID)
             

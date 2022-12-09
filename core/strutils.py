@@ -232,6 +232,7 @@ def str2symbol(s):
     #print("str2symbol: ", s)
     
     s = s.translate(__translation_table_to_identifier)
+    s = s.replace("__", "_")
     
     # then check if all is digits
     
@@ -250,6 +251,7 @@ def str2R(s):
         raise TypeError("Expecting a str; got %s instead" % type(s).__name__)
     
     s = s.translate(__translation_table_to_R_identifier)
+    s = s.replace("..", ".")
 
     return s
     

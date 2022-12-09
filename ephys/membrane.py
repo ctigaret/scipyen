@@ -6429,8 +6429,8 @@ def slide_detect(x,h):
     α  = np.full_like(x, fill_value = np.nan) # offset
     β  = np.full_like(x, fill_value = np.nan) # scale
     ε  = np.full_like(x, fill_value = np.nan) # sse
-    σ  = np.full_like(x, fill_value = np.nan) # standard error
-    θ  = np.full_like(x, fill_value = np.nan) # criterion   
+    # σ  = np.full_like(x, fill_value = np.nan) # standard error
+    # θ  = np.full_like(x, fill_value = np.nan) # criterion   
     
     # b_denom = h_dot - sum_h2_N  
     
@@ -6469,8 +6469,6 @@ def slide_detect(x,h):
         α[k] = (sum_y - β[k]*sum_h)/N
         
         
-        
-        
         # Calculate the SSE
         # the scaled (fitted) template:
         h_ = h*β[k] + α[k]
@@ -6481,10 +6479,13 @@ def slide_detect(x,h):
         # ε[k] = y_dot + β[k]**2 * h_dot + N*α[k]**2 - 2 * (β[k]*hy_dot + α[k]*sum_y - α[k]*β[k]*sum_h)
         
         # the standard error
-        σ[k] = np.sqrt(ε[k]/(N-1))
+        # σ[k] = np.sqrt(ε[k]/(N-1))
         
         # the detection criterion: scale / standard error
-        θ[k] = β[k] / σ[k]
+        # θ[k] = β[k] / σ[k]
+        
+    σ = np.sqrt(ε/(N-1))
+    θ = β/σ
     
     Result = collections.namedtuple("Result", ["θ", "α", "β", "ε", "σ", "xx", "x"])
     

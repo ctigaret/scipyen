@@ -3090,7 +3090,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         cursorDict[crsId].sig_cursorSelected[str].connect(self.slot_selectCursor)
         cursorDict[crsId].sig_reportPosition[str].connect(self.slot_reportCursorPosition)
         cursorDict[crsId].sig_doubleClicked[str].connect(self.slot_editCursor)
-        cursorDict[srcId].sig_lineContextMenuRequested[str].connect(self.slot_cursorMenu)
+        cursorDict[crsId].sig_lineContextMenuRequested[str].connect(self.slot_cursorMenu)
         cursorDict[crsId].sig_editMe[str].connect(self.slot_editCursor)
         
         return crsId
@@ -3577,7 +3577,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
     @pyqtSlot(str)
     def slot_cursorMenu(self, crsId):
-        print(f"{self.__class__.__name__} ({self.windowTitle()}) slot_cursorMenu RMB click on {crsId}")
+        # TODO ?
+        return
+        # print(f"{self.__class__.__name__} ({self.windowTitle()}) slot_cursorMenu RMB click on {crsId}")
+        
     @pyqtSlot(str)
     @pyqtSlot(bool)
     @safeWrapper

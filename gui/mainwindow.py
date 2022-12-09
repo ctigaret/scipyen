@@ -2562,8 +2562,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     
                     sessionInfoText = f"{sessionInfo[0]}"
                     # sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [repr(sessionNo)])
-                    # sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [sessionInfoText, sessionTimes])
-                    sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [sessionInfoText, "", startDateTime, stopDateTime])
+                    sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [sessionInfoText, sessionTimes])
+                    # sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [sessionInfoText, "", startDateTime, stopDateTime])
                     items.append(sessionItem)
 
                 lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [repr(line), inline])
@@ -4131,7 +4131,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #### END workspace view
         
         #### BEGIN command history view
-        self.historyTreeWidget.setHeaderLabels(["Session, line:", "Statement", "Start date & time","Stop date & time"])
+        self.historyTreeWidget.setHeaderLabels(["Session, line:", "Statement, Date & time:"])
+        # self.historyTreeWidget.setHeaderLabels(["Session, line:", "Statement", "Start date & time","Stop date & time"])
         self.historyTreeWidget.itemActivated[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemActivated)
         self.historyTreeWidget.customContextMenuRequested[QtCore.QPoint].connect(self.slot_historyContextMenuRequest)
         self.historyTreeWidget.itemClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemSelected)
