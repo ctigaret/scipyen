@@ -1192,19 +1192,20 @@ class ScipyenConfigurable(object):
                 return the same thing as if isTop were True ('cause there's no parent, let alone a tag)
                     
         """
-        if self.__class__.__name__ == "MPSCAnalysis":
-            print(f"scipyen_config {scipyen_config}")
+        # if self.__class__.__name__ == "MPSCAnalysis":
+        #     print(f"scipyen_config {id(scipyen_config)} {scipyen_config}")
             
         if isTop: 
-            return scipyen_config[self.__class__.__name__].get(None)
+            return scipyen_config[self.__class__.__name__]#.get()
+            # return scipyen_config[self.__class__.__name__].get(None)
             
         if parent is not None:
             if isinstance(tag, str) and len(tag.strip()):
-                return scipyen_config[parent.__class__.__name__][self.__class__.__name__][tag].get(None)
+                return scipyen_config[parent.__class__.__name__][self.__class__.__name__][tag]#.get(None)
             
-            return scipyen_config[parent.__class__.__name__][self.__class__.__name__].get(None)
+            return scipyen_config[parent.__class__.__name__][self.__class__.__name__]#.get(None)
         
-        return scipyen_config[self.__class__.__name__].get(None) 
+        return scipyen_config[self.__class__.__name__]#.get(None) 
             
     @property
     def configTag(self) -> str:
@@ -1330,29 +1331,39 @@ class ScipyenConfigurable(object):
             parent = self._get_parent_()
             tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
             
-            if self.__class__.__name__ == "MPSCAnalysis":
-                print(f"isTop: {isTop}, parent = {parent}, tag = {tag}")
+            # if self.__class__.__name__ == "MPSCAnalysis":
+            #     print(f"isTop: {isTop}, parent = {parent}, tag = {tag}")
                 
             user_conf = self._get_config_view_(isTop, parent, tag)
             
-            #### BEGIN debug - comment out when done
-            if self.__class__.__name__ == "MPSCAnalysis":
-                print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings() to load user_conf:")
-                pprint(user_conf)
+            # #### BEGIN debug - comment out when done
+            # if self.__class__.__name__ == "MPSCAnalysis":
+            #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings() to load user_conf:")
+            #     pprint(user_conf)
             #### END debug - comment out when done
 
-            if isinstance(user_conf, dict):
+#             if isinstance(user_conf, dict):
+#                 for k, v in user_conf.items():
+#                     getset = cfg.get(k, {})
+#                     settername = getset.get("setter", None)
+#                     
+#                     if not isinstance(settername, str) or len(settername.strip())==0:
+#                         continue
+#                     
+#                     if self.__class__.__name__ == "MPSCAnalysis":
+#                         print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings key {k}: {settername} = {v}")
+#                     
+#                     self._assign_trait_from_config_(settername, v)
+                    
+            if isinstance(user_conf, confuse.Subview):
                 for k, v in user_conf.items():
-                    getset = cfg.get(k, {})
-                    settername = getset.get("setter", None)
-                    
-                    if not isinstance(settername, str) or len(settername.strip())==0:
-                        continue
-                    
-                    # if self.__class__.__name__ == "MPSCAnalysis":
-                    #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings key {k}: {settername} = {v}")
-                    
-                    self._assign_trait_from_config_(settername, v)
+                    if k in cfg:
+                        getset = cfg.get(k, {})
+                        settername = getset.get("setter", None)
+                        
+                        if not isinstance(settername, str) or len(settername.strip()) == 0:
+                            continue
+                        self._assign_trait_from_config_(settername, v.get())
                     
         if issubclass(self.__class__, QtWidgets.QWidget):
             self.loadWindowSettings() 
@@ -1385,15 +1396,15 @@ class ScipyenConfigurable(object):
             parent = self._get_parent_()
             tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
             
-            if self.__class__.__name__ == "MPSCAnalysis":
-                print(f"isTop, {isTop}, parent, {parent}, tag {tag}")
+            # if self.__class__.__name__ == "MPSCAnalysis":
+            #     print(f"isTop, {isTop}, parent, {parent}, tag {tag}")
                 
             user_conf = self._get_config_view_(isTop, parent, tag)
             
             #### BEGIN debug - comment out when done
-            if self.__class__.__name__ == "MPSCAnalysis":
-                print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf:")
-                pprint(user_conf)
+            # if self.__class__.__name__ == "MPSCAnalysis":
+            #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf:")
+            #     pprint(user_conf)
                 
             #### END debug - comment out when done
             
@@ -1417,8 +1428,8 @@ class ScipyenConfigurable(object):
                         val  = getter()
 
                     #### BEGIN debug - comment out when done
-                    if self.__class__.__name__ == "MPSCAnalysis":
-                        print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings(), getter={gettername} → {k}={val} ({type(val).__name__}), v {v} ({type(v).__name__})")
+                    # if self.__class__.__name__ == "MPSCAnalysis":
+                    #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings(), getter={gettername} → {k}={val} ({type(val).__name__}), v {v} ({type(v).__name__})")
                     #### END debug - comment out when done
                     
                     if val != v:

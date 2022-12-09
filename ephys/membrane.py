@@ -6399,11 +6399,95 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
     # print(np.any(np.isnan(xx_)))
     
     
+def calculate_template_scale_offset(x, h):
+    if any(v.ndim != 1 for v in (x,h)):
+        raise TypeError("Expecting two 1D vectors")
+    
+    if x.shape[0] != h.shape[0]:
+        raise ValueError("Both vectors must have the same length")
+    
+    N = h.shape[0]
+    
+    sum_h = np.sum(h)           # Σ TEMPLATE
+    sum_h_N = sum_h/N
+    sum_h2 = sum_h*sum_h        # Σ TEMPLATE * Σ TEMPLATE = (Σ TEMPLATE)²
+    sum_h2_N = sum_h2/N         # (Σ TEMPLATE)² / N
+    
+    h_dot = np.dot(h, h)        # Σ TEMPLATE²
+    
+    beta_denom = h_dot - sum_h2_N #  Σ TEMPLATE² - Σ TEMPLATE * Σ TEMPLATE/N
+    
+    sum_y = np.sum(x) # Σ data
+    sum_y_N = sum_y / N
+    y_dot = np.dot(x,x)       # Σ(data²)
+    
+    hy_dot = np.dot(h, x)   # Σ(TEMPLATE * DATA)
+    
+    β  = (hy_dot - sum_h * sum_y_N) / beta_denom
+    
+    α = sum_y_N - β*sum_h_N
+    
+    h_ = h*β + α
+    y_h = x - h_ # the error
+    ε = np.dot(y_h, y_h) # explicit
+    
+    σ = np.sqrt(ε/(N-1))
+    θ = β/σ
+    
+    print(f" sum_h = {sum_h}")
+    print(f" sum_h_N = {sum_h_N}")
+    print(f" sum_y = {sum_y}")
+    print(f" sum_y_N = {sum_y_N}")
+    print(f" h_dot = {h_dot}")
+    print(f" y_dot = {y_dot}")
+    print(f" hy_dot = {hy_dot}")
+    print(f" sum_h * sum_y_N = {sum_h * sum_y_N }")
+    print(f" β_denom = {beta_denom}")
+    print(f" α = {α}")
+    print(f" β = {β}")
+    print(f" ε = {ε}")
+    print(f" σ = {σ}")
+    print(f" θ = {θ}")
+    
+    return  h_
+
+def test_sliding(x, y, h, viewer, step_size=100):
+    N = h.shape[0]
+    M = y.shape[0]
+    
+    test_y = np.full((M,), fill_value = np.nan)
+    test_h = np.full((M,), fill_value = np.nan)
+    test_scaled_h = np.full((M,), fill_value = np.nan)
+    
+    test_sig = np.concatenate([y[:,np.newaxis],
+                               test_y[:,np.newaxis],
+                               test_h[:,np.newaxis], 
+                               test_scaled_h[:,np.newaxis]],
+                              axis=1)
+    
+    for k in range(0, M-N, 100):
+        print(f"k = {k}")
+        y_ = y[k:(N+k)]
+        scaled_h = calculate_template_scale_offset(y_, h)
+        if k > 0:
+            test_sig[:,1] = np.nan
+            test_sig[:,2] = np.nan
+            test_sig[:,3] = np.nan
+            
+        test_sig[k:(N+k), 1] = y_[:]
+        test_sig[k:(N+k), 2] = h[:]
+        test_sig[k:(N+k), 3] = scaled_h[:]
+        # t_sig = np.concatenate([x_[:,np.newaxis], h[:,np.newaxis], scaled_h[:,np.newaxis]], axis=1)
+        viewer.plot(x, test_sig)
+        a = input("Press Enter to continue, any key followed by Enter to stop: ")
+        if len(a):
+            break
+    
 def slide_detect(x,h, padding:bool=False):
     if any(v.ndim != 1 for v in (x,h)):
         raise TypeError("Expecting two 1D vectors")
-    print(f"x.shape {x.shape}")
-    print(f"h.shape {h.shape}")
+    # print(f"x.shape {x.shape}")
+    # print(f"h.shape {h.shape}")
     
     N = h.shape[0]
     
@@ -6425,12 +6509,13 @@ def slide_detect(x,h, padding:bool=False):
     else:
         xx = x
         time_range = range(M-N)
-        α  = np.full((M, ), fill_value = np.nan) # offset
-        β  = np.full((M,), fill_value = np.nan) # scale
-        ε  = np.full((M,), fill_value = np.nan) # sse
+        α  = np.full((M-N, ), fill_value = np.nan) # offset
+        β  = np.full((M-N,), fill_value = np.nan) # scale
+        ε  = np.full((M-N,), fill_value = np.nan) # sse
         
         
     sum_h = np.sum(h)           # Σ TEMPLATE
+    sum_h_N = sum_h/N
     sum_h2 = sum_h*sum_h        # Σ TEMPLATE * Σ TEMPLATE = (Σ TEMPLATE)²
     sum_h2_N = sum_h2/N         # (Σ TEMPLATE)² / N
     
@@ -6475,9 +6560,10 @@ def slide_detect(x,h, padding:bool=False):
         
         # SCALE = [Σ(TEMPLATE * DATA) - Σ TEMPLATE * Σ DATA /N] / (Σ TEMPLATE² - Σ TEMPLATE * Σ TEMPLATE / N)
         
-        β[k]  = hy_dot - sum_h * sum_y_N / beta_denom
+        β[k]  = (hy_dot - sum_h * sum_y_N) / beta_denom
         
-        α[k] = (sum_y - β[k]*sum_h)/N
+        # α[k] = (sum_y - β[k]*sum_h)/N
+        α[k] = sum_y_N - β[k]*sum_h_N
         
         
         # Calculate the SSE
