@@ -68,6 +68,22 @@
        </widget>
       </item>
       <item>
+       <widget class="QCheckBox" name="useSlidingCheckBox">
+        <property name="toolTip">
+         <string>Use template sliding algorithm (Clements &amp; Bekkers '97)</string>
+        </property>
+        <property name="statusTip">
+         <string>Use template sliding algorithm (Clements &amp; Bekkers '97)</string>
+        </property>
+        <property name="whatsThis">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Checked:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Use template sliding algorithm (Clements &amp;amp; Bekkers '97, Biophys. J.)&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Unchecked:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Use cross-correlation of signal with template&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
+        <property name="text">
+         <string>Sliding</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QCheckBox" name="clearPreviousDetectionCheckBox">
         <property name="toolTip">
          <string>Replace previous detection</string>
@@ -606,7 +622,7 @@
      <x>0</x>
      <y>0</y>
      <width>656</width>
-     <height>20</height>
+     <height>23</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -1267,8 +1283,17 @@
    <property name="text">
     <string>Apply with detection</string>
    </property>
+   <property name="iconText">
+    <string>Preprocess</string>
+   </property>
    <property name="toolTip">
-    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;• If checked:&lt;/span&gt;&lt;span style=&quot; font-weight:400;&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;Each sweep in the data is filtered &lt;/span&gt;&lt;span style=&quot; font-weight:400; font-style:italic;&quot;&gt;during&lt;/span&gt;&lt;span style=&quot; font-weight:400;&quot;&gt; detection.&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&amp;quot;Undo detection&amp;quot; also restores the original (unfiltered) data.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;• If unchecked:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;The original data is left unchanged.&lt;/p&gt;&lt;p&gt;If any of Offset and Filter check boxes are &lt;span style=&quot; font-style:italic;&quot;&gt;checked&lt;/span&gt;, the detection of mPSC time stamps is performed on a filtered copy of the signal, but &lt;span style=&quot; font-style:italic;&quot;&gt;the resulting mPSCs are extracted from the original (unfiltered)  data&lt;/span&gt;.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&amp;quot;Undo detection&amp;quot; only restores previous detection; the original data stays unchanged.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    <string>Preprocess signal for detection only</string>
+   </property>
+   <property name="statusTip">
+    <string>Preprocess signal for detection only</string>
+   </property>
+   <property name="whatsThis">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;• Checked:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;Preprocess the signal before detection (see below). &lt;/span&gt;The original data is not modified.&lt;/p&gt;&lt;p&gt;Preprocessing consists of any of the filters applied according to the check boxes: Offset, Detrend, Humbug or Smooth.&lt;/p&gt;&lt;p&gt;When these are &lt;span style=&quot; font-style:italic;&quot;&gt;checked&lt;/span&gt;, the detection of mPSC time stamps is performed on a preprocessed copy of the signal, but &lt;span style=&quot; font-style:italic;&quot;&gt;the resulting mPSCs are extracted from the original (unfiltered) data&lt;/span&gt;.&lt;/p&gt;&lt;p&gt;&amp;quot;Undo detection&amp;quot; only restores previous detection; the original data stays unchanged.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="actionFilter_whole_data">
@@ -1277,9 +1302,15 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Filter whole data</string>
+    <string>Preprocess data</string>
    </property>
    <property name="toolTip">
+    <string>Preprocess data</string>
+   </property>
+   <property name="statusTip">
+    <string>Preprocess data</string>
+   </property>
+   <property name="whatsThis">
     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;Filter whole data &lt;/span&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;BEFORE&lt;/span&gt;&lt;span style=&quot; font-weight:400;&quot;&gt; detection (&lt;/span&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;CAUTION&lt;/span&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;, it takes time).&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;Subsequent detection uses filtered data; to restore the original data, click &amp;quot;Undo filter data&amp;quot;&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
