@@ -68,7 +68,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QCheckBox" name="useSlidingCheckBox">
+       <widget class="QCheckBox" name="useSlidingDetectionCheckBox">
         <property name="toolTip">
          <string>Use template sliding algorithm (Clements &amp; Bekkers '97)</string>
         </property>
@@ -80,6 +80,44 @@
         </property>
         <property name="text">
          <string>Sliding</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="label_3">
+        <property name="toolTip">
+         <string>Detection threshold [0 - 100]</string>
+        </property>
+        <property name="statusTip">
+         <string>Detection threshold [0 - 100]</string>
+        </property>
+        <property name="whatsThis">
+         <string>Detection threshold [0 - 100]</string>
+        </property>
+        <property name="text">
+         <string>θ</string>
+        </property>
+        <property name="buddy">
+         <cstring>detectionThresholdSpinBox</cstring>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QuantitySpinBox" name="detectionThresholdSpinBox">
+        <property name="toolTip">
+         <string>Detection threshold [0 - 100]</string>
+        </property>
+        <property name="statusTip">
+         <string>Detection threshold [0 - 100]</string>
+        </property>
+        <property name="whatsThis">
+         <string>Detection threshold [0 - 100]</string>
+        </property>
+        <property name="maximum">
+         <double>100.000000000000000</double>
+        </property>
+        <property name="stepType">
+         <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
         </property>
        </widget>
       </item>
@@ -124,7 +162,7 @@
     <item>
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
-       <number>0</number>
+       <number>1</number>
       </property>
       <widget class="QWidget" name="modelTab">
        <attribute name="title">
@@ -257,44 +295,6 @@
               </spacer>
              </item>
              <item>
-              <widget class="QLabel" name="label_3">
-               <property name="toolTip">
-                <string>Detection threshold [0 - 100]</string>
-               </property>
-               <property name="statusTip">
-                <string>Detection threshold [0 - 100]</string>
-               </property>
-               <property name="whatsThis">
-                <string>Detection threshold [0 - 100]</string>
-               </property>
-               <property name="text">
-                <string>θ</string>
-               </property>
-               <property name="buddy">
-                <cstring>detectionThresholdSpinBox</cstring>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QDoubleSpinBox" name="detectionThresholdSpinBox">
-               <property name="toolTip">
-                <string>Detection threshold [0 - 100]</string>
-               </property>
-               <property name="statusTip">
-                <string>Detection threshold [0 - 100]</string>
-               </property>
-               <property name="whatsThis">
-                <string>Detection threshold [0 - 100]</string>
-               </property>
-               <property name="maximum">
-                <double>100.000000000000000</double>
-               </property>
-               <property name="stepType">
-                <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
-               </property>
-              </widget>
-             </item>
-             <item>
               <widget class="QCheckBox" name="rsqThresholdCheckBox">
                <property name="toolTip">
                 <string>Threshold on R²</string>
@@ -381,7 +381,7 @@
       </widget>
       <widget class="QWidget" name="filtersTab">
        <attribute name="title">
-        <string>Signal Treatment</string>
+        <string>Preprocess Signal</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_3">
         <item row="0" column="0">
@@ -622,7 +622,7 @@
      <x>0</x>
      <y>0</y>
      <width>656</width>
-     <height>23</height>
+     <height>20</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

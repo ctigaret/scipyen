@@ -6423,9 +6423,9 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
         θ = theta.θ
         
         ret_ = extract_minis(x, mini_duration, θ, threshold, peakfunc)
-        ret["mini_starts"].append(ret_["mini_starts"])
-        ret["mini_peaks"].append(ret_["mini_peaks"])
-        ret["minis"].append(ret_["minis"])
+        ret["mini_starts"]=ret_["mini_starts"]
+        ret["mini_peaks"]=ret_["mini_peaks"]
+        ret["minis"]=ret_["minis"]
         ret["waveform"] = waveform
         ret["θ"] = θ
     
@@ -6778,6 +6778,19 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     else:
         raise ValueError("Incorrect waveform specification")
     
+    if isinstance(waveform, neo.core.basesignal.BaseSignal):
+        mini_duration = waveform.duration
+    else:
+        # NOTE: 2022-10-25 18:16:26
+        # you need to make sure the waveform (if a plain numpy array) has the
+        # same "sampling rate" as the signal
+        mini_duration = len(waveform) / x.sampling_rate
+    
+    if sigp.is_positive_waveform(waveform):
+        peakfunc = np.argmax
+    else:
+        peakfunc = np.argmin
+        
     if useCBsliding:
         return detect_mPSC_CBsliding(x, waveform, threshold)
             
@@ -6791,93 +6804,121 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
         if mdl.shape[1] > 1:
             mdl = mdl.T
         
-        
-        xc = scipy.signal.correlate(x, mdl, mode="valid")
-        
-        # 3) de-trend the cross-correlation signal (so that noise is almost about 0)
-        dxc = scipy.signal.detrend(xc, type="constant", axis=0)
-        
-        # 4) find out where cross-correlation is larger than its noise (root-mean-square)
-        flags = dxc > sigp.rms(dxc)
-    
-    # 5) find out starts and stops of those regions
-    # NOTE: 2022-10-25 16:44:58
-    # Putative peak regions start where flag_bounds are > 0 and end where 
-    # flag_bounds < 0 (we'd expect each +1 bound ie. a BEGIN to be FOLLOWED by 
-    # a -1 bound ie. and END).
-    #
-    flag_bounds = np.ediff1d(flags.astype(np.dtype(float)))
-    
-    # NOTE: 2022-10-25 16:46:10
-    # The only exception to NOTE: 2022-10-25 16:44:58 is when the cross-correlation
-    # signal ends with an upwards deflection (unlikely, but we can still check)
-    peak_begins = np.where(flag_bounds > 0)[0] # sample indices
-    peak_ends   = np.where(flag_bounds < 0)[0] # sample indices
-    
-    if len(peak_begins) == 0 or len(peak_ends) == 0:
-        return # nothing detected ?!?
-    
-    if len(peak_begins) > len(peak_ends):
-        if peak_begins[-1] > peak_ends[-1]:
-            peak_begins = peak_begins[0:-1]
-        elif peak_begins[-1] < peak_ends[-1]:
-            peak_begins = peak_begins[1:]
             
-    elif len(peak_begins) < len(peak_ends):
-        if peak_begins[0] > peak_ends[0]:
-            peak_ends = peak_ends[1:]
-            
-        elif peak_begins[-1] > peak_ends[-1]:
-            peak_ends = peak_ends[0:-1]
-            
+        ret = {"mini_starts":list(), "mini_peaks":list(), "minis":list()}
+        if x.ndim == 1:
+            xc = scipy.signal.correlate(x, mdl, mode="valid")
         
-    # 6) find the location of the local maxima in the cross-correlation signal 
-    # location is given in sample indices
-    # ATTENTION: these maxima correspond to samples where the model or template 
-    # fits best with the signal data; theo DO NOT correspond to the "peak" (or
-    # trough) of the actual mini EPSC!!!
-    xcmaxima = [np.argmax(xc[v[0]:v[1],0]) + v[0] for v in zip(peak_begins, peak_ends) if len(xc[v[0]:v[1],0]) > 0]
-    
-    # 7) get the start & end of the signal's regions where putative minis were found
-    
-    if isinstance(waveform, neo.core.basesignal.BaseSignal):
-        mini_duration = waveform.duration
-    else:
-        # NOTE: 2022-10-25 18:16:26
-        # you need to make sure the waveform (if a plain numpy array) has the
-        # same "sampling rate" as the signal
-        mini_duration = len(waveform) / x.sampling_rate
-    
-    mini_starts = x.times[xcmaxima]
-    
-    mini_ends = mini_starts + mini_duration
-    
-    # TODO: 2022-11-25 16:51:31 FIXME
-    # get the miniwaves aligned on peak start (rising phase)
-    wave_windows = [(t0,t1) for (t0,t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
-    
-    # 8) extract the minis as separate waveforms (signals) - DO NOT set relative t_start
-    # minis = neoutils.set_relative_time_start([x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop])
-    minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
-    
-    # 9) locate the actual peaks (for positive waveform) or troughs (negative waveforms)
-    if sigp.is_positive_waveform(waveform):
-        peakfunc = np.argmax
-    else:
-        peakfunc = np.argmin
+            # 3) de-trend the cross-correlation signal (so that noise is almost about 0)
+            dxc = scipy.signal.detrend(xc, type="constant", axis=0)
+            if threshold is None:
+                threshold = sigp.rms(dxc)
         
-    mini_peaks = np.array([w.times[peakfunc(w[:,0])] for w in minis])*x.times.units
-    
-    # peaks = [peakfunc(x.magnitude[v[0]:v[1],0]) + v[0] for v in zip(peak_begins, peak_ends) if len(x.magnitude[v[0]:v[1],0]) > 0]
-    # mini_peaks = w.times[peaks]
-    
+            # 4) find out where cross-correlation is larger than its noise (root-mean-square)
+            ret_ = extract_minis(x, mini_duration, dxc, threshold, peakfunc)
+            ret["mini_starts"].append(ret_["mini_starts"])
+            ret["mini_peaks"].append(ret_["mini_peaks"])
+            ret["minis"].append(ret_["minis"])
+            
+            ret["waveform"] = waveform
+            ret["θ"] = dxc
+            
+        else:
+            xc = [scipy.signal.correlate(x[:,k], mdl, mode="valid") for k in range(x.shape[1])]
+            for k, c in enumerate(xc):
+                dxc = scipy.signal.detrend(c, type="constant",axis=0)
+                if threshold is None:
+                    threshold = sigp.rms(dxc)
+                ret_ = extract_minis(x[:,k], mini_duration, dxc, threshold, peakfunc)
+                ret["mini_starts"].append(ret_["mini_starts"])
+                ret["mini_peaks"].append(ret_["mini_peaks"])
+                ret["minis"].append(ret_["minis"])
+                
+            ret["waveform"] = waveform
+            ret["θ"] = dxc
 
-    # 10) accept all minis at this stage; will change upon individual validation in GUI
-    for m in minis:
-        m.annotations["Accept"] = True
+        return ret
     
-    return {"mini_starts":[mini_starts], "mini_peaks":[mini_peaks], "minis":[minis],
-            "waveform":waveform, "θ": xc}
+#         flags = dxc > sigp.rms(dxc)
+#     
+#     # 5) find out starts and stops of those regions
+#     # NOTE: 2022-10-25 16:44:58
+#     # Putative peak regions start where flag_bounds are > 0 and end where 
+#     # flag_bounds < 0 (we'd expect each +1 bound ie. a BEGIN to be FOLLOWED by 
+#     # a -1 bound ie. and END).
+#     #
+#     flag_bounds = np.ediff1d(flags.astype(np.dtype(float)))
+#     
+#     # NOTE: 2022-10-25 16:46:10
+#     # The only exception to NOTE: 2022-10-25 16:44:58 is when the cross-correlation
+#     # signal ends with an upwards deflection (unlikely, but we can still check)
+#     peak_begins = np.where(flag_bounds > 0)[0] # sample indices
+#     peak_ends   = np.where(flag_bounds < 0)[0] # sample indices
+#     
+#     if len(peak_begins) == 0 or len(peak_ends) == 0:
+#         return # nothing detected ?!?
+#     
+#     if len(peak_begins) > len(peak_ends):
+#         if peak_begins[-1] > peak_ends[-1]:
+#             peak_begins = peak_begins[0:-1]
+#         elif peak_begins[-1] < peak_ends[-1]:
+#             peak_begins = peak_begins[1:]
+#             
+#     elif len(peak_begins) < len(peak_ends):
+#         if peak_begins[0] > peak_ends[0]:
+#             peak_ends = peak_ends[1:]
+#             
+#         elif peak_begins[-1] > peak_ends[-1]:
+#             peak_ends = peak_ends[0:-1]
+#             
+#         
+#     # 6) find the location of the local maxima in the cross-correlation signal 
+#     # location is given in sample indices
+#     # ATTENTION: these maxima correspond to samples where the model or template 
+#     # fits best with the signal data; theo DO NOT correspond to the "peak" (or
+#     # trough) of the actual mini EPSC!!!
+#     xcmaxima = [np.argmax(xc[v[0]:v[1],0]) + v[0] for v in zip(peak_begins, peak_ends) if len(xc[v[0]:v[1],0]) > 0]
+#     
+#     # 7) get the start & end of the signal's regions where putative minis were found
+#     
+#     if isinstance(waveform, neo.core.basesignal.BaseSignal):
+#         mini_duration = waveform.duration
+#     else:
+#         # NOTE: 2022-10-25 18:16:26
+#         # you need to make sure the waveform (if a plain numpy array) has the
+#         # same "sampling rate" as the signal
+#         mini_duration = len(waveform) / x.sampling_rate
+#     
+#     mini_starts = x.times[xcmaxima]
+#     
+#     mini_ends = mini_starts + mini_duration
+#     
+#     # TODO: 2022-11-25 16:51:31 FIXME
+#     # get the miniwaves aligned on peak start (rising phase)
+#     wave_windows = [(t0,t1) for (t0,t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
+#     
+#     # 8) extract the minis as separate waveforms (signals) - DO NOT set relative t_start
+#     # minis = neoutils.set_relative_time_start([x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop])
+#     minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
+#     
+#     # 9) locate the actual peaks (for positive waveform) or troughs (negative waveforms)
+#     if sigp.is_positive_waveform(waveform):
+#         peakfunc = np.argmax
+#     else:
+#         peakfunc = np.argmin
+#         
+#     mini_peaks = np.array([w.times[peakfunc(w[:,0])] for w in minis])*x.times.units
+#     
+#     # peaks = [peakfunc(x.magnitude[v[0]:v[1],0]) + v[0] for v in zip(peak_begins, peak_ends) if len(x.magnitude[v[0]:v[1],0]) > 0]
+#     # mini_peaks = w.times[peaks]
+#     
+# 
+#     # 10) accept all minis at this stage; will change upon individual validation in GUI
+#     for m in minis:
+#         m.annotations["Accept"] = True
+#     
+#     return {"mini_starts":[mini_starts], "mini_peaks":[mini_peaks], "minis":[minis],
+#             "waveform":waveform, "θ": xc}
 
 def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), Im:typing.Union[int, str] = "IN0", epoch=None, clear_spiketrains:bool=True, fit_waves:bool=False):
     """Batch m(E/I)PSC analysis.

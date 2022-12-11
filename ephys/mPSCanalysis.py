@@ -150,6 +150,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self._data_ = None
         self._filtered_data_ = None
+        
+        self._use_sliding_detection_=True
+        
         # self._fs_ = None
         self._filter_type_ = "Butterworth"
         self._filter_function_ = None
@@ -604,8 +607,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.accept_mPSCcheckBox.stateChanged.connect(self._slot_set_mPSC_accept)
         self.makeUnitAmplitudePushButton.clicked.connect(self._slot_makeUnitAmplitudeModel)
         
-        self.detectionThresholdSpinBox.setMinimum(self._detection_threshold_linear_range_min_)
-        self.detectionThresholdSpinBox.setMaximum(self._detection_threshold_linear_range_min_)
+        self.detectionThresholdSpinBox.setMinimum(0)
+        self.detectionThresholdSpinBox.setMaximum(math.inf)
         self.detectionThresholdSpinBox.setValue(self._detection_threshold_)
         self.detectionThresholdSpinBox.valueChanged.connect(self._slot_detectionThresholdChanged)
         # self.reFitPushButton.clicked.connect(self._slot_refit_mPSC)
@@ -641,6 +644,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self.deHumCheckBox.setChecked(False)
         self.deHumCheckBox.stateChanged.connect(self._slot_useHumbug)
+        
+        self.useSlidingDetectionCheckBox.setChecked(True)
+        self.useSlidingDetectionCheckBox.stateChanged.connect(self._slot_set_useSlidingDetection)
         
         
         # self.noiseFilterCheckBox.stateChanged.connect(self._slot_filterData)
@@ -1875,7 +1881,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
             for epoch in epochs:
                 sig = signal.time_slice(epoch.times[0], epoch.times[0]+epoch.durations[0])
-                detection = membrane.detect_mPSC(sig, waveform)
+                if self.filterDataUponDetection:
+                    sig = self._process_signal_(sig, newFilter=True)
+                detection = membrane.detect_mPSC(sig, waveform, 
+                                                 useCBsliding = self.useSlidingDetection,
+                                                 threshold = self._detection_threshold_)
                 if detection is None:
                     continue
                 
@@ -1885,14 +1895,19 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 mini_starts.append(detection["mini_starts"][0])
                 mini_peaks.append(detection["mini_peaks"][0])
                 
+            print(f"mini_starts {mini_starts}, mini_peaks {mini_peaks}")
             if len(mini_starts) and len(mini_starts):
-                start_times = np.hstack(mini_starts) * mini_starts[0].units
-                peak_times = np.hstack(mini_peaks) * mini_peaks[0].units
+                start_times = np.hstack(mini_starts) * mini_starts[0][0].units
+                peak_times = np.hstack(mini_peaks) * mini_peaks[0][0].units
                     
         else: # no epochs - detect in the whole signal
+            if self.filterDataUponDetection:
+                signal = self._process_signal_(signal, newFilter=True)
             detection = membrane.detect_mPSC(signal, waveform)
             if detection is None:
                 return
+            
+            print(f"detection {detection}")
             
             start_times = detection["mini_starts"][0]
             peak_times  = detection["mini_peaks"][0]
@@ -1909,6 +1924,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         else:
             trname = f"{segment.name}_PSCs"
         
+        print(f"start_times {start_times}; peak_times {peak_times}")
         if len(start_times):
             if isinstance(template, neo.core.basesignal.BaseSignal) and len(template.description.strip()):
                 dstring += f" using {template.description}"
@@ -2498,7 +2514,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.useThresholdOnRsquared = value == QtCore.Qt.Checked
         if self.useThresholdOnRsquared:
             self._apply_Rsq_threshold(self.rSqThreshold, self.currentFrame, self.currentWaveformIndex)
-            
+    
+    @pyqtSlot(int)
+    def _slot_set_useSlidingDetection(self, value):
+        self.useSlidingDetection = value == QtCore.Qt.Checked
+    
     @pyqtSlot(int)
     def _slot_use_mPSCTemplate(self, value):
         self.useTemplateWaveForm = value == QtCore.Qt.Checked
@@ -3275,7 +3295,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         return self._apply_filter_upon_detection
     
     
-    @markConfigurable("ApplyFilersUponDetection", trait_notifier=True)
+    @markConfigurable("ApplyFiltersUponDetection", trait_notifier=True)
     @filterDataUponDetection.setter
     def filterDataUponDetection(self, value:bool):
         self._apply_filter_upon_detection = value == True
@@ -3382,6 +3402,17 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.deHumCheckBox.setChecked(self._humbug_)
         
     @property
+    def useSlidingDetection(self):
+        return self._use_sliding_detection_
+    
+    @markConfigurable("UseSlidingDetection", trait_notifier=True)
+    @useSlidingDetection.setter
+    def useSlidingDetection(self, value:bool):
+        self._use_sliding_detection_ = value == True
+        sigBlocker = QtCore.QSignalBlocker(self.useSlidingDetectionCheckBox)
+        self.useSlidingDetectionCheckBox.setChecked(self._use_sliding_detection_)
+        
+    @property
     def rSqThreshold(self):
         return self._rsq_threshold_
     
@@ -3449,17 +3480,32 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     @markConfigurable("DetectionThreshold")
     @detectionThreshold.setter
     def detectionThreshold(self, value:float):
-        if value < self._detection_threshold_linear_range_min_:
-            value = self._detection_threshold_linear_range_min_
+        if self.useSlidingDetection:
+            if value < 0.:
+                value = 0
             
-        if value > self._detection_threshold_linear_range_max_:
-            value = self._detection_threshold_linear_range_max_
+        else:
+            if value < self._detection_threshold_linear_range_min_:
+                value = self._detection_threshold_linear_range_min_
+                
+            if value > self._detection_threshold_linear_range_max_:
+                value = self._detection_threshold_linear_range_max_
+            
             
         self._detection_threshold_ = value
         self.configurable_traits["DetectionThreshold"] = value
         
+        sigBlock = QtCore.QSignalBlocker(self.detectionThresholdSpinBox)
+        if self.useSlidingDetection:
+            self.detectionThresholdSpinBox.setMinimum(0)
+            self.detectionThresholdSpinBox.setMaximum(math.inf)
+            self.detectionThresholdSpinBox.setToolTip("Sliding detection threshold [0 .. Inf]")
+        else:
+            self.detectionThresholdSpinBox.setMinimum(self._detection_threshold_linear_range_min_)
+            self.detectionThresholdSpinBox.setMaximum(self._detection_threshold_linear_range_max_)
+            self.detectionThresholdSpinBox.setToolTip(f"Cross-correlation relative threshold [{self._detection_threshold_linear_range_min_} .. {self._detection_threshold_linear_range_max_}]")
+            
         if value != self.detectionThresholdSpinBox.value():
-            sigBlock = QtCore.QSignalBlocker(self.detectionThresholdSpinBox)
             self.detectionThresholdSpinBox.setValue(self._detection_threshold_)
 
     @property
