@@ -106,7 +106,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     
     _default_DC_offset_ = 0*pq.pA
     
-    _available_filters_ = ("Butterworth", "Hamming")
+    # _available_filters_ = ("Butterworth", "Hamming")
+    _available_filters_ = ("Butterworth", "Hamming", "Remez low-pass")
     
     _default_template_file = os.path.join(os.path.dirname(get_config_file()),"mPSCTemplate.h5" )
     
@@ -154,14 +155,22 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._filter_function_ = None
         self._filter_signal_ = False
         self._apply_filter_upon_detection = False
-        self._noise_cutoff_frequency_ = self._default_noise_cutoff_frequency_
         self._remove_DC_offset_ = False
         self._use_auto_offset_ = True
-        self._use_signal_linear_detrend_ = False
         self._lowpass_ = None
-        
-        
+        self._humbug_ = False
         self._dc_offset_ = self._default_DC_offset_
+        self._noise_cutoff_frequency_ = self._default_noise_cutoff_frequency_
+        self._use_signal_linear_detrend_ = False
+        
+        #### BEGIN TODO: 2022-12-11 00:52:38 
+        # make the ones below GUI & configurable (maybe...)
+        self._humbug_notch_freq_ = 50.0 
+        # self._humbug_Q_ = 25.
+        self._humbug_Q_ = 30.
+        self._inner_detrend_points_ = list()
+        #### END TODO: 2022-12-11 00:52:38 
+        
         
         self._detection_signal_name_ = None
         self._detection_epochs_ = list()
@@ -621,13 +630,18 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.actionApply_with_detection.triggered.connect(self._slot_applyFilters_with_detection)
         
         self.filterTypeComboBox.clear()
-        self.filterTypeComboBox.addItems(["Butterworth", "Hamming"])
+        # self.filterTypeComboBox.addItems(["Butterworth", "Hamming"])
+        self.filterTypeComboBox.addItems(self._available_filters_)
         self.filterTypeComboBox.currentTextChanged.connect(self._slot_filterTypeChanged)
         
         self.actionPreview_filtered_signal.triggered.connect(self._slot_previewFilteredSignal)
         
         self.linearDetrendCheckBox.setChecked(False)
         self.linearDetrendCheckBox.stateChanged.connect(self._slot_useSignalDetrend)
+        
+        self.deHumCheckBox.setChecked(False)
+        self.deHumCheckBox.stateChanged.connect(self._slot_useHumbug)
+        
         
         # self.noiseFilterCheckBox.stateChanged.connect(self._slot_filterData)
         # print(f"{self.__class__.__name__}._configureUI_ end...")
@@ -1867,9 +1881,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 
                 template = detection["waveform"]
                 
-                mini_waves.extend(detection["minis"])
-                mini_starts.append(detection["mini_starts"])
-                mini_peaks.append(detection["mini_peaks"])
+                mini_waves.extend(detection["minis"][0])
+                mini_starts.append(detection["mini_starts"][0])
+                mini_peaks.append(detection["mini_peaks"][0])
                 
             if len(mini_starts) and len(mini_starts):
                 start_times = np.hstack(mini_starts) * mini_starts[0].units
@@ -1880,9 +1894,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             if detection is None:
                 return
             
-            start_times = detection["mini_starts"]
-            peak_times  = detection["mini_peaks"]
-            mini_waves  = detection["minis"]
+            start_times = detection["mini_starts"][0]
+            peak_times  = detection["mini_peaks"][0]
+            mini_waves  = detection["minis"][0]
             
             # NOTE: 2022-11-27 21:05:07
             # this is ALWAYS a waveform !!!
@@ -2795,6 +2809,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def _slot_useSignalDetrend(self):
         value = self.sender().checkState() == QtCore.Qt.Checked
         self.useSignalDetrend = value
+        
+    @pyqtSlot()
+    def _slot_useHumbug(self):
+        value = self.sender().checkState() == QtCore.Qt.Checked
+        self.useHumbug = value
             
     @pyqtSlot()
     def _slot_set_removeDC(self):
@@ -2824,7 +2843,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
     @pyqtSlot()
     def _slot_applyFilters_with_detection(self):
-        self.filterDataUponDetection = self.sender().checkState() == QtCore.Qt.Checked
+        self.filterDataUponDetection = self.sender().isChecked()
         
     @pyqtSlot()
     def _slot_filterData(self):
@@ -2870,25 +2889,32 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
         ret = sig
         
-        processed=False
+        # processed=False
         
         if self._use_signal_linear_detrend_:
             ret = neoutils.detrend(ret, axis=0, bp = [0, ret.shape[0]], type="linear")
-            processed=True
+            # processed=True
 
         if self._remove_DC_offset_:
             if self._use_auto_offset_:
                 ret = sigp.remove_dc(ret)
             else:
                 ret = sigp.remove_dc(ret, self._dc_offset_)
-            processed=True
+            # processed=True
+            
+        if self._humbug_:
+            ret = self._deHum(ret, fs)
                 
         if self._filter_signal_:
             ret = self._lowpass_filter_signal(ret, makeFilter=newFilter)
-            processed=True
+            # processed=True
             
-        if processed:
-            ret.name = "processed"
+        # if processed:
+        #     name = getattr(ret, "name", None)
+        #     if isinstance(name, str) and len(name.strip()):
+        #         ret.name = f"processed_{name}"
+        #     else:
+        #         ret.name = "processed"
             
         return ret
         
@@ -3270,7 +3296,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         for w in (self.offsetLabel, self.dcValueSpinBox):
             w.setEnabled(not self._use_auto_offset_)
         
-        self.noiseFilterCheckBox.setEnabled(self._filter_signal_ == True or self._remove_DC_offset_ == True)
+        # self.noiseFilterCheckBox.setEnabled(self._filter_signal_ == True or self._remove_DC_offset_ == True)
         if self.actionLive_filter_preview.isChecked():
             self._slot_previewFilteredSignal()
         
@@ -3329,7 +3355,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         for w in (self.freqCutoffLabel, self.cutoffFrequencySpinBox):
             w.setEnabled(self._filter_signal_ == True)
             
-        self.noiseFilterCheckBox.setEnabled(self._filter_signal_ == True or self._remove_DC_offset_ == True)
+        # self.noiseFilterCheckBox.setEnabled(self._filter_signal_ == True or self._remove_DC_offset_ == True or self._use_signal_linear_detrend_ == True)
         if self.actionLive_filter_preview.isChecked():
             self._slot_previewFilteredSignal()
             
@@ -3344,6 +3370,16 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         sigBlock = QtCore.QSignalBlocker(self.linearDetrendCheckBox)
         self.linearDetrendCheckBox.setChecked(self._use_signal_linear_detrend_)
         
+    @property
+    def useHumbug(self):
+        return self._humbug_
+    
+    @markConfigurable("UseHumbug", trait_notifier=True)
+    @useHumbug.setter
+    def useHumbug(self, val):
+        self._humbug_ = val == True
+        sigBlock = QtCore.QSignalBlocker(self.deHumCheckBox)
+        self.deHumCheckBox.setChecked(self._humbug_)
         
     @property
     def rSqThreshold(self):
@@ -3593,7 +3629,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
 
         self._toolbars_locked_ = value == True
         # print(f"toolbarsLocked.setter _toolbars_locked_ {self._toolbars_locked_}")
-        for toolbar in (self.mainToolBar, self.detectionToolBar):
+        for toolbar in (self.mainToolBar, self.detectionToolBar, self.templateToolBar, self.filterToolBar):
             toolbar.setFloatable(not self._toolbars_locked_)
             toolbar.setMovable(not self._toolbars_locked_)
             
@@ -3607,24 +3643,48 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if isinstance(self._mPSC_template_, neo.AnalogSignal) and self._mPSC_template_.name == "mPSC Template":
             return self._mPSC_template_
         
+    def _deHum(self, sig, fs):
+        fn = fs/2
+        notch = scipy.signal.iirnotch(self._humbug_notch_freq_, self._humbug_Q_, fs=fs)
+        notchsos = scipy.signal.tf2sos(*notch)
+        if isinstance(sig, (neo.AnalogSignal, DataSignal)):
+            ret = scipy.signal.sosfiltfilt(notchsos, sig.magnitude, axis=0)
+            klass = sig.__class__
+            # name = sig.name
+            # if isinstance(name, str) and len(name.strip()):
+            #     name = f"{name}_{de}"
+            # else:
+            #     name = f"{self._filter_type_}"
+            ret = klass(ret, units = sig.units, t_start =  sig.t_start,
+                                sampling_rate = sig.sampling_rate,
+                                name=sig.name, 
+                                description = sig.description)
+            ann = sig.array_annotations
+            for key in ann:
+                ret.array_annotations[key] = ann[key]
+        else:
+            ret = scipy.signal.sosfiltfilt(notchsos, sig, axis=0)
+            
+        return ret
+        
     def _lowpass_filter_signal(self, sig, makeFilter:bool=False, fs=None):
         if self._lowpass_ is None or makeFilter == True:
             if fs is None:
                 fs = float(self._default_sampling_rate_)
             self._make_lowpass(sig, fs)
 
-        # print(f"_lowpass_ {self._lowpass_}")
-            
         if isinstance(sig, (neo.AnalogSignal, DataSignal)):
-            if self._filter_type_ == "Butterworth":
-                ret = scipy.signal.sosfiltfilt(self._lowpass_, sig.magnitude, axis=0)
-            else:
-                ret = scipy.signal.convolve(sig.magnitude[:,0], self._lowpass_, mode="same")
+            ret = scipy.signal.sosfiltfilt(self._lowpass_, sig.magnitude, axis=0)
                 
             klass = sig.__class__
+            name = sig.name
+            if isinstance(name, str) and len(name.strip()):
+                name = f"{name}_{self._filter_type_}"
+            else:
+                name = f"{self._filter_type_}"
             ret = klass(ret, units = sig.units, t_start =  sig.t_start,
                                 sampling_rate = sig.sampling_rate,
-                                name=sig.name, 
+                                name=name, 
                                 description = f"{sig.description} Lowpass {self._filter_type_} cutoff {self._noise_cutoff_frequency_}")
             ann = sig.array_annotations
             for key in ann:
@@ -3635,13 +3695,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 ret.array_annotations[key] = val
             
         else:
-            if self._filter_type_ == "Butterworth":
-                ret = scipy.signal.sosfiltfilt(self._lowpass_, sig, axis=0)
-            else:
-                if sig.ndims == 2:
-                    sig = sig[:,0]
-                    
-                ret = scipy.signal.convolve(sig, self._lowpass_, mode="same")
+            ret = scipy.signal.sosfiltfilt(self._lowpass_, sig, axis=0)
                 
         return ret
     
@@ -3654,8 +3708,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         if self._filter_type_ == "Butterworth":
             self._make_butterworth(fs)
-        else:
+            
+        elif self._filter_type_ == "Hamming":
             self._make_hamming(fs)
+            
+        else:
+            self._make_remez(fs)
         
     def _make_butterworth(self, fs):
         lporder = scipy.signal.buttord(float(self._noise_cutoff_frequency_),
@@ -3668,15 +3726,32 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._lowpass_ = lowpass
         
     def _make_hamming(self, fs):
-        ntaps = int(50 * fs / (22 * float(self._noise_cutoff_frequency_)* 0.5))
+        fn = fs/2
+        fc = float(self._noise_cutoff_frequency_)
+        fw = fc/2
+        ntaps = int(50 * fs / (22 * fw))
         if ntaps % 2 == 0:
             ntaps += 1
-            
-        lowpass = scipy.signal.firwin(ntaps, float(self._noise_cutoff_frequency_),
+        
+        lowpass = scipy.signal.firwin(ntaps, fc,
                                       window="hamming", pass_zero="lowpass",
                                       fs=fs)
         
-        self._lowpass_ = lowpass
+        self._lowpass_ = scipy.signal.tf2sos(lowpass, [1])
+        
+    def _make_remez(self, fs):
+        fn = fs/2
+        fc = float(self._noise_cutoff_frequency_)
+        fw = fc/2
+        ntaps = int(50 * fs / (22 * fw))
+        # ntaps = int(50 * fs / (22 * float(self._noise_cutoff_frequency_)* 0.5))
+        if ntaps % 2 == 0:
+            ntaps += 1
+            
+        lowpass = scipy.signal.remez(ntaps, [0, fc, fc+fw, fn], [1,0], fs=fs)
+        
+        # self._lowpass_ = lowpass
+        self._lowpass_ = scipy.signal.tf2sos(lowpass, [1])
         
     def result(self):
         """Retrieve the detection result.

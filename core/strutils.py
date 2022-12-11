@@ -232,7 +232,13 @@ def str2symbol(s):
     #print("str2symbol: ", s)
     
     s = s.translate(__translation_table_to_identifier)
-    s = s.replace("__", "_")
+    
+    # do some grooming
+    while ("__" in s):
+        s = s.replace("__", "_")
+        
+    if s.endswith("_"):
+        s = s[0:-1]
     
     # then check if all is digits
     

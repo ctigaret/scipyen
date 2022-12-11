@@ -6281,120 +6281,167 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     
     return ret
 
-def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal]):
+def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal], threshold:float=4.):
+    """Detect miniature or spontaneous PSCs with optimally scaled template.
+    Implements the "sliding template" algorithm in Clements & Bekkers 1997, Biophys.J.
     
-    def __slide_detect__(x_, h_, M, N):
-        sum_h = np.sum(h_)           # Σ template
-        sum_h2 = sum_h**2           # (Σ template)²
-        sum_h2_N = sum_h2/N         # (Σ template)² / N
+    Parameters:
+    ==========
+    
+    x: neo.AnalogSignal containing the recorded membrane current that 
+        will be scanned for mEPSCs. Typically this is single-channel, meaning it
+        is a 2D array with a singleton 2nd axis (e.g., x.shape = (n,1) where `n`
+        is the number of samples in `x`)
+    
+    waveform: neo.AnalogSignal or 1D numpy array (vector, i.e., 
+        waveform.shape = (m,) where `m` is the number of samples in `waveform`).
+    
+        Contains a model mEPSC (ie. a "synthetic" waveform) or a "template" 
+        mEPSC waveform extracted from a signal.
+    
+        ATTENTION: Make sure this model waveform has the SAME SAMPLING RATE as 
+        the signal!!!
+    
+        ALTERNATIVELY, the waveform can be specified by a sequence of six scalars, 
+        where the first five are the Clements & Bekkers 1997 model parameters:
+        α, β, x₀, τ₁ and τ₂ (see models.Clements_Bekkers_97 for details)
+        and the 6ᵗʰ element is the duration of the model waveform (which will
+        be generated ad-hoc); this last element is assumed to be in the units of
+        the domain of x.
+    
+        By default, waveform is (0., -1., 0.01, 0.001, 0.01, 0.05) which means,
+        for a membrane current signal `x` in pA:
+    
+        α  =  0.0 pA (ie. no offset)
+        β  = -1.0 (i.e. downward deflection)
+        x₀ =  0.01 (i.e. 10 ms from the start of the waveform)
+        τ₁ =  0.001 (i.e., rising time constant of 1 ms)
+        τ₂ =  0.01  (i.e., decay time constant of 10 ms)
         
-        # h_dot = np.dot(h_, h_)        # Σ(template²)
-        h_dot = np.sum(h_ * h_)        # Σ(template²)
+        and 50 ms duration of the model waveform
+    
+        NOTE: When specified in this way the waveform will be generated ad-hoc
+        using the sampling rate of the signal `x`.
+    
+    For example, if creating the waveform as a plain numpy array:
+    
+    t_start     = 0     # [s]
+    duration    = 0.2   # [s]
+    sr          = 1e4   # [Hz]
+    
+    t = np.linspace(0, duration, num = sr * duration)
+    model = models.Clements_Bekkers_97(x, parameters)
+    
+    As a convenience, you can use PSCwaveform(...) function in this module to
+    generate a synthetic  waveform as a neo.AnalogSignal.
+    
+    threshold: float; optional, default None.
+        This value is the threshold for the detection criterion used in the 
+        Clements & Bekkers 1997 Biophys J paper
+    
+        When threshold is None, the threshold of detection is the calculated 
+        root-mean-square of the detection criterion signal output by the sliding
+        template detection method.
+    
+        This parameter is only used when useCBsliding is True.
         
-        beta_denom = h_dot - sum_h2_N
         
+    Returns:
+    ========
+    A dict with keys:
+    "mini_starts": a quantity array with the start times of the detected waveforms
+    
+    "mini_peaks": a quantity array with the times of the "mini's" peak (or trough)
+    
+    "minis": a list of AnalogSignal objects with the detected "mini" waveforms.
+    
+    "waveform": the actual waveform used as model or "template". 
+    
+        This is either:
+    
+        • the realization of the synthetic mPSC (when the `waveform` parameter 
+            is the sequence of model parameters)
+    
+        • the `waveform` parameters itself, when it is a template (synthetic or
+            otherwise)
         
-        α  = np.full((M,), fill_value = np.nan) # offset
-        β  = np.full((M,), fill_value = np.nan) # scale
-        ε  = np.full((M,), fill_value = np.nan) # sse
-        σ  = np.full((M,), fill_value = np.nan) # standard error
-        θ  = np.full((M,), fill_value = np.nan) # criterion   
-        
-        # α  = np.full_like(x_, fill_value = np.nan) # offset
-        # β  = np.full_like(x_, fill_value = np.nan) # scale
-        # ε  = np.full_like(x_, fill_value = np.nan) # sse
-        # σ  = np.full_like(x_, fill_value = np.nan) # standard error
-        # θ  = np.full_like(x_, fill_value = np.nan) # criterion   
-        
-        b_denom = N*sum_h2 - h_dot
-        
-        # y = x_[0:N]
-        # sum_y = np.sum(y)
-        # y_dot = np.dot(y,y)
-        
-        for k in range(M):
-            y = x_[k:k+N]
-            sum_y = np.sum(y) # Σ data
-            # y_dot = np.dot(y,y)       # Σ(data²)
-            y_dot = np.sum(y*y)       # Σ(data²)
-            
-            # l = k + N - 1
-            # if k > 1:
-            #     y = x_[k:k+N]
-            #     sum_y = sum_y + x_[l] - x_[k-1]       # Σ data
-            #     y_dot = y_dot + x_[l]**2 - x_[k-1]**2 # Σ(data²)
-                
-                
-            # hy_dot = np.dot(h_, y)   # Σ(template * data)
-            hy_dot = np.sum(h_ * y)   # Σ(template * data)
-            
-            β[k]  = hy_dot - sum_h * sum_y/N / beta_denom
-            
-            α[k] = (sum_y - β[k]*sum_h)/N
-            
-            
-            # the scaled template:
-            hs = h*β[k] + α[k]
-            
-            y_h = y - hs # the error 
-            
-            # the SSE
-            # ε[k] = np.dot(y_h, y_h) # explicit
-            
-            ε[k] = y_dot + β[k]**2 * h_dot + N*α[k]**2 - 2 * (β[k]*hy_dot + α[k]*sum_y - α[k]*β[k]*sum_h)
-            
-            # the standard error
-            σ[k] = np.sqrt(ε[k]/(N-1))
-            
-            # the detection criterion: scale / standard error
-            θ[k] = β[k] / σ[k]
-        
-            
-        return θ, α, β, ε, σ 
-        
+    ATTENTION: When detection has failed, returns None
+    
+    """
     if x.ndim not in (1,2):
         raise TypeError(f"Signal must be a 1D or 2D array; got shape {x.shape} instead")
     
-    if isinstance(x, pq.Quantity):
-        xx = x.magnitude
-    # else:
-    #     if x.ndim > 1:
-    #         xx = x[:,0]
-    #     else:
-    #         xx = x
-        
-    if isinstance(waveform, pq.Quantity):
-        h = waveform.magnitude[:,0]
+    if isinstance(waveform, (np.ndarray,neo.core.basesignal.BaseSignal)):
+        if not dt.is_vector(waveform):
+            raise TypeError("waveform expected to be a vector")
+    
+    elif isinstance(waveform, (tuple, list)):
+        if len(waveform) == 6:
+            waveduration = waveform[5] * x.times.units
+            
+            waveform = PSCwaveform(waveform[0:-1], units = x.units,
+                                     t_start = 0*x.times.units,
+                                     duration = waveduration,
+                                     sampling_rate = x.sampling_rate)
+            
     else:
-        if waveform.ndim > 1:
-            h = waveform[:,0]
-        else:
-            h = waveform
+        raise ValueError("Incorrect waveform specification")
+    
+    if isinstance(waveform, neo.core.basesignal.BaseSignal):
+        mini_duration = waveform.duration
+    else:
+        # NOTE: 2022-10-25 18:16:26
+        # you need to make sure the waveform (if a plain numpy array) has the
+        # same "sampling rate" as the signal
+        mini_duration = len(waveform) / x.sampling_rate
+    
+    if sigp.is_positive_waveform(waveform):
+        peakfunc = np.argmax
+    else:
+        peakfunc = np.argmin
         
-    # # remove DC offset from signal
-    # # CAUTION/WARNING This might breakdown for signals without mPSCs
-    # if removeDC:
-    #     xx = sigp.remove_dc(xx)
+    h = waveform.magnitude[:,0]
     
     N = h.shape[0]
     
-    M = xx.shape[0]
+    M = x.shape[0]
     
-    # pad xx with a vector of size h, by duplicating last size(h) elements
+    sum_h = np.sum(h)           # Σ TEMPLATE
+    sum_h_N = sum_h/N
+    sum_h2 = sum_h*sum_h        # Σ TEMPLATE * Σ TEMPLATE = (Σ TEMPLATE)²
+    sum_h2_N = sum_h2/N         # (Σ TEMPLATE)² / N
     
-    pad = xx[M-N:,:]
+    h_dot = np.dot(h, h)        # Σ TEMPLATE²
     
-    xx_ = np.concatenate([xx, pad], axis=0)
+    beta_denom = h_dot - sum_h2_N #  Σ TEMPLATE² - Σ TEMPLATE * Σ TEMPLATE/N
     
-    if xx_.ndim == 1:
-        theta =  __slide_detect__(xx_, h, M, N)
-        θ = theta[0]
+    data_cache = (N, M, sum_h, sum_h_N, sum_h2, sum_h2_N, h_dot, beta_denom)
+
+    ret = {"mini_starts":list(), "mini_peaks":list(), "minis":list()}
+    if x.ndim == 1:
+        theta =  slide_detect(x, h, data_cache=data_cache)
+        θ = theta.θ
         
-    else:
-        thetas = [__slide_detect__(xx_[:,k], h, M, N)[:,np.newaxis] for k in range(xx.shape[1])]
-        θ = np.concatenate([t[0] for t in thetas], axis=1)
+        ret_ = extract_minis(x, mini_duration, θ, threshold, peakfunc)
+        ret["mini_starts"].append(ret_["mini_starts"])
+        ret["mini_peaks"].append(ret_["mini_peaks"])
+        ret["minis"].append(ret_["minis"])
+        ret["waveform"] = waveform
+        ret["θ"] = θ
     
-    return θ
+    else:
+        thetas = [slide_detect(x.magnitude[:,k], h, data_cache=data_cache) for k in range(x.shape[1])]
+        θ = np.concatenate([t.θ[:,np.newaxis] for t in thetas], axis=1)
+        for k,t in enumerate(thetas):
+            ret_ = extract_minis(x[:,k], mini_duration, t.θ, threshold, peakfunc)
+            ret["mini_starts"].append(ret_["mini_starts"])
+            ret["mini_peaks"].append(ret_["mini_peaks"])
+            ret["minis"].append(ret_["minis"])
+        
+        ret["waveform"] = waveform
+        ret["θ"] = θ
+    
+    return ret
     
     # print(np.any(np.isnan(xx_)))
     
@@ -6483,25 +6530,37 @@ def test_sliding(x, y, h, viewer, step_size=100):
         if len(a):
             break
     
-def slide_detect(x,h, padding:bool=False):
+def slide_detect(x, h, padding:bool=True, data_cache = None ):
+    """
+    x: signal
+    h: template
+    padding: True/False
+    data_cache: None, or 8-tuple with N, M, sum_h, sum_h_N, sum_h2, sum_h2_N, h_dot, beta_denom
+    """
     if any(v.ndim != 1 for v in (x,h)):
         raise TypeError("Expecting two 1D vectors")
-    # print(f"x.shape {x.shape}")
-    # print(f"h.shape {h.shape}")
     
-    N = h.shape[0]
-    
-    M = x.shape[0]
+    if isinstance(data_cache, tuple) and len(data_cache) == 8:
+        N, M, sum_h, sum_h_N, sum_h2, sum_h2_N, h_dot, beta_denom = data_cache
+    else:
+        N = h.shape[0]
+        M = x.shape[0]
+        sum_h = np.sum(h)           # Σ TEMPLATE
+        sum_h_N = sum_h/N
+        sum_h2 = sum_h*sum_h        # Σ TEMPLATE * Σ TEMPLATE = (Σ TEMPLATE)²
+        sum_h2_N = sum_h2/N         # (Σ TEMPLATE)² / N
+        
+        h_dot = np.dot(h, h)        # Σ TEMPLATE²
+        
+        beta_denom = h_dot - sum_h2_N #  Σ TEMPLATE² - Σ TEMPLATE * Σ TEMPLATE/N
     
     if padding:
         # pad xx with a vector of size h, by duplicating last size(h) elements
-        
         pad = x[M-N:]
         
         time_range = range(M)
         
         xx = np.concatenate([x, pad], axis=0)
-        # print(f"xx.shape {xx.shape}")
         
         α  = np.full_like(x, fill_value = np.nan) # offset
         β  = np.full_like(x, fill_value = np.nan) # scale
@@ -6514,28 +6573,6 @@ def slide_detect(x,h, padding:bool=False):
         ε  = np.full((M-N,), fill_value = np.nan) # sse
         
         
-    sum_h = np.sum(h)           # Σ TEMPLATE
-    sum_h_N = sum_h/N
-    sum_h2 = sum_h*sum_h        # Σ TEMPLATE * Σ TEMPLATE = (Σ TEMPLATE)²
-    sum_h2_N = sum_h2/N         # (Σ TEMPLATE)² / N
-    
-    h_dot = np.dot(h, h)        # Σ TEMPLATE²
-    
-    beta_denom = h_dot - sum_h2_N #  Σ TEMPLATE² - Σ TEMPLATE * Σ TEMPLATE/N
-    # N_b_denom = N (beta_denom)
-#     
-    
-    # σ  = np.full_like(x, fill_value = np.nan) # standard error
-    # θ  = np.full_like(x, fill_value = np.nan) # criterion   
-    
-    # b_denom = h_dot - sum_h2_N  
-    
-    
-    # y = xx[0:N]
-    # print(f"y.shape {y.shape}")
-    # sum_y = np.sum(y)
-    # sum_y_N = sum_y / N
-    # y_dot = np.dot(y,y)
     
     for k in time_range:
         y = xx[k:k+N]
@@ -6591,8 +6628,49 @@ def slide_detect(x,h, padding:bool=False):
         
     # return θ , α, β, ε, σ, xx
     
+def extract_minis(x, duration, θ, threshold, peakfunc):
+    flags =  θ >= threshold
+    flag_bounds = np.ediff1d(flags.astype(np.dtype(float)))
+    peak_begins = np.where(flag_bounds > 0)[0] # sample indices
+    peak_ends   = np.where(flag_bounds < 0)[0] # sample indices
     
-def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typing.Optional[float]=None, removeDC:typing.Union[bool, float]=True):
+    if len(peak_begins) == 0 or len(peak_ends) == 0:
+        return # nothing detected ?!?
+    
+    if len(peak_begins) > len(peak_ends):
+        if peak_begins[-1] > peak_ends[-1]:
+            peak_begins = peak_begins[0:-1]
+        elif peak_begins[-1] < peak_ends[-1]:
+            peak_begins = peak_begins[1:]
+            
+    elif len(peak_begins) < len(peak_ends):
+        if peak_begins[0] > peak_ends[0]:
+            peak_ends = peak_ends[1:]
+            
+        elif peak_begins[-1] > peak_ends[-1]:
+            peak_ends = peak_ends[0:-1]
+        
+    θmaxima = [np.argmax(θ[v[0]:v[1]]) + v[0] for v in zip(peak_begins, peak_ends) if len(θ[v[0]:v[1]]) > 0]
+    # θmaxima = [np.argmax(θ[v[0]:v[1],0]) + v[0] for v in zip(peak_begins, peak_ends) if len(θ[v[0]:v[1],0]) > 0]
+    
+    mini_starts = x.times[θmaxima]
+    
+    mini_ends = mini_starts + duration
+
+    wave_windows = [(t0,t1) for (t0,t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
+    
+    minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
+
+    mini_peaks = np.array([w.times[peakfunc(w[:,0])] for w in minis])*x.times.units
+    
+    for m in minis:
+        m.annotations["Accept"] = True
+    
+    return {"mini_starts":[mini_starts], "mini_peaks":[mini_peaks], "minis":[minis]}
+            # "waveform":waveform}
+    
+    
+def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typing.Optional[float]=None):
     """Detect miniature or spontaneous PSCs by cross-correlation with a waveform.
     
     Parameters:
@@ -6661,18 +6739,6 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     
         This parameter is only used when useCBsliding is True.
         
-    removeDC:bool or float, used with Clements & Bekkers sliding template method
-        (see detect_mPSC_CBsliding)
-    
-        When True (the default) the DC offset is calculated from the signal's
-        histogram, then subtracted from the signal `x` before applying the sliding 
-        template detection method.
-    
-        When a float, that specific valuse is subtracted from the signal `x`
-        before applying the sliding template detection method.
-    
-        This parameter is only used when useCBsliding is True.
-        
     Returns:
     ========
     A dict with keys:
@@ -6713,27 +6779,7 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
         raise ValueError("Incorrect waveform specification")
     
     if useCBsliding:
-        θ, α, β, ε, σ = detect_mPSC_CBsliding(x, waveform, removeDC = removeDC)
-        if not sigp.is_positive_waveform(waveform):
-            θ = -θ
-        
-        # remove DC offset from the detection criteria based on heuristic
-        # see sigp.remove_dc
-        θ_dc = sigp.remove_dc(θ) 
-        
-        # the detection criterion can still be high if signal is too noisy
-        min_threshold = sigp.rms(θ_dc) 
-        
-        if threshold is None:
-            threshold = min_threshold
-        elif not isinstance(threshold, float):
-            raise TypeError(f"The template sliding method expects threshold to be a float or None; got {type(threshold).__name__} instead")
-            
-        if threshold < min_threshold:
-            warnings.warn(f"Threshold {threshold} is within the RMS noise {min_threshold}")
-            
-        flags = θ_dc > threshold
-        
+        return detect_mPSC_CBsliding(x, waveform, threshold)
             
     else:
     # 1) normalize the model waveform - only for the cross-correlation method
@@ -6745,11 +6791,6 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
         if mdl.shape[1] > 1:
             mdl = mdl.T
         
-        
-        # 2) detrend the signal (also removes its offset)
-        # x_detrend = scipy.signal.detrend(x, type="constant", axis=0)
-            
-        # 2) cross-correlate the signal with the normalized model waveform
         
         xc = scipy.signal.correlate(x, mdl, mode="valid")
         
@@ -6835,8 +6876,8 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     for m in minis:
         m.annotations["Accept"] = True
     
-    return {"mini_starts":mini_starts, "mini_peaks":mini_peaks, "minis":minis,
-            "waveform":waveform}
+    return {"mini_starts":[mini_starts], "mini_peaks":[mini_peaks], "minis":[minis],
+            "waveform":waveform, "θ": xc}
 
 def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), Im:typing.Union[int, str] = "IN0", epoch=None, clear_spiketrains:bool=True, fit_waves:bool=False):
     """Batch m(E/I)PSC analysis.
