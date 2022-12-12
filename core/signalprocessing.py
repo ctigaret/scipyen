@@ -3,19 +3,20 @@
 For signal processing on elecctorphysiology signal types (e.g. neo.AnalogSignals or datatypes.DataSignal)
 please use the "ephys" module.
 """
-import typing, numbers
+import typing, numbers, functools
 #### BEGIN 3rd party modules
 import numpy as np
+import scipy
 import pandas as pd
 import quantities as pq
 import neo
 #### END 3rd party modules
 
-#### BEGIN pict.core modules
+#### BEGIN scipyen core modules
 from . import curvefitting as crvf
 from . import quantities as scq
 from . import datasignal as sds
-#### END pict.core modules
+#### END scipyen core modules
 
 def simplify_2d_shape(xy:np.ndarray, max_points:int = 5, k:int = 3):
     """Creates an simplified version of a 2D shape defined by x,y coordinate array
@@ -1159,7 +1160,7 @@ def detrend(x:typing.Union[neo.AnalogSignal, sds.DataSignal], **kwargs):
     bp = kwargs.pop("bp", 0)
     # overwrite_data = kwargs.pop("overwrite_data", True)
     
-    func = partial(scipy.signal.detrend, axis=axis, bp=bp,
+    func = functools.partial(scipy.signal.detrend, axis=axis, bp=bp,
                              type=detrend_type, overwrite_data=False)
     
     if detrend_type.lower() == "linear":
@@ -1194,7 +1195,7 @@ def detrend(x:typing.Union[neo.AnalogSignal, sds.DataSignal], **kwargs):
 
 def sosfilter(sig:typing.Union[pq.Quantity, np.ndarray], kernel:np.ndarray):
     if isinstance(sig, (neo.AnalogSignal, sds.DataSignal)):
-        ret = scipy.signal.sosfiltfilt(kernel sig.magnitude, axis=0)
+        ret = scipy.signal.sosfiltfilt(kernel, sig.magnitude, axis=0)
             
         klass = sig.__class__
         name = sig.name
@@ -1206,13 +1207,6 @@ def sosfilter(sig:typing.Union[pq.Quantity, np.ndarray], kernel:np.ndarray):
                             sampling_rate = sig.sampling_rate,
                             name=name, 
                             description = f"{sig.description} filtered")
-        # ann = sig.array_annotations
-        # for key in ann:
-        #     if key == "channel_names":
-        #         val = f"{ann[key]} filtered"
-        #     else:
-        #         val = ann[key]
-        #     ret.array_annotations[key] = val
         
     else:
         ret = scipy.signal.sosfiltfilt(kernel, sig, axis=0)

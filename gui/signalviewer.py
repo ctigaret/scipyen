@@ -7468,15 +7468,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if y.ndim == 1:
             y_nan_ndx = np.atleast_1d(np.isnan(y))
             
+            
             if any(y_nan_ndx):
-                yy = y[~y_nan_ndx]
-                if x is not None:
-                    if x.ndim == 1:
-                        xx = x[~y_nan_ndx]
-                    else:
-                        xx = x[~y_nan_ndx,0]
-                else:
-                    xx =  None
+                yy[y_nan_ndx] = -np.inf
+                xx = x
+#                 yy = y[~y_nan_ndx]
+#                 
+#                 if x is not None:
+#                     if x.ndim == 1:
+#                         xx = x[~y_nan_ndx]
+#                     else:
+#                         xx = x[~y_nan_ndx,0]
+#                 else:
+#                     xx =  None
                 
             else:
                 yy = y

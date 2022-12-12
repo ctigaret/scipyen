@@ -820,7 +820,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                                 self._accept_waves_cache_[k].add(kw) 
                     
             else:
-                self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects; got {type(data).__name__} instead")
+                self.errorMessage(self.windowTitle(), f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects; got {type(data).__name__} instead")
                 return
             
         elif data is None:
@@ -829,7 +829,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return
             
         else:
-            self.errorMessage(self._dialog_title_, f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects, or None; got {type(data).__name__} instead")
+            self.errorMessage(self.windowTitle(), f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects, or None; got {type(data).__name__} instead")
             return
         
         vname = self.workspaceSymbolForData(self._data_)
@@ -1261,8 +1261,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         processed = self._process_signal_(sig, newFilter=True)
         processed.segment = segment
         
-        if not any(self._use_signal_linear_detrend_, self._remove_DC_offset_,
-                   self._humbug_, self._filter_signal_):
+        if not any((self._use_signal_linear_detrend_, self._remove_DC_offset_,
+                   self._humbug_, self._filter_signal_)):
             processed.name = f"{sig.name}_copy"
             descr = f"Copy of {sig.name}"
         else:
@@ -1895,7 +1895,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 if detection is None:
                     continue
                 
-                template = detection["waveform"]
+                template = detection[0].annotations["waveform"]
                 
                 mini_waves.extend(detection["minis"][0])
                 mini_starts.append(detection["mini_starts"][0])
@@ -1936,7 +1936,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         mPSCTrains = list()
         wave_collection = list()
         
-        for k, start_timestamps in enumerate(start_times)
+        for k, start_timestamps in enumerate(start_times):
             if isinstance(template, neo.core.basesignal.BaseSignal) and len(template.description.strip()):
                 dstring += f" using {template.description}"
                 
@@ -3739,8 +3739,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
 
         if isinstance(sig, (neo.AnalogSignal, DataSignal)):
             ret = sigp.sosfilter(sig, self._lowpass_)
-            if isinstance(name, str) and len(name.strip()):
-                name = f"{name}_{self._filter_type_}"
+            if isinstance(sig.name, str) and len(sig.name.strip()):
+                name = f"{sig.name}_{self._filter_type_}"
             else:
                 name = f"{self._filter_type_}"
                 
