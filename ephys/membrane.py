@@ -2,7 +2,7 @@
 """Processing of electrophysiology signal data.
 """
 #### BEGIN core python modules
-import sys, traceback, inspect, numbers, typing
+import sys, traceback, inspect, numbers, typing, datetime
 import warnings
 import os, pickle
 import collections
@@ -6281,17 +6281,19 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     
     return ret
 
-def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal], threshold:float=4.):
+def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal], threshold:float=4., channels:typing.Optional[typing.Union[int, typing.Sequence[int]]]=None):
     """Detect miniature or spontaneous PSCs with optimally scaled template.
     Implements the "sliding template" algorithm in Clements & Bekkers 1997, Biophys.J.
     
     Parameters:
     ==========
     
-    x: neo.AnalogSignal containing the recorded membrane current that 
-        will be scanned for mEPSCs. Typically this is single-channel, meaning it
-        is a 2D array with a singleton 2nd axis (e.g., x.shape = (n,1) where `n`
-        is the number of samples in `x`)
+    x: neo.AnalogSignal or DataSignal containing the recorded membrane current
+        that will be scanned for mEPSCs. Typically this is single-channel, 
+        meaning it is a 2D array with a singleton 2nd axis (e.g., x.shape = (n,1)
+        where `n` is the number of samples in `x`)
+    
+        NOTE: 2022-12-12 08:56:23 as of now, more than one channel is supported
     
     waveform: neo.AnalogSignal or 1D numpy array (vector, i.e., 
         waveform.shape = (m,) where `m` is the number of samples in `waveform`).
@@ -6348,29 +6350,15 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
         
     Returns:
     ========
-    A dict with keys:
-    "mini_starts": a quantity array with the start times of the detected waveforms
+    a neo SpikeTrainList with SpikeTrain objects containing time stamps of the 
+    detected mPSCs, peak times, and associated waveforms
     
-    "mini_peaks": a quantity array with the times of the "mini's" peak (or trough)
-    
-    "minis": a list of AnalogSignal objects with the detected "mini" waveforms.
-    
-    "waveform": the actual waveform used as model or "template". 
-    
-        This is either:
-    
-        • the realization of the synthetic mPSC (when the `waveform` parameter 
-            is the sequence of model parameters)
-    
-        • the `waveform` parameters itself, when it is a template (synthetic or
-            otherwise)
-        
     ATTENTION: When detection has failed, returns None
     
     """
-    if x.ndim not in (1,2):
-        raise TypeError(f"Signal must be a 1D or 2D array; got shape {x.shape} instead")
-    
+    if not isinstance(x, (neo.AnalogSignal, DataSignal)):
+        raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal; got a {type(x).__name__} instead")
+
     if isinstance(waveform, (np.ndarray,neo.core.basesignal.BaseSignal)):
         if not dt.is_vector(waveform):
             raise TypeError("waveform expected to be a vector")
@@ -6391,8 +6379,8 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
         mini_duration = waveform.duration
     else:
         # NOTE: 2022-10-25 18:16:26
-        # you need to make sure the waveform (if a plain numpy array) has the
-        # same "sampling rate" as the signal
+        # make sure the waveform, if a plain numpy array, has the same
+        # "sampling rate" as the signal
         mini_duration = len(waveform) / x.sampling_rate
     
     if sigp.is_positive_waveform(waveform):
@@ -6416,35 +6404,36 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
     beta_denom = h_dot - sum_h2_N #  Σ TEMPLATE² - Σ TEMPLATE * Σ TEMPLATE/N
     
     data_cache = (N, M, sum_h, sum_h_N, sum_h2, sum_h2_N, h_dot, beta_denom)
-
-    ret = {"mini_starts":list(), "mini_peaks":list(), "minis":list()}
-    if x.ndim == 1:
-        theta =  slide_detect(x, h, data_cache=data_cache)
-        θ = theta.θ
+    
+    thetas = [slide_detect(x.magnitude[:,k], h, data_cache=data_cache) for k in range(x.shape[1])]
+    
+    ch_id = x.array_annotations.get("channel_ids", [0])[0]
+    ch_name = x.array_annotations.get("channel_names", [""])[0]
+    
+    ret = list()
+    
+    for kt,t in enumerate(thetas):
+        θ = type(x)(t.θ, units = pq.dimensionless, t_start = x.t_start, 
+                    sampling_rate = x.sampling_rate,
+                    name = f"{x.name}_θ")
+        θ.array_annotate(channel_names=[f"{ch_name}_θ"])
+        θ.array_annotate(channel_ids=[ch_id])
         
-        ret_ = extract_minis(x, mini_duration, θ, threshold, peakfunc)
-        ret["mini_starts"]=ret_["mini_starts"]
-        ret["mini_peaks"]=ret_["mini_peaks"]
-        ret["minis"]=ret_["minis"]
-        ret["waveform"] = waveform
-        ret["θ"] = θ
-    
-    else:
-        thetas = [slide_detect(x.magnitude[:,k], h, data_cache=data_cache) for k in range(x.shape[1])]
-        θ = np.concatenate([t.θ[:,np.newaxis] for t in thetas], axis=1)
-        for k,t in enumerate(thetas):
-            ret_ = extract_minis(x[:,k], mini_duration, t.θ, threshold, peakfunc)
-            ret["mini_starts"].append(ret_["mini_starts"])
-            ret["mini_peaks"].append(ret_["mini_peaks"])
-            ret["minis"].append(ret_["minis"])
+        ret_ = extract_minis(x[:,kt], mini_duration, t.θ, threshold, peakfunc)
         
-        ret["waveform"] = waveform
-        ret["θ"] = θ
-    
-    return ret
-    
-    # print(np.any(np.isnan(xx_)))
-    
+        if isinstance(ret_, neo.SpikeTrain):
+            ret_.annotate(waveform = waveform, θ = θ, channel_id = x.array_annotations.get("channel_ids", [0])[0])
+            # NOTE: 2022-12-12 15:34:06
+            # this is wrong: for spike trains, array annotations seem to need as many
+            # elements as there are time stamps !
+            # ret_.array_annotate(channel_names = [θ.array_annotations.get("channel_names", [""])[0]])
+            # ret_.array_annotate(channel_id = [θ.array_annotations.get("channel_ids", [0])[0]])
+            ret_.segment = x.segment
+            
+            ret.append(ret_)
+            
+    if len(ret):
+        return neo.core.spiketrainlist.SpikeTrainList(items = ret)
     
 def calculate_template_scale_offset(x, h):
     if any(v.ndim != 1 for v in (x,h)):
@@ -6530,15 +6519,19 @@ def test_sliding(x, y, h, viewer, step_size=100):
         if len(a):
             break
     
-def slide_detect(x, h, padding:bool=True, data_cache = None ):
+def slide_detect(x:np.ndarray, h:np.ndarray, padding:bool=True, data_cache = None, **kwargs):
     """
+    WARNING: Expects plain numpy arrays, NOT quantity arrays!
     x: signal
     h: template
     padding: True/False
     data_cache: None, or 8-tuple with N, M, sum_h, sum_h_N, sum_h2, sum_h2_N, h_dot, beta_denom
     """
-    if any(v.ndim != 1 for v in (x,h)):
-        raise TypeError("Expecting two 1D vectors")
+    if any(v.ndim > 1 for v in (x,h)):
+        raise TypeError("Expecting two 1D signals")
+    
+    units = kwargs.pop("units", None)
+    t_start = kwargs.pop("t_start", None)
     
     if isinstance(data_cache, tuple) and len(data_cache) == 8:
         N, M, sum_h, sum_h_N, sum_h2, sum_h2_N, h_dot, beta_denom = data_cache
@@ -6578,7 +6571,7 @@ def slide_detect(x, h, padding:bool=True, data_cache = None ):
         y = xx[k:k+N]
         sum_y = np.sum(y) # Σ data
         sum_y_N = sum_y / N
-        y_dot = np.dot(y,y)       # Σ(data²)
+        y_dot = np.dot(y, y)       # Σ(data²)
         
         # l = k + N - 1
         # if l >= M:
@@ -6621,14 +6614,46 @@ def slide_detect(x, h, padding:bool=True, data_cache = None ):
     σ = np.sqrt(ε/(N-1))
     θ = β/σ
     
-    Result = collections.namedtuple("Result", ["θ", "α", "β", "ε", "σ", "xx", "x"])
+    Result = collections.namedtuple("Result", ["θ", "α", "β", "ε", "σ"])
+    ret = Result(θ , α, β, ε, σ)
+    # Result = collections.namedtuple("Result", ["θ", "α", "β", "ε", "σ", "xx", "x"])
+    # ret = Result(θ , α, β, ε, σ, xx, x)
     
-    ret = Result(θ , α, β, ε, σ, xx, x)
     return ret
         
     # return θ , α, β, ε, σ, xx
     
-def extract_minis(x, duration, θ, threshold, peakfunc):
+def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, threshold, peakfunc):
+    """
+    Extracts detected mPSC waveforms.
+    
+    Waveforms are detected by comparing the θ signal (containing a detection
+    signal) to the scalar `threshold`, to determine the start & end time stamps
+    of each waveform in the parent signal `x`.
+    
+    The start time stamps are stored in a SpikeTrain, and the peak time
+    stamps are embedded as a quantity array in the SpikeTrain's annotations. The
+    waveforms are also embedded in the spike train's `waveforms` attribute, and 
+    also returned as a collection of analog signals 
+    
+    Parameters:
+    ==========-
+    x: single-channel signal
+    duration: duration of the mPSC template 
+    θ: single-channel signal with detection criterion (can be cross-correlation
+        of the result of sliding deteciton algorithm)
+    threshold: scalar detection threshold; samples in the θ that are >= threshold 
+        are considered to correspond to samples in the detected mPSCs
+    peakfunc: function to extract the sample index of the extremum in the 
+        mPSC waveform (i.e., either argmax, for upward event waveform, or argmin
+        for downward event waveform)
+    
+    Returns:
+    ========
+    A spike train, a sequence of neo signals with fitted copies of the waveforms
+    and a sequence of neo signals containing aligned copies of the waveforms.
+    
+    """
     flags =  θ >= threshold
     flag_bounds = np.ediff1d(flags.astype(np.dtype(float)))
     peak_begins = np.where(flag_bounds > 0)[0] # sample indices
@@ -6658,15 +6683,66 @@ def extract_minis(x, duration, θ, threshold, peakfunc):
     mini_ends = mini_starts + duration
 
     wave_windows = [(t0,t1) for (t0,t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
-    
-    minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
 
-    mini_peaks = np.array([w.times[peakfunc(w[:,0])] for w in minis])*x.times.units
+    minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
     
+    mini_peaks = np.array([w.times[peakfunc(w[:,0])] for w in minis])*x.times.units
     for m in minis:
         m.annotations["Accept"] = True
     
-    return {"mini_starts":[mini_starts], "mini_peaks":[mini_peaks], "minis":[minis]}
+#     onsets = np.full((len(minis),), fill_value=0*x.times.units)
+#     
+#     fitted = list()
+#     
+#     for kw, m in enumerate(minis):
+#         fw = fit_mPSC(m, params_init, lo=params_lo, up = params_up)
+#         onsets[kw] = fw.annotations["mPSC_fit"]["Coefficients"][2] * x.times.units
+#         fw.name = f"mPSC_{kw}"
+#         fw.annotations["t_peak"] = mini_peaks[kw]
+#         if isinstance(r2thr, float):
+#             fw.annotations["Accept"] = fw.annotations["mPSC_fit"]["Rsq"] >= r2thr
+#         else:
+#             fw.annotations["Accept"] = True
+#             
+#         fitted.append(fw)
+#         
+#     maxOnset = onsets.max()
+#     
+#     onsetCorrections = maxOnset - onsets
+#     new_starts = mini_starts - onsetCorrections
+#     new_stops  = new_starts + duration
+#     
+#     # align waveforms and remove baseline dc:
+#     aligned = list()
+#     for (t0, t1) in zip(new_starts, new_stops):
+#         w = x.time_slice(t0,t1)
+#         tₒ = t0 + maxOnset
+#         baseline = x.time_slice(t0, tₒ)
+#         w -= np.mean(baseline)
+#         aligned.append(neoutils.set_relative_time_start(w[:,0]))
+        
+    ret = neo.SpikeTrain(mini_starts, t_start = x.t_start, units = x.times.units,
+                         t_stop = x.times[-1], sampling_rate = x.sampling_rate,
+                         name="mPSCs")
+    
+    mPSCtrain_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
+    ret.waveforms = mPSCtrain_waves.T
+    # ret.segment = segment
+    # ret.array_annotate(channel_names = x.array_annotations["channel_names"][0])
+    # ret.array_annotate(channel_ids = x.array_annotations["channel_ids"][0])
+    ret.annotations["peak_times"] = mini_peaks
+    ret.annotations["source"] = "PSC_detection"
+    ret.annotations["signal_units"] = x.units
+    ret.annotations["signal_origin"] = x.name
+    ret.annotations["datetime"] = datetime.datetime.now()
+    ret.annotations["Accept"] = [w.annotations["Accept"] for w in minis]
+    # ret.annotations["Fitted"] = fitted
+    # ret.annotations["Aligned"] = aligned
+    
+    return ret
+        
+        
+    # return {"mini_starts":mini_starts, "mini_peaks":mini_peaks, "minis":minis}
             # "waveform":waveform}
     
     
@@ -6762,6 +6838,9 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     
     """
     # print(f"membrane.detect_mPSC: waveform is a {type(waveform).__name__}")
+    if not isinstance(x, (neo.AnalogSignal, DataSignal)):
+        raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal; got a {type(x).__name__} instead")
+
     if isinstance(waveform, (np.ndarray,neo.core.basesignal.BaseSignal)):
         if not dt.is_vector(waveform):
             raise TypeError("waveform expected to be a vector")
@@ -6795,8 +6874,8 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
         return detect_mPSC_CBsliding(x, waveform, threshold)
             
     else:
-    # 1) normalize the model waveform - only for the cross-correlation method
-    # if not useCBsliding:
+        # 1) normalize the model waveform - only for the cross-correlation method
+        # if not useCBsliding:
         mdl = sigp.normalise_waveform(waveform)
         
         mdl = np.atleast_2d(waveform)
@@ -6804,40 +6883,62 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
         if mdl.shape[1] > 1:
             mdl = mdl.T
         
-            
-        ret = {"mini_starts":list(), "mini_peaks":list(), "minis":list()}
-        if x.ndim == 1:
-            xc = scipy.signal.correlate(x, mdl, mode="valid")
+        xc = [scipy.signal.correlate(x[:,k], mdl, mode="valid") for k in range(x.shape[1])]
+        ret = list()
         
-            # 3) de-trend the cross-correlation signal (so that noise is almost about 0)
-            dxc = scipy.signal.detrend(xc, type="constant", axis=0)
+        for k, c in enumerate(xc):
+            dxc = scipy.signal.detrend(c, type="constant",axis=0)
             if threshold is None:
                 threshold = sigp.rms(dxc)
-        
-            # 4) find out where cross-correlation is larger than its noise (root-mean-square)
-            ret_ = extract_minis(x, mini_duration, dxc, threshold, peakfunc)
-            ret["mini_starts"].append(ret_["mini_starts"])
-            ret["mini_peaks"].append(ret_["mini_peaks"])
-            ret["minis"].append(ret_["minis"])
-            
-            ret["waveform"] = waveform
-            ret["θ"] = dxc
-            
-        else:
-            xc = [scipy.signal.correlate(x[:,k], mdl, mode="valid") for k in range(x.shape[1])]
-            for k, c in enumerate(xc):
-                dxc = scipy.signal.detrend(c, type="constant",axis=0)
-                if threshold is None:
-                    threshold = sigp.rms(dxc)
-                ret_ = extract_minis(x[:,k], mini_duration, dxc, threshold, peakfunc)
-                ret["mini_starts"].append(ret_["mini_starts"])
-                ret["mini_peaks"].append(ret_["mini_peaks"])
-                ret["minis"].append(ret_["minis"])
+            ret_ = extract_minis(x[:,k], mini_duration, dxc, threshold, peakfunc)
+            if isinstance(ret_, neo.SpikeTrain):
+                ret_.annotate(waveform = waveform, θ = dxc, channel_id = x.array_annotations.get("channel_ids", [0])[0])
+                ret_.segment = x.segment
+                ret.append(ret_)
                 
-            ret["waveform"] = waveform
-            ret["θ"] = dxc
-
-        return ret
+        if len(ret):
+            return neo.core.spiketrainlist.SpikeTrainList(items = ret)
+                
+#             ret["mini_starts"].append(ret_["mini_starts"])
+#             ret["mini_peaks"].append(ret_["mini_peaks"])
+#             ret["minis"].append(ret_["minis"])
+#             
+#         ret["waveform"] = waveform
+#         ret["θ"] = dxc
+            
+#         ret = {"mini_starts":list(), "mini_peaks":list(), "minis":list()}
+#         if x.ndim == 1:
+#             xc = scipy.signal.correlate(x, mdl, mode="valid")
+#         
+#             # 3) de-trend the cross-correlation signal (so that noise is almost about 0)
+#             dxc = scipy.signal.detrend(xc, type="constant", axis=0)
+#             if threshold is None:
+#                 threshold = sigp.rms(dxc)
+#         
+#             # 4) find out where cross-correlation is larger than its noise (root-mean-square)
+#             ret_ = extract_minis(x, mini_duration, dxc, threshold, peakfunc)
+#             ret["mini_starts"].append(ret_["mini_starts"])
+#             ret["mini_peaks"].append(ret_["mini_peaks"])
+#             ret["minis"].append(ret_["minis"])
+#             
+#             ret["waveform"] = waveform
+#             ret["θ"] = dxc
+#             
+#         else:
+#             xc = [scipy.signal.correlate(x[:,k], mdl, mode="valid") for k in range(x.shape[1])]
+#             for k, c in enumerate(xc):
+#                 dxc = scipy.signal.detrend(c, type="constant",axis=0)
+#                 if threshold is None:
+#                     threshold = sigp.rms(dxc)
+#                 ret_ = extract_minis(x[:,k], mini_duration, dxc, threshold, peakfunc)
+#                 ret["mini_starts"].append(ret_["mini_starts"])
+#                 ret["mini_peaks"].append(ret_["mini_peaks"])
+#                 ret["minis"].append(ret_["minis"])
+#                 
+#             ret["waveform"] = waveform
+#             ret["θ"] = dxc
+# 
+#         return ret
     
 #         flags = dxc > sigp.rms(dxc)
 #     

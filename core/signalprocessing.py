@@ -702,7 +702,7 @@ def state_levels(x:np.ndarray, **kwargs):
     
     return sLevels, counts, edges, ranges
 
-def remove_dc(x, value:typing.Optional[typing.Union[float, pq.Quantity, np.ndarray]] = None, channel:typing.Optional[int] = None):
+def remove_dc(x, value:typing.Optional[typing.Union[pq.Quantity, np.ndarray]] = None, channel:typing.Optional[int] = None):
     """Returns a copy of x with DC offset removed.
     
     This provides a similar functionality to scipy.signal.detrend with parameters
@@ -1095,6 +1095,131 @@ def rms(x:np.ndarray, **kwargs):
 #     
 #     return np.sqrt(xsq/x.size)
 
+def detrend(x:typing.Union[neo.AnalogSignal, sds.DataSignal], **kwargs):
+    """Detrend a signal.
+    
+    Delegates to scipy.signal.detrend
+    
+    Parameters:
+    ===========
+    x: neo.AnalogSignal or DataSignal
+    
+    Var-keyword parameters (see also scipy.signal.detrend)
+    ======================================================
+    axis: int, default is 0 (unlike scipy.signal.detrend qhere the default is the last axis, -1)
+    
+    type: str "linear" or "constant"; optional, default is "constant"
+        The default ("constant") subtracts x.mean(axis=axis) from `x`; "linear"
+        subtracts from `x` a linear least-squares fit to `x`.
+    
+    bp: array-like of int, or a scalar Quantity in signals' units; optional, 
+        default is None.
+    
+        When bd is a sequence of int, it represents the break points (given in 
+            sample numbers, or indices into `x`, NOT domain axis coordinates) 
+            between which a piecewise linear interpolation will be performed on
+            `x`. This pieceqise linear interpolation will be subtracted from `x`
+            when the `type` parameter(see above) is "linear".
+    
+        When bs is a scalar quantity (in signal units) AND `type` is "constant"
+            then the value of bp will be subtracted from `x` instead of its 
+            mean.
+    
+    
+    In a nutshell:
+        
+    `type`          `bp`                Result:
+    --------------------------------------------
+    "linear"        <sequence of int>  `x` after suubtracting a piecewise linear
+                                        interpolation between samples with indices
+                                        in bp
+                    
+                    <anything else>    `x` after subtracting a linear 
+                                        interpolation along the specified axis
+    
+    "constant"      <scalar quantity    `x` after subtracting bp value
+                    in signal's units>     
+    
+                    <anything else>     `x` after subtracting its mean
+    
+                    
+            When given, and `type` is "linear" an piecewise linear fit is 
+            performed on `x` between each break points.
+    
+    Returns:
+    =======
+    A detrended copy of the signal.
+        
+    NOTE: unlike scipy.signal.detrend, which ONLY works on plain numpy arrays, 
+    this function does NOT modify the signal in-place.
+    
+    """
+    axis = kwargs.pop("axis", 0)
+    detrend_type = kwargs.pop("type", "constant")
+    bp = kwargs.pop("bp", 0)
+    # overwrite_data = kwargs.pop("overwrite_data", True)
+    
+    func = partial(scipy.signal.detrend, axis=axis, bp=bp,
+                             type=detrend_type, overwrite_data=False)
+    
+    if detrend_type.lower() == "linear":
+        if bp is None or isinstance(bp, typing.Sequence) and all(isinstance(v, int) for v in bp):
+            ret = func(x.magnitude)
+            
+        else:
+            raise TypeError(f"Unexpected 'bp' value ({bp}) for {detrend_type} detrending")
+        
+    elif detrend_type.lower() == "constant":
+        if isinstance(bp, pq.Quantity):
+            if bp.size == 1 and units_convertible(bp, x):
+                return x-bp
+            else:
+                raise TypeError(f"Wrong constant value in bp: {bp} for {detrend_type} detrending")
+            
+        elif bp is not None:
+            raise TypeError(f"Unexpected 'bp' value ({bp}) for {detrend_type} detrending")
+            
+        ret = func(x.magnitude)
+                
+    ret = type(x)(ret, t_start = x.t_start, units = x.units, 
+                    sampling_rate = x.sampling_rate, 
+                    file_origin = x.file_origin, 
+                    name=x.name, description = x.description)
+    
+    ret.segment = x.segment
+    ret.array_annotations = x.array_annotations
+    ret.annotations.update(x.annotations)
+    
+    return ret
+
+def sosfilter(sig:typing.Union[pq.Quantity, np.ndarray], kernel:np.ndarray):
+    if isinstance(sig, (neo.AnalogSignal, sds.DataSignal)):
+        ret = scipy.signal.sosfiltfilt(kernel sig.magnitude, axis=0)
+            
+        klass = sig.__class__
+        name = sig.name
+        if isinstance(name, str) and len(name.strip()):
+            name = f"{name}_filtered"
+        else:
+            name = "filtered"
+        ret = klass(ret, units = sig.units, t_start =  sig.t_start,
+                            sampling_rate = sig.sampling_rate,
+                            name=name, 
+                            description = f"{sig.description} filtered")
+        # ann = sig.array_annotations
+        # for key in ann:
+        #     if key == "channel_names":
+        #         val = f"{ann[key]} filtered"
+        #     else:
+        #         val = ann[key]
+        #     ret.array_annotations[key] = val
+        
+    else:
+        ret = scipy.signal.sosfiltfilt(kernel, sig, axis=0)
+                
+    return ret
+    
+    
 
 
     

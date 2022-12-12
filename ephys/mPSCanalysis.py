@@ -1139,7 +1139,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 dc = np.mean(baseline, axis=0)
                 wave -= dc
                 # 2) set relatime time start to 0
-                wave = neoutils.set_relative_time_start(wave[:,0])
+                # wave = neoutils.set_relative_time_start(wave[:,0])
                 waves_list.append(neoutils.set_relative_time_start(wave[:,0]))
                 
         # print(len(waves_list))
@@ -1261,9 +1261,15 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         processed = self._process_signal_(sig, newFilter=True)
         processed.segment = segment
         
-        
+        if not any(self._use_signal_linear_detrend_, self._remove_DC_offset_,
+                   self._humbug_, self._filter_signal_):
+            processed.name = f"{sig.name}_copy"
+            descr = f"Copy of {sig.name}"
+        else:
+            descr = f"{sig.description} filtered with {self._filter_type_}, cutoff: {self._noise_cutoff_frequency_}"
+            
         testsig = sig.merge(processed)
-        testsig.description = f"{sig.description} filtered with {self._filter_type_}, cutoff: {self._noise_cutoff_frequency_}"
+        testsig.description = descr
         
         if not isinstance(self._ephysViewer_,sv.SignalViewer):
             self._init_ephysViewer_()
@@ -1895,10 +1901,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 mini_starts.append(detection["mini_starts"][0])
                 mini_peaks.append(detection["mini_peaks"][0])
                 
-            print(f"mini_starts {mini_starts}, mini_peaks {mini_peaks}")
+            print(f"with epochs: mini_starts {mini_starts}; mini_peaks {mini_peaks}")
             if len(mini_starts) and len(mini_starts):
                 start_times = np.hstack(mini_starts) * mini_starts[0][0].units
                 peak_times = np.hstack(mini_peaks) * mini_peaks[0][0].units
+                
+            print(f"with epochs: start_times {start_times}, peak_times {peak_times}")
                     
         else: # no epochs - detect in the whole signal
             if self.filterDataUponDetection:
@@ -1907,12 +1915,13 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             if detection is None:
                 return
             
-            print(f"detection {detection}")
+            # print(f"detection {detection}")
             
             start_times = detection["mini_starts"][0]
             peak_times  = detection["mini_peaks"][0]
             mini_waves  = detection["minis"][0]
             
+            print(f"no epochs: start_times {start_times}; peak_times {peak_times}")
             # NOTE: 2022-11-27 21:05:07
             # this is ALWAYS a waveform !!!
             template = detection["waveform"]
@@ -1924,16 +1933,18 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         else:
             trname = f"{segment.name}_PSCs"
         
-        print(f"start_times {start_times}; peak_times {peak_times}")
-        if len(start_times):
+        mPSCTrains = list()
+        wave_collection = list()
+        
+        for k, start_timestamps in enumerate(start_times)
             if isinstance(template, neo.core.basesignal.BaseSignal) and len(template.description.strip()):
                 dstring += f" using {template.description}"
                 
-            mPSCtrain = neo.SpikeTrain(start_times, t_stop = signal.t_stop, units = signal.times.units,
+            mPSCtrain = neo.SpikeTrain(start_timestamps, t_stop = signal.t_stop, units = signal.times.units,
                                     t_start = signal.t_start, sampling_rate = signal.sampling_rate,
                                     name = trname, description=dstring)
             
-            mPSCtrain.annotations["peak_times"] = peak_times
+            mPSCtrain.annotations["peak_times"] = peak_times[k]
             mPSCtrain.annotations["source"] = "PSC_detection"
             mPSCtrain.annotations["signal_units"] = signal.units
             mPSCtrain.annotations["signal_origin"] = signalName
@@ -1979,7 +1990,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 template_fit = membrane.fit_mPSC(self._mPSC_template_, init_params, lo, up)
                 template_init_params = template_fit.annotations["mPSC_fit"]["Coefficients"]
                 
-            for k,w in enumerate(mini_waves):
+            for kw,w in enumerate(mini_waves[k]):
                 # FIXME: 2022-11-25 00:50:11
                 # when template is Not a model where are the params taken from?
                 # FIXED, see NOTE: 2022-11-28 17:10:56
@@ -1996,9 +2007,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 else:
                     fw = membrane.fit_mPSC(w, init_params, lo=lo, up=up)
                 # fw = membrane.fit_mPSC(w, template.annotations["parameters"], lo=lo, up=up)
-                fw.annotations["t_peak"] = mPSCtrain.annotations["peak_times"][k]
-                fw.name = f"mPSC_{fw.name}_{k}"
-                mini_waves[k] = fw
+                fw.annotations["t_peak"] = mPSCtrain.annotations["peak_times"][kw]
+                fw.name = f"mPSC_{fw.name}_{kw}"
+                mini_waves[k][kw] = fw
                 mPSC_fits.append(fw.annotations["mPSC_fit"])
                 
                 if self._use_threshold_on_rsq_:
@@ -2010,13 +2021,16 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 accepted.append(fw.annotations["Accept"])
                 templates.append(fw.annotations["mPSC_fit"]["template"]) # flag indicating if a template or a model was used
                 
-            mPSCtrain_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
+            mPSCtrain_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves[k]], axis=2)
             mPSCtrain.waveforms = mPSCtrain_waves.T
             mPSCtrain.annotations["Accept"] = accepted
             mPSCtrain.annotations["Template"] = templates
             mPSCtrain.annotations["mPSC_fit"] = mPSC_fits
             
-            return mPSCtrain, mini_waves
+            mPSCtrains.append(mPSCtrain)
+            wave_collection.append[mini_waves[k]]
+            
+        return mPSCtrains, wave_collection
         
     @pyqtSlot()
     def _slot_create_mPSC_template(self):
@@ -2077,10 +2091,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             if detection_result is None:
                 return
             
-            mPSCtrain, detection = self._detect_sweep_(waveform=waveform)
+            mPSCtrains, detection = self._detect_sweep_(waveform=waveform)
             # NOTE: 2022-11-22 17:47:15
             # see WARNING: 2022-11-22 17:46:17
-            self._result_[self.currentFrame] = (mPSCtrain, [s for s in detection])
+            #### BEGIN FIXME 2022-12-12 08:53:19
+            # adapt for multi-channel detection (see membrane.extract_minis)
+            self._result_[self.currentFrame] = (mPSCtrains, [s for s in detection])
             
             if len(detection):
                 # NOTE: 2022-11-22 17:47:33
@@ -2090,6 +2106,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 # NOTE: see NOTE: 2022-11-27 13:49:44
                 # self._detected_mPSCs_.clear()
                 self._detected_mPSCs_ = list()
+            #### END FIXME 2022-12-12 08:53:19
                 
 
             # NOTE: 2022-11-20 11:30:15
@@ -2912,7 +2929,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # processed=False
         
         if self._use_signal_linear_detrend_:
-            ret = neoutils.detrend(ret, axis=0, bp = [0, ret.shape[0]], type="linear")
+            ret = sigp.detrend(ret, axis=0, bp = [0, ret.shape[0]], type="linear")
             # processed=True
 
         if self._remove_DC_offset_:
@@ -3694,7 +3711,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         notch = scipy.signal.iirnotch(self._humbug_notch_freq_, self._humbug_Q_, fs=fs)
         notchsos = scipy.signal.tf2sos(*notch)
         if isinstance(sig, (neo.AnalogSignal, DataSignal)):
-            ret = scipy.signal.sosfiltfilt(notchsos, sig.magnitude, axis=0)
+            ret = sigp.sosfilter(sig, notchsos)
+            # ret = scipy.signal.sosfiltfilt(notchsos, sig.magnitude, axis=0)
             klass = sig.__class__
             # name = sig.name
             # if isinstance(name, str) and len(name.strip()):
@@ -3720,18 +3738,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._make_lowpass(sig, fs)
 
         if isinstance(sig, (neo.AnalogSignal, DataSignal)):
-            ret = scipy.signal.sosfiltfilt(self._lowpass_, sig.magnitude, axis=0)
-                
-            klass = sig.__class__
-            name = sig.name
+            ret = sigp.sosfilter(sig, self._lowpass_)
             if isinstance(name, str) and len(name.strip()):
                 name = f"{name}_{self._filter_type_}"
             else:
                 name = f"{self._filter_type_}"
-            ret = klass(ret, units = sig.units, t_start =  sig.t_start,
-                                sampling_rate = sig.sampling_rate,
-                                name=name, 
-                                description = f"{sig.description} Lowpass {self._filter_type_} cutoff {self._noise_cutoff_frequency_}")
+                
+            ret.name = name
+            ret.description = f"{sig.description} Lowpass {self._filter_type_} cutoff {self._noise_cutoff_frequency_}"
             ann = sig.array_annotations
             for key in ann:
                 if key == "channel_names":
@@ -3741,7 +3755,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 ret.array_annotations[key] = val
             
         else:
-            ret = scipy.signal.sosfiltfilt(self._lowpass_, sig, axis=0)
+            ret = sigp.sosfilter(self._lowpass_, sig, axis=0)
                 
         return ret
     
