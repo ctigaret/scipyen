@@ -2803,6 +2803,11 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
                 arrayorder    = str(obj.order)
                 ordertip = "array order: "
             
+        elif hasattr(obj, "__iter__"):
+            sz = len(obj)
+            sizetip = "length:"
+            memsz    = str(getsizeof(obj))
+            memsztip = "memory size: "
             
         else:
             #vmemsize = QtGui.QStandardItem(str(getsizeof(obj)))

@@ -1877,15 +1877,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return
         
         epochs = [e for e in segment.epochs if e.name in self._detection_epochs_]
-#         
-#         start_times = list()
-#         peak_times  = list()
-#         mini_waves  = list()
         
         if waveform is None:
             waveform  = self._get_mPSC_template_or_waveform_()
             
         method = "sliding" if self.useSlidingDetection else "cross-correlation"
+        
         
         if len(epochs):
             mini_waves = list()
@@ -1902,18 +1899,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                     continue
                 
                 detections.append(detection)
-                
-                
-#                 mini_waves.extend(detection["minis"][0])
-#                 mini_starts.append(detection["mini_starts"][0])
-#                 mini_peaks.append(detection["mini_peaks"][0])
-#                 
-#             print(f"with epochs: mini_starts {mini_starts}; mini_peaks {mini_peaks}")
-#             if len(mini_starts) and len(mini_starts):
-#                 start_times = np.hstack(mini_starts) * mini_starts[0][0].units
-#                 peak_times = np.hstack(mini_peaks) * mini_peaks[0][0].units
-#                 
-#             print(f"with epochs: start_times {start_times}, peak_times {peak_times}")
             
             if len(detections):
                 template = detections[0][0].annotations["waveform"]
@@ -1964,6 +1949,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             if self.filterDataUponDetection:
                 signal = self._process_signal_(signal, newFilter=True)
             mPSCTrains = membrane.detect_mPSC(signal, waveform)
+            
             if detection is None:
                 return
             
@@ -1978,15 +1964,51 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         else:
             trname = f"{segment.name}_PSCs"
             
+        wave_collection = neo.Block()
+        
         # now, fit the minis
         model_params = self.paramsWidget.value()
         init_params = tuple(p.magnitude for p in model_params["Initial Value:"])
         lo = tuple(p.magnitude for p in model_params["Lower Bound:"])
         up = tuple(p.magnitude for p in model_params["Upper Bound:"])
             
+        if self._use_template_ and isinstance(self._mPSC_template_, neo.AnalogSignal):
+            template_fit = membrane.fit_mPSC(self._mPSC_template_, init_params, lo, up)
+            template_init_params = template_fit.annotations["mPSC_fit"]["Coefficients"]
+                
         for st in mPSCTrains:
+            minis = [neo.AnalogSignal(st.waveforms[k,:,:],
+                                      units = signal.units,
+                                      t_start = st[k]) for k in range(st.shape[0])]
             
+            for kw, w in minis:
+                if self._use_template_ and template_init_params is not None:
+                    fw = membrane.fit_mPSC(w, template_init_params, lo=lo, up=up)
+                    sigblock = QtCore.QSignalBlocker(self.paramsWidget)
+                    self.paramsWidget.setParameters(template_init_params,
+                                                lower = [float(v) for v in lo],
+                                                upper = [float(v) for v in up],
+                                                names = self._params_names_,
+                                                refresh = True)
+                    
+                else:
+                    fw = membrane.fit_mPSC(w, init_params, lo=lo, up=up)
         
+                fw.annotations["t_peak"] = mPSCtrain.annotations["peak_times"][kw]
+                fw.name = w.name
+                fw.name = f"mPSC_{fw.name}_{kw}"
+                minis[kw] = fw
+                
+                if self._use_threshold_on_rsq_:
+                    fw.annotations["Accept"] = fw.annotations["mPSC_fit"]["Rsq"] >= self.rSqThreshold
+                
+                if fw.annotations["Accept"]:
+                    self._accept_waves_cache_[segment_index].add(k)
+                
+            fittedWaves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
+            st.waveforms = fittedWaves
+            st.annotations["Accept"] = [w.annotations["Accept"] for w in minis]
+                
         # mPSCTrains = list()
         # wave_collection = list()
         

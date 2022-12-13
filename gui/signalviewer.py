@@ -1564,6 +1564,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                             pen=None, name=data_name,
                                             symbol="event", 
                                             symbolcolorcycle=symbolcolors)
+                # self._plot_numeric_data_(entities_axis, xx_, yy_,
+                #                         pen=None, name=data_name,
+                #                         symbol="event", 
+                #                         symbolcolorcycle=symbolcolors)
                 
                 yLabel = "Events"
                 # entities_axis.axes["left"]["item"].setPen(None)
@@ -5281,13 +5285,46 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             elif self.yData.ndim == 3: 
                 # NOTE: 2019-11-22 13:33:27
-                # both frameAxis and signalChannelAxis MUST be specified
+                # both frameAxis and signalChannelAxis SHOULD be specified
                 #
-                if frameAxis is None:
-                    raise TypeError("For 3D arrays the frame axis must be specified")
+                # NOTE: 2022-12-13 22:22:16
+                # below, we assume the following
+                #   0         1        2
+                # frame   → channel → data
+                # data    → frame   → channel
+                # channel → data    → frame
+                if isinstance(signalChannelAxis, int) and signalChannelAxis not in range(-1*(y.ndim), y.ndim):
+                    raise ValueError(f"signalChannelAxis {signalChannelAxis} out of range for array with {y.ndim} dimensions")
+
+                if isinstance(frameAxis, int) and frameAxis not in range(-1*(y.ndim), y.ndim):
+                    raise ValueError(f"frameAxis {frameAxis} out of range for array with {y.ndim} dimensions")
                 
                 if signalChannelAxis is None:
-                    raise TypeError("for 3D arrays the signal channel axis must be specified")
+                    if frameAxis is None:
+                        # data on highest dim
+                        frameAxis = 0
+                        signalChannelAxis = 1
+                    elif frameAxis == 0:
+                        # as above
+                        signalChannelAxis = 1
+                    elif frameAxis == 1:
+                        # data on lowest dim
+                        signalChannelAxis = 2
+                    else:
+                        # data on 2nd dim
+                        signalChannelAxis = 0
+                elif frameAxis is None:
+                    if signalChannelAxis == 0:
+                        frameAxis = 2
+                    elif signalChannelAxis == 1:
+                        frameAxis = 0
+                    elif signalChannelAxis == 2:
+                        frameAxis = 1
+                        
+                elif frameAis == signalChannelAxis:
+                    raise ValueError(f"frameAxis and signalChannelAxis cannot have the same index {frameAxis}")
+                    # raise TypeError("For 3D arrays the frame axis must be specified")
+                
                 
                 frameAxis = normalized_axis_index(self.yData, frameAxis)
                 signalChannelAxis = normalized_axis_index(self.yData, signalChannelAxis)
@@ -7183,7 +7220,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     for kchn, chNdx in enumerate(self.signalChannelIndex):
                         y_ = y[array_slice(y, {self.signalChannelAxis:chNdx})]
                         if y_.shape[self.signalChannelAxis] > 10:
-                            self.sigplot.emit(self._make_sig_plot_dict_(self.plotItem(kchn),
+                            self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(kchn),
                                                     x, y_,
                                                     *args, **kwargs))
                         else:
@@ -7234,8 +7271,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if self.separateSignalChannels:
                 self._prepareAxes_(len(self.signalChannelIndex))
                 for kchn, chNdx in enumerate(self.signalChannelIndex):
-                    y_ = y[array_slice(y, {self.signalChannelAxis:chNdx})]
-                    if y_.shape[self.signalChannelAxis] > 10:
+                    y_ = y[array_slice(y, {self.frameAxis:self.currentFrame,self.signalChannelAxis:chNdx})]
+                    # y_ = y[array_slice(y, {self.signalChannelAxis:chNdx})]
+                    if y.shape[self.signalChannelAxis] > 10:
                         self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(kchn),
                                                 x, y_, *args, **kwargs))
                     else:
@@ -7243,23 +7281,27 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                                 x, y_, *args, **kwargs)
                 
             else:
-                if not isinistance(axis, pg.PlotItem):
+                if not isinstance(axis, pg.PlotItem):
                     self._prepareAxes_(1)
-                    y_ = y[array_slice(y, {self.frameAxis:self.currentFrame})]
-                    if y_.shape[self.signalChannelAxis] > 10:
-                        self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), 
-                                                x, y_, *args, **kwargs))
-                    else:
-                        self._plot_numeric_data_(self.plotItem(0), 
-                                                x, y_, *args, **kwargs)
+                y_ = y[array_slice(y, 
+                                   {self.frameAxis:self.currentFrame, 
+                                    self.signalChannelAxis:slice(y.shape[self.signalChannelAxis])})]
+                                   
+                # print(y_.shape)
+                if y.shape[self.signalChannelAxis] > 10:
+                    self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), 
+                                            x, y_, *args, **kwargs))
                 else:
-                    y_ = y[array_slice(y, {self.frameAxis:self.currentFrame})]
-                    if y_.shape[self.signalChannelAxis] > 10:
-                        self.sig_plot.emit(self._make_sig_plot_dict_(axis, 
-                                                x, y_, *args, **kwargs))
-                    else:
-                        self._plot_numeric_data_(axis, 
-                                                x, y_, *args, **kwargs)
+                    self._plot_numeric_data_(self.plotItem(0), 
+                                            x, y_, *args, **kwargs)
+                # else:
+                #     y_ = y[array_slice(y, {self.frameAxis:self.currentFrame})]
+                #     if y_.shape[self.signalChannelAxis-1] > 10:
+                #         self.sig_plot.emit(self._make_sig_plot_dict_(axis, 
+                #                                 x, y_, *args, **kwargs))
+                #     else:
+                #         self._plot_numeric_data_(axis, 
+                #                                 x, y_, *args, **kwargs)
                     
         else:
             raise TypeError("numpy arrays with more than three dimensions are not supported")
@@ -7354,6 +7396,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                         ylabel="%s (%s)" % (signal_name, sig.units.dimensionality), 
                                         xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
                                         *args, **kwargs)
+            # self._plot_numeric_data_(self.axis(0), np.array(sig.times), 
+            #                         np.array(sig.magnitude), 
+            #                         ylabel="%s (%s)" % (signal_name, sig.units.dimensionality), 
+            #                         xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
+            #                         *args, **kwargs)
                 
         self.plotTitleLabel.setText("", color = "#000000")
         self.docTitle = signal_name
@@ -7557,6 +7604,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     plotItem.plot(y=yy, **kwargs)
         
         elif y.ndim == 2:
+            if y.shape[0] == 1:
+                y = y.T
+                
             colors = cycle(self.defaultLineColorsList)
             
             if y.shape[1] < len(plotDataItems):

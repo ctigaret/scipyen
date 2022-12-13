@@ -6655,6 +6655,9 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
     and a sequence of neo signals containing aligned copies of the waveforms.
     
     """
+    if not isinstance(x, (neo.AnalogSignal, DataSignal)):
+        raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal; got {type(x).__name__} instead")
+    
     flags =  θ >= threshold
     flag_bounds = np.ediff1d(flags.astype(np.dtype(float)))
     peak_begins = np.where(flag_bounds > 0)[0] # sample indices
@@ -6683,13 +6686,19 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
     
     mini_ends = mini_starts + duration
 
-    wave_windows = [(t0,t1) for (t0,t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
+    # wave_windows = [(t0,t1) for (t0,t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
 
     minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
     
     mini_peaks = np.array([w.times[peakfunc(w[:,0])] for w in minis])*x.times.units
-    for m in minis:
+    chname = x.array_annotations.get("channel_names", [""])[0]
+    if len(chname.strip())==0:
+        chname = "mPSC"
+    chname +="_"
+    for km, m in enumerate(minis):
         m.annotations["Accept"] = True
+        m.name = f"{chname}{km}"
+        m.array_annotate(**x.array_annotations)
     
 #     onsets = np.full((len(minis),), fill_value=0*x.times.units)
 #     
@@ -6943,7 +6952,7 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
             return
         
         ret = neo.core.spiketrainlist.SpikeTrainList(items = ret)
-        return ret, waves
+        return ret
 
 def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), Im:typing.Union[int, str] = "IN0", epoch=None, clear_spiketrains:bool=True, fit_waves:bool=False):
     """Batch m(E/I)PSC analysis.
