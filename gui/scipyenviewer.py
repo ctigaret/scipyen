@@ -576,7 +576,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # NOTE: 2021-07-11 09:48:50
             # Save window settings only for top level viewer windows
             # NOTE: 2021-05-04 21:53:04
-            # Here saveSettings will have access to all the subclass attributes (it
+            # Here, saveSettings will have access to all the subclass attributes (it
             # is fully initialized, etc)
             # see NOTE: 2019-11-09 09:30:38 for details
             #self.saveSettings()

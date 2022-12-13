@@ -324,7 +324,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         return get_symbol_in_namespace(data, ws)        
     
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None, title="", *args, **kwargs):
-        ScipyenConfigurable.__init__(self, *args, **kwargs)
                 
         self._scipyenWindow_ = None
         
@@ -351,34 +350,114 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         if isinstance(title, str) and len(title.strip()):
             self.setWindowTitle(title)  
             
+        ScipyenConfigurable.__init__(self, *args, **kwargs)
+            
+    @property
+    def scipyenWindow(self):
+        """Returns a reference to the main Scipyen window.
+    
+        For windows that are "top level", this is the same as the `appWindow`
+        property.
+    
+        For windows that are not "top level", this is a reference to the main
+        Scipyen window ONLY IF the main Scipyen window is found in their parents
+        hierarchy (e.g., windows managed by a Scipyen "application").
+    
+        Otherwise, this property returns None.
+           
+        """
+        # return self._scipyenWindow_
+        if self.isTopLevel:
+            return self._scipyenWindow_
+        else:
+            p = self.parent()
+            sciwin = None
+            while p is not None: # this is None for top-application's window
+                if getattr(p, "isTopLevel", False):
+                    sciwin = p.parent()
+                    break
+                else:
+                    p = p.parent()
+            return sciwin
+            
     @property
     def isTopLevel(self):
         """Returns True when this window is a top level window in Scipyen.
-        In Scipyen, a window is "top level" when its instance is not a member of
-        a Scipyen "application" (e.g. LSCaT).
+        In Scipyen, a window is "top level" when it is a direct child of the 
+        Scipyen's main window.
         
         For example, any viewer created upon double-clicking on a variable in
-        the workspace viewer ("User Variables") is a top-level window.
+        the workspace viewer ("User Variables"), or via a Scipyen menu or tool 
+        bar action, is a "top level" window.
         
         In contrast, viewers created from within a Scipyen "application" are
-        members of the application and thus are not "top level".
+        members of the application and thus are not "top level". The application
+        is responsible for managng these viewers.
         
         A Scipyen "application" is any facility that runs its own GUI inside
         Scipyen (e.g., LSCaT) - this is NOT a stand-alone PyQt5 application with
         which Scipyen communicates.
         
         """
-        return self.appWindow is self.parent()
+        return self.appWindow is self._scipyenWindow_
+        # return self._scipyenWindow_.__class__.__name__ == "ScipyenWindow"
+        # return self.appWindow is not None and self.appWindow is self._scipyenWindow_
                 
     @property
     def appWindow(self):
-        """The application main window.
-        This is a reference to the Scipyen main window, unless explicitly given
-        as some other QMainWindow at the viewer's initiation.
+        """The parent application window of this window.
         
-        appWindow gives access to Scipyen main window API (e.g. the workspace).
+        This property has one of following possible values:
+        
+        1) A reference to Scipyen's main window.
+            
+            This happens when the window is a direct child of Scipyen's main 
+            window (i.e., it is a "top level" window in Scipyen's framework). 
+    
+            This is the case of Scipyen viewers created via menu and/or tool bar
+        actions in the Scipyen's main window, or by double-clicking on a variable
+        name in Scipyen's workspace table ("User Variables").
+        
+        2) A reference to a Scipyen 'app' window (e.g LSCaT, mPSC detection, 
+        etc.), which also manages this window.
+        
+            In this case, this window is NOT a "top level" window, but has access
+        to Scipyen's user workspace via its parent appWindow.
+        
+            This is the case of various Scipyen viewers managed by LSCaT, etc.
+        
+            NOTE: In this case, appWindow is itself a "top level" window.
+        
+            Access to the Scipyen's main window is provided by the `scipyenWindow`
+        property.
+        
+        3) A reference to any QMainWindow which is NEITHER Scipyen's main window
+        NOR one of its apps.
+        
+            This is the case with Scipyen viewer instances created by calling 
+        their constructor at Scipyen's console (command line) WITHOUT explicitly
+        passing Scipyen's main window or a Sciopyen app window as `parent` to 
+        the constructor.
+        
+            In this case, this window DOES NOT have access to Scipyen's workspace,
+        unless its parent window somehow provides this access.
+        
+        4) None.
+            This is the case when this window is a child of a QWidget (e.g., 
+        this could be embedded inside another window, as a widget)
+        
+            In this case, this window DOES NOT have access to Scipyen's workspace.
+        
+            NOTE: One can always access this window `parent` directly, by calling
+        the `parent()` method.
+        
+        
         """
-        return self._scipyenWindow_
+        # return self._scipyenWindow_
+        p = self.parent()
+        
+        if isinstance(p, QtWidgets.QMainWindow):
+            return p
     
     @safeWrapper
     def importWorkspaceData(self, dataTypes:typing.Union[typing.Type[typing.Any], typing.Sequence[typing.Type[typing.Any]]], title:str="Import from workspace", single:bool=True, preSelected:typing.Optional[str]=None, with_varName:bool=False):

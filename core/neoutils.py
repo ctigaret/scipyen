@@ -2460,6 +2460,63 @@ def get_time_slice(data, t0, t1=None, window=0, segment_index=None, analog_index
         
     return ret
 
+def splice_signals(*args, times=None):
+    if all(isinstance(s, (neo.AnalogSignal, DataSignal)) for s in args):
+        if len(args) == 1:
+            return args[0] # no splice
+        
+        if any(args[0].times.units != s.times.units for s in args[1:]):
+            raise ValueError("Incompatible domain units")
+        
+        if any(args[0].sampling_rate != s.sampling_rate for s in args[1:]):
+            raise ValueError("Incompatible sampling rates")
+        
+        if any(args[0].units != s.units for s in args[1:]):
+            raise ValueError("Incompatible signal units")
+        
+        if any(args[0].shape[1] != s.shape[1] for s in args[1:]):
+            raise ValueError("Signals have incompatible sizes on the 2ⁿᵈ dimension")
+        
+        if times is None:
+            sp = args[0].sampling_period
+            t0 = args[0].t_start
+            t1 = args[-1].times[-1] + sp
+            times = np.linspace(t0, t1, num=int((t1-t0)*args[0].sampling_rate))
+            
+        y = np.full((times.shape[0], args[0].shape[1]), fill_value = np.nan*args[0].units)
+        
+        for s in args:
+            tndx = (times >= s.t_start) & (times <= s.times[-1]+args[0].sampling_period)
+            y[tndx] = s
+            
+        return type(args[0])(y, t_start = times[0], units = args[0].units)
+    
+    elif all(isinstance(s, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal))):
+        if len(args) == 1:
+            return args[0] # no splice
+        if any(args[0].times.units != s.times.units for s in args[1:]):
+            raise ValueError("Incompatible domain units")
+        
+        if any(args[0].sampling_rate != s.sampling_rate for s in args[1:]):
+            raise ValueError("Incompatible sampling rates")
+        
+        if any(args[0].units != s.units for s in args[1:]):
+            raise ValueError("Incompatible signal units")
+        
+        if any(args[0].shape[1] != s.shape[1] for s in args[1:]):
+            raise ValueError("Signals have incompatible sizes on the 2ⁿᵈ dimension")
+        
+        ret = args[0]
+        for s in args[1:]:
+            ret = ret.concatenate(s, allow_overlap=True)
+            
+        return ret
+            
+    else:
+        raise TypeError("Expecting signal objects")
+    
+    
+
 @safeWrapper
 def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_units:bool = False, set_domain_start:typing.Optional[float] = None, force_contiguous:bool=True, padding:typing.Optional[typing.Union[bool, pq.Quantity]]=False, overwrite:bool=False):
     """Concatenates regularly sampled signals.

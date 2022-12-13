@@ -703,7 +703,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # signal/slot connections & UI for pg.PlotItem objects are configured in
         # self._prepareAxes_()
         
-        self.sig_plot.connect(self._slot_plot_numeric_data_thr_, type = QtCore.Qt.QueuedConnection)
+        self.sig_plot.connect(self._slot_plot_numeric_data_threaded_, type = QtCore.Qt.QueuedConnection)
         
         if self.viewerWidgetContainer.layout() is None:
             self.viewerWidgetContainer.setLayout(QtWidgets.QGridLayout(self.viewerWidgetContainer))
@@ -813,15 +813,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.epochsFromCursorsAction = self.makeEpochsMenu.addAction("From Cursors")
         self.epochsFromCursorsAction.triggered.connect(self.slot_cursorsToEpoch)
-        self.epochsFromCursorsAction.setEnabled(self._scipyenWindow_ is not None)
+        # self.epochsFromCursorsAction.setEnabled(self._scipyenWindow_ is not None)
         
         self.epochFromSelectedCursorAction = self.makeEpochsMenu.addAction("Selected SignalCursor to Epoch")
         self.epochFromSelectedCursorAction.triggered.connect(self.slot_cursorToEpoch)
-        self.epochFromSelectedCursorAction.setEnabled(self._scipyenWindow_ is not None)
+        # self.epochFromSelectedCursorAction.setEnabled(self._scipyenWindow_ is not None)
         
         self.epochBetweenCursorsAction = self.makeEpochsMenu.addAction("Epoch Between Two Cursors")
         self.epochBetweenCursorsAction.triggered.connect(self.slot_epochBetweenCursors)
-        self.epochBetweenCursorsAction.setEnabled(self._scipyenWindow_ is not None)
+        # self.epochBetweenCursorsAction.setEnabled(self._scipyenWindow_ is not None)
         
         self.makeEpochsInDataMenu = QtWidgets.QMenu("Make Epochs in Data")
         
@@ -3850,6 +3850,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """Creates a neo.Epoch from existing cursors and exports it to the workspace.
         The epoch is NOT embedded in the plotted data.
         """
+        scipyenWindow = self.scipyenWindow
+        
+        if scipyenWindow is None:
+            return
+            
         vertAndCrossCursors = collections.ChainMap(self.crosshairSignalCursors, self.verticalSignalCursors)
         
         if len(vertAndCrossCursors) == 0:
@@ -3887,33 +3892,34 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             cursors = [c for c in vertAndCrossCursors.values()]
             
-        if self._scipyenWindow_ is not None:
-            if hasattr(self.yData, "name") and isinstance(self.yData.name, str) and len(self.yData.name.strip()):
-                name = "%s_Epoch" % self.yData.name
-                
-            else:
-                name = "Epoch"
-                
-            d = qd.QuickDialog(self, "Make Epoch From Cursors:")
-            d.promptWidgets = list()
-            d.promptWidgets.append(qd.StringInput(d, "Name:"))
-            d.promptWidgets[0].setText(name)
+        if hasattr(self.yData, "name") and isinstance(self.yData.name, str) and len(self.yData.name.strip()):
+            name = "%s_Epoch" % self.yData.name
             
-            d.promptWidgets[0].variable.setClearButtonEnabled(True)
-            d.promptWidgets[0].variable.redoAvailable = True
-            d.promptWidgets[0].variable.undoAvailable = True
+        else:
+            name = "Epoch"
             
-            if d.exec() == QtWidgets.QDialog.Accepted:
-                txt = d.promptWidgets[0].text()
-                if isinstance(txt, str) and len(txt.strip()):
-                    name=txt
-                    
-            cursors.sort(key=attrgetter('x')) # or key = lambda x: x.x
+        d = qd.QuickDialog(self, "Make Epoch From Cursors:")
+        d.promptWidgets = list()
+        d.promptWidgets.append(qd.StringInput(d, "Name:"))
+        d.promptWidgets[0].setText(name)
+        
+        d.promptWidgets[0].variable.setClearButtonEnabled(True)
+        d.promptWidgets[0].variable.redoAvailable = True
+        d.promptWidgets[0].variable.undoAvailable = True
+        
+        if d.exec() == QtWidgets.QDialog.Accepted:
+            txt = d.promptWidgets[0].text()
+            if isinstance(txt, str) and len(txt.strip()):
+                name=txt
+                
+        cursors.sort(key=attrgetter('x')) # or key = lambda x: x.x
 
-            epoch = self.cursorsToEpoch(*cursors, name=name, embed=False)
+        epoch = self.cursorsToEpoch(*cursors, name=name, embed=False)
+        
+        if epoch is not None:
+            scipyenWindow.assignToWorkspace(name, epoch)
             
-            if epoch is not None:
-                self._scipyenWindow_.assignToWorkspace(name, epoch)
+        # if scipyenWindow is not None:
                 
     @pyqtSlot()
     @safeWrapper
@@ -4170,54 +4176,64 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot()
     @safeWrapper
     def slot_cursorToEpoch(self):
+        scipyenWindow = self.scipyenWindow
+        
+        if scipyenWindow is None:
+            return
+            
         vertAndCrossCursors = collections.ChainMap(self.crosshairSignalCursors, self.verticalSignalCursors)
         
         if len(vertAndCrossCursors) == 0:
             return
         
-        if self._scipyenWindow_ is not None:
-            d = qd.QuickDialog(self, "Make Epoch From SignalCursor:")
-            d.promptWidgets = list()
-            d.namePrompt = qd.StringInput(d, "Name:")
+        d = qd.QuickDialog(self, "Make Epoch From SignalCursor:")
+        d.promptWidgets = list()
+        d.namePrompt = qd.StringInput(d, "Name:")
+        
+        d.epoch_name = "Epoch"
+        
+        if hasattr(self.yData, "name") and isinstance(self.yData.name, str) and len(self.yData.name.strip()):
+            d.epoch_name = "%s_Epoch"
+        
+        if isinstance(self.selectedDataCursor, SignalCursor) and self.selectedDataCursor.cursorType in (SignalCursor.SignalCursorTypes.vertical, SignalCursor.SignalCursorTypes.crosshair):
+            cursor = self.selectedDataCursor
+            cursorNameField = None
+            d.namePrompt.setText("%s from %s" % (d.epoch_name, cursor.ID))
             
-            d.epoch_name = "Epoch"
+        else:
+            d.cursorComboBox = qd.QuickDialogComboBox(d, "Select cursor:")
+            d.cursorComboBox.setItems([c.ID for c in vertAndCrossCursors.values()])
+            d.cursorComboBox.conextIndexChanged(partial(self._slot_update_cursor_to_epoch_dlg, d=d))
             
-            if hasattr(self.yData, "name") and isinstance(self.yData.name, str) and len(self.yData.name.strip()):
-                d.epoch_name = "%s_Epoch"
-            
-            if isinstance(self.selectedDataCursor, SignalCursor) and self.selectedDataCursor.cursorType in (SignalCursor.SignalCursorTypes.vertical, SignalCursor.SignalCursorTypes.crosshair):
-                cursor = self.selectedDataCursor
-                cursorNameField = None
-                d.namePrompt.setText("%s from %s" % (d.epoch_name, cursor.ID))
+        
+        if d.exec() == QtWidgets.QDialog.Accepted:
+            txt = d.namePrompt.text()
+            if isinstance(txt, str) and len(txt.strip()):
+                name=txt
                 
-            else:
-                d.cursorComboBox = qd.QuickDialogComboBox(d, "Select cursor:")
-                d.cursorComboBox.setItems([c.ID for c in vertAndCrossCursors.values()])
-                d.cursorComboBox.conextIndexChanged(partial(self._slot_update_cursor_to_epoch_dlg, d=d))
-                
-            
-            if d.exec() == QtWidgets.QDialog.Accepted:
-                txt = d.namePrompt.text()
-                if isinstance(txt, str) and len(txt.strip()):
-                    name=txt
-                    
-            epoch = self.cursorsToEpoch(self.selectedDataCursor, name=name)
-            
-            if epoch is not None:
-                self._scipyenWindow_.assignToWorkspace(name, epoch)
+        epoch = self.cursorsToEpoch(self.selectedDataCursor, name=name)
+        
+        if epoch is not None:
+            scipyenWindow.assignToWorkspace(name, epoch)
+        # if self._scipyenWindow_ is not None:
                 
     
     @pyqtSlot()
     @safeWrapper
     def slot_epochBetweenCursors(self):
-        if self._scipyenWindow_ is None:
-            return
+        scipyenWindow = self.scipyenWindow
         
+        if scipyenWindow is None:
+            return
+            
         vertAndCrossCursors = collections.ChainMap(self.crosshairSignalCursors, self.verticalSignalCursors)
         
-        if len(vertAndCrossCursors) == 0:
-            self.criticalMessage("Make Epoch between cursors", "This operation needs two vertical or crosshair cursors")
+        if len(vertAndCrossCursors) < 2:
+            a = 2 - len(vertAndCrossCursors)
+            QtWidgets.QMessageBox.warning(self,"Attach epoch to data",
+                                          f"Please add {a} vertical or crosshair {InflectEngine.plural('cursor', a)} first")
             return
+        
         
         d = qd.QuickDialog(self, "Make Epoch From Interval Between Cursors:")
         d.promptWidgets = list()
@@ -4230,7 +4246,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         c2Combo = qd.QuickDialogComboBox(d, "Select second cursor")
         c2Combo.setItems([c for c in vertAndCrossCursors])
-        c1Combo.setValue(1)
+        c2Combo.setValue(1)
         
         # c1Prompt = qd.StringInput(d, "SignalCursor 1 ID:")
         # c2Prompt = qd.StringInput(d, "SignalCursor 2 ID:")
@@ -4267,7 +4283,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if name is None:
                     name = "epoch"
                     
-                self._scipyenWindow_.assignToWorkspace(name, epoch)
+                scipyenWindow.assignToWorkspace(name, epoch)
         
     @safeWrapper
     def cursorsToEpoch(self, *cursors, name:typing.Optional[str] = None, embed:bool = False, all_segments:bool = True, relative_to_segment_start:bool=False, overwrite:bool = False):
@@ -6527,7 +6543,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
                         
     @safeWrapper
-    def _plotSpikeTrains_(self, trains:typing.Optional[typing.Union[neo.SpikeTrain, tuple, list]] = None, clear:bool = False, **kwargs):
+    def _plotSpikeTrains_(self, trains:typing.Optional[typing.Union[neo.SpikeTrain, neo.core.spiketrainlist.SpikeTrainList, tuple, list]] = None, clear:bool = False, plotLabelText = None, **kwargs):
         """Plots stand-alone spike trains.
         """
         if trains is None or clear:
@@ -6550,8 +6566,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             self.axes[-1].showAxis("bottom", True)
             
+        if isinstance(plotLabelText, str) and len(plotLabelText.strip()):
+            self.plotTitleLabel.setText(plotLabelText, color = "#000000")
+            
     @safeWrapper
-    def _plotEvents_(self, events: typing.Optional[typing.Union[neo.Event, DataMark, typing.Sequence]] = None, clear: bool = True, from_cache: bool = False, **kwargs):
+    def _plotEvents_(self, events: typing.Optional[typing.Union[neo.Event, DataMark, typing.Sequence]] = None, clear: bool = True, from_cache: bool = False, plotLabelText=None, **kwargs):
         
         if events is None or clear:
             self._clear_lris_()
@@ -6573,6 +6592,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             self.axes[-1].showAxis("bottom", True)
         
+        if isinstance(plotLabelText, str) and len(plotLabelText.strip()):
+            self.plotTitleLabel.setText(plotLabelText, color = "#000000")
+
     def _plot_epochs_seq_(self, *args, **kwargs):
         """Does the actual plotting of epoch data.
         Epochs is always a non-empty sequence (tuple or list) of neo.Epochs
@@ -6646,7 +6668,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     lri.setRegion(regions[kl])
         
     @safeWrapper
-    def _plotEpochs_(self, epochs: typing.Optional[typing.Union[neo.Epoch, DataZone, typing.Sequence]] = None, clear: bool = True, from_cache: bool = False, **kwargs):
+    def _plotEpochs_(self, epochs: typing.Optional[typing.Union[neo.Epoch, DataZone, typing.Sequence]] = None, clear: bool = True, from_cache: bool = False, plotLabelText=None, **kwargs):
         """Plots epochs.
         A neo.Epoch contains time intervals each defined by time and duration.
         Epoch intervals are drawn using pyqtgraph.LinearRegionItem objects.
@@ -6766,6 +6788,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # clear cache when no epochs were passed
             self._cached_epochs_.pop(self.currentFrame, None)
                     
+        if isinstance(plotLabelText, str) and len(plotLabelText.strip()):
+            self.plotTitleLabel.setText(plotLabelText, color = "#000000")
+            
     @safeWrapper
     def _plotSegment_(self, seg, *args, **kwargs):
         """Plots a neo.Segment.
@@ -6774,13 +6799,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         # NOTE: 2021-10-03 12:55:21 ChannelIndex is OUT of neo
         
+        if not isinstance(seg, neo.Segment):
+            raise TypeError("Expecting a neo.Segment; got %s instead" % type(seg).__name__)
+        
         # NOTE: 2021-01-02 11:54:50
         # allow custom plot title - handy e.g., for plotting segments from across
         # a list of blocks
-        plotTitle = kwargs.pop("plotTitle", "")
-        
-        if not isinstance(seg, neo.Segment):
-            raise TypeError("Expecting a neo.Segment; got %s instead" % type(seg).__name__)
+        plotTitle = kwargs.pop("plotTitle", getattr(seg, "name", "Segment"))
         
         
         # NOTE: 2019-11-24 23:21:13#
@@ -6970,6 +6995,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             signal_axis.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
                                                autoReduceTextSpace=False)
+            # signal_axis.setTitle(plotTitle)
             signal_axis.update()
             kAx += 1
          
@@ -7107,7 +7133,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.plotTitleLabel.setText(plotTitle, color = "#000000")
             
     @safeWrapper
-    def _plotNumpyArrays_(self, x, y, *args, **kwargs):
+    def _plotNumpyArrays_(self, x, y, plotLabelText = None, *args, **kwargs):
         """Plots several signals in one frame"""
         self._setup_signal_choosers_(y) # FIXME for a list of signals
         
@@ -7130,17 +7156,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 self._plotNumpyArray_(x[k], y_, self.plotItem(k))
             
+        if isinstance(plotLabelText, str) and len(plotLabelText.strip()):
+            self.plotTitleLabel.setText(plotLabelText, color = "#000000")
+        else:
+            self.plotTitleLabel.setText("", color = "#000000")
         
     @safeWrapper
-    def _plotNumpyArray_(self, x, y, axis = None, *args, **kwargs):
+    def _plotNumpyArray_(self, x, y, axis = None, plotLabelText = None, *args, **kwargs):
         """Called to plot a numpy array of up to three dimensions
         """
-#         print(f"{self.__class__.__name__} _plotNumpyArray_ call stack:")
-#         for s in inspect.stack():
-#             print(f"\t\t caller: {s.function}")
-#         
-#         print(f"{self.__class__.__name__} _plotNumpyArray_ y.ndim {y.ndim}")
-        
         self._setup_signal_choosers_(y)
         
         if y.ndim == 1:
@@ -7240,6 +7264,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             raise TypeError("numpy arrays with more than three dimensions are not supported")
         
+        if isinstance(plotLabelText, str) and len(plotLabelText.strip()):
+            self.plotTitleLabel.setText(plotLabelText, color = "#000000")
+        
     @safeWrapper
     def _plotSignal_(self, signal, *args, **kwargs):
         """Plots individual signal objects.
@@ -7268,7 +7295,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         self._setup_signal_choosers_(self.yData)
         
-        signal_name = signal.name
+        signal_name = getattr(signal, "name", "Signal")
         
         if isinstance(signal, (neo.AnalogSignal, neo.IrregularlySampledSignal)):
             domain_name = "Time"
@@ -7328,9 +7355,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                         xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
                                         *args, **kwargs)
                 
-        self.docTitle = sig.name
+        self.plotTitleLabel.setText("", color = "#000000")
+        self.docTitle = signal_name
             
-    def _make_sig_plot_dict_(self,plotItem: pg.PlotItem, x:np.ndarray, y:np.ndarray, xlabel:(str, type(None))=None,  ylabel:(str, type(None))=None, title:(str, type(None))=None, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
+    def _make_sig_plot_dict_(self, plotItem:pg.PlotItem, x:np.ndarray, y:np.ndarray, xlabel:(str, type(None))=None,  ylabel:(str, type(None))=None, title:(str, type(None))=None, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
         return {"plotItem":plotItem, 
                 "x": x, "y": y, 
                 "xlabel": xlabel, "ylabel": ylabel,
@@ -7340,11 +7368,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
     @safeWrapper
     @pyqtSlot(dict)
-    def _slot_plot_numeric_data_thr_(self, data:dict):  
+    def _slot_plot_numeric_data_threaded_(self, data:dict):  
         """For dict's keys and values see parameters of self._plot_numeric_data_
         For threading...
         """
-        #print("_slot_plot_numeric_data_thr_")
+        #print("_slot_plot_numeric_data_threaded_")
         self.statusBar().showMessage("Working...")
         
         plotItem            = data.pop("plotItem")
@@ -7467,11 +7495,21 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         if y.ndim == 1:
             y_nan_ndx = np.atleast_1d(np.isnan(y))
-            
-            
-            if any(y_nan_ndx):
+            yy = y
+            if isinstance(y, pq.Quantity):
+                yy[y_nan_ndx] = -np.inf*y.units
+            else:
                 yy[y_nan_ndx] = -np.inf
-                xx = x
+
+            if x is not None:
+                if x.ndim > 1:
+                    xx = x[:,0]
+                else:
+                    xx = x
+            else:
+                xx = None
+            
+#             if any(y_nan_ndx):
 #                 yy = y[~y_nan_ndx]
 #                 
 #                 if x is not None:
@@ -7481,19 +7519,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 #                         xx = x[~y_nan_ndx,0]
 #                 else:
 #                     xx =  None
-                
-            else:
-                yy = y
-                if x is not None:
-                    if x.ndim > 1:
-                        xx = x[:,0]
-                    else:
-                        xx = x
-                else:
-                    xx = None
-                
-            if yy.size == 0 or (xx is not None and xx.size == 0): # nothing left to plot
-                return
+#                 
+#             else:
+#                 yy = y
+#                 if x is not None:
+#                     if x.ndim > 1:
+#                         xx = x[:,0]
+#                     else:
+#                         xx = x
+#                 else:
+#                     xx = None
+#                 
+#             if yy.size == 0 or (xx is not None and xx.size == 0): # nothing left to plot
+#                 return
             
             # print(f"{self.__class__.__name__}._plot_numeric_data_ y.ndim == 1; plotdataitem kwargs {kwargs}")
             # NOTE 2019-09-15 18:53:56:
@@ -7543,17 +7581,27 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     x_ = None
                     
                 y_nan_ndx = np.isnan(y_)
-                
-                if any(y_nan_ndx): # np.bool_ not iterable in numpy 1.21.2
-                    yy = y_[~y_nan_ndx]
-                    if x_ is not None:
-                        xx = x_[~y_nan_ndx]
-                    else:
-                        xx = None
-                    
+                yy = y_
+                if isinstance(y_, pq.Quantity):
+                    yy[y_nan_ndx] = -np.inf*y_.units
                 else:
-                    yy = y_
+                    yy[y_nan_ndx] = -np.inf
+                if x_ is not None:
                     xx = x_
+                else:
+                    xx = None
+                
+#                 if any(y_nan_ndx): # np.bool_ not iterable in numpy 1.21.2
+#                     yy = 
+#                     yy = y_[~y_nan_ndx]
+#                     if x_ is not None:
+#                         xx = x_[~y_nan_ndx]
+#                     else:
+#                         xx = None
+#                     
+#                 else:
+#                     yy = y_
+#                     xx = x_
                 
                 # if xx.size == 0 or yy.size == 0: # nothing left to plot
                 if yy.size == 0 or (xx is not None and xx.size == 0):
@@ -7598,7 +7646,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         plotItem.setLabels(bottom = [xlabel], left=[ylabel])
         
-        plotItem.setTitle(title)
+        if isinstance(title, str) and len(title.strip()):
+            plotItem.setTitle(title)
+        # else:
+        #     plotItem.setTitle("")
         
         plotItem.replot()
         

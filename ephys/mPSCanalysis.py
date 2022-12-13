@@ -121,6 +121,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._last_used_file_save_filter_ = None
         self._last_used_file_open_filter_ = None
         
+        self._currentTabIndex_ = 0
+        
         # NOTE: 2022-11-20 11:36:08
         # For each segment in data, if there are spike trains with mPSC time
         # stamps, store them here - see membrane.batch_mPSC() for how such a 
@@ -512,6 +514,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.paramsWidget.sig_parameterChanged[str, str].connect(self._slot_modelParameterChanged)
         self.paramsWidget.sig_badBounds[str].connect(self._slot_badBounds)
         self.paramsWidget.sig_infeasible_x0[str].connect(self._slot_infeasible_x0s)
+        
+        self.tabWidget.currentChanged.connect(self._slot_currentTabChanged)
         
         self._frames_spinBoxSlider_.label = "Sweep:"
         self._frames_spinBoxSlider_.setRange(0, self._number_of_frames_)
@@ -2755,6 +2759,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
 #         if isinstance(fileName, str) and os.path.isfile(fileName):
 #             self.customDefaultTemplateFile = fileName
 
+    @pyqtSlot(int)
+    def _slot_currentTabChanged(self, val):
+        if val >= 0:
+            self.currentTabIndex = val
+            
+
     @pyqtSlot()
     def _slot_loadDefaultTemplate(self):
         if os.path.isfile(self.customDefaultTemplateFile):
@@ -3285,6 +3295,18 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._custom_template_file_ = value
             self.configurable_traits["CustomDefaultTemplateFile"] = self._custom_template_file_
             
+    @property
+    def currentTabIndex(self):
+        return self._currentTabIndex_
+    
+    @markConfigurable("CurrentTabIndex", "Qt")
+    @currentTabIndex.setter
+    def currentTabIndex(self, val:int):
+        if val >= 0:
+            self._currentTabIndex_ = val
+            sigBlock = QtCore.QSignalBlocker(self.tabWidget)
+            self.tabWidget.setCurrentIndex(val)
+    
     @property
     def lastUsedFileOpenFilter(self):
         return self._last_used_file_open_filter_
