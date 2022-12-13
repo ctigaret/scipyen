@@ -6731,12 +6731,17 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
     # ret.segment = segment
     # ret.array_annotate(channel_names = x.array_annotations["channel_names"][0])
     # ret.array_annotate(channel_ids = x.array_annotations["channel_ids"][0])
-    ret.annotations["peak_times"] = mini_peaks
-    ret.annotations["source"] = "PSC_detection"
-    ret.annotations["signal_units"] = x.units
-    ret.annotations["signal_origin"] = x.name
-    ret.annotations["datetime"] = datetime.datetime.now()
-    ret.annotations["Accept"] = [w.annotations["Accept"] for w in minis]
+    ret.annotate(peak_times = mini_peaks, source="PSC_detection",
+                 signal_units = x.units, signal_origin = x.name,
+                 datetime=datetime.datetime.now(),
+                 Accept = [w.annotations["Accept"] for w in minis],
+                 minis = minis)
+    # ret.annotations["peak_times"] = mini_peaks
+    # ret.annotations["source"] = "PSC_detection"
+    # ret.annotations["signal_units"] = x.units
+    # ret.annotations["signal_origin"] = x.name
+    # ret.annotations["datetime"] = datetime.datetime.now()
+    # ret.annotations["Accept"] = [w.annotations["Accept"] for w in minis]
     # ret.annotations["Fitted"] = fitted
     # ret.annotations["Aligned"] = aligned
     
@@ -6897,6 +6902,8 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
         
         ret = list()
         
+        # waves = list()
+        
         # for each cross-correlation:
         # • detrend it
         # • scale it to 10/max so that thresholding is done in this range (0..10)
@@ -6930,9 +6937,13 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
                               channel_id = x.array_annotations.get("channel_ids", [0])[0])
                 ret_.segment = x.segment
                 ret.append(ret_)
+                # waves.append(waves_)
                 
-        if len(ret):
-            return neo.core.spiketrainlist.SpikeTrainList(items = ret)
+        if len(ret) == 0:
+            return
+        
+        ret = neo.core.spiketrainlist.SpikeTrainList(items = ret)
+        return ret, waves
 
 def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), Im:typing.Union[int, str] = "IN0", epoch=None, clear_spiketrains:bool=True, fit_waves:bool=False):
     """Batch m(E/I)PSC analysis.

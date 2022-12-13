@@ -1877,22 +1877,24 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return
         
         epochs = [e for e in segment.epochs if e.name in self._detection_epochs_]
-        
-        start_times = list()
-        peak_times  = list()
-        mini_waves  = list()
+#         
+#         start_times = list()
+#         peak_times  = list()
+#         mini_waves  = list()
         
         if waveform is None:
             waveform  = self._get_mPSC_template_or_waveform_()
+            
+        method = "sliding" if self.useSlidingDetection else "cross-correlation"
         
         if len(epochs):
-            mini_starts = list()
-            mini_peaks = list()
+            mini_waves = list()
             detections = list()
             for epoch in epochs:
                 sig = signal.time_slice(epoch.times[0], epoch.times[0]+epoch.durations[0])
                 if self.filterDataUponDetection:
                     sig = self._process_signal_(sig, newFilter=True)
+                    
                 detection = membrane.detect_mPSC(sig, waveform, 
                                                  useCBsliding = self.useSlidingDetection,
                                                  threshold = self._detection_threshold_)
@@ -1901,7 +1903,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 
                 detections.append(detection)
                 
-                template = detection[0].annotations["waveform"]
                 
 #                 mini_waves.extend(detection["minis"][0])
 #                 mini_starts.append(detection["mini_starts"][0])
@@ -1915,38 +1916,57 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
 #             print(f"with epochs: start_times {start_times}, peak_times {peak_times}")
             
             if len(detections):
+                template = detections[0][0].annotations["waveform"]
                 # splice individual detections in each separate epoch; these
                 # individual epoch detections are SpikeTrainList objects, possibly
                 # with more than one SpikeTrain inside (one per channel)
                 max_channels = max(len(d) for d in detections)
                 stt = list() #  will lhold spliced spike trains, one per channel
                 for kc in range(max_channels):
-                    st = neoutils.splice_signals(*[d[kc] for d in detections])
-                    pt = np.concatenate([t.annotations["peak_times"].magnitude for t in [d[kc] for d in detections]], axis=0) * detections[0][0].units
-                    st.annotations["peak_times"] = pt
-                    θ = neoutils.splice_signals(*[d[kc].annotations["θ"]] for d in detections)
-                    θmax = np.max(θ[~np.isnan(θ)])
-                    θnorm = θ.copy()  # θ is a neo signal
-                    θnorm = sigp.scale_signal(θ, 10, θmax)
-                    st.annotations["θ"] = θ
-                    st.annotations["θ_norm"] = θ_norm
+                    minis = list()
+                    st_ = [d[kc] for d in detections]
+                    θ_ = [t.annotations["θ"] for t in st_]
+                    for t in st_:
+                        minis.extend(t.annotations["minis"])
+                    st = neoutils.splice_signals(*st_)
+                    pt = np.concatenate([t.annotations["peak_times"].magnitude for t in st_], axis=0) * st_[0].units
+                    θ = neoutils.splice_signals(*θ_, signal.times)
+                    θ.name = "Detection"
+                    θ.description = f"Detection criterion ({method})"
+                    if not self.useSlidingDetection:
+                        θmax = np.max(θ[~np.isnan(θ)])
+                        θnorm = θ.copy()  # θ is a neo signal
+                        θnorm = neo.AnalogSignal(sigp.scale_signal(θ_norm, 10, θmax),
+                                                units = θ.units, t_start = θ.t_start,
+                                                name = f"{θ.name}_scaled",
+                                                description = f"{θ.description} scaled to 10/{θmax}")
+                        
+                    chids = signal.array_annotations.get("channel_ids", None)
+                    if chids is not None:
+                        chid = chids[kc]
+                    else:
+                        chid = kc
+                    st.annotate(peak_times = pt, waveform=template,
+                                θ = θ,
+                                θ_norm = θ_norm, 
+                                channel_id = chid,
+                                source = "PSC_detection",
+                                PSC_parameters = template.annotations.get("parameters", None),
+                                minis = minis
+                                )
+                    
                     stt.append(st)
                     
+                if len(stt):
+                    mPSCTrains = neo.core.spiketrainlist.SpikeTrainList(items = stt) # spike train list, one train per channel
             
         else: # no epochs - detect in the whole signal
             if self.filterDataUponDetection:
                 signal = self._process_signal_(signal, newFilter=True)
-            detection = membrane.detect_mPSC(signal, waveform)
+            mPSCTrains = membrane.detect_mPSC(signal, waveform)
             if detection is None:
                 return
             
-            # print(f"detection {detection}")
-            
-#             start_times = detection["mini_starts"][0]
-#             peak_times  = detection["mini_peaks"][0]
-#             mini_waves  = detection["minis"][0]
-#             
-#             print(f"no epochs: start_times {start_times}; peak_times {peak_times}")
             # NOTE: 2022-11-27 21:05:07
             # this is ALWAYS a waveform !!!
             template = detection[0].annotations["waveform"]
@@ -1957,9 +1977,18 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             trname = f"{self._data_.name}_{segment.name}_PSCs"
         else:
             trname = f"{segment.name}_PSCs"
+            
+        # now, fit the minis
+        model_params = self.paramsWidget.value()
+        init_params = tuple(p.magnitude for p in model_params["Initial Value:"])
+        lo = tuple(p.magnitude for p in model_params["Lower Bound:"])
+        up = tuple(p.magnitude for p in model_params["Upper Bound:"])
+            
+        for st in mPSCTrains:
+            
         
-        mPSCTrains = list()
-        wave_collection = list()
+        # mPSCTrains = list()
+        # wave_collection = list()
         
         for k, start_timestamps in enumerate(start_times):
             if isinstance(template, neo.core.basesignal.BaseSignal) and len(template.description.strip()):
