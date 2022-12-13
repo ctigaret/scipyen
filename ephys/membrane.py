@@ -6891,10 +6891,18 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
 #         
 #         xx = np.concatenate([pad0, x, pad1], axis=0)
         
+        # a list of cross-correrlation signals, one per signal channel (i.e. each
+        # data on 2nd axis)
         xc = [scipy.signal.correlate(x[:,k], mdl, mode="valid") for k in range(x.shape[1])]
         
         ret = list()
         
+        # for each cross-correlation:
+        # • detrend it
+        # • scale it to 10/max so that thresholding is done in this range (0..10)
+        #   ∘ detrended & unscaled is stored in annotations as θ
+        #   ∘ detrended & scaled is stored in annotations as θ_norm
+        # • thresholding is always performed on θ_norm
         for k, c in enumerate(xc):
             dxc = scipy.signal.detrend(c, type="constant",axis=0)
             if threshold is None:
@@ -6902,17 +6910,23 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
             else:
                 thr = threshold
             
-            dxc = dxc*10/dxc.max()
+            dxc_n = np.copy(dxc) # because next is mod-ing in place
+            dxc_n = sigp.scale_waveform(dxc_n, 10, np.max(dxc[~np.isnan(dxc)]))
 
             θ = type(x)(dxc, units = pq.dimensionless, t_start = x.t_start,
                         sampling_rate = x.sampling_rate,
                         name = f"{x.name}_θ",
                         description = "Template cross-correlation")
             
-            ret_ = extract_minis(x[:,k], mini_duration, dxc, thr, peakfunc)
+            θ_norm = type(x)(dxc_n, units = pq.dimensionless, t_start = x.t_start,
+                        sampling_rate = x.sampling_rate,
+                        name = f"{x.name}_θ_norm",
+                        description = "Template cross-correlation (normalized)")
+            
+            ret_ = extract_minis(x[:,k], mini_duration, dxc_n, thr, peakfunc)
             
             if isinstance(ret_, neo.SpikeTrain):
-                ret_.annotate(waveform = waveform, θ = θ, 
+                ret_.annotate(waveform = waveform, θ = θ, θ_norm=θ_norm,
                               channel_id = x.array_annotations.get("channel_ids", [0])[0])
                 ret_.segment = x.segment
                 ret.append(ret_)

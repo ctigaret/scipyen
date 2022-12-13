@@ -298,6 +298,47 @@ def is_positive_waveform(x:np.ndarray):
     
     return len(xPos) > len(xNeg)
 
+def scale_waveform(x:np.ndarray, num, den):
+    """Scales waveform by num/den in place.
+    Returns a reference to x.
+    
+    """
+    nanx = np.isnan(x)
+    if isinstance(x, pq.Quantity):
+        units = x.units
+        xx = x.magnitude # → this is a REFERENCE ; its changes will be reflected in x !!!
+        
+        if isinstance(num, pq.Quantity):
+            if not scq.units_convertible(num, x):
+                raise TypeError("numerator has wrong units")
+            if num.units != x.units:
+                num = num.rescale(x.units)
+                
+            num = num.magnitude
+        
+        if isinstance(den, pq.Quantity):
+            if not scq.units_convertible(den, x):
+                raise TypeError("denominator has wrong units")
+            if den.units != x.units:
+                den = den.rescale(x.units)
+                
+            den = den.magnitude
+            
+    else:
+        if any(isinstance(v, pq.Quantity) for v in (num, den)):
+            raise TypeError("num and den canot be quantities if x is not a quantity")
+        xx = x
+        units = None
+        
+    if np.any(nanx):
+        scaled = xx[~nanx] * num/den
+        xx[~nanx] = scaled
+        
+    else:
+        xx *= num/den
+    
+    return xx if units is None else xx * units
+
 def normalise_waveform(x:np.ndarray):
     """Waveform normalization.
     
@@ -334,6 +375,8 @@ def normalise_waveform(x:np.ndarray):
     Numpy array (vector) with values of `x` normalized between max and min
     
     NOTE: when x is a Python Quantity, normalization will make it dimensionless
+    
+    FIXME: 2022-12-13 16:57:47 This is NOT nan-friendly!
     
     """
     

@@ -2461,6 +2461,70 @@ def get_time_slice(data, t0, t1=None, window=0, segment_index=None, analog_index
     return ret
 
 def splice_signals(*args, times=None):
+    """ Splice-merge signals along the time axis.
+    The signal need not be contiguous (see also `concatenate_signals` and the
+    `merge` instance methods of neo signals)
+    
+    Parameters:
+    ==========
+    args: a sequence of signal objects; all elements in the sequence must be of
+        compatible types:
+    
+        neo.AnalogSignal and/or DataSignal
+        neo.IrregularlySampledSignal and/or IrregularlySampledDataSignal
+        neo.SpikeTrain
+    
+        Furthermore, the signals must have:
+        • the same signal units (e.g. cannot splice together pA and mV signals)
+        • the same size on the second axis (i.e., the same number of channels)
+        • the same sampling rate and domain units (e.g., cannot splice together
+            signals in the time domain and signals in the space domain)
+    
+        WARNING: Futhermore, the domain units MUST be identical (no rescaling is
+        performed) although this condition may be removed in the future.
+    
+        ATTENTION: For spike trains:
+        • currently, the left_sweep and right_sweep properties are NOT taken 
+            into account, their equalities are not verified, and therefore they
+            are NOT carried over into the result.
+    
+    
+    times: optional, default is None
+        Used only in the case where args are neo.AnalogSignal and/or DataSignal
+        objects.
+    
+        This parameter has no effect in all other cases
+    
+        When specified, this is a time (or domain) vector - such as the `times` 
+        property of a neo signal) such that the domains of the signals in arg 
+        are fully contained in it. The result is a new signal with samples taken
+        from the signals in args (aligned with their corresponding time samples
+        in times) and np.nan values elsewhere.
+    
+        When None (default), a new time axis is created using the initial time
+        stamp in the first signal (`t_start` property) and the final time stamp 
+        of the last signal in args.
+    
+    Returns:
+    ========
+    
+    • When args contains regularly sampled analog signals (neo.AnalogSignal, 
+        DataSignal), the function returns an object of the same class as args[0]
+        with the domain (possibly, time) as explained for the `times` parameter.
+    
+        WARNING: When the spliced signals overlap partially, this may result in 
+        data loss (i.e. the time stamps in the overlap will align to the most 
+        recently added data samples).
+        
+    • When args contains irregularly sampled signals, the function returns an
+        object of the same class as args[0], with time stamps concatenated.
+        WARNING: the time stamps in the result are NOT sorted, and are NOT 
+        checked for uniqueness!
+    
+    • When args contains spike trains, the function returns a spike train.
+    
+    
+    """
     if all(isinstance(s, (neo.AnalogSignal, DataSignal)) for s in args):
         if len(args) == 1:
             return args[0] # no splice
@@ -2481,17 +2545,30 @@ def splice_signals(*args, times=None):
             sp = args[0].sampling_period
             t0 = args[0].t_start
             t1 = args[-1].times[-1] + sp
-            times = np.linspace(t0, t1, num=int((t1-t0)*args[0].sampling_rate))
+            tt = np.linspace(t0, t1, num=int((t1-t0)*args[0].sampling_rate))
+        else:
+            if times[0] > args[0].t_start:
+                raise ValueError("the 'times' vector starts after that the first signal")
+            if times[-1] < args[-1].times[-1]:
+                raise ValueError("the 'times' vector ends before the last signal")
+            tt = times
             
-        y = np.full((times.shape[0], args[0].shape[1]), fill_value = np.nan*args[0].units)
+        y = np.full((tt.shape[0], args[0].shape[1]), fill_value = np.nan*args[0].units)
         
-        for s in args:
-            tndx = (times >= s.t_start) & (times <= s.times[-1]+args[0].sampling_period)
+        for k,s in enumerate(args):
+            tndx = (tt >= s.t_start) & (tt <= s.t_start + s.duration) # s.times[-1]+s.sampling_period)
+            # print(f"{k} index size = {np.where(tndx)[0].size}; signal size = {s.shape[0]}")
+            if s.shape[0] > y[tndx].shape[0]:
+                tndx = (tt >= s.t_start) & (tt <= s.times[-1] + s.sampling_period)
+                
+            elif y[tndx].shape[0] > s.shape[0]:
+                tndx = (tt >= s.t_start) & (tt <= s.times[-1])
+                
             y[tndx] = s
             
-        return type(args[0])(y, t_start = times[0], units = args[0].units)
+        return type(args[0])(y, t_start = tt[0], units = args[0].units, sampling_rate = args[0].sampling_rate)
     
-    elif all(isinstance(s, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal))):
+    elif all(isinstance(s, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)) for s in args):
         if len(args) == 1:
             return args[0] # no splice
         if any(args[0].times.units != s.times.units for s in args[1:]):
@@ -2511,6 +2588,28 @@ def splice_signals(*args, times=None):
             ret = ret.concatenate(s, allow_overlap=True)
             
         return ret
+    
+    elif all(isinstance(s, neo.SpikeTrain) for s in args):
+        # NOTE: sampling_rare pertains to the asssociated waveforms
+        if any(args[0].times.units != s.times.units for s in args[1:]):
+            raise ValueError("Incompatible domain units")
+        
+        if any(args[0].units != s.units for s in args[1:]):
+            raise ValueError("Incompatible signal units")
+        
+        if any(args[0].sampling_rate != s.sampling_rate for s in args[1:]):
+            raise ValueError("Incompatible sampling rates")
+        
+        t_start = args[0].t_start
+        t_stop = args[-1].t_stop
+        t = np.concatenate([s.times.magnitude for s in args], axis=0) * t_start.units
+        waves = np.concatenate([s.waveforms for s in args], axis=0)
+        
+        return neo.SpikeTrain(t, t_start=t_start, t_stop = t_stop, 
+                              units = args[0].units,
+                              sampling_rate = args[0].sampling_rate,
+                              waveforms = waves,
+                              name="spliced")
             
     else:
         raise TypeError("Expecting signal objects")

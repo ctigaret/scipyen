@@ -1888,7 +1888,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if len(epochs):
             mini_starts = list()
             mini_peaks = list()
-            
+            detections = list()
             for epoch in epochs:
                 sig = signal.time_slice(epoch.times[0], epoch.times[0]+epoch.durations[0])
                 if self.filterDataUponDetection:
@@ -1899,19 +1899,40 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 if detection is None:
                     continue
                 
+                detections.append(detection`)
+                
                 template = detection[0].annotations["waveform"]
                 
-                mini_waves.extend(detection["minis"][0])
-                mini_starts.append(detection["mini_starts"][0])
-                mini_peaks.append(detection["mini_peaks"][0])
-                
-            print(f"with epochs: mini_starts {mini_starts}; mini_peaks {mini_peaks}")
-            if len(mini_starts) and len(mini_starts):
-                start_times = np.hstack(mini_starts) * mini_starts[0][0].units
-                peak_times = np.hstack(mini_peaks) * mini_peaks[0][0].units
-                
-            print(f"with epochs: start_times {start_times}, peak_times {peak_times}")
+#                 mini_waves.extend(detection["minis"][0])
+#                 mini_starts.append(detection["mini_starts"][0])
+#                 mini_peaks.append(detection["mini_peaks"][0])
+#                 
+#             print(f"with epochs: mini_starts {mini_starts}; mini_peaks {mini_peaks}")
+#             if len(mini_starts) and len(mini_starts):
+#                 start_times = np.hstack(mini_starts) * mini_starts[0][0].units
+#                 peak_times = np.hstack(mini_peaks) * mini_peaks[0][0].units
+#                 
+#             print(f"with epochs: start_times {start_times}, peak_times {peak_times}")
+            
+            if len(detections):
+                # splice individual detections in each separate epoch; these
+                # individual epoch detections are SpikeTrainList objects, possibly
+                # with more than one SpikeTrain inside (one per channel)
+                max_channels = max(len(d) for d in detections)
+                stt = list() #  will lhold spliced spike trains, one per channel
+                for kc in range(max_channels):
+                    st = neoutils.splice_signals(*[d[kc] for d in detections])
+                    pt = np.concatenate([t.annotations["peak_times"].magnitude for t in [d[kc] for d in detections]], axis=0) * detections[0][0].units
+                    st.annotations["peak_times"] = pt
+                    θ = neoutils.splice_signals(*[d[kc].annotations["θ"]] for d in detections)
+                    θmax = np.max(θ[~np.isnan(θ)])
+                    θnorm = θ.copy()  # θ is a neo signal
+                    θnorm = sigp.scale_signal(θ, 10, θmax)
+                    st.annotations["θ"] = θ
+                    st.annotations["θ_norm"] = θ_norm
+                    stt.append(st)
                     
+            
         else: # no epochs - detect in the whole signal
             if self.filterDataUponDetection:
                 signal = self._process_signal_(signal, newFilter=True)
@@ -1921,14 +1942,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
             # print(f"detection {detection}")
             
-            start_times = detection["mini_starts"][0]
-            peak_times  = detection["mini_peaks"][0]
-            mini_waves  = detection["minis"][0]
-            
-            print(f"no epochs: start_times {start_times}; peak_times {peak_times}")
+#             start_times = detection["mini_starts"][0]
+#             peak_times  = detection["mini_peaks"][0]
+#             mini_waves  = detection["minis"][0]
+#             
+#             print(f"no epochs: start_times {start_times}; peak_times {peak_times}")
             # NOTE: 2022-11-27 21:05:07
             # this is ALWAYS a waveform !!!
-            template = detection["waveform"]
+            template = detection[0].annotations["waveform"]
             
         # NOTE: 2022-11-20 11:33:43
         # set this here
@@ -3299,7 +3320,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def currentTabIndex(self):
         return self._currentTabIndex_
     
-    @markConfigurable("CurrentTabIndex", "Qt")
+    @markConfigurable("CurrentTabIndex", "Qt", value_type=int)
     @currentTabIndex.setter
     def currentTabIndex(self, val:int):
         if val >= 0:

@@ -194,7 +194,7 @@ def configsrc2bunch(src:typing.Union[confuse.ConfigSource, Bunch]):
     """
     return Bunch(((k, configsrc2bunch(v)) if isinstance(v, (confuse.ConfigSource, Bunch)) else (k,v) for k,v in src.items()))
 
-def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:typing.Optional[typing.Any]=None, trait_notifier:typing.Optional[typing.Union[bool, DataBag]] = None):
+def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:typing.Optional[typing.Any]=None, trait_notifier:typing.Optional[typing.Union[bool, DataBag]] = None, value_type=None):
     """Decorator for instance methods & properties.
     
     Decorates instance properties and methods that access instance attributes 
@@ -284,6 +284,11 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
         
         CAUTION: Always make sure the getter returns the same type of data as 
         that expected by the setter!
+    
+    value_type: optional default None
+        When specified, it must be a type, useful to force cast a config value to
+        a desired type. This seems to be necessary for qsettings which converts 
+        numbers to strings.
         
     Returns:
     =======
@@ -397,8 +402,8 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
             # applies only to read-write properties
             # hence only decorate xxx.setter if defined
             if all((inspect.isfunction(func) for func in (f.fget, f.fset))):
-                setattr(f.fget, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.fget.__name__, "default": default}))
-                setattr(f.fset, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.fset.__name__, "default": default}))
+                setattr(f.fget, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.fget.__name__, "default": default, "value_type": value_type}))
+                setattr(f.fset, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.fset.__name__, "default": default, "value_type": value_type}))
                 
                 if conftype != "qt": #and isinstance(trait_notifier, DataBag):
                     # NOTE: 2021-09-08 09:14:16
@@ -439,7 +444,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
                 
         elif inspect.isfunction(f):
             if setter is True:
-                setattr(f, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default}))
+                setattr(f, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default, "value_type": value_type}))
                 
                 if conftype != "qt":# and isinstance(trait_notifier, DataBag):
                     # see NOTE: 2021-09-08 09:14:16
@@ -469,7 +474,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
                     return parset 
         
             else:
-                setattr(f, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.__name__, "default": default}))
+                setattr(f, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.__name__, "default": default, "value_type": value_type}))
                 
         elif inspect.isbuiltin(f): # FIXME 2021-09-09 14:09:04
             # NOTE: 2021-09-08 10:10:07
@@ -478,7 +483,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
             # we must wrap on the fly
             #print("trait_notifier", trait_notifier)
             if setter is True:
-                conf_setter = Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default})
+                conf_setter = Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default, "value_type": value_type})
 
                 def newf(instance,  trn, *args, **kwargs):
                     """Calls the owner's setter method & updates the trait notifier.
@@ -504,7 +509,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
                 return parset
                 
             else:
-                configurable_getter = Bunch({"type": conftype, "name": confname, "getter":f.__name__, "default": default})
+                configurable_getter = Bunch({"type": conftype, "name": confname, "getter":f.__name__, "default": default, "value_type": value_type})
                 
                 def newf(instance, *args, **kwargs):
                     return f(instance, *args, **kwargs)
@@ -889,9 +894,26 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
             
             default = val
             
+            # if win.__class__.__name__ == "MPSCAnalysis":
+            #     print(f" key {confname}, val {val}, {type(val)}, default {default}, {type(default)}")
+            
             newval = loadQSettingsKey(qsettings, gname, key_prefix, confname, default)
             
+            # if win.__class__.__name__ == "MPSCAnalysis":
+            #     print(f" key {confname}, val {val}, {type(val)}, default {default}, {type(default)}, newval {newval}, {type(newval)}")
+            
             if isinstance(setter, property):
+                config_setter = getattr(setter.fset, "configurable_setter")
+                value_type = config_setter.get("value_type", None)
+                if not isinstance(value_type, type):
+                    value_type = type(default)
+                    
+                try:
+                    newval = value_type(newval)
+                except:
+                    warnings.warn(f"Cannot cast {type(newval).__name__} to {value_type.__name__}; reverting to default", category="RuntimeWarning")
+                    newval = default
+                
                 #print("\t\tsetter win.%s = %s" % (settername, newval))
                 setattr(win, settername, newval)
                 
