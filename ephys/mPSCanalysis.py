@@ -1899,7 +1899,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 if detection is None:
                     continue
                 
-                detections.append(detection`)
+                detections.append(detection)
                 
                 template = detection[0].annotations["waveform"]
                 
