@@ -1077,31 +1077,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 w.setEnabled(enable==True)
                 
     @safeWrapper
-    def _fit_waves_(self, st:neo.SpikeTrain):#, template:typing.Union[neo.AnalogSignal, DataSignal]):
-        """Fits the waveforms in the st to the CB model.
+    def _fit_waves_(self, st:neo.SpikeTrain, **kwargs):#, template:typing.Union[neo.AnalogSignal, DataSignal]):
+        """Fits the waveforms in the `st` SpikeTrain to the CB model.
         
-        Modifies the st in place, although it also returns a reference to it.
+        Returns the fitted waveforms.
         """
-        if self._data_ is None:
-            return
-        
-        if isinstance(self._data_, neo.Block):
-            if st.segment not in self._data_.segments:
-                warnings.warn("The spike train's segment is not part of the current data !")
-                return
-            
-            segment_index = st.segment.index
-            assert segment_index == self._data_.segments.index(st.segment)
-            
-        elif isinstance(self._data_, neo.Segment):
-            segment_index = 0
-            
-        elif isinstance(self._data_, (tuple, list)) and all(isinstance(s, neo.Segment) in self._data_):
-            if st.segment not in self._data_:
-                warnings.warn("The spike train's segment is not part of the current data !")
-                return
-            
-            segment_index = self._data_.index(st.segment)
         
         model_params = self.paramsWidget.value()
         init_params = tuple(p.magnitude for p in model_params["Initial Value:"])
@@ -1112,39 +1092,15 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         lo = tuple(p.magnitude for p in model_params["Lower Bound:"])
         up = tuple(p.magnitude for p in model_params["Upper Bound:"])
             
-        if st.annotations.get("signal_units", None) is None:
-            return
+        minis = neoutils.extract_waves(st, st.annotations["signal_units"], **kwargs)
         
-        minis = neoutils.extract_waves(st, st.annotations["signal_units"])
-        
-        wavenames = list()
-        fits = list()
+        fitted_minis = list()
         
         for kw, w in enumerate(minis):
             fw = membrane.fit_mPSC(w, init_params, lo=lo, up=up)
-    
-            wavenames.append(f"mPSC_{kw}")
-            fits.append(fw.annotations["mPSC_fit"])
-            minis[kw] = fw
-            
-            if self._use_threshold_on_rsq_:
-                # NOTE: 2022-12-14 11:03:47
-                # Accept flags added to train's annotations below
-                fw.annotations["Accept"] = fw.annotations["mPSC_fit"]["Rsq"] >= self.rSqThreshold
-                if fw.annotations["Accept"]:
-                    self._accept_waves_cache_[segment_index].add(kw)
-            
-        fittedWaves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
-        st.waveforms = fittedWaves
-        st.annotations["Accept"] = [w.annotations["Accept"] for w in minis]
-        # st.annotations["minis"] = minis
-        st.annotations["mPSC_fit"] = fits
-        st.annotations["wave_names"] = wavenames
-        st.annotations["Aligned"] = [False for w in minis]
-        
-        print(f"{self.__class__.__name__}._fit_waves_ st.annotations {st.annotations}")
+            fitted_minis.append(fw)
 
-        return st
+        return fitted_minis
                 
     def alignWaves(self):
         """
@@ -1313,7 +1269,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         signal = segment.analogsignals[sig_ndx]
         
-        waves = neoutils.extract_waves(train, train.annotations["signal_units"])
+        waves = neoutils.extract_waves(train, train.annotations["signal_units"],
+                                       prefix = signal.name)
         
         accepted_wave_ndx = [k for k in range(len(accepted)) if accepted[k]]
         
@@ -1547,7 +1504,15 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
             train = frameResult[self._displayed_detection_channel_]
             
-            self._detected_mPSCs_ = neoutils.extract_waves(train, train.annotations.get("signal_units", pq.dimensionless))
+            sig_name = train.annotations.get("signal_origin", None)
+            
+            if not isinstance(sig_name, str) or len(sig_name.strip()) == 0:
+                sig_name = train.name
+            
+            # print(f"*** {self.__class__.__name__}._plot_detected_mPSCs extract waves ***")
+            self._detected_mPSCs_ = neoutils.extract_waves(train, 
+                                                           train.annotations.get("signal_units", pq.dimensionless),
+                                                           prefix = sig_name)
 
             if len(self._detected_mPSCs_) == 0:
                 return
@@ -1605,7 +1570,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
             wavesR2 = [fdict.get("Rsq", None) for fdict in mPSC_fit if fdict is not None]
             
-            self._detected_mPSCs_ = neoutils.extract_waves(train, train.annotations.get("signal_units", pq.dimensionless))
+            sig_name = train.annotations.get("signal_origin", None)
+            
+            if not isinstance(sig_name, str) or len(sig_name.strip()) == 0:
+                sig_name = train.name
+            
+            self._detected_mPSCs_ = neoutils.extract_waves(train, train.annotations.get("signal_units", pq.dimensionless),
+                                                           prefix = sig_name)
+            
             if len(self._detected_mPSCs_) == 0:
                 return
             
@@ -2212,7 +2184,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                         θ.name = "mPSCs"
                     else:
                         θ = θ_[0]
+                        
                     θ.description = f"Detection criterion ({method})"
+                    
                     if not self.useSlidingDetection:
                         θmax = np.max(θ[~np.isnan(θ)])
                         θnorm = θ.copy()  # θ is a neo signal
@@ -2221,6 +2195,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                                                 sampling_rate = θ.sampling_rate,
                                                 name = f"{θ.name}_scaled",
                                                 description = f"{θ.description} scaled to 10/{θmax}")
+                    else:
+                        θnorm = θ
                         
                     chids = signal.array_annotations.get("channel_ids", None)
                     if chids is not None:
@@ -2248,30 +2224,45 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 if len(stt):
                     mPSCTrains = neo.core.spiketrainlist.SpikeTrainList(items = stt,
                                                                         segment = segment) # spike train list, one train per channel
+                else:
+                    return
+                
         else: # no epochs - detect in the whole signal
             if self.filterDataUponDetection:
                 signal = self._process_signal_(signal, newFilter=True)
+
             mPSCTrains = membrane.detect_mPSC(signal, waveform)
             
             if mPSCTrains is None:
                 return
+
             mPSCTrains.segment = segment
             
         # now, fit the minis
-        new_st = list()
         for st in mPSCTrains:
-            st = self._fit_waves_(st) # does this modify the st in place, or not?
-            if st is not None:
-                new_st.append(st)
-        
-        if len(new_st):
-            mPSCTrains = neo.core.spiketrainlist.SpikeTrainList(items = new_st,
-                                                                        segment = segment)
+            fitted_minis = self._fit_waves_(st, prefix = signal.name)
+            
+            if fitted_minis is None or len(fitted_minis) == 0:
+                continue
+            
+            for kw, fw in enumerate(fitted_minis):
+                if self._use_threshold_on_rsq_:
+                    accept = fw.annotations["mPSC_fit"]["Rsq"] >= self.rSqThreshold
+                    st.annotations["Accept"][kw] = accept
+                else:
+                    st.annotations["Accept"][kw] = fw.annotation["Accept"]
+                    
+                st.annotations["mPSC_fit"][kw] = fw.annotations["mPSC_fit"]
+
+            new_waves = np.concatenate([fw.magnitude[:,:,np.newaxis] for fw in fitted_minis], axis=2)
+            st.waveforms = new_waves.T
+            
         return mPSCTrains
         
     @pyqtSlot()
     def _slot_create_mPSC_template(self):
-        self.alignWaves()
+        # FIXME 2022-12-14 18:54:04
+        alignment = self._make_aligned_waves_()
         if isinstance(self._mPSC_template_, neo.AnalogSignal):
             self.use_mPSCTemplate_CheckBox.setEnabled(True)
         
@@ -3988,13 +3979,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
 
         if isinstance(sig, (neo.AnalogSignal, DataSignal)):
             ret = sigp.sosfilter(sig, self._lowpass_)
-            if isinstance(sig.name, str) and len(sig.name.strip()):
-                name = f"{sig.name}_{self._filter_type_}"
-            else:
-                name = f"{self._filter_type_}"
+            # if isinstance(sig.name, str) and len(sig.name.strip()):
+            #     name = f"{sig.name}_{self._filter_type_}"
+            # else:
+            #     name = f"{self._filter_type_}"
                 
-            ret.name = name
-            ret.description = f"{sig.description} Lowpass {self._filter_type_} cutoff {self._noise_cutoff_frequency_}"
+            ret.name = sig.name
+            ret.description = sig.description
+            # ret.description = f"{sig.description} Lowpass {self._filter_type_} cutoff {self._noise_cutoff_frequency_}"
             ann = sig.array_annotations
             for key in ann:
                 if key == "channel_names":

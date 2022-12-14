@@ -4775,7 +4775,7 @@ def inverse_lookup(signal, value, channel=0, rtol=1e-05, atol=1e-08, equal_nan =
     return ret, index, sigvals
 
     
-def extract_waves(x:neo.SpikeTrain, waveunits:pq.Quantity):
+def extract_waves(x:neo.SpikeTrain, waveunits:pq.Quantity, **kwargs):
     """Extracts the waveforms from a spike train, as a list of AnalogSignals.
     The waveforms represent the events with time stamps stored in the spike train.
     There seems to be no real convention as to what event time stamp is stored:
@@ -4834,6 +4834,12 @@ def extract_waves(x:neo.SpikeTrain, waveunits:pq.Quantity):
             left_sweep = 0 * x.units
             
         waves = list()
+        
+        prefix = kwargs.pop("prefix", None)
+        
+        if not isinstance(prefix, str) or len(prefix.strip()) == 0:
+            prefix = "wave"
+        
         for k in range(x.waveforms.shape[0]):
             w = x.waveforms[k,:,:]
             t_start = x[k]+left_sweep
@@ -4842,10 +4848,10 @@ def extract_waves(x:neo.SpikeTrain, waveunits:pq.Quantity):
                                     units = waveunits,
                                     t_start = t_start,
                                     sampling_rate=x.sampling_rate,
-                                    name = f"{x.name}_{k}")
+                                    name = f"{prefix}_{k}")
             wave.segment = x.segment
             
-            print(f"neoutils.extract_waves k {k}: t_start{t_start}, w.shape {w.shape}, wave.shape {wave.shape}")
+            # print(f"neoutils.extract_waves k {k}: t_start{t_start}, w.shape {w.shape}, wave.shape {wave.shape}")
             
             waves.append(wave)
                                   
