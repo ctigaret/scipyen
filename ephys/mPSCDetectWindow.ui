@@ -105,13 +105,13 @@
       <item>
        <widget class="QuantitySpinBox" name="detectionThresholdSpinBox">
         <property name="toolTip">
-         <string>Detection threshold [0 - 100]</string>
+         <string>Detection threshold [0 .. Inf]</string>
         </property>
         <property name="statusTip">
-         <string>Detection threshold [0 - 100]</string>
+         <string>Detection threshold [0 .. Inf]</string>
         </property>
         <property name="whatsThis">
-         <string>Detection threshold [0 - 100]</string>
+         <string>Detection threshold [0 .. Inf]</string>
         </property>
         <property name="maximum">
          <double>100.000000000000000</double>
@@ -583,6 +583,29 @@
        <item>
         <layout class="QHBoxLayout" name="_mPSCSpinBoxSliderLayout">
          <item>
+          <widget class="QLabel" name="label_4">
+           <property name="text">
+            <string>Channel:</string>
+           </property>
+           <property name="buddy">
+            <cstring>displayedDetectionChannelSpinBox</cstring>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="displayedDetectionChannelSpinBox">
+           <property name="toolTip">
+            <string>Detection channel</string>
+           </property>
+           <property name="statusTip">
+            <string>Detection channel</string>
+           </property>
+           <property name="whatsThis">
+            <string>Detection channel</string>
+           </property>
+          </widget>
+         </item>
+         <item>
           <widget class="SpinBoxSlider" name="_mPSC_spinBoxSlider_" native="true">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
@@ -785,6 +808,8 @@
    <addaction name="actionDetect"/>
    <addaction name="actionUndo"/>
    <addaction name="actionPlot_detected_mPSCs"/>
+   <addaction name="actionAlign_mPSCs"/>
+   <addaction name="actionPlot_aligned_mPSCs"/>
    <addaction name="actionView_results"/>
    <addaction name="actionSave_results"/>
    <addaction name="actionExport_results"/>
@@ -1348,6 +1373,28 @@
    </property>
    <property name="toolTip">
     <string>Live preview of filtered signal</string>
+   </property>
+  </action>
+  <action name="actionAlign_mPSCs">
+   <property name="icon">
+    <iconset theme="align-horizontal-left"/>
+   </property>
+   <property name="text">
+    <string>Align mPSCs</string>
+   </property>
+   <property name="toolTip">
+    <string>Align mPSCs by onset</string>
+   </property>
+  </action>
+  <action name="actionPlot_aligned_mPSCs">
+   <property name="icon">
+    <iconset theme="graphics"/>
+   </property>
+   <property name="text">
+    <string>Plot aligned mPSCs</string>
+   </property>
+   <property name="toolTip">
+    <string>Plot aligned mPSCs (if they exist)</string>
    </property>
   </action>
  </widget>

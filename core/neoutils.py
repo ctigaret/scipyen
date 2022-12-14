@@ -762,6 +762,13 @@ def _(obj,/,**kwargs):
     
     return factory()
 
+@make_neo_object.register(neo.core.spiketrainlist.SpikeTrainList)
+def _(obj,/,**kwargs):
+    items = [make_neo_obj(st) for st in obj]
+    segment = obj.segment
+    return neo.core.spiketrainlist.SpikeTrainList(items=items,segment=segment)
+    
+
 @make_neo_object.register(neo.core.dataobject.DataObject)
 def _(obj,/,**kwargs):
     """Generic (copy) constructor for objects of types inheriting neo.DataObject.
@@ -771,20 +778,20 @@ def _(obj,/,**kwargs):
     
     types in 'neo' package hierarchy:
     
-    neo.AnalogSignal, neo.IrregularlySampledSignal, neo.ImageSequence,
-    neo.Event, neo.Epoch, neo.SpikeTrain
+        neo.AnalogSignal, neo.IrregularlySampledSignal, neo.ImageSequence,
+        neo.Event, neo.Epoch, neo.SpikeTrain
     
     as well as Scipyen's types:
     
-    DataSignal, IrregularlySampledDataSignal (these are equivalent to 
-        neo.AnalogSignal and neo.IrregularlySampledSignal, respectively, but 
-        without the domain being constrained to time)
+        DataSignal, IrregularlySampledDataSignal (these are equivalent to 
+            neo.AnalogSignal and neo.IrregularlySampledSignal, respectively, but 
+            without the domain being constrained to time)
         
-    DataMark, DataZone (equivalent to neo.Event and neo.Epoch without the 
-        domain being constrained to time)
+        DataMark, DataZone (equivalent to neo.Event and neo.Epoch without the 
+            domain being constrained to time)
         
-    TriggerEvent: specialization of DataMark with domain contrained to time and
-    with specific event type
+        TriggerEvent: specialization of DataMark with domain constrained to time 
+        and with specific event type
     
     
     All neo DataObject types are fundamentally derived from numpy arrays
@@ -2525,6 +2532,8 @@ def splice_signals(*args, times=None):
     
     
     """
+    if len(args) == 1:
+        return args[0]
     if all(isinstance(s, (neo.AnalogSignal, DataSignal)) for s in args):
         if len(args) == 1:
             return args[0] # no splice
@@ -2590,6 +2599,8 @@ def splice_signals(*args, times=None):
         return ret
     
     elif all(isinstance(s, neo.SpikeTrain) for s in args):
+        if len(args) == 1:
+            return args[0] # no splice
         # NOTE: sampling_rare pertains to the asssociated waveforms
         if any(args[0].times.units != s.times.units for s in args[1:]):
             raise ValueError("Incompatible domain units")
@@ -2604,7 +2615,7 @@ def splice_signals(*args, times=None):
         t_stop = args[-1].t_stop
         t = np.concatenate([s.times.magnitude for s in args], axis=0) * t_start.units
         waves = np.concatenate([s.waveforms for s in args], axis=0)
-        
+        print(f"neoutils.splice_signals<SpikeTrain> waves shape {waves.shape}")
         return neo.SpikeTrain(t, t_start=t_start, t_stop = t_stop, 
                               units = args[0].units,
                               sampling_rate = args[0].sampling_rate,
@@ -4764,4 +4775,79 @@ def inverse_lookup(signal, value, channel=0, rtol=1e-05, atol=1e-08, equal_nan =
     return ret, index, sigvals
 
     
+def extract_waves(x:neo.SpikeTrain, waveunits:pq.Quantity):
+    """Extracts the waveforms from a spike train, as a list of AnalogSignals.
+    The waveforms represent the events with time stamps stored in the spike train.
+    There seems to be no real convention as to what event time stamp is stored:
+    • the waveform start
+    • the actual event onset (at some time interval AFTER the waveform start)
     
+    Scipyen uses the following convention:
+    • if the "left_sweep" attribute of the spike train is a POSITIVE scalar quantity:
+        the spike train stores the start times of the waveforms, and the event 
+        ONSETS are the sum of the start times and the "left_sweep" attribute
+    
+    • if the "left_sweep" is a NEGATIVE scalar quantity, then the time stamps of
+        the train are actual event ONSET times, and the waveforms start at
+        spike time - abs(left_sweep)
+    
+    • if the "left_sweep" is zero or None, then the waveform start times are 
+        considered as being the same as the time stamps stored in the train.
+    
+    Parameters:
+    ==========
+    x:neo.SpikeTrain
+    waveunits: units for the waveform signal (the spike trains store waveforms
+            as plain numpy arrays)
+    """
+    if x.waveforms.size > 0:
+        # NOTE: 2022-12-14 09:41:06
+        # The left_sweep depends seems intended to indicate the time from the 
+        # start of the waveform to the time of the actual onset of the event
+        #
+        # If the spike train stores the time stamps of the waveform, then the
+        # time stamp of the onset for the kth event is train[k] + left_sweep[k]
+        #
+        # If, on the other hand, the spike train stores the ACTUAL onset times
+        # of the waveform, then the start of the waveform for the kth event
+        # is train[k] - left_sweep[k]
+        #
+        # There is no recommendation / clarification of the semantics in the 
+        # neo documentation!
+        #
+        # In the following, I apply the convention stated in the docstring above.
+        #
+        # Furthermore, although the documentation states that left_sweep is a
+        # quantity array 1D, the source code points to left_sweep (recommended
+        # attribute) as being a scalar ( 0 dimensions), and treats it as a 
+        # scalar (see SpikeTrain.merge() for example).
+        #
+        # Therefore, I am also treating left_sweep as a scalar quantity!
+        
+        if isinstance(x.left_sweep, pq.Quantity):
+            if x.left_sweep.size > 1:
+                left_sweep = x.left_sweep[0] # just in case; see NOTE: 2022-12-14 09:41:06
+                
+            else:
+                left_sweep = x.left_sweep
+        else:
+            left_sweep = 0 * x.units
+            
+        waves = list()
+        for k in range(x.waveforms.shape[0]):
+            w = x.waveforms[k,:,:]
+            t_start = x[k]+left_sweep
+            
+            wave = neo.AnalogSignal(w.T,
+                                    units = waveunits,
+                                    t_start = t_start,
+                                    sampling_rate=x.sampling_rate,
+                                    name = f"{x.name}_{k}")
+            wave.segment = x.segment
+            
+            print(f"neoutils.extract_waves k {k}: t_start{t_start}, w.shape {w.shape}, wave.shape {wave.shape}")
+            
+            waves.append(wave)
+                                  
+        if len(waves):
+            return waves

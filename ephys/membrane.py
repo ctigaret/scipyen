@@ -6657,7 +6657,8 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
     """
     if not isinstance(x, (neo.AnalogSignal, DataSignal)):
         raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal; got {type(x).__name__} instead")
-    
+    if x.shape[1] > 1:
+        raise TypeError(f"Expecting a vector; instead, the signal has {x.shape[1]} channels")
     flags =  θ >= threshold
     flag_bounds = np.ediff1d(flags.astype(np.dtype(float)))
     peak_begins = np.where(flag_bounds > 0)[0] # sample indices
@@ -6680,87 +6681,48 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
             peak_ends = peak_ends[0:-1]
         
     θmaxima = [np.argmax(θ[v[0]:v[1]]) + v[0] for v in zip(peak_begins, peak_ends) if len(θ[v[0]:v[1]]) > 0]
-    # θmaxima = [np.argmax(θ[v[0]:v[1],0]) + v[0] for v in zip(peak_begins, peak_ends) if len(θ[v[0]:v[1],0]) > 0]
     
     mini_starts = x.times[θmaxima]
     
     mini_ends = mini_starts + duration
 
-    # wave_windows = [(t0,t1) for (t0,t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
-
     minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
     
     mini_peaks = np.array([w.times[peakfunc(w[:,0])] for w in minis])*x.times.units
+
     chname = x.array_annotations.get("channel_names", [""])[0]
+
     if len(chname.strip())==0:
         chname = "mPSC"
     chname +="_"
+        
     for km, m in enumerate(minis):
         m.annotations["Accept"] = True
         m.name = f"{chname}{km}"
         m.array_annotate(**x.array_annotations)
     
-#     onsets = np.full((len(minis),), fill_value=0*x.times.units)
-#     
-#     fitted = list()
-#     
-#     for kw, m in enumerate(minis):
-#         fw = fit_mPSC(m, params_init, lo=params_lo, up = params_up)
-#         onsets[kw] = fw.annotations["mPSC_fit"]["Coefficients"][2] * x.times.units
-#         fw.name = f"mPSC_{kw}"
-#         fw.annotations["t_peak"] = mini_peaks[kw]
-#         if isinstance(r2thr, float):
-#             fw.annotations["Accept"] = fw.annotations["mPSC_fit"]["Rsq"] >= r2thr
-#         else:
-#             fw.annotations["Accept"] = True
-#             
-#         fitted.append(fw)
-#         
-#     maxOnset = onsets.max()
-#     
-#     onsetCorrections = maxOnset - onsets
-#     new_starts = mini_starts - onsetCorrections
-#     new_stops  = new_starts + duration
-#     
-#     # align waveforms and remove baseline dc:
-#     aligned = list()
-#     for (t0, t1) in zip(new_starts, new_stops):
-#         w = x.time_slice(t0,t1)
-#         tₒ = t0 + maxOnset
-#         baseline = x.time_slice(t0, tₒ)
-#         w -= np.mean(baseline)
-#         aligned.append(neoutils.set_relative_time_start(w[:,0]))
-        
     ret = neo.SpikeTrain(mini_starts, t_start = x.t_start, units = x.times.units,
                          t_stop = x.times[-1], sampling_rate = x.sampling_rate,
                          name="mPSCs")
     
     mPSCtrain_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
     ret.waveforms = mPSCtrain_waves.T
-    # ret.segment = segment
-    # ret.array_annotate(channel_names = x.array_annotations["channel_names"][0])
-    # ret.array_annotate(channel_ids = x.array_annotations["channel_ids"][0])
-    ret.annotate(peak_times = mini_peaks, source="PSC_detection",
-                 signal_units = x.units, signal_origin = x.name,
-                 datetime=datetime.datetime.now(),
+    # print(f"membrane.extract_minis: waves shape {mPSCtrain_waves.shape}, waveforms shape {ret.waveforms.shape}")
+    ret.segment = x.segment
+    ret.annotate(
+                 peak_times = mini_peaks, 
+                 wave_names = [w.name for w in minis],
+                 mPSC_fit = [w.annotations.get("mPSC_fit", None) for w in minis],
                  Accept = [w.annotations["Accept"] for w in minis],
-                 minis = minis)
-    # ret.annotations["peak_times"] = mini_peaks
-    # ret.annotations["source"] = "PSC_detection"
-    # ret.annotations["signal_units"] = x.units
-    # ret.annotations["signal_origin"] = x.name
-    # ret.annotations["datetime"] = datetime.datetime.now()
-    # ret.annotations["Accept"] = [w.annotations["Accept"] for w in minis]
-    # ret.annotations["Fitted"] = fitted
-    # ret.annotations["Aligned"] = aligned
+                 source="PSC_detection",
+                 signal_units = x.units, 
+                 signal_origin = x.name,
+                 datetime=datetime.datetime.now(),
+                 Aligned = False,
+                 )
     
     return ret
-        
-        
-    # return {"mini_starts":mini_starts, "mini_peaks":mini_peaks, "minis":minis}
-            # "waveform":waveform}
-    
-    
+
 def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typing.Optional[float]=None):
     """Detect miniature or spontaneous PSCs by cross-correlation with a waveform.
     
@@ -6900,11 +6862,7 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
             
         N = mdl.shape[0]
         M = x.shape[0]
-#         pad0 = x[0:N]
-#         pad1 = x[(M-N):]
-#         
-#         xx = np.concatenate([pad0, x, pad1], axis=0)
-        
+
         # a list of cross-correrlation signals, one per signal channel (i.e. each
         # data on 2nd axis)
         xc = [scipy.signal.correlate(x[:,k], mdl, mode="valid") for k in range(x.shape[1])]
@@ -6951,7 +6909,7 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
         if len(ret) == 0:
             return
         
-        ret = neo.core.spiketrainlist.SpikeTrainList(items = ret)
+        ret = neo.core.spiketrainlist.SpikeTrainList(items = ret, segment=x.segment)
         return ret
 
 def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), Im:typing.Union[int, str] = "IN0", epoch=None, clear_spiketrains:bool=True, fit_waves:bool=False):
@@ -7359,7 +7317,7 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
     else:
         x_ = x
     
-    l, c, e, _ = sigp.state_levels(x_[:,0])
+    l, c, e, _ = sigp.state_levels(x_[:,0], axis=0)
     
     if isinstance(params, neo.AnalogSignal): # template waveform given
         if params.t_start.magnitude != 0:
@@ -7407,6 +7365,7 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
         fitresult = crvf.fit_mPSC_model(xx, params, bounds = [lo, up])
         
         fitted_x = type(x)(fitresult[0], units = x.units, t_start = x.t_start, sampling_rate = x.sampling_rate, name="mPSCfit")
+        fitted_x.segment = x.segment
         
         if x.shape[1] > 1:
             x[:,1] = fitted_x # modifies x in-place
@@ -7426,11 +7385,12 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
         # NOTE: 2022-10-27 22:44:50
         # Restore the domain start of the waveform (see NOTE: 2022-10-27 22:44:40)
         x.t_start = t_start
+        x.annotate(mPSC_fit = fitresult[1],
+                   amplitude = sigp.waveform_amplitude(x[:,0]))
         
-        x.annotations["mPSC_fit"] = fitresult[1]
         x.annotations["mPSC_fit"]["template"] = False
-        x.annotations["amplitude"] = sigp.waveform_amplitude(x[:,0])
         x.annotations["mPSC_fit"]["amplitude"] = sigp.waveform_amplitude(x[:,1])
+        
     
     return x
     

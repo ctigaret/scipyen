@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os, typing, math, datetime, logging, traceback
+import os, typing, math, datetime, logging, traceback, warnings
 from numbers import (Number, Real,)
 from itertools import chain
 
@@ -120,6 +120,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._data_var_name_ = None
         self._last_used_file_save_filter_ = None
         self._last_used_file_open_filter_ = None
+        self._displayed_detection_channel_ = 0
         
         self._currentTabIndex_ = 0
         
@@ -532,6 +533,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.durationSpinBox.setValue(self._mPSCduration_)
         self.durationSpinBox.valueChanged.connect(self._slot_modelDurationChanged)
         
+        self.displayedDetectionChannelSpinBox.valueChanged.connect(self._slot_displayedDetectionChannelChanged)
+        
         self.rsqThresholdDoubleSpinBox.setValue(self._rsq_threshold_)
         self.rsqThresholdDoubleSpinBox.valueChanged.connect(self._slot_rsqThresholdChanged)
         
@@ -542,6 +545,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.actionExportEphysData.triggered.connect(self._slot_exportEphysData)
         self.actionPlot_Data.triggered.connect(self._slot_plotData)
         self.actionPlot_detected_mPSCs.triggered.connect(self._plot_detected_mPSCs)
+        self.actionPlot_aligned_mPSCs.triggered.connect(self._plot_waves_for_template)
         self.actionMake_mPSC_Epoch.triggered.connect(self._slot_make_mPSCEpoch)
         self.actionOpen_mPSCTemplate.triggered.connect(self._slot_openTemplateFile)
         self.actionCreate_mPSC_Template.triggered.connect(self._slot_create_mPSC_template)
@@ -561,6 +565,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.actionLoad_last_used_mPSC_template.triggered.connect(self._slot_loadLastUsedTemplate)
         # self.actionValidate_in_current_sweep.triggered.connect(self._slot_validateSweep)
         self.actionUndo_current_sweep.triggered.connect(self._slot_undoCurrentSweep)
+        self.actionAlign_mPSCs.triggered.connect(self.alignWaves)
         
         # self.actionDetect.triggered.connect(self._slot_detect)
         # TODO/FIXME 2022-11-26 09:10:33 for testing
@@ -716,6 +721,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         else:
             data = kwargs.pop("data", None)
             
+        sigBlock = QtCore.QSignalBlocker(self.displayedDetectionChannelSpinBox)
+            
         if neoutils.check_ephys_data_collection(data): # and self._check_supports_parameter_type_(data):
             if isinstance(data, neo.Block):
                 self._undo_buffer_ = [None for s in data.segments]
@@ -733,8 +740,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 if len(self._data_.segments) and len(self._data_.segments[0].analogsignals):
                     time_units = self._data_.segments[0].analogsignals[0].times.units
                     signal_units = self._data_.segments[0].analogsignals[0].units
-                    # sampling_rate = self._data_.segments[0].analogsignals[0].sampling_rate
-                    # self.noiseCutoffFreq = sampling_rate/4
                     
                 else:
                     time_units = self._default_time_units_
@@ -754,12 +759,16 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._frameIndex_ = range(self._data_frames_)
                 self._number_of_frames_ = len(self._frameIndex_)
                 
+                channels = [1]
                 for k, segment in enumerate(self._data_.segments):
                     self._result_[k] = self._get_previous_detection_(segment)
-                    if self._result_[k] is not None:
-                        for kw, w in enumerate(self._result_[k][1]):
-                            if w.annotations["Accept"] == True:
-                                self._accept_waves_cache_[k].add(kw) 
+                    if isinstance(self._result_[k], neo.core.spiketrainlist.SpikeTrainList):
+                        channels.append(len(self._result_[k]))
+                        
+                max_channels = max(channels)
+                self.displayedDetectionChannelSpinBox.setMaximum(max_channels)
+                self._displayed_detection_channel_ = 0
+                self.displayedDetectionChannelSpinBox.setValue(self._displayed_detection_channel_)
                             
             elif isinstance(data, neo.Segment):
                 self._undo_buffer_ = [None]
@@ -786,10 +795,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._frameIndex_ = range(self._data_frames_)
                 self._number_of_frames_ = len(self._frameIndex_)
                 self._result_ = [self._get_previous_detection_(segment)]
-                if self._result_[0] is not None:
-                    for kw, w in enumerate(self._result_[1]):
-                        if w.annotations["Accept"] == True:
-                            self._accept_waves_cache_[0].add(kw) 
+                if isinstance(self._result_[0], neo.core.spiketrainlist.SpikeTrainList):
+                    self.displayedDetectionChannelSpinBox.setMaximum(len(self._result_[k]))
+                    self._displayed_detection_channel_ = 0
+                    self.displayedDetectionChannelSpinBox.setValue(self._displayed_detection_channel_)
                 
             elif isinstance(data, (tuple, list)) and all(isinstance(v, neo.Segment) for v in data):
                 self._undo_buffer_ = [None for s in data]
@@ -799,8 +808,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 if len(data[0].analogsignals):
                     time_units = data[0].analogsignals[0].times.units
                     signal_units = data[0].analogsignals[0].units
-                    # sampling_rate = data[0].analogsignals[0].sampling_rate
-                    # self.noiseCutoffFreq = sampling_rate/4
                 else:
                     time_units = self._default_time_units_
                     signal_units = self._default_model_units_
@@ -816,12 +823,16 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._frameIndex_ = range(self._data_frames_)
                 self._number_of_frames_ = len(self._frameIndex_)
                 
+                channels = [1]
                 for k,s in enumerate(self._data_):
                     self._result_[k] = self._get_previous_detection_(s)
-                    if self._result_[k] is not None:
-                        for kw, w in enumerate(self._result_[k][1]):
-                            if w.annotations["Accept"] == True:
-                                self._accept_waves_cache_[k].add(kw) 
+                    if isinstance(self._result_[k], neo.core.spiketrainlist.SpikeTrainList):
+                        channels.append(len(self._result_[k]))
+                        
+                max_channels = max(channels)
+                self.displayedDetectionChannelSpinBox.setMaximum(max_channels)
+                self._displayed_detection_channel_ = 0
+                self.displayedDetectionChannelSpinBox.setValue(self._displayed_detection_channel_)
                     
             else:
                 self.errorMessage(self.windowTitle(), f"Expecting a neo.Block, neo.Segment, or a sequence of neo.Segment objects; got {type(data).__name__} instead")
@@ -1065,10 +1076,83 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             if isinstance(w, (QtWidgets.QWidget, QtWidgets.QAction)):
                 w.setEnabled(enable==True)
                 
+    @safeWrapper
+    def _fit_waves_(self, st:neo.SpikeTrain):#, template:typing.Union[neo.AnalogSignal, DataSignal]):
+        """Fits the waveforms in the st to the CB model.
+        
+        Modifies the st in place, although it also returns a reference to it.
+        """
+        if self._data_ is None:
+            return
+        
+        if isinstance(self._data_, neo.Block):
+            if st.segment not in self._data_.segments:
+                warnings.warn("The spike train's segment is not part of the current data !")
+                return
+            
+            segment_index = st.segment.index
+            assert segment_index == self._data_.segments.index(st.segment)
+            
+        elif isinstance(self._data_, neo.Segment):
+            segment_index = 0
+            
+        elif isinstance(self._data_, (tuple, list)) and all(isinstance(s, neo.Segment) in self._data_):
+            if st.segment not in self._data_:
+                warnings.warn("The spike train's segment is not part of the current data !")
+                return
+            
+            segment_index = self._data_.index(st.segment)
+        
+        model_params = self.paramsWidget.value()
+        init_params = tuple(p.magnitude for p in model_params["Initial Value:"])
+        if self._use_template_ and isinstance(self._mPSC_template_, neo.AnalogSignal):
+            template_fit = membrane.fit_mPSC(self._mPSC_template_, init_params, lo, up)
+            init_params = template_fit.annotations["mPSC_fit"]["Coefficients"]
+                
+        lo = tuple(p.magnitude for p in model_params["Lower Bound:"])
+        up = tuple(p.magnitude for p in model_params["Upper Bound:"])
+            
+        if st.annotations.get("signal_units", None) is None:
+            return
+        
+        minis = neoutils.extract_waves(st, st.annotations["signal_units"])
+        
+        wavenames = list()
+        fits = list()
+        
+        for kw, w in enumerate(minis):
+            fw = membrane.fit_mPSC(w, init_params, lo=lo, up=up)
+    
+            wavenames.append(f"mPSC_{kw}")
+            fits.append(fw.annotations["mPSC_fit"])
+            minis[kw] = fw
+            
+            if self._use_threshold_on_rsq_:
+                # NOTE: 2022-12-14 11:03:47
+                # Accept flags added to train's annotations below
+                fw.annotations["Accept"] = fw.annotations["mPSC_fit"]["Rsq"] >= self.rSqThreshold
+                if fw.annotations["Accept"]:
+                    self._accept_waves_cache_[segment_index].add(kw)
+            
+        fittedWaves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
+        st.waveforms = fittedWaves
+        st.annotations["Accept"] = [w.annotations["Accept"] for w in minis]
+        # st.annotations["minis"] = minis
+        st.annotations["mPSC_fit"] = fits
+        st.annotations["wave_names"] = wavenames
+        st.annotations["Aligned"] = [False for w in minis]
+        
+        print(f"{self.__class__.__name__}._fit_waves_ st.annotations {st.annotations}")
+
+        return st
+                
     def alignWaves(self):
         """
-        Aligns detected mPSC waveforms on the onset. 
-        Useful in order to create a mPSC template waveform from their average.
+        Aligns all waveforms on their onset.
+        This requires that the mPSC waveforms have been fitted already.
+        
+        WARNING: Overwrites the spike train waveforms and modifies the spike
+        train mPSC metadata. There is NO undo.
         """
         if self._data_ is None:
             return
@@ -1101,7 +1185,137 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         #
         # 
         
-        waves_list = list() # holds aligned waves
+        go = self.questionMessage(self.windowTitle(), "This will overwrite the current detection. Continue?")
+        
+        if go != QtWidgets.QMessageBox.Yes:
+            return
+        
+        for k, frameResult in enumerate(self._result_):
+            if not isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList):
+                continue
+            
+            segment  = frameResult.segment
+            prev_detect = self._get_previous_detection_(segment)
+            self._undo_buffer_[k] = prev_detect
+            
+            if segment is None:
+                segment = self._get_data_segment_(k)
+            
+            for kc, train in enumerate(frameResult):
+                alignment = self._make_aligned_waves_(train, segment)
+                
+                if alignment is None:
+                    continue
+                
+                aligned_waveforms, wave_ndx = alignment
+                        
+                if len(aligned_waveforms):
+                    aligned_waveforms = np.concatenate([w.magnitude[:,:,np.newaxis] for w in aligned_waves], axis=2)
+                    
+                    # peak times, wave names, accept, mPSC_fit
+                    metainfo = [(train.annotations["peak_times"][k],
+                                 train.annotations["wave_names"][k],
+                                 train.annotations["Accept"][k],
+                                 train.annotations["mPSC_fit"][k]) for k in wave_ndx]
+                    
+                    train.annotations["peak_times"] = metainfo[0]
+                    train.annotations["wave_names"] = metainfo[1]
+                    train.annotations["Accept"] = metainfo[2]
+                    train.annotations["mPSC_fit"] = metainfo[3]
+                    train.annotations["Aligned"] = True
+                    
+                    train.waveforms = aligned_waveforms.T
+                    
+        self._plot_data()
+                    
+    def _make_aligned_waves_(self, train:neo.SpikeTrain, segment:typing.Optional[neo.Segment]=None, only_accepted:bool=True):
+        """
+        Aligns detected mPSC waveforms on the onset. 
+        Optionally, only the accepted waveforms are used.
+        Useful in order to create a mPSC template waveform from their average.
+        
+        Parameters:
+        ===========
+        train: the train with mPSC waveforms
+        
+        segment: the train's segment, or a segment containing the signal where
+            the waveforms are being extracted from.
+        
+            Optional, default is None.
+        
+            WARNING: When segment is None, this will use the train's segment
+            attribute. If this is None, will raise an error.
+        
+        only_accepted: when True, only the accepted waveforms are aligned
+            Optional; default is True
+        
+        Returns:
+        ========
+        A sequence of alignes waveforms (as neo.AnalogSignal obejcts) and a
+        sequece of their indices in the original waveforms collection.
+        
+        Returns None when inappropriate data is passed to the call.
+        
+        """
+        if self._data_ is None:
+            return
+        
+        if all(v is None for v in self._result_):
+            return
+        
+        if not isinstance(segment, neo.Segment):
+            segment = train.segment
+            if not isinstance(segment, neo.Segment):
+                self.criticalMessage(self.windowTitle(), "The spike train does not associate a segment")
+                return
+        
+        if train.waveforms is None:
+            warnings.warn("No waveforms found in the spike train", category=RuntimeWarning)
+            self.errorMessage(self.windowTitle(), "No waveforms found in the spike train")
+            return
+        
+        accepted = train.annotations.get("Accept", None)
+        if accepted is None:
+            warnings.warn("No accept flags were found in the spike train", category=RuntimeWarning)
+            self.errorMessage(self.windowTitle(), "No accept flags were found in the spike train")
+            return
+        
+        peak_times = train.annotations.get("peak_times", None)
+        
+        if peak_times is None:
+            return
+        
+        mPSC_fit = train.annotations.get("mPSC_fit", None)
+        
+        if mPSC_fit is None:
+            warnings.warn("The mPSCs waveforms do not appear to have been fitted", category=RuntimeWarning)
+            self.errorMessage(self.windowTitle(), "The mPSCs waveforms do not appear to have been fitted")
+            return
+            # train = self._fit_waves_(train)
+            # mPSC_fit = train.annotations["mPSC_fit"]
+            # accepted = train.annotations["Accept"]
+            
+        signal_origin = train.annotations.get("signal_origin", None)
+        
+        if signal_origin is None:
+            warnings.warn("No signal origin found in the spike train", category=RuntimeWarning)
+            self.errorMessage(self.windowTitle(), "No signal origin found in the spike train")
+            return
+        
+        sig_ndx = neoutils.get_index_of_named_signal(segment, signal_origin, silent=True)
+        
+        if len(sig_ndx) == 0 or all(v is None for v in sig_ndx):
+            warnings.warn(f"No signal named {signal_origin} is found in data", category=RuntimeWarning)
+            self.errorMessage(self.windowTitle(), f"No signal named {signal_origin} is found in data")
+            return
+        
+        sig_ndx = sig_ndx[0]
+        
+        signal = segment.analogsignals[sig_ndx]
+        
+        waves = neoutils.extract_waves(train, train.annotations["signal_units"])
+        
+        accepted_wave_ndx = [k for k in range(len(accepted)) if accepted[k]]
         
         sweep_index = list()
         wave_index = list()
@@ -1109,46 +1323,40 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         peak_times = list()
         onset = list()
         
-        for k, frameResult in enumerate(self._result_):
-            if frameResult is None:
-                continue
-            
-            # st = frameResult[0]
-            # wave_index = list()
-            for kw, w in enumerate(frameResult[1]):
-                if w.annotations["Accept"] == True:
-                    start_times.append(w.t_start)
-                    peak_times.append(w.annotations["t_peak"])
-                    onset.append(w.annotations["mPSC_fit"]["Coefficients"][2])
-                    wave_index.append(kw)
-                    sweep_index.append(k)
-                    
+        aligned_waves = list()
+        
+        # select accepted waves
+        for kw, w in enumerate(waves):
+            if accepted[kw]:
+                start_times.append(w.t_start)
+                peak_times.append(peak_times[kw])
+                onset.append(mPSC_fit[kw]["Coefficients"][2])
+                wave_index.append(kw)
+                sweep_index.append(k)
+        
         if len(onset):
             maxOnset = max(onset) * start_times[0].units
-            onsetCorrection = [maxOnset - v*start_times[0].units for v in onset]
-            new_start_times = [start_times[k] - onsetCorrection[k] for k in range(len(start_times))]
+            onsetCorrection = [maxOnset - v * start_times[0].units for v in onset]
+            new_start_times = [start_times[i] - onsetCorrection[i] for i in range(len(start_times))]
             stop_times = [v + self._mPSCduration_ for v in new_start_times]
             
-            for k,sweep_ndx in enumerate(sweep_index):
-                segment = self._get_data_segment_(sweep_ndx)
-                signal = self._get_selected_signal_(segment)
-                    
-                wave_ndx = wave_index[k]
-                t0 = new_start_times[k]
-                t1 = stop_times[k]
-                wave = signal.time_slice(t0, t1)
-                # 1) Remove the DC component - signal average beween t0 and onset
+            for kw, wave_ndx in enumerate(wave_index):
+                t0 = new_start_times[kw]
+                t1 = sop_times[kw]
+                wave = signal.time_slice(t0,t1)
                 t_onset = t0+maxOnset
                 baseline = signal.time_slice(t0, t_onset)
                 dc = np.mean(baseline, axis=0)
                 wave -= dc
-                # 2) set relatime time start to 0
-                # wave = neoutils.set_relative_time_start(wave[:,0])
-                waves_list.append(neoutils.set_relative_time_start(wave[:,0]))
+                aligned_waves.append(wave)
                 
-        # print(len(waves_list))
-        if len(waves_list):
-            self._mPSCs_for_template_[:] = waves_list
+        if len(aligned_waves):
+            return aligned_waves, wave_index
+        
+    def _average_waves_(self, train):
+        waves = neoutils.extract_waves(train, train.annotations["signal_units"])
+        if len(waves):
+            self._mPSCs_for_template_[:] = waves
             self._mPSC_template_ = ephys.average_signals(*waves_list)
             self._mPSC_template_.description = "Average mPSC Waveform"
             self._mPSC_template_.name ="mPSC Template"
@@ -1162,7 +1370,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                     dataOriginName = f"Averaged mPSC template {dateTimeStr}"
             
             self._mPSC_template_.annotations.update({"datetime":dateTime,
-                                                     "data_origin":dataOriginName})
+                                                        "data_origin":dataOriginName})
             
             
             self._plot_waves_for_template()
@@ -1222,7 +1430,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             else:
                 self._waveFormViewer_.view(self._mPSC_template_)
             
-    def _init_ephysViewer_(self):
+    def _init_ephysViewer_(self):   
         self._ephysViewer_ = sv.SignalViewer(win_title=self._winTitle_, 
                                                 parent=self, configTag="DataViewer")
         self._owns_viewer_ = True
@@ -1282,6 +1490,21 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
             
     def _plot_waves_for_template(self):
+        if len(self._mPSCs_for_template_) == 0:
+            frameResult = self._result_[self.currentFrame]
+            if not isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList):
+                return
+            channel = self._displayed_detection_channel_
+            if channel not in range(-len(frameResult), len(frameResult)):
+                return
+            train = frameResult[channel]
+            
+            alignment = self._make_aligned_waves_()
+            if alignment is None:
+                return
+            
+            self._mPSCs_for_template_, wave_ndx = alignment
+            
         if len(self._mPSCs_for_template_):
             self.accept_mPSCcheckBox.setEnabled(False)
             self._template_showing_ = True
@@ -1301,19 +1524,34 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
     def _plot_detected_mPSCs(self):
         # print(f"{self.__class__.__name__}._plot_detected_mPSCs")
-        frameResult = self._result_[self.currentFrame]
+        frameResult = self._result_[self.currentFrame] # a spike train list or None !!!
+        
         signalBlockers = (QtCore.QSignalBlocker(w) for w in (self._mPSC_spinBoxSlider_,
-                                                            self.accept_mPSCcheckBox))
+                                                             self.accept_mPSCcheckBox,
+                                                             self.displayedDetectionChannelSpinBox))
         self._template_showing_ = False
         
-        if isinstance(frameResult, (tuple, list)):
-            # WARNING: 2022-11-22 17:46:17
-            # make sure self._detected_mPSCs_ is not a mere reference
-            # to the list in frameResult! Create a NEW list !
-            # self._detected_mPSCs_ = [neoutils.set_relative_time_start(s) for s in frameResult[1]]
-            # self._detected_mPSCs_ = [s for s in frameResult[1]]
-            self._detected_mPSCs_ = frameResult[1]
+        if isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList):
+            nChannels = len(frameResult) # how many spike trains in there (one per channel)
             
+            self.displayedDetectionChannelSpinBox.setMaximum(nChannels)
+            self._displayed_detection_channel_ = self.displayedDetectionChannelSpinBox.value()
+            
+            if self._displayed_detection_channel_ >= len(frameResult):
+                self._displayed_detection_channel_ = len(frameResult)-1
+                
+            elif self._displayed_detection_channel_ < 0:
+                self._displayed_detection_channel_ = 0
+                
+            self.displayedDetectionChannelSpinBox.setValue(self._displayed_detection_channel_)
+            
+            train = frameResult[self._displayed_detection_channel_]
+            
+            self._detected_mPSCs_ = neoutils.extract_waves(train, train.annotations.get("signal_units", pq.dimensionless))
+
+            if len(self._detected_mPSCs_) == 0:
+                return
+        
             if not isinstance(self._detected_mPSCViewer_, sv.SignalViewer):
                 self._detected_mPSCViewer_ = sv.SignalViewer(win_title="Detected mPSCs", 
                                                             parent=self, configTag="mPSCViewer")
@@ -1322,13 +1560,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
 
                 self._detected_mPSCViewer_.frameChanged.connect(self._slot_mPSCViewer_frame_changed)
                 
-            # print(len(self._detected_mPSCs_))
             self._mPSC_spinBoxSlider_.setRange(0, len(self._detected_mPSCs_)-1)
             self._detected_mPSCViewer_.view(self._detected_mPSCs_)
+            self._detected_mPSCViewer_.docTitle = "mPSCs"
             
             self.accept_mPSCcheckBox.setEnabled(True)
             self._indicate_mPSC_(self._detected_mPSCViewer_.currentFrame)
-            
             
         else:
             if isinstance(self._detected_mPSCViewer_, sv.SignalViewer):
@@ -1339,97 +1576,108 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             if isinstance(self._ephysViewer_, sv.SignalViewer):
                 self._ephysViewer_.removeTargetsOverlay(self._ephysViewer_.axes[self._signal_index_])
         
-            
-        # self._detected_mPSCViewer_.docTitle = "mPSCs"
-            
-        # self._indicate_mPSC_(self._detected_mPSCViewer_.currentFrame)
-        
     def _indicate_mPSC_(self, waveindex):
         # print(f"_indicate_mPSC_ wave {waveindex} of {len(self._detected_mPSCs_)} waves")
         if not isinstance(self._ephysViewer_, sv.SignalViewer):
             return
         
-        currentSweepDetection = self._result_[self.currentFrame]
-        if currentSweepDetection is None:
-            return
+        frameResult = self._result_[self.currentFrame]
         
-        self._detected_mPSCs_ = self._result_[self.currentFrame][1]
-        
-        if len(self._detected_mPSCs_) == 0:
-            return
-        
-        
-        segment = self._get_data_segment_()
-        signal = segment.analogsignals[self._signal_index_]
-        axis = self._ephysViewer_.axes[self._signal_index_]
-        
-        if waveindex not in range(-len(self._detected_mPSCs_),len(self._detected_mPSCs_)):
-            waveindex = 0
-        
-        mPSC = self._detected_mPSCs_[waveindex]
-        
-        peak_time = mPSC.annotations.get("t_peak", None)
-        
-        waveR2 = mPSC.annotations["mPSC_fit"].get("Rsq", None)
-        
-        if waveR2 is not None:
-            if mPSC.annotations.get("Accept", False):
-                wavelabel = "R²=%.2f Accept" % waveR2
+        if isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList):
+            if self._displayed_detection_channel_ not in range(len(frameResult)):
+                return
+            train = frameResult[self._displayed_detection_channel_]
+            
+            if waveindex not in range(train.times.size):
+                waveindex = 0
+                
+            peak_times = train.annotations.get("peak_times", None)
+            if peak_times is None:
+                return
+            
+            accepted = train.annotations.get("Accept", None)
+            if accepted is None:
+                return
+            
+            mPSC_fit = train.annotations.get("mPSC_fit", None)
+            if mPSC_fit is None:
+                return
+            
+            wavesR2 = [fdict.get("Rsq", None) for fdict in mPSC_fit if fdict is not None]
+            
+            self._detected_mPSCs_ = neoutils.extract_waves(train, train.annotations.get("signal_units", pq.dimensionless))
+            if len(self._detected_mPSCs_) == 0:
+                return
+            
+            segment = self._get_data_segment_()
+            signal = segment.analogsignals[self._signal_index_]
+            axis = self._ephysViewer_.axes[self._signal_index_]
+            
+            peak_time = peak_times[waveindex]
+            
+            waveR2 = wavesR2[waveindex]
+            
+            accept = accepted[waveindex]
+            
+            if waveR2 is not None:
+                if accept:
+                    wavelabel = "R²=%.2f Accept" % waveR2
+                else:
+                    wavelabel = "R²=%.2f Reject" % waveR2
+                    
             else:
-                wavelabel = "R²=%.2f Reject" % waveR2
+                if accept:
+                    wavelabel = "Accept"
+                else:
+                    wavelabel = "Reject"
+                    
+            waxis = self._detected_mPSCViewer_.axis(0)
+            self._detected_mPSCViewer_.removeLabels(waxis)
+            [[x0,x1], [y0,y1]]  = waxis.viewRange()
+            
+            self._detected_mPSCViewer_.addLabel(wavelabel, 0, pos = (x0,y1), 
+                                                color=(0,0,0), anchor=(0,1))
+                    
+            if isinstance(self._mPSC_model_waveform_, neo.core.basesignal.BaseSignal):
+                upward = sigp.is_positive_waveform(self._mPSC_model_waveform_)
                 
-        else:
-            if mPSC.annotations.get("Accept", False):
-                wavelabel = "Accept"
+            elif isinstance(self._mPSC_template_, neo.core.basesignal.BaseSignal):
+                upward = sigp.is_positive_waveform(self._mPSC_template_)
+                
             else:
-                wavelabel = "Reject"
+                upward = False
+            
+            targetSize = 15 # TODO: 2022-11-27 13:44:45 make confuse configurable
+            
+            # NOTE: 2022-11-23 21:47:29
+            # below, the offset of the label to its target is given as (x,y) with
+            # x positive left → right
+            # y positive bottom → top (like the axis)
+            # TODO: make confuse configurable
+            targetLabelOffset = (0, -20) if upward else (0, 20)
+            
+            if isinstance(peak_time, pq.Quantity):
+                peak_value = neoutils.get_sample_at_domain_value(signal, peak_time)
+                self._ephysViewer_.removeTargetsOverlay(axis)
+
+                signalBlocker = QtCore.QSignalBlocker(self.accept_mPSCcheckBox)
+                self.accept_mPSCcheckBox.setChecked(accept)
                 
-        waxis = self._detected_mPSCViewer_.axis(0)
-        self._detected_mPSCViewer_.removeLabels(waxis)
-        [[x0,x1], [y0,y1]]  = waxis.viewRange()
-        
-        self._detected_mPSCViewer_.addLabel(wavelabel, 0, pos = (x0,y1), 
-                                            color=(0,0,0), anchor=(0,1))
-                
-        # print(f"peak_time {peak_time}")
-        
-        if isinstance(self._mPSC_model_waveform_, neo.core.basesignal.BaseSignal):
-            upward = sigp.is_positive_waveform(self._mPSC_model_waveform_)
-        elif isinstance(self._mPSC_template_, neo.core.basesignal.BaseSignal):
-            upward = sigp.is_positive_waveform(self._mPSC_template_)
-        else:
-            upward = False
-        
-        targetSize = 15 # TODO: 2022-11-27 13:44:45 make confuse configurable
-        
-        # NOTE: 2022-11-23 21:47:29
-        # below, the offset of the label to its target is given as (x,y) with
-        # x positive left → right
-        # y positive bottom → top (like the axis)
-        # TODO: make confuse configurable
-        targetLabelOffset = (0, -20) if upward else (0, 20)
-        
-        if isinstance(peak_time, pq.Quantity):
-            peak_value = neoutils.get_sample_at_domain_value(signal, peak_time)
-            self._ephysViewer_.removeTargetsOverlay(axis)
-            valid = mPSC.annotations.get("Accept", False) == True
-            signalBlocker = QtCore.QSignalBlocker(self.accept_mPSCcheckBox)
-            self.accept_mPSCcheckBox.setChecked(valid)
-            if valid:
-                targetBrush = (255,0,0,50)
-                targetLabelColor = (128,0,0,255)
-            else:
-                targetBrush = (0,0,255,50)
-                targetLabelColor = (0,0,128,255)
-                
-            self._ephysViewer_.overlayTargets((float(peak_time),float(peak_value)),
-                                                axis=axis, size=targetSize, 
-                                                movable=False,
-                                                brush=targetBrush, 
-                                                label=f"{waveindex}",
-                                                labelOpts = {"color":targetLabelColor,
-                                                             "offset":targetLabelOffset})
-            self._ephysViewer_.refresh()
+                if accept:
+                    targetBrush = (255,0,0,50)
+                    targetLabelColor = (128,0,0,255)
+                else:
+                    targetBrush = (0,0,255,50)
+                    targetLabelColor = (0,0,128,255)
+                    
+                self._ephysViewer_.overlayTargets((float(peak_time),float(peak_value)),
+                                                    axis=axis, size=targetSize, 
+                                                    movable=False,
+                                                    brush=targetBrush, 
+                                                    label=f"{waveindex}",
+                                                    labelOpts = {"color":targetLabelColor,
+                                                                "offset":targetLabelOffset})
+                self._ephysViewer_.refresh()
        
     def _clear_detection_in_sweep_(self, segment:neo.Segment):
         mPSCtrains = [s for s in segment.spiketrains if s.annotations.get("source", None) == "PSC_detection"]
@@ -1437,121 +1685,142 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             neoutils.remove_spiketrain(segment, s.name)
         
     def _get_previous_detection_(self, segment:neo.Segment):
-        """ Checks if there are any PSC_detection spike trains in the segment
-            Returns a (possibly empty) list of neo.SpikeTrain; not to be
-            confused with a neo.SpikeTrainList.
+        """ Returns the segment's spiketrains or None.
+        
+        WARNING: The spike train list may not necessarily contain PSC spike
+        trains; this will be sifted later as necessary.`
         """
         if not isinstance(segment, neo.Segment):
             raise TypeError(f"Expecting a neo.Segment; got {type(segment).__name__} instead")
         
-        mPSCtrains = [s for s in segment.spiketrains if s.annotations.get("source", None) == "PSC_detection"]
+        if len(segment.spiketrains):
+            return segment.spiketrains  # a stl
         
-        if len(mPSCtrains):
-            mPSCtrain = mPSCtrains[0]
-            peak_times = mPSCtrain.annotations.get("peak_times", list())
-            accepted = mPSCtrain.annotations.get("Accept", list())
-            template = mPSCtrain.annotations.get("Template", list())
-            
-            if len(peak_times) == 0: # invalid data, so discard everything
-                return
-            
-            signal_units = mPSCtrain.annotations.get("signal_units", None)
-            
-            if signal_units is None: # invalid data, so discard everything
-                return
-            
-            psc_params = mPSCtrain.annotations.get("PSC_parameters", None)
-            psc_fits = mPSCtrain.annotations.get("mPSC_fit", [])
-            
-            signal_origin =  mPSCtrain.annotations.get("signal_origin", None)
-            segment_origin = mPSCtrain.annotations.get("segment_origin", None)
-            data_origin = mPSCtrain.annotations.get("data_origin", None)
-            
-            
-            if len(mPSCtrains)> 1:
-                for s in mPSCtrains[1:]:
-                    ptimes = s.annotations.get("peak_times", list())
-                    if len(ptimes) == 0:
-                        return
-                    su = s.annotations.get("signal_units", None)
-                    if su is None or su != signal_units:
-                        return
-                    
-                    peak_times.extend(ptimes)
-                    accpt = s.annotations.get("Accept", list())
-                    accepted.extend(accpt)
-                    tmpl = s.annotations.get("Template", list())
-                    template.extend(tmpl)
-                    
-                    
-                # NOTE:2022-11-22 12:48:54
-                # collapse (merge) all mPSC spike trains in one, 
-                # replace them with the merged result
-                # WARNING there is no checking for duplicate time stamps !!!
-                mPSCtrain = mPSCtrain.merge(mPSCtrains[1:])
-                mPSCtrain.annotations["source"] = "PSC_detection"
-                mPSCtrain.annotations["peak_times"] = peak_times
-                mPSCtrain.annotations["signal_units"] = signal_units
-                mPSCtrain.annotations["Accept"] = accepted
-                mPSCtrain.annotations["Template"] = template
-                mPSCtrain.annotations["signal_origin"] = signal_origin
-                mPSCtrain.annotations["segment_origin"] = segment_origin
-                mPSCtrain.annotations["data_origin"] = data_origin
-                mPSCtrain.annotations["PSC_parameters"] = psc_params # may be None !
-                mPSCtrain.annotations["mPSC_fit"] = psc_fits # a list, which may be empty
-                
-                for t in mPSCtrains[1:]:
-                    neoutils.remove_spiketrain(segment, t.name)
-                    
-            waves = mPSCtrain.waveforms
-            
-            # print(waves.shape)
-            signal_units = mPSCtrain.annotations.get("signal_units", pq.pA)
-            mini_waves = list()
-            if waves.size > 0:
-                for k in range(waves.shape[0]): # spike #
-                    wave = neo.AnalogSignal(waves[k,:,:].T,
-                                            t_start = mPSCtrain[k],
-                                            units = signal_units,
-                                            sampling_rate = mPSCtrain.sampling_rate)
-                    
-                    wave.annotations["amplitude"] = sigp.waveform_amplitude(wave[:,0])
-                    
-                    if len(accepted) == waves.shape[0]:
-                        wave.annotations["Accept"] = accepted[k]
-                    else:
-                        wave.annotations["Accept"] = True
-                        
-                    # assign a peak time to each wave; if not present in 
-                    # the minis train, calculate it NOW
-                    if len(peak_times) == waves.shape[0]:
-                        wave.annotations["t_peak"] = peak_times[k]
-                    else:
-                        if sigp.is_positive_waveform(wave):
-                            peakfunc = np.argmax
-                        else:
-                            peakfunc = np.argmin
-                        p_time = wave.times[peakfunc(wave[:.0])]
-                        
-                        wave.annotations["t_peak"] = p_time
-                        
-                    if len(psc_fits) == waves.shape[0]:
-                        wave.annotations["mPSC_fit"] = psc_fits[k]
-                        
-                    mini_waves.append(wave)
-                
-                # if peak times not present in trhe minis train, add them
-                # NOW
-                if len(peak_times) == len(mini_waves):
-                    peak_times = [w.annotations["t_peak"] for w in mini_waves]
-                    mPSCtrain.annotations["peak_times"] = peak_times
-                    
-                
-            return (mPSCtrain, mini_waves)
-            
-        else:
-            return None
-                
+        
+#         # NOTE: 2022-12-14 14:32:49
+#         # select the mPSC spike trains, discard everything else!
+#         #
+#         # below these can be either original mPSCs or aligned ones!
+#         trains = [s for s in segment.spiketrains if s.annotations.get("source", None) == "PSC_detection"]
+#         
+#         # NOTE: 2022-12-14 08:34:51
+#         # as of now, there can be more than one spike train of mPSCs if the signal
+#         # was multi-channel and mPSCs were detected in each channel !
+        
+#         if len(trains) > 0 and len(trains) != len(segment.spiketrains):
+#             # there are other spike trains too
+#             # print(len(trains))
+#             mPSCtrains = neo.core.spiketrainlist.SpikeTrainList(items=trains,
+#                                                                 segment=segment)
+#             mPSCtrain = mPSCtrains[0]
+#             peak_times = mPSCtrain.annotations.get("peak_times", list())
+#             accepted = mPSCtrain.annotations.get("Accept", list())
+#             template = mPSCtrain.annotations.get("Template", list())
+#             
+#             if len(peak_times) == 0: # invalid data, so discard everything
+#                 return
+#             
+#             signal_units = mPSCtrain.annotations.get("signal_units", None)
+#             
+#             if signal_units is None: # invalid data, so discard everything
+#                 return
+#             
+#             psc_params = mPSCtrain.annotations.get("PSC_parameters", None)
+#             psc_fits = mPSCtrain.annotations.get("mPSC_fit", [])
+#             
+#             signal_origin =  mPSCtrain.annotations.get("signal_origin", None)
+#             segment_origin = mPSCtrain.annotations.get("segment_origin", None)
+#             data_origin = mPSCtrain.annotations.get("data_origin", None)
+#             
+#             
+#             if len(mPSCtrains)> 1:
+#                 for s in mPSCtrains[1:]:
+#                     ptimes = s.annotations.get("peak_times", list())
+#                     if len(ptimes) == 0:
+#                         return
+#                     su = s.annotations.get("signal_units", None)
+#                     if su is None or su != signal_units:
+#                         return
+#                     
+#                     peak_times.extend(ptimes)
+#                     accpt = s.annotations.get("Accept", list())
+#                     accepted.extend(accpt)
+#                     tmpl = s.annotations.get("Template", list())
+#                     template.extend(tmpl)
+#                     
+#                     
+#                 # NOTE:2022-11-22 12:48:54
+#                 # collapse (merge) all mPSC spike trains in one, 
+#                 # replace them with the merged result
+#                 # WARNING there is no checking for duplicate time stamps !!!
+#                 # FIXME 2022-12-14 16:10:08
+#                 # revisit this in light if the recent changes where we CAN have
+#                 # more than one spike train per list (i.e., one train per signal channel)
+#                 # see NOTE: 2022-12-14 08:34:51
+#                 mPSCtrain = mPSCtrain.merge(mPSCtrains[1:])
+#                 mPSCtrain.annotations["source"] = "PSC_detection"
+#                 mPSCtrain.annotations["peak_times"] = peak_times
+#                 mPSCtrain.annotations["signal_units"] = signal_units
+#                 mPSCtrain.annotations["Accept"] = accepted
+#                 mPSCtrain.annotations["Template"] = template
+#                 mPSCtrain.annotations["signal_origin"] = signal_origin
+#                 mPSCtrain.annotations["segment_origin"] = segment_origin
+#                 mPSCtrain.annotations["data_origin"] = data_origin
+#                 mPSCtrain.annotations["PSC_parameters"] = psc_params # may be None !
+#                 mPSCtrain.annotations["mPSC_fit"] = psc_fits # a list, which may be empty
+#                 
+#                 for t in mPSCtrains[1:]:
+#                     neoutils.remove_spiketrain(segment, t.name)
+#                     
+#             waves = mPSCtrain.waveforms
+#             
+#             # print(waves.shape)
+#             signal_units = mPSCtrain.annotations.get("signal_units", pq.pA)
+#             mini_waves = list()
+#             if waves.size > 0:
+#                 for k in range(waves.shape[0]): # spike #
+#                     wave = neo.AnalogSignal(waves[k,:,:].T,
+#                                             t_start = mPSCtrain[k],
+#                                             units = signal_units,
+#                                             sampling_rate = mPSCtrain.sampling_rate)
+#                     
+#                     wave.annotations["amplitude"] = sigp.waveform_amplitude(wave[:,0])
+#                     
+#                     if len(accepted) == waves.shape[0]:
+#                         wave.annotations["Accept"] = accepted[k]
+#                     else:
+#                         wave.annotations["Accept"] = True
+#                         
+#                     # assign a peak time to each wave; if not present in 
+#                     # the minis train, calculate it NOW
+#                     if len(peak_times) == waves.shape[0]:
+#                         wave.annotations["t_peak"] = peak_times[k]
+#                     else:
+#                         if sigp.is_positive_waveform(wave):
+#                             peakfunc = np.argmax
+#                         else:
+#                             peakfunc = np.argmin
+#                         p_time = wave.times[peakfunc(wave[:.0])]
+#                         
+#                         wave.annotations["t_peak"] = p_time
+#                         
+#                     if len(psc_fits) == waves.shape[0]:
+#                         wave.annotations["mPSC_fit"] = psc_fits[k]
+#                         
+#                     mini_waves.append(wave)
+#                 
+#                 # if peak times not present in trhe minis train, add them
+#                 # NOW
+#                 if len(peak_times) == len(mini_waves):
+#                     peak_times = [w.annotations["t_peak"] for w in mini_waves]
+#                     mPSCtrain.annotations["peak_times"] = peak_times
+#                     
+#                 
+#             return (mPSCtrain, mini_waves)
+#             
+#         else:
+#             return None
+#                 
     def _get_selected_signal_(self, segment):
         index = self.signalNameComboBox.currentIndex()
         if index in range(len(segment.analogsignals)):
@@ -1801,8 +2070,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._reportWindow_.view(resultsDF, doc_title = f"{self._data_.name} Results")
         self._reportWindow_.show()
         
-        
-                    
     def _detect_sweep_(self, segment_index:typing.Optional[int]=None, waveform=None):
         """ mPSC detection in a segment (a.k.a a sweep)
         
@@ -1825,7 +2092,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             individual neo.AnalogSignal objects (with annotations) useful for 
             the validation process.
         
-        NOTE For developers:
         The function is called by 
         • triggering `actionDetect_in_current_sweep` with the parameter `segment_index` 
             set to the value of `self.currentFrame`.
@@ -1883,7 +2149,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
         method = "sliding" if self.useSlidingDetection else "cross-correlation"
         
-        
         if len(epochs):
             mini_waves = list()
             detections = list()
@@ -1898,7 +2163,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 if detection is None:
                     continue
                 
-                detections.append(detection)
+                # this below is a collection of spike train lists (one per epoch)!
+                # but each spiketrainlist should have up to the same max number 
+                # of spiketrains (i.e. as many as there are channels)
+                detections.append(detection) 
             
             if len(detections):
                 template = detections[0][0].annotations["waveform"]
@@ -1906,23 +2174,51 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 # individual epoch detections are SpikeTrainList objects, possibly
                 # with more than one SpikeTrain inside (one per channel)
                 max_channels = max(len(d) for d in detections)
-                stt = list() #  will lhold spliced spike trains, one per channel
+                stt = list() #  will hold spliced spike trains, one per channel
                 for kc in range(max_channels):
-                    minis = list()
-                    st_ = [d[kc] for d in detections]
-                    θ_ = [t.annotations["θ"] for t in st_]
+                    wave_names = list()
+                    accept = list()
+                    fits = list()
+                    
+                    st_ = [d[kc] for d in detections if kc < len(d)]
+                    
+                    if len(st_) == 0:
+                        continue
+                    
                     for t in st_:
-                        minis.extend(t.annotations["minis"])
+                        wave_names.extend(t.annotations["wave_names"])
+                        accept.extend(t.annotations["Accept"])
+                        fits.extend(t.annotations["mPSC_fit"])
+                        
+                    θ_ = [t.annotations["θ"] for t in st_]
+                    
+                    # print(len(θ_), [type(t) for t in θ_])
+                    # print(*θ_)
+                    # print(type(*θ_))
+                    # for t in st_:
+                    #     minis.extend(t.annotations["minis"])
                     st = neoutils.splice_signals(*st_)
+                    st.name= "mPSCs"
+                    # if len(st_) > 1:
+                    #     st = neoutils.splice_signals(*st_)
+                    # else:
+                    #     st = st_[0]
+                        
+                    st.segment = segment
+                    
                     pt = np.concatenate([t.annotations["peak_times"].magnitude for t in st_], axis=0) * st_[0].units
-                    θ = neoutils.splice_signals(*θ_, signal.times)
-                    θ.name = "Detection"
+                    if len(θ_) > 1:
+                        θ = neoutils.splice_signals(*θ_, signal.times)
+                        θ.name = "mPSCs"
+                    else:
+                        θ = θ_[0]
                     θ.description = f"Detection criterion ({method})"
                     if not self.useSlidingDetection:
                         θmax = np.max(θ[~np.isnan(θ)])
                         θnorm = θ.copy()  # θ is a neo signal
-                        θnorm = neo.AnalogSignal(sigp.scale_signal(θ_norm, 10, θmax),
+                        θnorm = neo.AnalogSignal(sigp.scale_waveform(θnorm, 10, θmax),
                                                 units = θ.units, t_start = θ.t_start,
+                                                sampling_rate = θ.sampling_rate,
                                                 name = f"{θ.name}_scaled",
                                                 description = f"{θ.description} scaled to 10/{θmax}")
                         
@@ -1931,182 +2227,47 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                         chid = chids[kc]
                     else:
                         chid = kc
-                    st.annotate(peak_times = pt, waveform=template,
+                    st.annotate(
+                                peak_times = pt, 
+                                wave_names = wave_names,
+                                waveform=template,
+                                mPSC_fit = fits,
                                 θ = θ,
-                                θ_norm = θ_norm, 
+                                θnorm = θnorm, 
                                 channel_id = chid,
                                 source = "PSC_detection",
-                                PSC_parameters = template.annotations.get("parameters", None),
-                                minis = minis
+                                signal_units = sig.units,
+                                signal_origin = sig.name,
+                                datetime = datetime.datetime.now(),
+                                Aligned = False,
+                                Accept = accept,
                                 )
                     
                     stt.append(st)
                     
                 if len(stt):
-                    mPSCTrains = neo.core.spiketrainlist.SpikeTrainList(items = stt) # spike train list, one train per channel
-            
+                    mPSCTrains = neo.core.spiketrainlist.SpikeTrainList(items = stt,
+                                                                        segment = segment) # spike train list, one train per channel
         else: # no epochs - detect in the whole signal
             if self.filterDataUponDetection:
                 signal = self._process_signal_(signal, newFilter=True)
             mPSCTrains = membrane.detect_mPSC(signal, waveform)
             
-            if detection is None:
+            if mPSCTrains is None:
                 return
+            mPSCTrains.segment = segment
             
-            # NOTE: 2022-11-27 21:05:07
-            # this is ALWAYS a waveform !!!
-            template = detection[0].annotations["waveform"]
-            
-        # NOTE: 2022-11-20 11:33:43
-        # set this here
-        if isinstance(self._data_, neo.Block):
-            trname = f"{self._data_.name}_{segment.name}_PSCs"
-        else:
-            trname = f"{segment.name}_PSCs"
-            
-        wave_collection = neo.Block()
-        
         # now, fit the minis
-        model_params = self.paramsWidget.value()
-        init_params = tuple(p.magnitude for p in model_params["Initial Value:"])
-        lo = tuple(p.magnitude for p in model_params["Lower Bound:"])
-        up = tuple(p.magnitude for p in model_params["Upper Bound:"])
-            
-        if self._use_template_ and isinstance(self._mPSC_template_, neo.AnalogSignal):
-            template_fit = membrane.fit_mPSC(self._mPSC_template_, init_params, lo, up)
-            template_init_params = template_fit.annotations["mPSC_fit"]["Coefficients"]
-                
+        new_st = list()
         for st in mPSCTrains:
-            minis = [neo.AnalogSignal(st.waveforms[k,:,:],
-                                      units = signal.units,
-                                      t_start = st[k]) for k in range(st.shape[0])]
-            
-            for kw, w in minis:
-                if self._use_template_ and template_init_params is not None:
-                    fw = membrane.fit_mPSC(w, template_init_params, lo=lo, up=up)
-                    sigblock = QtCore.QSignalBlocker(self.paramsWidget)
-                    self.paramsWidget.setParameters(template_init_params,
-                                                lower = [float(v) for v in lo],
-                                                upper = [float(v) for v in up],
-                                                names = self._params_names_,
-                                                refresh = True)
-                    
-                else:
-                    fw = membrane.fit_mPSC(w, init_params, lo=lo, up=up)
+            st = self._fit_waves_(st) # does this modify the st in place, or not?
+            if st is not None:
+                new_st.append(st)
         
-                fw.annotations["t_peak"] = mPSCtrain.annotations["peak_times"][kw]
-                fw.name = w.name
-                fw.name = f"mPSC_{fw.name}_{kw}"
-                minis[kw] = fw
-                
-                if self._use_threshold_on_rsq_:
-                    fw.annotations["Accept"] = fw.annotations["mPSC_fit"]["Rsq"] >= self.rSqThreshold
-                
-                if fw.annotations["Accept"]:
-                    self._accept_waves_cache_[segment_index].add(k)
-                
-            fittedWaves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
-            st.waveforms = fittedWaves
-            st.annotations["Accept"] = [w.annotations["Accept"] for w in minis]
-                
-        # mPSCTrains = list()
-        # wave_collection = list()
-        
-        for k, start_timestamps in enumerate(start_times):
-            if isinstance(template, neo.core.basesignal.BaseSignal) and len(template.description.strip()):
-                dstring += f" using {template.description}"
-                
-            mPSCtrain = neo.SpikeTrain(start_timestamps, t_stop = signal.t_stop, units = signal.times.units,
-                                    t_start = signal.t_start, sampling_rate = signal.sampling_rate,
-                                    name = trname, description=dstring)
-            
-            mPSCtrain.annotations["peak_times"] = peak_times[k]
-            mPSCtrain.annotations["source"] = "PSC_detection"
-            mPSCtrain.annotations["signal_units"] = signal.units
-            mPSCtrain.annotations["signal_origin"] = signalName
-            mPSCtrain.annotations["segment_origin"] = segmentName
-            mPSCtrain.annotations["data_origin"] = dataOriginName
-            mPSCtrain.annotations["datetime"] = datetime.datetime.now()
-            
-            # NOTE: 2022-11-27 21:04:08
-            # this is always True, but only a model-generated waveform has the 
-            # model parameters in its annotations
-            if isinstance(template, neo.core.basesignal.BaseSignal):
-                mPSCtrain.annotations["PSC_parameters"] = template.annotations.get("parameters", None)
-            
-            model_params = self.paramsWidget.value()
-            init_params = tuple(p.magnitude for p in model_params["Initial Value:"])
-            lo = tuple(p.magnitude for p in model_params["Lower Bound:"])
-            up = tuple(p.magnitude for p in model_params["Upper Bound:"])
-            
-            accepted = list()
-            templates = list()
-            mPSC_fits = list()
-            
-            # fit the template then use the fitted params to fit the detected mPSCs
-            # if using a template
-            template_init_params = None
-            
-            # NOTE: 2022-11-28 17:10:56 
-            # FIX for FIXME: 2022-11-25 00:50:11:
-            # 1) The template is first fitted with the model params (initial,
-            # lower & upper bounds) using the values from the parameters 
-            # fields in the app window ⇒ template_fit
-            #
-            # 2) The result of the template fit is then used to provide initial
-            #  parameters `template_init_params` for fitting detected putative 
-            # mPSCs individually in the loop below
-            #
-            # TODO: 2022-11-28 17:15:49
-            # consider taking this calculation out of this method, or better,
-            # cache the template_init_params so that they are re-used inside the 
-            # loop in self._detect_all_
-            #
-            if self._use_template_ and isinstance(self._mPSC_template_, neo.AnalogSignal):
-                template_fit = membrane.fit_mPSC(self._mPSC_template_, init_params, lo, up)
-                template_init_params = template_fit.annotations["mPSC_fit"]["Coefficients"]
-                
-            for kw,w in enumerate(mini_waves[k]):
-                # FIXME: 2022-11-25 00:50:11
-                # when template is Not a model where are the params taken from?
-                # FIXED, see NOTE: 2022-11-28 17:10:56
-                if self._use_template_ and template_init_params is not None:
-                    fw = membrane.fit_mPSC(w, template_init_params, lo=lo, up=up)
-                    sigblock = QtCore.QSignalBlocker(self.paramsWidget)
-                    self.paramsWidget.setParameters(template_init_params,
-                                                lower = [float(v) for v in lo],
-                                                upper = [float(v) for v in up],
-                                                names = self._params_names_,
-                                                refresh = True)
-                
-                    # fw = membrane.fit_mPSC(w, self._mPSC_template_)
-                else:
-                    fw = membrane.fit_mPSC(w, init_params, lo=lo, up=up)
-                # fw = membrane.fit_mPSC(w, template.annotations["parameters"], lo=lo, up=up)
-                fw.annotations["t_peak"] = mPSCtrain.annotations["peak_times"][kw]
-                fw.name = f"mPSC_{fw.name}_{kw}"
-                mini_waves[k][kw] = fw
-                mPSC_fits.append(fw.annotations["mPSC_fit"])
-                
-                if self._use_threshold_on_rsq_:
-                    fw.annotations["Accept"] = fw.annotations["mPSC_fit"]["Rsq"] >= self.rSqThreshold
-                
-                if fw.annotations["Accept"]:
-                    self._accept_waves_cache_[segment_index].add(k)
-                
-                accepted.append(fw.annotations["Accept"])
-                templates.append(fw.annotations["mPSC_fit"]["template"]) # flag indicating if a template or a model was used
-                
-            mPSCtrain_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves[k]], axis=2)
-            mPSCtrain.waveforms = mPSCtrain_waves.T
-            mPSCtrain.annotations["Accept"] = accepted
-            mPSCtrain.annotations["Template"] = templates
-            mPSCtrain.annotations["mPSC_fit"] = mPSC_fits
-            
-            mPSCtrains.append(mPSCtrain)
-            wave_collection.append[mini_waves[k]]
-            
-        return mPSCtrains, wave_collection
+        if len(new_st):
+            mPSCTrains = neo.core.spiketrainlist.SpikeTrainList(items = new_st,
+                                                                        segment = segment)
+        return mPSCTrains
         
     @pyqtSlot()
     def _slot_create_mPSC_template(self):
@@ -2145,45 +2306,17 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         segment = self._get_data_segment_(index=self.currentFrame)
         
         if isinstance(segment, neo.Segment):
-            prev_detect = self._get_previous_detection_(segment) # tuple(spike trains, minis) or None
+            prev_detect = self._get_previous_detection_(segment)
             
-            self._undo_buffer_[self.currentFrame] = prev_detect #
+            self._undo_buffer_[self.currentFrame] = prev_detect
                 
-            # NOTE: 2022-11-22 08:47:24
-            # _detect_sweep_ returns a dict and an AnalogSignal but also has the 
-            # side effect of embedding a spiketrain with the event time stamps in
-            # the segment.
-            try:
-                detection_result = self._detect_sweep_(waveform=waveform)
-                
-            except Exception as exc:
-                traceback.print_exc()
-                execstr = traceback.format_exception(exc)
-                msg = execstr[-1]
-                self.criticalMessage("Detect mPSCs in current sweep",
-                                     msg)
+            mPSCTrains = self._detect_sweep_(waveform=waveform) # this is (mPSCtrains, waves)
+            if mPSCTrains is None:
                 return
             
-            if detection_result is None:
-                return
             
-            mPSCtrains, detection = self._detect_sweep_(waveform=waveform)
-            # NOTE: 2022-11-22 17:47:15
-            # see WARNING: 2022-11-22 17:46:17
-            #### BEGIN FIXME 2022-12-12 08:53:19
-            # adapt for multi-channel detection (see membrane.extract_minis)
-            self._result_[self.currentFrame] = (mPSCtrains, [s for s in detection])
+            self._result_[self.currentFrame] = mPSCTrains
             
-            if len(detection):
-                # NOTE: 2022-11-22 17:47:33
-                # see WARNING: 2022-11-22 17:46:17
-                self._detected_mPSCs_ = [s for s in detection]
-            else:
-                # NOTE: see NOTE: 2022-11-27 13:49:44
-                # self._detected_mPSCs_.clear()
-                self._detected_mPSCs_ = list()
-            #### END FIXME 2022-12-12 08:53:19
-                
 
             # NOTE: 2022-11-20 11:30:15
             # remove the previous detection if the appropriate widget is checked,
@@ -2195,7 +2328,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._clear_detection_in_sweep_(segment)
                 
             # embed the spike train in the segment
-            segment.spiketrains.append(mPSCtrain)
+            segment.spiketrains=mPSCTrains
             
             self._plot_data()
             
@@ -2611,6 +2744,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     @pyqtSlot(int)
     def _slot_set_useSlidingDetection(self, value):
         self.useSlidingDetection = value == QtCore.Qt.Checked
+        # maxVal = 100 if self.useSlidingDetection else 10
+        # sigBlock = QtCore.QSignalBlocker(self.detectionThresholdSpinBox)
+        # if self.detectionThresholdSpinBox.value() > maxVal:
+        #     self.detectionThresholdSpinBox.setValue(maxVal)
+        # self.detectionThresholdSpinBox.setMaximum(maxVal)
+        
     
     @pyqtSlot(int)
     def _slot_use_mPSCTemplate(self, value):
@@ -3092,7 +3231,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                                                   len(self._detected_mPSCs_)):
             return
         
-        # accept = value == QtCore.Qt.Checked
         accept = self.sender().checkState() == QtCore.Qt.Checked
         
         # NOTE: 2022-11-27 14:38:05
@@ -3112,14 +3250,21 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._accept_waves_cache_[self.currentFrame].remove(self.currentWaveformIndex)
         #
         # • update the Accept state in the wave annotations
-        self._detected_mPSCs_[self.currentWaveformIndex].annotations["Accept"] = accept
         #
         # • update the Accept state for the corresponding time stamp in the mPSC
         #   spike train
-        train = self._result_[self.currentFrame][0]
+        frameResult = self._result_[self.currentFrame] # a spike train list !
+        
+        if not isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList):
+            return
+        
+        if self._displayed_detection_channel_ not in range(len(frameResult)):
+            return
+        
+        train = frameResult[self._displayed_detection_channel_]
         
         train.annotations["Accept"][self.currentWaveformIndex] = accept
-        #
+            
         # • refresh mPSC indicator on the main data plot
         self._indicate_mPSC_(self.currentWaveformIndex)
         #
@@ -3169,9 +3314,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
 #         # self._detected_mPSCs_[self.currentWaveformIndex] = fw
 #         
 #         self._indicate_mPSC_(self.currentWaveformIndex)
-        
-        
-        
             
     @pyqtSlot()
     def _slot_metaDataChanged(self):
@@ -3320,6 +3462,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             if value not in range(-len(self._detected_mPSCs_), len(self._detected_mPSCs_)):
                 return
             self.displayDetectedWaveform(value)
+            
+    @pyqtSlot(int)
+    def _slot_displayedDetectionChannelChanged(self, val:int):
+        self.displayedDetectionChannel = val
+        self._plot_detected_mPSCs()
 
     @property
     def currentWaveformIndex(self):
@@ -3333,6 +3480,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 self._plot_detected_mPSCs()
         else:
             self._currentWaveformIndex_ = 0
+            
+    @property
+    def displayedDetectionChannel(self):
+        return self._displayed_detection_channel_
+    
+    @displayedDetectionChannel.setter
+    def displayedDetectionChannel(self, val:int):
+        self._displayed_detection_channel_ = int(val)
             
     @property
     def lastUsedFileSaveFilter(self):
