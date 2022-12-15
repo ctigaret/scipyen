@@ -161,6 +161,9 @@
     </item>
     <item>
      <widget class="QTabWidget" name="tabWidget">
+      <property name="toolTip">
+       <string/>
+      </property>
       <property name="currentIndex">
        <number>1</number>
       </property>
@@ -386,6 +389,15 @@
        <layout class="QGridLayout" name="gridLayout_3">
         <item row="0" column="0">
          <widget class="QGroupBox" name="groupBox">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pre-process data before detection.&lt;/p&gt;&lt;p&gt;Only applies to unfiltered data.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="statusTip">
+           <string>Pre-process data before detection</string>
+          </property>
+          <property name="whatsThis">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pre-process data before detection.&lt;/p&gt;&lt;p&gt;Only applies to unfiltered data.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
           <property name="title">
            <string/>
           </property>
@@ -850,7 +862,6 @@
    <attribute name="toolBarBreak">
     <bool>false</bool>
    </attribute>
-   <addaction name="actionApply_with_detection"/>
    <addaction name="actionFilter_whole_data"/>
    <addaction name="actionUndo_filter_whole_data"/>
    <addaction name="actionPreview_filtered_signal"/>
@@ -1317,14 +1328,14 @@
   </action>
   <action name="actionFilter_whole_data">
    <property name="icon">
-    <iconset theme="go-next">
+    <iconset theme="filter-symbolic">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Preprocess data</string>
    </property>
    <property name="toolTip">
-    <string>Preprocess data</string>
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pre-process all data before detection, using the options in the &amp;quot;Signal Processing&amp;quot; tab.&lt;/p&gt;&lt;p&gt;Once all data was processed, the options in the &amp;quot;Signal Processing&amp;quot; tab have no effect.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="statusTip">
     <string>Preprocess data</string>

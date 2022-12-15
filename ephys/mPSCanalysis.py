@@ -644,7 +644,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self.cutoffFrequencySpinBox.sig_valueChanged.connect(self._slot_cutoffFreqChanged)
         
-        self.actionApply_with_detection.triggered.connect(self._slot_applyFilters_with_detection)
+        # self.actionApply_with_detection.triggered.connect(self._slot_applyFilters_with_detection)
         
         self.filterTypeComboBox.clear()
         # self.filterTypeComboBox.addItems(["Butterworth", "Hamming"])
@@ -1409,6 +1409,17 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         if self._data_ is not None:
             if not isinstance(self._ephysViewer_,sv.SignalViewer):
                 self._init_ephysViewer_()
+            else:
+                # NOTE: 2022-12-15 13:39:32
+                # see NOTE: 2022-12-15 13:37:54
+                receivers = self._ephysViewer_.receivers(self._ephysViewer_.sig_axisActivated)
+                if receivers == 0:
+                    self._ephysViewer_.sig_axisActivated.connect(self._slot_newSignalViewerAxisSelected)
+                    
+                # NOTE: 2022-12-15 13:41:33
+                # see NOTE: 2022-12-15 13:38:13
+                if self._ephysViewer_ not in self.linkedViewers:
+                    self.linkToViewers(self._ephysViewer_)
                 
             self._ephysViewer_.view(self._data_)
             self._ephysViewer_.currentFrame = self.currentFrame
@@ -1448,16 +1459,26 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         else:
             sig = signal
             
-        if self.filterDataUponDetection:
+        # if self.filterDataUponDetection:
+        if not signal.annotations.get("filtered", False):
             sig = self._process_signal_(sig, newFilter=True)
         
         segment = neo.Segment()
         segment.analogsignals.append(sig)
         segment.analogsignals.extend(self._current_detection_θ)
         
-        if not isinstance(self._ephysViewer_,sv.SignalViewer):
+        if not isinstance(self._ephysViewer_, sv.SignalViewer):
             self._init_ephysViewer_()
-            
+        
+        # NOTE: 2022-12-15 13:37:54
+        # prevent messing up signal selection combo box
+        receivers = self._ephysViewer_.receivers(self._ephysViewer_.sig_axisActivated)
+        if receivers > 0:
+            self._ephysViewer_.sig_axisActivated.disconnect()
+        # NOTE: 2022-12-15 13:38:13
+        # prevent messing up self.currentFrame
+        self.unlinkViewer(self._ephysViewer_)
+        
         self._ephysViewer_.plot(segment)
         
         
@@ -1477,7 +1498,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 # esig = neoutils.get_time_slice(signal, epochs[0])
                 esig.segment = segment
                 esig.description = ""
-                
+                esigs.append(esig)
             if len(esigs) == 1:
                 sig = esigs[0]
                 
@@ -1489,24 +1510,32 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             sig = signal
             
             
-        klass = signal.__class__
-        
-        processed = self._process_signal_(sig, newFilter=True)
-        processed.segment = segment
-        
-        if not any((self._use_signal_linear_detrend_, self._remove_DC_offset_,
-                   self._humbug_, self._filter_signal_)):
-            processed.name = f"{sig.name}_copy"
-            descr = f"Copy of {sig.name}"
+        if signal.annotations.get("filtered", False):
+            testsig = signal
         else:
-            descr = f"{sig.description} filtered with {self._filter_type_}, cutoff: {self._noise_cutoff_frequency_}"
+            klass = signal.__class__
+            processed = self._process_signal_(sig, newFilter=True)
+            processed.segment = segment
             
-        testsig = sig.merge(processed)
-        testsig.description = descr
+            if not any((self._use_signal_linear_detrend_, self._remove_DC_offset_,
+                    self._humbug_, self._filter_signal_)):
+                processed.name = f"{sig.name}_copy"
+                descr = f"Copy of {sig.name}"
+            else:
+                descr = f"{sig.description} filtered with {self._filter_type_}, cutoff: {self._noise_cutoff_frequency_}"
+                
+            testsig = sig.merge(processed)
+            testsig.description = descr
         
         if not isinstance(self._ephysViewer_,sv.SignalViewer):
             self._init_ephysViewer_()
             
+        # NOTE: 2022-12-15 13:38:53
+        # see NOTE: 2022-12-15 13:37:54 and NOTE: 2022-12-15 13:38:13
+        receivers = self._ephysViewer_.receivers(self._ephysViewer_.sig_axisActivated)
+        if receivers > 0:
+            self._ephysViewer_.sig_axisActivated.disconnect()
+        self.unlinkViewer(self._ephysViewer_)
         self._ephysViewer_.plot(testsig)
         
             
@@ -1563,7 +1592,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._detected_mPSCViewer_.docTitle = "All mPSCs"
             
             # self.accept_mPSCcheckBox.setEnabled(True)
-            # self._indicate_mPSC_(self._detected_mPSCViewer_.currentFrame)
+            self._indicate_mPSC_(self._detected_mPSCViewer_.currentFrame)
             
     def _plot_detected_mPSCs(self):
         # print(f"{self.__class__.__name__}._plot_detected_mPSCs")
@@ -1627,21 +1656,35 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             if isinstance(self._ephysViewer_, sv.SignalViewer):
                 self._ephysViewer_.removeTargetsOverlay(self._ephysViewer_.axes[self._signal_index_])
         
-    def _indicate_mPSC_(self, waveindex):
+    def _indicate_mPSC_(self, waveindex, frame_index:typing.Optional[int]=None):
         # print(f"_indicate_mPSC_ wave {waveindex} of {len(self._detected_mPSCs_)} waves")
         if not isinstance(self._ephysViewer_, sv.SignalViewer):
             return
         
-        frameResult = self._result_[self.currentFrame]
+        if frame_index is None:
+            frame_index = self.currentFrame
+            
+        elif frame_index not in range(-len(self._result_), len(self._result_)):
+            frame_index = 0
+            
+        frameResult = self._result_[frame_index]
         
         if isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList):
             if self._displayed_detection_channel_ not in range(len(frameResult)):
                 return
+            
             train = frameResult[self._displayed_detection_channel_]
             
-            if waveindex not in range(train.times.size):
-                waveindex = 0
-                
+            sig_name = train.annotations.get("signal_origin", None)
+            if sig_name is None:
+                return
+            
+            segment = self._get_data_segment_()
+            
+            sig_index = neoutils.get_index_of_named_signal(segment, sig_name, silent=True)
+            if sig_index is None:
+                return
+            
             peak_times = train.annotations.get("peak_times", None)
             if peak_times is None:
                 return
@@ -1656,10 +1699,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
             wavesR2 = [fdict.get("Rsq", None) for fdict in mPSC_fit if fdict is not None]
             
-            sig_name = train.annotations.get("signal_origin", None)
-            
-            if not isinstance(sig_name, str) or len(sig_name.strip()) == 0:
-                sig_name = train.name
+#             sig_name = train.annotations.get("signal_origin", None)
+#             
+#             if not isinstance(sig_name, str) or len(sig_name.strip()) == 0:
+#                 sig_name = train.name
             
             self._detected_mPSCs_ = neoutils.extract_waves(train, train.annotations.get("signal_units", pq.dimensionless),
                                                            prefix = sig_name)
@@ -1667,10 +1710,16 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             if len(self._detected_mPSCs_) == 0:
                 return
             
-            segment = self._get_data_segment_()
-            signal = segment.analogsignals[self._signal_index_]
-            axis = self._ephysViewer_.axes[self._signal_index_]
+            # NOTE: 2022-12-15 13:14:39
+            # prevent plotting detection targets in the wrong axis
+#             signal = segment.analogsignals[self._signal_index_]
+#             axis = self._ephysViewer_.axes[self._signal_index_]
+            signal = segment.analogsignals[sig_index]
+            axis = self._ephysViewer_.axes[sig_index]
             
+            if waveindex not in range(train.times.size):
+                waveindex = 0
+                
             peak_time = peak_times[waveindex]
             
             waveR2 = wavesR2[waveindex]
@@ -2207,13 +2256,18 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
         method = "sliding" if self.useSlidingDetection else "cross-correlation"
         
+        processed = signal.annotations.get("filtered", False)
+        
         if len(epochs):
             mini_waves = list()
             detections = list()
             all_θ = list()
             for epoch in epochs:
                 sig = signal.time_slice(epoch.times[0], epoch.times[0]+epoch.durations[0])
-                if self.filterDataUponDetection:
+                # NOTE: 2022-12-15 11:56:46
+                # do away with filterDataUponDetection
+                # _process_signal_ checks whether there is any filter enabled
+                if not processed:
                     sig = self._process_signal_(sig, newFilter=True)
                     
                 detection = membrane.detect_mPSC(sig, waveform, 
@@ -2350,7 +2404,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                     self._current_detection_θ.append(θ)
                 
         else: # no epochs - detect in the whole signal
-            if self.filterDataUponDetection:
+            # if self.filterDataUponDetection:
+            if not processed:
                 signal = self._process_signal_(signal, newFilter=True)
 
             detection = membrane.detect_mPSC(signal, waveform, 
@@ -3220,9 +3275,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def _slot_cutoffFreqChanged(self, val):
         self.noiseCutoffFreq = val
         
-    @pyqtSlot()
-    def _slot_applyFilters_with_detection(self):
-        self.filterDataUponDetection = self.sender().isChecked()
+    # @pyqtSlot()
+    # def _slot_applyFilters_with_detection(self):
+    #     self.filterDataUponDetection = self.sender().isChecked()
         
     @pyqtSlot()
     def _slot_filterData(self):
@@ -3272,7 +3327,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
         ret = sig
         
-        # processed=False
+        if ret.annotations.get("filtered", False):
+            return ret
         
         if self._use_signal_linear_detrend_:
             ret = sigp.detrend(ret, axis=0, bp = [0, ret.shape[0]], type="linear")
@@ -3324,6 +3380,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                     new_sig = neoutils.make_neo_object(signal)
                     
                 new_sig.segment = new_seg
+                new_sig.annotate(filtered=True)
                         
                 new_seg.analogsignals.append(new_sig)
                 
@@ -3504,8 +3561,45 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     def _slot_newSignalViewerAxisSelected(self, index:int):
         # print(f"{self.__class__.__name__}._slot_newSignalViewerAxisSelected {index}")
         signalBlocker = QtCore.QSignalBlocker(self.signalNameComboBox)
-        self.signalNameComboBox.setCurrentIndex(index)
-        self._signal_index_ = index
+        segment = self._get_data_segment_(self.currentFrame)
+        # NOTE: 2022-12-15 12:52:12
+        # we re-use the viewer to plot filtered signal, θ, not just self._data_
+        # hence we need to make sure we don't inadvertently affect the signal 
+        # selection combobox
+        # FIXME: 2022-12-15 13:02:46
+        # the algorithm below doesn;t seem to work (i.e. the combo box still 
+        # gets updated)
+        # for now whenever we visualise anything other that self._data_, we 
+        # disconnect the relevant signal (sig_axisActivated) in the viewer
+        # and make sure we reconnect when self._data_ is viewed again (i.e., in 
+        # self._plot_data())
+        yData = self._ephysViewer_.yData
+        if yData is self._data_:
+            sig_name = segment.analogsignals[index].name
+        else:
+            if isinstance(yData, neo.Block):
+                if self.currentFrame in range(-len(yData.segments), len(yData.segments)):
+                    segment = yData.segments[self.currentFrame]
+                    sig_name = segment.analogsignals[index].name
+                else:
+                    sig_name = None
+            elif isinstance(yData, neo.Segment):
+                sig_name = segment.analogsignals[index].name
+            elif isinstance(yData, (neo.core.dataobject.DataObject)):
+                sig_name = getattr(yData, "name", None)
+                
+            else:
+                sig_name = None
+                
+        if isinstance(sig_name, str):
+            ndx = self.signalNameComboBox.findText(sig_name)
+            if ndx == index:
+                self.signalNameComboBox.setCurrentIndex(index)
+                old_sig_index = self._signal_index_
+                if self._signal_index_ != index:
+                    self._signal_index_ = index
+                    
+                
         
             
     @pyqtSlot(str)
@@ -3681,17 +3775,17 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         signalBlock = QtCore.QSignalBlocker(self.rsqThresholdCheckBox)
         self.rsqThresholdCheckBox.setChecked(self._use_threshold_on_rsq_)
         
-    @property
-    def filterDataUponDetection(self):
-        return self._apply_filter_upon_detection
-    
-    
-    @markConfigurable("ApplyFiltersUponDetection", trait_notifier=True)
-    @filterDataUponDetection.setter
-    def filterDataUponDetection(self, value:bool):
-        self._apply_filter_upon_detection = value == True
-        sigBlock = QtCore.QSignalBlocker(self.actionApply_with_detection)
-        self.actionApply_with_detection.setChecked(self._apply_filter_upon_detection == True)
+#     @property
+#     def filterDataUponDetection(self):
+#         return self._apply_filter_upon_detection
+#     
+#     
+#     @markConfigurable("ApplyFiltersUponDetection", trait_notifier=True)
+#     @filterDataUponDetection.setter
+#     def filterDataUponDetection(self, value:bool):
+#         self._apply_filter_upon_detection = value == True
+#         sigBlock = QtCore.QSignalBlocker(self.actionApply_with_detection)
+#         self.actionApply_with_detection.setChecked(self._apply_filter_upon_detection == True)
         
     @property
     def removeDCOffset(self):

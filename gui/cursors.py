@@ -912,10 +912,14 @@ class SignalCursor(QtCore.QObject):
         else:
             raise TypeError("pos expected to be a QtCore.QPoint or QPointF or a pair of numbers or None")
         
-        ctype_ndx = [v for v in SignalCursor._cursorTypes_.values()].index(self._cursor_type_)
-        keys = [k for k in SignalCursor._cursorTypes_.keys()]
-
-        show_lines = keys[ctype_ndx]
+        # ctype_ndx = [v for v in SignalCursor.SignalCursorTypes.values()].index(self._cursor_type_)
+        # keys = [k for k in SignalCursor.SignalCursorTypes.keys()]
+        # # ctype_ndx = [v for v in SignalCursor._cursorTypes_.values()].index(self._cursor_type_)
+        # # keys = [k for k in SignalCursor._cursorTypes_.keys()]
+        # 
+        # show_lines = keys[ctype_ndx]
+        
+        show_lines = self._cursor_type_.value
         
         self._host_graphics_item_ = host
             

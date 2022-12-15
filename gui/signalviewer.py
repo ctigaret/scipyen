@@ -2227,7 +2227,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 #cursor_label_text = "%s %s " % ("Dynamic", cursor.ID) if cursor.isDynamic else "%s %s" % ("SignalCursor", cursor.ID)
                 
                 if cursor.isSingleAxis:
-                    if isinstance(cursor.hostItem.vb.name, str) and len(cursor.hostItem.vb.name.strip()):
+                    if cursor.hostItem.vb is not None and isinstance(cursor.hostItem.vb.name, str) and len(cursor.hostItem.vb.name.strip()):
                         cursor_label_text += " (%s):" % cursor.hostItem.vb.name
                     
                     text.append(cursor_label_text)
