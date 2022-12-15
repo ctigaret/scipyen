@@ -126,6 +126,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self._current_detection_θ = list()
         
+        self._all_waves_to_result_ = False
+        
         # NOTE: 2022-11-20 11:36:08
         # For each segment in data, if there are spike trains with mPSC time
         # stamps, store them here - see membrane.batch_mPSC() for how such a 
@@ -547,6 +549,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.actionExportEphysData.triggered.connect(self._slot_exportEphysData)
         self.actionPlot_Data.triggered.connect(self._slot_plotData)
         self.actionPlot_detected_mPSCs.triggered.connect(self._plot_detected_mPSCs)
+        self.actionPlot_all_mPSCs.triggered.connect(self._plot_all_mPSCs)
         self.actionPlot_aligned_mPSCs.triggered.connect(self._plot_waves_for_template)
         self.actionMake_mPSC_Epoch.triggered.connect(self._slot_make_mPSCEpoch)
         self.actionOpen_mPSCTemplate.triggered.connect(self._slot_openTemplateFile)
@@ -661,6 +664,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self.actionView_detection.setIcon(QtGui.QIcon.fromTheme("tools-report-bug"))
         self.actionView_detection.triggered.connect(self._slot_previewDetectionTheta)
+        
+        self.actionAll_waves_to_result.triggered.connect(self._slot_set_allWavesToResult)
         # self.noiseFilterCheckBox.stateChanged.connect(self._slot_filterData)
         # print(f"{self.__class__.__name__}._configureUI_ end...")
 #### END _configureUI_        
@@ -715,6 +720,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         # 3) set check boxes
         self.use_mPSCTemplate_CheckBox.setChecked(self._use_template_ == True)
         self.clearPreviousDetectionCheckBox.setChecked(self._clear_detection_flag_ == True)
+        # self.actionAll_waves_to_result.setChecked(self._all_waves_to_result_ == True)
         
     def _set_data_(self, *args, **kwargs):
         # called by super() initializer; 
@@ -1536,6 +1542,28 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             self._mPSC_spinBoxSlider_.setRange(0, len(self._mPSCs_for_template_)-1)
             self._detected_mPSCViewer_.view(self._mPSCs_for_template_)
             
+    def _plot_all_mPSCs(self):
+        result = self.result()
+        
+        if result is not None:
+            table, trains, waves = result
+            # self._detected_mPSCs_ = waves
+            
+            if not isinstance(self._detected_mPSCViewer_, sv.SignalViewer):
+                self._detected_mPSCViewer_ = sv.SignalViewer(win_title="Detected mPSCs", 
+                                                            parent=self, configTag="mPSCViewer")
+
+                self._detected_mPSCViewer_.sig_closeMe.connect(self._slot_detected_mPSCViewer_closed)
+
+                self._detected_mPSCViewer_.frameChanged.connect(self._slot_mPSCViewer_frame_changed)
+            
+            
+            self._mPSC_spinBoxSlider_.setRange(0, len(waves)-1)
+            self._detected_mPSCViewer_.view(waves)
+            self._detected_mPSCViewer_.docTitle = "All mPSCs"
+            
+            # self.accept_mPSCcheckBox.setEnabled(True)
+            # self._indicate_mPSC_(self._detected_mPSCViewer_.currentFrame)
             
     def _plot_detected_mPSCs(self):
         # print(f"{self.__class__.__name__}._plot_detected_mPSCs")
@@ -1962,7 +1990,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 excstr = traceback.format_exception(exc)
                 msg = f"In sweep{frame}:\n{excstr[-1]}"
                 self.criticalMessage("Detect mPSCs in current sweep",
-                                     excstr)
+                                     "\n".join(excstr))
                 return
                 
             if not isinstance(res, neo.core.spiketrainlist.SpikeTrainList):
@@ -2504,7 +2532,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         resultsDF, resultsTrains, resultsWaves = results
         
-        varName = f"{self._data_._name}_mPSC_table"
+        varName = f"{self._data_.name}_mPSC_table"
         
         self.exportDataToWorkspace(resultsDF, var_name=varName, title="Export mPSC table to workspace")
         
@@ -2516,7 +2544,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         resultsDF, resultsTrains, resultsWaves = results
         
-        varName = f"{self._data_._name}_mPSC_trains"
+        varName = f"{self._data_.name}_mPSC_trains"
         
         self.exportDataToWorkspace(resultsTrains, var_name=varName, title="Export mPSC trains to workspace")
         
@@ -2528,7 +2556,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         resultsDF, resultsTrains, resultsWaves = results
         
-        varName = f"{self._data_._name}_mPSC_waves"
+        varName = f"{self._data_.name}_mPSC_waves"
         
         self.exportDataToWorkspace(resultsWaves, var_name=varName, title="Export mPSC waves to workspace")
         
@@ -3232,6 +3260,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self._filterThread_.start()
         
+    @pyqtSlot(bool)
+    def _slot_set_allWavesToResult(self, value):
+        self.allWavesToResult = value
+        
     def _process_signal_(self, sig, newFilter:bool=False):
         if isinstance(sig, (neo.AnalogSignal, DataSignal)):
             fs = float(sig.sampling_rate)
@@ -3783,6 +3815,17 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             signalBlocker = QtCore.QSignalBlocker(self.rsqThresholdDoubleSpinBox)
             self.rsqThresholdDoubleSpinBox.setValue(self._rsq_threshold_)
             self.configurable_traits["RsquaredThreshold"] = value
+            
+    @property
+    def allWavesToResult(self):
+        return self._all_waves_to_result_
+    
+    @markConfigurable("ResultIncludesAllWaves", trait_notifier=True)
+    @allWavesToResult.setter
+    def allWavesToResult(self, val:bool):
+        self._all_waves_to_result_ = val==True
+        sigBlock = QtCore.QSignalBlocker(self.actionAll_waves_to_result)
+        self.actionAll_waves_to_result.setChecked(self._all_waves_to_result_)
         
     @property
     def useTemplateWaveForm(self):
@@ -3804,6 +3847,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
     @overlayTemplateModel.setter
     def overlayTemplateModel(self, value):
         self._overlayTemplateModel = value == True
+        sigBlock = QtCore.QSignalBlocker(self.actionOverlay_Template_with_Model)
+        self.actionOverlay_Template_with_Model.setChecked(self._overlayTemplateModel)
         
     @property
     def templateWaveFormFile(self):
@@ -4158,7 +4203,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
     def result(self):
         """Retrieve the detection result.
-        The result is output as a tuple with three elements:
+        
+        Returns a tuple with three elements:
         
         • mPSC table (a pandas.DataFrame object)
             This contains the start time, peak time, fitted parameters and R² 
@@ -4215,7 +4261,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return
         
         psc_trains = list()
-        # all_waves = list()
+        all_waves = list()
         channel_id = list()
         start_time = list()
         peak_time = list()
@@ -4248,32 +4294,44 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 psc_trains.append(st)
                 
         for st in psc_trains:
-            print(st.size, st.annotations["peak_times"].size)
+            # print(st.size, st.annotations["peak_times"].size)
+            st_waves = neoutils.extract_waves(st, st.annotations["signal_units"], prefix=st.annotations["signal_origin"])
+            valid_waves = list()
             for k, t in enumerate(st):
-                print(k)
-                seg_index.append(st.annotations["segment_index"])
-                wave_index.append(k)
-                start_time.append(float(t))
-                channel_id.append(st.annotations["channel_id"])
-                peak_time.append(float(st.annotations["peak_times"][k]))
-                amplitude.append(float(st.annotations["amplitude"][k]))
-                from_template.append(st.annotations["mPSC_fit"][k]["template"])
-                fit_amplitude.append(float(st.annotations["mPSC_fit"][k]["amplitude"]))
-                r2.append(float(st.annotations["mPSC_fit"][k]["Rsq"]))
-                offset.append(float(st.annotations["mPSC_fit"][k]["Coefficients"][0]))
-                scale.append(float(st.annotations["mPSC_fit"][k]["Coefficients"][1]))
-                onset.append(float(st.annotations["mPSC_fit"][k]["Coefficients"][2]))
-                tau_rise.append(float(st.annotations["mPSC_fit"][k]["Coefficients"][3]))
-                tau_decay.append(float(st.annotations["mPSC_fit"][k]["Coefficients"][4]))
-                accept.append(st.annotations["Accept"][k])
-                source_id.append(self.metaDataWidget.sourceID)
-                cell_id.append(self.metaDataWidget.cell)
-                field_id.append(self.metaDataWidget.field)
-                age.append(self.metaDataWidget.age)
-                sex.append(self.metaDataWidget.sex)
-                genotype.append(self.metaDataWidget.genotype)
-                dataname.append(self.metaDataWidget.dataName)
-                datetime.append(self.metaDataWidget.analysisDateTime)
+                # print(k)
+                if not self._all_waves_to_result_:
+                    valid = st.annotations["Accept"][k]
+                else:
+                    valid = True
+                    
+                if valid:
+                    accept.append(st.annotations["Accept"][k])
+                    valid_waves.append(st_waves[k])
+                    seg_index.append(st.annotations["segment_index"])
+                    wave_index.append(k)
+                    start_time.append(float(t))
+                    channel_id.append(st.annotations["channel_id"])
+                    peak_time.append(float(st.annotations["peak_times"][k]))
+                    amplitude.append(float(st.annotations["amplitude"][k]))
+                    from_template.append(st.annotations["mPSC_fit"][k]["template"])
+                    fit_amplitude.append(float(st.annotations["mPSC_fit"][k]["amplitude"]))
+                    r2.append(float(st.annotations["mPSC_fit"][k]["Rsq"]))
+                    offset.append(float(st.annotations["mPSC_fit"][k]["Coefficients"][0]))
+                    scale.append(float(st.annotations["mPSC_fit"][k]["Coefficients"][1]))
+                    onset.append(float(st.annotations["mPSC_fit"][k]["Coefficients"][2]))
+                    tau_rise.append(float(st.annotations["mPSC_fit"][k]["Coefficients"][3]))
+                    tau_decay.append(float(st.annotations["mPSC_fit"][k]["Coefficients"][4]))
+                    source_id.append(self.metaDataWidget.sourceID)
+                    cell_id.append(self.metaDataWidget.cell)
+                    field_id.append(self.metaDataWidget.field)
+                    age.append(self.metaDataWidget.age)
+                    sex.append(self.metaDataWidget.sex)
+                    genotype.append(self.metaDataWidget.genotype)
+                    dataname.append(self.metaDataWidget.dataName)
+                    datetime.append(self.metaDataWidget.analysisDateTime)
+                    
+                if len(valid_waves):
+                    all_waves.extend(valid_waves)
             
             
             # for kw, w in enumerate(frameResult[1]): # mini waves

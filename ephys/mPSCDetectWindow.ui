@@ -7,8 +7,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>656</width>
-    <height>624</height>
+    <width>808</width>
+    <height>737</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -162,7 +162,7 @@
     <item>
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
-       <number>0</number>
+       <number>1</number>
       </property>
       <widget class="QWidget" name="modelTab">
        <attribute name="title">
@@ -381,7 +381,7 @@
       </widget>
       <widget class="QWidget" name="filtersTab">
        <attribute name="title">
-        <string>Preprocess Signal</string>
+        <string>Signal Processing</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_3">
         <item row="0" column="0">
@@ -644,8 +644,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>656</width>
-     <height>20</height>
+     <width>808</width>
+     <height>28</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -706,6 +706,7 @@
     </widget>
     <addaction name="menuPersistent_mPSC_template_location"/>
     <addaction name="actionOverlay_Template_with_Model"/>
+    <addaction name="actionAll_waves_to_result"/>
     <addaction name="actionLock_toolbars"/>
    </widget>
    <widget class="QMenu" name="menuDetect_mPSCs">
@@ -732,6 +733,7 @@
       <string>Results</string>
      </property>
      <addaction name="actionPlot_detected_mPSCs"/>
+     <addaction name="actionPlot_all_mPSCs"/>
      <addaction name="actionView_results"/>
      <addaction name="actionClear_results"/>
      <addaction name="separator"/>
@@ -801,7 +803,7 @@
     <enum>TopToolBarArea</enum>
    </attribute>
    <attribute name="toolBarBreak">
-    <bool>true</bool>
+    <bool>false</bool>
    </attribute>
    <addaction name="actionDetect_in_current_sweep"/>
    <addaction name="actionUndo_current_sweep"/>
@@ -824,7 +826,7 @@
     <enum>TopToolBarArea</enum>
    </attribute>
    <attribute name="toolBarBreak">
-    <bool>false</bool>
+    <bool>true</bool>
    </attribute>
    <addaction name="actionCreate_mPSC_Template"/>
    <addaction name="actionPlot_mPSC_template"/>
@@ -1190,7 +1192,7 @@
     <string>Plot detected mPSCs</string>
    </property>
    <property name="toolTip">
-    <string>Plot detected mPSCs</string>
+    <string>Plot mPSCs detected in current sweep</string>
    </property>
   </action>
   <action name="actionPlot_mPSC_template">
@@ -1287,15 +1289,6 @@
    </property>
    <property name="toolTip">
     <string>Open last used mPSC template file</string>
-   </property>
-  </action>
-  <action name="actionUndo_filter_data">
-   <property name="icon">
-    <iconset theme="edit-undo">
-     <normaloff>.</normaloff>.</iconset>
-   </property>
-   <property name="text">
-    <string>Undo filter data</string>
    </property>
   </action>
   <action name="actionApply_with_detection">
@@ -1401,11 +1394,40 @@
    </property>
   </action>
   <action name="actionView_detection">
+   <property name="icon">
+    <iconset theme="tools-report-bug">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
    <property name="text">
     <string>View detection</string>
    </property>
    <property name="toolTip">
     <string>View detection criterion</string>
+   </property>
+  </action>
+  <action name="actionPlot_all_mPSCs">
+   <property name="icon">
+    <iconset theme="graphics"/>
+   </property>
+   <property name="text">
+    <string>Plot all mPSCs</string>
+   </property>
+   <property name="toolTip">
+    <string>Plot all detected mPSCs in the data</string>
+   </property>
+  </action>
+  <action name="actionAll_waves_to_result">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="filter-symbolic"/>
+   </property>
+   <property name="text">
+    <string>All waves to result</string>
+   </property>
+   <property name="toolTip">
+    <string>Final result includes ALL waves (accepted AND rejected)</string>
    </property>
   </action>
  </widget>

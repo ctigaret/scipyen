@@ -6701,9 +6701,22 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
     mini_starts = x.times[θmaxima]
     
     mini_ends = mini_starts + duration
+    
+    # remove past-the-end intervals
+    intervals = [(t0,t1) for (t0,t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
+    
+    # generate new startsafter removal of past-the-end
+    starts = [interval[0] for interval in intervals]
+    # ends = starts + duration
+    
+    # for ke, me in enumerate(mini_ends):
+    #     if me > x.t_stop:
+    #         me = x.t_stop
     # print(mini_starts)
 
-    minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
+    minis = [x.time_slice(*interval) for interval in intervals]
+    # minis = [x.time_slice(t0,t1) if t1 < x.t_stop else x.time_slice(t0,x.t_stop) for (t0, t1) in zip(mini_starts, mini_ends)]
+    # minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop ]
     if len(minis) == 0:
         return
     
@@ -6720,7 +6733,7 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
         m.name = f"{chname}{km}"
         m.array_annotate(**x.array_annotations)
     
-    ret = neo.SpikeTrain(mini_starts, t_start = x.t_start, units = x.times.units,
+    ret = neo.SpikeTrain(starts, t_start = x.t_start, units = x.times.units,
                          t_stop = x.times[-1], sampling_rate = x.sampling_rate,
                          name="mPSCs")
     
