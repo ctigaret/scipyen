@@ -645,7 +645,7 @@
      <x>0</x>
      <y>0</y>
      <width>656</width>
-     <height>28</height>
+     <height>20</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -814,6 +814,7 @@
    <addaction name="actionSave_results"/>
    <addaction name="actionExport_results"/>
    <addaction name="actionClear_results"/>
+   <addaction name="actionView_detection"/>
   </widget>
   <widget class="QToolBar" name="templateToolBar">
    <property name="windowTitle">
@@ -1377,7 +1378,8 @@
   </action>
   <action name="actionAlign_mPSCs">
    <property name="icon">
-    <iconset theme="align-horizontal-left"/>
+    <iconset theme="align-horizontal-left">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Align mPSCs</string>
@@ -1388,13 +1390,22 @@
   </action>
   <action name="actionPlot_aligned_mPSCs">
    <property name="icon">
-    <iconset theme="graphics"/>
+    <iconset theme="graphics">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Plot aligned mPSCs</string>
    </property>
    <property name="toolTip">
     <string>Plot aligned mPSCs (if they exist)</string>
+   </property>
+  </action>
+  <action name="actionView_detection">
+   <property name="text">
+    <string>View detection</string>
+   </property>
+   <property name="toolTip">
+    <string>View detection criterion</string>
    </property>
   </action>
  </widget>

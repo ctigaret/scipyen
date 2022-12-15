@@ -6281,7 +6281,7 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     
     return ret
 
-def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal], threshold:float=4., channels:typing.Optional[typing.Union[int, typing.Sequence[int]]]=None):
+def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal], threshold:float=4., channels:typing.Optional[typing.Union[int, typing.Sequence[int]]]=None, outputDetection:bool=False):
     """Detect miniature or spontaneous PSCs with optimally scaled template.
     Implements the "sliding template" algorithm in Clements & Bekkers 1997, Biophys.J.
     
@@ -6411,7 +6411,7 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
     ch_name = x.array_annotations.get("channel_names", [""])[0]
     
     ret = list()
-    
+    theta_sigs = list()
     for kt,t in enumerate(thetas):
         θ = type(x)(t.θ, units = pq.dimensionless, t_start = x.t_start, 
                     sampling_rate = x.sampling_rate,
@@ -6419,7 +6419,7 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
                     description="Sliding template detection criterion")
         θ.array_annotate(channel_names=[f"{ch_name}_θ"])
         θ.array_annotate(channel_ids=[ch_id])
-        
+        theta_sigs.append(θ)
         ret_ = extract_minis(x[:,kt], mini_duration, t.θ, threshold, peakfunc)
         
         if isinstance(ret_, neo.SpikeTrain):
@@ -6434,7 +6434,16 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
             ret.append(ret_)
             
     if len(ret):
-        return neo.core.spiketrainlist.SpikeTrainList(items = ret)
+        result = neo.core.spiketrainlist.SpikeTrainList(items = ret, segment=x.segment)
+        if outputDetection:
+            return result, theta_sigs
+        else:
+            return result
+    else:
+        if outputDetection:
+            return None, theta_sigs
+        else:
+            return
     
 def calculate_template_scale_offset(x, h):
     if any(v.ndim != 1 for v in (x,h)):
@@ -6664,6 +6673,8 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
     peak_begins = np.where(flag_bounds > 0)[0] # sample indices
     peak_ends   = np.where(flag_bounds < 0)[0] # sample indices
     
+    # print(len(peak_begins), len(peak_ends))
+    
     if len(peak_begins) == 0 or len(peak_ends) == 0:
         return # nothing detected ?!?
     
@@ -6679,14 +6690,22 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
             
         elif peak_begins[-1] > peak_ends[-1]:
             peak_ends = peak_ends[0:-1]
+            
+    
+            
+    # print(f"peak begin, end: {[v for v in zip(peak_begins, peak_ends)]}")
         
     θmaxima = [np.argmax(θ[v[0]:v[1]]) + v[0] for v in zip(peak_begins, peak_ends) if len(θ[v[0]:v[1]]) > 0]
     
+    # print(f"θmaxima {θmaxima}")
     mini_starts = x.times[θmaxima]
     
     mini_ends = mini_starts + duration
+    # print(mini_starts)
 
     minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
+    if len(minis) == 0:
+        return
     
     mini_peaks = np.array([w.times[peakfunc(w[:,0])] for w in minis])*x.times.units
 
@@ -6723,7 +6742,7 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
     
     return ret
 
-def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typing.Optional[float]=None):
+def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typing.Optional[float]=None, outputDetection:bool=False):
     """Detect miniature or spontaneous PSCs by cross-correlation with a waveform.
     
     Parameters:
@@ -6848,7 +6867,7 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
         peakfunc = np.argmin
         
     if useCBsliding:
-        return detect_mPSC_CBsliding(x, waveform, threshold)
+        return detect_mPSC_CBsliding(x, waveform, threshold, outputDetection=outputDetection)
             
     else:
         # 1) normalize the model waveform - only for the cross-correlation method
@@ -6877,6 +6896,7 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
         #   ∘ detrended & unscaled is stored in annotations as θ
         #   ∘ detrended & scaled is stored in annotations as θ_norm
         # • thresholding is always performed on θ_norm
+        thetas = list()
         for k, c in enumerate(xc):
             dxc = scipy.signal.detrend(c, type="constant",axis=0)
             if threshold is None:
@@ -6897,6 +6917,8 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
                         name = f"{x.name}_θ_norm",
                         description = "Template cross-correlation (normalized)")
             
+            thetas.append(θ_norm)
+            
             ret_ = extract_minis(x[:,k], mini_duration, dxc_n, thr, peakfunc)
             
             if isinstance(ret_, neo.SpikeTrain):
@@ -6907,10 +6929,16 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
                 # waves.append(waves_)
                 
         if len(ret) == 0:
-            return
+            if outputDetection:
+                return None, thetas
+            else:
+                return
         
-        ret = neo.core.spiketrainlist.SpikeTrainList(items = ret, segment=x.segment)
-        return ret
+        result = neo.core.spiketrainlist.SpikeTrainList(items = ret, segment=x.segment)
+        if outputDetection:
+            return result, thetas
+        else:
+            return result
 
 def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), Im:typing.Union[int, str] = "IN0", epoch=None, clear_spiketrains:bool=True, fit_waves:bool=False):
     """Batch m(E/I)PSC analysis.
