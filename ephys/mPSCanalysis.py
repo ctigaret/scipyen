@@ -666,6 +666,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self.actionView_detection.triggered.connect(self._slot_previewDetectionTheta)
         
         self.actionAll_waves_to_result.triggered.connect(self._slot_set_allWavesToResult)
+        
+        self.refitWaveToolButton.triggered.connect(self._slot_refit_mPSC)
+        self.actionRefit_wave.triggered.connect(self._slot_refit_mPSC)
         # self.noiseFilterCheckBox.stateChanged.connect(self._slot_filterData)
         # print(f"{self.__class__.__name__}._configureUI_ end...")
 #### END _configureUI_        
@@ -1785,6 +1788,89 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                                                     labelOpts = {"color":targetLabelColor,
                                                                 "offset":targetLabelOffset})
                 self._ephysViewer_.refresh()
+                
+    def _refit_wave(self):
+        if self._data_ is None:
+            return
+        
+        if len(self._detected_mPSCs_) == 0:
+            return
+        
+        if not self._detected_mPSCViewer_.isVisible():
+            return
+        
+        if self._detected_mPSCViewer_.yData is None:
+            return
+        
+        frameResult = self._result_[self.currentFrame]
+        if not isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList):
+            return
+        
+        if len(frameResult) == 0:
+            return
+        
+        st = frameResult[self._displayed_detection_channel_]
+        
+        if isinstance(self._data_, neo.Block):
+            data_segment = self._data_.segments[self.currentFrame]
+        elif isinstance(self._data_, neo.Segment):
+            data_segment = self._data_
+            
+        elif isinstance(self._data_, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self._data_):
+            segment = self._data_[self.currentFrame]
+
+        else:
+            return
+        
+        if st.segment is not data_segment:
+            return
+        
+        waveIndex = self._detected_mPSCViewer_.currentFrame
+        if st.segment is not self._detected_mPSCViewer_.yData[waveIndex].segment:
+            return
+        
+        if st.segment is not self._detected_mPSCs_[waveIndex].segment:
+            return
+        
+        model_params = self.paramsWidget.value()
+        init_params = tuple(p.magnitude for p in model_params["Initial Value:"])
+        
+        if self._use_template_ and isinstance(self._mPSC_template_, neo.AnalogSignal):
+            template_fit = membrane.fit_mPSC(self._mPSC_template_, init_params, lo, up)
+            init_params = template_fit.annotations["mPSC_fit"]["Coefficients"]
+                
+        lo = tuple(p.magnitude for p in model_params["Lower Bound:"])
+        up = tuple(p.magnitude for p in model_params["Upper Bound:"])
+            
+        w = self._detected_mPSCs_[waveIndex]
+        
+        fw = membrane.fit_mPSC(w, init_params, lo=lo, up=up)
+        
+        if self._use_threshold_on_rsq_:
+            accept = fw.annotations["mPSC_fit"]["Rsq"] >= self.rSqThreshold
+        else:
+            accept = True
+            
+        if accept:
+            self._accept_waves_cache_[self.currentFrame].add(self.currentWaveformIndex)
+        else:
+            if self.currentWaveformIndex in self._accept_waves_cache_[self.currentFrame]:
+                self._accept_waves_cache_[self.currentFrame].remove(self.currentWaveformIndex)
+
+        self._detected_mPSCs_[waveIndex] = fw
+        
+        st.annotations["Accept"][waveIndex] = accept
+        st.annotations["mPSC_fit"][waveIndex] = fw.annotations["mPSC_fit"]
+        st.annotations["amplitude"][waveIndex] = fw.annotations["amplitude"]
+        
+        # now put back the waves into the st
+        new_waves = np.concatenate([fw.magnitude[:,:,np.newaxis] for fw in self._detected_mPSCs_], axis=2)
+        st.waveforms = new_waves.T
+        
+        # replot directly (to avoid re-extracting the waves from the st)
+        self._detected_mPSCViewer_.plot(self._detected_mPSCs_)
+        self._detected_mPSCViewer_.currentFrame = waveIndex
+        self._indicate_mPSC_(waveIndex, self.currentFrame)
        
     def _clear_detection_in_sweep_(self, segment:neo.Segment):
         mPSCtrains = [s for s in segment.spiketrains if s.annotations.get("source", None) == "PSC_detection"]
@@ -3462,10 +3548,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
 # have an impact on later detections because the new parametyer intial values
 # and bounds will be saved across sessions.
 # FIXME DO NOT DELETE: may come back to this
-#     @pyqtSlot()
-#     def _slot_refit_mPSC(self):
-#         """Not sure how refitting helps
-#         """
+    @pyqtSlot()
+    def _slot_refit_mPSC(self):
+        """Not sure how refitting helps
+        """
+        self._refit_wave()
 #         self._detected_mPSCs_ = self._result_[self.currentFrame][1]
 #         
 #         if len(self._detected_mPSCs_) == 0:

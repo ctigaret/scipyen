@@ -634,6 +634,16 @@
            </property>
           </widget>
          </item>
+         <item>
+          <widget class="QToolButton" name="refitWaveToolButton">
+           <property name="text">
+            <string>Fit</string>
+           </property>
+           <property name="icon">
+            <iconset theme="labplot-xy-fit-curve"/>
+           </property>
+          </widget>
+         </item>
         </layout>
        </item>
       </layout>
@@ -827,6 +837,7 @@
    <addaction name="actionView_results"/>
    <addaction name="actionSave_results"/>
    <addaction name="actionExport_results"/>
+   <addaction name="actionRefit_wave"/>
    <addaction name="actionClear_results"/>
    <addaction name="actionView_detection"/>
   </widget>
@@ -1439,6 +1450,14 @@
    </property>
    <property name="toolTip">
     <string>Final result includes ALL waves (accepted AND rejected)</string>
+   </property>
+  </action>
+  <action name="actionRefit_wave">
+   <property name="icon">
+    <iconset theme="labplot-xy-fit-curve"/>
+   </property>
+   <property name="text">
+    <string>Refit wave</string>
    </property>
   </action>
  </widget>
