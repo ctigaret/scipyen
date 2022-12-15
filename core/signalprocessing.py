@@ -809,15 +809,15 @@ def remove_dc(x, value:typing.Optional[typing.Union[pq.Quantity, np.ndarray]] = 
         xx = x
         
         
-    def __guess_dc_(x_):
-        levels, counts, edges, ranges = state_levels(x_)
-        
-        levelSizes = [np.sum(counts[level_range]) for level_range in ranges]
-    
-        ndx = np.argmax(levelSizes)
-        val = levels[ndx]
-            
-        return val
+#     def __guess_dc_(x_):
+#         levels, counts, edges, ranges = state_levels(x_)
+#         
+#         levelSizes = [np.sum(counts[level_range]) for level_range in ranges]
+#     
+#         ndx = np.argmax(levelSizes)
+#         val = levels[ndx]
+#             
+#         return val
         
     yy = np.full_like(xx, np.nan)
     
@@ -889,7 +889,7 @@ def remove_dc(x, value:typing.Optional[typing.Union[pq.Quantity, np.ndarray]] = 
                     val = value[0]
                         
                 elif value is None:
-                    val = __guess_dc_(xx[:,k])
+                    val = estimate_dc(xx[:,k])
                     
                 yy[:,k] = xx[:,k] - val
 
@@ -1257,6 +1257,16 @@ def sosfilter(sig:typing.Union[pq.Quantity, np.ndarray], kernel:np.ndarray):
     return ret
     
     
+def estimate_dc(x_):
+    levels, counts, edges, ranges = state_levels(x_)
+    
+    levelSizes = [np.sum(counts[level_range]) for level_range in ranges]
+
+    ndx = np.argmax(levelSizes)
+    val = levels[ndx]
+        
+    return val
+        
 
 
     

@@ -6,12 +6,11 @@ from itertools import chain
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from PyQt5.uic import loadUiType as __loadUiType__
-
 import numpy as np
 import scipy
 import quantities as pq
 import neo
-# import pyqtgraph as pg
+import pyqtgraph as pg
 import pandas as pd
 
 from iolib import pictio as pio
@@ -667,7 +666,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self.actionAll_waves_to_result.triggered.connect(self._slot_set_allWavesToResult)
         
-        self.refitWaveToolButton.triggered.connect(self._slot_refit_mPSC)
         self.actionRefit_wave.triggered.connect(self._slot_refit_mPSC)
         # self.noiseFilterCheckBox.stateChanged.connect(self._slot_filterData)
         # print(f"{self.__class__.__name__}._configureUI_ end...")
@@ -1700,13 +1698,17 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             if mPSC_fit is None:
                 return
             
+            
             wavesR2 = [fdict.get("Rsq", None) for fdict in mPSC_fit if fdict is not None]
+            coeffs = [fdict.get("Coefficients", None) for fdict in mPSC_fit if fdict is not None]
             
 #             sig_name = train.annotations.get("signal_origin", None)
 #             
 #             if not isinstance(sig_name, str) or len(sig_name.strip()) == 0:
 #                 sig_name = train.name
             
+            
+            # FIXME should rely on viewer's data
             self._detected_mPSCs_ = neoutils.extract_waves(train, train.annotations.get("signal_units", pq.dimensionless),
                                                            prefix = sig_name)
             
@@ -1729,23 +1731,53 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
             accept = accepted[waveindex]
             
+            acctext = "Accept" if accept else "Reject"
+            coeff = coeffs[waveindex]
+            
+            # print(coeffs)
+            # print(coeff)
+            
+            
             if waveR2 is not None:
                 if accept:
-                    wavelabel = "R²=%.2f Accept" % waveR2
+                    wavelabel = "%s R² = %.2f" % (acctext, waveR2)
                 else:
-                    wavelabel = "R²=%.2f Reject" % waveR2
+                    wavelabel = "%s R² = %.2f" % (acctext, waveR2)
                     
             else:
-                if accept:
-                    wavelabel = "Accept"
-                else:
-                    wavelabel = "Reject"
+                wavelabel = acctext
+                
+            if len(coeff) == 5:
+                cofftxt = ["%s = %.5f" % (s,c) for (s,c) in zip(("α", "β", "x₀", "τ₁", "τ₂"), coeff)]
+                
+                wl = [wavelabel]
+                wl.extend(cofftxt)
+                wavelabel = "; ".join(wl)
+                
+            # FIXME should rely on viewer's data
+            self._detected_mPSCs_[waveindex].annotate(Accept=accept, R2 = waveR2)
+            # fit_ann = ]
                     
             waxis = self._detected_mPSCViewer_.axis(0)
+            dataItems = [i for i in waxis.items if isinstance(i, pg.PlotDataItem)]
+            
+            dc = max([sigp.estimate_dc(item.yData) for item in dataItems])
+            
             self._detected_mPSCViewer_.removeLabels(waxis)
             [[x0,x1], [y0,y1]]  = waxis.viewRange()
             
-            self._detected_mPSCViewer_.addLabel(wavelabel, 0, pos = (x0,y1), 
+            label_x = x0
+            label_y = y0 - dc
+            # label_y = y1
+
+#             label_height = guiutils.get_text_height(wavelabel)
+#             if y1-y0 <= label_height:
+#                 label_y = y0 + 2*dc
+#                 
+#             else:
+#                 label_y = y1
+            
+            self._detected_mPSCViewer_.addLabel(wavelabel, 0, pos = (label_x,label_y), 
                                                 color=(0,0,0), anchor=(0,1))
                     
             if isinstance(self._mPSC_model_waveform_, neo.core.basesignal.BaseSignal):
@@ -1791,6 +1823,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 
     def _refit_wave(self):
         if self._data_ is None:
+            warnings.warn(f"No data!")
             return
         
         if len(self._detected_mPSCs_) == 0:
@@ -1804,6 +1837,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         frameResult = self._result_[self.currentFrame]
         if not isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList):
+            warnings.warn(f"No result for sweep {self.currentFrame}")
             return
         
         if len(frameResult) == 0:
@@ -1813,6 +1847,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         if isinstance(self._data_, neo.Block):
             data_segment = self._data_.segments[self.currentFrame]
+            
         elif isinstance(self._data_, neo.Segment):
             data_segment = self._data_
             
@@ -1820,16 +1855,21 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             segment = self._data_[self.currentFrame]
 
         else:
+            warnings.warn(f"No segment!")
+            
             return
         
         if st.segment is not data_segment:
+            warnings.warn(f"Segment mismatch between spike train and data!")
             return
         
         waveIndex = self._detected_mPSCViewer_.currentFrame
         if st.segment is not self._detected_mPSCViewer_.yData[waveIndex].segment:
+            warnings.warn(f"Segment mismatch between spike train and plotted mPSC  {waveIndex}!")
             return
         
         if st.segment is not self._detected_mPSCs_[waveIndex].segment:
+            warnings.warn(f"Segment mismatch between spike train and mPSC {waveIndex}!")
             return
         
         model_params = self.paramsWidget.value()
@@ -1864,6 +1904,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         st.annotations["amplitude"][waveIndex] = fw.annotations["amplitude"]
         
         # now put back the waves into the st
+        # print(f"{self.__class__.__name__} refit wave {waveIndex} in sweep {self.currentFrame} ")
         new_waves = np.concatenate([fw.magnitude[:,:,np.newaxis] for fw in self._detected_mPSCs_], axis=2)
         st.waveforms = new_waves.T
         
@@ -3545,7 +3586,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
 # Not sure how useful this is; for fitting we use the initial values of the 
 # model parameters, plus their lower & upper bounds. Tweaking these won't
 # necessarily improve the accepting of a detected wave, but will almost surely
-# have an impact on later detections because the new parametyer intial values
+# have an impact on later detections because the new parameter intial values
 # and bounds will be saved across sessions.
 # FIXME DO NOT DELETE: may come back to this
     @pyqtSlot()

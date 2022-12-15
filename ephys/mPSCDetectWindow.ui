@@ -634,16 +634,6 @@
            </property>
           </widget>
          </item>
-         <item>
-          <widget class="QToolButton" name="refitWaveToolButton">
-           <property name="text">
-            <string>Fit</string>
-           </property>
-           <property name="icon">
-            <iconset theme="labplot-xy-fit-curve"/>
-           </property>
-          </widget>
-         </item>
         </layout>
        </item>
       </layout>
