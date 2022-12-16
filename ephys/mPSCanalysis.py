@@ -149,7 +149,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         self._use_template_ = False
         self._use_threshold_on_rsq_ = False
         self._rsq_threshold_ = 0.
-        self._accept_waves_cache_ = list() # a set for each segment
+        # self._accept_waves_cache_ = list() # a set for each segment
         self._overlayTemplateModel = False
         self._mPSC_template_ = None
         self._template_showing_ = False
@@ -737,7 +737,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             if isinstance(data, neo.Block):
                 self._undo_buffer_ = [None for s in data.segments]
                 self._result_ = [None for s in data.segments]
-                self._accept_waves_cache_ = [set() for s in data.segments]
+                # self._accept_waves_cache_ = [set() for s in data.segments]
                 # for k,s in enumerate(data.segments):
                 #     # NOTE: 2022-11-20 11:54:02
                 #     # store any existing spike trains with PSC time stamps
@@ -783,7 +783,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             elif isinstance(data, neo.Segment):
                 self._undo_buffer_ = [None]
                 self._result_ = [None]
-                self._accept_waves_cache_ = [set()]
+                # self._accept_waves_cache_ = [set()]
                 
                 if len(data.analogsignals):
                     time_units = data.analogsignals[0].times.units
@@ -813,7 +813,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             elif isinstance(data, (tuple, list)) and all(isinstance(v, neo.Segment) for v in data):
                 self._undo_buffer_ = [None for s in data]
                 self._result_ = [None for s in data]
-                self._accept_waves_cache_ = [set() for s in data]
+                # self._accept_waves_cache_ = [set() for s in data]
                             
                 if len(data[0].analogsignals):
                     time_units = data[0].analogsignals[0].times.units
@@ -1038,7 +1038,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         self._detected_mPSCs_ = list()
         self._result_ = list()
-        self._accept_waves_cache_ = list()
+        # self._accept_waves_cache_ = list()
         self._undo_buffer_ = list()
         self._currentWaveformIndex_ = 0
         self._waveform_frames = 0
@@ -1698,27 +1698,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             if mPSC_fit is None:
                 return
             
-            
             wavesR2 = [fdict.get("Rsq", None) for fdict in mPSC_fit if fdict is not None]
-            coeffs = [fdict.get("Coefficients", None) for fdict in mPSC_fit if fdict is not None]
-            
-#             sig_name = train.annotations.get("signal_origin", None)
-#             
-#             if not isinstance(sig_name, str) or len(sig_name.strip()) == 0:
-#                 sig_name = train.name
-            
-            
-            # FIXME should rely on viewer's data
-            self._detected_mPSCs_ = neoutils.extract_waves(train, train.annotations.get("signal_units", pq.dimensionless),
-                                                           prefix = sig_name)
-            
-            if len(self._detected_mPSCs_) == 0:
-                return
             
             # NOTE: 2022-12-15 13:14:39
             # prevent plotting detection targets in the wrong axis
-#             signal = segment.analogsignals[self._signal_index_]
-#             axis = self._ephysViewer_.axes[self._signal_index_]
             signal = segment.analogsignals[sig_index]
             axis = self._ephysViewer_.axes[sig_index]
             
@@ -1732,11 +1715,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             accept = accepted[waveindex]
             
             acctext = "Accept" if accept else "Reject"
-            coeff = coeffs[waveindex]
-            
-            # print(coeffs)
-            # print(coeff)
-            
             
             if waveR2 is not None:
                 if accept:
@@ -1747,37 +1725,12 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             else:
                 wavelabel = acctext
                 
-            if len(coeff) == 5:
-                cofftxt = ["%s = %.5f" % (s,c) for (s,c) in zip(("α", "β", "x₀", "τ₁", "τ₂"), coeff)]
-                
-                wl = [wavelabel]
-                wl.extend(cofftxt)
-                wavelabel = "; ".join(wl)
-                
-            # FIXME should rely on viewer's data
-            self._detected_mPSCs_[waveindex].annotate(Accept=accept, R2 = waveR2)
-            # fit_ann = ]
-                    
             waxis = self._detected_mPSCViewer_.axis(0)
-            dataItems = [i for i in waxis.items if isinstance(i, pg.PlotDataItem)]
-            
-            dc = max([sigp.estimate_dc(item.yData) for item in dataItems])
             
             self._detected_mPSCViewer_.removeLabels(waxis)
             [[x0,x1], [y0,y1]]  = waxis.viewRange()
             
-            label_x = x0
-            label_y = y0 - dc
-            # label_y = y1
-
-#             label_height = guiutils.get_text_height(wavelabel)
-#             if y1-y0 <= label_height:
-#                 label_y = y0 + 2*dc
-#                 
-#             else:
-#                 label_y = y1
-            
-            self._detected_mPSCViewer_.addLabel(wavelabel, 0, pos = (label_x,label_y), 
+            self._detected_mPSCViewer_.addLabel(wavelabel, 0, pos = (x0,y1), 
                                                 color=(0,0,0), anchor=(0,1))
                     
             if isinstance(self._mPSC_model_waveform_, neo.core.basesignal.BaseSignal):
@@ -1891,12 +1844,14 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         else:
             accept = True
             
-        if accept:
-            self._accept_waves_cache_[self.currentFrame].add(self.currentWaveformIndex)
-        else:
-            if self.currentWaveformIndex in self._accept_waves_cache_[self.currentFrame]:
-                self._accept_waves_cache_[self.currentFrame].remove(self.currentWaveformIndex)
+        # if accept:
+        #     self._accept_waves_cache_[self.currentFrame].add(self.currentWaveformIndex)
+        # else:
+        #     if self.currentWaveformIndex in self._accept_waves_cache_[self.currentFrame]:
+        #         self._accept_waves_cache_[self.currentFrame].remove(self.currentWaveformIndex)
 
+        # NOTE:2022-12-15 21:58:29
+        # remember: self._detected_mPSCViewer_.yData is a reference to self._detected_mPSCs_
         self._detected_mPSCs_[waveIndex] = fw
         
         st.annotations["Accept"][waveIndex] = accept
@@ -1909,7 +1864,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         st.waveforms = new_waves.T
         
         # replot directly (to avoid re-extracting the waves from the st)
-        self._detected_mPSCViewer_.plot(self._detected_mPSCs_)
+        # self._detected_mPSCViewer_.plot(self._detected_mPSCs_)
         self._detected_mPSCViewer_.currentFrame = waveIndex
         self._indicate_mPSC_(waveIndex, self.currentFrame)
        
@@ -2221,69 +2176,41 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return 
         
         if isinstance(sweep, int) and sweep in range(-self.nFrames, self.nFrames):
-            result = self._result_[sweep]
-            if result is None:
+            stl = self._result_[sweep]
+            if stl is None:
                 return
             
-            st = result[0]
-            
-            if isinstance(st, (tuple, list)) and all(isinstance(v, neo.SpikeTrain) for v in st):
-                if len(st) > 1:
-                    # merge spike trains
-                    train = st[0].merge(st[1:])
-                else:
-                    train = st[0]
-                    
-                result[0] = train
-                st = train
-                    
-            if isinstance(wave, int) and wave in range(-len(st), len(st)):
-                w = result[1][wave]
-                if self.useThresholdOnRsquared:
-                    w.annotations["Accept"] = w.annotations["mPSC_fit"]["Rsq"] >= self.rSqThreshold
-                else:
-                    if kw in self._accept_waves_cache_[k]:
-                        w.annotations["Accept"] = True
-                        
-                st.annotations["Accept"][wave] = w.annotations["Accept"]
-                
-            else:
-                for kw, w in enumerate(result[1]):
+            for st in stl:
+                if isinstance(wave, int) and wave in range(-(st.shape[0]), st.shape[0]):
                     if self.useThresholdOnRsquared:
-                        w.annotations["Accept"] = w.annotations["mPSC_fit"]["Rsq"] >= self.rSqThreshold
+                        st.annotations["Accept"][wave] = st.annotations["mPSC_fit"][wave]["Rsq"] >= self.rSqThreshold
                     else:
-                        if kw in self._accept_waves_cache_[k]:
-                            w.annotations["Accept"] = True
+                        st.annotations["Accept"][wave] = True
+                else:
+                    for kw in range(st.shape[0]):
+                        if self.useThresholdOnRsquared:
+                            st.annotations["Accept"][kw] = st.annotations["mPSC_fit"][kw]["Rsq"] >= self.rSqThreshold
                         else:
-                            w.annotations["Accept"] = False
-                            
-                    st.annotations["Accept"][kw] = w.annotations["Accept"]
-
-            
-        
-        for k, result in enumerate(self._result_):
-            if result is None:
-                continue
-            
-            st = result[0]
-            
-            if isinstance(st, (tuple, list)) and all(isinstance(v, neo.SpikeTrain) for v in st):
-                if len(st) == 1:
-                    psc_trains.append(st[0])
-                else:
-                    # merge spike trains
-                    train = st[0].merge(st[1:])
-                    result[0] = train
-                    
-            for kw, w in enumerate(result[1]):
-                if self.useThresholdOnRsquared:
-                    w.annotations["Accept"] = w.annotations["mPSC_fit"]["Rsq"] >= self.rSqThreshold
-                else:
-                    if kw in self._accept_waves_cache_[k]:
-                        w.annotations["Accept"] = True
+                            st.annotations["Accept"][kw] = True
+                        
+        else:    
+            for k, stl in enumerate(self._result_):
+                if stl is None:
+                    continue
+                
+                for st in stl:
+                    if isinstance(wave, int) and wave in range(-(st.shape[0]), st.shape[0]):
+                        if self.useThresholdOnRsquared:
+                            st.annotations["Accept"][wave] = st.annotations["mPSC_fit"][wave]["Rsq"] >= self.rSqThreshold
+                        else:
+                            st.annotations["Accept"][wave] = True
                     else:
-                        w.annotations["Accept"] = False
-
+                        for kw in range(st.shape[0]):
+                            if self.useThresholdOnRsquared:
+                                st.annotations["Accept"][kw] = st.annotations["mPSC_fit"][kw]["Rsq"] >= self.rSqThreshold
+                            else:
+                                st.annotations["Accept"][kw] = True
+                        
         self._plot_data()
         if self._reportWindow_.isVisible():
             self._update_report_()
@@ -3552,11 +3479,11 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         #
         # • store previous accepted result in cache
         #
-        if accept:
-            self._accept_waves_cache_[self.currentFrame].add(self.currentWaveformIndex)
-        else:
-            if self.currentWaveformIndex in self._accept_waves_cache_[self.currentFrame]:
-                self._accept_waves_cache_[self.currentFrame].remove(self.currentWaveformIndex)
+        # if accept:
+        #     self._accept_waves_cache_[self.currentFrame].add(self.currentWaveformIndex)
+        # else:
+        #     if self.currentWaveformIndex in self._accept_waves_cache_[self.currentFrame]:
+        #         self._accept_waves_cache_[self.currentFrame].remove(self.currentWaveformIndex)
         #
         # • update the Accept state in the wave annotations
         #
@@ -3573,9 +3500,15 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         train = frameResult[self._displayed_detection_channel_]
         
         train.annotations["Accept"][self.currentWaveformIndex] = accept
+        if len(self._detected_mPSCs_):
+            if self._detected_mPSCs_[self.currentWaveformIndex].segment == train.segment:
+                self._detected_mPSCs_[self.currentWaveformIndex].annotate(Accept=accept)
+                if self._detected_mPSCViewer_.isVisible():
+                    self._detected_mPSCViewer_.currentFrame = self.currentWaveformIndex
+                    
             
         # • refresh mPSC indicator on the main data plot
-        self._indicate_mPSC_(self.currentWaveformIndex)
+        self._indicate_mPSC_(self.currentWaveformIndex, self.currentFrame)
         #
         # • refresh the results table (DataFrame); to save time, we only do it
         #   if the report window is showing

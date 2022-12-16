@@ -4799,6 +4799,26 @@ def extract_waves(x:neo.SpikeTrain, waveunits:pq.Quantity, **kwargs):
     x:neo.SpikeTrain
     waveunits: units for the waveform signal (the spike trains store waveforms
             as plain numpy arrays)
+    
+    Var-keyword parameters (**kwargs)
+    =================================
+    
+    prefix: str; optional , defalt is None; a prefix to generate each wave's name
+    
+    annotate:bool, or a dict with str keys mapped to a sequence of values, or an
+        array.
+    
+        When a key maps to a sequence, its length must equal the number of time
+        stamps (and waveforms) in the spike train `x`.
+    
+        When a key maps to a numpy array, the array size along itrs first axis 
+        (axis 0) must equal the number of waveforms (and time stamps) in the 
+        spike train `x`.
+    
+    
+        Optional, default is True, in which case the train's annotations are
+        searched for key-value mappings as described above.
+    
     """
     if x.waveforms.size > 0:
         # NOTE: 2022-12-14 09:41:06
@@ -4837,6 +4857,31 @@ def extract_waves(x:neo.SpikeTrain, waveunits:pq.Quantity, **kwargs):
         
         prefix = kwargs.pop("prefix", None)
         
+        annotate = kwargs.pop("annotate", True)
+        # extract the annotatios keys that map to a sequence or array of values
+        # with the same length as waveforms.shape[0]; for numpy arrays, their
+        # size on the first axis must match the waveforms.shape[0]
+        annotations = dict()
+        if isinstance(annotate, dict):
+            for (k,v) in annotate.items():
+                if isinstance(v, (tuple, list)) and len(v) == x.waveforms.shape[0]:
+                    annotations[k] = v
+                    
+                elif isinstance(v, np.ndarray):
+                    if len(v.shape) > 0 and v.shape[0] == x.waveforms.shape[0]:
+                        annotations[k] = v
+                    
+        elif isinstance(annotate, bool) and annotate:
+            for (k,v) in x.annotations.items():
+                if isinstance(v, (tuple, list)) and len(v) == x.waveforms.shape[0]:
+                    annotations[k] = v
+                    
+                # elif isinstance(v, np.ndarray) and v.shape[0] == x.waveforms.shape[0]:
+                elif isinstance(v, np.ndarray):
+                    # print(f"k {k}, v.shape {v.shape}, waves shape {x.waveforms.shape}")
+                    if len(v.shape) > 0 and v.shape[0] == x.waveforms.shape[0]:
+                        annotations[k] = v
+        
         if not isinstance(prefix, str) or len(prefix.strip()) == 0:
             prefix = "wave"
         
@@ -4850,6 +4895,9 @@ def extract_waves(x:neo.SpikeTrain, waveunits:pq.Quantity, **kwargs):
                                     sampling_rate=x.sampling_rate,
                                     name = f"{prefix}_{k}")
             wave.segment = x.segment
+            if len(annotations):
+                annt = dict((key, val[k]) for (key, val) in annotations.items())
+                wave.annotate(**annt)
             
             # print(f"neoutils.extract_waves k {k}: t_start{t_start}, w.shape {w.shape}, wave.shape {wave.shape}")
             

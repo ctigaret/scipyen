@@ -5638,7 +5638,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 warnings.warn(f"Could not parse the data x: {x}, y: {y}")
                 return
             
-            self._update_annotations_()
+            # self._update_annotations_()
             
             # NOTE: 2022-11-01 10:37:06
             # overwrites self.docTitle set by self._parse_data_
@@ -8123,6 +8123,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._current_plot_item_ = None
         self._current_plot_item_index_ = -1
         self._focussed_plot_item_ = None
+        
+        self.dataAnnotations.clear()
+        self.annotationsViewer.clear()
         
         for p in self.plotItems:
             self._remove_axes_(p)
