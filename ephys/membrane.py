@@ -6742,8 +6742,8 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
     # print(f"membrane.extract_minis: waves shape {mPSCtrain_waves.shape}, waveforms shape {ret.waveforms.shape}")
     ret.segment = x.segment
     ret.annotate(
-                 peak_times = mini_peaks, 
-                 wave_names = [w.name for w in minis],
+                 peak_time = mini_peaks, 
+                 wave_name = [w.name for w in minis],
                  mPSC_fit = [w.annotations.get("mPSC_fit", None) for w in minis],
                  Accept = [w.annotations["Accept"] for w in minis],
                  source="PSC_detection",
@@ -7091,6 +7091,7 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
     
     
     """
+    raise NotImplementedError("Must adapt to new data layout")
     
     if clear_spiketrains:
         neoutils.clear_spiketrains(x)
@@ -7243,7 +7244,7 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
             
             # # waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
             # train.waveforms = waves
-            train.annotations["peak_times"] = peak_times
+            train.annotations["peak_time"] = peak_times
             train.annotations["source"] = "PSC_detection"
             
             if isinstance(template, neo.core.basesignal.BaseSignal):

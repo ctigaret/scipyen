@@ -4803,6 +4803,12 @@ def extract_waves(x:neo.SpikeTrain, waveunits:pq.Quantity, **kwargs):
     Var-keyword parameters (**kwargs)
     =================================
     
+    keep_time:bool; optional default is True.
+        When True, the waveforms start time (`t_start`) is set to the corresponding
+        time stamp in the spike train + the value of left sweep (if given).
+    
+        When False, the waveforms start time is set to 0
+    
     prefix: str; optional , defalt is None; a prefix to generate each wave's name
     
     annotate:bool, or a dict with str keys mapped to a sequence of values, or an
@@ -4857,6 +4863,8 @@ def extract_waves(x:neo.SpikeTrain, waveunits:pq.Quantity, **kwargs):
         
         prefix = kwargs.pop("prefix", None)
         
+        keep_time = kwargs.pop("keep_time", True)
+        
         annotate = kwargs.pop("annotate", True)
         # extract the annotatios keys that map to a sequence or array of values
         # with the same length as waveforms.shape[0]; for numpy arrays, their
@@ -4887,7 +4895,10 @@ def extract_waves(x:neo.SpikeTrain, waveunits:pq.Quantity, **kwargs):
         
         for k in range(x.waveforms.shape[0]):
             w = x.waveforms[k,:,:]
-            t_start = x[k]+left_sweep
+            if keep_time:
+                t_start = x[k]+left_sweep
+            else:
+                t_start = 0 * x.units
             
             wave = neo.AnalogSignal(w.T,
                                     units = waveunits,

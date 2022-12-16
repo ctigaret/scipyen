@@ -1175,24 +1175,23 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 
                 aligned_waveforms, wave_ndx = alignment
                         
-                if len(aligned_waveforms):
-                    aligned_waveforms = np.concatenate([w.magnitude[:,:,np.newaxis] for w in aligned_waves], axis=2)
+#                 if len(aligned_waveforms):
+#                     aligned_waveforms = np.concatenate([w.magnitude[:,:,np.newaxis] for w in aligned_waveforms], axis=2)
+#                     
+#                     peak_times = np.array([train.annotations["peak_time"][k] for k in wave_ndx])
+#                     wave_names = [train.annotations["wave_name"][k] for k in wave_ndx]
+#                     accepted = [train.annotations["Accept"][k] for k in wave_ndx]
+#                     mPSC_fits = [train.annotations["mPSC_fit"][k] for k in wave_ndx]
+#                     
+#                     train.annotations["peak_time"] = peak_times
+#                     train.annotations["wave_name"] = wave_names
+#                     train.annotations["Accept"] = accepted
+#                     train.annotations["mPSC_fit"] = mPSC_fits
+#                     train.annotations["Aligned"] = True
+#                     
+#                     train.waveforms = aligned_waveforms.T
                     
-                    # peak times, wave names, accept, mPSC_fit
-                    metainfo = [(train.annotations["peak_times"][k],
-                                 train.annotations["wave_names"][k],
-                                 train.annotations["Accept"][k],
-                                 train.annotations["mPSC_fit"][k]) for k in wave_ndx]
-                    
-                    train.annotations["peak_times"] = metainfo[0]
-                    train.annotations["wave_names"] = metainfo[1]
-                    train.annotations["Accept"] = metainfo[2]
-                    train.annotations["mPSC_fit"] = metainfo[3]
-                    train.annotations["Aligned"] = True
-                    
-                    train.waveforms = aligned_waveforms.T
-                    
-        self._plot_data()
+        # self._plot_data()
                     
     def _make_aligned_waves_(self, train:neo.SpikeTrain, segment:typing.Optional[neo.Segment]=None, only_accepted:bool=True):
         """
@@ -1241,12 +1240,16 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return
         
         accepted = train.annotations.get("Accept", None)
+        # print(f"_make_aligned_waves_ accepted {accepted}")
+        
         if accepted is None:
             warnings.warn("No accept flags were found in the spike train", category=RuntimeWarning)
             self.errorMessage(self.windowTitle(), "No accept flags were found in the spike train")
             return
         
-        peak_times = train.annotations.get("peak_times", None)
+        peak_times = train.annotations.get("peak_time", None)
+        
+        # print(f"_make_aligned_waves_ peak_times {peak_times}")
         
         if peak_times is None:
             return
@@ -1263,6 +1266,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
         signal_origin = train.annotations.get("signal_origin", None)
         
+        # print(f"_make_aligned_waves_ signal_origin {signal_origin}")
+        
+        
         if signal_origin is None:
             warnings.warn("No signal origin found in the spike train", category=RuntimeWarning)
             self.errorMessage(self.windowTitle(), "No signal origin found in the spike train")
@@ -1270,12 +1276,21 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         
         sig_ndx = neoutils.get_index_of_named_signal(segment, signal_origin, silent=True)
         
-        if len(sig_ndx) == 0 or all(v is None for v in sig_ndx):
+        # print(f"_make_aligned_waves_ sig_ndx {sig_ndx}")
+        
+        if isinstance(sig_ndx, (tuple, list)):
+            if len(sig_ndx) == 0 or all(v is None for v in sig_ndx):
+                warnings.warn(f"No signal named {signal_origin} is found in data", category=RuntimeWarning)
+                self.errorMessage(self.windowTitle(), f"No signal named {signal_origin} is found in data")
+                return
+        
+            sig_ndx = sig_ndx[0]
+            
+        elif not isinstance(sig_ndx, int):
             warnings.warn(f"No signal named {signal_origin} is found in data", category=RuntimeWarning)
             self.errorMessage(self.windowTitle(), f"No signal named {signal_origin} is found in data")
             return
-        
-        sig_ndx = sig_ndx[0]
+    
         
         signal = segment.analogsignals[sig_ndx]
         
@@ -1296,10 +1311,10 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
         for kw, w in enumerate(waves):
             if accepted[kw]:
                 start_times.append(w.t_start)
-                peak_times.append(peak_times[kw])
+                peak_times.append(w.annotations["peak_time"])
                 onset.append(mPSC_fit[kw]["Coefficients"][2])
                 wave_index.append(kw)
-                sweep_index.append(k)
+                sweep_index.append(kw)
         
         if len(onset):
             maxOnset = max(onset) * start_times[0].units
@@ -1309,7 +1324,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             
             for kw, wave_ndx in enumerate(wave_index):
                 t0 = new_start_times[kw]
-                t1 = sop_times[kw]
+                t1 = stop_times[kw]
                 wave = signal.time_slice(t0,t1)
                 t_onset = t0+maxOnset
                 baseline = signal.time_slice(t0, t_onset)
@@ -1656,7 +1671,9 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 
             if isinstance(self._ephysViewer_, sv.SignalViewer):
                 self._ephysViewer_.removeTargetsOverlay(self._ephysViewer_.axes[self._signal_index_])
-        
+                
+            self._detected_mPSCs_.clear()
+            
     def _indicate_mPSC_(self, waveindex, frame_index:typing.Optional[int]=None):
         # print(f"_indicate_mPSC_ wave {waveindex} of {len(self._detected_mPSCs_)} waves")
         if not isinstance(self._ephysViewer_, sv.SignalViewer):
@@ -1686,7 +1703,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             if sig_index is None:
                 return
             
-            peak_times = train.annotations.get("peak_times", None)
+            peak_times = train.annotations.get("peak_time", None)
             if peak_times is None:
                 return
             
@@ -1698,7 +1715,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             if mPSC_fit is None:
                 return
             
-            wavesR2 = [fdict.get("Rsq", None) for fdict in mPSC_fit if fdict is not None]
+            wavesR2 = [fdict.get("Rsq", None) for fdict in mPSC_fit if isinstance(fdict, dict)]
             
             # NOTE: 2022-12-15 13:14:39
             # prevent plotting detection targets in the wrong axis
@@ -1886,130 +1903,6 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
             return segment.spiketrains  # a stl
         
         
-#         # NOTE: 2022-12-14 14:32:49
-#         # select the mPSC spike trains, discard everything else!
-#         #
-#         # below these can be either original mPSCs or aligned ones!
-#         trains = [s for s in segment.spiketrains if s.annotations.get("source", None) == "PSC_detection"]
-#         
-#         # NOTE: 2022-12-14 08:34:51
-#         # as of now, there can be more than one spike train of mPSCs if the signal
-#         # was multi-channel and mPSCs were detected in each channel !
-        
-#         if len(trains) > 0 and len(trains) != len(segment.spiketrains):
-#             # there are other spike trains too
-#             # print(len(trains))
-#             mPSCtrains = neo.core.spiketrainlist.SpikeTrainList(items=trains,
-#                                                                 segment=segment)
-#             mPSCtrain = mPSCtrains[0]
-#             peak_times = mPSCtrain.annotations.get("peak_times", list())
-#             accepted = mPSCtrain.annotations.get("Accept", list())
-#             template = mPSCtrain.annotations.get("Template", list())
-#             
-#             if len(peak_times) == 0: # invalid data, so discard everything
-#                 return
-#             
-#             signal_units = mPSCtrain.annotations.get("signal_units", None)
-#             
-#             if signal_units is None: # invalid data, so discard everything
-#                 return
-#             
-#             psc_params = mPSCtrain.annotations.get("PSC_parameters", None)
-#             psc_fits = mPSCtrain.annotations.get("mPSC_fit", [])
-#             
-#             signal_origin =  mPSCtrain.annotations.get("signal_origin", None)
-#             segment_origin = mPSCtrain.annotations.get("segment_origin", None)
-#             data_origin = mPSCtrain.annotations.get("data_origin", None)
-#             
-#             
-#             if len(mPSCtrains)> 1:
-#                 for s in mPSCtrains[1:]:
-#                     ptimes = s.annotations.get("peak_times", list())
-#                     if len(ptimes) == 0:
-#                         return
-#                     su = s.annotations.get("signal_units", None)
-#                     if su is None or su != signal_units:
-#                         return
-#                     
-#                     peak_times.extend(ptimes)
-#                     accpt = s.annotations.get("Accept", list())
-#                     accepted.extend(accpt)
-#                     tmpl = s.annotations.get("Template", list())
-#                     template.extend(tmpl)
-#                     
-#                     
-#                 # NOTE:2022-11-22 12:48:54
-#                 # collapse (merge) all mPSC spike trains in one, 
-#                 # replace them with the merged result
-#                 # WARNING there is no checking for duplicate time stamps !!!
-#                 # FIXME 2022-12-14 16:10:08
-#                 # revisit this in light if the recent changes where we CAN have
-#                 # more than one spike train per list (i.e., one train per signal channel)
-#                 # see NOTE: 2022-12-14 08:34:51
-#                 mPSCtrain = mPSCtrain.merge(mPSCtrains[1:])
-#                 mPSCtrain.annotations["source"] = "PSC_detection"
-#                 mPSCtrain.annotations["peak_times"] = peak_times
-#                 mPSCtrain.annotations["signal_units"] = signal_units
-#                 mPSCtrain.annotations["Accept"] = accepted
-#                 mPSCtrain.annotations["Template"] = template
-#                 mPSCtrain.annotations["signal_origin"] = signal_origin
-#                 mPSCtrain.annotations["segment_origin"] = segment_origin
-#                 mPSCtrain.annotations["data_origin"] = data_origin
-#                 mPSCtrain.annotations["PSC_parameters"] = psc_params # may be None !
-#                 mPSCtrain.annotations["mPSC_fit"] = psc_fits # a list, which may be empty
-#                 
-#                 for t in mPSCtrains[1:]:
-#                     neoutils.remove_spiketrain(segment, t.name)
-#                     
-#             waves = mPSCtrain.waveforms
-#             
-#             # print(waves.shape)
-#             signal_units = mPSCtrain.annotations.get("signal_units", pq.pA)
-#             mini_waves = list()
-#             if waves.size > 0:
-#                 for k in range(waves.shape[0]): # spike #
-#                     wave = neo.AnalogSignal(waves[k,:,:].T,
-#                                             t_start = mPSCtrain[k],
-#                                             units = signal_units,
-#                                             sampling_rate = mPSCtrain.sampling_rate)
-#                     
-#                     wave.annotations["amplitude"] = sigp.waveform_amplitude(wave[:,0])
-#                     
-#                     if len(accepted) == waves.shape[0]:
-#                         wave.annotations["Accept"] = accepted[k]
-#                     else:
-#                         wave.annotations["Accept"] = True
-#                         
-#                     # assign a peak time to each wave; if not present in 
-#                     # the minis train, calculate it NOW
-#                     if len(peak_times) == waves.shape[0]:
-#                         wave.annotations["t_peak"] = peak_times[k]
-#                     else:
-#                         if sigp.is_positive_waveform(wave):
-#                             peakfunc = np.argmax
-#                         else:
-#                             peakfunc = np.argmin
-#                         p_time = wave.times[peakfunc(wave[:.0])]
-#                         
-#                         wave.annotations["t_peak"] = p_time
-#                         
-#                     if len(psc_fits) == waves.shape[0]:
-#                         wave.annotations["mPSC_fit"] = psc_fits[k]
-#                         
-#                     mini_waves.append(wave)
-#                 
-#                 # if peak times not present in trhe minis train, add them
-#                 # NOW
-#                 if len(peak_times) == len(mini_waves):
-#                     peak_times = [w.annotations["t_peak"] for w in mini_waves]
-#                     mPSCtrain.annotations["peak_times"] = peak_times
-#                     
-#                 
-#             return (mPSCtrain, mini_waves)
-#             
-#         else:
-#             return None
-#                 
     def _get_selected_signal_(self, segment):
         index = self.signalNameComboBox.currentIndex()
         if index in range(len(segment.analogsignals)):
@@ -2359,7 +2252,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                         continue
                     
                     for t in st_:
-                        wave_names.extend(t.annotations["wave_names"])
+                        wave_names.extend(t.annotations["wave_name"])
                         accept.extend(t.annotations["Accept"])
                         fits.extend(t.annotations["mPSC_fit"])
                         
@@ -2379,7 +2272,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                         
                     st.segment = segment
                     
-                    pt = np.concatenate([t.annotations["peak_times"].magnitude for t in st_], axis=0) * st_[0].units
+                    pt = np.concatenate([t.annotations["peak_time"].magnitude for t in st_], axis=0) * st_[0].units
                     if len(θ_) > 1:
                         θ = neoutils.splice_signals(*θ_, signal.times)
                         θ.name = "mPSCs"
@@ -2411,8 +2304,8 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                         chid = kc
                         
                     st.annotate(
-                                peak_times = pt, 
-                                wave_names = wave_names,
+                                peak_time = pt, 
+                                wave_name = wave_names,
                                 waveform=template,
                                 mPSC_fit = fits,
                                 θ = θ,
@@ -4449,7 +4342,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                 psc_trains.append(st)
                 
         for st in psc_trains:
-            # print(st.size, st.annotations["peak_times"].size)
+            # print(st.size, st.annotations["peak_time"].size)
             st_waves = neoutils.extract_waves(st, st.annotations["signal_units"], prefix=st.annotations["signal_origin"])
             valid_waves = list()
             for k, t in enumerate(st):
@@ -4466,7 +4359,7 @@ class MPSCAnalysis(ScipyenFrameViewer, __Ui_mPSDDetectWindow__):
                     wave_index.append(k)
                     start_time.append(float(t))
                     channel_id.append(st.annotations["channel_id"])
-                    peak_time.append(float(st.annotations["peak_times"][k]))
+                    peak_time.append(float(st.annotations["peak_time"][k]))
                     amplitude.append(float(st.annotations["amplitude"][k]))
                     from_template.append(st.annotations["mPSC_fit"][k]["template"])
                     fit_amplitude.append(float(st.annotations["mPSC_fit"][k]["amplitude"]))
