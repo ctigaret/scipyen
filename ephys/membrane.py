@@ -6435,6 +6435,9 @@ def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform
             
     if len(ret):
         result = neo.core.spiketrainlist.SpikeTrainList(items = ret, segment=x.segment)
+        for st in result:
+            st.segment = x.segment
+            
         if outputDetection:
             return result, theta_sigs
         else:
@@ -6635,6 +6638,14 @@ def slide_detect(x:np.ndarray, h:np.ndarray, padding:bool=True, data_cache = Non
     
 def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, threshold, peakfunc):
     """
+    FIXME: 2022-12-18 23:11:33
+    For single channel waveforms, their array annotations all have a single element.
+    Fitted waveforms have two channels (0: recorded waveform , 1: fitted waveform)
+    which means their array annotation keys each have two elements.
+    
+    This is a problem when collecting these array annotations later, to attach to
+    the spike train, because array annotations can only be 1D!
+    
     Extracts detected mPSC waveforms.
     
     Waveforms are detected by comparing the θ signal (containing a detection
@@ -6691,8 +6702,6 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
         elif peak_begins[-1] > peak_ends[-1]:
             peak_ends = peak_ends[0:-1]
             
-    
-            
     # print(f"peak begin, end: {[v for v in zip(peak_begins, peak_ends)]}")
         
     θmaxima = [np.argmax(θ[v[0]:v[1]]) + v[0] for v in zip(peak_begins, peak_ends) if len(θ[v[0]:v[1]]) > 0]
@@ -6705,8 +6714,8 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
     # remove past-the-end intervals
     intervals = [(t0,t1) for (t0,t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
     
-    # generate new startsafter removal of past-the-end
-    starts = [interval[0] for interval in intervals]
+    # generate new starts after removal of past-the-end
+    starts = np.array([interval[0] for interval in intervals])
     # ends = starts + duration
     
     # for ke, me in enumerate(mini_ends):
@@ -6733,11 +6742,65 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
         m.name = f"{chname}{km}"
         m.array_annotate(**x.array_annotations)
     
+    # NOTE: 2022-12-17 22:08:57 array_annotating a SpikeTrain:
+    # Normally, neo.DataObject take array annotations with as many elements per
+    # key as the sie on the last axis (highest dimension).
+    # For AnalogSignal and such, this is also the number of channels (2nd dimension
+    # of the underlying data array, where one channel is a column vector).
+    #
+    # Therefore, the API dealing with array_annotations checks for the annotation
+    # length against the size of the DataObject's data array on its last axis
+    # (i.e., shape[-1]).
+    #
+    # However, for a SpikeTrain, things are different: the "data" array in a 
+    # SpikeTrain is, BY DEFINITION, a 1D array (with shape (N,)). This means 
+    # that for a SpikeTrain array.shape[-1] is the same as array.shape[0] !!!
+    # If this is what the neo authors have intended (this is not explicit in 
+    # the documentation) then the justification seems to be that the array
+    # annotations of a SpikeTrain are intended to provide data related to
+    # each individual spike in the SpikeTrain. This is perfectly justifiable
+    # given that the spike waveform data is only stored as a plain numpy array, 
+    # and not as a signal, in the SpikeTrain (so that any of the array annotations
+    # associated with the original signal from where the spikes were taken are 
+    # lost). 
+    # This is unlike the array annotations for, say, an AnalogSignal, where they 
+    # provide information related to each individual channel, and NOT to individual
+    # data points (the latter being practically penalizing in terms of resources
+    # and not very useful anyway).
     ret = neo.SpikeTrain(starts, t_start = x.t_start, units = x.times.units,
                          t_stop = x.times[-1], sampling_rate = x.sampling_rate,
                          name="mPSCs")
     
+    # NOTE: 2022-12-17 22:22:41 
+    # Although it would have been easier (and perhaps faster) to call directly
+    # np.concatenate on the wave's magnitude, as in the next line,
+    # mPSCtrain_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
+    # we would be losing the array annotations (see NOTE: 2022-12-17 22:08:57);
+    # therefore it would be better to merge signals one by one.
+    #
+    # However, this aproach has two shortcomings:
+    # 1) in order to merge them, minis must have the same t_start (which, of
+    # of course, they have not). We could set their time starts to 0, being
+    # mindful that the TRUE start time is stored in the SpikeTrain, and their
+    # peak time has already been collected above
+    #
+    # 2) The merged signal would efectively be a 2D array, whereas the 
+    # the waveforms of the SpikeTrain need to be a 3D array. Taking the magnitude 
+    # of the merged minis and adding add a new axis would NOT solve this because
+    # the new axis would be a singleton (i.e., all minis in the merged object
+    # would be treated as channels of a same signal, and NOT as separate waveform
+    # signals).
+    #
+    # Therefore the best approach is to np.concatenate as above, but to also
+    # merge their array annotations separately
+    #
+    # CAUTION: Here we deall with unfitted minis (i.e. single-channel waveforms)
+    # After fitting, these will have two channels (0: original data; 1: the fitted
+    # waveform; but the fitted channel is ignored after fitting)
     mPSCtrain_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
+    minis_arr_ann = minis[0].array_annotations
+    for mw in minis[1:]:
+        minis_arr_ann = neoutils.merge_array_annotations(minis_arr_ann, mw.array_annotations)
     ret.waveforms = mPSCtrain_waves.T
     # print(f"membrane.extract_minis: waves shape {mPSCtrain_waves.shape}, waveforms shape {ret.waveforms.shape}")
     ret.segment = x.segment
@@ -6752,6 +6815,11 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
                  datetime=datetime.datetime.now(),
                  Aligned = False,
                  )
+    ret.array_annotate(**minis_arr_ann)
+    ret.array_annotate(peak_time = mini_peaks)
+    ret.array_annotate(wave_name = [w.name for w in minis])
+    ret.array_annotate(accept = [w.annotations["Accept"] for w in minis])
+    # ret.array_annotate(mPSC_fit = [w.annotations.get("mPSC_fit", None) for w in minis]) # NOPE!
     
     return ret
 
@@ -6948,6 +7016,9 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
                 return
         
         result = neo.core.spiketrainlist.SpikeTrainList(items = ret, segment=x.segment)
+        for st in result:
+            st.segment = x.segment
+        
         if outputDetection:
             return result, thetas
         else:

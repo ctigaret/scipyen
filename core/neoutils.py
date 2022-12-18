@@ -300,16 +300,18 @@ def segment_start(data:neo.Segment):
         
 @singledispatch
 def set_relative_time_start(data, t = 0):
-    # TODO: dispatch for neo.ImageSequence; neo.Group; neo.ChannelView;
+    # TODO: dispatch for neo.ImageSequence; neo.Group; neo.ChannelView, SpikeTrainList
     raise NotImplementedError
 
 @set_relative_time_start.register(neo.Epoch)
 @set_relative_time_start.register(DataZone)
 def _(data, t = 0):
     if isinstance(t, pq.Quantity):
-        t.rescale(data.times.units) # will raise if unist wrong wrt signal's domin
+        t.rescale(data.times.units) # will raise if units are wrong wrt signal's domain
+        
     elif isinstance(t, numbers.Number):
         t = t * data.times.units
+        
     klass = data.__class__
     times = data.times - data.times[0] + t if len(data.times) else data.times
     ret = klass(times,
@@ -325,9 +327,11 @@ def _(data, t = 0):
 @set_relative_time_start.register(TriggerEvent)
 def _(data, t = 0):
     if isinstance(t, pq.Quantity):
-        t.rescale(data.times.units) # will raise if unist wrong wrt signal's domin
+        t.rescale(data.times.units) # will raise if units are wrong wrt signal's domain
+        
     elif isinstance(t, numbers.Number):
         t = t * data.times.units
+        
     times = data.times - data.times[0] + t if len(data.times) else data.times
     if isinstance(data, TriggerEvent):
         ret = TriggerEvent(times = times,
@@ -350,7 +354,8 @@ def _(data, t = 0):
 @set_relative_time_start.register(neo.SpikeTrain)
 def _(data, t = 0):
     if isinstance(t, pq.Quantity):
-        t.rescale(data.times.units) # will raise if unist wrong wrt signal's domin
+        t.rescale(data.times.units) # will raise if units wrong wrt signal's domain
+        
     elif isinstance(t, numbers.Number):
         t = t * data.times.units
     
@@ -374,22 +379,25 @@ def _(data, t = 0):
 @set_relative_time_start.register(DataSignal)
 def _(data, t = 0):
     if isinstance(t, pq.Quantity):
-        t.rescale(data.times.units) # will raise if unist wrong wrt signal's domin
+        t.rescale(data.times.units) # will raise if units are wrong wrt signal's domain
+        
     elif isinstance(t, numbers.Number):
         t = t * data.times.units
+        
     ret = make_neo_object(data, units = data.units,
                        t_start = t, sampling_rate = data.sampling_rate,
                        name=data.name)
-    # ret.times = ret.times - ret.times[0] + t
     return ret
 
 @set_relative_time_start.register(neo.IrregularlySampledSignal)
 @set_relative_time_start.register(IrregularlySampledDataSignal)
 def _(data, t = 0):
     if isinstance(t, pq.Quantity):
-        t.rescale(data.times.units) # will raise if unist wrong wrt signal's domin
+        t.rescale(data.times.units) # will raise if units are wrong wrt signal's domain
+        
     elif isinstance(t, numbers.Number):
         t = t * data.times.units
+        
     times = data.times - data_times + t if len(data.times) else data.times
     ret = make_neo_object(times, data)
     return ret
@@ -418,38 +426,8 @@ def _(data, t = 0):
     
     ret.spiketrains = SpikeTrainList(items = spiketrains)
     
-    # for signal in segment.analogsignals:
-    #     signal.t_start = t
-        
-#     try:
-#         # NOTE: 2022-11-23 22:39:24
-#         # we take this approach because the `times` attribute is read-only
-#         new_epochs = list()
-#         for epoch in segment.epochs:
-#             e = _set_epoch_time(epoch, t)
-#             new_epochs.append(e)
-#             
-#         segment.epochs[:] = new_epochs
-#             
-#         new_trains = list() # see NOTE: 2022-11-23 22:39:24 
-#         for spiketrain in segment.spiketrains:
-#             new_spiketrain = _set_train_time(spiektrain, t)
-#             new_trains.append(new_spiketrain)
-#                 
-#         segment.spiketrains = SpikeTrainList(items=new_trains)
-#             
-#         new_events = list() # NOTE: 2022-11-23 22:39:24
-#         for event in segment.events:
-#             new_event = _set_event_time(event, t)
-#             new_events.append(new_event)
-# 
-#         segment.events[:] = new_events
-#     
-#     except Exception as e:
-#         traceback.print_exc()
-    
 @set_relative_time_start.register(neo.Block)
-def _(data, t = 0 * pq.s):
+def _(data, t = 0):
     """Set the components in each segment to the same t_start.
     WARNING: Modifies data in-place only for signals, because the `times` 
     attribute is read-only for neo data objects, except analog signals and 
@@ -466,177 +444,12 @@ def _(data, t = 0 * pq.s):
     ret = make_neo_object(data)
     ret.segments = [set_relative_time_start(s, t) for s in data.segments]
     return ret
+
+@set_relative_time_start.register(tuple)
+@set_relative_time_start.register(list)
+def _(data, t = 0):
+    return [set_relative_time_start(d, t) for d in data]
     
-#     from neo.core.spiketrainlist import SpikeTrainList
-#     
-#     def _set_epoch_time(e, t):
-#         if e.times.size > 0:
-#             new_times = e.times - e.times[0] + t
-#         else:
-#             new_times = e.times
-#             
-#         epoch_klass = e.__class__ # might be a DataZone
-#             
-#         new_epoch = epoch_klass(new_times,
-#                                 durations = e.durations,
-#                                 labels = e.labels,
-#                                 units = e.units,
-#                                 name=e.name)
-#         
-#         new_epoch.annotations.update(e.annotations)
-#         
-#         return new_epoch
-#     
-#     def _set_event_time(e, t):
-#         new_times = e.times - e.times[0] + t if e.times.size > 0 else e.times
-#         
-#         if isinstance(event, TriggerEvent):
-#             new_event = TriggerEvent(times = new_times,
-#                                         labels = e.labels,
-#                                         units = e.units,
-#                                         name = e.name,
-#                                         description = e.description,
-#                                         event_type = e.event_type)
-#         else:
-#             new_event = neo.Event(times = new_times,
-#                                     labels = e.labels,
-#                                     units = e.units,
-#                                     name=e.name,
-#                                     description=e.description)
-#             
-#         new_event.annotations.update(e.annotations)
-#         
-#         return new_event
-#     
-#     def _set_train_time(spiketrain):
-#         if spiketrain.times.size > 0:
-#             new_times = spiketrain.times - spiketrain.times[0] + t
-#             
-#         else:
-#             new_times = spiketrain.times
-#             
-#         new_spiketrain = neo.SpikeTrain(new_times, 
-#                                         t_start = spiketrain.t_start - spiketrain.times[0] + t,
-#                                         t_stop = spiketrain.t_stop - spiketrain.times[0] + t,
-#                                         units = spiketrain.units,
-#                                         waveforms = spiketrain.waveforms,
-#                                         sampling_rate = spiketrain.sampling_rate,
-#                                         name=spiketrain.name,
-#                                         description=spiketrain.description)
-#         
-#         new_spiketrain.annotations.update(spiketrain.annotations)
-#         
-#         return new_spiketrain
-#     
-#     if isinstance(data, neo.Block):
-#         for segment in data.segments:
-#             for isig in segment.irregularlysampledsignals:
-#                 isig.times = isig.times-segment.analogsignals[0].t_start + t
-# 
-#             for signal in segment.analogsignals:
-#                 signal.t_start = t
-#                 
-#             try:
-#                 # NOTE: 2022-11-23 22:39:24
-#                 # we take this approach because the `times` attribute is read-only
-#                 new_epochs = list()
-#                 for epoch in segment.epochs:
-#                     e = _set_epoch_time(epoch, t)
-#                     new_epochs.append(e)
-#                     
-#                 segment.epochs[:] = new_epochs
-#                     
-#                 new_trains = list() # see NOTE: 2022-11-23 22:39:24 
-#                 for spiketrain in segment.spiketrains:
-#                     new_spiketrain = _set_train_time(spiektrain, t)
-#                     new_trains.append(new_spiketrain)
-#                         
-#                 segment.spiketrains = SpikeTrainList(items=new_trains)
-#                     
-#                 new_events = list() # NOTE: 2022-11-23 22:39:24
-#                 for event in segment.events:
-#                     new_event = _set_event_time(event, t)
-#                     new_events.append(new_event)
-# 
-#                 segment.events[:] = new_events
-#             
-#             except Exception as e:
-#                 traceback.print_exc()
-#                 
-#     elif isinstance(data, (tuple, list)):
-#         if all([isinstance(x, neo.Segment) for x in data]):
-#             for s in data:
-#                 for isig in s.irregularlysampledsignals:
-#                     isig.times = isig.times-segment.analogsignals[0].t_start + t
-#                     
-#                 for signal in s.analogsignals:
-#                     signal.t_start = t
-#                     
-#                 new_epochs = list() # see NOTE: 2022-11-23 22:39:24
-#                 for epoch in s.epochs:
-#                     new_epoch = _set_epoch_time(epoch, s)
-#                     new_epochs.append(new_epoch)
-#                 s.epochs[:] = new_epochs
-#                 
-#                 new_trains = list() # see NOTE: 2022-11-23 22:39:24 
-#                 for spiketrain in s.spiketrains:
-#                     new_spiketrain = _set_train_time(spiketrain, t)
-#                     new_trains.append(spiketrain)
-#                         
-#                 s.spiketrains = SpikeTrainList(items=new_trains)
-#                     
-#                 new_events = list() # NOTE: 2022-11-23 22:39:24
-#                 for event in s.events:
-#                     new_event = _set_event_time(event, t)
-#                     new_events.append(new_event)
-#                 s.events[:] = new_events
-#                 
-#         elif all([isinstance(x, (neo.AnalogSignal, DataSignal)) for x in data]):
-#             for s in data:
-#                 s.t_start = t
-#                 
-#         elif all([isinstance(x, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal))]):
-#             for s in data:
-#                 s.times = s.times - s.times[0] + t
-#                 
-#         elif all([isinstance(x, (neo.SpikeTrain, neo.Event, neo.Epoch))]):
-#             for s in data:
-#                 s.times = s.times - s.times[0] + t
-#                     
-#                 
-#     elif isinstance(data, neo.Segment):
-#         for isig in data.irregularlysampledsignals:
-#             isig.times = isig.times-data.analogsignals[0].t_start + t
-#             
-#         for signal in data.analogsignals:
-#             signal.t_start = t
-#             
-#         new_epochs = [_set_epoch_time(e, t) for e in data.epochs]
-#         data.epochs[:] = new_epochs
-# 
-#         new_trains = [_set_train_time(s,t) for s in data.spiketrains]
-#         data.spiketrains = SpikeTrainList(items = new_trains)
-#             
-#         new_events = [_set_event_time(e, t) for e in data.events]
-#         data,events[:] = new_events
-#                 
-#     elif isinstance(data, (neo.AnalogSignal, DataSignal)):
-#         data.t_start = t
-#         
-#     elif isinstance(data, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
-#         data.times = data.times - data.times[0] + t
-#         
-#     elif isinstance(data, (neo.SpikeTrain, neo.Event, neo.Epoch)):
-#         # FIXME: use single dispatch
-#         data.times = data.times = data.times[0] + t
-#         
-#     else:
-#         raise TypeError("Expecting a neo.Block, neo.Segment, neo.AnalogSignal or datatypes.DataSignal; got %s instead" % type(data).__name__)
-#         
-#         
-#     return data
-
-
 def merge_array_annotations(a0:ArrayDict, a1:ArrayDict):
     if not all(isinstance(a, (ArrayDict, dict)) for a in (a0,a1)):
         raise TypeError("Expecting two neo.core.dataobject.ArrayDict objects")
@@ -4906,11 +4719,19 @@ def extract_waves(x:neo.SpikeTrain, waveunits:pq.Quantity, **kwargs):
                                     sampling_rate=x.sampling_rate,
                                     name = f"{prefix}_{k}")
             wave.segment = x.segment
+            
             if len(annotations):
                 annt = dict((key, val[k]) for (key, val) in annotations.items())
                 wave.annotate(**annt)
+                
+            wave.annotate(spiketrain = x)
             
-            # print(f"neoutils.extract_waves k {k}: t_start{t_start}, w.shape {w.shape}, wave.shape {wave.shape}")
+            for key, val in x.array_annotations.items():
+                if wave.shape[1] == 1:
+                    arr_ann = {key:val[k]}
+                else:
+                    arr_ann = {key:[val[k] for s in range(wave.shape[1])]}
+                wave.array_annotate(**arr_ann)
             
             waves.append(wave)
                                   
