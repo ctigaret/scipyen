@@ -2836,13 +2836,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.displayFrame()
         
-        # if self._data_var_name_ is not None and self._data_var_name_ in self._scipyenWindow_.workspace.keys():
-        #     self.setData(self._scipyenWindow_.workspace[self._data_var_name_], self._data_var_name_)
-            
-        # if self.yData in self._scipyenWindow_.workspace.values():
-        #     self.setData(self._scipyenWindow_.workspace[self._data_var_name_], self._data_var_name_)
-            
-
     def _hasCursor_(self, crsID): #  syntactic sugar
         if len(self._data_cursors_) == 0:
             return False
@@ -6687,9 +6680,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(plotLabelText, str) and len(plotLabelText.strip()):
             self.plotTitleLabel.setText(plotLabelText, color = "#000000")
             
+        if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
+            self.docTitle = trains.name
+        
     @safeWrapper
     def _plotEvents_(self, events: typing.Optional[typing.Union[neo.Event, DataMark, typing.Sequence]] = None, clear: bool = True, from_cache: bool = False, plotLabelText=None, **kwargs):
-        
+        """Plot stand-alone events"""
         if events is None or clear:
             self._clear_lris_()
             #self._cached_events_.clear()
@@ -6713,6 +6709,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(plotLabelText, str) and len(plotLabelText.strip()):
             self.plotTitleLabel.setText(plotLabelText, color = "#000000")
 
+        if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
+            self.docTitle = "Events"
+        
     def _plot_epochs_seq_(self, *args, **kwargs):
         """Does the actual plotting of epoch data.
         Epochs is always a non-empty sequence (tuple or list) of neo.Epochs
@@ -6787,7 +6786,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
     @safeWrapper
     def _plotEpochs_(self, epochs: typing.Optional[typing.Union[neo.Epoch, DataZone, typing.Sequence]] = None, clear: bool = True, from_cache: bool = False, plotLabelText=None, **kwargs):
-        """Plots epochs.
+        """Plots stand-alone epochs.
         A neo.Epoch contains time intervals each defined by time and duration.
         Epoch intervals are drawn using pyqtgraph.LinearRegionItem objects.
         
@@ -6881,13 +6880,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if isinstance(e, (neo.Epoch, DataZone)):
                         epoch_seq.append(e)
                         
-                    # elif type(e).__name__ == "Epoch":
-                    #     epoch_seq.append(neo.Epoch(times=e.times,durations=e.durations,
-                    #                                labels=e.labels, name=e.name,
-                    #                                units=e.units, description=e.description,
-                    #                                file_origin=e.file_origin,
-                    #                                **e.annotations))
-            
         else:
             raise TypeError("Expecting a neo.Epoch or a Sequence of neo.Epoch objects; got %s instead" % type(epochs).__name__)
         
@@ -6909,6 +6901,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(plotLabelText, str) and len(plotLabelText.strip()):
             self.plotTitleLabel.setText(plotLabelText, color = "#000000")
             
+        if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
+            self.docTitle = "Epochs"
+        
     @safeWrapper
     def _plotSegment_(self, seg, *args, **kwargs):
         """Plots a neo.Segment.
@@ -7250,6 +7245,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             self.plotTitleLabel.setText(plotTitle, color = "#000000")
             
+        if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
+            self.docTitle = seg.name
+            
     @safeWrapper
     def _plotNumpyArrays_(self, x, y, plotLabelText = None, *args, **kwargs):
         """Plots several signals in one frame"""
@@ -7278,6 +7276,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.plotTitleLabel.setText(plotLabelText, color = "#000000")
         else:
             self.plotTitleLabel.setText("", color = "#000000")
+            
+        if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
+            self.docTitle = "Data arrays"
         
     @safeWrapper
     def _plotNumpyArray_(self, x, y, axis = None, plotLabelText = None, *args, **kwargs):
@@ -7390,6 +7391,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(plotLabelText, str) and len(plotLabelText.strip()):
             self.plotTitleLabel.setText(plotLabelText, color = "#000000")
         
+        if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
+            self.docTitle = "Data array"
+        
     @safeWrapper
     def _plotSignal_(self, signal, *args, **kwargs):
         """Plots individual signal objects.
@@ -7484,7 +7488,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             #                         *args, **kwargs)
                 
         self.plotTitleLabel.setText("", color = "#000000")
-        self.docTitle = signal_name
+        if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
+            self.docTitle = signal_name
             
     def _make_sig_plot_dict_(self, plotItem:pg.PlotItem, x:np.ndarray, y:np.ndarray, xlabel:(str, type(None))=None,  ylabel:(str, type(None))=None, title:(str, type(None))=None, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
         return {"plotItem":plotItem, 

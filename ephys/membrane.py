@@ -22,21 +22,19 @@ import matplotlib.pyplot as plt
 import scipy
 from scipy import optimize, cluster
 
-# TODO/FIXME 2019-07-29 13:08:29
-# -- move to pict.gui package
-#
-# NOTE: 2019-05-02 22:38:20
-# progress display in QtConsole seems broken
-try:
-    # NOTE: progressbar does not work on QtConsole
-    #from progressbar import ProgressBar, Percentage, Bar, ETA
-    
-    # and neither does this as it should !
-    from pyprog import ProgressBar
-    
-    
-except Exception as e:
-    ProgressBar = None
+# NOTE: 2019-05-02 22:38:20 
+# progress display in QtConsole seems broken - that is because QtConsole is NOT
+# a terminal like your usual shell console
+# try:
+#     # NOTE: progressbar does not work on QtConsole
+#     #from progressbar import ProgressBar, Percentage, Bar, ETA
+#     
+#     # and neither does this as it should !
+#     from pyprog import ProgressBar
+#     
+#     
+# except Exception as e:
+#     ProgressBar = None
 
 # NOTE: 2019-07-29 13:09:02 do I really need these 2 lines?
 from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
@@ -6638,14 +6636,6 @@ def slide_detect(x:np.ndarray, h:np.ndarray, padding:bool=True, data_cache = Non
     
 def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, threshold, peakfunc):
     """
-    FIXME: 2022-12-18 23:11:33
-    For single channel waveforms, their array annotations all have a single element.
-    Fitted waveforms have two channels (0: recorded waveform , 1: fitted waveform)
-    which means their array annotation keys each have two elements.
-    
-    This is a problem when collecting these array annotations later, to attach to
-    the spike train, because array annotations can only be 1D!
-    
     Extracts detected mPSC waveforms.
     
     Waveforms are detected by comparing the θ signal (containing a detection
@@ -6673,6 +6663,32 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
     ========
     A spike train, a sequence of neo signals with fitted copies of the waveforms
     and a sequence of neo signals containing aligned copies of the waveforms.
+    
+    CAUTION: 2022-12-18 23:11:33
+    This extracts single-channel waveforms, which will carry the array annotations
+    of the single-channel signal where the waveforms have been sliced from. 
+    
+    The waveforms are then concatenated into a 3D array stored as the `waveforms`
+    attribute of the resulting spike train, losing their array annotations.
+    
+    When these waveforms are individually fitted, they will be converted again
+    to individual analog signals waveforms which will be passed to the fitting
+    function. As a result, they will gain a second channel 
+    (channel 0 ↦ recorded waveform; channel 1 ↦ fitted waveform).
+
+    There is no point using array annotations with the individual waveforms for 
+    the following reasons:
+    1. the waveform analgsignals will lose their metainformation (array annotations
+    AND annotations) when embedded in the spike train
+    2. after fitting, the original array annotations of the waveform signals (if
+    present) will be incompatible with the shape of the new signals (which will
+    contain both the original data and the fit curve, as explained above)
+    
+    Here, the array_annotations of the SINGLE-CHANNEL waveforms are merged as 
+    array annotations in the spike train (where the keys are mapped to an 
+    array of scalars with as many elements as spikes). These
+    spike train array annotations are then used to carry the relevant metadata
+    per spike, further into the analysis function(s).
     
     """
     if not isinstance(x, (neo.AnalogSignal, DataSignal)):
@@ -6794,9 +6810,6 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
     # Therefore the best approach is to np.concatenate as above, but to also
     # merge their array annotations separately
     #
-    # CAUTION: Here we deall with unfitted minis (i.e. single-channel waveforms)
-    # After fitting, these will have two channels (0: original data; 1: the fitted
-    # waveform; but the fitted channel is ignored after fitting)
     mPSCtrain_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
     minis_arr_ann = minis[0].array_annotations
     for mw in minis[1:]:
@@ -6819,7 +6832,6 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
     ret.array_annotate(peak_time = mini_peaks)
     ret.array_annotate(wave_name = [w.name for w in minis])
     ret.array_annotate(accept = [w.annotations["Accept"] for w in minis])
-    # ret.array_annotate(mPSC_fit = [w.annotations.get("mPSC_fit", None) for w in minis]) # NOPE!
     
     return ret
 

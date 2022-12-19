@@ -1,8 +1,4 @@
 """ Various utilities for handling objects and data structures in the neo package.
-FIXME/TODO:: 2021-10-03 12:37:31 
-Unit and ChannelIndex are deprecated in neo
-Everything in here MUST reflect that!
-0.9.0 and removed in neo 0.10.0
 NOTE: 2020-10-07 09:45:08
 Code split and redistributed in core.neoutils, ephys.ephys and core.triggerprotocols
 
@@ -1701,7 +1697,7 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
             
             or the tuple (neo.AnalogSignal, datatypes.DataSignal)
             
-            TODO: or a tuple of types as above # TODO FIXME
+            TODO: or a tuple of types as above # TODO
             
     silent: boolean (optional, default is False): when True, the function returns
         'None' for each signal name not found; otherwise it will raise an exception
@@ -4726,12 +4722,15 @@ def extract_waves(x:neo.SpikeTrain, waveunits:pq.Quantity, **kwargs):
                 
             wave.annotate(spiketrain = x)
             
-            for key, val in x.array_annotations.items():
-                if wave.shape[1] == 1:
-                    arr_ann = {key:val[k]}
-                else:
-                    arr_ann = {key:[val[k] for s in range(wave.shape[1])]}
-                wave.array_annotate(**arr_ann)
+            # NOTE: 2022-12-19 08:43:47
+            # we do NOT array annnotate the waveforms here.
+            # This is because 
+            # for key, val in x.array_annotations.items():
+            #     if wave.shape[1] == 1:
+            #         arr_ann = {key:val[k]}
+            #     else:
+            #         arr_ann = {key:[val[k] for s in range(wave.shape[1])]}
+            #     wave.array_annotate(**arr_ann)
             
             waves.append(wave)
                                   
