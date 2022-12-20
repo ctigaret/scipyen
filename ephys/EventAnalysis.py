@@ -64,8 +64,8 @@ __Ui_EventDetectWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module
 
 class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     sig_AbortDetection = pyqtSignal(name="sig_AbortDetection")
-    # NOTE: this refers to the type of data where mPSC detection is done.
-    # The mPSC waveform viewer only expects neo.AnalogSignal
+    # NOTE: this refers to the type of data where event detection is done.
+    # The event waveform viewer only expects neo.AnalogSignal
     supported_types = (neo.Block, neo.Segment, type(None))
     
     _default_model_units_  = pq.pA
@@ -110,7 +110,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     
     _default_template_file = os.path.join(os.path.dirname(get_config_file()),"eventTemplate.h5" )
     
-    def __init__(self, ephysdata=None, clearOldPSCs=False, ephysViewer:typing.Optional[sv.SignalViewer]=None, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="mPSC Detect", **kwargs):
+    def __init__(self, ephysdata=None, clearOldPSCs=False, ephysViewer:typing.Optional[sv.SignalViewer]=None, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="Detect Events", **kwargs):
         # NOTE: 2022-11-05 14:54:24
         # by default, frameIndex is set to all available frames - KISS
         self._toolbars_locked_ = True
@@ -128,7 +128,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._all_waves_to_result_ = False
         
         # NOTE: 2022-11-20 11:36:08
-        # For each segment in data, if there are spike trains with mPSC time
+        # For each segment in data, if there are spike trains with event time
         # stamps, store them here - see membrane.batch_mPSC() for how such a 
         # spike train is identified
         # Here, each element in _undo_buffer_ is a possibly empty list of 
@@ -188,7 +188,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._detection_epochs_ = list()
         self._signal_index_ = 0
         
-        # the template file where a mPSC template is stored across sessions
+        # the template file where a event template is stored across sessions
         # this is located in the Scipyen's config directory
         # (on Linux, this file is in $HOME/.config/Scipyen, and its name can be
         # configured by triggering the appropriate action in the Settings menu)
@@ -207,47 +207,47 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._last_used_template_file_name = ""
         
         # NOTE: 2022-11-17 23:37:00 
-        # About mPSC template files
+        # About event template files
         # The logic is as follows:
-        # • by default at startup, the mPSC template is read from the custom 
+        # • by default at startup, the event template is read from the custom 
         #   template file, if it is accessible (NOTE: the template file is NOT
         #   actually read at __init__, but only when a detection is initiated,
         #   or when the waveform template is plotted)
         #
-        # • else the mPSC template is read from the default template file, if it
+        # • else the event template is read from the default template file, if it
         #   is accessible;
         #
-        # • else, there is no mPSC template for the session.
+        # • else, there is no event template for the session.
         #
         # When the user MAKES a new template, or IMPORTS one from workspace:
-        # • the mPSC template will be stored in the default template file (overwriting it)
-        #   ONLY IF the user chooses to do so by triggering the action "Set Default mPSC Template"
+        # • the event template will be stored in the default template file (overwriting it)
+        #   ONLY IF the user chooses to do so by triggering the action "Set Default event Template"
         #
-        # When the user OPENS (READS) an mPSC template from a file in the file system
+        # When the user OPENS (READS) an event template from a file in the file system
         # (other that the default template file):
         # • the name of THIS file is stored as the custom template file in the
         #   config
         #
-        # • the mPSC template will be stored in the default template file (overwriting it)
-        #   ONLY IF the user chooses to do so by triggering the action "Set Default mPSC Template"
+        # • the event template will be stored in the default template file (overwriting it)
+        #   ONLY IF the user chooses to do so by triggering the action "Set Default event Template"
         #
-        # When the user triggers "Forget mPSC template", then:
-        #   ∘ the mPSC template is cleared for the session and the template from
+        # When the user triggers "Forget event template", then:
+        #   ∘ the event template is cleared for the session and the template from
         #       the default template file is loaded (is available)
-        #   ∘ the custom mPSC template file name is removed from the config (i.e. is set to "")
-        #   ∘ at the next session only the default mPSC template may be available
+        #   ∘ the custom event template file name is removed from the config (i.e. is set to "")
+        #   ∘ at the next session only the default event template may be available
         #
-        # When the user triggers "Remove default mPSC template", then:
-        #   ∘ the default mPSC template file is removed
-        #   ∘ the mPSC template of the session (if it exists) exists and can be 
-        #       used until Forget mPSC template is also triggered
+        # When the user triggers "Remove default event template", then:
+        #   ∘ the default event template file is removed
+        #   ∘ the event template of the session (if it exists) exists and can be 
+        #       used until Forget event template is also triggered
         #
-        # When there is no mPSC template loaded in the session, AND Use mPSC template
+        # When there is no event template loaded in the session, AND Use event template
         # is checked, then the session will proceed as:
-        # • load mPSC template from the custom file, if present
-        # • else load mPSC template from the default file, if present
+        # • load event template from the custom file, if present
+        # • else load event template from the default file, if present
         # • else ask user to select a template from the workspace (if there is one)
-        #   NOTE: this is a single neo.AnalogSignal named "mPSC template" so it 
+        #   NOTE: this is a single neo.AnalogSignal named "event template" so it 
         #   would be easy to "fool" the app simply by renaming ANY neo.AnalogSignal
         #   in the workspace
         # • if no template is chosen form workspace (or there is None available)
@@ -256,14 +256,14 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         #   
         #   if no template has been loaded (either because user has cancelled the
         #   dialogs, or whatever was loaded from the file system does NOT appear
-        #   to be an mPSC template) then Use mPSC Template is automatically unckeched
+        #   to be an event template) then Use event Template is automatically unckeched
         #   
-        # When a mPSC detect action is triggered, AND Use mPSC template is checked
+        # When a event detect action is triggered, AND Use event template is checked
         #   proceed as above; if no templata has been loaded, then switch this 
         #   flag off and proceed with a synthetic waveform generated on the fly
         #
         #
-        # when the user opens a mPSC template from the file system, the name of 
+        # when the user opens a event template from the file system, the name of 
         # THAT file is stored in the configuration as custom template file
         
         # 
@@ -271,7 +271,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         # temporarily holds the file selected in _slot_editPreferences
         # self._cached_template_file_ =  self._default_template_file
         
-        # detected mPSC waveform(s) to validate
+        # detected event waveform(s) to validate
         # can be a single neo.AnalogSignal, or, usually, a sequence of
         # neo.AnalogSignal objects
         # NOTE: when detection was made in a collection of segments (e.g. a Block)
@@ -284,9 +284,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
           # 
         # NOTE: 2022-11-11 23:04:37
-        # the mPSC template is an average of selected waveforms, that have,
-        # typically, been detected using cros-correlation with a model mPSC
-        # The last mPSC template used is stored in a file (by default, located 
+        # the event template is an average of selected waveforms, that have,
+        # typically, been detected using cros-correlation with an event model waveform
+        # The last event template used is stored in a file (by default, located 
         # the Scipyen's config directory) so that it can be used across sessions
         # This file will be overwritten at the end of each session, so any new 
         # template will replace the old one. This is for convenience, so that
@@ -301,8 +301,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._event_template_ = None
         
         # NOTE: 2022-11-11 23:10:42
-        # the realization of the mPSC model according to the parameters in the 
-        # mPSC Model Groupbox
+        # the realization of the event model according to the parameters in the 
+        # event Model Groupbox
         # this serves as a cache for detecting events in a collection of segments
         # (and thus to avoid generating a new waveform for every segment)
         # HOWEVER, it is recommended to re-create this waveform from parameters
@@ -337,7 +337,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._params_initl_ = self._default_params_initl_
         self._params_lower_ = self._default_params_lower_
         self._params_upper_ = self._default_params_upper_
-        self._mPSCduration_ = self._default_duration_
+        self._event_duration_ = self._default_duration_
         self._detection_threshold_ = self._default_detection_threshold_
         
         # NOTE: 2022-11-10 09:22:35
@@ -367,8 +367,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             self._init_ephysViewer_()
             
         # NOTE: 2022-11-05 15:09:59
-        # will stay hidden until a waveform (either a mPSC model realisation or 
-        # a template mPSC) or a sequence of detetected minis becomes available
+        # will stay hidden until a waveform (either a event model realisation or 
+        # a template event) or a sequence of detetected minis becomes available
         self._waveFormViewer_ = sv.SignalViewer(win_title="Event waveform", 
                                                 parent=self, configTag="WaveformViewer")
         
@@ -529,7 +529,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._frames_spinBoxSlider_.setRange(0, self._number_of_frames_)
         self._frames_spinBoxSlider_.valueChanged.connect(self.slot_setFrameNumber) # slot inherited from ScipyenFrameViewer
         
-        self._mPSC_spinBoxSlider_.label = "mPSC:"
+        self._mPSC_spinBoxSlider_.label = "Event:"
         self._mPSC_spinBoxSlider_.setRange(0,0)
         self._mPSC_spinBoxSlider_.valueChanged.connect(self._slot_setWaveFormIndex)
         
@@ -537,7 +537,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.durationSpinBox.setSingleStep(10**(-self.paramsWidget.spinDecimals))
         self.durationSpinBox.units = pq.s
         self.durationSpinBox.setRange(0*pq.s, 0.1*pq.s)
-        self.durationSpinBox.setValue(self._mPSCduration_)
+        self.durationSpinBox.setValue(self._event_duration_)
         self.durationSpinBox.valueChanged.connect(self._slot_modelDurationChanged)
         
         self.displayedDetectionChannelSpinBox.valueChanged.connect(self._slot_displayedDetectionChannelChanged)
@@ -694,9 +694,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         sigblock = [QtCore.QSignalBlocker(w) for w in ww]
         
         # 1) assign values from config to paramsWidget
-        # p0 = self.mPSCParametersInitial
-        # l0 = self.mPSCParametersLowerBounds
-        # u0 = self.mPSCParametersUpperBounds
+        # p0 = self.eventModelParametersInitial
+        # l0 = self.eventModelParametersLowerBounds
+        # u0 = self.eventModelParametersUpperBounds
         # names, values = zip(*[(k,v) for k,v in p0.items()])
         # lower, upper = zip(*[(l0[k], u0[k]) for k in names])
 #         
@@ -717,7 +717,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         
         # 2) assign model duration from config
-        self.durationSpinBox.setValue(self._mPSCduration_)
+        self.durationSpinBox.setValue(self._event_duration_)
         
         # 3) set check boxes
         self.use_mPSCTemplate_CheckBox.setChecked(self._use_template_ == True)
@@ -883,7 +883,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             self._ephysViewer_.view(self._data_)
             
     def _generate_eventModelWaveform(self):
-        if self.mPSCDuration is pd.NA or (isinstance(self.mPSCDuration, pq.Quantity) and self.mPSCDuration.magnitude <= 0):
+        if self.eventDuration is pd.NA or (isinstance(self.eventDuration, pq.Quantity) and self.eventDuration.magnitude <= 0):
             return
         
         segment = self._get_data_segment_()
@@ -927,7 +927,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         init_params = tuple(float(p.magnitude) for p in model_params["Initial Value:"])
             
         self._event_model_waveform_ = membrane.PSCwaveform(init_params, 
-                                             duration=self.mPSCDuration,
+                                             duration=self.eventDuration,
                                              sampling_rate=sampling_rate)
         
     def _refresh_epochComboBox(self):
@@ -1048,7 +1048,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._params_initl_ = self._default_params_initl_
         self._params_lower_ = self._default_params_lower_
         self._params_upper_ = self._default_params_upper_
-        self._mPSCduration_ = self._default_duration_
+        self._event_duration_ = self._default_duration_
         
     @pyqtSlot()
     def _slot_Close(self):
@@ -1112,10 +1112,10 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     def alignWaves(self, detectionChannel:typing.Optional[int]=None, writeToData:bool=False):
         """
         Aligns all waveforms on their onset.
-        This requires that the mPSC waveforms have been fitted already.
+        This requires that the event waveforms have been fitted already.
         
         WARNING: Overwrites the spike train waveforms and modifies the spike
-        train mPSC metadata. There is NO undo.
+        train event metadata. There is NO undo.
         """
         if self._data_ is None:
             return
@@ -1137,14 +1137,14 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         # • readjust the start time such that there is the same delay between
         #   start time and the onset
         #
-        # • calculate stop time: start time + mPSC duration (from model parameters)
+        # • calculate stop time: start time + event duration (from model parameters)
         #
         # • use the new start time and the calculated stop time to get time 
         #   slices from each signal ⇒ store them in the list of aligned waves
         #
-        # • display the waves in the mPSC waveform viewer
+        # • display the waves in the event waveform viewer
         #
-        # • display their average in the mPSC model viewer
+        # • display their average in the event model viewer
         #
         # 
         
@@ -1196,13 +1196,13 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     
     def _make_aligned_waves_(self, train:neo.SpikeTrain, segment:typing.Optional[neo.Segment]=None, only_accepted:bool=True, write_back:bool=False):
         """
-        Aligns detected mPSC waveforms on the onset. 
+        Aligns detected event waveforms on the onset. 
         Optionally, only the accepted waveforms are used.
-        Useful in order to create a mPSC template waveform from their average.
+        Useful in order to create a event template waveform from their average.
         
         Parameters:
         ===========
-        train: the train with mPSC waveforms
+        train: the train with event waveforms
         
         segment: the train's segment, or a segment containing the signal where
             the waveforms are being extracted from.
@@ -1321,7 +1321,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             maxOnset = max(onset) * start_times[0].units
             onsetCorrection = [maxOnset - v * start_times[0].units for v in onset]
             new_start_times = [start_times[i] - onsetCorrection[i] for i in range(len(start_times))]
-            stop_times = [v + self._mPSCduration_ for v in new_start_times]
+            stop_times = [v + self._event_duration_ for v in new_start_times]
             
             for kw, wave_ndx in enumerate(wave_index):
                 t0 = new_start_times[kw]
@@ -1356,8 +1356,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         if len(self._aligned_waves_):
             # self._aligned_waves_[:] = waves
             self._event_template_ = ephys.average_signals(self._aligned_waves_)
-            self._event_template_.description = "Average mPSC Waveform"
-            self._event_template_.name ="mPSC Template"
+            self._event_template_.description = "Average Event Waveform"
+            self._event_template_.name ="Event Template"
             dataOriginName = self.metaDataWidget.value()["Name"]
             dateTime = datetime.datetime.now()
             dateTimeStr = dateTime.strftime("%d_%m_%Y_%H_%M_%S")
@@ -1365,7 +1365,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 if isinstance(self._data_, (tuple, list)) and all(isinstance(v, neo.Segment) for v in self._data_):
                     dataOriginName = f"List of segments {dateTimeStr}"
                 else:
-                    dataOriginName = f"Averaged mPSC template {dateTimeStr}"
+                    dataOriginName = f"Averaged Event template {dateTimeStr}"
             
             self._event_template_.annotations.update({"datetime":dateTime,
                                                         "data_origin":dataOriginName})
@@ -1376,9 +1376,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
             
     def _plot_model_(self):
-        """Plots mPSC model waveform"""
+        """Plots event model waveform"""
         if not isinstance(self._waveFormViewer_, sv.SignalViewer):
-            self._waveFormViewer_ = sv.SignalViewer(win_title="mPSC waveform", 
+            self._waveFormViewer_ = sv.SignalViewer(win_title="Event Waveform", 
                                                     parent=self, configTag="WaveformViewer")
             self._waveFormViewer_.sig_closeMe.connect(self._slot_waveFormViewer_closed)
             
@@ -1403,9 +1403,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 self._waveFormViewer_.view(waveform)
             
     def _plot_template_(self):
-        """Plots mPSC template"""
+        """Plots event template"""
         if not isinstance(self._waveFormViewer_, sv.SignalViewer):
-            self._waveFormViewer_ = sv.SignalViewer(win_title="mPSC waveform", 
+            self._waveFormViewer_ = sv.SignalViewer(win_title="Event Waveform", 
                                                     parent=self, configTag="WaveformViewer")
         
             self._waveFormViewer_.sig_closeMe.connect(self._slot_waveFormViewer_closed)
@@ -1750,7 +1750,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         if sig_index is None:
             return
         
-        #### BEGIN decorate the mPSC plot in the mPSC viewer - add a text showing
+        #### BEGIN decorate the event plot in the event viewer - add a text showing
         # whether the displayed wave is accepted, and its goodness of fit (R²)
         peak_time = current_wave.annotations["peak_time"]
         accepted = current_wave.annotations["Accept"]
@@ -1766,7 +1766,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         if waveR2 is not None:
             wavelabel = "%s R² = %.2f" % (acctext, waveR2)
                 
-        waxis = self._detected_Events_Viewer_.axis(0) # the axis in the mPSC viewer (always 0)
+        waxis = self._detected_Events_Viewer_.axis(0) # the axis in the event viewer (always 0)
         
         self._detected_Events_Viewer_.removeLabels(waxis)
         
@@ -1774,7 +1774,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         self._detected_Events_Viewer_.addLabel(wavelabel, 0, pos = (x0,y1), 
                                             color=(0,0,0), anchor=(0,1))
-        #### END decorate the mPSC plot in the mPSC viewer
+        #### END decorate the event plot in the event viewer
                 
         #### BEGIN decorate the signal plot in ephys viewer - targets indicate
         # the detected events and whether they are accepted or not
@@ -1925,7 +1925,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             targets.append(current_target)
         
         # store these in the cache, so we don't have to build with every frame 
-        # change in the mPSC viewer.
+        # change in the event viewer.
             
         #### END prepare indicator (target) for the currently shown wave 
         
@@ -2285,20 +2285,20 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._reportWindow_.show()
         
     def _detect_sweep_(self, segment_index:typing.Optional[int]=None, waveform=None, output_detection=False):
-        """ mPSC detection in a segment (a.k.a a sweep)
+        """ Event detection in a segment (a.k.a a sweep)
         
         Returns a tuple containing :
         • a spiketrain
-        • a list of detected mPSC waveforms,
+        • a list of detected event waveforms,
         
         If nothing was detected returns None.
         
         When detection was successful:
         • the spike train contains:
-            ∘ timestamps of the onset of the detected mPSC waves
-            ∘ associated mPSC waveform at the timestamp
+            ∘ timestamps of the onset of the detected event waves
+            ∘ associated event waveform at the timestamp
         
-        • the mPSC waveforms list contains the detected events.
+        • the event waveforms list contains the detected events.
         
             This one is for convenience, as the waveforms are also embedded in 
             the spike train described above. However, the embedded waveforms are 
@@ -2589,8 +2589,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         # refresh the template or waveform
         waveform = self._get_event_template_or_waveform_()
         if waveform is None:
-            self.criticalMessage("Detect mPSC in current sweep",
-                                 "No mPSC waveform or template is available")
+            self.criticalMessage("Detect events in current sweep",
+                                 "No event model waveform or template is available")
             return
         
         segment = self._get_data_segment_(index=self.currentFrame)
@@ -2630,7 +2630,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._undo_sweep(self.currentFrame)
         self._plot_data()
         
-    @pyqtSlot()
     def _slot_saveResults(self):
         results = self.result()
         if results is None:
@@ -2638,7 +2637,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         resultsDF, resultsTrains, resultsWaves = results
         
-        fn, fl = self.chooseFile("Save mPSC result table",
+        fn, fl = self.chooseFile("Save events result table",
                                  fileFilter = ";;".join(["Comma-separated values file (*.csv)","Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]),
                                  single=True,
                                  save=True)
@@ -3223,7 +3222,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
     @pyqtSlot()
     def _slot_makeUnitAmplitudeModel(self):
-        α, β, x0, τ1, τ2 = [float(v) for v in self.mPSCParametersInitial.values()]
+        α, β, x0, τ1, τ2 = [float(v) for v in self.eventModelParametersInitial.values()]
         
         β = models.get_CB_scale_for_unit_amplitude(β, τ1, τ2) # do NOT add x0 here because we only work on xx>=0
         
@@ -3231,8 +3230,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                        x0 * self._time_units_, 
                        τ1 * self._time_units_, τ2 * self._time_units_]
         
-        lb = [float(v) for v in self.mPSCParametersLowerBounds.values()]
-        ub = [float(v) for v in self.mPSCParametersUpperBounds.values()]
+        lb = [float(v) for v in self.eventModelParametersLowerBounds.values()]
+        ub = [float(v) for v in self.eventModelParametersUpperBounds.values()]
         
         sigBlock = QtCore.QSignalBlocker(self.paramsWidget)
         
@@ -3335,7 +3334,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         if not isinstance(self._event_template_, neo.AnalogSignal):
             return
         
-        self.exportDataToWorkspace(self._event_template_, var_name = "mPSC_template")
+        self.exportDataToWorkspace(self._event_template_, var_name = "Event_template")
             
     @pyqtSlot()
     def _slot_exportEphysData(self):
@@ -3616,17 +3615,17 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
     @pyqtSlot(float)
     def _slot_modelDurationChanged(self, value:float):
-        self.mPSCDuration = self.durationSpinBox.value()
+        self.eventDuration = self.durationSpinBox.value()
         self._plot_model_()
         
     @pyqtSlot(str ,str)
     def _slot_modelParameterChanged(self, row, column):
         if column == "Initial Value:":
-            self.mPSCParametersInitial      = self.paramsWidget.parameters["Initial Value:"]
+            self.eventModelParametersInitial      = self.paramsWidget.parameters["Initial Value:"]
         elif column == "Lower Bound:":
-            self.mPSCParametersLowerBounds  = self.paramsWidget.parameters["Lower Bound:"]
+            self.eventModelParametersLowerBounds  = self.paramsWidget.parameters["Lower Bound:"]
         elif column == "Upper Bound:":
-            self.mPSCParametersUpperBounds  = self.paramsWidget.parameters["Upper Bound:"]
+            self.eventModelParametersUpperBounds  = self.paramsWidget.parameters["Upper Bound:"]
             
         self._plot_model_()
         
@@ -4100,28 +4099,28 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             self.detectionThresholdSpinBox.setValue(self._detection_threshold_)
 
     @property
-    def mPSCDuration(self):
-        return self._mPSCduration_
+    def eventDuration(self):
+        return self._event_duration_
     
-    @markConfigurable("mPSC_Duration", trait_notifier=True)
-    @mPSCDuration.setter
-    def mPSCDuration(self, value):
-        # print(f"{self.__class__.__name__} @mPSCDuration.setter value: {value}")
-        self._mPSCduration_ = value
-        # self.configurable_traits["mPSC_Duration"] = self._mPSCduration_
+    @markConfigurable("Event_Duration", trait_notifier=True)
+    @eventDuration.setter
+    def eventDuration(self, value):
+        # print(f"{self.__class__.__name__} @eventDuration.setter value: {value}")
+        self._event_duration_ = value
+        # self.configurable_traits["Event_Duration"] = self._event_duration_
 
     @property
-    def mPSCParametersInitial(self):
+    def eventModelParametersInitial(self):
         """Initial parameter values
         """
         return dict(zip(self._params_names_, self._params_initl_))
     
     # NOTE: 2022-11-28 16:40:23
-    # Bypass default traut_nptofoer, since confuse / yaml cannot cope with a pandas Series
-    @markConfigurable("mPSCParametersInitial") # , trait_notifier=True) bypass default mechanism!
-    @mPSCParametersInitial.setter
-    def mPSCParametersInitial(self, value:typing.Union[pd.Series, tuple, list, dict]):
-        # print(f"{self.__class__.__name__} @mPSCParametersInitial.setter value: {value}")
+    # Bypass default trait notifier, since confuse / yaml cannot cope with a pandas Series
+    @markConfigurable("EventModelParametersInitial") # , trait_notifier=True) bypass default mechanism!
+    @eventModelParametersInitial.setter
+    def eventModelParametersInitial(self, value:typing.Union[pd.Series, tuple, list, dict]):
+        # print(f"{self.__class__.__name__} @eventModelParametersInitial.setter value: {value}")
         if isinstance(value, (pd.Series, tuple, list, dict)):
             if len(value) != len(self._default_params_initl_):
                 value = self._default_params_initl_
@@ -4151,17 +4150,17 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         else:
             raise TypeError(f"Expecting a sequence of scalar quantities (or their str representations) for initial values; instead, got {type(value).__name__}:\n {value}")
 
-        self.configurable_traits["mPSCParametersInitial"] = dict(zip(self._params_names_, self._params_initl_))
+        self.configurable_traits["eventModelParametersInitial"] = dict(zip(self._params_names_, self._params_initl_))
         # if isinstance(getattr(self, "configurable_traits", None), DataBag):
                 
     @property
-    def mPSCParametersLowerBounds(self):
+    def eventModelParametersLowerBounds(self):
         return dict(zip(self._params_names_, self._params_lower_))
     
-    @markConfigurable("mPSCParametersLowerBounds")# , trait_notifier=True) see NOTE: 2022-11-28 16:40:23
-    @mPSCParametersLowerBounds.setter
-    def mPSCParametersLowerBounds(self, value:typing.Union[pd.Series, tuple, list, dict]):
-        # print(f"{self.__class__.__name__} @mPSCParametersLowerBounds.setter value: {value}")
+    @markConfigurable("EventModelParametersLowerBounds")# , trait_notifier=True) see NOTE: 2022-11-28 16:40:23
+    @eventModelParametersLowerBounds.setter
+    def eventModelParametersLowerBounds(self, value:typing.Union[pd.Series, tuple, list, dict]):
+        # print(f"{self.__class__.__name__} @eventModelParametersLowerBounds.setter value: {value}")
         if isinstance(value, (pd.Series, tuple, list, dict)):
             if len(value) not in (1, len(self._default_params_initl_)):
                 value = self._default_params_lower_
@@ -4192,16 +4191,16 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         else:
             raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the lower bounds; instead, got {type(value).__name__}:\n {value}")
                 
-        self.configurable_traits["mPSCParametersLowerBounds"] = dict(zip(self._params_names_, self._params_lower_))
+        self.configurable_traits["eventModelParametersLowerBounds"] = dict(zip(self._params_names_, self._params_lower_))
                 
     @property
-    def mPSCParametersUpperBounds(self):
+    def eventModelParametersUpperBounds(self):
         return dict(zip(self._params_names_, self._params_upper_))
     
-    @markConfigurable("mPSCParametersUpperBounds") # , trait_notifier=True) see NOTE: 2022-11-28 16:40:23
-    @mPSCParametersUpperBounds.setter
-    def mPSCParametersUpperBounds(self, value:typing.Union[pd.Series, tuple, list, dict]):
-        # print(f"{self.__class__.__name__} @mPSCParametersUpperBounds.setter value: {value}")
+    @markConfigurable("EventModelParametersUpperBounds") # , trait_notifier=True) see NOTE: 2022-11-28 16:40:23
+    @eventModelParametersUpperBounds.setter
+    def eventModelParametersUpperBounds(self, value:typing.Union[pd.Series, tuple, list, dict]):
+        # print(f"{self.__class__.__name__} @eventModelParametersUpperBounds.setter value: {value}")
         if isinstance(value, (pd.Series, tuple, list, dict)):
             if len(value) not in (1, len(self._default_params_initl_)):
                 value = self._default_params_upper_
@@ -4231,7 +4230,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         else:
             raise TypeError(f"Expecting a sequence of scalar quantities, str representations of scalar quantiities, or one of None, math.nan, np.nan, for the upper bounds; instead, got {type(value).__name__}:\n {value}")
                 
-        self.configurable_traits["mPSCParametersUpperBounds"] = dict(zip(self._params_names_, self._params_upper_))
+        self.configurable_traits["eventModelParametersUpperBounds"] = dict(zip(self._params_names_, self._params_upper_))
                 
     @property
     def filterType(self):
@@ -4277,7 +4276,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         return self._get_event_template_or_waveform_(use_template = False)
     
     def templateWave(self):
-        if isinstance(self._event_template_, neo.AnalogSignal) and self._event_template_.name == "mPSC Template":
+        if isinstance(self._event_template_, neo.AnalogSignal) and self._event_template_.name == "Event Template":
             return self._event_template_
         
     def _deHum(self, sig, fs):
@@ -4394,33 +4393,33 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         Returns a tuple with three elements:
         
-        • mPSC table (a pandas.DataFrame object)
+        • Events table (a pandas.DataFrame object)
             This contains the start time, peak time, fitted parameters and R² 
-            goodness of fit for ALL detected mPSC waveforms in the data regardless
+            goodness of fit for ALL detected event waveforms in the data regardless
             of whether they have been manually accepted or not (their accepted 
             status is indicated in the "Accept" column of the DataFrame object).
         
             The columns of the DataFrame object are:
         
            "Source", "Cell", "Field", "Age", "Sex", "Genotype" → with the values
-                shown inthe top half of the mPSC Detect window
+                shown inthe top half of the event Detect window
         
             "Data": the name of the electrophysiology record used for detection
             "Date Time": date & time of detection
             "Accept": value of the Accept flag
-            "Sweep": index of the sweep (data segment) where the mPSC wave was 
+            "Sweep": index of the sweep (data segment) where the event wave was 
                     detected
-            "Wave": index of the mPSC wave in the list of events in the sweep
+            "Wave": index of the event wave in the list of events in the sweep
                     (see above)
-            "Start Time": start time of the mPSC waveform including its initial
+            "Start Time": start time of the event waveform including its initial
                 baseline; these are NOT the times of the onset of the rising
                 phase. The latter cann be calculated as start time + onset (see 
                 below).
         
-            "Peak Time": time of the mPSC peak (for outward currents) or trough
+            "Peak Time": time of the event peak (for outward currents) or trough
                         (for inward currents)
-            "Amplitude": amplitude of the mPSC waveform,
-            "Template": whether a template mPSC was used in detection
+            "Amplitude": amplitude of the event waveform,
+            "Template": whether a template event was used in detection
             "Fit Amplitude": amplitue of the fitted curve
             "R²": goodnesss of fit
         
@@ -4432,15 +4431,15 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             "Decay Time (τ₂)": decay phase time constant
         
         
-        • mPSC spiketrains (a list of neo.SpikeTrain objects), each containing
+        • event spiketrains (a list of neo.SpikeTrain objects), each containing
             the time stamps for the start of the events (one spike train per
             sweep of recording). The 'annotations' attributes of the spike train
-            contains the peak times of the mPSC waves (as an array), and the
-            'waveforms' attribute contains the actual detected mPSC waveforms.
+            contains the peak times of the event waves (as an array), and the
+            'waveforms' attribute contains the actual detected event waveforms.
         
-        • the detected mPSC waveforms (a list of one neo.AnalogSignal object 
+        • the detected event waveforms (a list of one neo.AnalogSignal object 
             
-            representing detected mPSC waveform, with the membrane current in channel 0 and
+            representing detected event waveform, with the membrane current in channel 0 and
             the fitted curve in channel 1)
         
         
