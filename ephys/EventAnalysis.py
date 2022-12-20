@@ -416,7 +416,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         # self.resize(-1,-1)
         if not isinstance(self._event_template_, neo.AnalogSignal):
             self._use_template_ = False
-            self.use_mPSCTemplate_CheckBox.setEnabled(False)
+            self.use_eventTemplate_CheckBox.setEnabled(False)
 
 #### BEGIN _configureUI_
     def _configureUI_(self):
@@ -529,9 +529,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._frames_spinBoxSlider_.setRange(0, self._number_of_frames_)
         self._frames_spinBoxSlider_.valueChanged.connect(self.slot_setFrameNumber) # slot inherited from ScipyenFrameViewer
         
-        self._mPSC_spinBoxSlider_.label = "Event:"
-        self._mPSC_spinBoxSlider_.setRange(0,0)
-        self._mPSC_spinBoxSlider_.valueChanged.connect(self._slot_setWaveFormIndex)
+        self._events_spinBoxSlider_.label = "Event:"
+        self._events_spinBoxSlider_.setRange(0,0)
+        self._events_spinBoxSlider_.valueChanged.connect(self._slot_setWaveFormIndex)
         
         self.durationSpinBox.setDecimals(self.paramsWidget.spinDecimals)
         self.durationSpinBox.setSingleStep(10**(-self.paramsWidget.spinDecimals))
@@ -551,28 +551,28 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.actionSaveEphysData.triggered.connect(self._slot_saveEphysData)
         self.actionExportEphysData.triggered.connect(self._slot_exportEphysData)
         self.actionPlot_Data.triggered.connect(self._slot_plotData)
-        self.actionPlot_detected_mPSCs.triggered.connect(self._plot_detected_events)
-        self.actionPlot_all_mPSCs.triggered.connect(self._plot_all_events)
-        self.actionPlot_aligned_mPSCs.triggered.connect(self._plot_aligned_waves)
-        self.actionMake_mPSC_Epoch.triggered.connect(self._slot_make_mPSCEpoch)
-        self.actionOpen_mPSCTemplate.triggered.connect(self._slot_openTemplateFile)
-        self.actionCreate_mPSC_Template.triggered.connect(self._slot_create_mPSC_template)
-        self.actionPlot_mPSC_template.triggered.connect(self._plot_template_)
-        self.actionPlot_mPSCs_for_template.triggered.connect(self._plot_aligned_waves)
-        self.actionImport_mPSCTemplate.triggered.connect(self._slot_importTemplate)
-        self.actionSave_mPSC_Template.triggered.connect(self._slot_saveTemplateFile)
-        self.actionExport_mPSC_Template.triggered.connect(self._slot_exportTemplate)
+        self.actionPlot_detected_events.triggered.connect(self._plot_detected_events)
+        self.actionPlot_all_events.triggered.connect(self._plot_all_events)
+        self.actionPlot_aligned_event_waveforms.triggered.connect(self._plot_aligned_waves)
+        self.actionMake_Event_Detection_Epoch.triggered.connect(self._slot_make_mPSCEpoch)
+        self.actionOpen_Event_Template.triggered.connect(self._slot_openTemplateFile)
+        self.actionCreate_Event_Template.triggered.connect(self._slot_create_mPSC_template)
+        self.actionPlot_Event_template.triggered.connect(self._plot_template_)
+        self.actionPlot_events_for_template.triggered.connect(self._plot_aligned_waves)
+        self.actionImport_Event_Template.triggered.connect(self._slot_importTemplate)
+        self.actionSave_Event_Template.triggered.connect(self._slot_saveTemplateFile)
+        self.actionExport_Event_Template.triggered.connect(self._slot_exportTemplate)
         self.actionRemember_mPSC_Template.triggered.connect(self._slot_storeTemplateAsDefault)
-        self.actionForget_mPSC_Template.triggered.connect(self._slot_forgetTemplate)
+        self.actionForget_Event_Template.triggered.connect(self._slot_forgetTemplate)
         self.actionDetect_in_current_sweep.triggered.connect(self._slot_detectCurrentSweep)
         self.actionClear_default.triggered.connect(self._slot_clearFactoryDefaultTemplateFile)
-        self.actionChoose_persistent_mPSC_template_file.triggered.connect(self._slot_choosePersistentTemplateFile)
+        self.actionChoose_persistent_event_template_file.triggered.connect(self._slot_choosePersistentTemplateFile)
         self.actionReset_to_factory.triggered.connect(self._slot_revertToFactoryDefaultTemplateFile)
         self.actionOverlay_Template_with_Model.triggered.connect(self._slot_setOverlayTemplateModel)
-        self.actionLoad_default_mPSC_Template.triggered.connect(self._slot_loadDefaultTemplate)
-        self.actionLoad_last_used_mPSC_template.triggered.connect(self._slot_loadLastUsedTemplate)
+        self.actionLoad_default_event_Template.triggered.connect(self._slot_loadDefaultTemplate)
+        self.actionLoad_last_used_event_template.triggered.connect(self._slot_loadLastUsedTemplate)
         self.actionUndo_current_sweep.triggered.connect(self._slot_undoCurrentSweep)
-        self.actionAlign_mPSCs.triggered.connect(self.alignWaves)
+        self.actionAlign_event_waveforms.triggered.connect(self.alignWaves)
         
         # self.actionDetect.triggered.connect(self._slot_detect)
         self.actionDetect.triggered.connect(self._slot_detectThread)
@@ -583,13 +583,13 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.actionView_results.triggered.connect(self.slot_showReportWindow)
         self.actionSave_results.triggered.connect(self._slot_saveResults)
         self.actionExport_results.triggered.connect(self._slot_exportPSCresult)
-        self.actionSave_mPSC_trains.triggered.connect(self._slot_savePSCtrains)
-        self.actionExport_mPSC_trains.triggered.connect(self._slot_exportPSCtrains)
-        self.actionSave_mPSC_waves.triggered.connect(self._slot_savePSCwaves)
-        self.actionExport_mPSC_waves.triggered.connect(self._slot_exportPSCwaves)
+        self.actionSave_event_trains.triggered.connect(self._slot_savePSCtrains)
+        self.actionExport_event_trains.triggered.connect(self._slot_exportPSCtrains)
+        self.actionSave_event_waveforms.triggered.connect(self._slot_savePSCwaves)
+        self.actionExport_event_waveforms.triggered.connect(self._slot_exportPSCwaves)
         self.actionClear_results.triggered.connect(self._slot_clearResults)
-        self.actionUse_default_location_for_persistent_mPSC_template.triggered.connect(self._slot_useDefaultTemplateLocation)
-        # self.actionChoose_persistent_mPSC_template_file.triggered.connect(self._slot_choosePersistentTemplateFile)
+        self.actionUse_default_location_for_persistent_event_template.triggered.connect(self._slot_useDefaultTemplateLocation)
+        # self.actionChoose_persistent_event_template_file.triggered.connect(self._slot_choosePersistentTemplateFile)
         self.actionLock_toolbars.setChecked(self._toolbars_locked_ == True)
         self.actionLock_toolbars.triggered.connect(self._slot_lockToolbars)
         # signal & epoch comboboxes
@@ -598,8 +598,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.epochComboBox.currentTextChanged.connect(self._slot_epochComboBoxSelectionChanged)
         # self.epochComboBox.currentIndexChanged.connect(self._slot_new_mPSCEpochIndexSelected)
         
-        self.use_mPSCTemplate_CheckBox.setChecked(self._use_template_ == True)
-        self.use_mPSCTemplate_CheckBox.stateChanged.connect(self._slot_use_mPSCTemplate)
+        self.use_eventTemplate_CheckBox.setChecked(self._use_template_ == True)
+        self.use_eventTemplate_CheckBox.stateChanged.connect(self._slot_use_mPSCTemplate)
         
         self.rsqThresholdCheckBox.setChecked(self._use_threshold_on_rsq_)
         self.rsqThresholdCheckBox.stateChanged.connect(self._slot_useThresholdOnRsquared)
@@ -607,7 +607,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.clearPreviousDetectionCheckBox.setChecked(self._clear_detection_flag_ == True)
         self.clearPreviousDetectionCheckBox.stateChanged.connect(self._slot_setClearDetectionFlag_)
         
-        self.plot_mPSCWaveformToolButton.clicked.connect(self._slot_plot_mPSCWaveForm)
+        self.plot_eventWaveformToolButton.clicked.connect(self._slot_plot_mPSCWaveForm)
         self.exportModelWaveToolButton.clicked.connect(self._slot_exportModelWaveformToWorkspace)
         
         if self._toolbars_locked_:
@@ -617,8 +617,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 
         self.metaDataWidget.sig_valueChanged.connect(self._slot_metaDataChanged)
         
-        self.accept_mPSCcheckBox.setEnabled(False)
-        self.accept_mPSCcheckBox.stateChanged.connect(self._slot_set_Event_accepted)
+        self.accept_eventCheckBox.setEnabled(False)
+        self.accept_eventCheckBox.stateChanged.connect(self._slot_set_Event_accepted)
         self.makeUnitAmplitudePushButton.clicked.connect(self._slot_makeUnitAmplitudeModel)
         
         self.detectionThresholdSpinBox.setMinimum(0)
@@ -689,7 +689,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         ww = (self.paramsWidget, 
               self.durationSpinBox,
               self.clearPreviousDetectionCheckBox,
-              self.use_mPSCTemplate_CheckBox)
+              self.use_eventTemplate_CheckBox)
         
         sigblock = [QtCore.QSignalBlocker(w) for w in ww]
         
@@ -720,7 +720,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.durationSpinBox.setValue(self._event_duration_)
         
         # 3) set check boxes
-        self.use_mPSCTemplate_CheckBox.setChecked(self._use_template_ == True)
+        self.use_eventTemplate_CheckBox.setChecked(self._use_template_ == True)
         self.clearPreviousDetectionCheckBox.setChecked(self._clear_detection_flag_ == True)
         # self.actionAll_waves_to_result.setChecked(self._all_waves_to_result_ == True)
         
@@ -1574,7 +1574,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     def _plot_aligned_waves(self):
         if len(self._aligned_waves_) == 0:
             return
-        self.accept_mPSCcheckBox.setEnabled(False)
+        self.accept_eventCheckBox.setEnabled(False)
         self._template_showing_ = True
         
         if not isinstance(self._detected_Events_Viewer_, sv.SignalViewer):
@@ -1586,7 +1586,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             self._detected_Events_Viewer_.frameChanged.connect(self._slot_mPSCViewer_frame_changed)
             
         self._detected_Events_Viewer_.removeLabels(0)
-        self._mPSC_spinBoxSlider_.setRange(0, len(self._aligned_waves_)-1)
+        self._events_spinBoxSlider_.setRange(0, len(self._aligned_waves_)-1)
         self._detected_Events_Viewer_.view(self._aligned_waves_)
         
     def _plot_all_events(self):
@@ -1609,7 +1609,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             if len(waves) == 0:
                 return
             
-            self._mPSC_spinBoxSlider_.setRange(0, len(waves)-1)
+            self._events_spinBoxSlider_.setRange(0, len(waves)-1)
             self._detected_Events_Viewer_.view(waves, doc_title="All events")
             
             self._indicate_event_(waves=waves)
@@ -1620,8 +1620,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             return
         frameResult = self._result_[self.currentFrame] # a spike train list or None !!!
         
-        signalBlockers = (QtCore.QSignalBlocker(w) for w in (self._mPSC_spinBoxSlider_,
-                                                             self.accept_mPSCcheckBox,
+        signalBlockers = (QtCore.QSignalBlocker(w) for w in (self._events_spinBoxSlider_,
+                                                             self.accept_eventCheckBox,
                                                              self.displayedDetectionChannelSpinBox,
                                                              self._ephysViewer_))
         self._template_showing_ = False
@@ -1674,9 +1674,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
 
                 self._detected_Events_Viewer_.frameChanged.connect(self._slot_mPSCViewer_frame_changed)
                 
-            self._mPSC_spinBoxSlider_.setRange(0, len(self._detected_events_)-1)
+            self._events_spinBoxSlider_.setRange(0, len(self._detected_events_)-1)
             
-            self.accept_mPSCcheckBox.setEnabled(True)
+            self.accept_eventCheckBox.setEnabled(True)
             
             self._detected_Events_Viewer_.view(self._detected_events_, doc_title = f"Events in sweep {self.currentFrame}")
             
@@ -1687,8 +1687,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
         else:
             if isinstance(self._detected_Events_Viewer_, sv.SignalViewer):
-                self._mPSC_spinBoxSlider_.setRange(0, 0)
-                self.accept_mPSCcheckBox.setEnabled(False)
+                self._events_spinBoxSlider_.setRange(0, 0)
+                self.accept_eventCheckBox.setEnabled(False)
                 self._detected_Events_Viewer_.clear()
                 
             if isinstance(self._ephysViewer_, sv.SignalViewer):
@@ -1896,8 +1896,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         if isinstance(peak_time, pq.Quantity):
             peak_value = neoutils.get_sample_at_domain_value(signal, peak_time)
 
-            signalBlocker = QtCore.QSignalBlocker(self.accept_mPSCcheckBox)
-            self.accept_mPSCcheckBox.setChecked(accepted)
+            signalBlocker = QtCore.QSignalBlocker(self.accept_eventCheckBox)
+            self.accept_eventCheckBox.setChecked(accepted)
             
             if accepted:
                 targetBrush = acc_targetBrush
@@ -2107,8 +2107,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                         return self._event_template_
                 
                 if not template_OK:
-                    signalBlocker = QtCore.QSignalBlocker(self.use_mPSCTemplate_CheckBox)
-                    self.use_mPSCTemplate_CheckBox.setChecked(False)
+                    signalBlocker = QtCore.QSignalBlocker(self.use_eventTemplate_CheckBox)
+                    self.use_eventTemplate_CheckBox.setChecked(False)
                     self._use_template_ = False
                     self._generate_eventModelWaveform()
                     return self._event_model_waveform_
@@ -2563,7 +2563,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         # FIXME 2022-12-14 18:54:04
         alignment = self._make_aligned_waves_()
         if isinstance(self._event_template_, neo.AnalogSignal):
-            self.use_mPSCTemplate_CheckBox.setEnabled(True)
+            self.use_eventTemplate_CheckBox.setEnabled(True)
         
     @pyqtSlot(str)
     def _slot_badBounds(self, param):
@@ -2924,14 +2924,14 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                              self.actionDetect_in_current_sweep,
                              self.actionUndo_current_sweep,
                              self.actionClear_results,
-                             self.accept_mPSCcheckBox,
+                             self.accept_eventCheckBox,
                              self.actionView_results,
                              self.actionExport_results,
                              self.actionSave_results,
-                             self.use_mPSCTemplate_CheckBox,
-                             self.actionCreate_mPSC_Template,
-                             self.actionOpen_mPSCTemplate,
-                             self.actionImport_mPSCTemplate,
+                             self.use_eventTemplate_CheckBox,
+                             self.actionCreate_Event_Template,
+                             self.actionOpen_Event_Template,
+                             self.actionImport_Event_Template,
                              enable=False)
         
         self._detectThread_.start() # ↯ _detectThread_.started ↣ _detectWorker_.run NOTE: 2022-11-26 16:56:19
@@ -2948,14 +2948,14 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                              self.actionDetect_in_current_sweep,
                              self.actionUndo_current_sweep,
                              self.actionClear_results,
-                             self.accept_mPSCcheckBox,
+                             self.accept_eventCheckBox,
                              self.actionView_results,
                              self.actionExport_results,
                              self.actionSave_results,
-                             self.use_mPSCTemplate_CheckBox,
-                             self.actionCreate_mPSC_Template,
-                             self.actionOpen_mPSCTemplate,
-                             self.actionImport_mPSCTemplate,
+                             self.use_eventTemplate_CheckBox,
+                             self.actionCreate_Event_Template,
+                             self.actionOpen_Event_Template,
+                             self.actionImport_Event_Template,
                              enable=True)
         
         self.loopControl["break"] = False
@@ -3100,7 +3100,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             if isinstance(data, neo.AnalogSignal):
                 self._event_template_ = data
                 self._plot_template_()
-                self.use_mPSCTemplate_CheckBox.setEnabled(True)
+                self.use_eventTemplate_CheckBox.setEnabled(True)
                 self.lastUsedTemplateFile = fileName
                 
             # if isinstance(self._event_template_, neo.AnalogSignal):
@@ -3173,7 +3173,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             self._plot_template_()
             
         if isinstance(self._event_template_, neo.AnalogSignal):
-            self.use_mPSCTemplate_CheckBox.setEnabled(True)
+            self.use_eventTemplate_CheckBox.setEnabled(True)
         
             
     @pyqtSlot()
@@ -3291,7 +3291,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         if isinstance(data, neo.AnalogSignal):
             self._event_template_ = data
             self._plot_template_()
-            self.use_mPSCTemplate_CheckBox.setEnabled(True)
+            self.use_eventTemplate_CheckBox.setEnabled(True)
         else:
             self.errorMessage("Load default mPSC template",
                               "Default template file does not contain a signal")
@@ -3313,7 +3313,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             if isinstance(data, neo.AnalogSignal):
                 self._event_template_ = data
                 self._plot_template_()
-                self.use_mPSCTemplate_CheckBox.setEnabled(True)
+                self.use_eventTemplate_CheckBox.setEnabled(True)
                 
             else:
                 self.errorMessage("Load last used mPSC template",
@@ -3744,10 +3744,10 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         # else:
         #     print(f"_slot_mPSCViewer_frame_changed sender {sender.__class__.__name__}")
         signal_blockers = [QtCore.QSignalBlocker(w) for w in (self._detected_Events_Viewer_,)]
-        # signal_blockers = [QtCore.QSignalBlocker(w) for w in (self._mPSC_spinBoxSlider_,)]
-        # signal_blockers = [QtCore.QSignalBlocker(w) for w in (self._mPSC_spinBoxSlider_,
+        # signal_blockers = [QtCore.QSignalBlocker(w) for w in (self._events_spinBoxSlider_,)]
+        # signal_blockers = [QtCore.QSignalBlocker(w) for w in (self._events_spinBoxSlider_,
         #                                                      self._frames_spinBoxSlider_)]
-        self._mPSC_spinBoxSlider_.value = value
+        self._events_spinBoxSlider_.value = value
         
         if not self._template_showing_:
             wave = self._detected_Events_Viewer_.yData[value]

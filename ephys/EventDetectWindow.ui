@@ -173,7 +173,7 @@
        </attribute>
        <layout class="QGridLayout" name="gridLayout_2">
         <item row="0" column="0">
-         <widget class="QGroupBox" name="mPSCmodelGroupBox">
+         <widget class="QGroupBox" name="eventModelGroupBox">
           <property name="toolTip">
            <string>mPSC model and mPSC detection parameters</string>
           </property>
@@ -269,7 +269,7 @@
            <item>
             <layout class="QHBoxLayout" name="horizontalLayout_2">
              <item>
-              <widget class="QCheckBox" name="use_mPSCTemplate_CheckBox">
+              <widget class="QCheckBox" name="use_eventTemplate_CheckBox">
                <property name="toolTip">
                 <string>Use mPSC template waveform instead of model-generated waveform</string>
                </property>
@@ -336,7 +336,7 @@
               </widget>
              </item>
              <item>
-              <widget class="QToolButton" name="plot_mPSCWaveformToolButton">
+              <widget class="QToolButton" name="plot_eventWaveformToolButton">
                <property name="toolTip">
                 <string>Plot mPSC template or model</string>
                </property>
@@ -593,7 +593,7 @@
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_6">
        <item>
-        <layout class="QHBoxLayout" name="_mPSCSpinBoxSliderLayout">
+        <layout class="QHBoxLayout" name="_eventsSpinBoxSliderLayout">
          <item>
           <widget class="QLabel" name="label_4">
            <property name="text">
@@ -618,7 +618,7 @@
           </widget>
          </item>
          <item>
-          <widget class="SpinBoxSlider" name="_mPSC_spinBoxSlider_" native="true">
+          <widget class="SpinBoxSlider" name="_events_spinBoxSlider_" native="true">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
              <horstretch>0</horstretch>
@@ -628,7 +628,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QCheckBox" name="accept_mPSCcheckBox">
+          <widget class="QCheckBox" name="accept_eventCheckBox">
            <property name="text">
             <string>Accept</string>
            </property>
@@ -664,26 +664,26 @@
     <property name="title">
      <string>File</string>
     </property>
-    <widget class="QMenu" name="menumPSC_Template">
+    <widget class="QMenu" name="menuEvent_Template">
      <property name="title">
       <string>mPSC Template</string>
      </property>
-     <addaction name="actionCreate_mPSC_Template"/>
-     <addaction name="actionPlot_mPSC_template"/>
-     <addaction name="actionOpen_mPSCTemplate"/>
-     <addaction name="actionSave_mPSC_Template"/>
-     <addaction name="actionImport_mPSCTemplate"/>
-     <addaction name="actionExport_mPSC_Template"/>
-     <addaction name="actionRemember_mPSC_Template"/>
-     <addaction name="actionClear_default_mPSC_Template"/>
-     <addaction name="actionForget_mPSC_Template"/>
+     <addaction name="actionCreate_Event_Template"/>
+     <addaction name="actionPlot_Event_template"/>
+     <addaction name="actionOpen_Event_Template"/>
+     <addaction name="actionSave_Event_Template"/>
+     <addaction name="actionImport_Event_Template"/>
+     <addaction name="actionExport_Event_Template"/>
+     <addaction name="actionRemember_Event_Template"/>
+     <addaction name="actionClear_default_Event_Template"/>
+     <addaction name="actionForget_Event_Template"/>
     </widget>
     <addaction name="actionOpenEphysData"/>
     <addaction name="actionSaveEphysData"/>
     <addaction name="actionImportEphysData"/>
     <addaction name="actionExportEphysData"/>
     <addaction name="separator"/>
-    <addaction name="menumPSC_Template"/>
+    <addaction name="menuEvent_Template"/>
     <addaction name="separator"/>
     <addaction name="actionClose"/>
    </widget>
@@ -691,7 +691,7 @@
     <property name="title">
      <string>Settings</string>
     </property>
-    <widget class="QMenu" name="menuPersistent_mPSC_template_location">
+    <widget class="QMenu" name="menuPersistent_evebnt_template_location">
      <property name="toolTip">
       <string>Manage default mPSC template</string>
      </property>
@@ -711,17 +711,17 @@
       <iconset theme="template">
        <normaloff>.</normaloff>.</iconset>
      </property>
-     <addaction name="actionUse_default_location_for_persistent_mPSC_template"/>
-     <addaction name="actionChoose_persistent_mPSC_template_file"/>
+     <addaction name="actionUse_default_location_for_persistent_event_template"/>
+     <addaction name="actionChoose_persistent_event_template_file"/>
      <addaction name="actionReset_to_factory"/>
      <addaction name="actionClear_default"/>
     </widget>
-    <addaction name="menuPersistent_mPSC_template_location"/>
+    <addaction name="menuPersistent_evebnt_template_location"/>
     <addaction name="actionOverlay_Template_with_Model"/>
     <addaction name="actionAll_waves_to_result"/>
     <addaction name="actionLock_toolbars"/>
    </widget>
-   <widget class="QMenu" name="menuDetect_mPSCs">
+   <widget class="QMenu" name="menuDetect_Events">
     <property name="title">
      <string>Event Detection</string>
     </property>
@@ -744,18 +744,18 @@
      <property name="title">
       <string>Results</string>
      </property>
-     <addaction name="actionPlot_detected_mPSCs"/>
-     <addaction name="actionPlot_all_mPSCs"/>
+     <addaction name="actionPlot_detected_events"/>
+     <addaction name="actionPlot_all_events"/>
      <addaction name="actionView_results"/>
      <addaction name="actionClear_results"/>
      <addaction name="separator"/>
      <addaction name="actionSave_results"/>
-     <addaction name="actionSave_mPSC_trains"/>
-     <addaction name="actionSave_mPSC_waves"/>
+     <addaction name="actionSave_event_trains"/>
+     <addaction name="actionSave_event_waveforms"/>
      <addaction name="separator"/>
      <addaction name="actionExport_results"/>
-     <addaction name="actionExport_mPSC_trains"/>
-     <addaction name="actionExport_mPSC_waves"/>
+     <addaction name="actionExport_event_trains"/>
+     <addaction name="actionExport_event_waveforms"/>
     </widget>
     <addaction name="menuCurrent_Sweep"/>
     <addaction name="menuEntire_Data"/>
@@ -772,7 +772,7 @@
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuFilter_data"/>
-   <addaction name="menuDetect_mPSCs"/>
+   <addaction name="menuDetect_Events"/>
    <addaction name="menuSettings"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -797,7 +797,7 @@
    <addaction name="actionSaveEphysData"/>
    <addaction name="actionExportEphysData"/>
    <addaction name="actionPlot_Data"/>
-   <addaction name="actionMake_mPSC_Epoch"/>
+   <addaction name="actionMake_Event_Detection_Epoch"/>
    <addaction name="separator"/>
    <addaction name="separator"/>
   </widget>
@@ -821,9 +821,9 @@
    <addaction name="actionUndo_current_sweep"/>
    <addaction name="actionDetect"/>
    <addaction name="actionUndo"/>
-   <addaction name="actionPlot_detected_mPSCs"/>
-   <addaction name="actionAlign_mPSCs"/>
-   <addaction name="actionPlot_aligned_mPSCs"/>
+   <addaction name="actionPlot_detected_events"/>
+   <addaction name="actionAlign_event_waveforms"/>
+   <addaction name="actionPlot_aligned_event_waveforms"/>
    <addaction name="actionView_results"/>
    <addaction name="actionSave_results"/>
    <addaction name="actionExport_results"/>
@@ -841,17 +841,17 @@
    <attribute name="toolBarBreak">
     <bool>true</bool>
    </attribute>
-   <addaction name="actionCreate_mPSC_Template"/>
-   <addaction name="actionPlot_mPSC_template"/>
-   <addaction name="actionPlot_mPSCs_for_template"/>
-   <addaction name="actionLoad_last_used_mPSC_template"/>
-   <addaction name="actionOpen_mPSCTemplate"/>
-   <addaction name="actionImport_mPSCTemplate"/>
-   <addaction name="actionLoad_default_mPSC_Template"/>
-   <addaction name="actionSave_mPSC_Template"/>
-   <addaction name="actionExport_mPSC_Template"/>
-   <addaction name="actionRemember_mPSC_Template"/>
-   <addaction name="actionForget_mPSC_Template"/>
+   <addaction name="actionCreate_Event_Template"/>
+   <addaction name="actionPlot_Event_template"/>
+   <addaction name="actionPlot_events_for_template"/>
+   <addaction name="actionLoad_last_used_event_template"/>
+   <addaction name="actionOpen_Event_Template"/>
+   <addaction name="actionImport_Event_Template"/>
+   <addaction name="actionLoad_default_event_Template"/>
+   <addaction name="actionSave_Event_Template"/>
+   <addaction name="actionExport_Event_Template"/>
+   <addaction name="actionRemember_Event_Template"/>
+   <addaction name="actionForget_Event_Template"/>
   </widget>
   <widget class="QToolBar" name="filterToolBar">
    <property name="windowTitle">
@@ -886,7 +886,7 @@
     <string>Import</string>
    </property>
   </action>
-  <action name="actionOpen_mPSCTemplate">
+  <action name="actionOpen_Event_Template">
    <property name="icon">
     <iconset theme="template">
      <normaloff>.</normaloff>.</iconset>
@@ -898,7 +898,7 @@
     <string>Open Event Template</string>
    </property>
   </action>
-  <action name="actionImport_mPSCTemplate">
+  <action name="actionImport_Event_Template">
    <property name="icon">
     <iconset theme="template">
      <normaloff>.</normaloff>.</iconset>
@@ -940,7 +940,7 @@
     <string>Plot electrophysiology</string>
    </property>
   </action>
-  <action name="actionMake_mPSC_Epoch">
+  <action name="actionMake_Event_Detection_Epoch">
    <property name="icon">
     <iconset theme="select">
      <normaloff>.</normaloff>.</iconset>
@@ -949,7 +949,7 @@
     <string>Make Event Detection Epoch</string>
    </property>
   </action>
-  <action name="actionSave_mPSC_Template">
+  <action name="actionSave_Event_Template">
    <property name="icon">
     <iconset theme="document-save-as">
      <normaloff>.</normaloff>.</iconset>
@@ -961,7 +961,7 @@
     <string>Save Event Template</string>
    </property>
   </action>
-  <action name="actionExport_mPSC_Template">
+  <action name="actionExport_Event_Template">
    <property name="icon">
     <iconset theme="document-export">
      <normaloff>.</normaloff>.</iconset>
@@ -973,7 +973,7 @@
     <string>Export Event Template to Workspace</string>
    </property>
   </action>
-  <action name="actionRemember_mPSC_Template">
+  <action name="actionRemember_Event_Template">
    <property name="icon">
     <iconset theme="document-save-as-template">
      <normaloff>.</normaloff>.</iconset>
@@ -985,7 +985,7 @@
     <string>Remember event template as default across sections</string>
    </property>
   </action>
-  <action name="actionClear_default_mPSC_Template">
+  <action name="actionClear_default_Event_Template">
    <property name="icon">
     <iconset theme="remove">
      <normaloff>.</normaloff>.</iconset>
@@ -997,7 +997,7 @@
     <string>Remove default event template</string>
    </property>
   </action>
-  <action name="actionCreate_mPSC_Template">
+  <action name="actionCreate_Event_Template">
    <property name="icon">
     <iconset theme="project-development-new-template">
      <normaloff>.</normaloff>.</iconset>
@@ -1099,7 +1099,7 @@
     <string>Clear results</string>
    </property>
   </action>
-  <action name="actionUse_default_location_for_persistent_mPSC_template">
+  <action name="actionUse_default_location_for_persistent_event_template">
    <property name="icon">
     <iconset theme="mark-location">
      <normaloff>.</normaloff>.</iconset>
@@ -1111,7 +1111,7 @@
     <string>Use default event template file (&quot;eventTemplate.h5&quot;) in Scipyen config</string>
    </property>
   </action>
-  <action name="actionChoose_persistent_mPSC_template_file">
+  <action name="actionChoose_persistent_event_template_file">
    <property name="icon">
     <iconset theme="document-save-as">
      <normaloff>.</normaloff>.</iconset>
@@ -1123,7 +1123,7 @@
     <string>Choose default event template file</string>
    </property>
   </action>
-  <action name="actionForget_mPSC_Template">
+  <action name="actionForget_Event_Template">
    <property name="icon">
     <iconset theme="delete">
      <normaloff>.</normaloff>.</iconset>
@@ -1147,7 +1147,7 @@
     <string>Lock toolbars</string>
    </property>
   </action>
-  <action name="actionSave_mPSC_trains">
+  <action name="actionSave_event_trains">
    <property name="icon">
     <iconset theme="document-save">
      <normaloff>.</normaloff>.</iconset>
@@ -1159,7 +1159,7 @@
     <string>Save event trains to file</string>
    </property>
   </action>
-  <action name="actionSave_mPSC_waves">
+  <action name="actionSave_event_waveforms">
    <property name="icon">
     <iconset theme="document-save">
      <normaloff>.</normaloff>.</iconset>
@@ -1171,7 +1171,7 @@
     <string>Save event waveforms to file</string>
    </property>
   </action>
-  <action name="actionExport_mPSC_trains">
+  <action name="actionExport_event_trains">
    <property name="icon">
     <iconset theme="document-export">
      <normaloff>.</normaloff>.</iconset>
@@ -1183,7 +1183,7 @@
     <string>Export event trains to workspace</string>
    </property>
   </action>
-  <action name="actionExport_mPSC_waves">
+  <action name="actionExport_event_waveforms">
    <property name="icon">
     <iconset theme="document-export">
      <normaloff>.</normaloff>.</iconset>
@@ -1195,7 +1195,7 @@
     <string>Export event waveforms to workspace</string>
    </property>
   </action>
-  <action name="actionPlot_detected_mPSCs">
+  <action name="actionPlot_detected_events">
    <property name="icon">
     <iconset theme="graphics">
      <normaloff>.</normaloff>.</iconset>
@@ -1207,7 +1207,7 @@
     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Plot events detected in current sweep.&lt;/p&gt;&lt;p&gt;These are both accepted and rejected events.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
-  <action name="actionPlot_mPSC_template">
+  <action name="actionPlot_Event_template">
    <property name="icon">
     <iconset theme="graphics">
      <normaloff>.</normaloff>.</iconset>
@@ -1219,7 +1219,7 @@
     <string>Plot Event template</string>
    </property>
   </action>
-  <action name="actionPlot_mPSCs_for_template">
+  <action name="actionPlot_events_for_template">
    <property name="icon">
     <iconset theme="graphics">
      <normaloff>.</normaloff>.</iconset>
@@ -1279,7 +1279,7 @@
     <string>Clear factory default template file</string>
    </property>
   </action>
-  <action name="actionLoad_default_mPSC_Template">
+  <action name="actionLoad_default_event_Template">
    <property name="icon">
     <iconset theme="template">
      <normaloff>.</normaloff>.</iconset>
@@ -1291,7 +1291,7 @@
     <string>Load event template from default file</string>
    </property>
   </action>
-  <action name="actionLoad_last_used_mPSC_template">
+  <action name="actionLoad_last_used_event_template">
    <property name="icon">
     <iconset theme="document-open-recent">
      <normaloff>.</normaloff>.</iconset>
@@ -1381,7 +1381,7 @@
     <string>Live preview of filtered signal</string>
    </property>
   </action>
-  <action name="actionAlign_mPSCs">
+  <action name="actionAlign_event_waveforms">
    <property name="icon">
     <iconset theme="align-horizontal-left">
      <normaloff>.</normaloff>.</iconset>
@@ -1393,7 +1393,7 @@
     <string>Align events by onset</string>
    </property>
   </action>
-  <action name="actionPlot_aligned_mPSCs">
+  <action name="actionPlot_aligned_event_waveforms">
    <property name="icon">
     <iconset theme="graphics">
      <normaloff>.</normaloff>.</iconset>
@@ -1417,7 +1417,7 @@
     <string>View detection criterion</string>
    </property>
   </action>
-  <action name="actionPlot_all_mPSCs">
+  <action name="actionPlot_all_events">
    <property name="icon">
     <iconset theme="graphics">
      <normaloff>.</normaloff>.</iconset>
