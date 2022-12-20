@@ -2804,7 +2804,10 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
                 ordertip = "array order: "
             
         elif hasattr(obj, "__iter__"):
-            sz = len(obj)
+            if hasattr(obj, "__len__"):
+                sz = len(obj)
+            else:
+                sz = ""
             sizetip = "length:"
             memsz    = str(getsizeof(obj))
             memsztip = "memory size: "

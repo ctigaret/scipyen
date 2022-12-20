@@ -5702,19 +5702,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             self.nFramesLabel.setText("of %d" % self._number_of_frames_)
             
-            if dataOK:
-                self.displayFrame()
-            else:
-                warnings.warn(f"Could not parse the data x: {x}, y: {y}")
-                return
-            
-            # self._update_annotations_()
-            
             # NOTE: 2022-11-01 10:37:06
             # overwrites self.docTitle set by self._parse_data_
             if isinstance(doc_title, str) and len(doc_title.strip()):
                 self.docTitle = doc_title
                 
+            if dataOK:
+                self.displayFrame()
+            else:
+                warnings.warn(f"Could not parse the data x: {x}, y: {y}")
+                return
             
             self.frameChanged.emit(self._current_frame_index_)
 
@@ -7481,11 +7478,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                         ylabel="%s (%s)" % (signal_name, sig.units.dimensionality), 
                                         xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
                                         *args, **kwargs)
-            # self._plot_numeric_data_(self.axis(0), np.array(sig.times), 
-            #                         np.array(sig.magnitude), 
-            #                         ylabel="%s (%s)" % (signal_name, sig.units.dimensionality), 
-            #                         xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
-            #                         *args, **kwargs)
                 
         self.plotTitleLabel.setText("", color = "#000000")
         if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:

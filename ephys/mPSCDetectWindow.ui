@@ -165,11 +165,11 @@
        <string/>
       </property>
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="modelTab">
        <attribute name="title">
-        <string>mPSC Model</string>
+        <string>Event Model</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_2">
         <item row="0" column="0">
@@ -657,7 +657,7 @@
      <x>0</x>
      <y>0</y>
      <width>808</width>
-     <height>28</height>
+     <height>20</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -723,7 +723,7 @@
    </widget>
    <widget class="QMenu" name="menuDetect_mPSCs">
     <property name="title">
-     <string>Detect mPSCs</string>
+     <string>Detect Events</string>
     </property>
     <widget class="QMenu" name="menuCurrent_Sweep">
      <property name="title">
@@ -892,10 +892,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Open</string>
+    <string>Open Event Template</string>
    </property>
    <property name="toolTip">
-    <string>Open mPSC Template</string>
+    <string>Open Event Template</string>
    </property>
   </action>
   <action name="actionImport_mPSCTemplate">
@@ -904,10 +904,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Import</string>
+    <string>Import Event Template</string>
    </property>
    <property name="toolTip">
-    <string>Import mPSC Template</string>
+    <string>Import Event Template</string>
    </property>
   </action>
   <action name="actionSaveEphysData">
@@ -946,7 +946,7 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Make mPSC Epoch</string>
+    <string>Make Event Detection Epoch</string>
    </property>
   </action>
   <action name="actionSave_mPSC_Template">
@@ -955,10 +955,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Save mPSC Template</string>
+    <string>Save Event Template</string>
    </property>
    <property name="toolTip">
-    <string>Save mPSC Template</string>
+    <string>Save Event Template</string>
    </property>
   </action>
   <action name="actionExport_mPSC_Template">
@@ -967,10 +967,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Export mPSC Template</string>
+    <string>Export Event Template</string>
    </property>
    <property name="toolTip">
-    <string>Export mPSC Template to Workspace</string>
+    <string>Export Event Template to Workspace</string>
    </property>
   </action>
   <action name="actionRemember_mPSC_Template">
@@ -979,10 +979,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Set Default mPSC Template</string>
+    <string>Set Default Event Template</string>
    </property>
    <property name="toolTip">
-    <string>Remember mPSC template as default across sections</string>
+    <string>Remember event template as default across sections</string>
    </property>
   </action>
   <action name="actionClear_default_mPSC_Template">
@@ -991,10 +991,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Remove default mPSC Template</string>
+    <string>Remove Default Event Template</string>
    </property>
    <property name="toolTip">
-    <string>Remove default mPSC template</string>
+    <string>Remove default event template</string>
    </property>
   </action>
   <action name="actionCreate_mPSC_Template">
@@ -1003,10 +1003,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Create mPSC Template</string>
+    <string>Create Event Template</string>
    </property>
    <property name="toolTip">
-    <string>Create a mPSC template from mPSCs</string>
+    <string>Create an event template from event waveforms</string>
    </property>
   </action>
   <action name="actionDetect_in_current_sweep">
@@ -1108,7 +1108,7 @@
     <string>Use factory default file</string>
    </property>
    <property name="toolTip">
-    <string>Use default mPSC template file (&quot;mPSCtemplate.h5&quot;) in Scipyen config</string>
+    <string>Use default event template file (&quot;eventTemplate.h5&quot;) in Scipyen config</string>
    </property>
   </action>
   <action name="actionChoose_persistent_mPSC_template_file">
@@ -1117,10 +1117,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Choose default mPSC template</string>
+    <string>Choose default event template</string>
    </property>
    <property name="toolTip">
-    <string>Choose default mPSC template file</string>
+    <string>Choose default event template file</string>
    </property>
   </action>
   <action name="actionForget_mPSC_Template">
@@ -1129,10 +1129,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Forget mPSC template</string>
+    <string>Forget Event template</string>
    </property>
    <property name="toolTip">
-    <string>Forget mPSC template</string>
+    <string>Forget Event template</string>
    </property>
   </action>
   <action name="actionLock_toolbars">
@@ -1153,10 +1153,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Save PSC trains</string>
+    <string>Save event trains</string>
    </property>
    <property name="toolTip">
-    <string>Save mPSC trains to file</string>
+    <string>Save event trains to file</string>
    </property>
   </action>
   <action name="actionSave_mPSC_waves">
@@ -1165,10 +1165,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Save mPSC waves</string>
+    <string>Save event waveforms</string>
    </property>
    <property name="toolTip">
-    <string>Save mSPC waves to file</string>
+    <string>Save event waveforms to file</string>
    </property>
   </action>
   <action name="actionExport_mPSC_trains">
@@ -1177,10 +1177,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Export mPSC trains</string>
+    <string>Export event trains</string>
    </property>
    <property name="toolTip">
-    <string>Export mPSC trains to workspace</string>
+    <string>Export event trains to workspace</string>
    </property>
   </action>
   <action name="actionExport_mPSC_waves">
@@ -1189,10 +1189,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Export mPSC waves</string>
+    <string>Export event waveforms</string>
    </property>
    <property name="toolTip">
-    <string>Export mPSC waves to workspace</string>
+    <string>Export event waveforms to workspace</string>
    </property>
   </action>
   <action name="actionPlot_detected_mPSCs">
@@ -1201,10 +1201,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Plot detected mPSCs</string>
+    <string>Plot detected events</string>
    </property>
    <property name="toolTip">
-    <string>Plot mPSCs detected in current sweep</string>
+    <string>Plot events detected in current sweep</string>
    </property>
   </action>
   <action name="actionPlot_mPSC_template">
@@ -1213,10 +1213,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Plot mPSC template</string>
+    <string>Plot Event template</string>
    </property>
    <property name="toolTip">
-    <string>Plot mPSC template</string>
+    <string>Plot Event template</string>
    </property>
   </action>
   <action name="actionPlot_mPSCs_for_template">
@@ -1225,10 +1225,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Plot mPSCs for template</string>
+    <string>Plot event waveforms for template</string>
    </property>
    <property name="toolTip">
-    <string>Plot selected mPSCs for template</string>
+    <string>Plot selected event waveforms for template</string>
    </property>
   </action>
   <action name="actionOverlay_Template_with_Model">
@@ -1285,10 +1285,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Load default mPSC Template</string>
+    <string>Load Default Event Template</string>
    </property>
    <property name="toolTip">
-    <string>Load mPSC template from default file</string>
+    <string>Load event template from default file</string>
    </property>
   </action>
   <action name="actionLoad_last_used_mPSC_template">
@@ -1297,10 +1297,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Load last used mPSC template</string>
+    <string>Load last used event template</string>
    </property>
    <property name="toolTip">
-    <string>Open last used mPSC template file</string>
+    <string>Open last used event template file</string>
    </property>
   </action>
   <action name="actionApply_with_detection">
@@ -1387,10 +1387,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Align mPSCs</string>
+    <string>Align events</string>
    </property>
    <property name="toolTip">
-    <string>Align mPSCs by onset</string>
+    <string>Align events by onset</string>
    </property>
   </action>
   <action name="actionPlot_aligned_mPSCs">
@@ -1399,10 +1399,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Plot aligned mPSCs</string>
+    <string>Plot aligned events</string>
    </property>
    <property name="toolTip">
-    <string>Plot aligned mPSCs (if they exist)</string>
+    <string>Plot aligned events (if they exist)</string>
    </property>
   </action>
   <action name="actionView_detection">
@@ -1419,13 +1419,14 @@
   </action>
   <action name="actionPlot_all_mPSCs">
    <property name="icon">
-    <iconset theme="graphics"/>
+    <iconset theme="graphics">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Plot all mPSCs</string>
+    <string>Plot all events</string>
    </property>
    <property name="toolTip">
-    <string>Plot all detected mPSCs in the data</string>
+    <string>Plot all detected events in the data</string>
    </property>
   </action>
   <action name="actionAll_waves_to_result">
@@ -1433,7 +1434,8 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="filter-symbolic"/>
+    <iconset theme="filter-symbolic">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>All waves to result</string>
@@ -1444,7 +1446,8 @@
   </action>
   <action name="actionRefit_wave">
    <property name="icon">
-    <iconset theme="labplot-xy-fit-curve"/>
+    <iconset theme="labplot-xy-fit-curve">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Refit wave</string>
