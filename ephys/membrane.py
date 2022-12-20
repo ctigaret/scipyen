@@ -6279,7 +6279,7 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     
     return ret
 
-def detect_mPSC_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal], threshold:float=4., channels:typing.Optional[typing.Union[int, typing.Sequence[int]]]=None, outputDetection:bool=False):
+def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal], threshold:float=4., channels:typing.Optional[typing.Union[int, typing.Sequence[int]]]=None, outputDetection:bool=False):
     """Detect miniature or spontaneous PSCs with optimally scaled template.
     Implements the "sliding template" algorithm in Clements & Bekkers 1997, Biophys.J.
     
@@ -6820,9 +6820,9 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
     ret.annotate(
                  peak_time = mini_peaks, 
                  wave_name = [w.name for w in minis],
-                 mPSC_fit = [w.annotations.get("mPSC_fit", None) for w in minis],
+                 event_fit = [w.annotations.get("event_fit", None) for w in minis],
                  Accept = [w.annotations["Accept"] for w in minis],
-                 source="PSC_detection",
+                 source="Event_detection",
                  signal_units = x.units, 
                  signal_origin = x.name,
                  datetime=datetime.datetime.now(),
@@ -6835,22 +6835,25 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
     
     return ret
 
-def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typing.Optional[float]=None, outputDetection:bool=False):
-    """Detect miniature or spontaneous PSCs by cross-correlation with a waveform.
+def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typing.Optional[float]=None, outputDetection:bool=False):
+    """Detect spontaneous events in a signal.
+
+    Uses cross-correlation with a waveform, or the sliding detection algorithm
+    by Clements & Bekkers, 1997, (Biophys J.).
     
     Parameters:
     ==========
     
     x: neo.AnalogSignal containing the recorded membrane current that 
-        will be scanned for mEPSCs. Typically this is single-channel, meaning it
+        will be scanned for events. Typically this is single-channel, meaning it
         is a 2D array with a singleton 2nd axis (e.g., x.shape = (n,1) where `n`
         is the number of samples in `x`)
     
     waveform: neo.AnalogSignal or 1D numpy array (vector, i.e., 
         waveform.shape = (m,) where `m` is the number of samples in `waveform`).
     
-        Contains a model mEPSC (ie. a "synthetic" waveform) or a "template" 
-        mEPSC waveform extracted from a signal.
+        Contains an event model (ie. a "synthetic" waveform) or a "template" 
+        waveform extracted from a signal.
     
         ATTENTION: Make sure this model waveform has the SAME SAMPLING RATE as 
         the signal!!!
@@ -6926,7 +6929,7 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     ATTENTION: When detection has failed, returns None
     
     """
-    # print(f"membrane.detect_mPSC: waveform is a {type(waveform).__name__}")
+    # print(f"membrane.detect_Events: waveform is a {type(waveform).__name__}")
     if not isinstance(x, (neo.AnalogSignal, DataSignal)):
         raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal; got a {type(x).__name__} instead")
 
@@ -6960,7 +6963,7 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
         peakfunc = np.argmin
         
     if useCBsliding:
-        return detect_mPSC_CBsliding(x, waveform, threshold, outputDetection=outputDetection)
+        return detect_Events_CBsliding(x, waveform, threshold, outputDetection=outputDetection)
             
     else:
         # 1) normalize the model waveform - only for the cross-correlation method
@@ -7042,9 +7045,9 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
     Detects and analyses mPSCs in a neo.Block, neo.Segment, or a sequence of 
     neo.Segment objects.
     
-    Calls detect_mPSC for each segment in `x`, and generates a spiketrain with
+    Calls detect_Events for each segment in `x`, and generates a spiketrain with
     the the stamps of the detected mPSCs. The spiketrain's annotation contain 
-    the mandatory key "source" mapped to the string "PSC_detection", in order
+    the mandatory key "source" mapped to the string "Event_detection", in order
     to identify this spike train among other (possible) spike trains held in the
     segment.
     
@@ -7092,7 +7095,7 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
         • when a sequence of floats, it contains the five parameters for the
             Clements & Bekkers 1997 waveform model, AND the duration of the
             synthetic waveform whcih will be generated ad hoc (see also the 
-            `detect_mPSC` function in this module).
+            `detect_Events` function in this module).
     
     Im: str or int. The identifier of the membrane current signal contained in
         the segments of `x`.
@@ -7232,9 +7235,9 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
         
         if epoch is None:
             if template is None:
-                detection = detect_mPSC(im, waveform)
+                detection = detect_Events(im, waveform)
             else:
-                detection = detect_mPSC(im, template)
+                detection = detect_Events(im, template)
             
             if detection is None:
                 result.append(None)
@@ -7300,10 +7303,10 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
             for detect_epoch in mPSCdetectepochs:
                 sig = im.time_slice(detect_epoch.times[0], detect_epoch.times[0] + detect_epoch.durations[0])
                 if template is None:
-                    detection = detect_mPSC(sig, waveform) # only generate template ONCE
+                    detection = detect_Events(sig, waveform) # only generate template ONCE
                 else:
-                    detection = detect_mPSC(sig, template) 
-                    # starts, peaks, epoch_minis, template = detect_mPSC(sig, template) 
+                    detection = detect_Events(sig, template) 
+                    # starts, peaks, epoch_minis, template = detect_Events(sig, template) 
                 if detection is None:
                     continue
                 
@@ -7328,7 +7331,7 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
             # # waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
             # train.waveforms = waves
             train.annotations["peak_time"] = peak_times
-            train.annotations["source"] = "PSC_detection"
+            train.annotations["source"] = "Event_detection"
             
             if isinstance(template, neo.core.basesignal.BaseSignal):
                 train.annotations["PSC_parameters"] = template.annotations["parameters"]
@@ -7342,7 +7345,7 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
             # fit mPSC waves if asked
             if fit_waves:
                 for k,w in enumerate(mini_waves):
-                    fw = fit_mPSC(w, template.annotations["parameters"])
+                    fw = fit_Event(w, template.annotations["parameters"])
                     
                     mini_waves[k] = fw
                 
@@ -7361,8 +7364,10 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
     return result, template
         
     
-def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Optional[typing.Sequence]=None):
-    """Convenience wrapper to curvefitting.fit_mPSC_model with suitable lower & upper bounds
+def fit_Event(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Optional[typing.Sequence]=None):
+    """Convenience wrapper to curvefitting.fit_Event_model with suitable lower & upper bounds
+    
+    Modifies signal `x` in-place.
     
     Parameters:
     ===========
@@ -7413,8 +7418,8 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
     • the fitted curve (optional; this IS NOT present when `params` is a template)
     
     Its `annotations` attribute (a dict) contains the following mapping:
-    • "mPSC_fit" → the fit result, an OrderedDict with the results of the 
-        fitting function, in this case: curvefitting.fit_mPSC_model, mapping:
+    • "event_fit" → the fit result, an OrderedDict with the results of the 
+        fitting function, in this case: curvefitting.fit_Event_model, mapping:
         ∘ "Fit"             → the result of scipy.optimize.least_squares
         ∘ "Coefficients"    → the fitted parameters
         ∘ "Rsq"             → The R² value of the fit (a.k.a goodness of fit)
@@ -7448,8 +7453,8 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
         if params.t_start.magnitude != 0:
             params = neoutils.set_relative_time_start(params)
             
-        Rsq = crvf.fit_mPSC_wave(x_, params)
-        x.annotations["mPSC_fit"] = {"Rsq": Rsq, "template": True, "amplitude":sigp.waveform_amplitude(params)}
+        Rsq = crvf.fit_Event_wave(x_, params)
+        x.annotations["event_fit"] = {"Rsq": Rsq, "template": True, "amplitude":sigp.waveform_amplitude(params)}
         x.annotations["amplitude"] = sigp.waveform_amplitude(x)
         
     else:
@@ -7487,7 +7492,7 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
         xx = x_[:,0] # this always works even if there is only one channel, 
                     # and returns an AnalogSignal
                     
-        fitresult = crvf.fit_mPSC_model(xx, params, bounds = [lo, up])
+        fitresult = crvf.fit_Event_model(xx, params, bounds = [lo, up])
         
         fitted_x = type(x)(fitresult[0], units = x.units, t_start = x.t_start, sampling_rate = x.sampling_rate, name="mPSCfit")
         fitted_x.segment = x.segment
@@ -7510,11 +7515,11 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
         # NOTE: 2022-10-27 22:44:50
         # Restore the domain start of the waveform (see NOTE: 2022-10-27 22:44:40)
         x.t_start = t_start
-        x.annotate(mPSC_fit = fitresult[1],
+        x.annotate(event_fit = fitresult[1],
                    amplitude = sigp.waveform_amplitude(x[:,0]))
         
-        x.annotations["mPSC_fit"]["template"] = False
-        x.annotations["mPSC_fit"]["amplitude"] = sigp.waveform_amplitude(x[:,1])
+        x.annotations["event_fit"]["template"] = False
+        x.annotations["event_fit"]["amplitude"] = sigp.waveform_amplitude(x[:,1])
         
     
     return x

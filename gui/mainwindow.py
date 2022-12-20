@@ -304,35 +304,10 @@ import imaging.CaTanalysis as CaTanalysis
 if CaTanalysis.LSCaTWindow not in gui_viewers:
     gui_viewers += [CaTanalysis.LSCaTWindow]
     
-import ephys.mPSCanalysis as mPSCanalysis
-if mPSCanalysis.MPSCAnalysis not in gui_viewers:
-    gui_viewers += [mPSCanalysis.MPSCAnalysis]
+import ephys.EventAnalysis as EventAnalysis
+if EventAnalysis.EventAnalysis not in gui_viewers:
+    gui_viewers += [EventAnalysis.EventAnalysis]
     
-#if has_vigra:
-    #from imaging import (imageprocessing as imgp, imgsim,)
-    #from imaging import axisutils, vigrautils
-    #from imaging.axisutils import (axisTypeFromString, 
-                                   #axisTypeName,
-                                   #axisTypeStrings,
-                                   #axisTypeSymbol, 
-                                   #axisTypeUnits,
-                                   #dimEnum,
-                                   #dimIter,
-                                   #evalAxisTypeExpression,
-                                   #getAxisTypeFlagsInt,
-                                   #getNonChannelDimensions,
-                                   #hasChannelAxis,
-                                   #)
-    #from imaging.axiscalibration import (AxesCalibration,
-                                         #AxisCalibrationData, 
-                                         #ChannelCalibrationData, 
-                                         #CalibrationData)
-    
-    #from imaging.scandata import (AnalysisUnit, ScanData,)
-
-    #import imaging.CaTanalysis as CaTanalysis 
-    #if CaTanalysis.LSCaTWindow not in gui_viewers:
-        #gui_viewers += [CaTanalysis.LSCaTWindow]
 #### END scipyen imaging modules
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -3010,9 +2985,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
     @pyqtSlot()
     @safeWrapper
-    def slot_launchMPSCDetection(self):
-        mPSCWindow = self._newViewer(mPSCanalysis.MPSCAnalysis, parent=self)
-        mPSCWindow.show()
+    def slot_launchEventDetection(self):
+        eventDetectWindow = self._newViewer(EventAnalysis.EventAnalysis, parent=self)
+        eventDetectWindow.show()
     
     def _getHistoryBlockAsCommand_(self, magic=None):
         cmd = ""
@@ -3975,9 +3950,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.CaTAnalysisAction.triggered.connect(self.slot_launchCaTAnalysis)
         self.applicationsMenu.addAction(self.CaTAnalysisAction)
         
-        self.MPSCAnalysisAction = QtWidgets.QAction("mPSC Detection", self)
-        self.MPSCAnalysisAction.triggered.connect(self.slot_launchMPSCDetection)
-        self.applicationsMenu.addAction(self.MPSCAnalysisAction)
+        self.EventAnalysisAction = QtWidgets.QAction("Events Detection", self)
+        self.EventAnalysisAction.triggered.connect(self.slot_launchEventDetection)
+        self.applicationsMenu.addAction(self.EventAnalysisAction)
         
         self.analyseAPtrainsAction = QtWidgets.QAction("test", self)
         self.analyseAPtrainsAction.triggered.connect(self.slot_launchTest)

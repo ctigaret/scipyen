@@ -507,7 +507,7 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), method
     
     return fittedCurve, fittedComponentCurves, result
 
-def fit_mPSC_model(data, p0, **kwargs):
+def fit_Event_model(data, p0, **kwargs):
     """Fits a Clements & Bekkers '97 waveform through the data.
     
     Parameters:
@@ -747,7 +747,7 @@ def fit_mPSC_model(data, p0, **kwargs):
     
     return fittedCurve, result
 
-def fit_mPSC_wave(data, wave):
+def fit_Event_wave(data, wave):
     """R² between data and a template waveform
     
     Not a curve fit but a measure of how well the data is matched by the waveform

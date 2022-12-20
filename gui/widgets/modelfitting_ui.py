@@ -186,7 +186,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     # (based on parameter name and value type i.e. initial, lower
                     # or upper bound)
                     # This can be done using self.getSpinBox() method, see
-                    # mPSCanalysis.MPSCAnalysis for an example
+                    # mPSCanalysis.EventAnalysis for an example
                     w.setMinimum(self._spin_min_)
                     w.setMaximum(self._spin_max_)
                     
@@ -245,7 +245,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
         that is both physically and numerically reasonable, AFER the widget has
         been constructed.
         
-        See mPSCanalysis.MPSCAnalysis for an example.
+        See mPSCanalysis.EventAnalysis for an example.
         
         Parameters:
         ==========

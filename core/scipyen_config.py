@@ -894,12 +894,12 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
             
             default = val
             
-            # if win.__class__.__name__ == "MPSCAnalysis":
+            # if win.__class__.__name__ == "EventAnalysis":
             #     print(f" key {confname}, val {val}, {type(val)}, default {default}, {type(default)}")
             
             newval = loadQSettingsKey(qsettings, gname, key_prefix, confname, default)
             
-            # if win.__class__.__name__ == "MPSCAnalysis":
+            # if win.__class__.__name__ == "EventAnalysis":
             #     print(f" key {confname}, val {val}, {type(val)}, default {default}, {type(default)}, newval {newval}, {type(newval)}")
             
             if isinstance(setter, property):
@@ -1071,7 +1071,7 @@ class ScipyenConfigurable(object):
         in the config file then it does not need to reimplement this method. 
         This is what SignalViewer does, because it stores in the config file only
         data that is associated with objects that are NOT initialized during
-        __init__ (sich as the colours of various cursor types).
+        __init__ (such as the colours of various cursor types).
     
     2) must call saveSettings() inside the closeEvent() handler in the derived
         class
@@ -1110,7 +1110,7 @@ class ScipyenConfigurable(object):
         
         cfg = self._make_confuse_config_data_(change, isTop, parent, tag)
         #### BEGIN debug - comment out when done
-#         if self.__class__.__name__ == "MPSCAnalysis":
+#         if self.__class__.__name__ == "EventAnalysis":
 #             print(f"ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_():")
 #             stack = inspect.stack()
 #             for s in stack:
@@ -1151,14 +1151,14 @@ class ScipyenConfigurable(object):
                     scipyen_config[k][kk].set(vv)
                     
         #### BEGIN debug - comment out when done
-#         if self.__class__.__name__ == "MPSCAnalysis":
+#         if self.__class__.__name__ == "EventAnalysis":
 #             print(f"\twriting configuration file")
         #### END debug - comment out when done
             
         write_config(scipyen_config)
         
         #### BEGIN debug - comment out when done
-        # if self.__class__.__name__ == "MPSCAnalysis":
+        # if self.__class__.__name__ == "EventAnalysis":
         #     print(f"DONE ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_()\n\n")
         #### END debug - comment out when done
             
@@ -1214,7 +1214,7 @@ class ScipyenConfigurable(object):
                 return the same thing as if isTop were True ('cause there's no parent, let alone a tag)
                     
         """
-        # if self.__class__.__name__ == "MPSCAnalysis":
+        # if self.__class__.__name__ == "EventAnalysis":
         #     print(f"scipyen_config {id(scipyen_config)} {scipyen_config}")
             
         if isTop: 
@@ -1296,7 +1296,7 @@ class ScipyenConfigurable(object):
     
     def _assign_trait_from_config_(self, settername, val):
         #### BEGIN debug - comment out when done
-        # if self.__class__.__name__ == "MPSCAnalysis":
+        # if self.__class__.__name__ == "EventAnalysis":
         #     print(f"ScipyenConfigurable<{self.__class__.__name__}>._assign_trait_from_config_ settername {settername}, val {val}")
         #### END debug - comment out when done
         setter = inspect.getattr_static(self, settername, None)
@@ -1353,13 +1353,13 @@ class ScipyenConfigurable(object):
             parent = self._get_parent_()
             tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
             
-            # if self.__class__.__name__ == "MPSCAnalysis":
+            # if self.__class__.__name__ == "EventAnalysis":
             #     print(f"isTop: {isTop}, parent = {parent}, tag = {tag}")
                 
             user_conf = self._get_config_view_(isTop, parent, tag)
             
             # #### BEGIN debug - comment out when done
-            # if self.__class__.__name__ == "MPSCAnalysis":
+            # if self.__class__.__name__ == "EventAnalysis":
             #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings() to load user_conf:")
             #     pprint(user_conf)
             #### END debug - comment out when done
@@ -1372,7 +1372,7 @@ class ScipyenConfigurable(object):
 #                     if not isinstance(settername, str) or len(settername.strip())==0:
 #                         continue
 #                     
-#                     if self.__class__.__name__ == "MPSCAnalysis":
+#                     if self.__class__.__name__ == "EventAnalysis":
 #                         print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings key {k}: {settername} = {v}")
 #                     
 #                     self._assign_trait_from_config_(settername, v)
@@ -1418,13 +1418,13 @@ class ScipyenConfigurable(object):
             parent = self._get_parent_()
             tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
             
-            # if self.__class__.__name__ == "MPSCAnalysis":
+            # if self.__class__.__name__ == "EventAnalysis":
             #     print(f"isTop, {isTop}, parent, {parent}, tag {tag}")
                 
             user_conf = self._get_config_view_(isTop, parent, tag)
             
             #### BEGIN debug - comment out when done
-            # if self.__class__.__name__ == "MPSCAnalysis":
+            # if self.__class__.__name__ == "EventAnalysis":
             #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf:")
             #     pprint(user_conf)
                 
@@ -1450,7 +1450,7 @@ class ScipyenConfigurable(object):
                         val  = getter()
 
                     #### BEGIN debug - comment out when done
-                    # if self.__class__.__name__ == "MPSCAnalysis":
+                    # if self.__class__.__name__ == "EventAnalysis":
                     #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings(), getter={gettername} → {k}={val} ({type(val).__name__}), v {v} ({type(v).__name__})")
                     #### END debug - comment out when done
                     
@@ -1470,13 +1470,13 @@ class ScipyenConfigurable(object):
                         
             if changed:
                 #### BEGIN debug - comment out when done
-                # if self.__class__.__name__ == "MPSCAnalysis":
+                # if self.__class__.__name__ == "EventAnalysis":
                 #     print(f"\twriting configuration file")
                 #### END debug - comment out when done
                 # self._update_config_view(user_conf, isTop, parent, tag)
                 write_config(scipyen_config)
                 #### BEGIN debug - comment out when done
-                # if self.__class__.__name__ == "MPSCAnalysis":
+                # if self.__class__.__name__ == "EventAnalysis":
                 #     print(f"DONE ScipyenConfigurable<{self.__class__.__name__}>.saveSettings()\n\n")
                 #### END debug - comment out when done
                 

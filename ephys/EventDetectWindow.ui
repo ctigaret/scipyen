@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <author>Cezar Tigaret</author>
- <class>mPSCDetectWindow</class>
- <widget class="QMainWindow" name="mPSCDetectWindow">
+ <class>EventDetectWindow</class>
+ <widget class="QMainWindow" name="EventDetectWindow">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -12,7 +12,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>mPSC Detect</string>
+   <string>Detect Events</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -280,7 +280,7 @@
                 <string>Use mPSC template waveform instead of model-generated waveform</string>
                </property>
                <property name="text">
-                <string>Use mPSC Template</string>
+                <string>Use Event Template</string>
                </property>
               </widget>
              </item>
@@ -657,7 +657,7 @@
      <x>0</x>
      <y>0</y>
      <width>808</width>
-     <height>20</height>
+     <height>28</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -723,7 +723,7 @@
    </widget>
    <widget class="QMenu" name="menuDetect_mPSCs">
     <property name="title">
-     <string>Detect Events</string>
+     <string>Event Detection</string>
     </property>
     <widget class="QMenu" name="menuCurrent_Sweep">
      <property name="title">
@@ -1201,10 +1201,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Plot detected events</string>
+    <string>Plot events in the sweep</string>
    </property>
    <property name="toolTip">
-    <string>Plot events detected in current sweep</string>
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Plot events detected in current sweep.&lt;/p&gt;&lt;p&gt;These are both accepted and rejected events.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="actionPlot_mPSC_template">
@@ -1426,7 +1426,7 @@
     <string>Plot all events</string>
    </property>
    <property name="toolTip">
-    <string>Plot all detected events in the data</string>
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Plot all detected events in the data.&lt;/p&gt;&lt;p&gt;Normally therse are only the accepted events, unless &amp;quot;All waves to result&amp;quot; is checked.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="actionAll_waves_to_result">

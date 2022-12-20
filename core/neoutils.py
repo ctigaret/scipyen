@@ -4720,7 +4720,13 @@ def extract_waves(x:neo.SpikeTrain, waveunits:pq.Quantity, **kwargs):
                 annt = dict((key, val[k]) for (key, val) in annotations.items())
                 wave.annotate(**annt)
                 
-            wave.annotate(spiketrain = x)
+            # NOTE: 2022-12-20 12:56:13
+            # it is useful to record the index number of the wave in the train
+            # in csase the resulting wave collection if further filtered by some
+            # condition which leaves waves out; in this way the wave_index of the
+            # wave can vbe used to point back to the original waveform in the train
+            # should some changes be made later to the waveform
+            wave.annotate(spiketrain = x, wave_index = k)
             
             # NOTE: 2022-12-19 08:43:47
             # we do NOT array annnotate the waveforms here.
