@@ -822,6 +822,7 @@
    <addaction name="actionDetect"/>
    <addaction name="actionUndo"/>
    <addaction name="actionPlot_detected_events"/>
+   <addaction name="actionPlot_all_events"/>
    <addaction name="actionAlign_event_waveforms"/>
    <addaction name="actionPlot_aligned_event_waveforms"/>
    <addaction name="actionView_results"/>
