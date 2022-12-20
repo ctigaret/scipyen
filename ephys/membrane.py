@@ -7039,10 +7039,10 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
         else:
             return result
 
-def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), Im:typing.Union[int, str] = "IN0", epoch=None, clear_spiketrains:bool=True, fit_waves:bool=False):
-    """Batch m(E/I)PSC analysis.
+def batch_EventDetection(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), Im:typing.Union[int, str] = "IN0", epoch=None, clear_spiketrains:bool=True, fit_waves:bool=False):
+    """Batch event detection - e.g., mini EPSC, IPSC, etc.
     
-    Detects and analyses mPSCs in a neo.Block, neo.Segment, or a sequence of 
+    Detects and analyses events (e.g. mini ePSCs) in a neo.Block, neo.Segment, or a sequence of 
     neo.Segment objects.
     
     Calls detect_Events for each segment in `x`, and generates a spiketrain with
@@ -7371,7 +7371,8 @@ def fit_Event(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opt
     
     Parameters:
     ===========
-    x: neo.AnalogSignal or DataSignal) with a miniEPSC (i.e. fragment of a signal)
+    x: neo.AnalogSignal or DataSignal) with an event such as a mmini ePSC   
+        (i.e. fragment of a signal)
     
     params: sequence of float scalars; these are the initial parameter values for
             the Clements & Bekkers '97 model:

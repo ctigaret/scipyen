@@ -562,7 +562,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.actionImport_Event_Template.triggered.connect(self._slot_importTemplate)
         self.actionSave_Event_Template.triggered.connect(self._slot_saveTemplateFile)
         self.actionExport_Event_Template.triggered.connect(self._slot_exportTemplate)
-        self.actionRemember_mPSC_Template.triggered.connect(self._slot_storeTemplateAsDefault)
+        self.actionRemember_Event_Template.triggered.connect(self._slot_storeTemplateAsDefault)
         self.actionForget_Event_Template.triggered.connect(self._slot_forgetTemplate)
         self.actionDetect_in_current_sweep.triggered.connect(self._slot_detectCurrentSweep)
         self.actionClear_default.triggered.connect(self._slot_clearFactoryDefaultTemplateFile)
@@ -582,11 +582,11 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.actionUndo.triggered.connect(self._slot_undoDetection)
         self.actionView_results.triggered.connect(self.slot_showReportWindow)
         self.actionSave_results.triggered.connect(self._slot_saveResults)
-        self.actionExport_results.triggered.connect(self._slot_exportPSCresult)
-        self.actionSave_event_trains.triggered.connect(self._slot_savePSCtrains)
-        self.actionExport_event_trains.triggered.connect(self._slot_exportPSCtrains)
-        self.actionSave_event_waveforms.triggered.connect(self._slot_savePSCwaves)
-        self.actionExport_event_waveforms.triggered.connect(self._slot_exportPSCwaves)
+        self.actionExport_results.triggered.connect(self._slot_exportEventsTable)
+        self.actionSave_event_trains.triggered.connect(self._slot_saveEventTrains)
+        self.actionExport_event_trains.triggered.connect(self._slot_exportEventTrains)
+        self.actionSave_event_waveforms.triggered.connect(self._slot_saveEventWaves)
+        self.actionExport_event_waveforms.triggered.connect(self._slot_exportEventWaves)
         self.actionClear_results.triggered.connect(self._slot_clearResults)
         self.actionUse_default_location_for_persistent_event_template.triggered.connect(self._slot_useDefaultTemplateLocation)
         # self.actionChoose_persistent_event_template_file.triggered.connect(self._slot_choosePersistentTemplateFile)
@@ -1643,6 +1643,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
             train = frameResult[self._displayed_detection_channel_]
             
+            if train.annotations.get("source", None) != "Event_detection":
+                return
+            
             sig_name = train.annotations.get("signal_origin", None)
             
             if not isinstance(sig_name, str) or len(sig_name.strip()) == 0:
@@ -2653,14 +2656,14 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 pio.saveHDF5(resultsDF, fn)
              
     @pyqtSlot()
-    def _slot_savePSCtrains(self):
+    def _slot_saveEventTrains(self):
         results = self.result()
         if results is None:
             return
         
         resultsDF, resultsTrains, resultsWaves = results
         
-        fn, fl = self.chooseFile("Save mPSC trains",
+        fn, fl = self.chooseFile("Save event trains",
                                  fileFilter = ";;".join(["Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]),
                                  single=True,
                                  save=True)
@@ -2673,14 +2676,14 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 pio.saveHDF5(resultsTrains, fn)
                 
     @pyqtSlot()
-    def _slot_savePSCwaves(self):
+    def _slot_saveEventWaves(self):
         results = self.result()
         if results is None:
             return
         
         resultsDF, resultsTrains, resultsWaves = results
         
-        fn, fl = self.chooseFile("Save mPSC waves",
+        fn, fl = self.chooseFile("Save event waveforms",
                                  fileFilter = ";;".join(["Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]),
                                  single=True,
                                  save=True)
@@ -2693,38 +2696,38 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 pio.saveHDF5(resultsWaves, fn)
                 
     @pyqtSlot()
-    def _slot_exportPSCresult(self):
+    def _slot_exportEventsTable(self):
         results = self.result()
         if results is None:
             return
         
         resultsDF, resultsTrains, resultsWaves = results
         
-        varName = f"{self._data_.name}_mPSC_table"
+        varName = f"{self._data_.name}_events_table"
         
-        self.exportDataToWorkspace(resultsDF, var_name=varName, title="Export mPSC table to workspace")
+        self.exportDataToWorkspace(resultsDF, var_name=varName, title="Export events table to workspace")
         
     @pyqtSlot()
-    def _slot_exportPSCtrains(self):
+    def _slot_exportEventTrains(self):
         results = self.result()
         if results is None:
             return
         
         resultsDF, resultsTrains, resultsWaves = results
         
-        varName = f"{self._data_.name}_mPSC_trains"
+        varName = f"{self._data_.name}_event_trains"
         
         self.exportDataToWorkspace(resultsTrains, var_name=varName, title="Export mPSC trains to workspace")
         
     @pyqtSlot()
-    def _slot_exportPSCwaves(self):
+    def _slot_exportEventWaves(self):
         results = self.result()
         if results is None:
             return
         
         resultsDF, resultsTrains, resultsWaves = results
         
-        varName = f"{self._data_.name}_mPSC_waves"
+        varName = f"{self._data_.name}_event_waves"
         
         self.exportDataToWorkspace(resultsWaves, var_name=varName, title="Export mPSC waves to workspace")
         
@@ -4478,6 +4481,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 continue
             
             for st in frameResult:
+                if st.annotations.get("source", None) != "Event_detection":
+                    continue
                 psc_trains.append(st)
                 st_waves = neoutils.extract_waves(st, st.annotations["signal_units"], prefix=st.annotations["signal_origin"])
                 # use only accepted waves, unless self.allWavesToResult is True
@@ -4528,6 +4533,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 if len(valid_train_waves):
                     all_waves.extend(valid_train_waves)
                 
+        if len(psc_trains) == 0:
+            return
                 
         res = {"Source":source_id, "Cell": cell_id, "Field": field_id,
                "Age": age, "Sex": sex, "Genotype":genotype, 
