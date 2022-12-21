@@ -154,7 +154,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._rsq_threshold_ = 0.
         # self._accept_waves_cache_ = list() # a set for each segment
         self._overlayTemplateModel = False
-        self._event_template_ = None
         self._template_showing_ = False
         
         self._data_ = None
@@ -554,16 +553,24 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.actionPlot_detected_events.triggered.connect(self._plot_detected_events)
         self.actionPlot_all_events.triggered.connect(self._plot_all_events)
         self.actionPlot_aligned_event_waveforms.triggered.connect(self._plot_aligned_waves)
+        self.actionPlot_aligned_event_waveforms.setEnabled(False)
         self.actionMake_Event_Detection_Epoch.triggered.connect(self._slot_make_mPSCEpoch)
         self.actionOpen_Event_Template.triggered.connect(self._slot_openTemplateFile)
         self.actionCreate_Event_Template.triggered.connect(self._slot_create_mPSC_template)
+        self.actionCreate_Event_Template.setEnabled(False)
         self.actionPlot_Event_template.triggered.connect(self._plot_template_)
+        self.actionPlot_Event_template.setEnabled(False)
         self.actionPlot_events_for_template.triggered.connect(self._plot_aligned_waves)
+        self.actionPlot_events_for_template.setEnabled(False)
         self.actionImport_Event_Template.triggered.connect(self._slot_importTemplate)
         self.actionSave_Event_Template.triggered.connect(self._slot_saveTemplateFile)
+        self.actionSave_Event_Template.setEnabled(False)
         self.actionExport_Event_Template.triggered.connect(self._slot_exportTemplate)
+        self.actionExport_Event_Template.setEnabled(False)
         self.actionRemember_Event_Template.triggered.connect(self._slot_storeTemplateAsDefault)
+        self.actionRemember_Event_Template.setEnabled(False)
         self.actionForget_Event_Template.triggered.connect(self._slot_forgetTemplate)
+        self.actionForget_Event_Template.setEnabled(False)
         self.actionDetect_in_current_sweep.triggered.connect(self._slot_detectCurrentSweep)
         self.actionClear_default.triggered.connect(self._slot_clearFactoryDefaultTemplateFile)
         self.actionChoose_persistent_event_template_file.triggered.connect(self._slot_choosePersistentTemplateFile)
@@ -1010,7 +1017,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
 #             if st.annotations.get("source", None) != "Event_detection":
 #                 return
 #             
-#             self._detected_events_ = neoutils.extract_waves(st, st.annotations["signal_units"], prefix=st.annotations["signal_origin"])
+#             self._detected_events_ = neoutils.extract_spike_train_waveforms(st, st.annotations["signal_units"], prefix=st.annotations["signal_origin"])
         
         # self._plot_detected_events()
         
@@ -1107,7 +1114,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         lo = tuple(p.magnitude for p in model_params["Lower Bound:"])
         up = tuple(p.magnitude for p in model_params["Upper Bound:"])
             
-        minis = neoutils.extract_waves(st, st.annotations["signal_units"], **kwargs)
+        minis = neoutils.extract_spike_train_waveforms(st, st.annotations["signal_units"], **kwargs)
         
         fitted_minis = list()
         
@@ -1179,17 +1186,22 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             aligned_waveforms, wave_ndx = alignment
             aligned_waves.extend(aligned_waveforms)
             
-        self._aligned_waves_[:] = aligned_waves
-        
+        if len(aligned_waves):    
+            self._aligned_waves_[:] = aligned_waves
+            for action in (self.actionCreate_Event_Template,
+                           self.actionPlot_events_for_template,
+                           self.actionPlot_aligned_event_waveforms):
+                action.setEnabled(True)
+            
         self._plot_aligned_waves()
             
             
     def _extract_waves_(self, train, valid_only=False):
         """Extracts event wavforms from the train.
-        Calls neoutils.extract_waves then annotates the waveforms with information
+        Calls neoutils.extract_spike_train_waveforms then annotates the waveforms with information
         useful for event tagging in the plotted signal.
         """
-        waves = neoutils.extract_waves(train, train.annotations["signal_units"],
+        waves = neoutils.extract_spike_train_waveforms(train, train.annotations["signal_units"],
                                        prefix=train.annotations["signal_origin"])
         
         if valid_only:
@@ -1270,14 +1282,10 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             warnings.warn("The events waveforms do not appear to have been fitted", category=RuntimeWarning)
             self.errorMessage(self.windowTitle(), "The events waveforms do not appear to have been fitted")
             return
-            # train = self._fit_waves_(train)
-            # event_fit = train.annotations["event_fit"]
-            # accepted = train.annotations["Accept"]
             
         signal_origin = train.annotations.get("signal_origin", None)
         
         # print(f"_make_aligned_waves_ signal_origin {signal_origin}")
-        
         
         if signal_origin is None:
             warnings.warn("No signal origin found in the spike train", category=RuntimeWarning)
@@ -1332,7 +1340,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             dc = np.mean(baseline, axis=0)
             aligned_wave -= dc
             
-            # no need to annotatw the original start tiem: these ARE the train's
+            aligned_wave = neoutils.set_relative_time_start(aligned_wave)
+            
+            # no need to annotate the original start time: these ARE the train's
             # times attribute
             aligned_wave.annotate(channel_id = train.annotations["channel_id"],
                           amplitude = train.annotations["amplitude"][kw],
@@ -1340,7 +1350,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                           event_fit = train.annotations["event_fit"][kw],
                           Accept = train.annotations["Accept"][kw],
                           signal_origin = train.annotations["signal_origin"],
-                          Aligned = True,
+                          Aligned = np.array([True]),
                           wave_index = wave_ndx)
             
             if write_back:
@@ -1352,30 +1362,29 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             train.annotations["Aligned"] = True
             
         return aligned_waves, wave_index
+
+    def _combine_model_and_template_(self):
+        modelwave = self._get_event_template_or_waveform_(use_template=False)
+        maxLen = max(modelwave.shape[0], self._event_template_.shape[0])
+        maxChannels = modelwave.shape[1] + self._event_template_.shape[1]
         
-    def _average_waves_(self, train):
-        # waves = neoutils.extract_waves(train, train.annotations["signal_units"])
-        if len(self._aligned_waves_):
-            # self._aligned_waves_[:] = waves
-            self._event_template_ = ephys.average_signals(self._aligned_waves_)
-            self._event_template_.description = "Average Event Waveform"
-            self._event_template_.name ="Event Template"
-            dataOriginName = self.metaDataWidget.value()["Name"]
-            dateTime = datetime.datetime.now()
-            dateTimeStr = dateTime.strftime("%d_%m_%Y_%H_%M_%S")
-            if not isinstance(dataOriginName, str) or len(dataOriginName.strip()) == 0:
-                if isinstance(self._data_, (tuple, list)) and all(isinstance(v, neo.Segment) for v in self._data_):
-                    dataOriginName = f"List of segments {dateTimeStr}"
-                else:
-                    dataOriginName = f"Averaged Event template {dateTimeStr}"
-            
-            self._event_template_.annotations.update({"datetime":dateTime,
-                                                        "data_origin":dataOriginName})
-            
-            
-            self._plot_aligned_waves()
-            self._plot_template_()
-            
+        combinedWaves = np.full((maxLen, maxChannels), fill_value = np.nan)
+        
+        # print(combinedWaves.shape)
+        
+        combinedWaves[0:self._event_template_.shape[0],0:self._event_template_.shape[1]] = self._event_template_.magnitude
+        combinedWaves[0:modelwave.shape[0],-1] = modelwave[:,0].flatten().magnitude
+        
+        merged = neo.AnalogSignal(combinedWaves, 
+                                units = self._event_template_.units, 
+                                t_start = 0*pq.s,
+                                sampling_rate = self._event_template_.sampling_rate,
+                                name = self._event_template_.name,
+                                description = self._event_template_.description)
+        merged.annotations.update(self._event_template_.annotations)
+        # print(merged.shape)
+        
+        return merged
             
     def _plot_model_(self):
         """Plots event model waveform"""
@@ -1385,24 +1394,15 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             self._waveFormViewer_.sig_closeMe.connect(self._slot_waveFormViewer_closed)
             
         if self._overlayTemplateModel and isinstance(self._event_template_, neo.AnalogSignal):
-            modelwave = self._get_event_template_or_waveform_(use_template = False)
-            maxLen = max(modelwave.shape[0], self._event_template_.shape[0])
-            combinedWaves = np.full((maxLen, 2), fill_value = np.nan)
-            combinedWaves[0:self._event_template_.shape[0],0] = self._event_template_[:,0].flatten().magnitude
-            combinedWaves[0:modelwave.shape[0],1] = modelwave[:,0].flatten().magnitude
-            merged = neo.AnalogSignal(combinedWaves, 
-                                      units = self._event_template_.units, 
-                                      t_start = 0*pq.s,
-                                      sampling_rate = self._event_template_.sampling_rate,
-                                      name = self._event_template_.name,
-                                      description = self._event_template_.description)
-            merged.annotations.update(self._event_template_.annotations)
-            self._waveFormViewer_.view(merged)
+            merged = self._combine_model_and_template_()
+            
+            self._waveFormViewer_.view(merged, doc_title=merged.name)
+            
         else:
             waveform = self._get_event_template_or_waveform_()
             
             if isinstance(waveform, (neo.AnalogSignal, DataSignal)):
-                self._waveFormViewer_.view(waveform)
+                self._waveFormViewer_.view(waveform, doc_title=waveform.name)
             
     def _plot_template_(self):
         """Plots event template"""
@@ -1414,22 +1414,24 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
 
         if isinstance(self._event_template_, neo.AnalogSignal):
             if self.overlayTemplateModel:
-                modelwave = self._get_event_template_or_waveform_(use_template = False)
-                maxLen = max(modelwave.shape[0], self._event_template_.shape[0])
-                combinedWaves = np.full((maxLen, 2), fill_value = np.nan)
-                combinedWaves[0:self._event_template_.shape[0],0] = self._event_template_[:,0].flatten().magnitude
-                combinedWaves[0:modelwave.shape[0],1] = modelwave[:,0].flatten().magnitude
-                merged = neo.AnalogSignal(combinedWaves, 
-                                        units = self._event_template_.units, 
-                                        t_start = 0*pq.s,
-                                        sampling_rate = self._event_template_.sampling_rate,
-                                        name = self._event_template_.name,
-                                        description = self._event_template_.description)
-                merged.annotations.update(self._event_template_.annotations)
-                self._waveFormViewer_.view(merged)
+                merged = self._combine_model_and_template_()
+                self._waveFormViewer_.view(merged, doc_title=merged.name)
             else:
-                self._waveFormViewer_.view(self._event_template_)
-            
+                self._waveFormViewer_.view(self._event_template_, doc_title=self._event_template_.name)
+                
+            event_fit = self._event_template_.annotations.get("event_fit", None)
+            if isinstance(event_fit, dict):
+                waveR2 = event_fit.get("Rsq", None)
+                if waveR2 is not None:
+                    wavelabel = "R² = %.2f" % waveR2
+                    
+                waxis = self._waveFormViewer_.axis(0)
+                self._waveFormViewer_.removeLabels(waxis)
+                [[x0,x1], [y0,y1]]  = waxis.viewRange()
+                
+                self._waveFormViewer_.addLabel(wavelabel, 0, pos = (x0,y1), 
+                                               color=(0,0,0), anchor=(0,1))
+                
     def _init_ephysViewer_(self):   
         self._ephysViewer_ = sv.SignalViewer(win_title=self._winTitle_, 
                                                 parent=self, configTag="DataViewer")
@@ -1589,7 +1591,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
         self._detected_Events_Viewer_.removeLabels(0)
         self._events_spinBoxSlider_.setRange(0, len(self._aligned_waves_)-1)
-        self._detected_Events_Viewer_.view(self._aligned_waves_)
+        self._detected_Events_Viewer_.view(self._aligned_waves_, doc_title="Aligned events")
         
     def _plot_all_events(self):
         if not isinstance(self._ephysViewer_, sv.SignalViewer):
@@ -1744,6 +1746,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         # whether the displayed wave is accepted, and its goodness of fit (R²)
         peak_time = current_wave.annotations["peak_time"]
         accepted = current_wave.annotations["Accept"]
+        if isinstance(accepted, np.ndarray):
+            accepted = accepted[0]
+        
         frame_wave_index = current_wave.annotations["wave_index"]
         
         event_fit = current_wave.annotations["event_fit"]
@@ -1859,7 +1864,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     symbol = "event2"
                     y = v
                     
-                acc = w.annotations.get("Accept", None)
+                acc = w.annotations.get("Accept", np.array([True]))
+                if isinstance(acc, np.ndarray):
+                    acc = acc[0]
                 
                 if acc == True:
                     brush = acc_targetBrush#[0:3] + (255,)
@@ -2079,20 +2086,20 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
         if use_template: # return the cached template if it exists
             if isinstance(self._event_template_, neo.AnalogSignal) and self._event_template_.name == "Event Template":
-                return self._event_template_
+                return self._event_template_[:,0] # discard any possible fit channels
             else: # no template is loaded; get one from custom file or default file, or generate a synthetic waveform
                 template_OK = False
                 if os.path.isfile(self._custom_template_file_):
                     tpl = pio.loadFile(self._custom_template_file_)
                     if isinstance(tpl, neo.AnalogSignal) and tpl.name == "Event Template":
                         self._event_template_ = tpl
-                        return self._event_template_
+                        return self._event_template_[:,0]# discard any possible fit channels
                 
                 if not template_OK and os.path.isfile(self._template_file_):
                     tpl = pio.loadFile(self._template_file_)
                     if isinstance(tpl, neo.AnalogSignal) and tpl.name == "Event Template":
                         self._event_template_ = tpl
-                        return self._event_template_
+                        return self._event_template_[:,0] # discard any possible fit channels
                 
                 if not template_OK:
                     signalBlocker = QtCore.QSignalBlocker(self.use_eventTemplate_CheckBox)
@@ -2414,15 +2421,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     # print(len(θ_), [type(t) for t in θ_])
                     # print(*θ_)
                     # print(type(*θ_))
-                    # for t in st_:
-                    #     minis.extend(t.annotations["minis"])
                     st = neoutils.splice_signals(*st_)
                     st.name= "events"
-                    # if len(st_) > 1:
-                    #     st = neoutils.splice_signals(*st_)
-                    # else:
-                    #     st = st_[0]
-                        
                     st.segment = segment
                     
                     pt = np.concatenate([t.annotations["peak_time"].magnitude for t in st_], axis=0) * st_[0].units
@@ -2469,7 +2469,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                                 signal_origin = sig.name,
                                 datetime = datetime.datetime.now(),
                                 Aligned = False,
-                                Accept = accept,
+                                Accept = np.concatenate(accept),
                                 segment_index = segment_index
                                 )
                     
@@ -2551,9 +2551,56 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     @pyqtSlot()
     def _slot_create_mPSC_template(self):
         # FIXME 2022-12-14 18:54:04
-        alignment = self._make_aligned_waves_()
-        if isinstance(self._event_template_, neo.AnalogSignal):
-            self.use_eventTemplate_CheckBox.setEnabled(True)
+        if len(self._aligned_waves_) == 0:
+            return
+        
+        try:
+            klass = type(self._aligned_waves_[0])
+            merged = neoutils.concatenate_signals(*self._aligned_waves_)
+            
+            self._event_template_ = klass(merged.mean(axis=1),
+                                          units = merged.units,
+                                          t_start = merged.t_start,
+                                          sampling_rate = merged.sampling_rate,
+                                          name = "Event_template")
+            
+            self._event_template_.annotate(channel_id = self._aligned_waves_[0].annotations["channel_id"],
+                                           signal_origin = self._aligned_waves_[0].annotations["signal_origin"],
+                                           source = str(self.metaDataWidget.sourceID),
+                                           cell = str(self.metaDataWidget.cell),
+                                           field = str(self.metaDataWidget.field),
+                                           age = str(self.metaDataWidget.age),
+                                           sex = str(self.metaDataWidget.sex),
+                                           genotype = str(self.metaDataWidget.genotype),
+                                           dataname = str(self.metaDataWidget.dataName),
+                                           datetime = datetime.datetime.now())
+            
+            self._event_template_.array_annotate(channel_names = self._aligned_waves_[0].array_annotations["channel_names"][0],
+                                                channel_ids = self._aligned_waves_[0].array_annotations["channel_ids"][0],
+                                                nADCNum = self._aligned_waves_[0].array_annotations["nADCNum"][0])
+            
+            model_params = self.paramsWidget.value()
+            init_params = tuple(float(p) for p in model_params["Initial Value:"])
+            lo = tuple(float(p) for p in model_params["Lower Bound:"])
+            up = tuple(float(p) for p in model_params["Upper Bound:"])
+            fw = membrane.fit_Event(self._event_template_, init_params, lo, up)
+            
+            self._event_template_ = fw
+            for action in (self.actionSave_Event_Template,
+                           self.actionExport_Event_Template,
+                           self.actionRemember_Event_Template,
+                           self.actionForget_Event_Template,
+                           self.actionPlot_Event_template):
+                action.setEnabled(isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)))
+            
+            self._plot_template_()
+            
+        except Exception as e:
+            traceback.print_exc()
+            excstr = traceback.format_exception(e)
+            self.criticalMessage("Make event template",
+                                 "\n".join(excstr))
+            
         
     @pyqtSlot(str)
     def _slot_badBounds(self, param):

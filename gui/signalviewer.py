@@ -1691,7 +1691,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         elif isinstance(axis, int):
             if axis not in range(-len(self.axes), len(self.axes)):
-                raise ValueError(f"axis index {axis} ir out of range for {len(self.axes)} axes")
+                raise ValueError(f"axis index {axis} is out of range for {len(self.axes)} axes")
             
             axNdx = axis
             axis = self.axes[axis]
@@ -1950,8 +1950,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def removeLabels(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None):
         """ Removes ALL labels (TextItems) from the given axis
         """
-        pass
-        
+        if axis not in range(-len(self.plotItems), len(self.plotItems)):
+            return
+            
         axis, axNdx = self._check_axis_spec_ndx_(axis)
         cFrame = self.frameIndex[self.currentFrame]
         

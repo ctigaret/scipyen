@@ -159,8 +159,13 @@ import numpy as np
 import scipy
 import quantities as pq
 import neo
-from neo.core.baseneo import (MergeError, merge_annotations, intersect_annotations,
-                              _reference_name, _container_name)
+# from neo.core.baseneo import (MergeError, merge_annotations, intersect_annotations,
+#                               _reference_name, _container_name)
+
+# NOTE: 2022-12-21 10:48:47
+# use the more relaxed version of intersect_annotations and merge_annotations
+from neo.core.baseneo import (MergeError, _reference_name, _container_name)
+
 from neo.core.dataobject import (DataObject, ArrayDict)
 import matplotlib as mpl
 
@@ -2437,7 +2442,7 @@ def splice_signals(*args, times=None):
     
 
 @safeWrapper
-def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_units:bool = False, set_domain_start:typing.Optional[float] = None, force_contiguous:bool=True, padding:typing.Optional[typing.Union[bool, pq.Quantity]]=False, overwrite:bool=False):
+def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_units:bool = False, ignore_annotations:bool=True, ignore_array_annotations:bool=True, set_domain_start:typing.Optional[float] = None, force_contiguous:bool=True, padding:typing.Optional[typing.Union[bool, pq.Quantity]]=False, overwrite:bool=False):
     """Concatenates regularly sampled signals.
     
     Implements the functionality of neo.AnalogSignal's merge() and concatenate()
@@ -2490,13 +2495,31 @@ def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_
         
     ignore_units = bool, default False
         When True, will skip checks for units compatibilty among signals.
+    
+    ignore_annotations = bool, default True
+        When False, the annotations will be merged. 
+    
+        WARNING: When True, the result will LACK annotations; the caller should 
+        assign new annotations, as needed, to the new signal.
+    
+        NOTE/FIXME: This needs more work, therefore by default this is True
+        
+    ignore_array_annotations = bool, default True
+        When False, the array_annotations will be merged. 
+    
+        WARNING: When True, the result will LACK array annotations; the caller 
+        should assign new array annotations, as needed, to the new signal.
+    
+        NOTE/FIXME: This needs more work, therefore by default this is True
         
     force_contiguous:bool, default True
         When concatenating signals across the domain axis, assign new domain
         values when signals' domains overlap
         
     padding, overwrite: parameters used when signals are concatenated across the
-    domain axis (see neo.AnalogSignal.concatenate() for details)
+        domain axis (typically thsi is axis 0).
+    
+        See neo.AnalogSignal.concatenate() for details
     
     """
     def __get_default_attr__(val, default):
@@ -2509,7 +2532,6 @@ def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_
                                                                                           ("annotations", {}),
                                                                                           ("array_annotations", ArrayDict(s.shape[-1]))))
         
-    
     if len(args) == 1:
         if isinstance(args[0], (tuple, list)):
             signals = args[0]
@@ -2583,21 +2605,31 @@ def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_
         if sum(len(x) for x in files) > 0:
             kwargs["file_origin"] = f"{action}(" + ", ".join(files) + ")"
         
-        
-        f_annots = intersect_annotations if axis == 0 else merge_annotations
-        f_aannots = intersect_annotations if axis == 0 else merge_array_annotations
-        
-        new_annotations = reduce(f_annots, annots)
-        new_array_annotations = reduce(f_aannots, aannots)
-        
-        if axis == 0:
-            kwargs["annotations"] = new_annotations
-        else:
-            kwargs.update(new_annotations)
+        if not ignore_annotations:
+            f_annots = intersect_annotations if axis == 0 else merge_annotations
+            new_annotations = reduce(f_annots, annots)
             
-        kwargs["array_annotations"] = new_array_annotations
+        else:
+            new_annotations = None
+            
+        if not ignore_array_annotations:
+            f_aannots = intersect_annotations if axis == 0 else merge_array_annotations
         
-        if axis == 1: #  merging
+            new_array_annotations = reduce(f_aannots, aannots)
+            
+        else:
+            new_array_annotations = None
+        
+        if isinstance(new_annotations, dict):
+            if axis == 0:
+                kwargs["annotations"] = new_annotations
+            else:
+                kwargs.update(new_annotations)
+            
+        if isinstance(new_array_annotations, neo.core.dataobject.ArrayDict):
+            kwargs["array_annotations"] = new_array_annotations
+        
+        if axis == 1: #  concatenation on the channel axis (axis 1) a.k.a "merging"
             # NOTE: 2021-11-08 19:39:33
             # code parts from neo.core.basesignal.BaseSignal.merge()
             data = np.hstack(signal_data)
@@ -2613,7 +2645,7 @@ def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_
                                sampling_rate=sampling_rate, **kwargs)
             
                 
-        else: # concatenation on the domain axis
+        else: # concatenation on the domain axis (axis 0)
             # NOTE: 2021-11-08 19:39:04
             # code parts from neo.AnalogSignal.concatenate()
             # check gaps and overlaps in the signal's domains
@@ -4584,7 +4616,7 @@ def inverse_lookup(signal, value, channel=0, rtol=1e-05, atol=1e-08, equal_nan =
     return ret, index, sigvals
 
     
-def extract_waves(x:neo.SpikeTrain, waveunits:pq.Quantity, **kwargs):
+def extract_spike_train_waveforms(x:neo.SpikeTrain, waveunits:pq.Quantity, **kwargs):
     """Extracts the waveforms from a spike train, as a list of AnalogSignals.
     The waveforms represent the events with time stamps stored in the spike train.
     There seems to be no real convention as to what event time stamp is stored:
@@ -4742,3 +4774,125 @@ def extract_waves(x:neo.SpikeTrain, waveunits:pq.Quantity, **kwargs):
                                   
         if len(waves):
             return waves
+
+def intersect_annotations(A, B):
+    """
+    NOTE: This is a copy of the neo.core.baseneo.intersect_annotations
+    functions which is more relaxed when in comparing numpy.bool_ with bool
+    (normalizing to numpy.bool_)
+
+    Original documentation follows:
+    
+    Identify common entries in dictionaries A and B
+    and return these in a separate dictionary.
+
+    Entries have to share key as well as value to be
+    considered common.
+    
+    Parameters
+    ----------
+    A, B : dict
+        Dictionaries to merge.
+    """
+
+    result = {}
+
+    for key in set(A.keys()) & set(B.keys()):
+        v1, v2 = A[key], B[key]
+        
+        if isinstance(v1, bool):
+            v1 = np.array([v1], dtype=np.bool_)
+            
+        if isinstance(v2, bool):
+            v1 = np.array([v2], dtype=np.bool_)
+            
+        assert type(v1) == type(v2), 'type({}) {} != type({}) {}'.format(v1, type(v1),
+                                                                         v2, type(v2))
+        if isinstance(v1, dict) and v1 == v2:
+            result[key] = deepcopy(v1)
+            
+        elif isinstance(v1, str) and v1 == v2:
+            result[key] = A[key]
+            
+        elif isinstance(v1, list) and v1 == v2:
+            result[key] = deepcopy(v1)
+            
+        elif isinstance(v1, np.ndarray) and all(v1 == v2):
+            result[key] = deepcopy(v1)
+    return result
+
+def merge_annotation(a, b):
+    """
+    NOTE: This is a copy of the neo.core.baseneo.merge_annotation
+    function which is more relaxed when in comparing numpy.bool_ with bool
+    (normalizing to numpy.bool_).
+    
+    Original documentation follows:
+    
+    First attempt at a policy for merging annotations (intended for use with
+    parallel computations using MPI). This policy needs to be discussed
+    further, or we could allow the user to specify a policy.
+
+    Current policy:
+        For arrays or lists: concatenate
+        For dicts: merge recursively
+        For strings: concatenate with ';'
+        Otherwise: fail if the annotations are not equal
+    """
+    if isinstance(a, bool):
+        v1 = np.array([v1], dtype=np.bool_)
+        
+    if isinstance(b, bool):
+        v1 = np.array([v2], dtype=np.bool_)
+            
+    assert type(a) == type(b), 'type({}) {} != type({}) {}'.format(a, type(a),
+                                                               b, type(b))
+    if isinstance(a, dict):
+        return merge_annotations(a, b)
+    elif isinstance(a, np.ndarray):  # concatenate b to a
+        return np.append(a, b)
+    elif isinstance(a, list):  # concatenate b to a
+        return a + b
+    elif isinstance(a, str):
+        if a == b:
+            return a
+        else:
+            return a + ";" + b
+    else:
+        assert a == b, '{} != {}'.format(a, b)
+        return a
+
+
+def merge_annotations(A, *Bs):
+    """
+    NOTE: This is a copy of the neo.core.baseneo.merge_annotations
+    function which is more relaxed when in comparing numpy.bool_ with bool
+    (normalizing to numpy.bool_)
+
+    Original documentation follows:
+    
+    Merge two sets of annotations.
+
+    Merging follows these rules:
+    All keys that are in A or B, but not both, are kept.
+    For keys that are present in both:
+        For arrays or lists: concatenate
+        For dicts: merge recursively
+        For strings: concatenate with ';'
+        Otherwise: warn if the annotations are not equal
+    """
+    merged = A.copy()
+    for B in Bs:
+        for name in B:
+            if name not in merged:
+                merged[name] = B[name]
+            else:
+                try:
+                    merged[name] = merge_annotation(merged[name], B[name])
+                except BaseException as exc:
+                    # exc.args += ('key %s' % name,)
+                    # raise
+                    merged[name] = "MERGE CONFLICT"  # temporary hack
+    logger.debug("Merging annotations: A=%s Bs=%s merged=%s", A, Bs, merged)
+    return merged
+

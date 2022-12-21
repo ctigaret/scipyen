@@ -6418,7 +6418,7 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], wavefo
         θ.array_annotate(channel_names=[f"{ch_name}_θ"])
         θ.array_annotate(channel_ids=[ch_id])
         theta_sigs.append(θ)
-        ret_ = extract_minis(x[:,kt], mini_duration, t.θ, threshold, peakfunc)
+        ret_ = extract_event_waveforms(x[:,kt], mini_duration, t.θ, threshold, peakfunc)
         
         if isinstance(ret_, neo.SpikeTrain):
             ret_.annotate(waveform = waveform, θ = θ, channel_id = x.array_annotations.get("channel_ids", [0])[0])
@@ -6634,7 +6634,7 @@ def slide_detect(x:np.ndarray, h:np.ndarray, padding:bool=True, data_cache = Non
         
     # return θ , α, β, ε, σ, xx
     
-def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, threshold, peakfunc):
+def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, threshold, peakfunc):
     """
     Extracts detected mPSC waveforms.
     
@@ -6754,7 +6754,7 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
     chname +="_"
         
     for km, m in enumerate(minis):
-        m.annotations["Accept"] = True
+        m.annotations["Accept"] = np.array([True])
         m.name = f"{chname}{km}"
         m.array_annotate(**x.array_annotations)
     
@@ -6815,23 +6815,26 @@ def extract_minis(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, th
     for mw in minis[1:]:
         minis_arr_ann = neoutils.merge_array_annotations(minis_arr_ann, mw.array_annotations)
     ret.waveforms = mPSCtrain_waves.T
-    # print(f"membrane.extract_minis: waves shape {mPSCtrain_waves.shape}, waveforms shape {ret.waveforms.shape}")
+    # print(f"membrane.extract_event_waveforms: waves shape {mPSCtrain_waves.shape}, waveforms shape {ret.waveforms.shape}")
     ret.segment = x.segment
+    
     ret.annotate(
                  peak_time = mini_peaks, 
                  wave_name = [w.name for w in minis],
                  event_fit = [w.annotations.get("event_fit", None) for w in minis],
-                 Accept = [w.annotations["Accept"] for w in minis],
+                 Accept = np.concatenate([w.annotations["Accept"] for w in minis]),
                  source="Event_detection",
                  signal_units = x.units, 
                  signal_origin = x.name,
                  datetime=datetime.datetime.now(),
                  Aligned = False,
                  )
+    
     ret.array_annotate(**minis_arr_ann)
     ret.array_annotate(peak_time = mini_peaks)
     ret.array_annotate(wave_name = [w.name for w in minis])
-    ret.array_annotate(accept = [w.annotations["Accept"] for w in minis])
+    ret.array_annotate(accept = ret.annotations["Accept"])
+    # ret.array_annotate(accept = np.concatenate([w.annotations["Accept"] for w in minis]))
     
     return ret
 
@@ -7015,7 +7018,7 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
             
             thetas.append(θ_norm)
             
-            ret_ = extract_minis(x[:,k], mini_duration, dxc_n, thr, peakfunc)
+            ret_ = extract_event_waveforms(x[:,k], mini_duration, dxc_n, thr, peakfunc)
             
             if isinstance(ret_, neo.SpikeTrain):
                 ret_.annotate(waveform = waveform, θ = θ, θ_norm=θ_norm,
@@ -7495,7 +7498,7 @@ def fit_Event(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opt
                     
         fitresult = crvf.fit_Event_model(xx, params, bounds = [lo, up])
         
-        fitted_x = type(x)(fitresult[0], units = x.units, t_start = x.t_start, sampling_rate = x.sampling_rate, name="mPSCfit")
+        fitted_x = type(x)(fitresult[0], units = x.units, t_start = x.t_start, sampling_rate = x.sampling_rate, name="EventModelFit")
         fitted_x.segment = x.segment
         
         if x.shape[1] > 1:
@@ -7503,7 +7506,7 @@ def fit_Event(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opt
         else:
             for annkey in x.array_annotations:
                 if annkey == "channel_names":
-                    fitted_x.array_annotations[annkey] = ["mPSCfit"]
+                    fitted_x.array_annotations[annkey] = [f"{annkey[0]}_fit"]
                 elif annkey == "channel_ids":
                     fitted_x.array_annotations[annkey] = x.array_annotations[annkey][0] + "_fit"
                 else:
