@@ -40,7 +40,7 @@ if "event2" not in pg.graphicsItems.ScatterPlotItem.Symbols.keys():
     pg.graphicsItems.ScatterPlotItem.Symbols["event2"] = event2_Symbol
     
 if "event2_dn" not in pg.graphicsItems.ScatterPlotItem.Symbols.keys():
-    pg.graphicsItems.ScatterPlotItem.Symbols["event2"] = event2_dn_Symbol
+    pg.graphicsItems.ScatterPlotItem.Symbols["event2_dn"] = event2_dn_Symbol
 
 
 

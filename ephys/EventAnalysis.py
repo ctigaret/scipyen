@@ -418,7 +418,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         # self.resize(-1,-1)
         if not isinstance(self._event_template_, neo.AnalogSignal):
-            self._use_template_ = False
+            self.useTemplateWaveForm = False
             self.use_eventTemplate_CheckBox.setEnabled(False)
 
 #### BEGIN _configureUI_
@@ -560,7 +560,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.actionPlot_aligned_event_waveforms.setEnabled(False)
         self.actionMake_Event_Detection_Epoch.triggered.connect(self._slot_make_mPSCEpoch)
         self.actionOpen_Event_Template.triggered.connect(self._slot_openTemplateFile)
-        self.actionCreate_Event_Template.triggered.connect(self._slot_create_mPSC_template)
+        self.actionCreate_Event_Template.triggered.connect(self._slot_create_event_template)
         self.actionCreate_Event_Template.setEnabled(False)
         self.actionPlot_Event_template.triggered.connect(self._plot_template_)
         self.actionPlot_Event_template.setEnabled(False)
@@ -1113,13 +1113,13 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         model_params = self.paramsWidget.value()
         init_params = tuple(p.magnitude for p in model_params["Initial Value:"])
-        if self._use_template_ and isinstance(self._event_template_, neo.AnalogSignal):
-            template_fit = membrane.fit_Event(self._event_template_, init_params, lo, up)
-            init_params = template_fit.annotations["event_fit"]["Coefficients"]
-                
         lo = tuple(p.magnitude for p in model_params["Lower Bound:"])
         up = tuple(p.magnitude for p in model_params["Upper Bound:"])
             
+        if self.useTemplateWaveForm and isinstance(self._event_template_, neo.AnalogSignal):
+            template_fit = membrane.fit_Event(self._event_template_, init_params, lo, up)
+            init_params = template_fit.annotations["event_fit"]["Coefficients"]
+                
         minis = neoutils.extract_spike_train_waveforms(st, st.annotations["signal_units"], **kwargs)
         
         fitted_minis = list()
@@ -1221,7 +1221,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                           event_fit = train.annotations["event_fit"][kw],
                           Accept = train.annotations["Accept"][kw],
                           signal_origin = train.annotations["signal_origin"],
-                          Aligned = train.annotations["Aligned"])
+                          Aligned = train.annotations["Aligned"],
+                          using_template = train.annotations.get("using_template", False))
             
         return waves
 
@@ -1323,6 +1324,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             signal = self._process_signal_(signal, newFilter=True)
 
         waves = self._extract_waves_(train, valid_only = not self.allWavesToResult)
+        if len(waves) == 0:
+            return
         
         start_times = np.array([w.t_start for w in waves]) * waves[0].t_start.units
         peak_times = np.array([w.annotations["peak_time"] for w in waves]) * waves[0].t_start.units
@@ -1402,7 +1405,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         if len(self._waveFormViewer_.axes):
             self._waveFormViewer_.removeLabels(0)
         
-        if self._overlayTemplateModel and isinstance(self._event_template_, neo.AnalogSignal):
+        if self._overlayTemplateModel and self.useTemplateWaveForm and isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)):
             merged = self._combine_model_and_template_()
             
             self._waveFormViewer_.view(merged, doc_title=merged.name)
@@ -1424,7 +1427,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         if len(self._waveFormViewer_.axes):
             self._waveFormViewer_.removeLabels(0)
         
-        if isinstance(self._event_template_, neo.AnalogSignal):
+        if isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)):
             if self.overlayTemplateModel:
                 merged = self._combine_model_and_template_()
                 self._waveFormViewer_.view(merged, doc_title=merged.name)
@@ -1471,7 +1474,13 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 if self._ephysViewer_ not in self.linkedViewers:
                     self.linkToViewers(self._ephysViewer_)
                 
-            self._ephysViewer_.view(self._data_)
+            if isinstance(self._data_, (neo.Block, neo.Segment)):
+                doctitle = self._data_.name
+            else:
+                doctitle = self.metaDataWidget.dataVarName
+                
+            self._ephysViewer_.view(self._data_, doc_title=doctitle)
+            
             self._ephysViewer_.currentFrame = self.currentFrame
                 
             self._refresh_signalNameComboBox()
@@ -1642,6 +1651,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         frameResult = self._result_[self.currentFrame] # a spike train list or None !!!
         
         if not isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList) or len(frameResult) == 0:
+            if isinstance(self._detected_Events_Viewer_, sv.SignalViewer):
+                self._detected_Events_Viewer_.clear()
             return
         
         signalBlockers = (QtCore.QSignalBlocker(w) for w in (self._events_spinBoxSlider_,
@@ -1885,9 +1896,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 # the value at t_start, else upward
                 if pv < v:
                     y = pv
-                    symbol = "event2_dn"
-                else:
                     symbol = "event2"
+                else:
+                    symbol = "event2_dn"
                     y = v
                     
                 acc = w.annotations.get("Accept", np.array([True]))
@@ -1899,8 +1910,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     
                 elif acc == False:
                     brush = rej_targetBrush#[0:3] + (255,)
-                    
-                print(tuple(pg.graphicsItems.ScatterPlotItem.Symbols.keys()))
                     
                 target = pg.TargetItem((t, y), 
                                         size=int(targetSize*1.3),
@@ -2034,7 +2043,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         model_params = self.paramsWidget.value()
         init_params = tuple(p.magnitude for p in model_params["Initial Value:"])
         
-        if self._use_template_ and isinstance(self._event_template_, neo.AnalogSignal):
+        if self.useTemplateWaveForm and isinstance(self._event_template_, neo.AnalogSignal):
             template_fit = membrane.fit_Event(self._event_template_, init_params, lo, up)
             init_params = template_fit.annotations["event_fit"]["Coefficients"]
                 
@@ -2110,31 +2119,31 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     def _get_event_template_or_waveform_(self, use_template:typing.Optional[bool]=None):
         # see NOTE: 2022-11-17 23:37:00 NOTE: 2022-11-11 23:04:37 NOTE: 2022-11-11 23:10:42
         if use_template is None:
-            use_template = self._use_template_
+            use_template = self.useTemplateWaveForm
             
         if use_template: # return the cached template if it exists
-            if isinstance(self._event_template_, neo.AnalogSignal) and self._event_template_.name == "Event Template":
+            if isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)):# and self._event_template_.name == "Event Template":
                 return self._event_template_[:,0] # discard any possible fit channels
             else: # no template is loaded; get one from custom file or default file, or generate a synthetic waveform
-                template_OK = False
-                if os.path.isfile(self._custom_template_file_):
-                    tpl = pio.loadFile(self._custom_template_file_)
-                    if isinstance(tpl, neo.AnalogSignal) and tpl.name == "Event Template":
-                        self._event_template_ = tpl
-                        return self._event_template_[:,0]# discard any possible fit channels
-                
-                if not template_OK and os.path.isfile(self._template_file_):
-                    tpl = pio.loadFile(self._template_file_)
-                    if isinstance(tpl, neo.AnalogSignal) and tpl.name == "Event Template":
-                        self._event_template_ = tpl
-                        return self._event_template_[:,0] # discard any possible fit channels
-                
-                if not template_OK:
-                    signalBlocker = QtCore.QSignalBlocker(self.use_eventTemplate_CheckBox)
-                    self.use_eventTemplate_CheckBox.setChecked(False)
-                    self._use_template_ = False
-                    self._generate_eventModelWaveform()
-                    return self._event_model_waveform_
+                self._generate_eventModelWaveform()
+                return self._event_model_waveform_
+#                 template_OK = False
+#                 if os.path.isfile(self._custom_template_file_):
+#                     tpl = pio.loadFile(self._custom_template_file_)
+#                     if isinstance(tpl, (neo.AnalogSignal, DataSignal)):# and tpl.name.startswith("Event_Template"):
+#                         self._event_template_ = tpl
+#                         return self._event_template_[:,0]# discard any possible fit channels
+#                 
+#                 if not template_OK and os.path.isfile(self._template_file_):
+#                     tpl = pio.loadFile(self._template_file_)
+#                     if isinstance(tpl, (neo.AnalogSignal, DataSignal)):# and tpl.name == "Event Template":
+#                         self._event_template_ = tpl
+#                         return self._event_template_[:,0] # discard any possible fit channels
+#                 
+#                 if not template_OK:
+#                     signalBlocker = QtCore.QSignalBlocker(self.use_eventTemplate_CheckBox)
+#                     self.use_eventTemplate_CheckBox.setChecked(False)
+#                     self._use_template_ = False
                             
         else:
             self._generate_eventModelWaveform()
@@ -2389,9 +2398,17 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         if waveform is None:
             waveform  = self._get_event_template_or_waveform_()
             
+        if "Event_template" in waveform.name:
+            using_template = self._template_file_
+            
+        else:
+            using_template = False
+            
         method = "sliding" if self.useSlidingDetection else "cross-correlation"
         
         processed = signal.annotations.get("filtered", False)
+        
+        mPSCTrains = None
         
         if len(epochs):
             mini_waves = list()
@@ -2408,7 +2425,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 detection = membrane.detect_Events(sig, waveform, 
                                                  useCBsliding = self.useSlidingDetection,
                                                  threshold = self._detection_threshold_,
-                                                 outputDetection=output_detection)
+                                                 outputDetection = output_detection)
                 
                 # print(f"detection {detection}")
                 
@@ -2564,6 +2581,10 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                                               useCBsliding = self.useSlidingDetection,
                                               threshold = self._detection_threshold_,
                                               outputDetection = output_detection)
+            
+            if detection is None:
+                return
+            
             if output_detection:
                 mPSCTrains, thetas = detection
                 self._current_detection_θ = thetas
@@ -2572,9 +2593,10 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
 
         if isinstance(mPSCTrains, neo.core.spiketrainlist.SpikeTrainList):
             mPSCTrains.segment = segment
+            
             for st_ in mPSCTrains:
                 st_.segment = segment
-            
+                st_.annotate(using_template = using_template)
             
             # now, fit the minis
             for st in mPSCTrains:
@@ -2583,6 +2605,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     continue
                 
                 st.annotations["amplitude"] = list()
+                
                 for kw, fw in enumerate(fitted_minis):
                     if self._use_threshold_on_rsq_:
                         accept = fw.annotations["event_fit"]["Rsq"] >= self.rSqThreshold
@@ -2599,7 +2622,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             return mPSCTrains
         
     @pyqtSlot()
-    def _slot_create_mPSC_template(self):
+    def _slot_create_event_template(self):
         # FIXME 2022-12-14 18:54:04
         if len(self._aligned_waves_) == 0:
             return
@@ -2675,7 +2698,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     @pyqtSlot()
     def _slot_detectCurrentSweep(self):
         # refresh the template or waveform
-        waveform = self._get_event_template_or_waveform_()
+        waveform = self._get_event_template_or_waveform_(use_template = self._use_template_)
         if waveform is None:
             self.criticalMessage("Detect events in current sweep",
                                  "No event model waveform or template is available")
@@ -3106,8 +3129,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
     @pyqtSlot()
     def _slot_plot_mPSCWaveForm(self):
-        self._get_event_template_or_waveform_()
-        if self._use_template_:
+        # self._get_event_template_or_waveform_()
+        if self._use_template_ and isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)):
             self._plot_template_()
         else:
             self._plot_model_()
@@ -3185,17 +3208,23 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             else:
                 return
                 
-            if isinstance(data, neo.AnalogSignal):
+            if isinstance(data, (neo.AnalogSignal, DataSignal)):
                 self._event_template_ = data
                 self._plot_template_()
-                self.use_eventTemplate_CheckBox.setEnabled(True)
+                # self.use_eventTemplate_CheckBox.setEnabled(True)
                 self.lastUsedTemplateFile = fileName
+
+                for action in (self.actionSave_Event_Template,
+                            self.actionExport_Event_Template,
+                            self.actionRemember_Event_Template,
+                            self.actionForget_Event_Template,
+                            self.actionPlot_Event_template,
+                            self.use_eventTemplate_CheckBox):
+                    action.setEnabled(isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)))
                 
-            # if isinstance(self._event_template_, neo.AnalogSignal):
-        
     @pyqtSlot()
     def _slot_saveTemplateFile(self):
-        if not isinstance(self._event_template_, neo.AnalogSignal):
+        if not isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)):
             return
         
         fileFilters = ["Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]
@@ -3259,11 +3288,18 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             return
         
         if len(objs) == 1:
-            self._event_template_ = objs[0]
-            self._plot_template_()
+            obj = objs[0]
+            if isinstance(obj, (neo.AnalogSignal, DataSignal)):
+                self._event_template_ = objs[0]
+                self._plot_template_()
+                for action in (self.actionSave_Event_Template,
+                            self.actionExport_Event_Template,
+                            self.actionRemember_Event_Template,
+                            self.actionForget_Event_Template,
+                            self.actionPlot_Event_template,
+                            self.use_eventTemplate_CheckBox):
+                    action.setEnabled(isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)))
             
-        if isinstance(self._event_template_, neo.AnalogSignal):
-            self.use_eventTemplate_CheckBox.setEnabled(True)
         
             
     @pyqtSlot()
@@ -3289,7 +3325,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     @pyqtSlot()
     def _slot_storeTemplateAsDefault(self):
         """Stores mPSC template in the default template file"""
-        if not isinstance(self._event_template_, neo.AnalogSignal):
+        if not isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)):
             return
         
         # TODO: 2022-11-27 22:04:11
@@ -3304,7 +3340,14 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     @pyqtSlot()
     def _slot_forgetTemplate(self):
         self._event_template_ = None
-        
+        for action in (self.actionSave_Event_Template,
+                self.actionExport_Event_Template,
+                self.actionRemember_Event_Template,
+                self.actionForget_Event_Template,
+                self.actionPlot_Event_template,
+                self.use_eventTemplate_CheckBox):
+        action.setEnabled(isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)))
+     
     @pyqtSlot()
     def _slot_clearFactoryDefaultTemplateFile(self):
         if os.path.isfile(self._default_template_file):
@@ -3378,10 +3421,16 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                               f"Check the template file name; expecting a pickle or a HDF5 file, but got {template_file} instead")
             return
         
-        if isinstance(data, neo.AnalogSignal):
+        if isinstance(data, (neo.AnalogSignal, DataSignal)):
             self._event_template_ = data
             self._plot_template_()
-            self.use_eventTemplate_CheckBox.setEnabled(True)
+            for action in (self.actionSave_Event_Template,
+                        self.actionExport_Event_Template,
+                        self.actionRemember_Event_Template,
+                        self.actionForget_Event_Template,
+                        self.actionPlot_Event_template,
+                        self.use_eventTemplate_CheckBox):
+                action.setEnabled(isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)))
         else:
             self.errorMessage("Load default mPSC template",
                               "Default template file does not contain a signal")
@@ -3400,10 +3449,18 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                                 f"Check the template file name; expecting a pickle or a HDF5 file, but got {self.lastUsedTemplateFile} instead")
                 return
             
-            if isinstance(data, neo.AnalogSignal):
+            if isinstance(data, (neo.AnalogSignal, DataSignal)):
                 self._event_template_ = data
                 self._plot_template_()
-                self.use_eventTemplate_CheckBox.setEnabled(True)
+                # self.use_eventTemplate_CheckBox.setEnabled(True)
+        
+                for action in (self.actionSave_Event_Template,
+                            self.actionExport_Event_Template,
+                            self.actionRemember_Event_Template,
+                            self.actionForget_Event_Template,
+                            self.actionPlot_Event_template,
+                            self.use_eventTemplate_CheckBox):
+                    action.setEnabled(isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)))
                 
             else:
                 self.errorMessage("Load last used mPSC template",
@@ -3421,7 +3478,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
     @pyqtSlot()
     def _slot_exportTemplate(self):
-        if not isinstance(self._event_template_, neo.AnalogSignal):
+        if not isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)):
             return
         
         self.exportDataToWorkspace(self._event_template_, var_name = "Event_template")
@@ -4118,8 +4175,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     def useTemplateWaveForm(self, value):
         # print(f"{self.__class__.__name__} @useTemplateWaveForm.setter value: {value}")
         self._use_template_ = value == True
-        # if isinstance(getattr(self, "configurable_traits", None), DataBag):
-        #     self.configurable_traits["UseTemplateWaveForm"] = self._use_template_
+        sigBlocker = QtCore.QSignalBlocker(self.use_eventTemplate_CheckBox)
+        self.use_eventTemplate_CheckBox.setChecked(False)
             
     @property
     def overlayTemplateModel(self):
@@ -4549,7 +4606,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         start_time = list()
         peak_time = list()
         amplitude = list()
-        from_template = list()
+        using_template = list()
         fit_amplitude = list()
         r2 = list()
         offset = list()
@@ -4569,6 +4626,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         datetime=list()
         dataname = list()
         field_id = list()
+        tpl_used = list()
         
         for k, frameResult in enumerate(self._result_):
             if not isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList) or len(frameResult) == 0:
@@ -4587,7 +4645,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     channel_id.append(mini_wave.annotations["channel_id"])
                     peak_time.append(float(mini_wave.annotations["peak_time"]))
                     amplitude.append(float(mini_wave.annotations["amplitude"]))
-                    from_template.append(mini_wave.annotations["event_fit"]["template"])
                     fit_amplitude.append(float(mini_wave.annotations["event_fit"]["amplitude"]))
                     r2.append(float(mini_wave.annotations["event_fit"]["Rsq"]))
                     offset.append(float(mini_wave.annotations["event_fit"]["Coefficients"][0]))
@@ -4603,6 +4660,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     genotype.append(self.metaDataWidget.genotype)
                     dataname.append(self.metaDataWidget.dataName)
                     datetime.append(self.metaDataWidget.analysisDateTime)
+                    using_template.append(mini_wave.annotations.get("using_template", False))
                     
                 if len(st_waves):
                     all_waves.extend(st_waves)
@@ -4617,7 +4675,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                "Start Time": start_time, "Peak Time": peak_time, 
                "Amplitude": amplitude, "Fit Amplitude": fit_amplitude,
                "Rsq": r2, "α":offset, "β": scale, "x0": onset, "τ1": tau_rise, "τ2": tau_decay,
-               "Template":from_template}
+               "Template":using_template}
         
         res_df = pd.DataFrame(res)
         

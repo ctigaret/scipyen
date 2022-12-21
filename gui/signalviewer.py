@@ -185,9 +185,9 @@ from gui.widgets.colorwidgets import ColorSelectionWidget, quickColorDialog
 from gui.pictgui import GuiWorker
 from gui.itemslistdialog import ItemsListDialog
 from gui import guiutils
-from gui.guiutils import (spike_Symbol, 
-                          event_Symbol, event_dn_Symbol, 
-                          event2_Symbol, event2_dn_Symbol)
+# from gui.guiutils import (spike_Symbol, 
+#                           event_Symbol, event_dn_Symbol, 
+#                           event2_Symbol, event2_dn_Symbol)
 
 #### END pict.gui modules
 
@@ -916,7 +916,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #print("_configureUI_ sets up annotations dock widget action")
         #### END set up annotations dock widget
         
-        #### BEGIN set up coordinates dock widget
+        #### BEGIN set up coordinates dock widget - defined in the UI file
         #print("_configureUI_ sets up coordinates dock widget")
         self.coordinatesDockWidget.setWindowTitle("Cursors")
         
@@ -8237,10 +8237,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.dataAnnotations.clear()
         self.annotationsViewer.clear()
-        
-        for p in self.plotItems:
-            self._remove_axes_(p)
-            # self.signalsLayout.removeItem(p)
 
         self.plotTitleLabel.setText("")
         
@@ -8303,6 +8299,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.nFramesLabel.setText(f"of {self._number_of_frames_}")
         self.docTitle = None # to completely remove the data name from window title
         
+        for p in self.plotItems:
+            self._remove_axes_(p)
+            # self.signalsLayout.removeItem(p)
+
     def setTitlePrefix(self, value):
         """Sets the window-specific prefix of the window title
         """

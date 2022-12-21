@@ -3,6 +3,7 @@
 
 from __future__ import print_function
 import errno, os
+import locale
 import sys
 import typing
 import keyword
@@ -358,4 +359,56 @@ def str2float(s):
         ret = np.nan
     
     return ret
+
+def isnumber(s):
+    """Returns True if string s can be evalated to a numbers.Number
+    
+    Strings of the form [-/+]x.y[e][-/+]z return True.
+    
+    """
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return False
+    
+    try:
+        v = eval(s)
+        if isinstance(v, Number):
+            return True
+        
+    except:
+        return False
+    
+    # ### BEGIN fool around, do NOT delete
+#     # split the string in parts separated by the current locale decimal point,
+#     # or by "e" (scientific notation)
+#     
+#     # in scientific notation a mantissa can have a decimal point
+#     
+#     ss = s.split("e")
+#     
+#     if len(ss) > 2:
+#         return False
+#     
+#     ss_ = ss[0].split(locale.localeconv()["decimal_point"])
+#     if len(ss_) > 2:
+#         return False
+#     
+#     print(f"ss_: {ss_}")
+#     ss_.extend(ss[1:])
+#     print(f"extended ss_: {ss_}")
+#     
+#     if ss_[0].startswith('-') or ss_[0].startswith('+'):
+#         ss_[0] = ss_[0][1:]
+#     
+#     if ss_[-1].startswith('-') or ss_[-1].startswith('+'):
+#         ss_[-1] = ss_[-1][1:]
+#         
+#     if ss_[-1].endswith('j'):
+#         ss_[-1] - ss_[-1][0:-1]
+#      
+#     print(f"ss_: {ss_} w/o signs")
+#     test = "".join(ss_)
+#     print(f"test: {test}")
+#     
+#     return test.isnumeric()
+    # ### END fool around, do NOT delete
 

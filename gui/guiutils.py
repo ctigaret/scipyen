@@ -8,9 +8,11 @@ from gui.painting_shared import (FontStyleType, standardQtFontStyles,
 
 import quantities as pq
 from gui.pyqtgraph_patch import pyqtgraph as pg
-from gui.pyqtgraph_symbols import (spike_Symbol, 
-                                    event_Symbol, event_dn_Symbol, 
-                                    event2_Symbol, event2_dn_Symbol)
+# from gui.pyqtgraph_symbols import (spike_Symbol, 
+#                                     event_Symbol, event_dn_Symbol, 
+#                                     event2_Symbol, event2_dn_Symbol)
+
+from core import strutils
 
 class UnitsStringValidator(QtGui.QValidator):
     def __init__(self, parent=None):
@@ -39,6 +41,10 @@ class InftyDoubleValidator(QtGui.QDoubleValidator):
             ret = (QtGui.QValidator.Intermediate, ss, pos)
         elif ss.lower() in ("-inf", "inf"):
             ret = (QtGui.QValidator.Acceptable, ss, pos)
+            
+        elif strutils.isnumber(ss):
+            ret = (QtGui.QValidator.Acceptable, ss, pos)
+            
         else:
             # return (QtGui.QValidator.Invalid, s, pos)
             ret = super().validate(ss, pos)
