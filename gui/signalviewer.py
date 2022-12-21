@@ -184,49 +184,13 @@ from .cursors import SignalCursor
 from gui.widgets.colorwidgets import ColorSelectionWidget, quickColorDialog
 from gui.pictgui import GuiWorker
 from gui.itemslistdialog import ItemsListDialog
+from gui import guiutils
+from gui.guiutils import (spike_Symbol, 
+                          event_Symbol, event_dn_Symbol, 
+                          event2_Symbol, event2_dn_Symbol)
 
 #### END pict.gui modules
 
-# each spike is a small vertical line centered at 0.0, height of 1
-if "spike" not in pg.graphicsItems.ScatterPlotItem.Symbols.keys():
-    spike = QtGui.QPainterPath(QtCore.QPointF(0.0, -0.5))
-    spike.lineTo(QtCore.QPointF(0.0, 0.5))
-    spike.closeSubpath()
-    pg.graphicsItems.ScatterPlotItem.Symbols["spike"] = spike
-
-if "event" not in pg.graphicsItems.ScatterPlotItem.Symbols.keys():
-    # spike = QtGui.QPainterPath(QtCore.QPointF(-0.1, 0.5))
-    # spike.lineTo(QtCore.QPointF(0.0, -0.5))
-    # spike.lineTo(QtCore.QPointF(0.1, 0.5))
-    spike = QtGui.QPainterPath(QtCore.QPointF(0.0, -0.5))
-    spike.lineTo(QtCore.QPointF(-0.1, 0.5))
-    spike.lineTo(QtCore.QPointF(0.1, 0.5))
-    spike.closeSubpath()
-    pg.graphicsItems.ScatterPlotItem.Symbols["event"] = spike
-    
-if "event_dn" not in pg.graphicsItems.ScatterPlotItem.Symbols.keys():
-    # spike = QtGui.QPainterPath(QtCore.QPointF(-0.1, -0.5))
-    # spike.lineTo(QtCore.QPointF(0.0, 0.5))
-    # spike.lineTo(QtCore.QPointF(0.1, -0.5))
-    spike = QtGui.QPainterPath(QtCore.QPointF(0.0, 0.5))
-    spike.lineTo(QtCore.QPointF(-0.1, -0.5))
-    spike.lineTo(QtCore.QPointF(0.1, -0.5))
-    spike.closeSubpath()
-    pg.graphicsItems.ScatterPlotItem.Symbols["event_dn"] = spike
-
-if "event2" not in pg.graphicsItems.ScatterPlotItem.Symbols.keys():
-    spike = QtGui.QPainterPath(QtCore.QPointF(0.0, 0.0))
-    spike.lineTo(QtCore.QPointF(-0.1, -0.5))
-    spike.lineTo(QtCore.QPointF(0.1, -0.5))
-    spike.closeSubpath()
-    pg.graphicsItems.ScatterPlotItem.Symbols["event2"] = spike
-    
-if "event2_dn" not in pg.graphicsItems.ScatterPlotItem.Symbols.keys():
-    spike = QtGui.QPainterPath(QtCore.QPointF(0.0, 0.0))
-    spike.lineTo(QtCore.QPointF(-0.1, 0.5))
-    spike.lineTo(QtCore.QPointF(0.1,  0.5))
-    spike.closeSubpath()
-    pg.graphicsItems.ScatterPlotItem.Symbols["event2"] = spike
     
 
 
@@ -465,6 +429,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self._cached_title = None
         
+        self._show_legends_ = False
+        
         #self.threadpool = QtCore.QThreadPool()
         
         self._plot_names_ = dict() # maps item row position to name
@@ -485,6 +451,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._target_overlays_ = dict()
         
         self._label_overlays_ = dict()
+        
+        self._legends_ = dict()
         
         # NOTE: 2017-05-10 22:57:30
         # these are linked cursors in the same window
@@ -978,6 +946,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionData_to_workspace.setIcon(QtGui.QIcon.fromTheme("document-export"))
         self.actionData_to_workspace.triggered.connect(self.slot_exportDataToWorkspace)
         
+        self.actionShow_Legends.triggered.connect(self._slot_showLegends)
+        # self.actionShow_Legends.setEnabled(False)
+        
     # ### BEGIN properties
     @property
     def dockWidgets(self):
@@ -995,6 +966,22 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             for k, v in val.items():
                 if k in dw:
                     dw[k].setVisible(v is True) # just to make sure v is a bool
+                    
+    @property
+    def showsLegends(self):
+        return self._show_legends_
+    
+    @markConfigurable("ShowsLegends", trait_notifier=True)
+    @showsLegends.setter
+    def showsLegends(self, value:bool):
+        self._show_legends_ = True
+        sigBlock = QtCore.QSignalBlocker(self.actionShow_Legends)
+        self.actionShow_Legends.setChecked(value==True)
+        self.showLegends(self._show_legends_)
+            
+    @pyqtSlot(bool)
+    def _slot_showLegends(self, value):
+        self.showsLegends = value == True
                     
     @property
     def cursorLabelPrecision(self):
@@ -1682,7 +1669,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         for i in items:
             axis.removeItem(i)
         
-                
+    def _remove_legend(self, axis):
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+        items = [i for i in axis.items if isinstance(i, pg.LegendItem)]
+        for i in items:
+            axis.removeItem(i)
             
     def _check_axis_spec_ndx_(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None):
         if axis is None:
@@ -1903,7 +1894,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if isinstance(self._target_overlays_[cFrame].get(axNdx, None), (tuple, list)):
                         self._target_overlays_[cFrame][axNdx].clear()
                     else:
+                        # self._target_overlays_[cFrame].pop(axNdx, None)
                         self._target_overlays_[cFrame][axNdx] = list()
+                        
+                    # if len(self._target_overlays_[cFrame]) == 0:
+                    #     self._target_overlays_.pop(cFrame)
                         
             # cal this just in case we have overlays that escaped the cache mechanism
             self._clear_targets_overlay_(axis)
@@ -1947,11 +1942,68 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         axis.addItem(textItem)
         
+    def showLegends(self, value:bool):
+        if value == True:
+            for axis in self.axes:
+                self.addLegend(axis) # use default values
+                
+        else:
+            for axis in self.axes:
+                self.removeLegend(axis)
+                
+        self.refresh()
+        
+    def addLegend(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None, x=30, y=30, **kwargs):
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+        cFrame = self.frameIndex[self.currentFrame]
+        
+        # make sure there is at most one legend here
+        # if the axis already has one legend item, don't add
+        # if the axis has more than one legend item, remove all but the first
+        currentLegends = [i for i in axis.items if isinstance(i, pg.LegendItem)]
+        if len(currentLegends):
+            currentLegend = currentLegends[0]
+            if len(currentLegends) > 1:
+                for i in currentLegends[1:]:
+                    axis.removeItem(i)
+                    
+            # now make sure this item is in the _legends_ cache
+            # check if there is already a legend item here
+            if isinstance(self._legends_.get(cFrame, None), dict):
+                if isinstance(self._legends_[cFrame].get(axNdx, None), pg.LegendItem):
+                    if self._legends_[cFrame][axNdx] == currentLegend:
+                        return
+
+        # for sanity, also check if there is a cached legend even if this is not
+        # a chuild of the axis - in this case, just remove it
+        if isinstance(self._legends_.get(cFrame, None), dict):
+            self._legends_[cFrame].pop(axNdx, None)
+            
+        legendItem = axis.addLegend((x,y) ,**kwargs)
+        
+        if cFrame not in self._legends_:
+            self._legends_[cFrame] = dict()
+            
+        self._legends_[cFrame][axNdx] = legendItem
+        
+    def removeLegend(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None):
+        if axis not in range(-len(self.plotItems), len(self.plotItems)):
+            return
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+        cFrame = self.frameIndex[self.currentFrame]
+        if cFrame in self._legends_:
+            if isinstance(self._legends_[cFrame], dict):
+                self._legends_[cFrame].pop(axNdx, None)
+                if len(self._legends_[cFrame]) == 0:
+                    self._legends_.pop(cFrame)
+                    
+        self._remove_legend(axis)
+        
     def removeLabels(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None):
         """ Removes ALL labels (TextItems) from the given axis
         """
-        if axis not in range(-len(self.plotItems), len(self.plotItems)):
-            return
+        # if axis not in range(-len(self.plotItems), len(self.plotItems)):
+        #     return
             
         axis, axNdx = self._check_axis_spec_ndx_(axis)
         cFrame = self.frameIndex[self.currentFrame]
@@ -1961,9 +2013,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if isinstance(self._label_overlays_[cFrame].get(axNdx, None), (tuple, list)):
                     self._label_overlays_[cFrame][axNdx].clear()
                 else:
+                    # self._label_overlays_[cFrame].pop(axNdx)
                     self._label_overlays_[cFrame][axNdx] = list()
                     
-        # cal this just in case we have overlays that escaped the cache mechanism
+                # if len(self._label_overlays_[cFrame]) == 0:
+                #     self._label_overlays_.pop(cFrame)
+                    
+        # call this just in case we have overlays that escaped the cache mechanism
         self._clear_labels_overlay(axis)
                 
         
@@ -6057,7 +6113,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     @property
     def axes(self):
-        """The tuple of axes (PlotItem objects).
+        """The tuple of axes (PlotItem objects) for current frame
         
         Alias to self.plotItems property
         """
@@ -7148,6 +7204,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                         xlabel = "Time (%s)" % sig.t_start.units.dimensionality,
                                         ylabel = "%s (%s)" % (sig.name, signal.units.dimensionality),
                                         symbol = None,
+                                        name=sig.name,
                                         **kwargs))
             else:
                 self._plot_numeric_data_(plotItem,
@@ -7156,6 +7213,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                         xlabel = "Time (%s)" % sig.t_start.units.dimensionality,
                                         ylabel = "%s (%s)" % (sig.name, signal.units.dimensionality),
                                         symbol = None,
+                                        name = sig.name,
                                         **kwargs)
             
             signal_axis.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
@@ -7288,12 +7346,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         self._setup_signal_choosers_(y)
         
+        plotDataItemName = kwargs.pop("name", None)
+        
+        if plotDataItemName is None:
+            plotDataItemName = "Array signal"
+            
+        kwargs["name"] = plotDataItemName
+            
         if y.ndim == 1:
             if not isinstance(axis, pg.PlotItem):
                 self._prepareAxes_(1)
-                self._plot_numeric_data_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs)
+                self._plot_numeric_data_(self.plotItem(0), x, y, *args, **kwargs)
             else:
-                self._plot_numeric_data_(axis, x, y, name="Analog signal", *args, **kwargs)
+                self._plot_numeric_data_(axis, x, y, *args, **kwargs)
             #self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs))
             
         elif y.ndim == 2:
@@ -7319,12 +7384,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         if y.shape[self.signalChannelAxis] > 10:
                             self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs))
                         else:
-                            self._plot_numeric_data_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs)
+                            self._plot_numeric_data_(self.plotItem(0), x, y, 
+                                                     *args, **kwargs)
                     else:
                         if y.shape[self.signalChannelAxis] > 10:
-                            self.sig_plot.emit(self._make_sig_plot_dict_(axis, x, y, name="Analog signal", *args, **kwargs))
+                            self.sig_plot.emit(self._make_sig_plot_dict_(axis, x, y, 
+                                                                         *args, **kwargs))
                         else:
-                            self._plot_numeric_data_(axis, x, y, name="Analog signal", *args, **kwargs)
+                            self._plot_numeric_data_(axis, x, y, 
+                                                     *args, **kwargs)
                         
                     
             else:
@@ -7337,16 +7405,18 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                                 *args, **kwargs))
                     else:
                             
-                        self._plot_numeric_data_(self.plotItem(0), x, y_, *args, **kwargs)
+                        self._plot_numeric_data_(self.plotItem(0), x, y_, 
+                                                 *args, **kwargs)
                 else:
                     y_ = y[array_slice(y, {self.frameAxis:self.currentFrame})]
                     if y_.shape[self.signalChannelAxis] > 10:
                         self.sig_plot.emit(self._make_sig_plot_dict_(axis, 
-                                                x, y_,
+                                                x, y_,  
                                                 *args, **kwargs))
                     else:
                             
-                        self._plot_numeric_data_(axis, x, y_, *args, **kwargs)
+                        self._plot_numeric_data_(axis, x, y_, 
+                                                 *args, **kwargs)
                     
                 
         elif y.ndim == 3:
@@ -7378,14 +7448,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     self._plot_numeric_data_(self.plotItem(0), 
                                             x, y_, *args, **kwargs)
-                # else:
-                #     y_ = y[array_slice(y, {self.frameAxis:self.currentFrame})]
-                #     if y_.shape[self.signalChannelAxis-1] > 10:
-                #         self.sig_plot.emit(self._make_sig_plot_dict_(axis, 
-                #                                 x, y_, *args, **kwargs))
-                #     else:
-                #         self._plot_numeric_data_(axis, 
-                #                                 x, y_, *args, **kwargs)
                     
         else:
             raise TypeError("numpy arrays with more than three dimensions are not supported")
@@ -7462,9 +7524,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._prepareAxes_(len(chNdx), sigNames = ["%s_channel%d" % (signal_name, c) for c in chNdx])
             
             for (k, channel) in enumerate(chNdx):
+                ch_name = sig.array_annotations.get("channel_names", None)
+                if not isinstance(ch_name, np.ndarray):
+                    ch_name = f"channel_{k}"
+                else:
+                    ch_name = ch_name[k]
+                    
                 self._plot_numeric_data_(self.axis(k), 
                                          np.array(sig.times),
                                          np.array(sig[:,channel].magnitude),
+                                         name = ch_name,
                                          xlabel="%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
                                          ylabel="%s (%s)\nchannel %d" % (signal_name, sig.units.dimensionality, channel), 
                                          *args, **kwargs)
@@ -7474,12 +7543,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if sig.shape[1] > 10:
                 self.sig_plot.emit(self._make_sig_plot_dict_(self.axis(0), np.array(sig.times), 
                                        np.array(sig.magnitude), 
+                                       name=sig.name,
                                        ylabel="%s (%s)" % (signal_name, sig.units.dimensionality), 
                                        xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
                                        *args, **kwargs))
             else:
                 self._plot_numeric_data_(self.axis(0), np.array(sig.times), 
                                         np.array(sig.magnitude), 
+                                        name=sig.name,
                                         ylabel="%s (%s)" % (signal_name, sig.units.dimensionality), 
                                         xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
                                         *args, **kwargs)
@@ -7520,9 +7591,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         self._plot_numeric_data_(plotItem,  x, y, xlabel, ylabel,
                                 title, name, symbolcolorcycle, *args, **kwargs)
-        
-        #self._plot_numeric_data_(plotItem,  x, y, xlabel, xunits, ylabel, yunits,
-                                #title, name, symbolcolorcycle, *args, **kwargs)
         
         self.statusBar().clearMessage()
         
@@ -7586,13 +7654,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
             if x.shape[0] != y.shape[dataAxis]:
                 raise ValueError(f"x and y have different sizes: {x.shape[0]} and {y.shape[dataAxis]} on their first axes")
-                #x = x.squeeze()
-            
-        
-#         print(f"{self.__class__.__name__}._plot_numeric_data_ self.dataAxis {self.dataAxis}")
-#         print(f"{self.__class__.__name__}._plot_numeric_data_ self.signalChannelAxis {self.signalChannelAxis}")
-#         print(f"{self.__class__.__name__}._plot_numeric_data_ dataAxis {dataAxis}")
-#         
+
         # NOTE: 2021-09-09 18:30:20
         # when symbol is present we don't draw the connection line
         symbol = kwargs.get("symbol", None)
@@ -7639,30 +7701,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     xx = x
             else:
                 xx = None
-            
-#             if any(y_nan_ndx):
-#                 yy = y[~y_nan_ndx]
-#                 
-#                 if x is not None:
-#                     if x.ndim == 1:
-#                         xx = x[~y_nan_ndx]
-#                     else:
-#                         xx = x[~y_nan_ndx,0]
-#                 else:
-#                     xx =  None
-#                 
-#             else:
-#                 yy = y
-#                 if x is not None:
-#                     if x.ndim > 1:
-#                         xx = x[:,0]
-#                     else:
-#                         xx = x
-#                 else:
-#                     xx = None
-#                 
-#             if yy.size == 0 or (xx is not None and xx.size == 0): # nothing left to plot
-#                 return
             
             # print(f"{self.__class__.__name__}._plot_numeric_data_ y.ndim == 1; plotdataitem kwargs {kwargs}")
             # NOTE 2019-09-15 18:53:56:
@@ -7727,19 +7765,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     xx = None
                 
-#                 if any(y_nan_ndx): # np.bool_ not iterable in numpy 1.21.2
-#                     yy = 
-#                     yy = y_[~y_nan_ndx]
-#                     if x_ is not None:
-#                         xx = x_[~y_nan_ndx]
-#                     else:
-#                         xx = None
-#                     
-#                 else:
-#                     yy = y_
-#                     xx = x_
-                
-                # if xx.size == 0 or yy.size == 0: # nothing left to plot
                 if yy.size == 0 or (xx is not None and xx.size == 0):
                     continue
                     
@@ -7784,8 +7809,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         if isinstance(title, str) and len(title.strip()):
             plotItem.setTitle(title)
-        # else:
-        #     plotItem.setTitle("")
         
         plotItem.replot()
         
@@ -8206,6 +8229,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._current_plot_item_ = None
         self._current_plot_item_index_ = -1
         self._focussed_plot_item_ = None
+        
+        for axis in self.axes:
+            self.removeLegend(axis)
+            self.removeLabels(axis)
+            self.removeTargetsOverlay(axis)
         
         self.dataAnnotations.clear()
         self.annotationsViewer.clear()

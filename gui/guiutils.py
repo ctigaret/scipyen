@@ -8,6 +8,9 @@ from gui.painting_shared import (FontStyleType, standardQtFontStyles,
 
 import quantities as pq
 from gui.pyqtgraph_patch import pyqtgraph as pg
+from gui.pyqtgraph_symbols import (spike_Symbol, 
+                                    event_Symbol, event_dn_Symbol, 
+                                    event2_Symbol, event2_dn_Symbol)
 
 class UnitsStringValidator(QtGui.QValidator):
     def __init__(self, parent=None):

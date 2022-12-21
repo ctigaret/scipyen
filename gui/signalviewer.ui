@@ -169,7 +169,7 @@
      <x>0</x>
      <y>0</y>
      <width>726</width>
-     <height>20</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -197,8 +197,15 @@
     </property>
     <addaction name="actionDetect_Triggers"/>
    </widget>
+   <widget class="QMenu" name="menuSettings">
+    <property name="title">
+     <string>Settings</string>
+    </property>
+    <addaction name="actionShow_Legends"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuTools"/>
+   <addaction name="menuSettings"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QDockWidget" name="coordinatesDockWidget">
@@ -308,6 +315,14 @@
   <action name="actionData_to_workspace">
    <property name="text">
     <string>Data to workspace</string>
+   </property>
+  </action>
+  <action name="actionShow_Legends">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show Legends</string>
    </property>
   </action>
  </widget>

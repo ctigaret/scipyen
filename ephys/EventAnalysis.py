@@ -10,7 +10,7 @@ import numpy as np
 import scipy
 import quantities as pq
 import neo
-import pyqtgraph as pg
+# import pyqtgraph as pg
 import pandas as pd
 
 from iolib import pictio as pio
@@ -54,6 +54,10 @@ from gui.widgets import small_widgets
 from gui.widgets.small_widgets import QuantitySpinBox
 from gui import guiutils
 from gui.tableeditor import TableEditor
+from gui.pyqtgraph_patch import pyqtgraph as pg
+from gui.pyqtgraph_symbols import (spike_Symbol, 
+                                    event_Symbol, event_dn_Symbol, 
+                                    event2_Symbol, event2_dn_Symbol)
 
 
 import iolib.pictio as pio
@@ -630,6 +634,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         self.detectionThresholdSpinBox.setMinimum(0)
         self.detectionThresholdSpinBox.setMaximum(math.inf)
+        self.detectionThresholdSpinBox.setMaximum(math.inf)
+        self.detectionThresholdSpinBox.setDecimals(4)
         self.detectionThresholdSpinBox.setValue(self._detection_threshold_)
         self.detectionThresholdSpinBox.valueChanged.connect(self._slot_detectionThresholdChanged)
         # self.reFitPushButton.clicked.connect(self._slot_refit_Event_Waveform)
@@ -1393,6 +1399,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                                                     parent=self, configTag="WaveformViewer")
             self._waveFormViewer_.sig_closeMe.connect(self._slot_waveFormViewer_closed)
             
+        if len(self._waveFormViewer_.axes):
+            self._waveFormViewer_.removeLabels(0)
+        
         if self._overlayTemplateModel and isinstance(self._event_template_, neo.AnalogSignal):
             merged = self._combine_model_and_template_()
             
@@ -1412,6 +1421,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
             self._waveFormViewer_.sig_closeMe.connect(self._slot_waveFormViewer_closed)
 
+        if len(self._waveFormViewer_.axes):
+            self._waveFormViewer_.removeLabels(0)
+        
         if isinstance(self._event_template_, neo.AnalogSignal):
             if self.overlayTemplateModel:
                 merged = self._combine_model_and_template_()
@@ -1419,14 +1431,16 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             else:
                 self._waveFormViewer_.view(self._event_template_, doc_title=self._event_template_.name)
                 
+            
             event_fit = self._event_template_.annotations.get("event_fit", None)
+            
+            waxis = self._waveFormViewer_.axis(0)
+            
             if isinstance(event_fit, dict):
                 waveR2 = event_fit.get("Rsq", None)
                 if waveR2 is not None:
                     wavelabel = "R² = %.2f" % waveR2
                     
-                waxis = self._waveFormViewer_.axis(0)
-                self._waveFormViewer_.removeLabels(waxis)
                 [[x0,x1], [y0,y1]]  = waxis.viewRange()
                 
                 self._waveFormViewer_.addLabel(wavelabel, 0, pos = (x0,y1), 
@@ -1589,7 +1603,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
 
             self._detected_Events_Viewer_.frameChanged.connect(self._slot_mPSCViewer_frame_changed)
             
-        self._detected_Events_Viewer_.removeLabels(0)
+        if len(self._detected_Events_Viewer_.axes):
+            self._detected_Events_Viewer_.removeLabels(0)
         self._events_spinBoxSlider_.setRange(0, len(self._aligned_waves_)-1)
         self._detected_Events_Viewer_.view(self._aligned_waves_, doc_title="Aligned events")
         
@@ -1614,6 +1629,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 return
             
             self._events_spinBoxSlider_.setRange(0, len(waves)-1)
+            if len(self._detected_Events_Viewer_.axes):
+                self._detected_Events_Viewer_.removeLabels(0)
             self._detected_Events_Viewer_.view(waves, doc_title="All events")
             
             self._indicate_events_(waves=waves)
@@ -1623,6 +1640,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         if not isinstance(self._ephysViewer_, sv.SignalViewer):
             return
         frameResult = self._result_[self.currentFrame] # a spike train list or None !!!
+        
+        if not isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList) or len(frameResult) == 0:
+            return
         
         signalBlockers = (QtCore.QSignalBlocker(w) for w in (self._events_spinBoxSlider_,
                                                              self.accept_eventCheckBox,
@@ -1673,6 +1693,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
             self.accept_eventCheckBox.setEnabled(True)
             
+            if len(self._detected_Events_Viewer_.axes):
+                self._detected_Events_Viewer_.removeLabels(0)
+
             self._detected_Events_Viewer_.view(self._detected_events_, doc_title = f"Events in sweep {self.currentFrame}")
             
             self._indicate_events_()
@@ -1709,6 +1732,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         if not self._ephysViewer_.isVisible():
             self._ephysViewer_.setVisible(True)
+            
+        if self._detected_Events_Viewer_.yData is None:
+            return
             
         sigBlockers = [QtCore.QSignalBlocker(w) for w in (self._ephysViewer_,
                                                           self._frames_spinBoxSlider_)]
@@ -1873,6 +1899,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     
                 elif acc == False:
                     brush = rej_targetBrush#[0:3] + (255,)
+                    
+                print(tuple(pg.graphicsItems.ScatterPlotItem.Symbols.keys()))
                     
                 target = pg.TargetItem((t, y), 
                                         size=int(targetSize*1.3),
@@ -2381,6 +2409,12 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                                                  useCBsliding = self.useSlidingDetection,
                                                  threshold = self._detection_threshold_,
                                                  outputDetection=output_detection)
+                
+                # print(f"detection {detection}")
+                
+                if detection is None:
+                    continue
+                
                 if output_detection:
                     detection, thetas = detection
                     # print(f"{[type(t).__name__ for t in thetas]}")
@@ -2416,6 +2450,11 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                         accept.extend(t.annotations["Accept"])
                         fits.extend(t.annotations["event_fit"])
                         
+                    pt = np.concatenate([t.annotations["peak_time"].magnitude for t in st_], axis=0) * st_[0].units
+                    
+                    if any(len(v) == 0 for v in (wave_names, accept, fits, pt)):
+                            continue
+                        
                     θ_ = [t.annotations["θ"] for t in st_]
                     
                     # print(len(θ_), [type(t) for t in θ_])
@@ -2425,7 +2464,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     st.name= "events"
                     st.segment = segment
                     
-                    pt = np.concatenate([t.annotations["peak_time"].magnitude for t in st_], axis=0) * st_[0].units
+                    
                     if len(θ_) > 1:
                         θ = neoutils.splice_signals(*θ_, signal.times)
                         θ.name = "events"
@@ -2456,6 +2495,17 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     else:
                         chid = kc
                         
+                    # print(f"accept {accept}")
+                    
+                    if all(isinstance(v, bool) for v in accept):
+                        accept = np.array(accept)
+                        
+                    elif all(isinstance(v, np.ndarray) for v in accept):
+                        accept = np.concatenate(accept)
+                        
+                    else:
+                        accept = np.full((st.shape[0],), fill_value = True, dtype=np.bool_)
+                    
                     st.annotate(
                                 peak_time = pt, 
                                 wave_name = wave_names,
@@ -2469,7 +2519,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                                 signal_origin = sig.name,
                                 datetime = datetime.datetime.now(),
                                 Aligned = False,
-                                Accept = np.concatenate(accept),
+                                Accept = accept,
                                 segment_index = segment_index
                                 )
                     
@@ -2590,7 +2640,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                            self.actionExport_Event_Template,
                            self.actionRemember_Event_Template,
                            self.actionForget_Event_Template,
-                           self.actionPlot_Event_template):
+                           self.actionPlot_Event_template,
+                           self.use_eventTemplate_CheckBox):
                 action.setEnabled(isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)))
             
             self._plot_template_()
@@ -3161,6 +3212,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 pio.saveHDF5(self._event_template_, fileName)
             else:
                 pio.savePickleFile(self._event_template_, fileName)
+                
+            self.lastUsedTemplateFile = fileName
                 
     @pyqtSlot()
     def _slot_openEphysDataFile(self):
@@ -4518,7 +4571,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         field_id = list()
         
         for k, frameResult in enumerate(self._result_):
-            if frameResult is None:
+            if not isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList) or len(frameResult) == 0:
                 continue
             
             for st in frameResult:
