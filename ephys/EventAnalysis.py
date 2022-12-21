@@ -981,7 +981,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             sigBlock = QtCore.QSignalBlocker(self._detected_Events_Viewer_)
             # print(f"displayDetectedWaveform {len(self._detected_Events_Viewer_.yData)} waves")
             self._detected_Events_Viewer_.currentFrame = index
-            self._indicate_event_()
+            self._indicate_events_()
         
             
     def displayFrame(self):
@@ -1172,32 +1172,41 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         aligned_waves = list()
         
         for train in trains:
-            alignment = self._make_aligned_waves_(train, train.segment)
-        
-        
-        
-        
-        for k, frameResult in enumerate(self._result_):
-            if not isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList):
+            alignment = self._make_aligned_waves_(train, write_back=writeToData)
+            if alignment is None:
                 continue
+
+            aligned_waveforms, wave_ndx = alignment
+            aligned_waves.extend(aligned_waveforms)
             
-            segment  = frameResult.segment
-            prev_detect = self._get_previous_detection_(segment)
-            self._undo_buffer_[k] = prev_detect
+        self._aligned_waves_[:] = aligned_waves
+        
+        self._plot_aligned_waves()
             
-            if segment is None:
-                segment = self._get_data_segment_(k)
-                
-            if not isinstance(detectionChannel, int):
-                for kc, train in enumerate(frameResult):
-                    alignment = self._make_aligned_waves_(train)
-                    
-                    if alignment is None:
-                        continue
-                    
-                    aligned_waveforms, wave_ndx = alignment
-                    
-    # def _make_aligned_waves_(self, train:neo.SpikeTrain, segment:typing.Optional[neo.Segment]=None, only_accepted:bool=True, write_back:bool=False):
+            
+    def _extract_waves_(self, train, valid_only=False):
+        """Extracts event wavforms from the train.
+        Calls neoutils.extract_waves then annotates the waveforms with information
+        useful for event tagging in the plotted signal.
+        """
+        waves = neoutils.extract_waves(train, train.annotations["signal_units"],
+                                       prefix=train.annotations["signal_origin"])
+        
+        if valid_only:
+            waves = [w for w in filter(lambda x: x.annotations.get("Accept", True)==True, waves)]
+        
+        for wave in waves:
+            kw = wave.annotations["wave_index"]
+            wave.annotate(channel_id = train.annotations["channel_id"],
+                          amplitude = train.annotations["amplitude"][kw],
+                          peak_time = train.annotations["peak_time"][kw],
+                          event_fit = train.annotations["event_fit"][kw],
+                          Accept = train.annotations["Accept"][kw],
+                          signal_origin = train.annotations["signal_origin"],
+                          Aligned = train.annotations["Aligned"])
+            
+        return waves
+
     def _make_aligned_waves_(self, train:neo.SpikeTrain, write_back:bool=False):
         """
         Aligns detected event waveforms on the onset. 
@@ -1233,11 +1242,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         if all(v is None for v in self._result_):
             return
         
-        if not isinstance(segment, neo.Segment):
-            segment = train.segment
-            if not isinstance(segment, neo.Segment):
-                self.criticalMessage(self.windowTitle(), "The spike train does not associate a segment")
-                return
+        segment = train.segment
         
         if train.waveforms is None:
             warnings.warn("No waveforms found in the spike train", category=RuntimeWarning)
@@ -1299,61 +1304,54 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         signal = segment.analogsignals[sig_ndx]
         
-        waves = neoutils.extract_waves(train, train.annotations["signal_units"],
-                                       prefix = signal.name)
+        processed = signal.annotations.get("filtered", False)
+        if not processed:
+            signal = self._process_signal_(signal, newFilter=True)
+
+        waves = self._extract_waves_(train, valid_only = not self.allWavesToResult)
         
-        accepted_wave_ndx = [k for k in range(len(accepted)) if accepted[k]]
+        start_times = np.array([w.t_start for w in waves]) * waves[0].t_start.units
+        peak_times = np.array([w.annotations["peak_time"] for w in waves]) * waves[0].t_start.units
+        onset = np.array([w.annotations["event_fit"]["Coefficients"][2] for w in waves]) * waves[0].t_start.units
+        wave_index = [w.annotations["wave_index"] for w in waves]
+        segment_index = [w.segment.index for w in waves]
+        maxOnset = onset.max()
+        onsetCorrections = maxOnset - onset
         
-        sweep_index = list()
-        wave_index = list()
-        start_times = list()
-        peak_times = list()
-        onset = list()
+        new_start_times = start_times - onsetCorrections
+        stop_times = new_start_times + self._event_duration_
         
         aligned_waves = list()
         
-        # select accepted waves
-        for kw, w in enumerate(waves):
-            if accepted[kw]:
-                start_times.append(w.t_start)
-                peak_times.append(w.annotations["peak_time"])
-                onset.append(event_fit[kw]["Coefficients"][2])
-                wave_index.append(kw)
-                sweep_index.append(kw)
-        
-        if len(onset):
-            maxOnset = max(onset) * start_times[0].units
-            onsetCorrection = [maxOnset - v * start_times[0].units for v in onset]
-            new_start_times = [start_times[i] - onsetCorrection[i] for i in range(len(start_times))]
-            stop_times = [v + self._event_duration_ for v in new_start_times]
+        for kw, wave_ndx in enumerate(wave_index):
+            t0 = new_start_times[kw]
+            t1 = stop_times[kw]
+            aligned_wave = signal.time_slice(t0, t1)
+            t_onset = t0 + maxOnset
+            baseline = signal.time_slice(t0, t_onset)
+            dc = np.mean(baseline, axis=0)
+            aligned_wave -= dc
             
-            for kw, wave_ndx in enumerate(wave_index):
-                t0 = new_start_times[kw]
-                t1 = stop_times[kw]
-                wave = signal.time_slice(t0,t1)
-                t_onset = t0+maxOnset
-                baseline = signal.time_slice(t0, t_onset)
-                dc = np.mean(baseline, axis=0)
-                wave -= dc
-                aligned_waves.append(wave)
-                
-        if len(aligned_waves):
+            # no need to annotatw the original start tiem: these ARE the train's
+            # times attribute
+            aligned_wave.annotate(channel_id = train.annotations["channel_id"],
+                          amplitude = train.annotations["amplitude"][kw],
+                          peak_time = train.annotations["peak_time"][kw],
+                          event_fit = train.annotations["event_fit"][kw],
+                          Accept = train.annotations["Accept"][kw],
+                          signal_origin = train.annotations["signal_origin"],
+                          Aligned = True,
+                          wave_index = wave_ndx)
+            
             if write_back:
-                aligned_waveforms = np.concatenate([w.magnitude[:,:,np.newaxis] for w in aligned_waves], axis=2)
-                peak_times = np.array([train.annotations["peak_time"][k] for k in wave_ndx])
-                wave_names = [train.annotations["wave_name"][k] for k in wave_ndx]
-                accepted = [train.annotations["Accept"][k] for k in wave_ndx]
-                event_fits = [train.annotations["event_fit"][k] for k in wave_ndx]
-                
-                train.annotations["peak_time"] = peak_times
-                train.annotations["wave_name"] = wave_names
-                train.annotations["Accept"] = accepted
-                train.annotations["event_fit"] = event_fits
-                train.annotations["Aligned"] = True
-                
-                train.waveforms = aligned_waveforms.T
-                
-            return aligned_waves, wave_index
+                train.waveforms[wave_ndx,:,:] = aligned_wave.magnitude.T
+  
+            aligned_waves.append(aligned_wave)
+            
+        if write_back:
+            train.annotations["Aligned"] = True
+            
+        return aligned_waves, wave_index
         
     def _average_waves_(self, train):
         # waves = neoutils.extract_waves(train, train.annotations["signal_units"])
@@ -1616,8 +1614,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             self._events_spinBoxSlider_.setRange(0, len(waves)-1)
             self._detected_Events_Viewer_.view(waves, doc_title="All events")
             
-            self._indicate_event_(waves=waves)
-            # self._indicate_event_(self._detected_Events_Viewer_.currentFrame, waves=waves)
+            self._indicate_events_(waves=waves)
+            # self._indicate_events_(self._detected_Events_Viewer_.currentFrame, waves=waves)
             
     def _plot_detected_events(self):
         if not isinstance(self._ephysViewer_, sv.SignalViewer):
@@ -1656,23 +1654,11 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 sig_name = train.name
             
             # print(f"*** {self.__class__.__name__}._plot_detected_events extract waves ***")
-            self._detected_events_ = neoutils.extract_waves(train, 
-                                                           train.annotations.get("signal_units", pq.dimensionless),
-                                                           prefix = sig_name)
+            self._detected_events_ = self._extract_waves_(train)
             
             if len(self._detected_events_) == 0:
                 return
             
-            # create temporary annotations useful in _indicate_event_()
-            for kw, w in enumerate(self._detected_events_):
-                w.annotate(channel_id = train.annotations["channel_id"],
-                           amplitude = train.annotations["amplitude"][kw],
-                           peak_time = train.annotations["peak_time"][kw],
-                           event_fit = train.annotations["event_fit"][kw],
-                           Accept = train.annotations["Accept"][kw],
-                           signal_origin = train.annotations["signal_origin"],
-                           Aligned = train.annotations.get("Aligned", False))
-        
             if not isinstance(self._detected_Events_Viewer_, sv.SignalViewer):
                 self._detected_Events_Viewer_ = sv.SignalViewer(win_title="Detected events", 
                                                             parent=self, configTag="mPSCViewer")
@@ -1687,10 +1673,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
             self._detected_Events_Viewer_.view(self._detected_events_, doc_title = f"Events in sweep {self.currentFrame}")
             
-
-            # will be called by _slot_mPSCViewer_frame_changed
-            # self._indicate_event_(self._detected_events_)
-            # self._indicate_event_(self._detected_Events_Viewer_.currentFrame,self._detected_events_)
+            self._indicate_events_()
             
         else:
             if isinstance(self._detected_Events_Viewer_, sv.SignalViewer):
@@ -1703,11 +1686,11 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 
             self._detected_events_.clear()
             
-    def _indicate_event_(self, waves=None):
+    def _indicate_events_(self, waves=None):
         """Indicates detcted events inside the signal plot.
         """
         #### BEGIN debug call stack
-        # print(f"_indicate_event_ call stack:")
+        # print(f"_indicate_events_ call stack:")
         # stack = inspect.stack()
         # for s in stack:
         #     print(f"\t\tcaller {s.function} from {s.filename} at {s.lineno}")
@@ -1826,7 +1809,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         # for the current sweep !
         # current_frame_waves = [w for w in waves if w.segment.index == self._ephysViewer_.currentFrame]
         current_frame_waves = [w for w in filter(lambda x: x.segment.index == self._ephysViewer_.currentFrame, waves)]
-        # print(f"_indicate_event_: {len(current_frame_waves)} waves in sweep {frame_index}")
+        # print(f"_indicate_events_: {len(current_frame_waves)} waves in sweep {frame_index}")
         # NOTE: 2022-12-15 13:14:39
         # prevent plotting detection targets in the wrong axis
         signal = segment.analogsignals[sig_index]
@@ -1842,7 +1825,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         # build again
         # the cache is emptied when displaying a wave had caused the ephys viewer
         # to jump frame.
-        # print(f"_indicate_event_: _targets_cache_ has {len(self._targets_cache_)} targets")
+        # print(f"_indicate_events_: _targets_cache_ has {len(self._targets_cache_)} targets")
         if len(self._targets_cache_) == 0:
             # no targets in cache ⇒ generate target items and store in cache
             for kw, w in enumerate(current_frame_waves):
@@ -2023,15 +2006,15 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         lo = tuple(p.magnitude for p in model_params["Lower Bound:"])
         up = tuple(p.magnitude for p in model_params["Upper Bound:"])
             
-        # w = self._detected_events_[waveIndex]
-        
         fw = membrane.fit_Event(wave, init_params, lo=lo, up=up)
-        fw.annotate(wave_index = wave_index, Aligned = aligned)
-        
         if self._use_threshold_on_rsq_:
             accept = fw.annotations["event_fit"]["Rsq"] >= self.rSqThreshold
         else:
             accept = True
+            
+        fw.annotate(Accept = accept)
+        fw.annotate(Aligned = aligned)
+        
             
         self._detected_Events_Viewer_.yData[waveIndex] = fw
         
@@ -2046,7 +2029,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._detected_Events_Viewer_.refresh()
         self._targets_cache_.clear()
         # self._detected_Events_Viewer_.currentFrame = waveIndex
-        self._indicate_event_()
+        self._indicate_events_()
        
     def _clear_detection_in_sweep_(self, segment:neo.Segment):
         mPSCtrains = [s for s in segment.spiketrains if s.annotations.get("source", None) == "Event_detection"]
@@ -3569,9 +3552,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     
             
         # • refresh mPSC indicator on the main data plot
-        self._indicate_event_()
-        # self._indicate_event_(self.currentFrame)
-        # self._indicate_event_(self.currentWaveformIndex, self.currentFrame)
+        self._indicate_events_()
+        # self._indicate_events_(self.currentFrame)
+        # self._indicate_events_(self.currentWaveformIndex, self.currentFrame)
         #
         # • refresh the results table (DataFrame); to save time, we only do it
         #   if the report window is showing
@@ -3759,8 +3742,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     sigBlock = QtCore.QSignalBlocker(self._frames_spinBoxSlider_)
                     self._frames_spinBoxSlider_.setValue(segment_index)
             self._currentWaveformIndex_ = value
-            self._indicate_event_()
-            # self._indicate_event_(self.currentWaveformIndex)
+            self._indicate_events_()
+            # self._indicate_events_(self.currentWaveformIndex)
         
     @pyqtSlot(int)
     def _slot_setWaveFormIndex(self, value):
@@ -4477,7 +4460,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         accept = list()
         seg_index = list()
         wave_index = list()
-        current_index = list()
+        # current_index = list()
         source_id = list()
         cell_id = list()
         sex = list()
@@ -4495,55 +4478,34 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 if st.annotations.get("source", None) != "Event_detection":
                     continue
                 psc_trains.append(st)
-                st_waves = neoutils.extract_waves(st, st.annotations["signal_units"], prefix=st.annotations["signal_origin"])
-                # use only accepted waves, unless self.allWavesToResult is True
-                # (this is a configurable attribute)
-                valid_train_waves = list()
-                for kw, t in enumerate(st):
-                    if not self.allWavesToResult:
-                        valid = st.annotations["Accept"][kw]
-                    else:
-                        valid = True
-                        
-                    if valid:
-                        mini_wave = st_waves[kw]
-                        accept.append(st.annotations["Accept"][kw])
-                        mini_wave.annotate(channel_id = st.annotations["channel_id"],
-                                        amplitude = st.annotations["amplitude"][kw],
-                                        peak_time = st.annotations["peak_time"][kw],
-                                        event_fit = st.annotations["event_fit"][kw],
-                                        Accept = st.annotations["Accept"][kw],
-                                        signal_origin = st.annotations["signal_origin"],
-                                        Aligned = st.annotations["Aligned"])
-                        
-                        valid_train_waves.append(mini_wave)
-                        
-                        seg_index.append(st.annotations["segment_index"])
-                        wave_index.append(mini_wave.annotations["wave_index"])
-                        current_index.append(kw)
-                        start_time.append(float(t))
-                        channel_id.append(st.annotations["channel_id"])
-                        peak_time.append(float(st.annotations["peak_time"][kw]))
-                        amplitude.append(float(st.annotations["amplitude"][kw]))
-                        from_template.append(st.annotations["event_fit"][kw]["template"])
-                        fit_amplitude.append(float(st.annotations["event_fit"][kw]["amplitude"]))
-                        r2.append(float(st.annotations["event_fit"][kw]["Rsq"]))
-                        offset.append(float(st.annotations["event_fit"][kw]["Coefficients"][0]))
-                        scale.append(float(st.annotations["event_fit"][kw]["Coefficients"][1]))
-                        onset.append(float(st.annotations["event_fit"][kw]["Coefficients"][2]))
-                        tau_rise.append(float(st.annotations["event_fit"][kw]["Coefficients"][3]))
-                        tau_decay.append(float(st.annotations["event_fit"][kw]["Coefficients"][4]))
-                        source_id.append(self.metaDataWidget.sourceID)
-                        cell_id.append(self.metaDataWidget.cell)
-                        field_id.append(self.metaDataWidget.field)
-                        age.append(self.metaDataWidget.age)
-                        sex.append(self.metaDataWidget.sex)
-                        genotype.append(self.metaDataWidget.genotype)
-                        dataname.append(self.metaDataWidget.dataName)
-                        datetime.append(self.metaDataWidget.analysisDateTime)
-                        
-                if len(valid_train_waves):
-                    all_waves.extend(valid_train_waves)
+                st_waves = self._extract_waves_(st, valid_only=not self.allWavesToResult)
+                for mini_wave in st_waves:
+                    seg_index.append(mini_wave.segment.index)
+                    accept.append(mini_wave.annotations["Accept"])
+                    wave_index.append(mini_wave.annotations["wave_index"])
+                    start_time.append(float(st[mini_wave.annotations["wave_index"]]))
+                    channel_id.append(mini_wave.annotations["channel_id"])
+                    peak_time.append(float(mini_wave.annotations["peak_time"]))
+                    amplitude.append(float(mini_wave.annotations["amplitude"]))
+                    from_template.append(mini_wave.annotations["event_fit"]["template"])
+                    fit_amplitude.append(float(mini_wave.annotations["event_fit"]["amplitude"]))
+                    r2.append(float(mini_wave.annotations["event_fit"]["Rsq"]))
+                    offset.append(float(mini_wave.annotations["event_fit"]["Coefficients"][0]))
+                    scale.append(float(mini_wave.annotations["event_fit"]["Coefficients"][1]))
+                    onset.append(float(mini_wave.annotations["event_fit"]["Coefficients"][2]))
+                    tau_rise.append(float(mini_wave.annotations["event_fit"]["Coefficients"][3]))
+                    tau_decay.append(float(mini_wave.annotations["event_fit"]["Coefficients"][4]))
+                    source_id.append(self.metaDataWidget.sourceID)
+                    cell_id.append(self.metaDataWidget.cell)
+                    field_id.append(self.metaDataWidget.field)
+                    age.append(self.metaDataWidget.age)
+                    sex.append(self.metaDataWidget.sex)
+                    genotype.append(self.metaDataWidget.genotype)
+                    dataname.append(self.metaDataWidget.dataName)
+                    datetime.append(self.metaDataWidget.analysisDateTime)
+                    
+                if len(st_waves):
+                    all_waves.extend(st_waves)
                 
         if len(psc_trains) == 0:
             return
