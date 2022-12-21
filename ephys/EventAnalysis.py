@@ -1188,6 +1188,11 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         #
         # 
         
+        # FIXME: 2022-12-21 21:24:27
+        # this functionality is not implemented - consider dumping it: after all,
+        # the aligned aves are mostly useful in creating a template for later use
+        # in event detection; the sliding technique works well even with a synthetic
+        # event waveform
         if writeToData:
             go = self.questionMessage(self.windowTitle(), "This will overwrite the current detection. Continue?")
             
