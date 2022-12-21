@@ -550,9 +550,13 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         # actions (shared among menu and toolbars):
         self.actionOpenEphysData.triggered.connect(self._slot_openEphysDataFile)
+        
         self.actionImportEphysData.triggered.connect(self._slot_importEphysData)
+        
         self.actionSaveEphysData.triggered.connect(self._slot_saveEphysData)
+        
         self.actionExportEphysData.triggered.connect(self._slot_exportEphysData)
+        
         self.actionPlot_Data.triggered.connect(self._slot_plotData)
         self.actionPlot_detected_events.triggered.connect(self._plot_detected_events)
         self.actionPlot_all_events.triggered.connect(self._plot_all_events)
@@ -681,6 +685,21 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.actionAll_waves_to_result.triggered.connect(self._slot_set_allWavesToResult)
         
         self.actionRefit_wave.triggered.connect(self._slot_refit_Event_Waveform)
+        
+        for c in self.children():
+            if isinstance(c, QtWidgets.QAction):
+                if len(c.toolTip().strip()) == 0:
+                    s = c.toolTip()
+                else:
+                    s = c.text()
+                    c.setToolTip(s)
+                    
+                if len(c.statusTip().strip()) == 0:
+                    c.setStatusTip(s)
+                    
+                if len(c.whatsThis().strip()) == 0:
+                    c.setWhatsThis(s)
+                    
         # self.noiseFilterCheckBox.stateChanged.connect(self._slot_filterData)
         # print(f"{self.__class__.__name__}._configureUI_ end...")
 #### END _configureUI_        
@@ -3341,12 +3360,12 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     def _slot_forgetTemplate(self):
         self._event_template_ = None
         for action in (self.actionSave_Event_Template,
-                self.actionExport_Event_Template,
-                self.actionRemember_Event_Template,
-                self.actionForget_Event_Template,
-                self.actionPlot_Event_template,
-                self.use_eventTemplate_CheckBox):
-        action.setEnabled(isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)))
+                        self.actionExport_Event_Template,
+                        self.actionRemember_Event_Template,
+                        self.actionForget_Event_Template,
+                        self.actionPlot_Event_template,
+                        self.use_eventTemplate_CheckBox):
+            action.setEnabled(isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)))
      
     @pyqtSlot()
     def _slot_clearFactoryDefaultTemplateFile(self):
