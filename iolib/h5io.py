@@ -2491,12 +2491,19 @@ def makeDataset(obj, group:h5py.Group, attrs:dict, name:str, compression:typing.
         group[target_name] = cached_entity # make a hard link
         return cached_entity
     
+    # NOTE: 2022-12-21 22:00:52
+    # in Python 3.10 bool is a numbers.Number
     supported_types = (numbers.Number, tuple, list, deque)
     
     if not isinstance(obj, supported_types):
         warnings.warn(f"makeDataset: {type(obj).__name__} objects are not supported")
         dset = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
     else:
+        # HDF5 prevents the use of compression and chunks with scalars!
+        if isinstance(obj, numbers.Number):
+            compression = None
+            chunks = None
+            
         dset = group.create_dataset(name, data = obj, compression=compression,
                                     chunks=chunks, track_order=track_order)
         

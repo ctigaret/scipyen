@@ -6279,7 +6279,7 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     
     return ret
 
-def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal], threshold:float=4., channels:typing.Optional[typing.Union[int, typing.Sequence[int]]]=None, outputDetection:bool=False):
+def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal], threshold:float=4., channels:typing.Optional[typing.Union[int, typing.Sequence[int]]]=None, outputDetection:bool=False, raw_signal=None):
     """Detect miniature or spontaneous PSCs with optimally scaled template.
     Implements the "sliding template" algorithm in Clements & Bekkers 1997, Biophys.J.
     
@@ -6323,18 +6323,18 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], wavefo
         NOTE: When specified in this way the waveform will be generated ad-hoc
         using the sampling rate of the signal `x`.
     
-    For example, if creating the waveform as a plain numpy array:
-    
-    t_start     = 0     # [s]
-    duration    = 0.2   # [s]
-    sr          = 1e4   # [Hz]
-    
-    t = np.linspace(0, duration, num = sr * duration)
-    model = models.Clements_Bekkers_97(x, parameters)
-    
-    As a convenience, you can use PSCwaveform(...) function in this module to
-    generate a synthetic  waveform as a neo.AnalogSignal.
-    
+        For example, if creating the waveform as a plain numpy array:
+        
+        t_start     = 0     # [s]
+        duration    = 0.2   # [s]
+        sr          = 1e4   # [Hz]
+        
+        t = np.linspace(0, duration, num = sr * duration)
+        model = models.Clements_Bekkers_97(x, parameters)
+        
+        As a convenience, you can use PSCwaveform(...) function in this module to
+        generate a synthetic  waveform as a neo.AnalogSignal.
+        
     threshold: float; optional, default None.
         This value is the threshold for the detection criterion used in the 
         Clements & Bekkers 1997 Biophys J paper
@@ -6345,6 +6345,17 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], wavefo
     
         This parameter is only used when useCBsliding is True.
         
+    outputDetection:bool, default is False
+        When True, the function also returns the detection criterion (here, as 
+        defined in Clements & Bekkers 1997 paper)
+    
+    raw_signal: analog signal with the same shape and domain as the signal where
+        the detection took place, default is None
+        When given, the waveforms will be extracted from THIS signal using the 
+        time stamps in the spike train.
+        This is useful when detection was performed on a pre-processed (e.g., 
+        smoothed) signal but the "raw" waveforms are required.
+    
         
     Returns:
     ========
@@ -6410,6 +6421,7 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], wavefo
     
     ret = list()
     theta_sigs = list()
+    
     for kt,t in enumerate(thetas):
         θ = type(x)(t.θ, units = pq.dimensionless, t_start = x.t_start, 
                     sampling_rate = x.sampling_rate,
@@ -6418,7 +6430,16 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], wavefo
         θ.array_annotate(channel_names=[f"{ch_name}_θ"])
         θ.array_annotate(channel_ids=[ch_id])
         theta_sigs.append(θ)
-        ret_ = extract_event_waveforms(x[:,kt], mini_duration, t.θ, threshold, peakfunc)
+        
+        if isinstance(raw_signal, type(x)) and raw_signal.shape == x.shape and \
+            raw_signal.sampling_rate == x.sampling_rate and raw_signal.times.units == x.times.units and \
+                raw_signal.t_start == x.t_start and raw_signal.units == x.units:
+            ret_ = extract_event_waveforms(raw_signal[:,kt], mini_duration, t.θ, threshold, peakfunc)
+        else:
+            ret_ = extract_event_waveforms(x[:,kt], mini_duration, t.θ, threshold, peakfunc)
+        
+        
+        # ret_ = extract_event_waveforms(x[:,kt], mini_duration, t.θ, threshold, peakfunc)
         
         if isinstance(ret_, neo.SpikeTrain):
             ret_.annotate(waveform = waveform, θ = θ, channel_id = x.array_annotations.get("channel_ids", [0])[0])
@@ -6838,7 +6859,7 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal], durati
     
     return ret
 
-def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typing.Optional[float]=None, outputDetection:bool=False):
+def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typing.Optional[float]=None, outputDetection:bool=False, raw_signal=None):
     """Detect spontaneous events in a signal.
 
     Uses cross-correlation with a waveform, or the sliding detection algorithm
@@ -6882,18 +6903,18 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
         NOTE: When specified in this way the waveform will be generated ad-hoc
         using the sampling rate of the signal `x`.
     
-    For example, if creating the waveform as a plain numpy array:
-    
-    t_start     = 0     # [s]
-    duration    = 0.2   # [s]
-    sr          = 1e4   # [Hz]
-    
-    t = np.linspace(0, duration, num = sr * duration)
-    model = models.Clements_Bekkers_97(x, parameters)
-    
-    As a convenience, you can use PSCwaveform(...) function in this module to
-    generate a synthetic  waveform as a neo.AnalogSignal.
-    
+        For example, if creating the waveform as a plain numpy array:
+        
+        t_start     = 0     # [s]
+        duration    = 0.2   # [s]
+        sr          = 1e4   # [Hz]
+        
+        t = np.linspace(0, duration, num = sr * duration)
+        model = models.Clements_Bekkers_97(x, parameters)
+        
+        As a convenience, you can use PSCwaveform(...) function in this module 
+        to generate a synthetic  waveform as a neo.AnalogSignal.
+        
     useCBsliding:bool, default is False
         When True (the default), uses the Clements & Bekkers optimally scaled 
         template sliding detection, with the waveform as a template.
@@ -6909,7 +6930,18 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
         template detection method.
     
         This parameter is only used when useCBsliding is True.
-        
+    
+    outputDetection:bool, default is False
+        When True, the function also returns the detection criterion (here, the 
+        cross-correlation signal)
+    
+    raw_signal: analog signal with the same shape and domain as the signal where
+        the detection took place, default is None
+        When given, the waveforms will be extracted from THIS signal using the 
+        time stamps in the spike train.
+        This is useful when detection was performed on a pre-processed (e.g., 
+        smoothed) signal but the "raw" waveforms are required.
+    
     Returns:
     ========
     A dict with keys:
@@ -6966,7 +6998,7 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
         peakfunc = np.argmin
         
     if useCBsliding:
-        return detect_Events_CBsliding(x, waveform, threshold, outputDetection=outputDetection)
+        return detect_Events_CBsliding(x, waveform, threshold, outputDetection=outputDetection, raw_signal=raw_signal)
             
     else:
         # 1) normalize the model waveform - only for the cross-correlation method
@@ -6996,6 +7028,7 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
         #   ∘ detrended & scaled is stored in annotations as θ_norm
         # • thresholding is always performed on θ_norm
         thetas = list()
+        
         for k, c in enumerate(xc):
             dxc = scipy.signal.detrend(c, type="constant",axis=0)
             if threshold is None:
@@ -7018,7 +7051,12 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
             
             thetas.append(θ_norm)
             
-            ret_ = extract_event_waveforms(x[:,k], mini_duration, dxc_n, thr, peakfunc)
+            if isinstance(raw_signal, type(x)) and raw_signal.shape == x.shape and \
+                raw_signal.sampling_rate == x.sampling_rate and raw_signal.times.units == x.times.units and \
+                    raw_signal.t_start == x.t_start and raw_signal.units == x.units:
+                ret_ = extract_event_waveforms(raw_signal[:,k], mini_duration, dxc_n, thr, peakfunc)
+            else:
+                ret_ = extract_event_waveforms(x[:,k], mini_duration, dxc_n, thr, peakfunc)
             
             if isinstance(ret_, neo.SpikeTrain):
                 ret_.annotate(waveform = waveform, θ = θ, θ_norm=θ_norm,

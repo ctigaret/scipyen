@@ -553,6 +553,9 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         else:
             val = value
         
+        if isinstance(val, int):
+            val = float(val)
+            
         # FIXME/TODO: 2022-11-07 13:51:37
         # at the moment, this will fail silently; find a way to notify user/caller
         if isinstance(val, float):
@@ -570,7 +573,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             super().setValue(-math.inf)
                 
         else:
-            raise TypeError(f"Expecting a scalar quantity or a float; instead, got {value}")
+            raise TypeError(f"Expecting a scalar quantity or a float; instead, got {type(value).__name__}")
         
     @property
     def unitFamily(self):

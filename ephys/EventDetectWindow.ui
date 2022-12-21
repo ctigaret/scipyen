@@ -381,6 +381,58 @@
              <string/>
             </property>
             <layout class="QGridLayout" name="gridLayout">
+             <item row="2" column="0">
+              <widget class="QCheckBox" name="deHumCheckBox">
+               <property name="text">
+                <string>Humbug</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1" colspan="2">
+              <widget class="QComboBox" name="filterTypeComboBox"/>
+             </item>
+             <item row="3" column="3" colspan="2">
+              <widget class="QLabel" name="freqCutoffLabel">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="text">
+                <string>Cutoff:</string>
+               </property>
+               <property name="buddy">
+                <cstring>cutoffFrequencySpinBox</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="5">
+              <widget class="QuantitySpinBox" name="cutoffFrequencySpinBox">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <widget class="QCheckBox" name="noiseFilterCheckBox">
+               <property name="toolTip">
+                <string>De-noise signal before detection</string>
+               </property>
+               <property name="statusTip">
+                <string>De-noise signal before detection</string>
+               </property>
+               <property name="whatsThis">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Before detection, de-noise signal using a low pass digital filter (Hamming window).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+               <property name="text">
+                <string>Smooth</string>
+               </property>
+              </widget>
+             </item>
              <item row="0" column="0">
               <widget class="QCheckBox" name="linearDetrendCheckBox">
                <property name="toolTip">
@@ -460,90 +512,12 @@
                 <bool>false</bool>
                </property>
                <property name="sizePolicy">
-                <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
                  <horstretch>0</horstretch>
                  <verstretch>0</verstretch>
                 </sizepolicy>
                </property>
               </widget>
-             </item>
-             <item row="1" column="6">
-              <spacer name="horizontalSpacer_4">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>190</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-             <item row="2" column="0">
-              <widget class="QCheckBox" name="deHumCheckBox">
-               <property name="text">
-                <string>Humbug</string>
-               </property>
-              </widget>
-             </item>
-             <item row="3" column="0">
-              <widget class="QCheckBox" name="noiseFilterCheckBox">
-               <property name="toolTip">
-                <string>De-noise signal before detection</string>
-               </property>
-               <property name="statusTip">
-                <string>De-noise signal before detection</string>
-               </property>
-               <property name="whatsThis">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Before detection, de-noise signal using a low pass digital filter (Hamming window).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-               </property>
-               <property name="text">
-                <string>Smooth</string>
-               </property>
-              </widget>
-             </item>
-             <item row="3" column="1" colspan="2">
-              <widget class="QComboBox" name="filterTypeComboBox"/>
-             </item>
-             <item row="3" column="3" colspan="2">
-              <widget class="QLabel" name="freqCutoffLabel">
-               <property name="enabled">
-                <bool>false</bool>
-               </property>
-               <property name="text">
-                <string>Cutoff:</string>
-               </property>
-               <property name="buddy">
-                <cstring>cutoffFrequencySpinBox</cstring>
-               </property>
-              </widget>
-             </item>
-             <item row="3" column="5">
-              <widget class="QuantitySpinBox" name="cutoffFrequencySpinBox">
-               <property name="enabled">
-                <bool>false</bool>
-               </property>
-               <property name="sizePolicy">
-                <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                 <horstretch>0</horstretch>
-                 <verstretch>0</verstretch>
-                </sizepolicy>
-               </property>
-              </widget>
-             </item>
-             <item row="3" column="6">
-              <spacer name="horizontalSpacer_5">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>190</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
              </item>
             </layout>
            </widget>
@@ -638,7 +612,7 @@
      <x>0</x>
      <y>0</y>
      <width>808</width>
-     <height>30</height>
+     <height>28</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -746,7 +720,7 @@
     <property name="title">
      <string>Filter data</string>
     </property>
-    <addaction name="actionApply_with_detection"/>
+    <addaction name="actionUseFilteredWaves"/>
     <addaction name="actionFilter_whole_data"/>
     <addaction name="actionUndo_filter_whole_data"/>
     <addaction name="actionPreview_filtered_signal"/>
@@ -1285,7 +1259,7 @@
     <string>Open last used event template file</string>
    </property>
   </action>
-  <action name="actionApply_with_detection">
+  <action name="actionUseFilteredWaves">
    <property name="checkable">
     <bool>true</bool>
    </property>
@@ -1294,13 +1268,13 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Apply with detection</string>
+    <string>Waves from filtered signal</string>
    </property>
    <property name="iconText">
     <string>Preprocess</string>
    </property>
    <property name="toolTip">
-    <string>Preprocess signal for detection only</string>
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Checked: Detected waveforms are retrieved from from smoothed signal (if applied)&lt;/p&gt;&lt;p&gt;Unchecked: Detected waveforms are retrieved from the raw signal.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="statusTip">
     <string>Preprocess signal for detection only</string>

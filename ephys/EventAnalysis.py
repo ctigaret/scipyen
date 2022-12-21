@@ -169,7 +169,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._filter_type_ = "Butterworth"
         self._filter_function_ = None
         self._filter_signal_ = False
-        self._apply_filter_upon_detection = False
+        self._extract_filtered_waves_ = False
         self._remove_DC_offset_ = False
         self._use_auto_offset_ = True
         self._lowpass_ = None
@@ -280,7 +280,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         # NOTE: when detection was made in a collection of segments (e.g. a Block)
         # the _detected_events_ will change with each segment !
         self._detected_events_ = list()
-        # self._aligned_waves_ = list()
         self._aligned_waves_ = list()
         self._waveform_frames = 0
         self._currentWaveformIndex_ = 0
@@ -417,7 +416,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         # self._data_var_name_ = self.getDataSymbolInWorkspace(self._data_)
         
         # self.resize(-1,-1)
-        if not isinstance(self._event_template_, neo.AnalogSignal):
+        if not isinstance(self._event_template_, (neo.AnalogSignal, DataSignal)):
             self.useTemplateWaveForm = False
             self.use_eventTemplate_CheckBox.setEnabled(False)
 
@@ -604,7 +603,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.actionExport_event_waveforms.triggered.connect(self._slot_exportEventWaves)
         self.actionClear_results.triggered.connect(self._slot_clearResults)
         self.actionUse_default_location_for_persistent_event_template.triggered.connect(self._slot_useDefaultTemplateLocation)
-        # self.actionChoose_persistent_event_template_file.triggered.connect(self._slot_choosePersistentTemplateFile)
+        self.actionChoose_persistent_event_template_file.triggered.connect(self._slot_choosePersistentTemplateFile)
         self.actionLock_toolbars.setChecked(self._toolbars_locked_ == True)
         self.actionLock_toolbars.triggered.connect(self._slot_lockToolbars)
         # signal & epoch comboboxes
@@ -651,6 +650,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.dcValueSpinBox.setMinimum(-math.inf*pq.pA)
         self.dcValueSpinBox.setMaximum(math.inf*pq.pA)
         self.dcValueSpinBox.setValue(self._dc_offset_)
+        self.dcValueSpinBox.setDecimals(4)
         self.dcValueSpinBox.sig_valueChanged.connect(self._slot_DCOffsetChanged)
         
         self.noiseFilterCheckBox.stateChanged.connect(self._slot_set_useLowPassFilter)
@@ -661,7 +661,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         self.cutoffFrequencySpinBox.sig_valueChanged.connect(self._slot_cutoffFreqChanged)
         
-        # self.actionApply_with_detection.triggered.connect(self._slot_applyFilters_with_detection)
+        self.actionUseFilteredWaves.triggered.connect(self._slot_setUseFilteredWaves)
         
         self.filterTypeComboBox.clear()
         # self.filterTypeComboBox.addItems(["Butterworth", "Hamming"])
@@ -1344,10 +1344,17 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         signal = segment.analogsignals[sig_ndx]
         
         processed = signal.annotations.get("filtered", False)
-        if not processed:
-            signal = self._process_signal_(signal, newFilter=True)
+        
+        if self.useFilteredWaves:
+            if not processed:
+                signal = self._process_signal_(signal, newFilter=True)
+                
+        else:
+            signal = self._process_signal_(signal, dc_detrend_only=True)
 
+        # get the original waveforms
         waves = self._extract_waves_(train, valid_only = not self.allWavesToResult)
+        
         if len(waves) == 0:
             return
         
@@ -1542,7 +1549,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         else:
             sig = signal
             
-        # if self.filterDataUponDetection:
+        # if self.useFilteredWaves:
         if not signal.annotations.get("filtered", False):
             sig = self._process_signal_(sig, newFilter=True)
         
@@ -2066,14 +2073,13 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         model_params = self.paramsWidget.value()
         init_params = tuple(p.magnitude for p in model_params["Initial Value:"])
-        
+        lo = tuple(p.magnitude for p in model_params["Lower Bound:"])
+        up = tuple(p.magnitude for p in model_params["Upper Bound:"])
+            
         if self.useTemplateWaveForm and isinstance(self._event_template_, neo.AnalogSignal):
             template_fit = membrane.fit_Event(self._event_template_, init_params, lo, up)
             init_params = template_fit.annotations["event_fit"]["Coefficients"]
                 
-        lo = tuple(p.magnitude for p in model_params["Lower Bound:"])
-        up = tuple(p.magnitude for p in model_params["Upper Bound:"])
-            
         fw = membrane.fit_Event(wave, init_params, lo=lo, up=up)
         if self._use_threshold_on_rsq_:
             accept = fw.annotations["event_fit"]["Rsq"] >= self.rSqThreshold
@@ -2094,7 +2100,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         # spike train's waveforms
         st.waveforms[wave_index, :, :] = fw.magnitude[:,:,np.newaxis].T
         
-        self._detected_Events_Viewer_.refresh()
+        self._detected_Events_Viewer_.displayFrame()
+        # self._detected_Events_Viewer_.refresh()
         self._targets_cache_.clear()
         # self._detected_Events_Viewer_.currentFrame = waveIndex
         self._indicate_events_()
@@ -2370,6 +2377,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         • triggering `actionDetect` in a loop over all segments (with `segment_index`
             parameter set inside the loop)
         
+        NOTE: By design this extracts detected waveforms from the raw signal,
+        even if detection is performed on a filtered copy of the signal if any
+        filters are activated in the "Signal Processing" tab.
         
         """
         self._current_detection_θ.clear()
@@ -2438,18 +2448,36 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             mini_waves = list()
             detections = list()
             all_θ = list()
+            
+            # detect events in individual signal epochs (allowing to define more
+            # than one epoch in a signal)
             for epoch in epochs:
                 sig = signal.time_slice(epoch.times[0], epoch.times[0]+epoch.durations[0])
                 # NOTE: 2022-12-15 11:56:46
-                # do away with filterDataUponDetection
                 # _process_signal_ checks whether there is any filter enabled
+                # if there is then a filtered copy is passed to the events 
+                # detection function
+                # ATTENTION: This will result in waves extracted from the filtered
+                # version of the signal. This is certainly NOT desirable for
+                # non-stationary fluctation analysis. In such case, if the signal
+                # is beign filtered, then the option "Waves from filtered signal"
+                # must be switched off. Alternatively, run the detection directly
+                # on the raw signal (or at least a signal NOT smoothed).
+                
                 if not processed:
                     sig = self._process_signal_(sig, newFilter=True)
+                    
+                if not self.useFilteredWaves:
+                    quasi_raw = self._process_signal_(signal.time_slice(epoch.times[0], epoch.times[0]+epoch.durations[0]),
+                                                      dc_detrend_only=True)
+                else:
+                    quasi_raw = None
                     
                 detection = membrane.detect_Events(sig, waveform, 
                                                  useCBsliding = self.useSlidingDetection,
                                                  threshold = self._detection_threshold_,
-                                                 outputDetection = output_detection)
+                                                 outputDetection = output_detection,
+                                                 raw_signal = quasi_raw)
                 
                 # print(f"detection {detection}")
                 
@@ -2464,11 +2492,18 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 if not isinstance(detection, neo.core.spiketrainlist.SpikeTrainList):
                     continue
                 
+                # check if raw waveforms are wanted; if not, and signal WAS
+                # humbugged and smoothed, then extract waves from the raw signal
+                
+                    
+                    
+                
                 # this below is a collection of spike train lists (one per epoch)!
                 # but each spiketrainlist should have up to the same max number 
                 # of spiketrains (i.e. as many as there are channels)
                 detections.append(detection) 
             
+            # collate the detection spike trains into one single spike train
             if len(detections):
                 template = detections[0][0].annotations["waveform"]
                 # splice individual detections in each separate epoch; these
@@ -2504,7 +2539,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     st = neoutils.splice_signals(*st_)
                     st.name= "events"
                     st.segment = segment
-                    
                     
                     if len(θ_) > 1:
                         θ = neoutils.splice_signals(*θ_, signal.times)
@@ -2597,14 +2631,20 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     self._current_detection_θ.append(θ)
                 
         else: # no epochs - detect in the whole signal
-            # if self.filterDataUponDetection:
+            # if self.useFilteredWaves:
             if not processed:
                 signal = self._process_signal_(signal, newFilter=True)
 
+            if not self.useFilteredWaves:
+                quasi_raw = self._process_signal_(signal, dc_detrend_only=True)
+            else:
+                quasi_raw = None
+                
             detection = membrane.detect_Events(signal, waveform, 
                                               useCBsliding = self.useSlidingDetection,
                                               threshold = self._detection_threshold_,
-                                              outputDetection = output_detection)
+                                              outputDetection = output_detection,
+                                              raw_signal = quasi_raw)
             
             if detection is None:
                 return
@@ -3354,12 +3394,12 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         # TODO: 2022-11-27 22:04:11
         # see TODO: 2022-11-27 22:03:10 and TODO 2022-11-27 22:03:34
-        if os.path.isfile(self.templateWaveFormFile):
-            fn, ext = os.path.splitext(self.templateWaveFormFile)
-            if "pkl" in ext:
-                pio.savePickleFile(self._event_template_, self.templateWaveFormFile)
-            else:
-                pio.saveHDF5(self._event_template_, self.templateWaveFormFile)
+        # if os.path.isfile(self.templateWaveFormFile):
+        fn, ext = os.path.splitext(self.templateWaveFormFile)
+        if "pkl" in ext:
+            pio.savePickleFile(self._event_template_, self.templateWaveFormFile)
+        else:
+            pio.saveHDF5(self._event_template_, self.templateWaveFormFile)
                 
     @pyqtSlot()
     def _slot_forgetTemplate(self):
@@ -3427,6 +3467,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     def _slot_loadDefaultTemplate(self):
         if os.path.isfile(self.customDefaultTemplateFile):
             template_file = self.customDefaultTemplateFile
+            
         elif os.path.isfile(self._template_file_):
             template_file = self._template_file_
         else:
@@ -3498,7 +3539,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
     @pyqtSlot()
     def _slot_revertToFactoryDefaultTemplateFile(self):
-        self._template_file_ = self._default_template_file
+        self.templateWaveFormFile = self._default_template_file
             
     @pyqtSlot()
     def _slot_exportTemplate(self):
@@ -3560,9 +3601,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     def _slot_cutoffFreqChanged(self, val):
         self.noiseCutoffFreq = val
         
-    # @pyqtSlot()
-    # def _slot_applyFilters_with_detection(self):
-    #     self.filterDataUponDetection = self.sender().isChecked()
+    @pyqtSlot()
+    def _slot_setUseFilteredWaves(self):
+        self.useFilteredWaves = self.sender().isChecked()
         
     @pyqtSlot()
     def _slot_filterData(self):
@@ -3604,7 +3645,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     def _slot_set_allWavesToResult(self, value):
         self.allWavesToResult = value
         
-    def _process_signal_(self, sig, newFilter:bool=False):
+    def _process_signal_(self, sig, newFilter:bool=False, dc_detrend_only:bool=False):
         if isinstance(sig, (neo.AnalogSignal, DataSignal)):
             fs = float(sig.sampling_rate)
         else:
@@ -3626,19 +3667,16 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 ret = sigp.remove_dc(ret, self._dc_offset_)
             # processed=True
             
+        if dc_detrend_only:
+            return ret
+        
         if self._humbug_:
             ret = self._deHum(ret, fs)
+            ret.annotate(filtered=True)
                 
         if self._filter_signal_:
             ret = self._lowpass_filter_signal(ret, makeFilter=newFilter)
-            # processed=True
-            
-        # if processed:
-        #     name = getattr(ret, "name", None)
-        #     if isinstance(name, str) and len(name.strip()):
-        #         ret.name = f"processed_{name}"
-        #     else:
-        #         ret.name = "processed"
+            ret.annotate(filtered=True)
             
         return ret
         
@@ -4031,17 +4069,17 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         signalBlock = QtCore.QSignalBlocker(self.rsqThresholdCheckBox)
         self.rsqThresholdCheckBox.setChecked(self._use_threshold_on_rsq_)
         
-#     @property
-#     def filterDataUponDetection(self):
-#         return self._apply_filter_upon_detection
-#     
-#     
-#     @markConfigurable("ApplyFiltersUponDetection", trait_notifier=True)
-#     @filterDataUponDetection.setter
-#     def filterDataUponDetection(self, value:bool):
-#         self._apply_filter_upon_detection = value == True
-#         sigBlock = QtCore.QSignalBlocker(self.actionApply_with_detection)
-#         self.actionApply_with_detection.setChecked(self._apply_filter_upon_detection == True)
+    @property
+    def useFilteredWaves(self):
+        return self._extract_filtered_waves_
+    
+    
+    @markConfigurable("UseFilteredWaves", trait_notifier=True)
+    @useFilteredWaves.setter
+    def useFilteredWaves(self, value:bool):
+        self._extract_filtered_waves_ = value == True
+        sigBlock = QtCore.QSignalBlocker(self.actionUseFilteredWaves)
+        self.actionUseFilteredWaves.setChecked(self._extract_filtered_waves_ == True)
         
     @property
     def removeDCOffset(self):
