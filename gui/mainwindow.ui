@@ -101,6 +101,8 @@
     </property>
     <addaction name="actionGUI_Style"/>
     <addaction name="actionAuto_launch_Script_Manager"/>
+    <addaction name="actionChoose_code_editor"/>
+    <addaction name="actionUse_system_s_default_code_editor"/>
    </widget>
    <widget class="QMenu" name="menuConsoles">
     <property name="title">
@@ -883,6 +885,27 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>Auto-launch Script Manager</string>
+   </property>
+  </action>
+  <action name="actionChoose_code_editor">
+   <property name="icon">
+    <iconset theme="editor">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Choose code editor</string>
+   </property>
+  </action>
+  <action name="actionUse_system_s_default_code_editor">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="editor">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Use system's default code editor</string>
    </property>
   </action>
  </widget>

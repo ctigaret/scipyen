@@ -102,7 +102,7 @@ def nsfa(x, parameters):
     
     Parameters: i, N, b
     """
-     if isinstance(x, pq.Quantity):
+    if isinstance(x, pq.Quantity):
         x = x.magnitude
         
     x = x.flatten()

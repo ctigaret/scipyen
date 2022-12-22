@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-__pict_plugin__ = None
+__scipyen_plugin__ = None
 
 import collections
 
@@ -9,7 +9,7 @@ def my_plugin_function():
     print("Hello world three")
 
 
-def init_pict_plugin():
+def init_scipyen_plugin():
     #return {__name__:(__file__, {'Plugin3': my_plugin_function})}
 
 

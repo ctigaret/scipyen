@@ -188,6 +188,7 @@ def getInput(prompts:dict, mapping:bool=False):
             w.variable.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Preferred)
         else:
             w.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Preferred)
+            
         group.addWidget(w, stretch=1)
         prompt_widgets[k] = w
             

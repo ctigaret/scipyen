@@ -1339,6 +1339,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     # NOTE: 2021-08-23 10:36:14 WindowManager inherits from __QMainWindow__ which
     # is QtWidgets.QMainWindow
     workspaceChanged = pyqtSignal()
+    startPluginLoad = pyqtSignal()
     
     _instance = None
     
@@ -1699,7 +1700,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._maxRecentFiles = 10 # TODO: make this user-configurable
         self._maxRecentDirectories = 100 # TODO: make this user-configurable
     
-        #pg.setConfigOptions(editorCommand=self._scipyenEditor)
+        pg.setConfigOptions(editorCommand=self._scipyenEditor)
         
         #self._default_scipyen_settings_ = defaults
         
@@ -1801,10 +1802,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #self.workspaceModel.windowVariableDeleted[int].connect(self.slot_windowVariableDeleted)
         
         # NOTE: 2021-01-06 17:22:45
-        # a lot of things happen up to here which depend on an initialized bare-bones
-        # UI; hence setupUi must be called early (where it is right now), and
-        # _configureUI_ must be called NOW; this will initialize additional UI
-        # elements and signal-slot connections NOT defined in the *.ui file
+        # A lot of things happen up to here which depend on an initialized bare-bones
+        # UI; hence setupUi is early (see NOTE: WARNING 2021-09-16 14:32:03).
+        #
+        # _configureUI_ must be called NOW, to initialize additional UI elements
+        # and signal-slot connections NOT defined in the *.ui file
         self._configureUI_()
         
         # NOTE:2022-01-28 23:16:57
@@ -1816,21 +1818,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits["RecentScripts"] = self._recentScripts
             
-        # With all UI and their signal-slot connections in place we can now
-        # apply stored settings, including the 'state' of the ScipyenWindow object
-        #  (a QMainWindow instance)
+        # With all UI elements and their signal-slot connections in place we can
+        # now apply stored settings, including the 'state' of the ScipyenWindow
+        # object (which is an instance of QMainWindow)
         #
         self.loadSettings()
         
         self.activeDockWidget = self.dockWidgetWorkspace
         
-        
-        # NOTE: 2021-08-17 12:36:49 TODO custom icon ?
-        # see also NOTE: 2021-08-17 10:06:24 in scipyen.py
-        icon = QtGui.QIcon.fromTheme("python")
-        #self.setWindowIcon(icon) # this doesn't work? -- next line does
-        QtWidgets.QApplication.setWindowIcon(icon)
-
         # -----------------
         # connect widget actions through signal/slot mechanism
         # NOTE: 2017-07-04 16:28:52
@@ -1853,8 +1848,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # all this does is to make these guys visible in the workspace browser -- do we really want this?
         # clearly not, since the workspace is the user_ns namespace of the ipython kernel, where all 
         # free variables are held (plus bits added by ipython)
-        #if len(pict_plugin_loader.loaded_plugins) > 0:
-            #self.workspace.update(dict(pict_plugin_loader.loaded_plugins))
+        #if len(scipyen_plugin_loader.loaded_plugins) > 0:
+            #self.workspace.update(dict(scipyen_plugin_loader.loaded_plugins))
             
         ##print("ScipyenWindow initialized")
         
@@ -1864,10 +1859,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # finally, inject self into relevant modules:
         #for m in (ltp, ivramp, membrane, epsignal, CaTanalysis, pgui, sigp, imgp, crvf, plots):
         self_aware_modules = (ltp, ivramp, membrane, CaTanalysis, pgui, sigp, imgp, crvf, plots)
-        #if has_vigra:
-            #self_aware_modules = (ltp, ivramp, membrane, CaTanalysis, pgui, sigp, imgp, crvf, plots)
-        #else:
-            #self_aware_modules = (ltp, ivramp, membrane, pgui, sigp, crvf, plots)
             
         for m in self_aware_modules:
             m.__dict__["mainWindow"] = self
@@ -1879,6 +1870,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.threadpool = QtCore.QThreadPool()
         
         self.__class__._instance = self # FIXME: what's this for?!? - flag as singleton?
+        
+        #self.startPluginLoad.emit()
+
         
     #### BEGIN Properties
     @property
@@ -2119,6 +2113,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @overrideSystemEditor.setter
     def overrideSystemEditor(self, val:bool=False):
         self._overrideSystemEditor = val is True
+        sigBlock = QtCore.QSignalBlocker(self.actionUse_system_s_default_code_editor)
+        self.actionUse_system_s_default_code_editor.setChecked(self._overrideSystemEditor)
         
     @markConfigurable("LastCommandSearch", "Qt")
     @lastCommandSearch.setter
@@ -2165,6 +2161,19 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     
     #### BEGIN PyQt slots
     
+    @pyqtSlot()
+    def _slot_chooseCodeEditor(self):
+        d = qd.QuickDialog(self, "Choose code editor")
+        editorNameInput = qd.StringInput(d, "Editor name (e.g., 'kate' or 'kwrite')")
+        editorNameInput.setValue(self.scipyenEditor)
+        d.editorNameInput = editorNameInput
+        if d.exec() == QtWidgets.QDialog.Accepted:
+            self.scipyenEditor = d.editorNameInput.text()
+        
+    @pyqtSlot(bool)
+    def _slot_setOverrideSystemEditor(self, val):
+        self.overrideSystemEditor = val == True
+        
     @pyqtSlot()
     def slot_launchExternalRunningIPython(self):
         self._init_ExternalIPython_(new="connection")
@@ -4047,8 +4056,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #### END scripts menu
         
         # NOTE: 2016-05-02 12:22:21 -- refactoring plugin codes
-        #self.startPluginLoad.connect(self.slot_loadPlugins)
-        #self.startPluginLoad.emit()
+        self.startPluginLoad.connect(self.slot_loadPlugins)
         
         #### BEGIN custom workspace viewer DO NOT DELETE
         
@@ -4265,6 +4273,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #### END console dock
         #### END Dock widgets management
         
+        #### BEGIN miscellaneous
+        self.actionChoose_code_editor.triggered.connect(self._slot_chooseCodeEditor)
+        self.actionUse_system_s_default_code_editor.triggered.connect(self._slot_setOverrideSystemEditor)
+        #### END miscellaneous
+        
+        # NOTE: 2021-08-17 12:36:49 TODO custom icon ?
+        # see also NOTE: 2021-08-17 10:06:24 in scipyen.py
+        icon = QtGui.QIcon.fromTheme("python")
+        #self.setWindowIcon(icon) # this doesn't work? -- next line does
+        QtWidgets.QApplication.setWindowIcon(icon)
+
         
     @pyqtSlot()
     @safeWrapper
@@ -5077,15 +5096,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def slot_systemEditScript(self, fileName):
         if os.path.exists(fileName) and os.path.isfile(fileName):
-            if not self._overrideSystemEditor:
-                url = QtCore.QUrl.fromLocalFile(fileName)
-                QtGui.QDesktopServices.openUrl(url)
-            else:
+            if self.overrideSystemEditor:
                 try:
-                    subprocess.run([editor, filename])
+                    subprocess.run([self.scipyenEditor, fileName])
                 except:
                     traceback.print_exc()
-            #QtGui.QDesktopServices.openUrl(QtCore.QUrl("file://%s" % fileName))
+                    url = QtCore.QUrl.fromLocalFile(fileName)
+                    QtGui.QDesktopServices.openUrl(url)
+            else:
+                url = QtCore.QUrl.fromLocalFile(fileName)
+                QtGui.QDesktopServices.openUrl(url)
         
     @pyqtSlot(str)
     @safeWrapper
@@ -6540,7 +6560,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         '''
         Removes the (sub)menus and menu items created by loading plugins.
         The only use, really, is when called by slot_reloadPlugins().
-        The plugin code itself is recompiled (and reloaded) by the pict_plugin_loader
+        The plugin code itself is recompiled (and reloaded) by the scipyen_plugin_loader
         '''
         if len(self.pluginActions) > 0:
             for action in self.pluginActions:
@@ -6569,20 +6589,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_loadPlugins(self):
-        ''' See pict_plugin_loader docstring
+        ''' See scipyen_plugin_loader docstring
         '''
         #print("   slot_loadPlugins")
         self.plugins = types.ModuleType('plugins','Contains pict plugin modules with their publicized callback functions')
-        pict_plugin_loader.find_plugins(__module_path__)
+        scipyen_plugin_loader.find_plugins(__module_path__)
         
         # NOTE: 2016-04-15 11:53:08
         # let the plugin loader just load plugin module code
         # and do the plugin initialization here
         
-        if len(pict_plugin_loader.loaded_plugins) > 0:
-            for p in pict_plugin_loader.loaded_plugins.values():
-                menudict = collections.OrderedDict([(p.__name__, (p.__file__, p.init_pict_plugin()) )])
-                #menudict = p.init_pict_plugin()
+        if len(scipyen_plugin_loader.loaded_plugins) > 0:
+            for p in scipyen_plugin_loader.loaded_plugins.values():
+                menudict = collections.OrderedDict([(p.__name__, (p.__file__, p.init_scipyen_plugin()) )])
+                #menudict = p.init_scipyen_plugin()
                 if len(menudict) > 0:
                     for (k,v) in menudict.items():
                         if (isinstance(k, str) and len(k)>0):
@@ -6631,7 +6651,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def _installPluginFunction_(self, f, menuItemLabel, parentMenu, nReturns=None, inArgTypes=None):
         '''
         Implements the actual logic of installing individual plugin functions 
-        advertised by the init_pict_plugin function defined in the plugin module.
+        advertised by the init_scipyen_plugin function defined in the plugin module.
         
         The function 'f' is wrapped in a slot that will be connected to the 
         triggered() signal emited by the appropriate menu item.
@@ -6744,7 +6764,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # inside slot_initQtConsole function.
         
         # The drawback is that this will also expose functions defined inside the plugin
-        # module, but not advertised by the init_pict_plugin function, which may 
+        # module, but not advertised by the init_scipyen_plugin function, which may 
         # or may not be desirable.
         
         # Another option is to create "pseudo-modules" (types.ModuleType)
@@ -6766,7 +6786,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
             # by the way the original (fully fledged) module should already be
             # in sys (because the module has been loaded with imp.load_module by 
-            # pict_plugin_loader therefore the next check is redundant, and the 
+            # scipyen_plugin_loader therefore the next check is redundant, and the 
             # lines inside the 'if' block below might as well be taken out of it
             if f.__module__ in sys.modules.keys():
                 self.plugins.__dict__[f.__module__].__doc__ = sys.modules[f.__module__].__doc__
@@ -6832,7 +6852,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         NOTE:   v[0] is a string wih the absolute pathname of the plugin module
         
-                v[1] is a plugin info dict as advertised by the init_pict_plugin 
+                v[1] is a plugin info dict as advertised by the init_scipyen_plugin 
                      function in the plugin module, where the keys are srings
                      describing a menu path, and the values are either dictionaries
                      mapping function objects to number of return variables and 
@@ -6842,7 +6862,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                      attribute.
                      
         
-        See pict_plugin_loader docstring for details about v[1]
+        See scipyen_plugin_loader docstring for details about v[1]
         '''
         
         if len(v[1]) > 0: # the nested dict

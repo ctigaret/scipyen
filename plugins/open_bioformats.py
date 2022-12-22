@@ -25,6 +25,6 @@ def open_with_bioformats(fileName=None):
 
 open_with_bioformats.__setattr__('__annotations__', {'return':'ret', 'fileName':str})
 
-def init_pict_plugin():
+def init_scipyen_plugin():
     return {'File|Open|Image Using BioFormats': open_with_bioformats}
 

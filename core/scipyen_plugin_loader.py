@@ -1,26 +1,40 @@
 ''' Mon Apr 04 2016 23:41:53 GMT+0100 (BST)
 
-    Finds then loads python modules declared as pict plugins. 
+    Finds then loads python modules declared as plugins. 
     
     Python module files (*.py or *.pyc) are searched recursively from the directory
-    where pict module is located.
+    where a module is located.
     
-    Pict plugins mainly provide code (functions) to be called from the pict 
+    Scipyen plugins mainly provide code (functions) to be called from the Scipyen 
     GUI main menu. While the plugin module may define an arbitrary number of 
     functions, a subset of these would be useful as "callbacks", to be called 
     interactively from menu items in the main pict GUI window.
     
-    For the purpoe of flexibility, there are no restriction on the syntax of the 
+    For the purpose of flexibility, there are no restriction on the syntax of the 
     plugin functions designated for use as "callbacks".
     
     A pict plugin is defined as a python module containing the attribute 
-    __pict_plugin__ and the function init_pict_plugin().
+    __scipyen_plugin__ and the function init_scipyen_plugin().
     
-    __pict_plugin__ can have any value -- in fact it can be None -- and plays 
-    the role of a "tag", used by pict_plugin_loader to distinguish a pict
-    module from regular python modules in the pict package.
+    __scipyen_plugin__ can have any value -- in fact it can be None -- and plays 
+    the role of a "tag", used by scipyen_plugin_loader to distinguish a scpiyen
+    plugin module from regular python modules in the scipyen package.
     
-    The init_pict_plugin() function returns information about how plugin functions 
+    NOTE: 2022-12-22 22:06:24
+    
+    A few special str values to the __scipyen_plugin__ indicate further specialization:
+    • "app" - the plugin defines a Scipyen "app" - a fully fledged GUI applet 
+        which implements complex functionality and runs under a QMainWindow
+        inheriting from WorkspaceGuiMixin and is managed directly by Scipyen;
+        examples include LSCaT and EventDetection
+        
+    • "viewer" - the plugin identifies a viewer GUI window - designed to visualise
+        complex data types (e.g. signals in the neo package - and related), 
+        Vigra arrays (images, voluems), Pandas data frames, dictionaries, lists,
+        numpy arrays, etc); examples are all the Scipyen's viewers
+        
+    
+    The init_scipyen_plugin() function returns information about how plugin functions 
     designated as callbacks should be handled by the pict application's GUI.
     
     This information is packed as a mapping: a dict or a collections.OrderedDict.
@@ -89,7 +103,7 @@ Key:                                Mapped to:          Result:
         or more designated plugin functions, together with their call syntax,
         to be associated with the menu or menuitem defined in the KEYS. 
         
-        Whenn there are more than one functions described here, they will be
+        When there are more than one functions described here, they will be
         attached to menu items named after them, placed in a submenu named after 
         the last element in the menu path string (see the examples in the Table 
         above).
@@ -122,7 +136,7 @@ TODO, FIXME:
     return variables, and possibly, the argument types for positional parameters
     could be deduced directly from the function object.
 
-    This would simplify init_pict_plugin() function -- no need for nested 
+    This would simplify init_scipyen_plugin() function -- no need for nested 
     dictionary but just a simple dictionary mapping a menu path to a function 
     object.
 
@@ -208,7 +222,7 @@ NOTE: 2016-04-17 16:53:00
     
     f7.__setattr__('__annotations__',{'return':'a+b', 'arg1':int, 'arg2':str, 'arg3':int})
     
-    The mapping returned by init_pict_plugin() should be:
+    The mapping returned by init_scipyen_plugin() should be:
     
     'Example Plugin|Plugin|Annotated function', f7
     
@@ -247,14 +261,14 @@ __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 loaded_plugins = collections.OrderedDict()
 
-__avoid_modules__ = ("scipyen_start", "pict_plugin_loader")
+__avoid_modules__ = ("scipyen_start", "scipyen_plugin_loader")
 
 def load_plugin(mod_info):
     '''Imports the plugin module according to the information in mod_info tuple:
     
         mod_info[0] is a module information sequence as returned by inspect.getmoduleinfo
         
-        In partcular:
+        In particular:
         
         mod_info[0].name is the module name (when imported, this will be the __name__ 
             attribute of the module)
@@ -269,7 +283,7 @@ def load_plugin(mod_info):
     module_file = open(mod_info[1], mod_info[0].mode)
 
     # NOTE: 2016-04-15 11:51:08
-    # do not call init_pict_plugin here anymore, just import the modules, then
+    # do not call init_scipyen_plugin here anymore, just import the modules, then
     # let the caller of the plugin_loader to deal with plugin initialization and
     # installation
     
@@ -307,14 +321,18 @@ def find_plugins(path):
                         module_file = open(fn, module_info.mode)
                         try:
                             for line in module_file:
-                                if '__pict_plugin__' in line:
+                                # if '__scipyen_plugin__' in line:
+                                if line.startswith('__scipyen_plugin__'):
                                     if module_info.module_type == imp.PY_COMPILED:
                                         plugin_files[module_info.name] = (module_info, fn)
+                                        
                                     elif module_info.module_type == imp.PY_SOURCE:
                                         plugin_sources[module_info.name] = (module_info, fn)
+                                        
                                     break
                         except:
                             module_file.close()
+                            
                         finally:
                             module_file.close()
                             

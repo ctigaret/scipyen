@@ -3591,7 +3591,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         if not isinstance(crsID, str):
             d = qd.QuickDialog(self, "Choose cursor to remove")
-            #d = vigra.pyqt.qd.QuickDialog(self, "Choose cursor to remove")
         
             cursorComboBox = qd.QuickDialogComboBox(d, "Select cursor:")
             cursorComboBox.setItems([c for c in self._data_cursors_])
