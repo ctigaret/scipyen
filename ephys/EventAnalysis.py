@@ -726,21 +726,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         sigblock = [QtCore.QSignalBlocker(w) for w in ww]
         
         # 1) assign values from config to paramsWidget
-        # p0 = self.eventModelParametersInitial
-        # l0 = self.eventModelParametersLowerBounds
-        # u0 = self.eventModelParametersUpperBounds
-        # names, values = zip(*[(k,v) for k,v in p0.items()])
-        # lower, upper = zip(*[(l0[k], u0[k]) for k in names])
-#         
-#         plu = {"Initial Value:":values, "Lower Bound:":lower, "Upper Bound:": upper}
-#         
-#         df = pd.DataFrame(plu, index = names)
-        # self.paramsWidget.parameters = df
-        # print(f"{self.__class__}.loadSettings:")
-        # print(f"\t_params_initl_ = {self._params_initl_}")
-        # print(f"\t_params_lower_ = {self._params_lower_}")
-        # print(f"\t_params_upper_ = {self._params_upper_}")
-        # print(f"\t_params_names_ = {self._params_names_}")
         self.paramsWidget.setParameters(self._params_initl_,
                                         lower = self._params_lower_,
                                         upper = self._params_upper_,

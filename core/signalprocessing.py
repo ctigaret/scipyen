@@ -298,9 +298,14 @@ def is_positive_waveform(x:np.ndarray):
     
     return len(xPos) > len(xNeg)
 
-def scale_waveform(x:np.ndarray, num, den):
-    """Scales waveform by num/den in place.
+def scale_waveform(x:np.ndarray, α, β):
+    """Scales waveform by a rational factor (α/β) in place.
     Returns a reference to x.
+    
+    Parameters:
+    ==========
+    x: the signal (waveform)
+    α, β: floats
     
     """
     nanx = np.isnan(x)
@@ -308,50 +313,64 @@ def scale_waveform(x:np.ndarray, num, den):
         units = x.units
         xx = x.magnitude # → this is a REFERENCE ; its changes will be reflected in x !!!
         
-        if isinstance(num, pq.Quantity):
-            if not scq.units_convertible(num, x):
+        if isinstance(α, pq.Quantity):
+            if not scq.units_convertible(α, x):
                 raise TypeError("numerator has wrong units")
-            if num.units != x.units:
-                num = num.rescale(x.units)
+            if α.units != x.units:
+                α = α.rescale(x.units)
                 
-            num = num.magnitude
+            α = α.magnitude
         
-        if isinstance(den, pq.Quantity):
-            if not scq.units_convertible(den, x):
+        if isinstance(β, pq.Quantity):
+            if not scq.units_convertible(β, x):
                 raise TypeError("denominator has wrong units")
-            if den.units != x.units:
-                den = den.rescale(x.units)
+            if β.units != x.units:
+                β = β.rescale(x.units)
                 
-            den = den.magnitude
+            β = β.magnitude
             
     else:
-        if any(isinstance(v, pq.Quantity) for v in (num, den)):
-            raise TypeError("num and den canot be quantities if x is not a quantity")
+        if any(isinstance(v, pq.Quantity) for v in (α, β)):
+            raise TypeError("α and β canot be quantities if x is not a quantity")
         xx = x
         units = None
         
     if np.any(nanx):
-        scaled = xx[~nanx] * num/den
+        scaled = xx[~nanx] * α/β
         xx[~nanx] = scaled
         
     else:
-        xx *= num/den
+        xx *= α/β
     
     return xx if units is None else xx * units
 
-def normalise_waveform(x:np.ndarray):
+def normalise_waveform(x:np.ndarray, axis:typing.Optional[int]=None, rng:typing.Optional[float] = None):
     """Waveform normalization.
     
-    Keeps the waveform's orientation and polarity.
+    
+    Parameters:
+    ===========
+    x: numpy array (i.e., a vector)
+    
+    axis: int or None
+    
+    rng: float, optional (default is None). The normalization range
     
     Returns:
+    =======
+    • For a positive waveform (i.e. "upward" deflection)
+
+        ∘ (x-x_min)/abs(rng) when rng is a float, else:
+
+        ∘ (x-x_min)/(x_max - x_min) 
     
-    • (x-x_min)/(x_max - x_min) 
-        
-        for a positive waveform (i.e. "upward" deflection)
+    • For a negative waveform (i.e., "downward" deflection)
+
+        ∘ (x_max - x)/abs(rng) when rng is a float, else:
+
+        ∘ (x_max - x)/(x_min - x_max) 
     
-    • (x_max - x)/(x_min - x_max) 
-        for a negative waveform (i.e., "downward" deflection)
+    Keeps the waveform's orientation and polarity.
     
     The point is that waveform "min" is not its numerical minimum, but the sample 
     value closest to zero; likewise, the "max" is the sample value farthest away
@@ -365,25 +384,88 @@ def normalise_waveform(x:np.ndarray):
     In this case, shoud you decide to analyze such recording, you'd better
     remove the DC drift manually before proceeding...
     
-    Parameters:
-    ===========
-    x: 1D numpy array (i.e., a vector);
-    
-    Returns:
-    =======
-    
-    Numpy array (vector) with values of `x` normalized between max and min
-    
     NOTE: when x is a Python Quantity, normalization will make it dimensionless
     
     FIXME: 2022-12-13 16:57:47 This is NOT nan-friendly!
     
     """
-    
-    if is_positive_waveform(x):
-        return (x-np.min(x))/(np.max(x)-np.min(x))
-
-    return (np.max(x)-x)/(np.min(x)-np.max(x))
+    if isinstance(x, pq.Quantity):
+        if isinstance(rng, float):
+            rng *+ x.units
+            
+        elif isinstance(rng, np.ndarray):
+            if rng.size != 1:
+                raise ValueError("rng must be a scalar")
+            
+            if isinstance(rng, pq.Quantity):
+                if not scq.units_convertible(x, rng):
+                    raise TypeError(f"rng quantity ({rng.units.dimensionality}) is incompatible with x quantity ({x.units.dimensionality})")
+                if rng.units != x.units:
+                    rng.rescale(x.units)
+                    
+            else:
+                rng *= x.units
+                
+        elif rng is not None:
+            raise TypeError(f"Bad rng type ({type(rng).__name__})")
+                
+    elif isinstance(x. np.ndarray):
+        if isinstance(rng, np.ndarray):
+            if rng.size != 1:
+                raise ValueError("rng must be a scalar")
+            
+            if isinstance(rng, pq.Quantity):
+                rng = float(rng.magnitude[0])
+            
+        if not isinstance(rng, float) and rng is not None:
+            raise TypeError(f"Bad rng type ({type(rng).__name__})")
+        
+    if rng is None:
+        if x.ndim == 1:
+            rng = abs(x.min()-x.max())
+            
+        else:
+            if axis is None:
+                rng = abs(x.min()-x.max())
+                
+            else:
+                if not isinstance(axis, int):
+                    raise TypeError(f"axis expected to be an int or None; got {type(axis).__name__} instead")
+                
+                if axis not in range(x.ndim):
+                    raise ValueError(f"Bad axis {axis} for x with {x.ndim} dimensions")
+                
+                rng = np.abs(x.max(axis=axis) - x.min(axis=axis)) # rng is a quantity if x is a quantity
+        
+    if x.ndim == 1:
+        if is_positive_waveform(x):
+            return (x-np.min(x))/rng
+        
+        return (np.max(x)-x)/rng
+        # return (x-np.min(x))/(np.max(x)-np.min(x))
+        
+    else:
+        if axis is None:
+            if isinstance(x, pq.Quantity):
+                ispos = is_positive_waveform(x.magnitude.flatten())
+            else:
+                ispos = is_positive_waveform(x.flatten())
+            if ispos:
+                return (x-np.min(x))/rng
+            return (np.max(x)-x)/rng
+        
+        else:
+            if isinstance(x, pq.Quantity):
+                ispos = is_positive_waveform(x.magnitude)
+            
+        
+        
+    #### BEGIN original code
+    # if is_positive_waveform(x):
+    #     return (x-np.min(x))/(np.max(x)-np.min(x))
+    # 
+    # return (np.max(x)-x)/(np.min(x)-np.max(x))
+    #### END original code
 
 def data_range(x:np.ndarray, **kwargs):
     """The difference between a signal max and min values.

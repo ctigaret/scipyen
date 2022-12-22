@@ -5452,7 +5452,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     elif signalChannelAxis == 2:
                         frameAxis = 1
                         
-                elif frameAis == signalChannelAxis:
+                elif frameAxis == signalChannelAxis:
                     raise ValueError(f"frameAxis and signalChannelAxis cannot have the same index {frameAxis}")
                     # raise TypeError("For 3D arrays the frame axis must be specified")
                 
@@ -6434,27 +6434,30 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         Implements gui.scipyenviewer.ScipyenFrameViewer.displayFrame
         
         Delegates plotting as follows:
+        ------------------------------
+        neo.Segment                     ↦ _plotSegment_ # needed to pick up which signal from segment
+        neo.AnalogSignal                ↦ _plotSignal_
+        neo.IrregularlySampledSignal    ↦ _plotSignal_
+        neo.Epoch                       ↦ _plotSignal_
+        neo.SpikeTrain                  ↦ _plotSignal_
+        neo.Event                       ↦ _plotSignal_
+        datatypes.DataSignal            ↦ _plotSignal_
+        vigra.Kernel1D, vigra.Kernel2D  ↦ _plotNumpyArray_ 
+            NOTE: These are converted to numpy.ndarray
+        numpy.ndarray                   ↦ _plotNumpyArray_ 
+            NOTE: This includes vigra.VigraArray and quantities.Quantity arrays
+            The meta-information in VigarArray objects is ignored here.
         
-        neo.Segment                     -> _plotSegment_ # needed to pick up which signal from segment
         
-        neo.AnalogSignal                -> _plotSignal_
-        neo.IrregularlySampledSignal    -> _plotSignal_
-        neo.Epoch                       -> _plotSignal_
-        neo.SpikeTrain                  -> _plotSignal_
-        neo.Event                       -> _plotSignal_
-        datatypes.DataSignal            -> _plotSignal_
-        vigra.Kernel1D, vigra.Kernel2D  -> _plotNumpyArray_ (after conversion to numpy.ndarray)
-        numpy.ndarray                   -> _plotNumpyArray_ (including vigra.VigraArray and quantity arrays)
-        
-        sequence (iterable)             -> _plotSequence_
-            The sequence can contain these types:
+        sequence (iterable)             ↦ _plotSequence_
+            NOTE: The sequence can contain these types:
                 neo.AnalogSignal, 
                 neo.IrregularlySampledSignal, 
                 datatypes.DataSignal, 
                 np.ndarray
-                vigra.filters.Kernel1D  -> NOTE  this is converted to two numpy arrays in plot()
+                vigra.filters.Kernel1D  (NOTE  this is converted to two numpy arrays)
         
-        Anything else  (?)              -> _plot_numeric_data_
+        Anything else                   ↦ ignored
         
         """
         if self.yData is None:
@@ -7352,6 +7355,21 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             plotDataItemName = "Array signal"
             
         kwargs["name"] = plotDataItemName
+        xlabel = kwargs.pop("xlabel", None)
+        
+        if xlabel is None or (isinstance(xlabel, str) and len(xlabel.strip()) == 0):
+            xlabel = "Sample index"
+            
+        kwargs["xlabel"] = xlabel
+        
+        ylabel = kwargs.pop("ylabel", None)
+        if ylabel is None or (isinstance(ylabel, str) and len(ylabel.strip()) == 0):
+            ylabel = "Sample value"
+            
+        if isinstance(y, pq.Quantity):
+            ylabel = f"Sample value ({y.units.dimensionality})"
+            
+        kwargs["ylabel"] = ylabel
             
         if y.ndim == 1:
             if not isinstance(axis, pg.PlotItem):
@@ -7437,6 +7455,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 if not isinstance(axis, pg.PlotItem):
                     self._prepareAxes_(1)
+                    
                 y_ = y[array_slice(y, 
                                    {self.frameAxis:self.currentFrame, 
                                     self.signalChannelAxis:slice(y.shape[self.signalChannelAxis])})]
@@ -7450,7 +7469,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                             x, y_, *args, **kwargs)
                     
         else:
-            raise TypeError("numpy arrays with more than three dimensions are not supported")
+            msg = f"numpy arrays with {y.ndim} dimensions are not supported"
+            self.errorMessage("Plot", msg)
+            return
+            # raise TypeError("numpy arrays with more than three dimensions are not supported")
         
         if isinstance(plotLabelText, str) and len(plotLabelText.strip()):
             self.plotTitleLabel.setText(plotLabelText, color = "#000000")
@@ -7589,6 +7611,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         args                = data.pop("args", tuple())
         kwargs              = data.pop("args", dict())
 
+        # print(f"_slot_plot_numeric_data_threaded_ y.shape {y.shape}")
         self._plot_numeric_data_(plotItem,  x, y, xlabel, ylabel,
                                 title, name, symbolcolorcycle, *args, **kwargs)
         
@@ -7632,6 +7655,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # ATTENTION: y is a numpy arrays here; x is either None, or a numpy array
         
         #traceback.print_stack(limit=8)
+        
+        #### BEGIN debug
+        # stack = inspect.stack()
+        # for s in stack:
+        #     print(f"\tcaller\t {s.function} at line {s.lineno}")
+        #### END debug
         
         y = np.atleast_1d(y)
         
@@ -7725,7 +7754,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     plotItem.plot(y=yy, **kwargs)
         
         elif y.ndim == 2:
-            if y.shape[0] == 1:
+            # if y.shape[0] == 1:
+            #     y = y.T
+                
+            if y.shape[0] < y.shape[1]:
                 y = y.T
                 
             colors = cycle(self.defaultLineColorsList)
@@ -7734,8 +7766,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 for item in plotDataItems[y.shape[1]:]:
                     plotItem.removeItem(item)
             
-            for k in range(y.shape[self.signalChannelAxis]):
-                y_ = np.atleast_1d(y[array_slice(y, {self.signalChannelAxis:k})].squeeze())
+            # for k in range(y.shape[self.signalChannelAxis]):
+            #     y_ = np.atleast_1d(y[array_slice(y, {self.signalChannelAxis:k})].squeeze())
+                
+            for k in range(y.shape[1]):
+                y_ = np.atleast_1d(y[array_slice(y, {1:k})].squeeze())
                 
                 #print("y_.shape", y_.shape)
                 
@@ -7743,7 +7778,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     y_ = y_.T
                     
                 if x is not None:
-                    if x.ndim == 2 and x.shape[1] == y.shape[self.signalChannelAxis]:
+                    # if x.ndim == 2 and x.shape[1] == y.shape[self.signalChannelAxis]:
+                    if x.ndim == 2 and x.shape[1] == y.shape[1]:
                         x_ = np.atleast_1d(x[:,k].squeeze())
                         
                     else:
@@ -7810,7 +7846,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(title, str) and len(title.strip()):
             plotItem.setTitle(title)
         
-        plotItem.replot()
+        # plotItem.replot()
         
         if plotItem is self._current_plot_item_:
             lbl = "<B>%s</B>" % self._current_plot_item_.axes["left"]["item"].labelText
@@ -7823,6 +7859,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 lbl = lbl[3 : lbl.find("</B>")]
                 plotItem.setLabel("left", lbl)
         
+        plotItem.replot()
         return plotItem
     
     def _remove_axes_(self, plotItem:pg.PlotItem):

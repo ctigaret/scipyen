@@ -6392,12 +6392,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             #useSignalViewerForNdArrays = False
             
         varname = self.getCurrentVarName()
-        if varname is None:
-            return
-        
-        #if not self.viewVar(varname, newWindow=True, useSignalViewerForNdArrays=useSignalViewerForNdArrays):
+
         if not self.viewVar(varname, newWindow=True):
-            self.console.execute(varname)
+            self.console.execute(varname) # will raise exception if varname not in workspace
         
     def viewVar(self, varname, newWindow=False, winType=None): #, useSignalViewerForNdArrays=True):
         """Displays a variable in the workspace.
@@ -6405,7 +6402,25 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         #print("ScipyenWindow.viewVar, newWindow:", newWindow)
         if varname in self.workspace.keys():
-            return self.viewObject(self.workspace[varname], varname, 
+            if varname is None:
+                return False
+            obj = self.workspace[varname]
+            
+            # NOTE: 2022-12-22 09:59:02
+            # The following three checks are here to avoid launching a viewer for a
+            # scalar numpy array or nuemric object, or for a sequence with one element
+            # 
+            if isinstance(obj, np.ndarray) and obj.size < 2 or obj.ndim == 0:
+                return False
+            
+            if isinstance(obj, numbers.Number):
+                return False
+            
+            if isinstance(obj, (tuple, list, deque)) or hasattr(obj, "__iter__") or hasattr(obj, "__len__"):
+                if len(obj) < 1:
+                    return False
+        
+            return self.viewObject(obj, varname, 
                                    winType=winType,
                                    newWindow=newWindow)
         
@@ -6434,6 +6449,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         useSignalViewerForNdArrays when true, plot signals in signal viewer
         """
         # TODO: accommodate new viewer types - nearly DONE via VTH
+        
+        # NOTE: 2022-12-22 09:59:02
+        # The following three checks are here to avoid launching a viewer for a
+        # scalar numpy array or nuemric object, or for a sequence with one element
+        
+        if isinstance(obj, np.ndarray) and obj.size < 2 or obj.ndim == 0:
+            return False
+        
+        if isinstance(obj, numbers.Number):
+            return False
+        
+        if isinstance(obj, (tuple, list, deque)) or hasattr(obj, "__iter__") or hasattr(obj, "__len__"):
+            if len(obj) < 1:
+                return False
         
         if isinstance(winType, str) and winType in [v.__name__ for v in self.viewers.keys()]:
             if winType not in self.viewers.keys():

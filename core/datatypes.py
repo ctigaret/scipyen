@@ -248,6 +248,7 @@ def sequence_element_type(s):
     
 def array_slice(data:np.ndarray, slicing:(dict, type(None))):
     """Dynamic slicing of nD arrays and introducing new axis in the array.
+    Returns an indexing tuple
     """
     if not isinstance(data, np.ndarray):
         raise TypeError("data expected to be a numpy ndarray or a type derived from numpy ndarray; got %s instead" % type(data).__name__)
