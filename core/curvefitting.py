@@ -780,5 +780,157 @@ def fit_Event_wave(data, wave):
     
     
     
+def fit_nsfa(data, p0, **kwargs):
+    jac         = kwargs.pop("jac",         "2-point")
+    bounds      = kwargs.pop("bounds",      (-np.inf, np.inf))
+    method      = kwargs.pop("method",      "trf")
+    ftol        = kwargs.pop("ftol",        1e-8)
+    xtol        = kwargs.pop("xtol",        1e-8)
+    gtol        = kwargs.pop("gtol",        1e-8)
+    x_scale     = kwargs.pop("x_scale",     1.0)
+    loss        = kwargs.pop("loss",        "linear")
+    f_scale     = kwargs.pop("f_scale",     1.0)
+    max_nfev    = kwargs.pop("max_nfev",    None)
+    diff_step   = kwargs.pop("diff_step",   None)
+    tr_solver   = kwargs.pop("tr_solver",   None)
+    tr_options  = kwargs.pop("tr_options",  {})
+    jac_sparsity= kwargs.pop("jac_sparsity",None)
+    verbose     = kwargs.pop("verbose",     0)
+    
+    def __cost_fun__(x, t, y, *args, **kwargs):  # returns residuals
+        yf = models.nsfa(t, x)
+        
+        ret = y-yf
+        
+        return ret
+    
+    args        = kwargs.pop("args",        ()) 
+   
+    realDataNdx = ~np.isnan(data)
+    
+    ydata = data.magnitude[realDataNdx]
+    
+    realDataNdx = np.squeeze(realDataNdx)
+    
+    if isinstance(data, neo.AnalogSignal):
+        domaindata = data.times.magnitude
+        
+    else:
+        domaindata = data.domain.magnitude
+    
+    xdata  = domaindata[realDataNdx]
+    
+    x0 = p0
+    lo = list()
+    up = list()
+    
+    l0 = bounds[0]
+    u0 = bounds[1]
+    
+    if isinstance(l0, numbers.Real):
+        lo = [l0] * len(p0)
+        
+    elif isinstance(l0, (tuple, list)):
+        if len(l0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {len(l0)} instead")
+
+        if all(isinstance(l, numbers.Real) for l in l0):
+            if len(l0) == 1:
+                lo = [l0[0]] * len(p0)
+            else:
+                lo = [l for l in l0]
+
+        elif all(isinstance(l, np.ndarray) and l.size == 1 and l.dtype == np.dtype(float) for l in l0):
+            if len(l0) == 1:
+                lo = [float(l)] * len(p0)
+            else:
+                lo = [float(l) for l in l0]
+                
+    elif isinstance(l0, np.ndarray):
+        if l0.size not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
+        
+        if not dt.is_vector(l0):
+            raise ValueError("Lower bounds must be a vector")
+        
+    elif isinstance(l0, pd.Series):
+        if len(l0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
+        
+        lo = [float(l.magnitude) if isinstance(l, pq.Quantity) else float(l) for l in l0]
+            
+    else:
+        raise ValueError(f"Incorrect lower bounds specified {l0}")
+    
+    if isinstance(u0, numbers.Real):
+        up = [u0] * len(p0)
+        
+    elif isinstance(u0, (tuple, list)):
+        if len(u0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {len(u0)} instead")
+
+        if all(isinstance(l, numbers.Real) for l in u0):
+            if len(u0) == 1:
+                up = [u0[0]] * len(p0)
+            else:
+                up = [l for l in u0]
+
+        elif all(isinstance(l, np.ndarray) and l.size == 1 and l.dtype == np.dtype(float) for l in u0):
+            if len(u0) == 1:
+                up = [float(l)] * len(p0)
+            else:
+                up = [float(l) for l in u0]
+                
+    elif isinstance(u0, np.ndarray):
+        if u0.size not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
+        
+        if not dt.is_vector(u0):
+            raise ValueError("Lower bounds must be a vector")
+        
+    elif isinstance(u0, pd.Series):
+        if len(u0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
+        
+        up = [float(l.magnitude) if isinstance(l, pq.Quantity) else float(l) for l in u0]
+            
+    else:
+        raise ValueError(f"Incorrect upper bounds specified {u0}")
     
     
+    bnds = (lo, up)
+    
+    res = optimize.least_squares(__cost_fun__, x0, args=(xdata, ydata), jac=jac,
+                                 bounds = bounds, method=method, loss=loss,
+                                 ftol=ftol, xtol=xtol, gtol=gtol, x_scale=x_scale,
+                                 f_scale=f_scale, max_nfev=max_nfev, 
+                                 diff_step=diff_step, tr_solver=tr_solver,
+                                 tr_options=tr_options, jac_sparsity=jac_sparsity,
+                                 verbose=verbose, kwargs=kwargs)
+    
+    res_x = list(res.x.flatten())
+
+    fC = models.nsfa(xdata, res_x)
+    
+    sst = np.sum( (ydata - ydata.mean()) ** 2.)
+    
+    sse = np.sum((fC - ydata) ** 2.)
+    
+    # R² for the entire fit
+    rsq = 1 - sse/sst # only one R²
+    
+    result = collections.OrderedDict()
+    result["Fit"] = res
+    result["Coefficients"] = res_x
+    result["Rsq"] = rsq
+    
+    initialSupport = np.full((data.shape[0],), np.NaN)
+    
+    fittedCurve = initialSupport.copy()
+    
+    fittedCurve[realDataNdx] = fC
+    
+    return fittedCurve, result
+
+                     
+                     

@@ -95,6 +95,25 @@ def alphaFunction(x, parameters):
     
     return y
 
+
+def nsfa(x, parameters):
+    """
+        y = x * i - x²/N + b
+    
+    Parameters: i, N, b
+    """
+     if isinstance(x, pq.Quantity):
+        x = x.magnitude
+        
+    x = x.flatten()
+    
+    i, N, b = parameters
+    
+    y = x*i - x**2 / N + b
+    
+    return y
+   
+
 def Clements_Bekkers_97(x, parameters, unit_amplitude:bool=False):
     """
     Clements & Bekkers 1997 mEPSC waveform.
