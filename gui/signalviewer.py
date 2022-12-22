@@ -2391,6 +2391,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         
                         for kdata, dataitem in enumerate(dataitems):
                             data_x, data_y = dataitem.getData()
+                            if x is None or data_x is None:
+                                continue
                             ndx = np.where(data_x >= x)[0]
                             
                             if len(ndx):
@@ -6604,7 +6606,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                      DataSignal, 
                                      neo.core.IrregularlySampledSignal,
                                      IrregularlySampledDataSignal)):
-                self._plotSignal_(self.yData, *self.plot_args, **self.plot_kwargs)
+                if self.frameAxis == 1:
+                    if self._current_frame_index_ in self.frameIndex:
+                        ndx = self.frameIndex[self._current_frame_index_]
+                    else:
+                        self._current_frame_index_ = 0
+                        ndx = 0
+                        
+                    self._plotSignal_(self.yData[:,ndx], *self.plot_args, **self.plot_kwargs)
+                else:
+                    self._plotSignal_(self.yData, *self.plot_args, **self.plot_kwargs)
 
             elif isinstance(self.yData, (neo.core.Epoch, DataZone)): # plot an Epoch independently of data
                 x_min, x_max = (self.yData[0], self.yData[-1] + self.yData.durations[-1])
@@ -6738,12 +6749,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             self.axes[-1].showAxis("bottom", True)
             
+            if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
+                self.docTitle = trains.name
+            
         if isinstance(plotLabelText, str) and len(plotLabelText.strip()):
             self.plotTitleLabel.setText(plotLabelText, color = "#000000")
             
-        if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
-            self.docTitle = trains.name
-        
     @safeWrapper
     def _plotEvents_(self, events: typing.Optional[typing.Union[neo.Event, DataMark, typing.Sequence]] = None, clear: bool = True, from_cache: bool = False, plotLabelText=None, **kwargs):
         """Plot stand-alone events"""
@@ -6767,12 +6778,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             self.axes[-1].showAxis("bottom", True)
         
+            if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
+                self.docTitle = "Events"
+            
         if isinstance(plotLabelText, str) and len(plotLabelText.strip()):
             self.plotTitleLabel.setText(plotLabelText, color = "#000000")
 
-        if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
-            self.docTitle = "Events"
-        
     def _plot_epochs_seq_(self, *args, **kwargs):
         """Does the actual plotting of epoch data.
         Epochs is always a non-empty sequence (tuple or list) of neo.Epochs
@@ -6899,7 +6910,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             self._plot_epochs_seq_(*epoch_seq, **kwargs)
                 
+            if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
+                self.docTitle = "Epochs"
+                
             return
+                
         # END plot epochs from cache (containing standalone epoch data), if any and if requested
             
         # BEGIN plot supplied epoch
@@ -6955,6 +6970,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     else:
                         self._cached_epochs_[self.currentFrame] += epoch_seq
                         
+            if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
+                self.docTitle = "Epochs"
+                
         else:
             # clear cache when no epochs were passed
             self._cached_epochs_.pop(self.currentFrame, None)
@@ -6962,8 +6980,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(plotLabelText, str) and len(plotLabelText.strip()):
             self.plotTitleLabel.setText(plotLabelText, color = "#000000")
             
-        if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
-            self.docTitle = "Epochs"
         
     @safeWrapper
     def _plotSegment_(self, seg, *args, **kwargs):
@@ -7400,7 +7416,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if not isinstance(axis, pg.PlotItem):
                         self._prepareAxes_(1)
                         if y.shape[self.signalChannelAxis] > 10:
-                            self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs))
+                            self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), x, y, *args, **kwargs))
                         else:
                             self._plot_numeric_data_(self.plotItem(0), x, y, 
                                                      *args, **kwargs)

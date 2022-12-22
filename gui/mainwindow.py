@@ -6410,8 +6410,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # The following three checks are here to avoid launching a viewer for a
             # scalar numpy array or nuemric object, or for a sequence with one element
             # 
-            if isinstance(obj, np.ndarray) and obj.size < 2 or obj.ndim == 0:
-                return False
+            if isinstance(obj, np.ndarray):
+                if obj.size < 2 or obj.ndim == 0:
+                    return False
             
             if isinstance(obj, numbers.Number):
                 return False
@@ -6454,8 +6455,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # The following three checks are here to avoid launching a viewer for a
         # scalar numpy array or nuemric object, or for a sequence with one element
         
-        if isinstance(obj, np.ndarray) and obj.size < 2 or obj.ndim == 0:
-            return False
+        if isinstance(obj, np.ndarray):
+            if (obj.size < 2 or obj.ndim == 0):
+                return False
         
         if isinstance(obj, numbers.Number):
             return False

@@ -612,7 +612,7 @@
      <x>0</x>
      <y>0</y>
      <width>808</width>
-     <height>28</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -675,6 +675,7 @@
     <addaction name="actionOverlay_Template_with_Model"/>
     <addaction name="actionAll_waves_to_result"/>
     <addaction name="actionLock_toolbars"/>
+    <addaction name="actionWaves_alignment_on_rising_phase"/>
    </widget>
    <widget class="QMenu" name="menuDetect_Events">
     <property name="title">
@@ -1407,6 +1408,17 @@
    </property>
    <property name="text">
     <string>Refit wave</string>
+   </property>
+  </action>
+  <action name="actionWaves_alignment_on_rising_phase">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="align-horizontal-left"/>
+   </property>
+   <property name="text">
+    <string>Waves alignment on rising phase</string>
    </property>
   </action>
  </widget>

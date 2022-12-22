@@ -6839,6 +6839,7 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal], durati
     # print(f"membrane.extract_event_waveforms: waves shape {mPSCtrain_waves.shape}, waveforms shape {ret.waveforms.shape}")
     ret.segment = x.segment
     
+    # print(f"extract_event_waveforms x.name {x.name}")
     ret.annotate(
                  peak_time = mini_peaks, 
                  wave_name = [w.name for w in minis],

@@ -344,7 +344,7 @@ def scale_waveform(x:np.ndarray, α, β):
     
     return xx if units is None else xx * units
 
-def normalise_waveform(x:np.ndarray, axis:typing.Optional[int]=None, rng:typing.Optional[float] = None):
+def normalise_waveform(x:np.ndarray, axis:typing.Optional[int]=None, rng:typing.Optional[typing.Union[float, np.ndarray]] = None):
     """Waveform normalization.
     
     
@@ -352,7 +352,8 @@ def normalise_waveform(x:np.ndarray, axis:typing.Optional[int]=None, rng:typing.
     ===========
     x: numpy array (i.e., a vector)
     
-    axis: int or None
+    axis: int with vale in range(-(x.ndim), x.ndim), or None
+        When axis is -1 the last axis is used.
     
     rng: float, optional (default is None). The normalization range
     
@@ -372,6 +373,10 @@ def normalise_waveform(x:np.ndarray, axis:typing.Optional[int]=None, rng:typing.
     
     Keeps the waveform's orientation and polarity.
     
+    WARNING
+    When x is a quantities.Quantity, the result is a dimensioness Quantity!
+    WARNING
+    
     The point is that waveform "min" is not its numerical minimum, but the sample 
     value closest to zero; likewise, the "max" is the sample value farthest away
     from zero.
@@ -389,82 +394,119 @@ def normalise_waveform(x:np.ndarray, axis:typing.Optional[int]=None, rng:typing.
     FIXME: 2022-12-13 16:57:47 This is NOT nan-friendly!
     
     """
-    if isinstance(x, pq.Quantity):
-        if isinstance(rng, float):
-            rng *+ x.units
-            
-        elif isinstance(rng, np.ndarray):
-            if rng.size != 1:
-                raise ValueError("rng must be a scalar")
-            
-            if isinstance(rng, pq.Quantity):
-                if not scq.units_convertible(x, rng):
-                    raise TypeError(f"rng quantity ({rng.units.dimensionality}) is incompatible with x quantity ({x.units.dimensionality})")
-                if rng.units != x.units:
-                    rng.rescale(x.units)
-                    
-            else:
-                rng *= x.units
-                
-        elif rng is not None:
-            raise TypeError(f"Bad rng type ({type(rng).__name__})")
-                
-    elif isinstance(x. np.ndarray):
-        if isinstance(rng, np.ndarray):
-            if rng.size != 1:
-                raise ValueError("rng must be a scalar")
-            
-            if isinstance(rng, pq.Quantity):
-                rng = float(rng.magnitude[0])
-            
-        if not isinstance(rng, float) and rng is not None:
-            raise TypeError(f"Bad rng type ({type(rng).__name__})")
-        
-    if rng is None:
-        if x.ndim == 1:
-            rng = abs(x.min()-x.max())
-            
+    from core import datatypes as dt
+    if x.ndim != 1:
+        if x.ndim == 2:
+            if min(x.shape) != 1:
+                raise NotImplementedError("Only 1D vectors are supported")
         else:
-            if axis is None:
-                rng = abs(x.min()-x.max())
-                
-            else:
-                if not isinstance(axis, int):
-                    raise TypeError(f"axis expected to be an int or None; got {type(axis).__name__} instead")
-                
-                if axis not in range(x.ndim):
-                    raise ValueError(f"Bad axis {axis} for x with {x.ndim} dimensions")
-                
-                rng = np.abs(x.max(axis=axis) - x.min(axis=axis)) # rng is a quantity if x is a quantity
+            raise NotImplementedError("Only 1D vectors are supported")
         
-    if x.ndim == 1:
-        if is_positive_waveform(x):
-            return (x-np.min(x))/rng
-        
-        return (np.max(x)-x)/rng
-        # return (x-np.min(x))/(np.max(x)-np.min(x))
-        
-    else:
-        if axis is None:
-            if isinstance(x, pq.Quantity):
-                ispos = is_positive_waveform(x.magnitude.flatten())
-            else:
-                ispos = is_positive_waveform(x.flatten())
-            if ispos:
-                return (x-np.min(x))/rng
-            return (np.max(x)-x)/rng
-        
-        else:
-            if isinstance(x, pq.Quantity):
-                ispos = is_positive_waveform(x.magnitude)
             
+    # def __nrm__(x, ref, r):
+    #     return (x-ref)/r
+        
+#     #### BEGIN deal with the rng parameter
+#     if isinstance(x, pq.Quantity):
+#         if isinstance(rng, float):
+#             rng = rng * x.units
+#             
+#         elif isinstance(rng, np.ndarray):
+#             if rng.size != 1:
+#                 raise ValueError("rng must be a scalar")
+#             
+#             if isinstance(rng, pq.Quantity):
+#                 if not scq.units_convertible(x, rng):
+#                     raise TypeError(f"rng quantity ({rng.units.dimensionality}) is incompatible with x quantity ({x.units.dimensionality})")
+#                 if rng.units != x.units:
+#                     rng.rescale(x.units)
+#                     
+#             else:
+#                 rng = rng * x.units
+#                 
+#         elif rng is not None:
+#             raise TypeError(f"Bad rng type ({type(rng).__name__})")
+#                 
+#     elif isinstance(x. np.ndarray):
+#         if isinstance(rng, np.ndarray):
+#             if rng.size != 1:
+#                 raise ValueError("rng must be a scalar")
+#             
+#             if isinstance(rng, pq.Quantity):
+#                 rng = float(rng.magnitude[0])
+#             
+#         if not isinstance(rng, float) and rng is not None:
+#             raise TypeError(f"Bad rng type ({type(rng).__name__})")
+#         
+#     if rng is None:
+#         rng = abs(x.min()-x.max())
+# #         if x.ndim == 1:
+# #             rng = abs(x.min()-x.max())
+# #             
+# #         else:
+# #             raise NotImplementedError(f"arrays with {x.ndim} dimensions are not supported")
+# #             if axis is None:
+# #                 rng = abs(x.min()-x.max())
+# #                 
+# #             else:
+# #                 if not isinstance(axis, int):
+# #                     raise TypeError(f"axis expected to be an int or None; got {type(axis).__name__} instead")
+# #                 dims = x.ndim
+# #                 if axis not in range( -dims, dims):
+# #                     raise ValueError(f"Bad axis {axis} for x with {x.ndim} dimensions")
+# #                 
+# #                 rng = np.abs(x.max(axis=axis) - x.min(axis=axis)) # rng is a quantity if x is a quantity
+#     #### END deal with the rng parameter
+#     
+#     if is_positive_waveform(x):
+#         return (x-np.min(x))/rng
+#     
+#     return (np.max(x)-x)/rng
+# 
+# #     if x.ndim == 1:
+# #         if is_positive_waveform(x):
+# #             return (x-np.min(x))/rng
+# #         
+# #         return (np.max(x)-x)/rng
+# #         # return (x-np.min(x))/(np.max(x)-np.min(x))
+# #         
+# #     else:
+# #         raise NotImplementedError(f"arrays with {x.ndim} dimensions are not supported")
+#         # FIXME: 2022-12-22 11:50:13
+#         # should revisit this
+# #         if axis is None:
+# #             if isinstance(x, pq.Quantity):
+# #                 ispos = is_positive_waveform(x.magnitude.flatten())
+# #             else:
+# #                 ispos = is_positive_waveform(x.flatten())
+# #                 
+# #             if ispos:
+# #                 return (x-np.min(x))/rng
+# #             
+# #             return (np.max(x)-x)/rng
+# #         
+# #         else:
+# #             if isinstance(x, pq.Quantity):
+# #                 xx_ = x.magnitude
+# #             else:
+# #                 xx_ = x
+# #             
+# #             # ispos = [is_positive_waveform(x.magnitude[dt.array_slice(x, {axis:k})] for k in xx_.shape[axis])]
+# #             
+# #             ret = x.copy()
+# #             print(f"rng = array {rng.shape}: {rng}")
+# #             
+# #             # NOTE: 2022-12-22 12:15:06
+# #             # this is WRONG: axis indicates the axis along shich we calculate min max
+# #             for k in range(x.shape[axis]):
+# #                 ret[dt.array_slice(xx_, {axis:k})] = normalise_waveform(x[dt.array_slice(xx_, {axis:k})], axis = -1, rng=rng[k])
         
         
     #### BEGIN original code
-    # if is_positive_waveform(x):
-    #     return (x-np.min(x))/(np.max(x)-np.min(x))
-    # 
-    # return (np.max(x)-x)/(np.min(x)-np.max(x))
+    if is_positive_waveform(x):
+        return (x-np.min(x))/(np.max(x)-np.min(x))
+    
+    return (np.max(x)-x)/(np.min(x)-np.max(x))
     #### END original code
 
 def data_range(x:np.ndarray, **kwargs):
