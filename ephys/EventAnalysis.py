@@ -1370,7 +1370,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         aligned_waves = list()
         
         if by_max_rise:
-            print(f"_make_aligned_waves_ align on rising phase")
+            # print(f"_make_aligned_waves_ align on rising phase")
             # extract the time point of fastest rise time (max rise) in the wave;
             # in order to do that we need to smooth the wave first !
             # also, if the wave if "inward", then we take the argmin() !
@@ -1414,7 +1414,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 aligned_waves.append(aligned_wave)
                 
         else:
-            print(f"_make_aligned_waves_ align on onset")
+            # print(f"_make_aligned_waves_ align on onset")
             maxOnset = onset.max()
             onsetCorrections = maxOnset - onset
             new_start_times = start_times - onsetCorrections
