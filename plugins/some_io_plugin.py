@@ -6,5 +6,5 @@ def my_plugin_function():
 
 
 def init_scipyen_plugin():
-    return {__name__:(__file__, {'File|Open|Spam': my_plugin_function})}
+    return {'File|Open|Spam': my_plugin_function}
 

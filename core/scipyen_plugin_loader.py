@@ -235,21 +235,15 @@ NOTE: 2016-04-17 16:53:00
 
 '''
 
-
-
 from __future__ import print_function
-# TODO/FIXME -- imp is deprecated in Python 3 !!!
-
-# FIXME 2016-04-02
-# dict.view...() functions are removed from Python3 !!!
-# FIXED 2016-04-02 23:59:45
-# using items(), keys(), value() (in Python 3 these already return views)
 
 # FIXME 2016-04-03 00:35:17
 # if the plugin advertises itself on an already used menu item and with a similar callback function
 # the previosuly loaded plugin will be overwritten !!!
 
-import os, inspect, imp, sys, collections
+import os, inspect, importlib, sys, collections, traceback
+from pprint import pprint
+# import os, inspect, imp, sys, collections
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -261,46 +255,85 @@ __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 loaded_plugins = collections.OrderedDict()
 
-__avoid_modules__ = ("scipyen_start", "scipyen_plugin_loader")
+# __avoid_modules__ = ("scipyen_start", "scipyen_plugin_loader")
 
-def load_plugin(mod_info):
-    '''Imports the plugin module according to the information in mod_info tuple:
+# def load_plugin(mod_info):
+#     '''Imports the plugin module according to the information in mod_info tuple:
+#     
+#         mod_info[0] is a module information sequence as returned by inspect.getmoduleinfo
+#         
+#         In particular:
+#         
+#         mod_info[0].name is the module name (when imported, this will be the __name__ 
+#             attribute of the module)
+#             
+#         mod_info[0].mode is the mode; relevant hare are:
+#             python source file (*.py)    -- mode is PY_SOURCE
+#             compiled python file (*.pyc) -- mode is PY_COMPILED
+#             
+#         mod_info[1] is the filename (fully qualified absolute pathname); when 
+#             imported, this will appear as __file__ attribute of the module
+#     '''
+#     module_file = open(mod_info[1], mod_info[0].mode)
+# 
+#     # NOTE: 2016-04-15 11:51:08
+#     # do not call init_scipyen_plugin here anymore, just import the modules, then
+#     # let the caller of the plugin_loader to deal with plugin initialization and
+#     # installation
+#     
+#     # NOTE: 2016-04-15 14:21:43
+#     # the loaded module is found in sys.modules that can be accessed via the 
+#     # PICT console !!!
+# 
+#     try:
+#         plugin_module = imp.load_module(mod_info[0].name, module_file, mod_info[1], (mod_info[0].suffix, mod_info[0].mode, mod_info[0].module_type))
+#         loaded_plugins.update({mod_info[0].name:plugin_module})
+#         module_file.close()
+#     finally:
+#         module_file.close()
+#     
+#     module_file.close()
     
-        mod_info[0] is a module information sequence as returned by inspect.getmoduleinfo
-        
-        In particular:
-        
-        mod_info[0].name is the module name (when imported, this will be the __name__ 
-            attribute of the module)
-            
-        mod_info[0].mode is the mode; relevant hare are:
-            python source file (*.py)    -- mode is PY_SOURCE
-            compiled python file (*.pyc) -- mode is PY_COMPILED
-            
-        mod_info[1] is the filename (fully qualified absolute pathname); when 
-            imported, this will appear as __file__ attribute of the module
-    '''
-    module_file = open(mod_info[1], mod_info[0].mode)
-
-    # NOTE: 2016-04-15 11:51:08
-    # do not call init_scipyen_plugin here anymore, just import the modules, then
-    # let the caller of the plugin_loader to deal with plugin initialization and
-    # installation
-    
-    # NOTE: 2016-04-15 14:21:43
-    # the loaded module is found in sys.modules that can be accessed via the 
-    # PICT console !!!
-
-    try:
-        plugin_module = imp.load_module(mod_info[0].name, module_file, mod_info[1], (mod_info[0].suffix, mod_info[0].mode, mod_info[0].module_type))
-        loaded_plugins.update({mod_info[0].name:plugin_module})
-        module_file.close()
-    finally:
-        module_file.close()
-    
-    module_file.close()
-
 def find_plugins(path):
+    dw = os.walk(path)
+    module_dict = dict()
+    for entry in dw:
+        # print(f"find_plugins({path}) entry: {entry}")
+        for file_name in (os.path.join(entry[0], i) for i in entry[2]):
+            root, ext = os.path.splitext(file_name)
+            # NOTE: 2022-12-22 22:43:14
+            # stick with source code files only
+            if ext in importlib.machinery.SOURCE_SUFFIXES:
+                module_name = inspect.getmodulename(file_name)
+                if module_name is not None:
+                    # print(f"find_plugins({path}) filename: {file_name}, module_name: {module_name}")
+                    module_spec = importlib.util.spec_from_file_location(module_name, file_name)
+                    # print(f"module spec: {module_spec}")
+                    with open(file_name, "rt") as module_file:
+                        for line in module_file:
+                            if line.startswith('__scipyen_plugin__') or line.startswith("def init_scipyen_plugin"):
+                                module_dict[module_name] = module_spec
+                                break
+                        
+            else:
+                continue
+            
+    # print("module_dict:")
+    # pprint(module_dict)
+    
+    for name, spec in module_dict.items():
+        if name in sys.modules:
+            continue
+        try:
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[name] = module
+            spec.loader.exec_module(module)
+            loaded_plugins[name] = module
+        except:
+            traceback.print_exc()
+            continue
+
+def find_plugins_old(path):
     '''Searches for module files that advertise themselves as pict plugins, in 
     the directory tree rooted at path.
     '''

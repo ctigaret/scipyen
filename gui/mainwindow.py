@@ -310,6 +310,8 @@ if EventAnalysis.EventAnalysis not in gui_viewers:
     
 #### END scipyen imaging modules
 
+from core import scipyen_plugin_loader
+
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 __scipyendir__ = os.path.dirname(__module_path__)
@@ -1386,7 +1388,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             '''
             
             try:
-                
                 if in_types is not None:# and ((type(in_types) in (tuple, list) and len(in_types) > 0) or (type(in_types) is type)):
                     def inner_f():
                         def interpret_str(varstr):
@@ -1871,7 +1872,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.__class__._instance = self # FIXME: what's this for?!? - flag as singleton?
         
-        #self.startPluginLoad.emit()
+        self.startPluginLoad.emit()
 
         
     #### BEGIN Properties
@@ -6592,8 +6593,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         ''' See scipyen_plugin_loader docstring
         '''
         #print("   slot_loadPlugins")
-        self.plugins = types.ModuleType('plugins','Contains pict plugin modules with their publicized callback functions')
-        scipyen_plugin_loader.find_plugins(__module_path__)
+        self.plugins = types.ModuleType('plugins','Contains scipyen plugin modules with their publicized callback functions')
+        scipyen_plugin_loader.find_plugins(self._scipyendir_)
         
         # NOTE: 2016-04-15 11:53:08
         # let the plugin loader just load plugin module code
@@ -6601,6 +6602,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         if len(scipyen_plugin_loader.loaded_plugins) > 0:
             for p in scipyen_plugin_loader.loaded_plugins.values():
+                # maps module name to the tuple (module file, menu dict)
+                # menu dict in turn maps a menu tree structure (a '|'-separated string) to a function defined in the plugin
                 menudict = collections.OrderedDict([(p.__name__, (p.__file__, p.init_scipyen_plugin()) )])
                 #menudict = p.init_scipyen_plugin()
                 if len(menudict) > 0:
@@ -6638,15 +6641,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         (c) itemText is the empty string ('') because it denotes a separator
         '''
         #parentActions = parent.actions()
-        parentActionLabels = [str(i.text()) for i in parent.actions()]
+        parentActionLabels = [i.text().replace('&', '') for i in parent.actions()]
         parentActionMenus = [i.menu() for i in parent.actions()]
         
         if itemText in parentActionLabels:
-            ret = parentActionMenus[parentActionLabels.index(itemText)]
-        else:
-            ret = None
+            return parentActionMenus[parentActionLabels.index(itemText)]
 
-        return ret
 
     def _installPluginFunction_(self, f, menuItemLabel, parentMenu, nReturns=None, inArgTypes=None):
         '''
@@ -6658,7 +6658,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         Furthermore the plugin module that advertises this function is imported 
         inside the pseudo-module self.plugins -- "pseudo" because this is a
-        ypes.ModuleType ere is no
+        types.ModuleType ere is no
         python source file for it and is created at runtime, but otherwise it is just a types.ModuleType. 
         
         There, each plugin is also installed also as a pseudo-module: a types.ModuleType where 
@@ -6719,14 +6719,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             else: # leave it as a tuple
                 inTypes = inArgTypes
                 
-            #if (arg_defaults is not None and len(arg_names) > len(arg_defaults)):
-                #defs = [None] * len(arg_names)
-                #defs[(len(arg_names)-len(arg_defaults)):] = arg_defaults
-                #arg_defaults = defs
-                #del defs
-            #elif arg_defaults is None:
-                #arg_defaults = [None] * len(arg_names)
-                    
         else:
             inTypes = inArgTypes
         
@@ -6798,19 +6790,21 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         icmd = ''.join(["self.plugins.",f.__module__,".",f.__name__," = f"])
         exec(icmd)
         
-    def _parsePluginFunctionDict_(self, d, menuOrItemLabel, parentMenu):
-        '''
-        Parses a plugin functions dictionary and installs the functions in the appropriate menu paths
-        '''
-        if len(d) > 1: # more than one function defined
-            newMenu = parentMenu.addMenu(menuOrItemLabel)
-            for (f, fargs) in d.items():
-                self._installPluginFunction_(f, f.__name__, newMenu, *fargs)
-                
-        elif len(d) == 1:
-            self._installPluginFunction_(dd.keys()[0], menuOrItemLabel, parentMenu, *d.values()[0])
+#     def _parsePluginFunctionDict_(self, d, menuOrItemLabel, parentMenu):
+#         '''
+#         Parses a plugin functions dictionary and installs the functions in the appropriate menu paths
+#         '''
+#         if len(d) > 1: # more than one function defined
+#             newMenu = parentMenu.addMenu(menuOrItemLabel)
+#             for (f, fargs) in d.items():
+#                 self._installPluginFunction_(f, f.__name__, newMenu, *fargs)
+#                 
+#         elif len(d) == 1:
+#             self._installPluginFunction_(dd.keys()[0], menuOrItemLabel, parentMenu, *d.values()[0])
             
     def _run_loop_process_(self, fn, process_name, *args, **kwargs):
+        # TODO: 2022-12-23 00:24:19
+        # see EventAnalysis for a working approach !
         # TODO : 2021-08-17 12:43:35
         # check where it is used (currently nowhere, but potentially when running
         # plugins) 
@@ -6865,73 +6859,97 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         See scipyen_plugin_loader docstring for details about v[1]
         '''
         
-        if len(v[1]) > 0: # the nested dict
-            for mp in v[1]: # iterate over keys #print(mp)
-                if mp is not None and isinstance(mp, str) and len(mp) > 0:
+        if isinstance(v[1], dict) and len(v[1]) > 0: # the nested dict
+            # the plugin's init_scipyen_plugin function outputs a mapping
+            # of a str or sequence of str, to a function or sequence of functions
+            # there can be more than one such mappings
+            for mp, ff in v[1].items(): 
+                # iterate over keys #print(mp)
+                if isinstance(mp, str) and len(mp.strip()) > 0:
                     menuPathList = mp.split('|')
-                    ff = v[1][mp]
+                elif isinstance(mp, (tuple, list)) and all(isinstance(s, str) and len(s.strip()) for s in mp):
+                    menuPathList = mp
+                else:
+                    continue
+                
+                # ff = v[1][mp]
+                
+                # print(f"ff: {type(ff)} in module {pname} file {v[0]}")
 
-                    parentMenu = self.menuBar()
-                    currentMenu = None
+                parentMenu = self.menuBar()
+                currentMenu = None
 
-                    for item in menuPathList:
-                        currentMenu = self._locateMenuByItemText_(parentMenu, item)
-                        siblingActionLabels = [str(i.text()) for i in parentMenu.actions()]
+                for item in menuPathList:
+                    currentMenu = self._locateMenuByItemText_(parentMenu, item)
+                    siblingActionLabels = [i.text().replace('&', '') for i in parentMenu.actions()]
 
-                        if currentMenu is None:
-                            if item == menuPathList[-1]:
-                                if item in siblingActionLabels: # avoid name clashes
-                                    item  = ' '.join([item, "(",ff.__module__,")"])
+                    if currentMenu is None:
+                        if item == menuPathList[-1]: # last item is the menu item (action)
+                            if item in siblingActionLabels: # avoid name clashes
+                                item  = ' '.join([item, "(",ff.__module__,")"])
 
-                                if 'function' in type(ff).__name__:
-                                    self._installPluginFunction_(ff, item, parentMenu)
+                            # if 'function' in type(ff).__name__:
+                            if inspect.isfunction(ff):
+                                self._installPluginFunction_(ff, item, parentMenu)
 
-                                elif isinstance(ff, list):
-                                    if len(ff)>1:
-                                        newMenu = parentMenu.addMenu(item)
-                                        for f in ff:
-                                            if 'function' in type(f).__name__:
-                                                self._installPluginFunction_(f, f.__name__, newMenu)
-                                            else:
-                                                raise TypeError("function object expected")
-                                    else:
-                                        self._installPluginFunction_(ff[0], item, parentMenu)
-
-                                elif isinstance(ff, dict):
-                                    self._parsePluginFunctionDict_(collections.OrderedDict(ff), item, parentMenu)
-
+                            elif isinstance(ff, (tuple, list)):
+                                if len(ff)>1:
+                                    newMenu = parentMenu.addMenu(item)
+                                    for f in ff:
+                                        # print(f"f: {type(f)}")
+                                        # if 'function' in type(f).__name__:
+                                        if inspect.isfunction(f):
+                                            self._installPluginFunction_(f, f.__name__, newMenu)
+                                        else:
+                                            raise TypeError("function object expected")
                                 else:
-                                    raise TypeError(" a function object or a list of function objects was expected")
-                            else:
-                                parentMenu = parentMenu.addMenu(item)
-                                continue
+                                    self._installPluginFunction_(ff[0], item, parentMenu)
 
+                            # elif isinstance(ff, dict):
+                            #     self._parsePluginFunctionDict_(collections.OrderedDict(ff), item, parentMenu)
+
+                            else:
+                                raise TypeError(" a function object or a list of function objects was expected")
                         else:
-                            parentMenu = currentMenu
+                            parentMenu = parentMenu.addMenu(item)
+                            continue
 
-                else: #  plugin module does not advertise any menu path => use plugin module name as submenu of a canonical Plugins menu
-                    pluginsMenu = self._locateMenuByItemText_(self.menuBar(), "Plugins")
-                    if pluginsMenu is None:
-                        pluginsMenu = self.menuBar().addMenu("Plugins")
+                    else:
+                        parentMenu = currentMenu
+        else: 
+            # the plugin's init_scipyen_plugin function does not advertise a
+            # menupath ⇒ use the plugin module name as submenu of a canonical 
+            # Plugins menu
+            ff = v[1]
+            pluginsMenu = self._locateMenuByItemText_(self.menuBar(), "Plugins")
+            if pluginsMenu is None:
+                pluginsMenu = self.menuBar().addMenu("Plugins")
 
-                    if 'function' in type(ff).__name__:
-                        newMenu = pluginsMenu.addMenu(pname)
-                        self._installPluginFunction_(ff, ff.__name__, newMenu)
-                    elif isinstance(ff, list):
-                        newMenu = pluginsMenu.addMenu(pname)
-                        if len(ff) == 1:
-                            if 'function' in type(ff[0]).__name__:
-                                self._installPluginFunction_(ff[0], ff[0].__name__, newMenu)
-                            else:
-                                raise TypeError("function object expected")
-                        elif len(ff) > 1:
-                            for f in ff:
-                                if 'function' in type(f).__name__:
-                                    self._installPluginFunction_(f, f.__name__, newMenu)
-                                else:
-                                    raise TypeError("function object expected")
-                    elif isinstance(ff, dict):
-                        self._parsePluginFunctionDict_(collections.OrderedDict(ff), pname, pluginsMenu)
-        else:
-            raise ValueError("empty nested dict in plugin info")
+            # if 'function' in type(v[1]).__name__:
+            if inspect.isfunction(ff):
+                newMenu = pluginsMenu.addMenu(pname)
+                
+                self._installPluginFunction_(ff, ff.__name__, newMenu)
+                
+            elif isinstance(ff, (tuple, list)):
+                newMenu = pluginsMenu.addMenu(pname)
+                if len(ff) == 1:
+                    # if 'function' in type(ff[0]).__name__:
+                    if inspect.isfunction(ff[0]):
+                        self._installPluginFunction_(ff[0], ff[0].__name__, newMenu)
+                    else:
+                        raise TypeError("function object expected")
+                    
+                elif len(ff) > 1:
+                    for f in ff:
+                        # if 'function' in type(f).__name__:
+                        if inspect.isfunction(f):
+                            self._installPluginFunction_(f, f.__name__, newMenu)
+                        else:
+                            raise TypeError("function object expected")
+                        
+            # elif isinstance(ff, dict):
+            #     self._parsePluginFunctionDict_(collections.OrderedDict(ff), pname, pluginsMenu)
+        # else:
+        #     raise ValueError("empty nested dict in plugin info")
     
