@@ -205,15 +205,15 @@ from gui.itemslistdialog import ItemsListDialog
 #### END pict.gui modules
 
 #### BEGIN imaging modules
-from . import vigrautils as vu
+from imaging import vigrautils as vu
 from imaging.vigrautils import (imageIndexTuple, proposeLayout)
-from . import imageprocessing as imgp
-from .imageprocessing import *
-from . import scandata
-from .scandata import (ScanData, AnalysisUnit, check_apiversion, scanDataOptions)
-from . import axisutils
-from .axisutils import dimEnum
-from .axiscalibration import (AxesCalibration, 
+from imaging import imageprocessing as imgp
+from imaging.imageprocessing import *
+from imaging import scandata
+from imaging.scandata import (ScanData, AnalysisUnit, check_apiversion, scanDataOptions)
+from imaging import axisutils
+from imaging.axisutils import dimEnum
+from imaging.axiscalibration import (AxesCalibration, 
                               AxisCalibrationData, 
                               ChannelCalibrationData,
                               CalibrationData,  
@@ -9660,7 +9660,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @safeWrapper
     def _check_for_linescan_data_(self, data):
         try:
-            if not check_apiversion(data):
+            if not check_apiversion(data) and hasattr(data, "_upgrade_API_"):
                 data._upgrade_API_()
                 
             return data._scandatatype_ == ScanData.ScanDataType.linescan and data._analysismode_ == ScanData.ScanDataAnalysisMode.frame
@@ -13875,6 +13875,17 @@ def blankUncageArtifactInLineScans(data, time, width, bgstart, bgend, frame=0):
             img[imgIndex] = val
         
         
+def launch():
+    try:
+        win = mainWindow.newViewer(LSCaTWindow, parent = mainWindow, win_title="LSCaT")
+        win.show()
+    except:
+        traceback.print_exc()
+        
+        
+def init_scipyen_plugin():
+    return {"Apps|LSCaT":launch}
+
 
     
     

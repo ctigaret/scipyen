@@ -4785,3 +4785,16 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         return res_df, psc_trains, all_waves
     
     
+def launch():
+    try:
+        win = mainWindow.newViewer(EventAnalysis, parent = mainWindow, win_title="Synaptic Events")
+        win.show()
+    except:
+        traceback.print_exc()
+        
+        
+def init_scipyen_plugin():
+    return {"Apps|Synaptic Event Analysis":launch}
+
+
+    

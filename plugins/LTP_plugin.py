@@ -19,9 +19,5 @@ def genLTPOptions():
 def offlineLTP():
     pass
 
-
-
-
 def init_scipyen_plugin():
-    LTP_Offline_menu = collections.OrderedDict()
     return {"LTP|Offline|Analysis": offlineLTP}

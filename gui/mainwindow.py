@@ -578,7 +578,7 @@ class WindowManager(__QMainWindow__):
         return win_name
             
     @safeWrapper
-    def _newViewer(self, winClass, *args, **kwargs):
+    def newViewer(self, winClass, *args, **kwargs):
         """Factory method for a GUI Viewer or matplotlib figure.
         
         Parameters:
@@ -605,8 +605,8 @@ class WindowManager(__QMainWindow__):
         # NOTE: 2021-07-08 14:52:44
         # called by ScipyenWindow.slot_newViewerMenuAction
         
-        #print("WindowManager._newViewer winClass = %s" % winClass)
-        #print("WindowManager._newViewer **kwargs", **kwargs)
+        #print("WindowManager.newViewer winClass = %s" % winClass)
+        #print("WindowManager.newViewer **kwargs", **kwargs)
         if isinstance(winClass, str) and len(winClass.replace("&","").strip()):
             wClass = winClass.replace("&","")
             
@@ -630,7 +630,7 @@ class WindowManager(__QMainWindow__):
             
         win_title = self._set_new_viewer_window_name_(winClass, name=kwargs.pop("win_title", None))
         
-        #print("WindowManager._newViewer win_title = %s" % win_title)
+        #print("WindowManager.newViewer win_title = %s" % win_title)
         
         kwargs["win_title"] = win_title
         
@@ -1368,7 +1368,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     
     # NOTE: 2016-04-17 16:11:56
     # argument and return variable parsing moved to _installPluginFunction_
-    def _inputPrompter_(self, nOutputs=0, in_types=None, arg_names=None, arg_defaults=None, var_args=None, kw_args=None):
+    def _inputPrompter_(self, n_outputs=0, arg_types=None, arg_names=None, arg_defaults=None, var_args=None, kw_args=None):
         '''
         Decorator to prompt user with a dialog for the arguments that are to be 
         dispatched to function f.
@@ -1378,7 +1378,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         See Python Wiki / PythonDecoratorLibrary / Creating well behaved decorators
         '''
         
-        #print(nOutputs)
+        #print(n_outputs)
         def fs(a, b):
             return ''.join((a,b))
         
@@ -1386,9 +1386,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             '''
             Does the actual function call of the wrapped plugin function
             '''
-            
+            print(f"_inputPrompter_ {f.__module__}.{f.__name__} arg_types: {arg_types}")
             try:
-                if in_types is not None:# and ((type(in_types) in (tuple, list) and len(in_types) > 0) or (type(in_types) is type)):
+                # if arg_types is not None:# and ((type(arg_types) in (tuple, list) and len(arg_types) > 0) or (type(arg_types) is type)):
+                if arg_types is not None and ((isinstance(arg_types, (tuple, list)) and len(arg_types)) or isinstance(arg_types, type)):
                     def inner_f():
                         def interpret_str(varstr):
                             try:
@@ -1416,8 +1417,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                                     
                             return dict()
                             
-                        # prepare the dialog (see vigra.pyqt.QuickDialog)
-                        #d = vigra.pyqt.quickdialog.QuickDialog(self, "Enter Arguments")
+                        # prepare the dialog
                         d = qd.QuickDialog(self, "Enter Arguments")
                         d.promptWidgets=[]
                         d.varPromptWidget = None
@@ -1425,23 +1425,18 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         d.returnWidgets=[]
                         args = []
                         
-                        for (a,b,c) in zip(in_types, arg_names, arg_defaults):
+                        for (a,b,c) in zip(arg_types, arg_names, arg_defaults):
                             if isinstance(a, type):
                                 if a.__name__ in ('int', 'long'):
                                     widgetClass = qd.IntegerInput
-                                    #widgetClass = vigra.pyqt.quickdialog.IntegerInput
                                 elif a.__name__ == 'float':
                                     widgetClass = qd.FloatInput
-                                    #widgetClass = vigra.pyqt.qd.FloatInput
                                 elif a.__name__ == 'str':
                                     widgetClass = qd.StringInput
-                                    #widgetClass = vigra.pyqt.quickdialog.StringInput
                                 elif a.__name__ == 'bool':
                                     widgetClass = qd.CheckBox
-                                    #widgetClass = vigra.pyqt.quickdialog.CheckBox
                                 else:
                                     widgetClass = qd.InputVariable
-                                    #widgetClass = vigra.pyqt.quickdialog.InputVariable
 
                                 promptWidget = widgetClass(d, b + " (" + a.__name__ +")")
 
@@ -1467,16 +1462,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                             
                         if var_args is not None:
                             d.varPromptWidget = qd.InputVariable(d, "Variadic arguments: ")
-                            #d.varPromptWidget = vigra.pyqt.quickdialog.InputVariable(d, "Variadic arguments: ")
                             
                         if kw_args is not None:
                             d.kwPromptWidget = qd.InputVariable(d, "Keyword arguments: ")
-                            #d.kwPromptWidget = vigra.pyqt.quickdialog.InputVariable(d, "Keyword arguments: ")
                             
-                        if nOutputs > 0:
+                        if n_outputs > 0:
                             d.addLabel('Return variable names:')
-                            ret_names = map(fs, ['var '] * nOutputs, map(str, range(nOutputs)))
-                            suggested_ret_names = map(fs, ['var_'] * nOutputs, map(str, range(nOutputs)))
+                            ret_names = map(fs, ['var '] * n_outputs, map(str, range(n_outputs)))
+                            suggested_ret_names = map(fs, ['var_'] * n_outputs, map(str, range(n_outputs)))
                             
                             print("type of ret_names: ", type(ret_names))
                             
@@ -1484,9 +1477,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                             
                             srt_nm = [i for i in suggested_ret_names]
                             
-                            for k in range(nOutputs):
+                            for k in range(n_outputs):
                                 widget = qd.OutputVariable(d, rt_nm[k])
-                                #widget = vigra.pyqt.quickdialog.OutputVariable(d, rt_nm[k])
                                 widget.setText(srt_nm[k])
                                 d.returnWidgets.append(widget)
                         
@@ -1495,7 +1487,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         
                         # NOTE: 2016-04-15 03:19:05
                         # deal with positional arguments
-                        for (a,b) in zip(in_types, d.promptWidgets):
+                        for (a,b) in zip(arg_types, d.promptWidgets):
                             if isinstance(a, type) and b is not None:
                                 if a.__name__ in ('int', 'float', 'long'):
                                     if len(b.text()) == 0:
@@ -1542,7 +1534,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         
                         # NOTE: 2016-04-15 03:20:13
                         # finally, deal with return variables
-                        if (nOutputs > 0 and ret is not None):
+                        if (n_outputs > 0 and ret is not None):
                             if type(ret) in (tuple, list):
                                 for k in range(len(ret)):
                                     var_name = d.returnWidgets[k].text()
@@ -1563,15 +1555,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 else:
                     def inner_f():
-                        if nOutputs > 0:
+                        if n_outputs > 0:
                             d = qd.QuickDialog(self, "Enter Return Variable Names")
-                            #d = vigra.pyqt.quickdialog.QuickDialog(self, "Enter Return Variable Names")
                             d.returnWidgets=[]
-                            ret_names = map(fs, ['var '] * nOutputs, map(str, range(nOutputs)))
-                            suggested_ret_names = map(fs, ['var_'] * nOutputs, map(str, range(nOutputs)))
-                            for k in range(nOutputs):
+                            ret_names = map(fs, ['var '] * n_outputs, map(str, range(n_outputs)))
+                            suggested_ret_names = map(fs, ['var_'] * n_outputs, map(str, range(n_outputs)))
+                            for k in range(n_outputs):
                                 widget = qd.OutputVariable(d, ret_names[k])
-                                #widget = vigra.pyqt.quickdialog.OutputVariable(d, ret_names[k])
                                 widget.setText(suggested_ret_names[k])
                                 d.returnWidgets.append(widget)
 
@@ -1580,7 +1570,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
                         ret = f()
 
-                        if (nOutputs > 0 and ret is not None):
+                        if (n_outputs > 0 and ret is not None):
                             if type(ret) in (tuple, list):
                                 for k in range(len(ret)):
                                     var_name = d.returnWidgets[k].text()
@@ -1607,16 +1597,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 return inner_f
             
             except Exception as e:
-                print(str(e))
+                traceback.print_exc()
 
         return prompt_f
     
     # NOTE: 2016-04-17 16:14:18
-    # argument parsing code moved to _installPluginFunction_ ini order to keep
+    # argument parsing code moved to _installPluginFunction_ in order to keep
     # this decorator small: this decorator should only do this: DECORATE
-    def slot_wrapPluginFunction(self, f, nReturns = 0, argumentTypes = None, argumentNames=None, argumentDefaults=None, variadicArguments=None, keywordArguments=None):
+    def slot_wrapPluginFunction(self, f, n_outputs = 0, arg_types = None, arg_names=None, arg_default=None, var_args=None, kw_args=None):
         '''
-        Defines a new slot for plugins functionality
+        Defines a new slot for plugins functionality.
+        Connected to the `triggered` signal of dynamic QActions for plugins.
         '''
         #from PyQt5.QtCore import pyqtSlot
             
@@ -1628,9 +1619,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         # NOTE: 2016-04-17 16:18:18 to reflect new code layout
         @pyqtSlot()
-        @self._inputPrompter_(nReturns, argumentTypes, argumentNames, argumentDefaults, variadicArguments, keywordArguments)
-        def sw_f(*argumentTypes, **keywordArguments):
-            return f(*argumentTypes, **keywordArguments)
+        @self._inputPrompter_(n_outputs, arg_types, arg_names, arg_default, var_args, kw_args)
+        def sw_f(*arg_types, **kw_args):
+            return f(*arg_types, **kw_args)
         
         sw_f.__name__ = f.__name__
         sw_f.__doc__ = f.__doc__
@@ -1639,6 +1630,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if hasattr(f, '__annotations__'):
             sw_f.__setattr__('__annotations__', getattr(f, '__annotations__'))
         
+        print(f"slot_wrapPluginFunction in @self._inputPrompter_ {f.__module__}.{f.__name__} arg_types {arg_types} kw_args {kw_args}")
         return sw_f
 
     #@processtimefunc
@@ -1858,12 +1850,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # FIXME: 2021-08-17 12:41:57 TODO Sounds contrived - check is really needed
         # and, if not, then remove
         # finally, inject self into relevant modules:
-        #for m in (ltp, ivramp, membrane, epsignal, CaTanalysis, pgui, sigp, imgp, crvf, plots):
         self_aware_modules = (ltp, ivramp, membrane, CaTanalysis, pgui, sigp, imgp, crvf, plots)
             
         for m in self_aware_modules:
-            m.__dict__["mainWindow"] = self
-            m.__dict__["workspace"] = self.workspace
+            # NOTE: 2022-12-23 10:47:39
+            # some modules provide plugin functionality whic will trigger these
+            # injections
+            if not hasattr(m, "mainWindow"):
+                m.__dict__["mainWindow"] = self
+            if not hasattr(m, "workspace"):
+                m.__dict__["workspace"] = self.workspace
             
         # NOTE: 2021-08-17 12:45:10 TODO
         # currently used in _run_loop_process_, which at the moment is not used 
@@ -2947,14 +2943,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
             selected_viewer_type_name = seltxt[0]
             
-            win = self._newViewer(selected_viewer_type_name)# , name=win_name)
+            win = self.newViewer(selected_viewer_type_name)# , name=win_name)
             
     @pyqtSlot()
     @safeWrapper
     def slot_newViewerMenuAction(self):
         """Slot for creating new viewer directly from Windows/Create New menu
         """
-        win = self._newViewer(self.sender().text()) # inherited: WindowManager._newViewer
+        win = self.newViewer(self.sender().text()) # inherited: WindowManager.newViewer
         
     @pyqtSlot(QtCore.QPoint)
     @safeWrapper
@@ -2989,14 +2985,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_launchCaTAnalysis(self):
-        lscatWindow = self._newViewer(CaTanalysis.LSCaTWindow, parent=self, win_title="LSCaT")
+        lscatWindow = self.newViewer(CaTanalysis.LSCaTWindow, parent=self, win_title="LSCaT")
         #lscatWindow = CaTanalysis.LSCaTWindow(parent=self, win_title="LSCaT")
         lscatWindow.show()
         
     @pyqtSlot()
     @safeWrapper
     def slot_launchEventDetection(self):
-        eventDetectWindow = self._newViewer(EventAnalysis.EventAnalysis, parent=self)
+        eventDetectWindow = self.newViewer(EventAnalysis.EventAnalysis, parent=self)
         eventDetectWindow.show()
     
     def _getHistoryBlockAsCommand_(self, magic=None):
@@ -6510,7 +6506,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             return False
         
         if len(self.viewers[winType]) == 0 or newWindow:
-            win = self._newViewer(winType)
+            win = self.newViewer(winType)
             
         else:
             win = self.currentViewers[winType]
@@ -6601,17 +6597,26 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # and do the plugin initialization here
         
         if len(scipyen_plugin_loader.loaded_plugins) > 0:
-            for p in scipyen_plugin_loader.loaded_plugins.values():
+            for module in scipyen_plugin_loader.loaded_plugins.values():
                 # maps module name to the tuple (module file, menu dict)
                 # menu dict in turn maps a menu tree structure (a '|'-separated string) to a function defined in the plugin
-                menudict = collections.OrderedDict([(p.__name__, (p.__file__, p.init_scipyen_plugin()) )])
-                #menudict = p.init_scipyen_plugin()
-                if len(menudict) > 0:
-                    for (k,v) in menudict.items():
-                        if (isinstance(k, str) and len(k)>0):
-                            self._installPlugin_(k,v)
-                        else:
-                            raise TypeError("Incompatible Plugin Key")
+                # NOTE: 2022-12-23 09:06:36
+                # inject ourselves into the module, as module attributes
+                if not hasattr(module,"mainWindow"):
+                    module.__dict__["mainWindow"] = self
+                if not hasattr(module, "workspace"):
+                    module.__dict__["workspace"] = self.workspace
+
+                # NOTE: 2022-12-23 09:02:02
+                # allow plugins to be intialized without advertising a menu for main window 
+                if inspect.isfunction(getattr(module,"init_scipyen_plugin", None)):
+                    menudict = collections.OrderedDict([(module.__name__, (module.__file__, module.init_scipyen_plugin()) )])
+                    if len(menudict) > 0:
+                        for (k,v) in menudict.items():
+                            if (isinstance(k, str) and len(k)>0):
+                                self.installPluginMenu(k,v)
+                            else:
+                                raise TypeError("Incompatible Plugin Key")
                         
         #print("   done slot_loadPlugins")
 
@@ -6648,7 +6653,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             return parentActionMenus[parentActionLabels.index(itemText)]
 
 
-    def _installPluginFunction_(self, f, menuItemLabel, parentMenu, nReturns=None, inArgTypes=None):
+    def _installPluginFunction_(self, f, menuItemLabel, parentMenu, n_outputs=None, inArgTypes=None):
         '''
         Implements the actual logic of installing individual plugin functions 
         advertised by the init_scipyen_plugin function defined in the plugin module.
@@ -6677,7 +6682,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: 2016-04-17 15:49:08 funcargs are mostly useful to get return annotation if present
         # I found inspect.getfullargspec (or better, inspect.getfullargspec in python 3) more
         # useful to get positional argument list
-        if (nReturns is None or inArgTypes is None):
+        if (n_outputs is None or inArgTypes is None):
             if hasattr(f, '__annotations__'):
                 sig = inspect.signature(f)
 
@@ -6690,49 +6695,54 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     # list or tuple, or None, or anything else in ) the _inputPrompter_
                     # will raise ValueError on the input Type
                     inArgTypes = [f.__annotations__[i] for i in argSpec.args] # simple !
+                    
+                    print(f"_installPluginFunction_ {f.__module__}.{f.__name__} inArgTypes {inArgTypes}")
 
-                if (nReturns is None or nReturns == 0):
+                if (n_outputs is None or n_outputs == 0):
                     try:
                         ra = sig.return_annotation
                         if ra != sig.empty:
                             if isinstance(ra, str):
-                                nReturns = 1
+                                n_outputs = 1
                             elif isinstance(ra, (tuple, list)):
-                                nReturns = len(sig.return_annotation)
+                                n_outputs = len(sig.return_annotation)
                             else:
                                 raise ValueError('Incompatible value in return annotation')
                         else:
-                            nReturns = 0
+                            n_outputs = 0
                     finally:
-                        pass
+                        n_outputs = 0
+                        # pass
         
         # NOTE 2016-04-17 16:06:29 code taken from prompt_f in _inputPrompter_
         # and from slot_wrapPluginFunction decorator, in order to keep the 
-        # deocrator's code small and tractable
+        # decorator's code small and tractable
         #
         #   if is None, or is a nonempty (tuple or list) or is a type or the string '~'
-        if inArgTypes is not None and ((type(inArgTypes) in (tuple, list) and len(inArgTypes) > 0) or (type(inArgTypes) is type) or (type(inArgTypes) is str and inArgTypes == '~')):
-            if type(inArgTypes) is type: # cover the case where argument type is given as a single type
-                inTypes = (inArgTypes,)
+        # if inArgTypes is not None and ((type(inArgTypes) in (tuple, list) and len(inArgTypes) > 0) or (type(inArgTypes) is type) or (type(inArgTypes) is str and inArgTypes == '~')):
+        if inArgTypes is not None and (isinstance(inArgTypes, (tuple, list)) and len(inArgTypes) > 0) or (isinstance(inArgTypes, type) or (isinstance(inArgTypes, str) and inArgTypes == '~')):
+            if isinstance(inArgTypes, type): # cover the case where argument type is given as a single type
+                arg_types = (inArgTypes,)
             elif type(inArgTypes) is str and inArgTypes == '~':
-                inTypes= (inArgTypes,)
+                arg_types= (inArgTypes,)
             else: # leave it as a tuple
-                inTypes = inArgTypes
+                arg_types = inArgTypes
                 
         else:
-            inTypes = inArgTypes
+            arg_types = inArgTypes
         
         if (arg_defaults is not None and len(arg_names) > len(arg_defaults)):
-            defs = [None] * len(arg_names)
+            defs = [None for k in range(len(arg_names))]
             defs[(len(arg_names)-len(arg_defaults)):] = arg_defaults
             arg_defaults = defs
             del defs
+            
         elif arg_defaults is None:
-            arg_defaults = [None] * len(arg_names)
+            arg_defaults = [None for k in range(len(arg_names))]
                     
         newAction = parentMenu.addAction(menuItemLabel)
         self.pluginActions.append(newAction)
-        newAction.triggered.connect(self.slot_wrapPluginFunction(f, nReturns, inTypes, arg_names, arg_defaults, var_args, kw_args))
+        newAction.triggered.connect(self.slot_wrapPluginFunction(f, n_outputs, arg_types, arg_names, arg_defaults, var_args, kw_args))
 
         # Ideally, these functions might not be visible as free functions in the
         # console environment, but rather as member(s) of a subenvironment (module-like)
@@ -6770,38 +6780,83 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # It if the responsibility of the plugin author to ensure that the 
         # advertised functions have sane names
         
-        if f.__module__ not in self.plugins.__dict__.keys():
-            # inside self.plugins, create a pseudo-module for the function's
-            # plugin,if not already there
-            icmd = ''.join(["self.plugins.",f.__module__," = types.ModuleType('",f.__module__,"')"])
-            exec(icmd)
-            
-            # by the way the original (fully fledged) module should already be
-            # in sys (because the module has been loaded with imp.load_module by 
-            # scipyen_plugin_loader therefore the next check is redundant, and the 
-            # lines inside the 'if' block below might as well be taken out of it
-            if f.__module__ in sys.modules.keys():
-                self.plugins.__dict__[f.__module__].__doc__ = sys.modules[f.__module__].__doc__
-                self.plugins.__dict__[f.__module__].__package__ = sys.modules[f.__module__].__package__
-                self.plugins.__dict__[f.__module__].__file__ = None
-            
-        # now "install" the function in this pseudo-module corresponding to
-        # the plugin module that defined the function
-        icmd = ''.join(["self.plugins.",f.__module__,".",f.__name__," = f"])
-        exec(icmd)
+        print(f"_installPluginFunction_ f name {f.__name__} f module {f.__module__}")
+        # NOTE: 2022-12-23 11:38:30
+        # deal with absolute imports:
+        module_path = f.__module__.split('.')
+        if len(module_path) == 1:
+            m = None
+            modname = module_path[0]
+            m = getattr(self.plugins, modname, None)
+            if m is None:
+                m = types.ModuleType(modname)
+                if f.__module__ in sys.modules:
+                    mm = sys.modules[f.__module__]
+                    setattr(m, "__doc__", getattr(mm, "__doc__", ""))
+                setattr(self.plugins, modname, m)
+                
+            elif not isinstance(m, types.ModuleName):
+                mname = f"{modname}_module"
+                m = types.ModuleType(mname)
+                m.__spec__.name = mname
+                if f.__module__ in sys.modules:
+                    mm = sys.modules[f.__module__]
+                    setattr(m, "__doc__", getattr(mm, "__doc__", ""))
+                setattr(self.plugins, mname, m)
+                
+            if isinstance(m, types.ModuleType):
+                setattr(m, f.__name__, f) # not to be called !
+                
+        else:
+            m = self.plugins
+            for k,n in enumerate(module_path):
+                if isinstance(m, types.ModuleType):
+                    m_ = getattr(m, n, None)
+                    if m_ is None:
+                        subm = types.ModuleType(n)
+                        setattr(m, n, subm)
+                        m = subm
+                    else:
+                        if not isinstance(m_, types.ModuleType):
+                            mname = f"{n}_module"
+                            subm = types.ModuleType(mname)
+                            setattr(m, mname, subm)
+                            m = subm
+                        else:
+                            m = m_
+                            
+                    if n == module_path[-1]:
+                        setattr(m, f.__name__, f) # not to be called
+                        
+                        if f.__module__ in sys.modules:
+                            mm = sys.modules[f.__module__]
+                            setattr(m, "__doc__", getattr(mm, "__doc__", ""))
+                            
+                        elif n in sys.modules:
+                            mm = sys.modules[n]
+                            setattr(m, "__doc__", getattr(mm, "__doc__", ""))
+                
+#         if f.__module__ not in self.plugins.__dict__.keys():
+#             # inside self.plugins, create a pseudo-module for the function's
+#             # plugin, if not already there
+#             icmd = ''.join(["self.plugins.",f.__module__," = types.ModuleType('",f.__module__,"')"])
+#             print(f"_installPluginFunction_ icmd {icmd}")
+#             exec(icmd)
+#             
+#             # by the way the original (fully fledged) module should already be
+#             # in sys (because the module has been loaded with imp.load_module by 
+#             # scipyen_plugin_loader therefore the next check is redundant, and the 
+#             # lines inside the 'if' block below might as well be taken out of it
+#             if f.__module__ in sys.modules.keys():
+#                 self.plugins.__dict__[f.__module__].__doc__ = sys.modules[f.__module__].__doc__
+#                 self.plugins.__dict__[f.__module__].__package__ = sys.modules[f.__module__].__package__
+#                 self.plugins.__dict__[f.__module__].__file__ = None
+#             
+#         # now "install" the function in this pseudo-module corresponding to
+#         # the plugin module that defined the function
+#         icmd = ''.join(["self.plugins.",f.__module__,".",f.__name__," = f"])
+#         exec(icmd)
         
-#     def _parsePluginFunctionDict_(self, d, menuOrItemLabel, parentMenu):
-#         '''
-#         Parses a plugin functions dictionary and installs the functions in the appropriate menu paths
-#         '''
-#         if len(d) > 1: # more than one function defined
-#             newMenu = parentMenu.addMenu(menuOrItemLabel)
-#             for (f, fargs) in d.items():
-#                 self._installPluginFunction_(f, f.__name__, newMenu, *fargs)
-#                 
-#         elif len(d) == 1:
-#             self._installPluginFunction_(dd.keys()[0], menuOrItemLabel, parentMenu, *d.values()[0])
-            
     def _run_loop_process_(self, fn, process_name, *args, **kwargs):
         # TODO: 2022-12-23 00:24:19
         # see EventAnalysis for a working approach !
@@ -6840,23 +6895,74 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
         self.workspaceChanged.emit()
         
+    def installPluginMenu(self, pname, v):
+        '''Installs a GUI menu for the  plugin named pname.
         
-    def _installPlugin_(self, pname, v):
-        '''Installs the plugin named pname according to the information in v 
+        Parameters:
+        ===========
         
-        NOTE:   v[0] is a string wih the absolute pathname of the plugin module
+        pname: the plugin's module name
         
-                v[1] is a plugin info dict as advertised by the init_scipyen_plugin 
-                     function in the plugin module, where the keys are srings
-                     describing a menu path, and the values are either dictionaries
-                     mapping function objects to number of return variables and 
-                     parameter types, or just function object (or sequence of ...).
-                     In the latter case, if the functions take arguments and/or
-                     return something, the functions should have an __annotations__
-                     attribute.
-                     
+        v: a tuple with two elements:
+            v[0] is a string wih the absolute pathname of the plugin module
+            v[1] is a mapping of key ↦ value, a module-level function or a 
+            tuple of functions.
+            
+            When v[1] is a mapping (i.e., dict-like) they key ↦ value are as 
+            follows:
+    
+            • key is a menu path represented either as a single string 
+                containing names of menu tree items texts separated by '|' 
+                (from left to right: top menu to the deepest submenu)
         
-        See scipyen_plugin_loader docstring for details about v[1]
+                Example: "File|Open|Special" will:
+
+                1) generate a "File" menu in the menu bar (if it does 
+                    not exist)
+
+                2) add a submenu "Open" (if it does not exist)
+
+                3.a) if the key is maped to a module-level function (see
+                    below) then adds a menu item (action - basically a 
+                    QtWidgets.QAction) named "Special" which will, when
+                    triggered, will call the module-level function
+                    to which this key is mapped.
+
+                3.b) if the key is mapped to a sequence of module-level
+                    functions defined in the plugin's module, then adds
+                    a submenu named "Special", which will be populated 
+                    with QActions each bearing the name of the function
+                    in the sequence (and when triggered will call that
+                    function)
+        
+            • value is either:
+                ∘ a single module-level function defined inside the 
+                plugin's module; this function will be executed when the 
+                menu action created using the last menu item name element
+                in the 'key' is triggered.
+    
+                ∘ a sequence of module-level functions defined inside the
+                plugin's module; in this case, the last meun item element in 
+                the key will generate a deep submenu populated with QActions
+                named after the names of the functions in this sequence.
+    
+                When v[1] is a module-level function, this function must be
+                defined in the plugin's module and a QAction triggering it will 
+                be created directly inside the menu bar (i.e., top level). This
+                QAction will be named after the function's name.
+            
+                When v[1] is a sequence (tuple, list) of module-level functions, 
+                these functions must be defined in the plugin's module and a 
+                QAction will be created for each function at top level (i.e. 
+                directly in the menu bar). The function will give the name of 
+                the associated QAction which will call the function when 
+                triggered.
+            
+            NOTE: This mapping is supplied by the init_scipyen_plugin()
+            function defined inside the plugin's module. If such function
+            does NOT exist, then the plugin, although loaded, will not
+            be accessible via menu items in the main window's menu bar.
+        
         '''
         
         if isinstance(v[1], dict) and len(v[1]) > 0: # the nested dict
@@ -6867,15 +6973,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 # iterate over keys #print(mp)
                 if isinstance(mp, str) and len(mp.strip()) > 0:
                     menuPathList = mp.split('|')
-                elif isinstance(mp, (tuple, list)) and all(isinstance(s, str) and len(s.strip()) for s in mp):
-                    menuPathList = mp
                 else:
                     continue
                 
-                # ff = v[1][mp]
-                
-                # print(f"ff: {type(ff)} in module {pname} file {v[0]}")
-
                 parentMenu = self.menuBar()
                 currentMenu = None
 

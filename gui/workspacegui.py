@@ -33,18 +33,34 @@ class GuiMessages(object):
     @safeWrapper
     def criticalMessage(self, title, text, default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.critical(self, title, text)
+    
+    @staticmethod    
+    def criticalMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Critical", text:str="A critical error has occurred", default=QtWidgets.QMessageBox.No):
+        return QtWidgets.QMessageBox.critical(obj, title, text)
         
     @safeWrapper
     def informationMessage(self, title, text, default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.information(self, title, text)
+
+    @staticmethod
+    def informationMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Information", text:str="", default=QtWidgets.QMessageBox.No):
+        return QtWidgets.QMessageBox.information(obj, title, text)
         
     @safeWrapper
     def questionMessage(self, title, text, default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.question(self, title, text)
+
+    @staticmethod
+    def questionMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Question", text:str="", default=QtWidgets.QMessageBox.No):
+        return QtWidgets.QMessageBox.question(obj, title, text)
         
     @safeWrapper
     def warningMessage(self, title, text, default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.warning(self, title, text)
+    
+    @staticmethod
+    def warningMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Warning", text:str="", default=QtWidgets.QMessageBox.No):
+        return QtWidgets.QMessageBox.warning(obj, title, text)
         
     @safeWrapper
     def detailedMessage(self, title:str, text:str, info:typing.Optional[str]="", detail:typing.Optional[str]="", msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):
@@ -75,6 +91,55 @@ class GuiMessages(object):
                     icon = QtWidgets.QMessageBox.NoIcon
         
         msgbox = QtWidgets.QMessageBox(parent=self)
+        msgbox.addButton(QtWidgets.QMessageBox.Ok)
+        if isinstance(icon, QtGui.QPixmap):
+            msgbox.setIconPixmap(icon)
+        elif isinstance(icon, QtWidgets.QMessageBox.Icon):
+            msgbox.setIcon(icon)
+        else:
+            msgbox.setIcon(QtWidgets,QMessageBox.NoIcon)
+            
+        msgbox.setSizeGripEnabled(True)
+        msgbox.setWindowTitle(title)
+        msgbox.setText(text)
+        
+        if isinstance(info, str) and len(info.strip()):
+            msgbox.setInformativeText(info)
+            
+        if isinstance(detail, str) and len(detail.strip()):
+            msgbox.setDetailedText(detail)
+            
+        return msgbox.exec()
+       
+    @staticmethod
+    def detailedMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Message", text:str="", info:typing.Optional[str]="", detail:typing.Optional[str]="", msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):
+        """Detailed generic message dialog box
+        title: str  = dialog title
+        text:str =  main message
+        info:str (optional, default is None) informative text
+        detail:str (optional default is None) = detaile dtext shown by expanding
+            the dialog
+        msgType:str (optional default is 'Information')
+            Allowed values are:
+            "NoIcon", "Question", "Information", "Warning", "Critical", a valid
+            pixmap file name, or a valid theme icon name.
+            
+        """
+        if isinstance(msgType, str) and len(msgType.strip()):
+            if getattr(QtWidgets.QMessageBox.Icon, msgType, None) is not None:
+                icon = getattr(QtWidgets.QMessageBox.Icon, msgType, QtWidgets.QMessageBox.NoIcon)
+            else:
+                try:
+                    if os.path.isfile(msgType):
+                        pix = QtGui.QPixmap(msgType)
+                    else:
+                        pix = QtGui.Icon.fromTheme(msgType).pixmap(QtWidgets.QStyle.PM_MessageBoxIconSize)
+                        msgBox.setIconPixmap(pix)
+                        
+                except:
+                    icon = QtWidgets.QMessageBox.NoIcon
+        
+        msgbox = QtWidgets.QMessageBox(parent=obj)
         msgbox.addButton(QtWidgets.QMessageBox.Ok)
         if isinstance(icon, QtGui.QPixmap):
             msgbox.setIconPixmap(icon)
@@ -156,6 +221,66 @@ class FileIOGui(object):
         
         return fn, fl
     
+    @staticmethod
+    def chooseFile_static(obj:typing.Optional[QtWidgets.QWidget]=None, caption:typing.Optional[str]=None, fileFilter:typing.Optional[str]=None, single:typing.Optional[bool]=True, save:bool=False, targetDir:typing.Optional[str]=None):
+        """Launcher of file open dialog (static version)
+        
+        Parameters:
+        ----------
+        caption: str, optional default is None - The caption of the file chooser dialog
+        
+        fileFilter: str, optional, default is None - The file filter for choosing
+            from a specific subset of tile types. When present, it must have a 
+            specific format, e.g. "Pickle Files (*.pkl);;Text Files (*.txt)"
+            
+            See QtWidget.QDialog.getOpenFileName for details about fileFilter
+            
+        single:bool, optional (default: True)
+           When False, the file chooser dialog will allow opening several files
+           
+           Ignored when 'save' is True (see below)
+           
+        save:bool, default False
+            When True, signals the intention to SAVE to the selected file name, 
+            and 'single' will eb ignored
+            In this case it will ask for confirmation to overwrite the file.
+           
+        targetDir:str, optional (default is None) Target directory from where 
+            files are chosen.
+            
+            When None, an empty string or a string that does NOT resolve to a
+            directory, target 
+            
+        Returns:
+        -------
+        fn: str or list of str The selected file name (or file names, if "single"
+            is False)
+            
+        fl: str The string containing the selected file filter (defaults to
+            "All files (*.*)")
+        
+        """
+        from functools import partial
+        
+        if targetDir is None:
+            targetDir = os.getcwd()
+            
+        if isinstance(targetDir, str):
+            if len(targetDir.strip()) == 0 or not os.path.isdir(targetDir):
+                targetDir = os.getcwd()
+                
+        opener = QtWidgets.QFileDialog.getSaveFileName if save is True else QtWidgets.QFileDialog.getOpenFileName if single else QtWidgets.QFileDialog.getOpenFileNames
+        
+        if isinstance(caption, str) and len(caption.strip()):
+            opener = partial(opener, caption=caption)
+            
+        if isinstance(fileFilter, str) and len(fileFilter.strip()):
+            opener = partial(opener, filter=fileFilter)
+        
+        fn, fl = opener(parent=obj, directory=targetDir)
+        
+        return fn, fl
+    
     @safeWrapper
     def chooseDirectory(self, caption:typing.Optional[str]=None,targetDir:typing.Optional[str]=None):
         
@@ -163,6 +288,16 @@ class FileIOGui(object):
             dirName = str(QtWidgets.QFileDialog.getExistingDirectory(self, caption=caption, directory=targetDir))
         else:
             dirName = str(QtWidgets.QFileDialog.getExistingDirectory(self, caption=caption))
+            
+        return dirName
+
+    @staticmethod
+    def chooseDirectory_static(obj:typing.Optional[QtWidgets.QWidget]=None, caption:typing.Optional[str]=None,targetDir:typing.Optional[str]=None):
+        
+        if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
+            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(obj, caption=caption, directory=targetDir))
+        else:
+            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(obj, caption=caption))
             
         return dirName
     
