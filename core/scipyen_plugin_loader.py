@@ -4,30 +4,43 @@
     
     The search is executed inside scipyen's directory.
     
-    Scipyen plugins provide code (module-level functions) to be called from the 
-    Scipyen main window menu bar. While the plugin module may define an arbitrary 
-    number of functions, a subset of these would be useful as "callbacks", to be 
-    called interactively from menu items in the main pict GUI window.
+    Scipyen plugins provide code (module-level functions) that can also to be 
+    via the graphical user interface e.g. menu actions in Scipyen main window.
     
-    For the purpose of flexibility, there are no restriction on the syntax of the 
-    plugin functions designated for use as "callbacks".
+    This approach is useful for extending Scipyen's GUI functionality dyamically,
+    without actually editing the GUI code of the ScipyenWindow class (defined in 
+    the gui.mainwindow module)
+
+
+    While the plugin module may define an arbitrary number of functions, a subset
+    of these may be useful as "callbacks" to be run interactively from menu items
+    in the main windos of Scipyen.
     
-    A Scipyen plugin is defined as a python module containing the attribute 
-    __scipyen_plugin__ and/or the function init_scipyen_plugin().
+    For the purpose of flexibility, the rules to define a module as a "plugin"
+    are quite simple.
     
-    When a plugin module defines the function init_scipyen_plugin() this function
-    is expected to return:
+    A Scipyen plugin is any python module that satisfies at least one of the 
+    conditions below:
     
-    • a mapping (dict-like) of menu path string (key) ↦ module-level function or
-        sequence of module-level functions (all defined in the plugin module)
+    𝟏) contains an attribute `__scipyen_plugin__` (with ANY value)
+
+    𝟐) defines a function named `init_scipyen_plugin` that takes no arguments 
+    and returns either:
+    
+        • a mapping (dict-like) of menu path string ↦ module-level function or
+            sequence of module-level functions (all defined in the plugin module)
         
-        Menu paths are given as stirngs of the form:
+            Menu paths are given as strings of the form:
+            
+            "Top menu|submenu|sub-submenu|item_or_submenu"
+            See ScipyenWindow.installPluginMenu() docstring for details.
         
-        "Top menu|submenu|sub-submenu|item_or_submenu"
-        See ScipyenWindow.installPluginMenu() docstring for details.
+        • a module-level function or a sequence of module-level functions, all 
+            defined in the plugin module.
         
-    • a module-level function or a sequence of module-level functions, all 
-        defined in the plugin module.
+    𝟑) 
+    
+    
         
     
     The following table illustrates this with some examples:

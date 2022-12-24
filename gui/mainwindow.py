@@ -1386,9 +1386,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             '''
             Does the actual function call of the wrapped plugin function
             '''
-            print(f"_inputPrompter_ {f.__module__}.{f.__name__} arg_types: {arg_types}")
+            # print(f"_inputPrompter_ {f.__module__}.{f.__name__} arg_types: {arg_types}")
             try:
-                # if arg_types is not None:# and ((type(arg_types) in (tuple, list) and len(arg_types) > 0) or (type(arg_types) is type)):
                 if arg_types is not None and ((isinstance(arg_types, (tuple, list)) and len(arg_types)) or isinstance(arg_types, type)):
                     def inner_f():
                         def interpret_str(varstr):
@@ -1630,7 +1629,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if hasattr(f, '__annotations__'):
             sw_f.__setattr__('__annotations__', getattr(f, '__annotations__'))
         
-        print(f"slot_wrapPluginFunction in @self._inputPrompter_ {f.__module__}.{f.__name__} arg_types {arg_types} kw_args {kw_args}")
+        # print(f"slot_wrapPluginFunction in @self._inputPrompter_ {f.__module__}.{f.__name__} arg_types {arg_types} kw_args {kw_args}")
         return sw_f
 
     #@processtimefunc
@@ -1652,7 +1651,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             This is where configurable objects (including facilities or 'apps')
             store their non-Qt related settings.
         
-        parent: QtWidgets.QWidget.
+        parent: QtWidgets.QWidget or None (default).
         """
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: QMainWindow python3 way
         self.app = app
@@ -1693,57 +1692,26 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._maxRecentFiles = 10 # TODO: make this user-configurable
         self._maxRecentDirectories = 100 # TODO: make this user-configurable
     
+        # export the code editor to the pyqtgraph framework
         pg.setConfigOptions(editorCommand=self._scipyenEditor)
         
-        #self._default_scipyen_settings_ = defaults
-        
-        # NOTE: 2021-08-17 13:09:38
-        # passed from scipyen.main(), this is 
-        # confuse.LazyConfig("Scipyen", "scipyen_defaults")
-        # and is aliased in the workspace as 'scipyen_settings'
-        # NOTE: 2021-09-09 12:00:19
-        # obsoletes NOTE: 2021-08-17 13:09:38; imported directly from core.scipyen_config
-        # From console, the user configuration file name is accessed as 
-        # scipyen_settings.user_config_path()
-        # --> $HOME/.config/Scipyen/config.yaml
-        # WARNING this has nothing to do with %config magic in IPython (available
-        # in Scipyen's consoles)
-        #self._scipyen_settings_         = scipyen_settings 
-        
-        # NOTE: Qt GUI settings in $HOME/.config/Scipyen/Scipyen.conf
-        # this can only be accessed once the Qt application is instantiated in
-        # order for its organizationName and applicationName to be set
-        # Since the ScipyenWindow instance is the first Scipyen object that
-        # comes alive, the qsettings must be set up here and not rely on what is
-        # inherited from ScipyenConfigurable (indirectly via WorkspaceGuiMixin)
-        #self.qsettings = QtCore.QSettings(QtCore.QCoreApplication.organizationName(),
-                                          #QtCore.QCoreApplication.applicationName())
-        #self.qsettings                   = QtCore.QSettings("Scipyen", "Scipyen")
-
         # NOTE: 2021-08-17 12:29:29
-        # directory where scipyen is installed
-        # aliased in the workspace as 'scipyen_topdir'
+        # directory where scipyen is installed; it is aliased in the workspace 
+        # to the  'scipyen_topdir' symbol
         self._scipyendir_ = os.path.dirname(__module_path__) 
                 
         #### BEGIN - to revisit
         self._temp_python_filename_   = None # cached file name for python source (for loading or running)
-        
-        #self._save_settings_guard_ = False
         
         self._copy_varnames_quoted_ = False
         
         self._copy_varnames_separator_ = " "
         #### END - to revisit
         
-                # NOTE: 2021-08-17 12:38:41 see also NOTE: 2021-08-17 10:05:20 in scipyen.py
+        # NOTE: 2021-08-17 12:38:41 see also NOTE: 2021-08-17 10:05:20 in scipyen.py
         #self._default_GUI_style = self.app.style()
         self._current_GUI_style_name = "Default"
         self._prev_gui_style_name = self._current_GUI_style_name
-        
-        #self._setup_console_pygments_()
-        
-        
-        #self._defaultCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
         
         # NOTE: WARNING 2021-09-16 14:32:03
         # this must be called AFTER all class and instance attributes used in the 
@@ -1792,8 +1760,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.shell.events.register("pre_execute", self.workspaceModel.pre_execute)
         self.shell.events.register("post_execute", self.workspaceModel.post_execute)
         
-        #self.workspaceModel.windowVariableDeleted[int].connect(self.slot_windowVariableDeleted)
-        
         # NOTE: 2021-01-06 17:22:45
         # A lot of things happen up to here which depend on an initialized bare-bones
         # UI; hence setupUi is early (see NOTE: WARNING 2021-09-16 14:32:03).
@@ -1826,38 +1792,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.cwd = os.getcwd()
         
         # NOTE: 2016-03-20 14:49:05
-        # we also need to quit the app when Pict main window is closed
+        # Quit the PyQt5 app when Scipyen main window is closed
         self.app.destroyed.connect(self.slot_Quit)
         
-        # NOTE: 2017-07-04 16:10:14 -- NOT NEEDED ANYMORE
-        # for this to work one has to set horizontalScrollBarPolicy
-        # to ScrollBarAlwaysOff (e.g in QtDesigner)
-        #self._resizeFileColumn_()
-        
-        # NOTE: 2016-04-15 12:18:04
-        # TODO/FIXME also import the plugins in the pict / ipkernel scopes
-        
-        # NOTE: 2016-04-15 14:25:23
-        # all this does is to make these guys visible in the workspace browser -- do we really want this?
-        # clearly not, since the workspace is the user_ns namespace of the ipython kernel, where all 
-        # free variables are held (plus bits added by ipython)
-        #if len(scipyen_plugin_loader.loaded_plugins) > 0:
-            #self.workspace.update(dict(scipyen_plugin_loader.loaded_plugins))
+        # finally, inject references to self and the workspace into relevant 
+        # modules:
+        ws_aware_modules = (ltp, ivramp, membrane, CaTanalysis, pgui, sigp, imgp, crvf, plots)
             
-        ##print("ScipyenWindow initialized")
-        
-        # NOTE: 2018-02-22 13:36:17
-        # FIXME: 2021-08-17 12:41:57 TODO Sounds contrived - check is really needed
-        # and, if not, then remove
-        # finally, inject self into relevant modules:
-        self_aware_modules = (ltp, ivramp, membrane, CaTanalysis, pgui, sigp, imgp, crvf, plots)
-            
-        for m in self_aware_modules:
+        for m in ws_aware_modules:
             # NOTE: 2022-12-23 10:47:39
-            # some modules provide plugin functionality whic will trigger these
-            # injections
+            # some modules provide plugin functionality which will trigger these
+            # injections -- see slot_loadPlugins
             if not hasattr(m, "mainWindow"):
                 m.__dict__["mainWindow"] = self
+                
             if not hasattr(m, "workspace"):
                 m.__dict__["workspace"] = self.workspace
             
@@ -6586,11 +6534,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_loadPlugins(self):
-        ''' See scipyen_plugin_loader docstring
+        ''' Asynchronously search and load of Scipyen 'plugins'
+        Scipyen 'plugins' are modules in Scipyen package tree that advertise 
+        module-level functions callable through for graphical user interface 
+        (i.e., menus in the Scipyen Main Window).
+        For details, see the documentation of the core.scipyen_plugin_loader 
+        module.
         '''
         #print("   slot_loadPlugins")
         self.plugins = types.ModuleType('plugins','Contains scipyen plugin modules with their publicized callback functions')
-        scipyen_plugin_loader.find_plugins(self._scipyendir_)
+        
+        scipyen_plugin_loader.find_plugins(self._scipyendir_) # calls os.walk
         
         # NOTE: 2016-04-15 11:53:08
         # let the plugin loader just load plugin module code
@@ -6601,14 +6555,18 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 # maps module name to the tuple (module file, menu dict)
                 # menu dict in turn maps a menu tree structure (a '|'-separated string) to a function defined in the plugin
                 # NOTE: 2022-12-23 09:06:36
-                # inject ourselves into the module, as module attributes
+                # inject references to self and the workspace into the module, 
+                # as module attributes; see also NOTE: 2022-12-23 10:47:39
                 if not hasattr(module,"mainWindow"):
                     module.__dict__["mainWindow"] = self
+                    
                 if not hasattr(module, "workspace"):
                     module.__dict__["workspace"] = self.workspace
 
                 # NOTE: 2022-12-23 09:02:02
-                # allow plugins to be intialized without advertising a menu for main window 
+                # allow plugins to be intialized without advertising a menu for
+                # the main window; hence, only install menus for those plugins
+                # that indeed to provide a menu path, via their init_scipyen_plugin
                 if inspect.isfunction(getattr(module,"init_scipyen_plugin", None)):
                     menudict = collections.OrderedDict([(module.__name__, (module.__file__, module.init_scipyen_plugin()) )])
                     if len(menudict) > 0:
@@ -6618,12 +6576,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                             else:
                                 raise TypeError("Incompatible Plugin Key")
                         
-        #print("   done slot_loadPlugins")
 
         # NOTE: 2016-04-03 00:25:00
         # calling this seems to make the qt app close -- why?
         # NOTE: FIXED 2016-04-03 01:03:53 -- we call this asynchrnously, 
-        # via Qt signal/slot mechanism
+        # via Qt signal/slot mechanism (main window emits startPluginLoad)
         #dw = os.walk(path)
         
     # FIXME: 2016-04-03 16:34:19
@@ -6696,7 +6653,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     # will raise ValueError on the input Type
                     inArgTypes = [f.__annotations__[i] for i in argSpec.args] # simple !
                     
-                    print(f"_installPluginFunction_ {f.__module__}.{f.__name__} inArgTypes {inArgTypes}")
+                    # print(f"_installPluginFunction_ {f.__module__}.{f.__name__} inArgTypes {inArgTypes}")
 
                 if (n_outputs is None or n_outputs == 0):
                     try:
@@ -6717,9 +6674,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE 2016-04-17 16:06:29 code taken from prompt_f in _inputPrompter_
         # and from slot_wrapPluginFunction decorator, in order to keep the 
         # decorator's code small and tractable
-        #
-        #   if is None, or is a nonempty (tuple or list) or is a type or the string '~'
-        # if inArgTypes is not None and ((type(inArgTypes) in (tuple, list) and len(inArgTypes) > 0) or (type(inArgTypes) is type) or (type(inArgTypes) is str and inArgTypes == '~')):
         if inArgTypes is not None and (isinstance(inArgTypes, (tuple, list)) and len(inArgTypes) > 0) or (isinstance(inArgTypes, type) or (isinstance(inArgTypes, str) and inArgTypes == '~')):
             if isinstance(inArgTypes, type): # cover the case where argument type is given as a single type
                 arg_types = (inArgTypes,)
@@ -6780,7 +6734,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # It if the responsibility of the plugin author to ensure that the 
         # advertised functions have sane names
         
-        print(f"_installPluginFunction_ f name {f.__name__} f module {f.__module__}")
+        # print(f"_installPluginFunction_ f name {f.__name__} f module {f.__module__}")
         # NOTE: 2022-12-23 11:38:30
         # deal with absolute imports:
         module_path = f.__module__.split('.')
