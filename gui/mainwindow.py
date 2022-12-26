@@ -1146,93 +1146,12 @@ class VTH(object):
     #       NOTE: when a tuple with a single element 'x', make sure it is passed as (x,)
     #       otherwise it will resolve to x itself !
     
-    #default_handlers = dict(map(lambda x: (x, {"action":"Plot (matplotlib)",
-                                           #"types": [np.ndarray, tuple, list]} if isinstance(x, mpl.figure.Figure) else {"action": x.view_action_name, "types": list(x.viewer_for_types)}), gui_viewers))
-    
-#     default_handlers = dict(map(lambda x: (x, {"action": x.view_action_name, "types": list(x.viewer_for_types)}), gui_viewers))
-#     
-#     default_handlers[mpl.figure.Figure] = {"action":"Plot (matplotlib)",
-#                                            "types": [np.ndarray, tuple, list]}
     
     default_handlers = {mpl.figure.Figure: {"action":"Plot (matplotlib)",
                                            "types": {np.ndarray: 99, tuple: 99, list: 99}}}
     
     gui_handlers = deepcopy(default_handlers)
 
-#     @safeWrapper
-#     def register(viewerClass, dataTypes, actionName=None):#, priority:int=-1):
-#         """Modifies data handling by viewers or registers a new viewer type.
-#         Viewers are user-designed windows for data display.
-#         Parameters:
-#         ----------
-#         viewerClass: sip.wrappertype derived from gui.scipyenviewer.ScipyenViewer
-#                 OR a python type derived from matplotlib.fiure.Figure.
-#         
-#         dataTypes: a python type or a sequence (tuple, list) of python types
-#         
-#         actionName: a non-empty str or None, the name of the menu action in the
-#             context menu of the Scipyen's workspace browser 
-#             
-#             When actionName is None, if the viewer is already registered its 
-#             action name is unchanged; for a new viewer, the action name will be
-#             set to "View".
-#         
-#         """
-#         if not inspect.isclass(viewerClass):
-#             raise TypeError("viewerClass must be a type, class or sip wrapper type; got %s instead" % type(viewerClass).__name__)
-#         
-#         if not isinstance(viewerClass, sip.wrappertype) and viewerClass is not mpl.figure.Figure:
-#             raise TypeError("%s has unsupported type (%s); expecting a sip.wrappertype or matplotlib Figure" % (viewerClass.__name__, type(viewerClass).__name__))
-#         
-#         if not isinstance(actionName, (str, type(None))):
-#             raise TypeError("actionName expected to be a str or None; got %s instead" % type(actionName).__name__)
-#         
-#         if viewerClass in gui_handlers:
-#             # viewer type is already registered; action name my be left unchanged
-#             if isinstance(actionName, str) and len(actionName.strip()):
-#                 VTH.gui_handlers[viewerClass]["action"] = actionName
-#                 
-#             if inspect.isclass(dataTypes):
-#                 VTH.gui_handlers[viewerClass]["types"].append(dataTypes)
-#                 
-#             elif isinstance(dataTypes, (tuple, list)):
-#                 if not all([inspect.isclass(v) for v in dataTypes]):
-#                     raise TypeError("Expecting a sequence of types in 'dataTypes")
-#                 
-#                 d_types = [d for d in dataTypes if d not in VTH.gui_handlers[viewerClass]["types"]]
-#                 VTH.gui_handlers[viewerClass]["types"] += d_types
-#                 
-#             else:
-#                 raise TypeError("'dataTypes' expected to be a type or a sequence of types")
-#                 
-#         else:
-#             # registers a new viewer type
-#             if inspect.isclass(dataTypes):
-#                 dataTypes = [dataTypes]
-#                 
-#             elif isinstance(dataTypes, (tuple, list)) and not all([inspect.isclass(d) for d in dataTypes]):
-#                 raise TypeError("Expecting a sequence of types in 'dataTypes")
-#             
-#             else:
-#                 raise TypeError("'dataTypes' expected to be a type or a sequence of types")
-#             
-#             if actionName is None or (isinstance(actionName, str) and len(actionName.strip()) == 0):
-#                 actionName = "View"
-#             
-#             VTH.gui_handlers[viewerClass] = {"action":actionName,
-#                                             "types":dataTypes}
-            
-
-    # def registered_handlers():
-    #     return [viewer for viewer in VTH.gui_handlers]
-    
-    # def is_supported_type(obj_type, viewer_type):
-    #     return obj_type in VTH.gui_handlers[viewer_type]["types"]
-        
-    # def is_supported_ancestor_type(obj_type, viewer_type):
-    #     return any([t in inspect.getmro(obj_type) for t in VTH.gui_handlers[viewer_type]["types"]])
-    #     #return any([t in obj_type.mro() for t in VTH.gui_handlers[viewer_type]["types"]])
-        
     def get_handler_spec(variable):
         """Returns a list of specifications for handling `variable`.
     
@@ -1277,58 +1196,6 @@ class VTH(object):
         
         return list()
                     
-#     def get_view_actions(variable):
-#         #if isinstance(variable, (type, sip.wrappertype)):
-#         if inspect.isclass(variable):
-#             vartype = variable
-#         else:
-#             vartype = type(variable)
-#             
-#         if vartype in VTH.gui_handlers.keys():
-#             return 
-#             
-#        vartypemro = inspect.getmro(vartype)
-#         act_np = set()
-#         for vtype in vartypemro:
-#             for k,v in VTH.gui_handlers.items():
-#                 if vtype in v["types"]:
-#                     act_np.add((v["action"], v["types"][vtype]))
-#                     
-#         if len(act_np):
-#             actions = sorted(sorted(list(act_np), key=lambda x: x[0]), key = lambda x: x[1], reverse=True)
-#             
-#             actionNames = list(a[0] for a in actions)
-#             return actionNames
-#             
-# #         viewers_actions = [(key, value["action"]) for key, value in VTH.gui_handlers.items() if any([v in value["types"] for v in inspect.getmro(vartype)])]
-# #         
-# #         return viewers_actions
-
-    # def get_actionNames(variable):
-#     def get_view_actions(variable):
-#         if inspect.isclass(variable):
-#             vartype = variable
-#         else:
-#             vartype = type(variable)
-#             
-#         if vartype in VTH.gui_handlers.keys() or QtWidgets.QWidget in inspect.getmro(vartype):
-#             return 
-#         
-#         vartypemro = inspect.getmro(vartype)
-#         act_np = set()
-#         for vtype in vartypemro:
-#             for k,v in VTH.gui_handlers.items():
-#                 if vtype in v["types"]:
-#                     act_np.add((k, v["action"], v["types"][vtype]))
-#                     
-#         if len(act_np):
-#             actions = sorted(sorted(list(act_np), key=lambda x: x[1]), key = lambda x: x[2], reverse=True)
-#             
-#             actionNames = list(a[0] for a in actions)
-#             return actionNames
-#         
-#         return list()
-            
     def reset_all():
         """Resets all gui handlers to the default.
         This will remove any registered custom viewer!
@@ -3105,6 +2972,26 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if not self.viewVar(self.workspaceModel.currentItemName, newWindow=newWindow):
                 # view (display) object in console is no handler exists
                 self.console.execute(self.workspaceModel.currentItemName)
+                
+    def showVariable(self, obj, newWindow:bool=True):
+        """Shows obj in a suitable new window
+        """
+        if obj is None:
+            self.console.execute(obj)
+        
+        if QtWidgets.QWidget in inspect.getmro(type(obj)):
+            obj.show()
+            return
+        
+        if isinstance(obj, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
+            self._raiseWindow(obj)
+            
+        else:
+            if not self.viewVar(obj, newWindow=newWindow):
+                # view (display) object in console is no handler exists
+                self.console.execute(obj)
+                
+        
                 
     @safeWrapper
     def _genExternalVarContextMenu(self, indexList, cm):

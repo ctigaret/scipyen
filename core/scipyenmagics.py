@@ -55,15 +55,15 @@ class ScipyenMagics(Magics):
             
         #return line
         
-    @line_magic
-    @needs_local_scope
-    def remote_ipython(self, line, local_ns):
-        pass
-    
-    @line_magic
-    @needs_local_scope
-    def remote_ipython(self, line, local_ns):
-        pass
+#     @line_magic
+#     @needs_local_scope
+#     def remote_ipython(self, line, local_ns):
+#         pass
+#     
+#     @line_magic
+#     @needs_local_scope
+#     def remote_ipython(self, line, local_ns):
+#         pass
     
     @line_magic
     @needs_local_scope
@@ -165,3 +165,26 @@ class ScipyenMagics(Magics):
         console = local_ns.get("console", None)
         if console.__class__.__name__ == 'ScipyenConsole':
             console.centralWidget().clear()
+
+    @line_magic
+    @needs_local_scope
+    def view(self, line, local_ns):
+        mw = local_ns.get("mainWindow", None)
+        if mw.__class__.__name__ == "ScipyenWindow":
+            obj = local_ns.get(line, None)
+            if obj is None:
+                return
+            mw.showVariable(obj, newWindow=False)
+            
+    @line_magic
+    @needs_local_scope
+    def newView(self, line, local_ns):
+        mw = local_ns.get("mainWindow", None)
+        if mw.__class__.__name__ == "ScipyenWindow":
+            obj = local_ns.get(line, None)
+            if obj is None:
+                return
+            mw.showVariable(obj)
+            
+        
+       
