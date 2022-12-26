@@ -23,6 +23,10 @@ from . import resources_rc
 
 import iolib.pictio as pio
 
+# NOTE: 2022-12-25 23:08:51
+# needed for the new plugins framework
+__scipyen_plugin__ = None
+
 # TODO: 2019-11-10 13:12:40
 # configure text syntax highlighting
 class TextViewer(ScipyenViewer):
@@ -38,8 +42,8 @@ class TextViewer(ScipyenViewer):
     # signal_window_will_close = pyqtSignal()
     sig_textChanged = pyqtSignal(name = "sig_textChanged")
     
-    supported_types = (str, QtGui.QTextDocument)
-    view_action_name = "Text"
+    viewer_for_types = {str: 99, QtGui.QTextDocument: 99}
+    # view_action_name = "Text"
     
     # FIXME/TODO: 2019-11-10 13:16:56
     # highlighter_types = ("plain", "xml", "html")

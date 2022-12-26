@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Qt5-based viewer window for dict and subclasses
-TODO
 """
 
 #### BEGIN core python modules
@@ -63,6 +62,10 @@ from .scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from . import quickdialog
 from . import resources_rc
 #### END pict.gui modules
+
+# NOTE: 2022-12-25 23:08:51
+# needed for the new plugins framework
+__scipyen_plugin__ = None
 
 SINGLETONS = (tuple(), None, math.inf, math.nan, np.inf, np.nan, MISSING, pd.NA)
 
@@ -566,14 +569,16 @@ class DataViewer(ScipyenViewer):
     # TODO: 2019-11-01 22:44:34
     # implement viewing of other data structures (e.g., viewing their __dict__
     # for the generic case, )
-    supported_types = (dict, list, tuple,
-                        AnalysisUnit,
-                        AxesCalibration,
-                        neo.core.baseneo.BaseNeo,
-                        ScanData, 
-                        TriggerProtocol)
+    viewer_for_types = {dict:99, 
+                        list:99, 
+                        tuple:99,
+                        AnalysisUnit:0,
+                        AxesCalibration:99,
+                        neo.core.baseneo.BaseNeo:0,
+                        ScanData:0, 
+                        TriggerProtocol:0}
     
-    view_action_name = "Object"
+    # view_action_name = "Object"
     
     def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None,  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, useTableEditor:bool = True, *args, **kwargs):
         self._useTableEditor_ = useTableEditor

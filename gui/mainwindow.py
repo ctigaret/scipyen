@@ -249,7 +249,7 @@ from . import resources_rc as resources_rc
 from . import quickdialog as qd
 from . import scipyenviewer
 from . import consoles
-from . import gui_viewers # list defined in gui.__init__.py !!!
+# from . import gui_viewers # list defined in gui.__init__.py !!!
 from . import scipyen_colormaps as colormaps
 # colormaps.registerCustomColorMaps()
 from .widgets import colorwidgets
@@ -301,12 +301,12 @@ from imaging.axiscalibration import (AxesCalibration,
 from imaging.scandata import (AnalysisUnit, ScanData,)
 
 import imaging.CaTanalysis as CaTanalysis 
-if CaTanalysis.LSCaTWindow not in gui_viewers:
-    gui_viewers += [CaTanalysis.LSCaTWindow]
+# if CaTanalysis.LSCaTWindow not in gui_viewers:
+#     gui_viewers += [CaTanalysis.LSCaTWindow]
     
 import ephys.EventAnalysis as EventAnalysis
-if EventAnalysis.EventAnalysis not in gui_viewers:
-    gui_viewers += [EventAnalysis.EventAnalysis]
+# if EventAnalysis.EventAnalysis not in gui_viewers:
+#     gui_viewers += [EventAnalysis.EventAnalysis]
     
 #### END scipyen imaging modules
 
@@ -474,16 +474,21 @@ class WorkspaceViewer(QtWidgets.QTableView):
 class WindowManager(__QMainWindow__):
     sig_windowRemoved = pyqtSignal(tuple, name="sig_windowRemoved")
     
-    def __init__(self, config=None, parent=None, *args, **kwargs):
+    # def __init__(self, config=None, parent=None, *args, **kwargs):
+    def __init__(self, parent=None, *args, **kwargs):
         super().__init__(parent)
         
         # gui_viewers defined in gui package (see gui/__init__.py)
-        self.viewers = dict(map(lambda x: (x, list()), gui_viewers))
+        # self.viewers = dict(map(lambda x: (x, list()), gui_viewers))
         # for matplotlib figures
-        self.viewers[mpl.figure.Figure] = list()
+        # self.viewers[mpl.figure.Figure] = list()
         
-        self.currentViewers = dict(map(lambda x: (x, None), gui_viewers))
-        self.currentViewers[mpl.figure.Figure] = None
+        self.viewers = {mpl.figure.Figure: list()}
+        
+        # self.currentViewers = dict(map(lambda x: (x, None), gui_viewers))
+        # self.currentViewers[mpl.figure.Figure] = None
+        
+        self.currentViewers = {mpl.figure.Figure: None}
         
     @pyqtSlot(object)
     @safeWrapper
@@ -530,52 +535,43 @@ class WindowManager(__QMainWindow__):
             #self.shell.user_ns.pop(ns_fig[0], None)
             #self.workspaceModel.update(from_console=False)
             
-    @safeWrapper
-    def _set_new_viewer_window_name_(self, winClass, name=None):
-        """Sets up the name of a new window viewer variable in the workspace
-        Should be called before initializing an instance of winClass.
-        Can be bypassed by creating a viewer window instance directly in the 
-        workspace by calling its constructor at the console.
-        """
-        # algorithm:
-        # if name is a non-empty string, check if it is suitable as identifier,
-        # and if it is already mapped to a variable in the workspace: 
-        #   use validate_varname to get a version with a counter appended to it.
-        #
-        # if no name is given (name is either None, or an empty string), then
-        # then compose the name based on the winClass name, append a counter based
-        # on the number of viewers of winClass type, in self.viewers
-        
-        import keyword
-        
-        # NOTE: 2019-11-01 22:04:38
-        # check winClass inherits from QtWidgets.QMainWindow, mpl.figure.Figure
-        if not any([klass in winClass.mro() for klass in (scipyenviewer.ScipyenViewer, mpl.figure.Figure)]):
-            raise ValueError("Unexpected window class %s" % winClass.__name__)
-        
-        # NOTE: 2019-11-01 22:04:47
-        # check if winClass is one of the registered viewers
-        # this makes NOTE 2019-11-01 22:04:38 redundant
-        # TODO: mechanisms for registering new viewer types
-        if winClass not in self.viewers:
-            raise ValueError("Unexpected window class %s" % winClass.__name__)
-        
-        nViewers = len(self.viewers[winClass])
-        
-        if isinstance(name, str):
-            if len(name.strip()):
-                win_name = validate_varname(name, self.workspace)
-            
-            else:
-                win_name = "%s_%d" % (winClass.__name__, nViewers)
-                
-        elif name is None:
-            win_name = "%s_%d" % (winClass.__name__, nViewers)
-        
-        else:
-            raise TypeError("name can be either a valid string or None")
-            
-        return win_name
+#     @safeWrapper
+#     def _set_new_viewer_window_name_(self, winClass, name=None):
+#         """Sets up the name of a new window viewer variable in the workspace
+#         Should be called before initializing an instance of winClass.
+#         Can be bypassed by creating a viewer window instance directly in the 
+#         workspace by calling its constructor at the console.
+#         """
+#         # algorithm:
+#         # if name is a non-empty string, check if it is suitable as identifier,
+#         # and if it is already mapped to a variable in the workspace: 
+#         #   use validate_varname to get a version with a counter appended to it.
+#         #
+#         # if no name is given (name is either None, or an empty string), then
+#         # then compose the name based on the winClass name, append a counter based
+#         # on the number of viewers of winClass type, in self.viewers
+#         
+#         import keyword
+#         
+#         if winClass not in self.viewers:
+#             raise ValueError("Unexpected window class %s" % winClass.__name__)
+#         
+#         nViewers = len(self.viewers[winClass])
+#         
+#         if isinstance(name, str):
+#             if len(name.strip()):
+#                 win_name = validate_varname(name, self.workspace)
+#             
+#             else:
+#                 win_name = "%s_%d" % (winClass.__name__, nViewers)
+#                 
+#         elif name is None:
+#             win_name = "%s_%d" % (winClass.__name__, nViewers)
+#         
+#         else:
+#             raise TypeError("name can be either a valid string or None")
+#             
+#         return win_name
             
     @safeWrapper
     def newViewer(self, winClass, *args, **kwargs):
@@ -610,10 +606,12 @@ class WindowManager(__QMainWindow__):
         if isinstance(winClass, str) and len(winClass.replace("&","").strip()):
             wClass = winClass.replace("&","")
             
-            if wClass not in [v.__name__ for v in gui_viewers]:
+            # if wClass not in [v.__name__ for v in gui_viewers]:
+            if wClass not in list(v.__name__ for v in self.viewers):
                 raise ValueError("Unexpected viewer class name %s" % wClass)
             
-            win_classes = [v for v in gui_viewers if v.__name__ == wClass]
+            # win_classes = [v for v in gui_viewers if v.__name__ == wClass]
+            win_classes = list(filter(lambda x: x.__name__ == wClass, self.viewers))
             
             if len(win_classes):
                 winClass = win_classes[0]
@@ -625,22 +623,19 @@ class WindowManager(__QMainWindow__):
             raise TypeError("Expecting a type or sip.wrappertype; got %s instead" % type(winClass).__name__)
         
         else:
-            if winClass not in self.viewers.keys():
+            if winClass not in self.viewers:
                 raise ValueError("Unexpected viewer class %s" % winClass.__name__)
             
-        win_title = self._set_new_viewer_window_name_(winClass, name=kwargs.pop("win_title", None))
+        # win_title = self._set_new_viewer_window_name_(winClass, name=kwargs.pop("win_title", None))
+        # win_title = self._set_new_viewer_window_name_(winClass, name=kwargs.pop("win_title", winClass.__name__))
         
-        #print("WindowManager.newViewer win_title = %s" % win_title)
-        
+        win_title = kwargs.pop("win_title", winClass.__name__)
+        win_title, counter_suffix = validate_varname(win_title, self.workspace, return_counter=True)
+
         kwargs["win_title"] = win_title
         
         if "parent" not in kwargs:
             kwargs["parent"] = self
-            
-        # NOTE: 2021-07-08 08:41:41
-        # do away with "pWin" in scipyen viewers; this is taken over by "parent"
-        #if "pWin" not in kwargs:
-            #kwargs["pWin"] = self
             
         if winClass is mpl.figure.Figure:
             fig_kwargs = dict()
@@ -661,9 +656,10 @@ class WindowManager(__QMainWindow__):
         
         else:
             win = winClass(*args, **kwargs)
-            nViewers = len(self.viewers[winClass])
-            win.ID = nViewers
-            winId = win.ID
+            win.ID = counter_suffix
+            # nViewers = len(self.viewers[winClass])
+            # win.ID = nViewers
+            # winId = win.ID
             win.sig_activated[int].connect(self.slot_setCurrentViewer)
             
         self.viewers[winClass].append(win)
@@ -673,7 +669,9 @@ class WindowManager(__QMainWindow__):
             workspace_win_varname = "Figure%d" % win.number
             
         else:
-            workspace_win_varname = strutils.str2symbol(win.winTitle)
+            # workspace_win_varname = strutils.str2symbol(win.winTitle)
+            workspace_win_varname = strutils.str2symbol(win_title)
+            # workspace_win_varname = strutils.str2symbol(f"{win.winTitle}_{win.ID}")
             
         self.workspace[workspace_win_varname] = win
         
@@ -1149,179 +1147,188 @@ class VTH(object):
     #       otherwise it will resolve to x itself !
     
     #default_handlers = dict(map(lambda x: (x, {"action":"Plot (matplotlib)",
-                                           #"types": [np.ndarray, tuple, list]} if isinstance(x, mpl.figure.Figure) else {"action": x.view_action_name, "types": list(x.supported_types)}), gui_viewers))
+                                           #"types": [np.ndarray, tuple, list]} if isinstance(x, mpl.figure.Figure) else {"action": x.view_action_name, "types": list(x.viewer_for_types)}), gui_viewers))
     
-    default_handlers = dict(map(lambda x: (x, {"action": x.view_action_name, "types": list(x.supported_types)}), gui_viewers))
+#     default_handlers = dict(map(lambda x: (x, {"action": x.view_action_name, "types": list(x.viewer_for_types)}), gui_viewers))
+#     
+#     default_handlers[mpl.figure.Figure] = {"action":"Plot (matplotlib)",
+#                                            "types": [np.ndarray, tuple, list]}
     
-    default_handlers[mpl.figure.Figure] = {"action":"Plot (matplotlib)",
-                                           "types": [np.ndarray, tuple, list]}
+    default_handlers = {mpl.figure.Figure: {"action":"Plot (matplotlib)",
+                                           "types": {np.ndarray: 99, tuple: 99, list: 99}}}
     
     gui_handlers = deepcopy(default_handlers)
 
-    @safeWrapper
-    def register(viewerClass, dataTypes, actionName=None):#, priority:int=-1):
-        """Modifies data handling by viewers or registers a new viewer type.
-        Viewers are user-designed windows for data display.
-        Parameters:
-        ----------
-        viewerClass: sip.wrappertype derived from gui.scipyenviewer.ScipyenViewer
-                OR a python type derived from matplotlib.fiure.Figure.
-        
-        dataTypes: a python type or a sequence (tuple, list) of python types
-        
-        actionName: a non-empty str or None, the name of the menu action in the
-            context menu of the Scipyen's workspace browser 
+#     @safeWrapper
+#     def register(viewerClass, dataTypes, actionName=None):#, priority:int=-1):
+#         """Modifies data handling by viewers or registers a new viewer type.
+#         Viewers are user-designed windows for data display.
+#         Parameters:
+#         ----------
+#         viewerClass: sip.wrappertype derived from gui.scipyenviewer.ScipyenViewer
+#                 OR a python type derived from matplotlib.fiure.Figure.
+#         
+#         dataTypes: a python type or a sequence (tuple, list) of python types
+#         
+#         actionName: a non-empty str or None, the name of the menu action in the
+#             context menu of the Scipyen's workspace browser 
+#             
+#             When actionName is None, if the viewer is already registered its 
+#             action name is unchanged; for a new viewer, the action name will be
+#             set to "View".
+#         
+#         """
+#         if not inspect.isclass(viewerClass):
+#             raise TypeError("viewerClass must be a type, class or sip wrapper type; got %s instead" % type(viewerClass).__name__)
+#         
+#         if not isinstance(viewerClass, sip.wrappertype) and viewerClass is not mpl.figure.Figure:
+#             raise TypeError("%s has unsupported type (%s); expecting a sip.wrappertype or matplotlib Figure" % (viewerClass.__name__, type(viewerClass).__name__))
+#         
+#         if not isinstance(actionName, (str, type(None))):
+#             raise TypeError("actionName expected to be a str or None; got %s instead" % type(actionName).__name__)
+#         
+#         if viewerClass in gui_handlers:
+#             # viewer type is already registered; action name my be left unchanged
+#             if isinstance(actionName, str) and len(actionName.strip()):
+#                 VTH.gui_handlers[viewerClass]["action"] = actionName
+#                 
+#             if inspect.isclass(dataTypes):
+#                 VTH.gui_handlers[viewerClass]["types"].append(dataTypes)
+#                 
+#             elif isinstance(dataTypes, (tuple, list)):
+#                 if not all([inspect.isclass(v) for v in dataTypes]):
+#                     raise TypeError("Expecting a sequence of types in 'dataTypes")
+#                 
+#                 d_types = [d for d in dataTypes if d not in VTH.gui_handlers[viewerClass]["types"]]
+#                 VTH.gui_handlers[viewerClass]["types"] += d_types
+#                 
+#             else:
+#                 raise TypeError("'dataTypes' expected to be a type or a sequence of types")
+#                 
+#         else:
+#             # registers a new viewer type
+#             if inspect.isclass(dataTypes):
+#                 dataTypes = [dataTypes]
+#                 
+#             elif isinstance(dataTypes, (tuple, list)) and not all([inspect.isclass(d) for d in dataTypes]):
+#                 raise TypeError("Expecting a sequence of types in 'dataTypes")
+#             
+#             else:
+#                 raise TypeError("'dataTypes' expected to be a type or a sequence of types")
+#             
+#             if actionName is None or (isinstance(actionName, str) and len(actionName.strip()) == 0):
+#                 actionName = "View"
+#             
+#             VTH.gui_handlers[viewerClass] = {"action":actionName,
+#                                             "types":dataTypes}
             
-            When actionName is None, if the viewer is already registered its 
-            action name is unchanged; for a new viewer, the action name will be
-            set to "View".
+
+    # def registered_handlers():
+    #     return [viewer for viewer in VTH.gui_handlers]
+    
+    # def is_supported_type(obj_type, viewer_type):
+    #     return obj_type in VTH.gui_handlers[viewer_type]["types"]
         
+    # def is_supported_ancestor_type(obj_type, viewer_type):
+    #     return any([t in inspect.getmro(obj_type) for t in VTH.gui_handlers[viewer_type]["types"]])
+    #     #return any([t in obj_type.mro() for t in VTH.gui_handlers[viewer_type]["types"]])
+        
+    def get_handler_spec(variable):
+        """Returns a list of specifications for handling `variable`.
+    
+        If `variable` is a type registered with VTH, or `variable` is an
+        instance of a type registeres wit VTH, returns a 3-tuple:
+        (viewer type, action name, priority), where:
+        
+            • viewer type is the Scipyen viewer class suitable to view the type
+        
+            • action name (str) - the name of the menu action for viewing the
+                variable (in the workspace viewer context menu)
+        
+            • priority (int) - used when several viewer types can handle the 
+                same variable name; the viewer class with the highest priority
+                for the given type is used first
+    
+        The returned list is sorted by descending order of priority and ascending
+        order of action name.
+         
         """
-        if not inspect.isclass(viewerClass):
-            raise TypeError("viewerClass must be a type, class or sip wrapper type; got %s instead" % type(viewerClass).__name__)
-        
-        if not isinstance(viewerClass, sip.wrappertype) and viewerClass is not mpl.figure.Figure:
-            raise TypeError("%s has unsupported type (%s); expecting a sip.wrappertype or matplotlib Figure" % (viewerClass.__name__, type(viewerClass).__name__))
-        
-        if not isinstance(actionName, (str, type(None))):
-            raise TypeError("actionName expected to be a str or None; got %s instead" % type(actionName).__name__)
-        
-        if viewerClass in gui_handlers:
-            # viewer type is already registered; action name my be left unchanged
-            if isinstance(actionName, str) and len(actionName.strip()):
-                VTH.gui_handlers[viewerClass]["action"] = actionName
-                
-            if inspect.isclass(dataTypes):
-                VTH.gui_handlers[viewerClass]["types"].append(dataTypes)
-                
-            elif isinstance(dataTypes, (tuple, list)):
-                if not all([inspect.isclass(v) for v in dataTypes]):
-                    raise TypeError("Expecting a sequence of types in 'dataTypes")
-                
-                d_types = [d for d in dataTypes if d not in VTH.gui_handlers[viewerClass]["types"]]
-                VTH.gui_handlers[viewerClass]["types"] += d_types
-                
-            else:
-                raise TypeError("'dataTypes' expected to be a type or a sequence of types")
-                
-        else:
-            # registers a new viewer type
-            if inspect.isclass(dataTypes):
-                dataTypes = [dataTypes]
-                
-            elif isinstance(dataTypes, (tuple, list)) and not all([inspect.isclass(d) for d in dataTypes]):
-                raise TypeError("Expecting a sequence of types in 'dataTypes")
-            
-            else:
-                raise TypeError("'dataTypes' expected to be a type or a sequence of types")
-            
-            if actionName is None or (isinstance(actionName, str) and len(actionName.strip()) == 0):
-                actionName = "View"
-            
-            VTH.gui_handlers[viewerClass] = {"action":actionName,
-                                            "types":dataTypes}
-            
-
-    def registered_handlers():
-        return [viewer for viewer in VTH.gui_handlers]
-    
-    def is_supported_type(obj_type, viewer_type):
-        return obj_type in VTH.gui_handlers[viewer_type]["types"]
-        
-    def is_supported_ancestor_type(obj_type, viewer_type):
-        return any([t in inspect.getmro(obj_type) for t in VTH.gui_handlers[viewer_type]["types"]])
-        #return any([t in obj_type.mro() for t in VTH.gui_handlers[viewer_type]["types"]])
-        
-    def get_handlers_for_type(obj_type):
-        #viewers = [viewer_type for viewer_type in VTH.gui_handlers.keys() if VTH.is_supported_type(obj_type, viewer_type)]
-        #mro_viewers = [viewer_type for viewer_type in VTH.gui_handlers.keys() if VTH.is_supported_ancestor_type(obj_type, viewer_type)]
-        
-        vartypemro = inspect.getmro(obj_type)
-        viewers_types  = list()
-        for vtype in vartypemro:
-            viewers = [key for key, value in VTH.gui_handlers.items() if vtype in value["types"]]
-            for viewer in viewers:
-                if viewer not in viewers_types:
-                    viewers_types.append(viewer)  
-                    
-        return viewers_types
-                    
-        # viewers_types = [(viewer_type, VTH.gui_handlers[viewer_type]["types"]) for viewer_type in VTH.gui_handlers.keys() if VTH.is_supported_type(obj_type, viewer_type)]
-        
-#         viewers_mro = [(viewer_type, VTH.gui_handlers[viewer_type]["types"]) for viewer_type in VTH.gui_handlers.keys() if VTH.is_supported_ancestor_type(obj_type, viewer_type)]
-#         
-#         viewer_priorities = list()
-#         
-#         for v_t in viewers_types:
-#             if obj_type in v_t[1]:
-#                 for k, type_obj in enumerate(v_t[1]):
-#                     if obj_type is type_obj:
-#                         viewer_priorities.append((k, v_t[0]))
-#                         
-#             else: #  look for ancestor types only if the object type is not explicitly listed in the viewer's supported_types'
-#                 for k, type_obj in enumerate(v_t[1]):
-#                     if type_obj in obj_type.mro():
-#                         viewer_priorities.append((k, v_t[0]))
-#                     
-#         if len(viewer_priorities):
-#             viewer_priorities = sorted(viewer_priorities, key=lambda x: x[0])
-#             
-#         n_direct = len(viewer_priorities)
-#         
-#         for v_t in viewers_mro:
-#             if obj_type in v_t[1]:
-#                 for k, type_obj in enumerate(v_t[1]):
-#                     if obj_type is type_obj: # or type_obj in obj_type.mro():
-#                         if v_t[0] not in [v_[1] for v_ in viewer_priorities]:
-#                             viewer_priorities.append((n_direct+k, v_t[0]))
-#                         
-#             else: #  look for ancestor types only if the object type is not explicitly listed in the viewer's supported_types'
-#                 for k, type_obj in enumerate(v_t[1]):
-#                     if type_obj in obj_type.mro():
-#                         if v_t[0] not in [v_[1] for v_ in viewer_priorities]:
-#                             viewer_priorities.append((n_direct+k, v_t[0]))
-#                     
-#         if len(viewer_priorities):
-#             viewer_priorities = sorted(viewer_priorities, key=lambda x: x[0])
-#             
-#         return viewer_priorities
-    
-    def get_view_actions(variable):
-        #if isinstance(variable, (type, sip.wrappertype)):
-        if inspect.isclass(variable):
-            vartype = variable
-        else:
-            vartype = type(variable)
-            
-        if vartype in VTH.gui_handlers.keys():
-            return 
-            
-        viewers_actions = [(key, value["action"]) for key, value in VTH.gui_handlers.items() if any([v in value["types"] for v in inspect.getmro(vartype)])]
-        
-        return viewers_actions
-
-    def get_actionNames(variable):
-        #if isinstance(variable, (type, sip.wrappertype)):
-        if inspect.isclass(variable):
+        if inspect.isclass(variable) or isinstance(variable, type):
             vartype = variable
         else:
             vartype = type(variable)
             
         if vartype in VTH.gui_handlers.keys() or QtWidgets.QWidget in inspect.getmro(vartype):
-            return 
+            return list()
         
         vartypemro = inspect.getmro(vartype)
-        actionNames  = list()
+        act_np = set()
         for vtype in vartypemro:
-            actions = [value["action"] for key, value in VTH.gui_handlers.items() if vtype in value["types"]]
-            for a in actions:
-                if a not in actionNames:
-                    actionNames.append(a)        
+            for k,v in VTH.gui_handlers.items():
+                if vtype in v["types"]:
+                    act_np.add((k, v["action"], v["types"][vtype]))
+                    
+        if len(act_np):
+            actions = sorted(sorted(list(act_np), key=lambda x: x[1]), key = lambda x: x[2], reverse=True)
+            return actions
             
-        # actionNames = [value["action"] for key, value in VTH.gui_handlers.items() if any([v in value["types"] for v in inspect.getmro(vartype)])]
+            # handler_types = list(a[0] for a in actions)
+            # return handler_types
         
-        return actionNames
-    
+        return list()
+                    
+#     def get_view_actions(variable):
+#         #if isinstance(variable, (type, sip.wrappertype)):
+#         if inspect.isclass(variable):
+#             vartype = variable
+#         else:
+#             vartype = type(variable)
+#             
+#         if vartype in VTH.gui_handlers.keys():
+#             return 
+#             
+#        vartypemro = inspect.getmro(vartype)
+#         act_np = set()
+#         for vtype in vartypemro:
+#             for k,v in VTH.gui_handlers.items():
+#                 if vtype in v["types"]:
+#                     act_np.add((v["action"], v["types"][vtype]))
+#                     
+#         if len(act_np):
+#             actions = sorted(sorted(list(act_np), key=lambda x: x[0]), key = lambda x: x[1], reverse=True)
+#             
+#             actionNames = list(a[0] for a in actions)
+#             return actionNames
+#             
+# #         viewers_actions = [(key, value["action"]) for key, value in VTH.gui_handlers.items() if any([v in value["types"] for v in inspect.getmro(vartype)])]
+# #         
+# #         return viewers_actions
+
+    # def get_actionNames(variable):
+#     def get_view_actions(variable):
+#         if inspect.isclass(variable):
+#             vartype = variable
+#         else:
+#             vartype = type(variable)
+#             
+#         if vartype in VTH.gui_handlers.keys() or QtWidgets.QWidget in inspect.getmro(vartype):
+#             return 
+#         
+#         vartypemro = inspect.getmro(vartype)
+#         act_np = set()
+#         for vtype in vartypemro:
+#             for k,v in VTH.gui_handlers.items():
+#                 if vtype in v["types"]:
+#                     act_np.add((k, v["action"], v["types"][vtype]))
+#                     
+#         if len(act_np):
+#             actions = sorted(sorted(list(act_np), key=lambda x: x[1]), key = lambda x: x[2], reverse=True)
+#             
+#             actionNames = list(a[0] for a in actions)
+#             return actionNames
+#         
+#         return list()
+            
     def reset_all():
         """Resets all gui handlers to the default.
         This will remove any registered custom viewer!
@@ -1355,6 +1362,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         ("slot_showScriptsManagerWindow", "scritpsManager"),
                         )
     
+    # class attribute
+    pluginActions = []
+    
     @classmethod
     def initialized(cls):
         return hasattr(cls, "_instance" and isinstance(cls._instance, cls))
@@ -1363,8 +1373,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def instance(cls):
         if hasattr(cls, "_instance"):
             return cls._instance
-    
-    pluginActions = []
     
     # NOTE: 2016-04-17 16:11:56
     # argument and return variable parsing moved to _installPluginFunction_
@@ -1656,6 +1664,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: QMainWindow python3 way
         self.app = app
         
+        # NOTE: 2022-12-25 10:41:12
+        # a mapping of plugin_module ↦ {plugin_module_function ↦ QtWidgets.QAction}
+        self.plugins = dict()
+        
         #### BEGIN configurables; for each of these we define a read-write property
         # decorated with markConfigurable
         self._recentFiles               = collections.OrderedDict()
@@ -1720,6 +1732,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # been themselves initialized
         self.setupUi(self)
         
+        # WindowManager.__init__(self, parent=self)
         WorkspaceGuiMixin.__init__(self, parent=self)#, settings=settings)
         self.scriptsManager = ScriptManager(parent=self)
         self.scriptsManager.signal_executeScript[str].connect(self._slot_runPythonScriptFromManager)
@@ -1755,6 +1768,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: 2020-10-22 13:30:54
         # self._nonInteractiveVars_ is updated in _init_QtConsole_()
         self.workspaceModel.user_ns_hidden.update(self._nonInteractiveVars_)
+        
+        # holds references to workspace objects that should NOT be visibile in 
+        # the workspace viewer - this includes viewer classes
         self.user_ns_hidden = self.workspaceModel.user_ns_hidden
         
         self.shell.events.register("pre_execute", self.workspaceModel.pre_execute)
@@ -1796,7 +1812,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.app.destroyed.connect(self.slot_Quit)
         
         # finally, inject references to self and the workspace into relevant 
-        # modules:
+        # NOTE: 2022-12-25 22:48:32 
+        # soo ot be deprecated in favour of plugins mechanism
         ws_aware_modules = (ltp, ivramp, membrane, CaTanalysis, pgui, sigp, imgp, crvf, plots)
             
         for m in ws_aware_modules:
@@ -2532,9 +2549,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # namespace (they're just references to those objects)
             self.workspace = self.ipkernel.shell.user_ns
             
+            # NOTE: 2022-12-25 22:58:41
+            # code below now done by plugin loader
             # populate workspace with the gui viewer classes, for convenience
-            for viewer in gui_viewers:
-                self.workspace[viewer.__name__] = viewer
+            # for viewer in gui_viewers:
+            #     self.workspace[viewer.__name__] = viewer
             
             # NOTE: 2020-11-12 12:51:36
             # used by %scipyen_debug line magic
@@ -2880,7 +2899,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_newViewer(self):
         """Slot for opening a list of viewer types (no used)
         """
-        viewer_type_names = [v.__name__ for v in gui_viewers]
+        # viewer_type_names = [v.__name__ for v in gui_viewers]
+        viewer_type_names = list(v.__name__ for v in self.viewers)
         dlg = ItemsListDialog(parent=self, itemsList=viewer_type_names,
                                    title="Viewer type", modal=True)
         
@@ -2912,37 +2932,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         saveHistorySelection.setToolTip("Save selected history to file")
         saveHistorySelection.triggered.connect(self._saveHistorySelection_)
         
-    @pyqtSlot()
-    @safeWrapper
-    def slot_launchTest(self):
-        pass
-        #from ephys.membrane import analyse_AP_depol_series
-        
-        #varname = self.getCurrentVarName()
-        
-        #if varname is None:
-            #return
-        
-        #data = self.workspace[varname]
-        
-        #if isinstance(data, neo.Block):
-            #args = (data,)
-            #kwargs = dict()
-            #self._run_loop_process_(analyse_AP_depol_series, None, *args, **kwargs)
-    
-    @pyqtSlot()
-    @safeWrapper
-    def slot_launchCaTAnalysis(self):
-        lscatWindow = self.newViewer(CaTanalysis.LSCaTWindow, parent=self, win_title="LSCaT")
-        #lscatWindow = CaTanalysis.LSCaTWindow(parent=self, win_title="LSCaT")
-        lscatWindow.show()
-        
-    @pyqtSlot()
-    @safeWrapper
-    def slot_launchEventDetection(self):
-        eventDetectWindow = self.newViewer(EventAnalysis.EventAnalysis, parent=self)
-        eventDetectWindow.show()
-    
     def _getHistoryBlockAsCommand_(self, magic=None):
         cmd = ""
         selectedItems = self.historyTreeWidget.selectedItems()
@@ -3178,19 +3167,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 clearWs.hovered.connect(self._slot_showActionStatusMessage_)
                 return
                 
-            #cm.addSeparator()
-            
-            specialViewMenu = cm.addMenu("View")
-            
             if QtWidgets.QWidget in inspect.getmro(varType):
-                action = specialViewMenu.addAction("Show")
+                action = cm.addAction("Show")
                 action.triggered.connect(self.workspace[varName].show)
                 
             else:
-                for actionName in VTH.get_actionNames(varType):
-                    # print(f"actionName {actionName} ({type(actionName).__name__})")
-                    if actionName is not None:
-                        action = specialViewMenu.addAction(actionName)
+                handler_specs = VTH.get_handler_spec(varType)
+                if len(handler_specs):
+                    specialViewMenu = cm.addMenu("View with")
+                    for handler_spec in handler_specs:
+                        action = specialViewMenu.addAction(handler_spec[1])
                         action.triggered.connect(self.slot_autoSelectViewer)
                 
         else:
@@ -3772,55 +3758,50 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
         evt.accept()
         
-    #def saveSettings(self):
-        #self.saveWindowSettings()
-        #self.saveAppSettings()
-        
-    #def saveAppSettings(self):
-        #pass
-        
     def saveWindowSettings(self):
         gname, pfx = saveWindowSettings(self.qsettings, self, group_name = self.__class__.__name__)
         
-        #### NOTE: user-defined gui handlers (viewers) for variable types, or user-changed
-        # configuration of gui handlers
-        # FIXME 2021-07-17 22:55:17 
-        # Not written to Scipyen.conf -- WHY ??? because nested groups aren't
-        # supported by QSettings
-        self.qsettings.beginGroup("Custom_GUI_Handlers")
-        for viewerClass in VTH.gui_handlers.keys():
-            pfx = viewerClass.__name__
-            
-            if viewerClass not in VTH.default_handlers.keys():
-                # store user-defines handlers
-                self.qsettings.setValue("%s_action" % pfx, VTH.gui_handlers[viewerClass]["action"])
-                
-                if isinstance(VTH.gui_handlers[viewerClass]["types"], type):
-                    type_names = [VTH.gui_handlers[viewerClass]["types"]._name__]
-                    
-                else:
-                    type_names = [t.__name__ for t in VTH.gui_handlers[viewerClass]["types"]] 
-                    
-                self.qsettings.setValue("%s_types" % pfx, type_names)
-                
-            else:
-                # store customizations for built-in handlers:
-                default_action_name = VTH.default_handlers[viewerClass]["action"]
-                default_types = VTH.default_handlers[viewerClass]["types"]
-                
-                if VTH.gui_handlers[viewerClass]["types"] != default_types:
-                    if isinstance(VTH.gui_handlers[viewerClass]["types"], type):
-                        type_names = [VTH.gui_handlers[viewerClass]["types"].__name__]
-                        
-                    else:
-                        type_names = [t.__name__ for t in VTH.gui_handlers[viewerClass]["types"]]
-                        
-                    self.qsettings.setValue("%s_types" % pfx, VTH.gui_handlers[viewerClass]["types"])
-                
-                if VTH.gui_handlers[viewerClass]["action"] is not default_action_name:
-                    self.qsettings.setValue("%s_action" % pfx, VTH.gui_handlers[viewerClass]["action"])
-        
-        self.qsettings.endGroup()
+        # ### BEGIN TODO/FIXME/BUG 2022-12-26 22:44:59
+#         #### NOTE: user-defined gui handlers (viewers) for variable types, or 
+#         # user-changed configuration of gui handlers
+#         # FIXME 2021-07-17 22:55:17 
+#         # Not written to Scipyen.conf -- WHY ??? because nested groups aren't
+#         # supported by QSettings
+#         self.qsettings.beginGroup("Custom_GUI_Handlers")
+#         for viewerClass in VTH.gui_handlers.keys():
+#             pfx = viewerClass.__name__
+#             
+#             if viewerClass not in VTH.default_handlers.keys():
+#                 # store user-defines handlers
+#                 self.qsettings.setValue("%s_action" % pfx, VTH.gui_handlers[viewerClass]["action"])
+#                 
+#                 if isinstance(VTH.gui_handlers[viewerClass]["types"], type):
+#                     type_names = [VTH.gui_handlers[viewerClass]["types"]._name__]
+#                     
+#                 else:
+#                     type_names = [t.__name__ for t in VTH.gui_handlers[viewerClass]["types"]] 
+#                     
+#                 self.qsettings.setValue("%s_types" % pfx, type_names)
+#                 
+#             else:
+#                 # store customizations for built-in handlers:
+#                 default_action_name = VTH.default_handlers[viewerClass]["action"]
+#                 default_types = VTH.default_handlers[viewerClass]["types"]
+#                 
+#                 if VTH.gui_handlers[viewerClass]["types"] != default_types:
+#                     if isinstance(VTH.gui_handlers[viewerClass]["types"], type):
+#                         type_names = [VTH.gui_handlers[viewerClass]["types"].__name__]
+#                         
+#                     else:
+#                         type_names = [t.__name__ for t in VTH.gui_handlers[viewerClass]["types"]]
+#                         
+#                     self.qsettings.setValue("%s_types" % pfx, VTH.gui_handlers[viewerClass]["types"])
+#                 
+#                 if VTH.gui_handlers[viewerClass]["action"] is not default_action_name:
+#                     self.qsettings.setValue("%s_action" % pfx, VTH.gui_handlers[viewerClass]["action"])
+#         
+#         self.qsettings.endGroup()
+        # ### END TODO/FIXME/BUG 2022-12-26 22:44:59
         
     #@processtimefunc
     def loadSettings(self):
@@ -3831,44 +3812,51 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #print("%s.loadWindowSettings" % self.__class__.__name__)
         gname, prefix = loadWindowSettings(self.qsettings, self, group_name = self.__class__.__name__)
         
-        
-        self.qsettings.beginGroup("Custom_GUI_Handlers")
-        
-        for viewerClass in VTH.gui_handlers.keys():
-            pfx = viewerClass.__name__
-            
-            if viewerClass not in VTH.default_handlers.keys():
-                action = self.qsettings.value("%s_action" % pfx, "View")
-                type_names_list = self.qsettings.value("%s_types" % pfx, ["type(None)"])
-                types = [eval(t_name) for t_name in type_names_list]
-                if len(types) == 0:
-                    continue
-                VTH.register(viewerClass, types, actionName=action)
-        
-        # FIXME: 2019-11-03 22:56:20 -- inconsistency
-        # what if a viewer doesn't have any types defined?
-        # by default it would be skipped from the auto-menus, but
-        # if one uses VTH.register() then types must be defined!
-        #for viewerGroup in self.qsettings.childGroups():
-            #customViewer = [v for v in VTH.gui_handlers.keys() if v.__name__ == viewerGroup]
-            #if len(customViewer):
-                #viewerClass = customViewer[0]
-                #self.qsettings.beginGroup(viewerGroup)
-                #if "action" in self.qsettings.childKeys():
-                    #action = self.qsettings.value("action", "View")
-                    
-                #if "types" in self.qsettings.childKeys():
-                    #type_names_list = self.qsettings.value("types", ["type(None)"])
-                    #types = [eval(t_name) for t_name in type_names_list]
-                    
-                #if len(types) == 0: # see FIXME: 2019-11-03 22:56:20
-                    #self.qsettings.endGroup()
-                    #continue
-                
-                #VTH.register(viewerClass, types, actionName=action)
-                #self.qsettings.endGroup()
-            
-        self.qsettings.endGroup()
+        # ### BEGIN TODO/FIXME/BUG 2022-12-26 22:46:12 (see TODO/FIXME/BUG 2022-12-26 22:44:59)
+#         self.qsettings.beginGroup("Custom_GUI_Handlers")
+#         
+#         # NOTE: 2022-12-26 22:39:13 FIXME/BUG:
+#         # The plugins framework will OVERRIDE this. 
+#         # TODO: While having the viewers 'automagically' set up by the plugin 
+#         # framework is a very useful thing, there should be a way to enable 
+#         # user-configuration of how to handle variable types to override the 
+#         # handling inferred by the plugins framework.
+#         for viewerClass in VTH.gui_handlers.keys():
+#             pfx = viewerClass.__name__
+#             
+#             if viewerClass not in VTH.default_handlers.keys():
+#                 action = self.qsettings.value("%s_action" % pfx, "View")
+#                 type_names_list = self.qsettings.value("%s_types" % pfx, ["type(None)"])
+#                 types = [eval(t_name) for t_name in type_names_list]
+#                 if len(types) == 0:
+#                     continue
+#                 VTH.register(viewerClass, types, actionName=action)
+#         
+#         # FIXME: 2019-11-03 22:56:20 -- inconsistency
+#         # what if a viewer doesn't have any types defined?
+#         # by default it would be skipped from the auto-menus, but
+#         # if one uses VTH.register() then types must be defined!
+#         #for viewerGroup in self.qsettings.childGroups():
+#             #customViewer = [v for v in VTH.gui_handlers.keys() if v.__name__ == viewerGroup]
+#             #if len(customViewer):
+#                 #viewerClass = customViewer[0]
+#                 #self.qsettings.beginGroup(viewerGroup)
+#                 #if "action" in self.qsettings.childKeys():
+#                     #action = self.qsettings.value("action", "View")
+#                     
+#                 #if "types" in self.qsettings.childKeys():
+#                     #type_names_list = self.qsettings.value("types", ["type(None)"])
+#                     #types = [eval(t_name) for t_name in type_names_list]
+#                     
+#                 #if len(types) == 0: # see FIXME: 2019-11-03 22:56:20
+#                     #self.qsettings.endGroup()
+#                     #continue
+#                 
+#                 #VTH.register(viewerClass, types, actionName=action)
+#                 #self.qsettings.endGroup()
+#             
+#         self.qsettings.endGroup()
+        # ### END TODO/FIXME/BUG 2022-12-26 22:46:12 
     
     #@processtimefunc
     def _configureUI_(self):
@@ -3895,22 +3883,24 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # small screens (e.g.,laptops)
         
         self.applicationsMenu = QtWidgets.QMenu("Applications", self)
+        self.applicationsMenu.setTearOffEnabled(True)
+        self.applicationsMenu.setToolTipsVisible(True)
         self.menubar.insertMenu(self.menuHelp.menuAction(), self.applicationsMenu)
         
         # TODO: 2022-11-20 13:18:01
         # make applications as "plugins" and let this menu populate itself at
         # session start
-        self.CaTAnalysisAction = QtWidgets.QAction("LSCaT (CaT Analysis)", self)
-        self.CaTAnalysisAction.triggered.connect(self.slot_launchCaTAnalysis)
-        self.applicationsMenu.addAction(self.CaTAnalysisAction)
+        # self.CaTAnalysisAction = QtWidgets.QAction("LSCaT (CaT Analysis)", self)
+        # self.CaTAnalysisAction.triggered.connect(self.slot_launchCaTAnalysis)
+        # self.applicationsMenu.addAction(self.CaTAnalysisAction)
         
-        self.EventAnalysisAction = QtWidgets.QAction("Events Detection", self)
-        self.EventAnalysisAction.triggered.connect(self.slot_launchEventDetection)
-        self.applicationsMenu.addAction(self.EventAnalysisAction)
+        # self.EventAnalysisAction = QtWidgets.QAction("Events Detection", self)
+        # self.EventAnalysisAction.triggered.connect(self.slot_launchEventDetection)
+        # self.applicationsMenu.addAction(self.EventAnalysisAction)
         
-        self.analyseAPtrainsAction = QtWidgets.QAction("test", self)
-        self.analyseAPtrainsAction.triggered.connect(self.slot_launchTest)
-        self.applicationsMenu.addAction(self.analyseAPtrainsAction)
+        # self.analyseAPtrainsAction = QtWidgets.QAction("test", self)
+        # self.analyseAPtrainsAction.triggered.connect(self.slot_launchTest)
+        # self.applicationsMenu.addAction(self.analyseAPtrainsAction)
         
         self.whatsThisAction = QtWidgets.QWhatsThis.createAction(self)
         
@@ -4068,9 +4058,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #### END command history view
         self.setWindowTitle("Scipyen")
         
-        self.newViewersMenu = QtWidgets.QMenu("Create New", self)
-        for v in gui_viewers:
-            self.newViewersMenu.addAction(v.__name__, self.slot_newViewerMenuAction)
+        self.newViewersMenu = QtWidgets.QMenu("New", self)
+        self.newViewersMenu.setTearOffEnabled(True)
+        self.newViewersMenu.setToolTipsVisible(True)
         self.menuViewers.addMenu(self.newViewersMenu)
         
         # add new viewers menu as toolbar action, too
@@ -6225,10 +6215,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         variable = self.workspace[varname]
         vartype = type(variable)
         
-        viewers_actions = VTH.get_view_actions(vartype)
-        
-        if len(viewers_actions):
-            viewers = [va[0] for va in viewers_actions if va[1] == actionName]
+        handler_specs = VTH.get_handler_spec(vartype)
+        # FIXME/BUG: 2022-12-26 22:17:07
+        # this can easily get buggered if the user decides to set an action 
+        # name other than the viewer class name
+        if len(handler_specs):
+            viewers = [spec[0] for spec in handler_specs if spec[1] == actionName]
             
             if len(viewers) == 0:
                 self.console.execute(varname)
@@ -6369,6 +6361,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if varname in self.workspace.keys():
             if varname is None:
                 return False
+            
             obj = self.workspace[varname]
             
             # NOTE: 2022-12-22 09:59:02
@@ -6442,13 +6435,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 raise ValueError("Unknown viewer type %s" % winType.__name__)
                 
         elif winType is None:
-            viewers_type_list = VTH.get_handlers_for_type(type(obj))
-            
-            if len(viewers_type_list) == 0:
+            handler_specs = VTH.get_handler_spec(type(obj))
+            # print(viewers_type_list)
+            if len(handler_specs) == 0:
                 return False
             
-            # winType = viewers_type_list[0][1]
-            winType = viewers_type_list[0]
+            winType = handler_specs[0][0]
             
         else:
             return False
@@ -6490,14 +6482,58 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     
         return True
             
+    def _run_loop_process_(self, fn, process_name, *args, **kwargs):
+        # TODO: 2022-12-23 00:24:19
+        # see EventAnalysis for a working approach !
+        # TODO : 2021-08-17 12:43:35
+        # check where it is used (currently nowhere, but potentially when running
+        # plugins) 
+        # possibly move to core.prog
+        if isinstance(process_name, str) and len(process_name.strip()):
+            title = "%s..." % process_name
+            
+        else:
+            title = "Processing..."
+            
+        #print("_run_loop_process_ args", args)
+            
+        pdlg = QtWidgets.QProgressDialog(title, "Cancel", 0,1000, self)
+        
+        worker = pgui.ProgressWorkerRunnable(fn, pdlg, *args, **kwargs)
+        worker.signals.signal_Finished.connect(pdlg.reset)
+        worker.signals.signal_Result.connect(self.slot_loop_process_result)
+            
+        if worker is not None:
+            self.threadpool.start(worker)
+    
+    @pyqtSlot(object)
+    @safeWrapper
+    def slot_loop_process_result(self, obj, name=""):
+        if isinstance(name, str) and len(name.strip()):
+            self.workspace[name] = obj
+            
+        else:
+            self.workspace["result"] = obj
+            
+        self.workspaceModel.update()
+        #self.workspaceModel.update(from_console=False)
+            
+        self.workspaceChanged.emit()
+        
     def _removeMenu_(self, menu):
-        if len(menu.actions()) == 0:
-            parentMenuOrMenuBar = menu.parent()
-            if parentMenuOrMenuBar is not None: # parent should never be None, but let's check anyway
-                parentMenuOrMenuBar.removeAction(menu.menuAction())
-                if type(parentMenuOrMenuBar).__name__ == "QMenu": 
-                    if parentMenuOrMenuBar.title() != "Plugins":
-                        self._removeMenu_(parentMenuOrMenuBar)
+        parentMenuOrMenuBar = menu.parent()
+        if parentMenuOrMenuBar is not None: # parent should never be None, but let's check anyway
+            parentMenuOrMenuBar.removeAction(menu.menuAction())
+            if type(parentMenuOrMenuBar).__name__ == "QMenu": 
+                if parentMenuOrMenuBar.title() != "Plugins":
+                    self._removeMenu_(parentMenuOrMenuBar)
+        # if len(menu.actions()) > 0:
+        #     parentMenuOrMenuBar = menu.parent()
+        #     if parentMenuOrMenuBar is not None: # parent should never be None, but let's check anyway
+        #         parentMenuOrMenuBar.removeAction(menu.menuAction())
+        #         if type(parentMenuOrMenuBar).__name__ == "QMenu": 
+        #             if parentMenuOrMenuBar.title() != "Plugins":
+        #                 self._removeMenu_(parentMenuOrMenuBar)
             
     @pyqtSlot()
     @safeWrapper
@@ -6506,21 +6542,43 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         Removes the (sub)menus and menu items created by loading plugins.
         The only use, really, is when called by slot_reloadPlugins().
         The plugin code itself is recompiled (and reloaded) by the scipyen_plugin_loader
+        if necessary.
         '''
-        if len(self.pluginActions) > 0:
-            for action in self.pluginActions:
-                parentMenuOrMenuBar = action.parent()
-                if parentMenuOrMenuBar is not None: # parent should never be None, but let's check anyway
-                    parentMenuOrMenuBar.removeAction(action)
-                    if type(parentMenuOrMenuBar).__name__ == "QMenu":
-                        if parentMenuOrMenuBar.title() != "Plugins": # check if menu left empy, chances are it is created by the plugin => remove it
-                            self._removeMenu_(parentMenuOrMenuBar)
-
-        plugins_members = self.plugins.__dict__.keys()
-        
-        for m in plugins_members:
-            if isinstance(self.plugins.__dict__[m], types.ModuleType):
-                del(self.plugins.__dict__[m])
+        # NOTE: 2022-12-25 10:52:58
+        # this does NOT remove the module from sys.modules! 
+        if len(self.plugins):
+            parents = list()
+            for module, moduleDict in self.plugins.items():
+                if isinstance(moduleDict, dict) and len(moduleDict)>0:
+                    for func, action in moduleDict.items():
+                        if inspect.isfunction(func) and isinstance(action, QtWidgets.QAction):
+                            parentMenuOrMenuBar = action.parent()
+                            if isinstance(parentMenuOrMenuBar, QtWidgets.QMenu):
+                                parents.append(parentMenuOrMenuBar)
+                                # parentMenuOrMenuBar.removeAction(action)
+                    moduleDict.clear()
+                    
+            for p in parents:
+                self._removeMenu_(p)
+                
+            self.plugins.clear()
+            scipyen_plugin_loader.loaded_plugins.clear()  # need to clear this, too              
+        # pass
+    
+#         if len(self.pluginActions) > 0:
+#             for action in self.pluginActions:
+#                 parentMenuOrMenuBar = action.parent()
+#                 if parentMenuOrMenuBar is not None: # parent should never be None, but let's check anyway
+#                     parentMenuOrMenuBar.removeAction(action)
+#                     if type(parentMenuOrMenuBar).__name__ == "QMenu":
+#                         if parentMenuOrMenuBar.title() != "Plugins": # check if menu left empy, chances are it is created by the plugin => remove it
+#                             self._removeMenu_(parentMenuOrMenuBar)
+# 
+#         plugins_members = self.plugins.__dict__.keys()
+#         
+#         for m in plugins_members:
+#             if isinstance(self.plugins.__dict__[m], types.ModuleType):
+#                 del(self.plugins.__dict__[m])
 
 
     @pyqtSlot()
@@ -6541,9 +6599,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         For details, see the documentation of the core.scipyen_plugin_loader 
         module.
         '''
-        #print("   slot_loadPlugins")
-        self.plugins = types.ModuleType('plugins','Contains scipyen plugin modules with their publicized callback functions')
-        
         scipyen_plugin_loader.find_plugins(self._scipyendir_) # calls os.walk
         
         # NOTE: 2016-04-15 11:53:08
@@ -6551,6 +6606,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # and do the plugin initialization here
         
         if len(scipyen_plugin_loader.loaded_plugins) > 0:
+            viewers = list() # list of (name, class) tuples
             for module in scipyen_plugin_loader.loaded_plugins.values():
                 # maps module name to the tuple (module file, menu dict)
                 # menu dict in turn maps a menu tree structure (a '|'-separated string) to a function defined in the plugin
@@ -6563,32 +6619,68 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 if not hasattr(module, "workspace"):
                     module.__dict__["workspace"] = self.workspace
 
+                # NOTE 2022-12-25 21:10:52
+                # crawl the module for Viewer classes - register if any is found
+                # Do this independently of installing self advertised menus (see
+                # below)
+                viewerClasses = list(filter(lambda x: inspect.isclass(x[1]) and prog.is_class_defined_in_module(x[1], module) and self._is_scipyen_viewer_class_(x[1]), inspect.getmembers(module)))
+                for viewerClass in viewerClasses:
+                    self._register_viewer_class_(*viewerClass)
+                    viewers.append(viewerClass)
+                        
                 # NOTE: 2022-12-23 09:02:02
                 # allow plugins to be intialized without advertising a menu for
                 # the main window; hence, only install menus for those plugins
-                # that indeed to provide a menu path, via their init_scipyen_plugin
+                # that provide a menu path via their init_scipyen_plugin
                 if inspect.isfunction(getattr(module,"init_scipyen_plugin", None)):
+                    # print(f"slot_loadPlugins self-advertising module {module.__name__}")
+                    # NOTE: 2022-12-25 21:10:19
+                    # create/update the menus as provided by the plugin module
                     menudict = collections.OrderedDict([(module.__name__, (module.__file__, module.init_scipyen_plugin()) )])
                     if len(menudict) > 0:
                         for (k,v) in menudict.items():
                             if (isinstance(k, str) and len(k)>0):
-                                self.installPluginMenu(k,v)
+                                pluginMenuActions = self.installPluginMenu(k,v)
+                                if len(pluginMenuActions):
+                                    self._cachePluginActions_(module, pluginMenuActions)
                             else:
                                 raise TypeError("Incompatible Plugin Key")
+               
+            if len(viewers):
+                sortedViewers = sorted(viewers, key = lambda x: x[0])
+                newViewerActions = self.newViewersMenu.actions()
+                if len(newViewerActions) == 0:
+                    for v in sortedViewers:
+                        self.newViewersMenu.addAction(v[0],self.slot_newViewerMenuAction)
+                else:
+                    actions = self.newViewersMenu.actions()
+                    labels = sorted(list(action.text() for action in actions))
+                    extended = sorted(labels + list(v[0] for v in sortedViewers))
+                    beforeAction=None
+                    beforeActionLabel=None
+                    for v in sortedViewers:
+                        ndx = extended.index(v[0])
+                        if ndx < (len(extended)-1):
+                            beforeActionLabel = extended[ndx+1]
+                            
+                            if beforeActionLabel in labels:
+                                beforeNdx = labels.index(beforeActionLabel)
+                                beforeAction = actions[beforeNdx]
+                                newAction = QtWidgets.QAction(v[0])
+                                newAction.triggered.connect(self.slot_newViewerMenuAction)
+                                self.newViewersMenu.insertAction(beforeAction, newAction)
+                            else:
+                                self.newViewersMenu.addAction(v[0], self.slot_newViewerMenuAction)
                         
+                                     
 
-        # NOTE: 2016-04-03 00:25:00
+        # NOTE: 2016-04-03 00:25:00 - do NOT delete - keep for future reference
+        # (i.e., don't make this mistake again...)
         # calling this seems to make the qt app close -- why?
         # NOTE: FIXED 2016-04-03 01:03:53 -- we call this asynchrnously, 
         # via Qt signal/slot mechanism (main window emits startPluginLoad)
         #dw = os.walk(path)
         
-    # FIXME: 2016-04-03 16:34:19
-    # not sure this will be very efficient when we will iterate through many plugins;
-    # I guess ImageJ approch is better, in that all plugins are rooted in the 
-    # "Plugins" menu in the menubar and then the menu path corresponds to the 
-    # actual subdirectory path of the plugin file (or a virtual path if plugin is
-    # a jar file)
     def _locateMenuByItemText_(self, parent, itemText):
         '''
         Looks for (and returns) a QMenu labeled with itemText,
@@ -6602,28 +6694,34 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             menu tree)
         (c) itemText is the empty string ('') because it denotes a separator
         '''
-        #parentActions = parent.actions()
         parentActionLabels = [i.text().replace('&', '') for i in parent.actions()]
         parentActionMenus = [i.menu() for i in parent.actions()]
         
         if itemText in parentActionLabels:
             return parentActionMenus[parentActionLabels.index(itemText)]
 
-
-    def _installPluginFunction_(self, f, menuItemLabel, parentMenu, n_outputs=None, inArgTypes=None):
-        '''
+    def _installPluginFunction_(self, f:types.FunctionType, menuItemLabel:str, parentMenu:QtWidgets.QMenu, before:typing.Optional[QtWidgets.QAction]=None, n_outputs=None, inArgTypes=None):
+        ''' Creates a QAction for calling the module-level function `f`.
         Implements the actual logic of installing individual plugin functions 
         advertised by the init_scipyen_plugin function defined in the plugin module.
         
         The function 'f' is wrapped in a slot that will be connected to the 
         triggered() signal emited by the appropriate menu item.
         
-        Furthermore the plugin module that advertises this function is imported 
-        inside the pseudo-module self.plugins -- "pseudo" because this is a
-        types.ModuleType ere is no
-        python source file for it and is created at runtime, but otherwise it is just a types.ModuleType. 
+        Parameters:
+        ===========
+        f: the module-level function object to be called by a dynamically-created 
+            menu action
         
-        There, each plugin is also installed also as a pseudo-module: a types.ModuleType where 
+        menuItemLabel: str, the text of the menu action
+        
+        parentMenu: the QMenu where the QAction will be created.
+    
+        before: QtWidgets.QAction. Optional, default is None.
+            When present, the new action will be inserted in the parent menu 
+                before this one (useufl to have the actions sorted e.g., by name)
+            When None (the default) the new action willl be appended to the end
+                of the parnet menu
         
         '''
         # NOTE: TODO: in python 3: use inspect.getfullargspec(f) 
@@ -6694,161 +6792,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         elif arg_defaults is None:
             arg_defaults = [None for k in range(len(arg_names))]
                     
-        newAction = parentMenu.addAction(menuItemLabel)
-        self.pluginActions.append(newAction)
+        if isinstance(before, QtWidgets.QAction):
+            newAction = QtWidgets.QAction(menuItemLabel)
+            parentMenu.insertAction(before, newAction)
+        else:
+            newAction = parentMenu.addAction(menuItemLabel)
+            
         newAction.triggered.connect(self.slot_wrapPluginFunction(f, n_outputs, arg_types, arg_names, arg_defaults, var_args, kw_args))
 
-        # Ideally, these functions might not be visible as free functions in the
-        # console environment, but rather as member(s) of a subenvironment (module-like)
-        # named in a simple fashion (to minime keystrokes, thus to facilitate their call
-        # from the console).
-        
-        # On the other hand, their naming should reconcile possible name clashes
-        # e.g., different plugin advertise functions with the same name (and signature, maybe).
-        
-        # A simple way would be to reference the plugin module in the global environment
-        # of the console -- how? -- but NOT in the user_ns namespace, so that they do
-        # not clutter the workspace window unnnecessarily. Alternatively we could 
-        # alter the workspace model such that the workspace window does not display 
-        # function objects. This however is not really desiable, as it would also hide 
-        # functions defined by the user at the console, and thus deteaf the purpose
-        # of having a console in the first place (i.e. quick code prototyping)
-        
-        # One option would be to "re-import" the plugin module in the console
-        # environment as we did for __all__ in slot_initQtConsole. This could be done 
-        # here if the console and the ipkernel are initialized, or could  be done
-        # inside slot_initQtConsole function.
-        
-        # The drawback is that this will also expose functions defined inside the plugin
-        # module, but not advertised by the init_scipyen_plugin function, which may 
-        # or may not be desirable.
-        
-        # Another option is to create "pseudo-modules" (types.ModuleType)
-        # and populate them with the function object(s) advertised by the 
-        # fully fledged plugin module
-        
-        # NOTE: 2016-04-16 10:05:48
-        # at this point we cannot change f.__name__ (it having been already 
-        # registered with a menuitem so if it has a weird / nonconformant name 
-        # e.g. with spaces or illegal characters the following code will fail.
-        # It if the responsibility of the plugin author to ensure that the 
-        # advertised functions have sane names
-        
-        # print(f"_installPluginFunction_ f name {f.__name__} f module {f.__module__}")
-        # NOTE: 2022-12-23 11:38:30
-        # deal with absolute imports:
-        module_path = f.__module__.split('.')
-        if len(module_path) == 1:
-            m = None
-            modname = module_path[0]
-            m = getattr(self.plugins, modname, None)
-            if m is None:
-                m = types.ModuleType(modname)
-                if f.__module__ in sys.modules:
-                    mm = sys.modules[f.__module__]
-                    setattr(m, "__doc__", getattr(mm, "__doc__", ""))
-                setattr(self.plugins, modname, m)
-                
-            elif not isinstance(m, types.ModuleName):
-                mname = f"{modname}_module"
-                m = types.ModuleType(mname)
-                m.__spec__.name = mname
-                if f.__module__ in sys.modules:
-                    mm = sys.modules[f.__module__]
-                    setattr(m, "__doc__", getattr(mm, "__doc__", ""))
-                setattr(self.plugins, mname, m)
-                
-            if isinstance(m, types.ModuleType):
-                setattr(m, f.__name__, f) # not to be called !
-                
-        else:
-            m = self.plugins
-            for k,n in enumerate(module_path):
-                if isinstance(m, types.ModuleType):
-                    m_ = getattr(m, n, None)
-                    if m_ is None:
-                        subm = types.ModuleType(n)
-                        setattr(m, n, subm)
-                        m = subm
-                    else:
-                        if not isinstance(m_, types.ModuleType):
-                            mname = f"{n}_module"
-                            subm = types.ModuleType(mname)
-                            setattr(m, mname, subm)
-                            m = subm
-                        else:
-                            m = m_
-                            
-                    if n == module_path[-1]:
-                        setattr(m, f.__name__, f) # not to be called
-                        
-                        if f.__module__ in sys.modules:
-                            mm = sys.modules[f.__module__]
-                            setattr(m, "__doc__", getattr(mm, "__doc__", ""))
-                            
-                        elif n in sys.modules:
-                            mm = sys.modules[n]
-                            setattr(m, "__doc__", getattr(mm, "__doc__", ""))
-                
-#         if f.__module__ not in self.plugins.__dict__.keys():
-#             # inside self.plugins, create a pseudo-module for the function's
-#             # plugin, if not already there
-#             icmd = ''.join(["self.plugins.",f.__module__," = types.ModuleType('",f.__module__,"')"])
-#             print(f"_installPluginFunction_ icmd {icmd}")
-#             exec(icmd)
-#             
-#             # by the way the original (fully fledged) module should already be
-#             # in sys (because the module has been loaded with imp.load_module by 
-#             # scipyen_plugin_loader therefore the next check is redundant, and the 
-#             # lines inside the 'if' block below might as well be taken out of it
-#             if f.__module__ in sys.modules.keys():
-#                 self.plugins.__dict__[f.__module__].__doc__ = sys.modules[f.__module__].__doc__
-#                 self.plugins.__dict__[f.__module__].__package__ = sys.modules[f.__module__].__package__
-#                 self.plugins.__dict__[f.__module__].__file__ = None
-#             
-#         # now "install" the function in this pseudo-module corresponding to
-#         # the plugin module that defined the function
-#         icmd = ''.join(["self.plugins.",f.__module__,".",f.__name__," = f"])
-#         exec(icmd)
-        
-    def _run_loop_process_(self, fn, process_name, *args, **kwargs):
-        # TODO: 2022-12-23 00:24:19
-        # see EventAnalysis for a working approach !
-        # TODO : 2021-08-17 12:43:35
-        # check where it is used (currently nowhere, but potentially when running
-        # plugins) 
-        # possibly move to core.prog
-        if isinstance(process_name, str) and len(process_name.strip()):
-            title = "%s..." % process_name
-            
-        else:
-            title = "Processing..."
-            
-        #print("_run_loop_process_ args", args)
-            
-        pdlg = QtWidgets.QProgressDialog(title, "Cancel", 0,1000, self)
-        
-        worker = pgui.ProgressWorkerRunnable(fn, pdlg, *args, **kwargs)
-        worker.signals.signal_Finished.connect(pdlg.reset)
-        worker.signals.signal_Result.connect(self.slot_loop_process_result)
-            
-        if worker is not None:
-            self.threadpool.start(worker)
+        return newAction
     
-    @pyqtSlot(object)
-    @safeWrapper
-    def slot_loop_process_result(self, obj, name=""):
-        if isinstance(name, str) and len(name.strip()):
-            self.workspace[name] = obj
-            
-        else:
-            self.workspace["result"] = obj
-            
-        self.workspaceModel.update()
-        #self.workspaceModel.update(from_console=False)
-            
-        self.workspaceChanged.emit()
-        
     def installPluginMenu(self, pname, v):
         '''Installs a GUI menu for the  plugin named pname.
         
@@ -6918,6 +6871,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             be accessible via menu items in the main window's menu bar.
         
         '''
+        pluginMenuActions = list()
         
         if isinstance(v[1], dict) and len(v[1]) > 0: # the nested dict
             # the plugin's init_scipyen_plugin function outputs a mapping
@@ -6936,31 +6890,44 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 for item in menuPathList:
                     currentMenu = self._locateMenuByItemText_(parentMenu, item)
                     siblingActionLabels = [i.text().replace('&', '') for i in parentMenu.actions()]
-
+                    # print(f"item {item}, siblingActionLabels: {siblingActionLabels}")
                     if currentMenu is None:
                         if item == menuPathList[-1]: # last item is the menu item (action)
                             if item in siblingActionLabels: # avoid name clashes
                                 item  = ' '.join([item, "(",ff.__module__,")"])
+                                
+                            beforeAction = None
+                            beforeActionLabel = None
+                            if parentMenu != self.menuBar():
+                                actionLabels = [item] + siblingActionLabels
+                                actionLabels = sorted(actionLabels)
+                                ndx = actionLabels.index(item)
+                                if ndx < (len(actionLabels) - 1):
+                                    beforeActionLabel = actionLabels[ndx+1]
+                                    
+                                if isinstance(beforeActionLabel, str) and beforeActionLabel in siblingActionLabels:
+                                    beforeNdx = siblingActionLabels.index(beforeActionLabel)
+                                    beforeAction = parentMenu.actions()[beforeNdx]
 
-                            # if 'function' in type(ff).__name__:
                             if inspect.isfunction(ff):
-                                self._installPluginFunction_(ff, item, parentMenu)
+                                menuAction = self._installPluginFunction_(ff, item, parentMenu, before=beforeAction)
+                                if isinstance(menuAction, QtWidgets.QAction):
+                                    pluginMenuActions.append((menuAction, ff))
 
                             elif isinstance(ff, (tuple, list)):
                                 if len(ff)>1:
                                     newMenu = parentMenu.addMenu(item)
                                     for f in ff:
-                                        # print(f"f: {type(f)}")
-                                        # if 'function' in type(f).__name__:
                                         if inspect.isfunction(f):
-                                            self._installPluginFunction_(f, f.__name__, newMenu)
+                                            menuAction = self._installPluginFunction_(f, f.__name__, newMenu)
+                                            if isinstance(menuAction, QtWidgets.QAction):
+                                                pluginMenuActions.append((menuAction, f))
                                         else:
                                             raise TypeError("function object expected")
                                 else:
-                                    self._installPluginFunction_(ff[0], item, parentMenu)
-
-                            # elif isinstance(ff, dict):
-                            #     self._parsePluginFunctionDict_(collections.OrderedDict(ff), item, parentMenu)
+                                    menuAction = self._installPluginFunction_(ff[0], item, parentMenu)
+                                    if isinstance(menuAction, QtWidgets.QAction):
+                                        pluginMenuActions.append((menuAction, ff[0]))
 
                             else:
                                 raise TypeError(" a function object or a list of function objects was expected")
@@ -6983,14 +6950,18 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if inspect.isfunction(ff):
                 newMenu = pluginsMenu.addMenu(pname)
                 
-                self._installPluginFunction_(ff, ff.__name__, newMenu)
+                menuAction = self._installPluginFunction_(ff, ff.__name__, newMenu)
+                if isinstance(menuAction, QtWidgets.QAction):
+                    pluginMenuActions.append((menuAction, ff))
                 
             elif isinstance(ff, (tuple, list)):
                 newMenu = pluginsMenu.addMenu(pname)
                 if len(ff) == 1:
                     # if 'function' in type(ff[0]).__name__:
                     if inspect.isfunction(ff[0]):
-                        self._installPluginFunction_(ff[0], ff[0].__name__, newMenu)
+                        menuAction = self._installPluginFunction_(ff[0], ff[0].__name__, newMenu)
+                        if isinstance(menuAction, QtWidgets.QAction):
+                            pluginMenuActions.append((menuAction, ff[0]))
                     else:
                         raise TypeError("function object expected")
                     
@@ -6998,12 +6969,73 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     for f in ff:
                         # if 'function' in type(f).__name__:
                         if inspect.isfunction(f):
-                            self._installPluginFunction_(f, f.__name__, newMenu)
+                            menuAction = self._installPluginFunction_(f, f.__name__, newMenu)
+                            if isinstance(menuAction, QtWidgets.QAction):
+                                pluginMenuActions.append((menuAction, f))
                         else:
                             raise TypeError("function object expected")
                         
-            # elif isinstance(ff, dict):
-            #     self._parsePluginFunctionDict_(collections.OrderedDict(ff), pname, pluginsMenu)
-        # else:
-        #     raise ValueError("empty nested dict in plugin info")
-    
+        return pluginMenuActions
+
+    def _cachePluginActions_(self, pluginModule, pluginMenuActions):
+        if inspect.ismodule(pluginModule):
+            if pluginModule not in self.plugins:
+                self.plugins[pluginModule] = dict()
+                
+            for (menuAction, pluginFunction) in pluginMenuActions:
+                self.plugins[pluginModule][pluginFunction] = menuAction
+                
+                
+    def _is_scipyen_viewer_class_(self, x:typing.Type):
+        if not inspect.isclass(x):
+            warnings.warn(f"Expecting a class; got {type(x).__name__} instead")
+            return False
+        return scipyenviewer.ScipyenViewer in inspect.getmro(x)
+
+    def _register_viewer_class_(self, name:str, x:typing.Type):
+        if not inspect.isclass(x):
+            warnings.warn(f"Expecting a class; got {type(x).__name__} instead")
+            return False
+        
+        # NOTE: 2022-12-25 21:43:43
+        # the check if this is a ScipyenViewer descendant is done in _is_scipyen_viewer_class_
+        # gui_viewers.add(x)
+        self.user_ns_hidden[name] = x
+        self.workspace[name] = x
+        self.viewers[x] = list()
+        self.currentViewers[x] = None
+        # NOTE: 2022-12-25 23:17:47
+        # to prevent re-sorting the newViewersMenu each time, a new view action
+        # is added in slot_loadPlugins
+        if hasattr(x, "viewer_for_types"):
+            action_name = getattr(x, "view_action_name", None)
+            if not isinstance(action_name, str) or len(action_name.strip()) == 0:
+                action_name = x.__name__
+                
+            if isinstance(x.viewer_for_types, dict) and len(x.viewer_for_types):
+                if all(isinstance(k, type) and isinstance(v, int) for k,v in x.viewer_for_types.items()):
+                    VTH.default_handlers[x] = {"action":action_name, "types":x.viewer_for_types}
+                    VTH.gui_handlers[x] = {"action":action_name, "types":x.viewer_for_types}
+                    
+            elif isinstance(x.viewer_for_types, (tuple, list)) and len(x.viewer_for_types) and all(isinstance(v, type) for v in x.viewer_for_types):
+                viewer_for_types = dict((t, 0) for t in x.viewer_for_types)
+                VTH.default_handlers[x] = {"action":action_name, "types":viewer_for_types}
+                VTH.gui_handlers[x] = {"action":action_name, "types":viewer_for_types}
+                
+        
+#         if hasattr(x, "viewer_for_types") and hasattr(x, "view_action_name"):
+#             if isinstance(x.viewer_for_types, dict) and len(x.viewer_for_types):
+#                 if all(isinstance(k, type) and isinstance(v, int) for k,v in x.viewer_for_types.items()):
+#                     VTH.default_handlers[x] = {"action":x.view_action_name, "types":x.viewer_for_types}
+#                     VTH.gui_handlers[x] = {"action":x.view_action_name, "types":x.viewer_for_types}
+#                     
+#             elif isinstance(x.viewer_for_types, (tuple, list)) and len(x.viewer_for_types) and all(isinstance(v, type) for v in x.viewer_for_types):
+#                 viewer_for_types = dict((t, 0) for t in x.viewer_for_types)
+#                 VTH.default_handlers[x] = {"action":x.view_action_name, "types":viewer_for_types}
+#                 VTH.gui_handlers[x] = {"action":x.view_action_name, "types":viewer_for_types}
+                
+        
+        
+
+        
+        

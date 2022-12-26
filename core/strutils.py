@@ -9,6 +9,7 @@ import typing
 import keyword
 import string
 import ast
+import re as _re
 from numbers import (Number, Real,)
 import numpy as np
 import quantities as pq
@@ -231,8 +232,8 @@ def str2symbol(s):
     
     # replace any punctuation & white spaces with "_"
     #print("str2symbol: ", s)
-    
-    s = s.translate(__translation_table_to_identifier)
+    s = _re.sub("^(?=\d)","data_", _re.sub("\W", "_", _re.sub("\s", "_", s)))
+    # s = s.translate(__translation_table_to_identifier)
     
     # do some grooming
     while ("__" in s):
@@ -243,8 +244,8 @@ def str2symbol(s):
     
     # then check if all is digits
     
-    if len(s) and not s[0].isalpha():
-        s = "data_"+s
+    # if len(s) and not s[0].isalpha():
+    #     s = "data_"+s
         
     return s
 
@@ -257,8 +258,16 @@ def str2R(s):
     if not isinstance(s, str):
         raise TypeError("Expecting a str; got %s instead" % type(s).__name__)
     
-    s = s.translate(__translation_table_to_R_identifier)
-    s = s.replace("..", ".")
+    if keyword.iskeyword(s):
+        s = "data."+s
+    
+    s = _re.sub("^(?=\d)","data.", _re.sub("\W", ".", _re.sub("\s", ".", arg)))
+    # s = s.translate(__translation_table_to_R_identifier)
+    while (".." in s):
+        s = s.replace("..", ".")
+        
+    if s.endswith("."):
+        s = s[0:-1]
 
     return s
     

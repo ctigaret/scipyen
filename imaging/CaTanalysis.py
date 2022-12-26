@@ -3406,7 +3406,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     #
     # On the other hand, the settings for LSCaT and its client viewers are ALL
     # SAVED when LSCaTWindow is closed (see self.slot_Quit() PyQt slot)
-    supported_types = (ScanData,)
+    viewer_for_types = (ScanData,)
     
     view_action_name = "Launch LSCaT"
     
@@ -13884,7 +13884,7 @@ def launch():
         
         
 def init_scipyen_plugin():
-    return {"Apps|LSCaT":launch}
+    return {"Applications|LSCaT":launch}
 
 
     

@@ -2981,7 +2981,7 @@ def elements_types(s):
     return gen_unique(map(lambda x: type(x).__name__, s))
 
 
-def counter_suffix(x, strings, sep="_"):
+def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, ret:bool=False):
     """Appends a counter suffix to x if x is found in the list of strings
     
     Parameters:
@@ -2991,9 +2991,9 @@ def counter_suffix(x, strings, sep="_"):
     
     strings = sequence of str to check for existence of x
     
-    underscore_sfx: bool default is True: and underscore separated the numeric
-     suffi from the root of the string
-     When False, the separator is space
+    sep: str, default is "_"; suffix separator
+    
+    start: 
     
     """
     # TODO:
@@ -3017,9 +3017,14 @@ def counter_suffix(x, strings, sep="_"):
     if not isinstance(sep, str):
         raise TypeError("Separator must be a str; got %s instead" % type(sep).__name__)
     
-    if len(sep) == 0:
+    if len(sep.strip()) == 0:
         raise ValueError("Separator cannot be an empty string")
     
+    if not isinstance(start, int):
+        raise TypeError(f"'start' expected to be an int; got {type(start).__name__} instead")
+    
+    if start < 0:
+        raise ValueError(f"'start' expected to be a poitive int (>= 0); instead, got {start}")
     
     if len(strings):
         base, cc = get_int_sfx(x, sep=sep)
@@ -3030,14 +3035,16 @@ def counter_suffix(x, strings, sep="_"):
         items = list(filter(lambda x: p.match(x), strings))
         
         if len(items):
-            fullndx = range(1, len(items))
+            # fullndx = range(1, len(items))
+            fullndx = range(start, len(items))
             full = set(fullndx)
             currentsfx = sorted(list(filter(lambda x: x, map(lambda x: get_int_sfx(x, sep=sep)[1], items))))
             current = set(currentsfx)
             if len(currentsfx):
                 if min(currentsfx) > 1:
                     # first slot (base_1) is missing - fill it 
-                    newsfx = 1
+                    # newsfx = 1
+                    newsfx = start
                     
                 else:
                     if current == full:
@@ -3066,13 +3073,20 @@ def counter_suffix(x, strings, sep="_"):
                             return base # FIXME/TODO good default ?!?
             else:
                 # base not found: return the next available slot (base_1)
-                newsfx = 1
+                # newsfx = 1
+                newsfx = start
                 
+            if ret:
+                return sep.join([base, "%d" % newsfx]), newsfx
+            
             return sep.join([base, "%d" % newsfx])
             
         else:
+            if ret:
+                return x, None
             return x
-                
+    if ret:
+        return x, None
     return x
                 
 def get_nested_value(src, path):

@@ -16,9 +16,9 @@ from operator import attrgetter, itemgetter, methodcaller
 
 from collections import OrderedDict, deque
 
-
 try:
     from reprlib import repr
+    
 except ImportError:
     pass
 
@@ -552,29 +552,50 @@ def delvars(*args, glob=True, ws=None):
                 for t in targets:
                     ws.pop(t[0], None)
                         
-def validate_varname(arg, ws=None):
-    """Converts a putative variable name "arg" into a valid one.
+def validate_varname(arg, ws=None, start_counter=0, sep = "_", return_counter:bool=False):
+    """Returns a valid symbol based on an intended variable name.
     
-    arg: a string
+    arg: a string (symbol to be bound to a variable in the namespace `ws`)
+    
     ws: a namespace (dict), default None => will search for the topmost workspace
     
-    1)  Non-valid characters are replaced with underscores.
+    start_counter: int (default is 0) the start value of the counter used in the
+            suffix to the variable name is an identical symbol already exists in 
+            ws.
     
-    2)  If "arg" begins with a digit or is a standard python language keyword, 
-        it will be prefixed with "variable_".
-    3)  If "arg" already exists in the "ws" dictionary (e.g. a workspace/namespace)
-        then it will be suffixed with "_counter" where counter starts at 1 and 
-        carries on; 
-        
-        3.a) if there is already a variable with this suffix, it will be incremented
-            as necessary
+    sep: str, default is "_"; the separator between the symbol base string and 
+        its suffix (counter)
+    
+    return_counter:bool, default is False;
+            When True, returns the valid symbol _AND_ the integer counter for 
+            the suffix.
     
     Returns:
     
-    a modified variable name
+    • When return_counter is False (default), returns a modified verions of `arg`
+        where:
+    
+        1)  Non-valid characters are replaced with underscores.
+        
+        2)  If arg begins with a digit or is a standard python language keyword, 
+            it will be prefixed with "data_".
+    
+        3)  If arg already exists in the "ws" namespace it will be sufixes with
+            `_<counter>`, where <counter> is a string representation of an int
+            starting at `start_counter`; the actual value written to the suffix
+            reflects the number of symbols with same base as `arg`
+            
+            3.a) If a counter suffix already exists, it will be incremented as
+                necessary.
+    
+    • When return_counter is True, returns a two-elements tuple containing the
+        modified `arg` as above, AND the counter suffix as an int or None (when
+        a suffix was not appended to the modified `arg`)
+        
     
     """
     from core.utilities import counter_suffix
+    from core.strutils import str2symbol
     
     if ws is None:
         frame_records = inspect.getouterframes(inspect.currentframe())
@@ -582,31 +603,40 @@ def validate_varname(arg, ws=None):
             if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within the IPython console
                 ws = f[0].f_globals["mainWindow"].workspace
                 break
+            
     if not isinstance(arg, str) or len(arg.strip()) == 0:
         arg = "data"
-    # check if arg is a valid python variable identifier; replace non-valid characters with 
-    # "_" (underscore) and prepend "data_" if it starts with a digit
-    if not arg.isidentifier():
-        arg = _re.sub("^(?=\d)","data_", _re.sub("\W", "_", arg))
         
-    # avoid arg being a valid python language keyword
     if keyword.iskeyword(arg):
         arg = "data_" + arg
         
-    arg = counter_suffix(arg, ws.keys())
+    # check if arg is a valid python variable identifier; adjust accordingly:
+    # replace non-valid characters with 
+    # "_" (underscore) and prepend "data_" if it starts with a digit
+    if not arg.isidentifier():
+        arg = str2symbol(arg)
+        # arg = _re.sub("^(?=\d)","data_", _re.sub("\W", "_", arg))
         
-    #if arg in ws.keys():
-        #while arg in ws.keys():
-            #m = _re.search("_(\d+)$", arg)
-            #if m:
-                #count = int(m.group(0).split("_")[1]) + 1
-                #arg = _re.sub("_(\d+)$", "_%d" % count, arg)
-                
-            #else:
-                #arg += "_01"
+    # NOTE: 2022-12-26 14:35:33
+    # no need to add suffix if arg is not already in the workspace symbols
+    # HOWEVER, IF arg is already there THEN:
+    # • if arg is a symbol bound to a class or a type, then start the counter at
+    #   0 (as in <variable of given type>_0, etc)
+    # • otherwise, start the counter at 1 ('cause an instance with same name 
+    # already exists)
+    if arg in ws.keys():
+        if inspect.isclass(ws[arg]) or isinstance(ws[arg], type):
+            start_counter = 0 # 
+        else:
+            start_counter = 1
+    else:
+        # not need to append suffix since arg symbol is not in the ws
+        if return_counter:
+            return arg, None
         
-            ##print("validate_varname: new name: %s", arg)
-                
-            
+        return arg
+        
+    arg = counter_suffix(arg, ws.keys(), sep=sep, start=start_counter, ret=return_counter)
+        
     return arg
     

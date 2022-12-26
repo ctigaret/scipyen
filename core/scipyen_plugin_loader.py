@@ -219,10 +219,10 @@ from __future__ import print_function
 # if the plugin advertises itself on an already used menu item and with a similar callback function
 # the previosuly loaded plugin will be overwritten !!!
 
-import os, inspect, importlib, sys, collections, traceback, types
+import os, inspect, importlib, sys, collections, functools, traceback, types
 from pprint import pprint
 # import os, inspect, imp, sys, collections
-
+from core import prog
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
@@ -233,13 +233,15 @@ __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 loaded_plugins = collections.OrderedDict()
 
+pluginsSpecFinder = prog.SpecFinder({})
+sys.meta_path.append(pluginsSpecFinder)
+
 # __avoid_modules__ = ("scipyen_start", "scipyen_plugin_loader")
 
 def find_plugins(path):
     dw = os.walk(path)
     # module_dict = dict()
     for entry in dw:
-        # print(f"find_plugins({path}) entry: {entry}")
         for file_name in (os.path.join(entry[0], i) for i in entry[2]):
             root, ext = os.path.splitext(file_name)
             # NOTE: 2022-12-22 22:43:14
@@ -247,65 +249,30 @@ def find_plugins(path):
             if ext in importlib.machinery.SOURCE_SUFFIXES:
                 module_name = inspect.getmodulename(file_name)
                 if module_name is not None:
-                    # print(f"find_plugins({path}) filename: {file_name}, module_name: {module_name}")
-                    module_spec = importlib.util.spec_from_file_location(module_name, file_name)
-                    # print(f"module spec: {module_spec}")
                     with open(file_name, "rt") as module_file:
                         for line in module_file:
                             if line.startswith('__scipyen_plugin__') or line.startswith("def init_scipyen_plugin"):
+                                # print(f"found plugin file {file_name}")
+                                pluginsSpecFinder.path_map[module_name] = file_name
+                                module_spec = importlib.util.spec_from_file_location(module_name, file_name)
                                 check_load_module(module_spec)
-                                # module_dict[module_name] = module_spec
                                 break
                         
             else:
                 continue
-            
-    # print(f"modules to load: {[module_dict.keys()]}")
-    # pprint(module_dict)
-    
-    # for name, spec in module_dict.items():
-    #     # print(f"module {name} in sys.modules: {name in sys.modules}")
-    #     if name in sys.modules:
-    #         # NOTE: 2022-12-23 10:50:11
-    #         # we might still want to add this module to the loaded_plugins
-    #         # as we want to run its init_scipyen_plugin() function
-    #         # loaded_plugins[name] = module
-    #         continue
-    #     try:
-    #         module = importlib.util.module_from_spec(spec)
-    #         sys.modules[name] = module
-    #         spec.loader.exec_module(module)
-    #         loaded_plugins[name] = module
-    #     except:
-    #         traceback.print_exc()
-    #         continue
 
 def check_load_module(spec):
-    module = sys.modules.get(spec.name, None)
-    if isinstance(module, types.ModuleType): 
-        # module found, no beef here
+    module = prog.get_loaded_module(spec)
+    if isinstance(module, types.ModuleType): # module found, no beef here
+        reloaded_module = importlib.reload(module) # reload plugin to reflect changes
         loaded_plugins[module.__name__] = module
-    
-    # NOTE: it may be that the module name is not the same (e.g. if it was 
-    # imported with absolute import statements)
-    
-    # retrieve loaded modules with same origin:
-    modules = [m_ for m_ in sys.modules.values() if isinstance(m_, types.ModuleType) and isinstance(m_.__spec__, importlib.machinery.ModuleSpec) and m_.__spec__.origin == spec.origin]
-    
-    if len(modules): # module found, no beef here
-        module = modules[0]
-        loaded_plugins[module.__name__] = module
-    
-    # module not found ⇒ create and load module
-    try:
-        module = importlib.util.moduel_from_spec(spec)
-        sys.modules[spec.name] = module
-        spec.loader.exec_module(module)
-        loaded_plugins[spec.name] = module
-    except:
-        traceback.print_exc
-    
-    
-    
-    
+        
+    else: # module not found ⇒ create and load module
+        try:
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = module
+            spec.loader.exec_module(module)
+            loaded_plugins[spec.name] = module
+        except:
+            traceback.print_exc
     

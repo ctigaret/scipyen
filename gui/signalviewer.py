@@ -83,6 +83,10 @@ CHANGELOG
 #### BEGIN core python modules
 #from __future__ import print_function
 
+# NOTE: 2022-12-25 23:08:51
+# needed for the new plugins framework
+__scipyen_plugin__ = None
+
 from pprint import pprint
 
 import sys, os, traceback, numbers, warnings, weakref, inspect, typing, math
@@ -373,22 +377,25 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     # TODO: 2019-11-01 22:43:50
     # implement viewing for all these
-    supported_types = (neo.Block, neo.Segment, 
-                       neo.AnalogSignal, DataSignal, 
-                       neo.IrregularlySampledSignal,
-                       IrregularlySampledDataSignal,
-                       neo.SpikeTrain, 
-                       neo.Event,
-                       neo.Epoch, 
-                       neo.core.baseneo.BaseNeo,
-                       TriggerEvent,
-                       TriggerProtocol,
-                       vigra.filters.Kernel1D, 
-                       pq.Quantity,
-                       np.ndarray,
-                       tuple, list)
+    viewer_for_types = {neo.Block: 99, 
+                        neo.Segment: 99, 
+                        neo.AnalogSignal: 99, 
+                        DataSignal: 99, 
+                        neo.IrregularlySampledSignal: 99,
+                        IrregularlySampledDataSignal: 99,
+                        neo.SpikeTrain: 99, 
+                        neo.Event: 99,
+                        neo.Epoch: 99, 
+                        neo.core.baseneo.BaseNeo: 99,
+                        TriggerEvent: 99,
+                        TriggerProtocol: 99,
+                        vigra.filters.Kernel1D: 99, 
+                        pq.Quantity: 99,
+                        np.ndarray: 99,
+                        tuple: 99, 
+                        list: 99}
     
-    view_action_name = "Signal"
+    # view_action_name = "Signal"
         
     defaultCursorWindowSizeX = 0.001
     defaultCursorWindowSizeY = 0.001
@@ -644,7 +651,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.observed_vars.verbose = True
         self.observed_vars.observe(self.var_observer)
         
-        if isinstance(y, self.supported_types) or any([t in type(y).mro() for t in self.supported_types]):
+        if isinstance(y, tuple(self.viewer_for_types.keys())) or any([t in type(y).mro() for t in tuple(self.viewer_for_types.keys())]):
             self.setData(x, y, frameIndex=frameIndex, 
                             frameAxis=frameAxis, signalIndex=signalIndex,
                             signalChannelAxis=signalChannelAxis,
@@ -7772,8 +7779,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # if y.shape[0] == 1:
             #     y = y.T
                 
-            if y.shape[0] < y.shape[1]:
-                y = y.T
+            # if y.shape[0] < y.shape[1]:
+            #     y = y.T
                 
             colors = cycle(self.defaultLineColorsList)
             
@@ -7784,10 +7791,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # for k in range(y.shape[self.signalChannelAxis]):
             #     y_ = np.atleast_1d(y[array_slice(y, {self.signalChannelAxis:k})].squeeze())
                 
+            # print("y.shape", y.shape)
             for k in range(y.shape[1]):
                 y_ = np.atleast_1d(y[array_slice(y, {1:k})].squeeze())
                 
-                #print("y_.shape", y_.shape)
+                # print("y_.shape", y_.shape)
                 
                 if y_.ndim ==2 and x.shape[0] == y_.shape[1]:
                     y_ = y_.T

@@ -58,6 +58,10 @@ import iolib.pictio as pio
 #### END pict.iolib modules
 
 
+# NOTE: 2022-12-25 23:08:51
+# needed for the new plugins framework
+__scipyen_plugin__ = None
+
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -830,7 +834,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     # TODO 2019-11-01 22:57:01
     # finish implementing all these
-    supported_types = (pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
+    viewer_for_types = (pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
                        neo.AnalogSignal, neo.IrregularlySampledSignal,
                        neo.Epoch, neo.Event, neo.SpikeTrain,
                        DataSignal, IrregularlySampledDataSignal,
@@ -1236,14 +1240,23 @@ class TableEditor(ScipyenViewer):#, Ui_TableEditor):
     
     # TODO 2019-11-01 22:57:01
     # finish implementing all these
-    supported_types = (pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
-                       neo.AnalogSignal, neo.IrregularlySampledSignal,
-                       neo.Epoch, neo.Event, neo.SpikeTrain,
-                       DataSignal, IrregularlySampledDataSignal,
-                       TriggerEvent, TriggerProtocol,
-                       np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D)
+    viewer_for_types = {pd.DataFrame: 99, 
+                        pd.Series: 99, 
+                        neo.core.baseneo.BaseNeo: 0,
+                        neo.AnalogSignal: 0, 
+                        neo.IrregularlySampledSignal: 0,
+                        neo.Epoch: 0, 
+                        neo.Event: 0,
+                        neo.SpikeTrain: 0,
+                        DataSignal: 0, 
+                        IrregularlySampledDataSignal: 0,
+                        TriggerEvent: 0, TriggerProtocol: 0,
+                        np.ndarray: 0, 
+                        vigra.VigraArray: 0, 
+                        vigra.filters.Kernel1D: 0,
+                        vigra.filters.Kernel2D: 0}
     
-    view_action_name = "Table"
+    # view_action_name = "Table"
     
     def __init__(self, data: (object, type(None)) = None, 
                  parent: (QtWidgets.QMainWindow, type(None)) = None, 
@@ -1421,7 +1434,7 @@ class TableEditor(ScipyenViewer):#, Ui_TableEditor):
                        TriggerEvent, TriggerProtocol,
                        np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D), *args, **kwargs):
         
-        if type(data) not in self.supported_types or not any([t in type(data).mro() for t in self.supported_types]):
+        if type(data) not in self.viewer_for_types or not any([t in type(data).mro() for t in self.viewer_for_types]):
             raise TypeError("%s cannot handle data type %s" % (type(self).__name__, type(data).__name__))
         
         #if isinstance(data, np.ndarray):

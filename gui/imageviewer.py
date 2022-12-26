@@ -116,6 +116,10 @@ from . import painting_shared
 from gui.itemslistdialog import ItemsListDialog
 #### END scipyen gui modules
 
+# NOTE: 2022-12-25 23:08:51
+# needed for the new plugins framework
+__scipyen_plugin__ = None
+
 mpl.rcParams['backend']='Qt5Agg'
 
 #__viewer_info__ = {"alias": "iv", "class": "ImageViewer"}
@@ -2213,10 +2217,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     # TODO 2019-11-01 22:41:39
     # implement viewing of Kernel2D, numpy.ndarray with 2 <= ndim <= 3
     # list and tuple of 2D VigraArray 2D, Kernel2D, 2D numpy.ndarray, QImage, QPixmap
-    supported_types = (vigra.VigraArray, vigra.filters.Kernel2D, np.ndarray, 
-                       QtGui.QImage, QtGui.QPixmap, tuple, list) 
+    viewer_for_types = {vigra.VigraArray:99, 
+                        vigra.filters.Kernel2D:99, 
+                        np.ndarray:0, 
+                        QtGui.QImage:99, 
+                        QtGui.QPixmap:99, 
+                        tuple:0, 
+                        list:0}
     
-    view_action_name = "Image"
+    # view_action_name = "Image"
     
     # image = the image (2D or volume, or up to 5D (but with up to 3 spatial
     #           dimensions e.g., xyztc, etc))
@@ -2388,7 +2397,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         # specially (unlike in SignalViewer's case)
         #
         # in turn, super.setData() calls self._set_data_(...)
-        if isinstance(data, ImageViewer.supported_types) or any([t in type(data).mro() for t in ImageViewer.supported_types]):
+        if isinstance(data, tuple(ImageViewer.viewer_for_types.keys())) or any([t in type(data).mro() for t in tuple(ImageViewer.viewer_for_types.keys())]):
             self.setData(data, doc_title=self._docTitle_)
             
         

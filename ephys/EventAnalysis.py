@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os, typing, math, datetime, logging, traceback, warnings, inspect
 from numbers import (Number, Real,)
-from itertools import chain
+# from itertools import chain
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
@@ -23,13 +23,12 @@ import core.models as models
 
 from core.datasignal import DataSignal
 
-from core.traitcontainers import DataBag
 from core.scipyen_config import (markConfigurable, get_config_file)
 
 from core.quantities import (arbitrary_unit, check_time_units, units_convertible,
                             unit_quantity_from_name_or_symbol, str2quantity)
 
-from core.datatypes import UnitTypes
+# from core.datatypes import UnitTypes
 from core.strutils import numbers2str
 from ephys import membrane
 
@@ -70,7 +69,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     sig_AbortDetection = pyqtSignal(name="sig_AbortDetection")
     # NOTE: this refers to the type of data where event detection is done.
     # The event waveform viewer only expects neo.AnalogSignal
-    supported_types = (neo.Block, neo.Segment, type(None))
+    # viewer_for_types = (neo.Block, neo.Segment, type(None))
+    viewer_for_types = tuple()
     
     _default_model_units_  = pq.pA
     _default_time_units_   = pq.s
@@ -114,7 +114,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     
     _default_template_file = os.path.join(os.path.dirname(get_config_file()),"eventTemplate.h5" )
     
-    def __init__(self, ephysdata=None, clearOldPSCs=False, ephysViewer:typing.Optional[sv.SignalViewer]=None, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="Detect Events", **kwargs):
+    # def __init__(self, ephysdata=None, clearOldPSCs=False, ephysViewer:typing.Optional[sv.SignalViewer]=None, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="Detect Events", **kwargs):
+    def __init__(self, ephysdata=None, clearOldPSCs=False, ephysViewer:typing.Optional[sv.SignalViewer]=None, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title=None, **kwargs):
         # NOTE: 2022-11-05 14:54:24
         # by default, frameIndex is set to all available frames - KISS
         self._toolbars_locked_ = True
@@ -355,7 +356,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         super().__init__(data=ephysdata, win_title=win_title, 
                          doc_title=self._data_var_name_, parent=parent)
         
-        self.winTitle = "Detect Events"
+        # self.winTitle = "Detect Events"
         
         # NOTE: 2022-11-05 23:48:25
         # must be executed here AFTER superclasses have been initialized,
@@ -1132,8 +1133,19 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         fitted_minis = list()
         
+        segment = st.segment
+        
         for kw, w in enumerate(minis):
-            fw = membrane.fit_Event(w, init_params, lo=lo, up=up)
+            try:
+                fw = membrane.fit_Event(w, init_params, lo=lo, up=up)
+            except Exception as e:
+                traceback.print_exc()
+                excstr = traceback.format_exception(exc)
+                msg = f"Event {kw} in sweep {segment}:\n{excstr[-1]}"
+                self.criticalMessage("Fitting event",
+                                        "\n".join(excstr))
+                return e
+            
             fitted_minis.append(fw)
 
         return fitted_minis
@@ -2724,6 +2736,13 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             # now, fit the minis
             for st in mPSCTrains:
                 fitted_minis = self._fit_waves_(st, prefix = signal.name)
+                if isinstance(fitted_minis, Exception):
+                    traceback.print_exc()
+                    excstr = traceback.format_exception(exc)
+                    msg = f"Event {kw} in sweep {segment}:\n{excstr[-1]}"
+                    self.criticalMessage("Fitting event",
+                                            "\n".join(excstr))
+                    return 
                 if fitted_minis is None or len(fitted_minis) == 0:
                     continue
                 
@@ -4314,10 +4333,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     @markConfigurable("ClearOldPSCsOnDetection", trait_notifier=True)
     @clearOldPSCs.setter
     def clearOldPSCs(self, value):
-        # print(f"{self.__class__.__name__} @clearOldPSCs.setter value: {value}")
         self._clear_detection_flag_ = value == True
-        # self.configurable_traits["ClearOldPSCsOnDetection"] = self._clear_detection_flag_
-        # if isinstance(getattr(self, "configurable_traits", None), DataBag):
 
     @property
     def detectionThreshold(self):
@@ -4407,7 +4423,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             raise TypeError(f"Expecting a sequence of scalar quantities (or their str representations) for initial values; instead, got {type(value).__name__}:\n {value}")
 
         self.configurable_traits["eventModelParametersInitial"] = dict(zip(self._params_names_, self._params_initl_))
-        # if isinstance(getattr(self, "configurable_traits", None), DataBag):
                 
     @property
     def eventModelParametersLowerBounds(self):
@@ -4794,7 +4809,7 @@ def launch():
         
         
 def init_scipyen_plugin():
-    return {"Apps|Synaptic Event Analysis":launch}
+    return {"Applications|Synaptic Events Analysis":launch}
 
 
     
