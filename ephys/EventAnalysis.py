@@ -3,6 +3,10 @@ import os, typing, math, datetime, logging, traceback, warnings, inspect
 from numbers import (Number, Real,)
 # from itertools import chain
 
+from IPython.core.magic import (Magics, magics_class, line_magic,
+                                cell_magic, line_cell_magic,
+                                needs_local_scope)
+
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from PyQt5.uic import loadUiType as __loadUiType__
@@ -4812,4 +4816,26 @@ def init_scipyen_plugin():
     return {"Applications|Synaptic Events Analysis":launch}
 
 
+    
+@magics_class
+class EventAnalysisMagics(Magics):
+    @line_magic
+    @needs_local_scope
+    def DetectMinis(self, line, local_ns):
+        if len(line.strip()):
+            data = local_ns.get(line, None)
+        else:
+            data = None
+            
+        mw = local_ns.get("mainWindow", None)
+        
+        if mw.__class__.__name__ == "ScipyenWindow":
+            win = mw.newViewer(EventAnalysis, parent=mw, win_title="EventAnalysis")
+            if isinstance(data,  neo.Block):
+                win.view(data)
+            else:
+                win.show()
+                
+def load_ipython_extension(ipython):
+    ipython.register_magics(EventAnalysisMagics)
     

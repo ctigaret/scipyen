@@ -2973,12 +2973,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 # view (display) object in console is no handler exists
                 self.console.execute(self.workspaceModel.currentItemName)
                 
-    def showVariable(self, obj, newWindow:bool=True):
+    def showVariable(self, name:str, newWindow:bool=True):
         """Shows obj in a suitable new window
         """
+        obj = self.workspace.get(name, None)
         if obj is None:
-            self.console.execute(obj)
-        
+            self.console.execute(name)
+            
         if QtWidgets.QWidget in inspect.getmro(type(obj)):
             obj.show()
             return
@@ -2987,9 +2988,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self._raiseWindow(obj)
             
         else:
-            if not self.viewVar(obj, newWindow=newWindow):
+            if not self.viewVar(name, newWindow=newWindow):
                 # view (display) object in console is no handler exists
-                self.console.execute(obj)
+                self.console.execute(name)
                 
         
                 
@@ -6532,6 +6533,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                                     self._cachePluginActions_(module, pluginMenuActions)
                             else:
                                 raise TypeError("Incompatible Plugin Key")
+                            
+                if inspect.isfunction(getattr(module, "load_ipython_extension", None)):
+                    module.load_ipython_extension(self.ipkernel.shell)
                
             if len(viewers):
                 sortedViewers = sorted(viewers, key = lambda x: x[0])

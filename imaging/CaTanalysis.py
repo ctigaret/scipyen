@@ -134,6 +134,10 @@ from functools import partial
 from copy import deepcopy
 #### END core python modules
 
+from IPython.core.magic import (Magics, magics_class, line_magic,
+                                cell_magic, line_cell_magic,
+                                needs_local_scope)
+
 #### BEGIN traitlets
 #from traitlets import (HasTraits, Integer, Float, Complex, Unicode, Bytes,
                        #List, Set, Tuple, Dict, Bool, )
@@ -13874,6 +13878,24 @@ def blankUncageArtifactInLineScans(data, time, width, bgstart, bgend, frame=0):
             #print("blanking index", imgIndex)
             img[imgIndex] = val
         
+@magics_class
+class LSCaTMagics(Magics):
+    @line_magic
+    @needs_local_scope
+    def LSCaT(self, line, local_ns):
+        if len(line.strip()):
+            lsdata = local_ns.get(line, None)
+        else:
+            lsdata = None
+            
+        mw = local_ns.get("mainWindow", None)
+        
+        if mw.__class__.__name__ == "ScipyenWindow":
+            lscatWindow = mw.newViewer(LSCaTWindow, parent=mw, win_title="LSCaT")
+            if isinstance(lsdata,  ScanData):
+                lscatWindow.view(lsdata)
+            else:
+                lscatWindow.show()
         
 def launch():
     try:
@@ -13887,5 +13909,6 @@ def init_scipyen_plugin():
     return {"Applications|LSCaT":launch}
 
 
-    
+def load_ipython_extension(ipython):
+    ipython.register_magics(LSCaTMagics)
     

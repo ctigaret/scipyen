@@ -377,7 +377,12 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
     def _check_supports_parameter_type_(self, value):
         def __check_val_type_is_supported__(val):
-            return isinstance(value, tuple(self.viewer_for_types.keys())) or any([t in type(value).mro() for t in tuple(self.viewer_for_types.keys())])
+            mro = type(value).mro()
+            types = list(v[0] for v in self.viewer_for_types)
+            
+            return any(t in types for t in mro)
+            
+            # return isinstance(value, tuple(self.viewer_for_types.keys())) or any([t in type(value).mro() for t in tuple(self.viewer_for_types.keys())])
             
         if isinstance(value, (tuple, list)):
             return all(__check_val_type_is_supported__(v) for v in value)
@@ -437,8 +442,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # print(f"ScipyenViewer<{self.__class__.__name__}>setData:")
             # for k,a in enumerate(args):
             #     print(f"\targ{k}: {type(a)}")
-            if not any([self._check_supports_parameter_type_(a) for a in args]):
-                raise TypeError("Expecting one of the supported types: %s" % " ".join([s.__name__ for s in self.viewer_for_types]))
+            if len(self.viewer_for_types) and not any([self._check_supports_parameter_type_(a) for a in args]):
+                raise TypeError("Expecting one of the supported types: %s" % " ".join([s.__name__ for s[0] in self.viewer_for_types]))
             
         get_focus = kwargs.get("get_focus", False)
         

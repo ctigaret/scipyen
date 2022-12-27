@@ -133,27 +133,27 @@ class ScipyenMagics(Magics):
             val = user_workspace().get("SCIPYEN_DEBUG", False)
             return debug_scipyen(not val)
             
-    @line_magic
-    @needs_local_scope
-    def LSCaT(self, line, local_ns):
-        from imaging import CaTanalysis
-        if len(line.strip()):
-            lsdata = local_ns.get(line, None)
-            
-        else:
-            lsdata = None
-            
-        mw = local_ns.get("mainWindow", None)
-        
-        #if isinstance(mw, ScipyenWindow):
-        if mw.__class__.__name__ == "ScipyenWindow":
-            if lsdata is not None:
-                lscatWindow = CaTanalysis.LSCaTWindow(lsdata, parent=mw, win_title="LSCaT")
-            else:
-                lscatWindow = CaTanalysis.LSCaTWindow(parent=mw, win_title="LSCaT")
-            lscatWindow.show()
-            
-        #return line
+#     @line_magic
+#     @needs_local_scope
+#     def LSCaT(self, line, local_ns):
+#         from imaging import CaTanalysis
+#         if len(line.strip()):
+#             lsdata = local_ns.get(line, None)
+#             
+#         else:
+#             lsdata = None
+#             
+#         mw = local_ns.get("mainWindow", None)
+#         
+#         #if isinstance(mw, ScipyenWindow):
+#         if mw.__class__.__name__ == "ScipyenWindow":
+#             if lsdata is not None:
+#                 lscatWindow = CaTanalysis.LSCaTWindow(lsdata, parent=mw, win_title="LSCaT")
+#             else:
+#                 lscatWindow = CaTanalysis.LSCaTWindow(parent=mw, win_title="LSCaT")
+#             lscatWindow.show()
+#             
+#         #return line
 
     @line_magic
     @needs_local_scope
@@ -171,20 +171,17 @@ class ScipyenMagics(Magics):
     def view(self, line, local_ns):
         mw = local_ns.get("mainWindow", None)
         if mw.__class__.__name__ == "ScipyenWindow":
-            obj = local_ns.get(line, None)
-            if obj is None:
-                return
-            mw.showVariable(obj, newWindow=False)
+            mw.showVariable(line, newWindow=False)
+        # return 
             
     @line_magic
     @needs_local_scope
     def newView(self, line, local_ns):
         mw = local_ns.get("mainWindow", None)
         if mw.__class__.__name__ == "ScipyenWindow":
-            obj = local_ns.get(line, None)
-            if obj is None:
-                return
-            mw.showVariable(obj)
+            mw.showVariable(line)
+                
+        # return line
             
         
        
