@@ -3024,67 +3024,130 @@ def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, re
         raise TypeError(f"'start' expected to be an int; got {type(start).__name__} instead")
     
     if start < 0:
-        raise ValueError(f"'start' expected to be a poitive int (>= 0); instead, got {start}")
+        raise ValueError(f"'start' expected to be a positive int (>= 0); instead, got {start}")
+    
+    # print(f"counter_suffix: x = {x}, strings = {strings}, start = {start}")
+    # print(f"counter_suffix: x = {x}, start = {start}, ret = {ret}")
     
     if len(strings):
         base, cc = get_int_sfx(x, sep=sep)
         
+        # print(f"counter_suffix: base = {base}, cc = {cc}")
+        
         #p = re.compile(base)
         p = re.compile("^%s%s{0,1}\d*$" % (base, sep))
         
-        items = list(filter(lambda x: p.match(x), strings))
+        items = sorted(list(filter(lambda x: p.match(x), strings)))
         
+        # print(f"counter_suffix items = {items}")
+        newsfx = None
         if len(items):
-            # fullndx = range(1, len(items))
-            fullndx = range(start, len(items))
-            full = set(fullndx)
-            currentsfx = sorted(list(filter(lambda x: x, map(lambda x: get_int_sfx(x, sep=sep)[1], items))))
-            current = set(currentsfx)
+            full_ndx = list(range(start, len(items)))
+            currentsfx = list(x[1] for x in sorted(list(filter(lambda x: isinstance(x[1], int), (map(lambda x: get_int_sfx(x, sep=sep), items)))), key=lambda x: x[1]))
             if len(currentsfx):
-                if min(currentsfx) > 1:
-                    # first slot (base_1) is missing - fill it 
-                    # newsfx = 1
-                    newsfx = start
-                    
+                min_current = min(currentsfx)
+                max_current = max(currentsfx)
+                if min_current > min(full_ndx):
+                    newsfx = min(full_ndx)
                 else:
-                    if current == full:
-                        # full range if indices is taken;
-                        # but the 0th slot may be missing (base)
-                        if base not in items:
-                            # 0th slot (base) is missing:
-                            return base
-                        # => get the next one up (base_x, x = len(items)
-                        newsfx = len(items)
-                        
-                    else: # set cardinality may be different, or just their elements are different
-                        if len(current) == len(full):
-                            # same cardinality => different elements =>
-                            # neither is a subset of the other
-                            # check what elements from full are NOT in currentsfx
-                            # while SOME currentsfx are in full
-                            missing = full - current
-                            if len (missing):
-                                # get the minimal slot from missing
-                                newsfx = min(missing)
-                            else:
-                                # full and currentsfx are disjoint
-                                newsfx = min(full)
+                    # find out missing indices
+                    if len(currentsfx) > 1:
+                        dsfx = np.ediff1d(currentsfx)
+                        locs = np.where(dsfx > 1)[0]
+                        if len(locs):
+                            newsfx = locs[0] + 1
                         else:
-                            return base # FIXME/TODO good default ?!?
+                            newsfx = currentsfx[-1] + 1
+                    else:
+                        newsfx = currentsfx[-1] + 1
+                        
+                    # newsfx = full_ndx[-1]
+                    
             else:
-                # base not found: return the next available slot (base_1)
-                # newsfx = 1
-                newsfx = start
+                newsfx = start   
                 
+            result = sep.join([base, "%d" % newsfx])
+            
             if ret:
-                return sep.join([base, "%d" % newsfx]), newsfx
-            
-            return sep.join([base, "%d" % newsfx])
-            
+                return result, newsfx
+            return result
+        
+#         if len(items):
+#             # fullndx = range(1, len(items))
+#             fullndx = range(start, len(items))
+#             full = set(fullndx)
+#             print(f"counter_suffix full = {full}")
+#             # currentsfx = sorted(list(filter(lambda x: x, map(lambda x: get_int_sfx(x, sep=sep)[1], items))))
+#             currentsfx = list(x[1] for x in sorted(list(filter(lambda x: isinstance(x[1], int), (map(lambda x: get_int_sfx(x, sep=sep), items)))), key=lambda x: x[1]))
+#             current = set(currentsfx)
+#             print(f"counter_suffix currentsfx = {currentsfx}, current = {current}")
+#             if len(current):
+#                 if min(current) > min(full):
+#                     newsfx = min(full)
+#                     
+#                 
+#             if len(currentsfx):
+#                 min_sfx = min(currentsfx)
+#                 print(f"current_sfx min_sfx = {min_sfx}, start = {start}")
+#                 if min_sfx > start:
+#                     # first slot (base_1) is missing - fill it 
+#                     # newsfx = 1
+#                     newsfx = start
+#                     print(f"current_sfx newsfx = {newsfx}")
+#                     
+#                 else:
+#                     if current == full:
+#                         # full range if indices is taken;
+#                         # but the 0th slot may be missing (base)
+#                         print(f"current_sfx base {base} in items {items}: {base in items}")
+#                         if base not in items:
+#                             # 0th slot (base) is missing:
+#                             print(f"current_sfx returning base = {base}")
+#                             if ret:
+#                                 return base, None
+#                             
+#                             return base
+#                         
+#                         # => get the next one up (base_x, x = len(items)
+#                         newsfx = len(items)
+#                         
+#                     else: # set cardinality may be different, or just their elements are different
+#                         if len(current) == len(full):
+#                             # same cardinality => different elements =>
+#                             # neither is a subset of the other
+#                             # check what elements from full are NOT in currentsfx
+#                             # while SOME currentsfx are in full
+#                             missing = full - current
+#                             if len (missing):
+#                                 # get the minimal slot from missing
+#                                 newsfx = min(missing)
+#                             else:
+#                                 # full and currentsfx are disjoint
+#                                 newsfx = min(full)
+#                         else:
+#                             max_sfx = max(current)
+#                             newsfx = max_sfx + 1
+#                             if ret:
+#                                 return base, newsfx
+#                             return base # FIXME/TODO good default ?!?
+#             else:
+#                 # base not found: return the next available slot (base_1)
+#                 # newsfx = 1
+#                 newsfx = start
+#                 
+#             result = sep.join([base, "%d" % newsfx])
+#                 
+#             if ret:
+#                 return result, newsfx
+#             
+#             return result
+#             
         else:
+            result = x
             if ret:
                 return x, None
             return x
+        
     if ret:
         return x, None
     return x

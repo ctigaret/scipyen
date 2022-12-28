@@ -601,7 +601,7 @@ class WindowManager(__QMainWindow__):
         # NOTE: 2021-07-08 14:52:44
         # called by ScipyenWindow.slot_newViewerMenuAction
         
-        #print("WindowManager.newViewer winClass = %s" % winClass)
+        # print(f"{self.__class__.__name__}.newViewer winClass = {winClass} (arg type = {type(winClass).__name__})")
         #print("WindowManager.newViewer **kwargs", **kwargs)
         if isinstance(winClass, str) and len(winClass.replace("&","").strip()):
             wClass = winClass.replace("&","")
@@ -631,6 +631,8 @@ class WindowManager(__QMainWindow__):
         
         win_title = kwargs.pop("win_title", winClass.__name__)
         win_title, counter_suffix = validate_varname(win_title, self.workspace, return_counter=True)
+        
+        # print(f"{self.__class__.__name__} win_title = {win_title}, counter_suffix = {counter_suffix}")
 
         kwargs["win_title"] = win_title
         
@@ -3035,11 +3037,22 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             renameVar.hovered.connect(self._slot_showActionStatusMessage_)
 
             varName = self.workspaceModel.item(indexList[0].row(),0).text()
-            
-            varType = type(self.workspace[varName])
-            # print(varType, inspect.getmro(varType))
+            obj = self.workspace[varName]
+            varType = type(obj)
             
             if QtWidgets.QWidget in inspect.getmro(varType):
+                action = cm.addAction("Show")
+                action.setToolTip("Show this viewer's window")
+                action.setStatusTip("Show this viewer's window")
+                action.setWhatsThis("Show this viewer's window")
+                action.triggered.connect(obj.show)
+                if isinstance(obj, scipyenviewer.ScipyenViewer):
+                    close_action = cm.addAction("Close")
+                    close_action.setToolTip("Closes this viewer's window then removes it from workspace")
+                    close_action.setStatusTip("Closes this viewer's window then removes it from workspace")
+                    close_action.setWhatsThis("Closes this viewer's window then removes it from workspace")
+                    close_action.triggered.connect(obj.close)
+                    
                 delVars = cm.addAction("Delete")
                 delVars.setToolTip("Delete selected variables")
                 delVars.setStatusTip("Delete selected variables")
@@ -3054,10 +3067,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 clearWs.triggered.connect(self._slot_clear_internal_workspace)
                 clearWs.hovered.connect(self._slot_showActionStatusMessage_)
                 return
-                
-            if QtWidgets.QWidget in inspect.getmro(varType):
-                action = cm.addAction("Show")
-                action.triggered.connect(self.workspace[varName].show)
                 
             else:
                 handler_specs = VTH.get_handler_spec(varType)
@@ -3203,12 +3212,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.workspaceModel.currentItem = None
             self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
 
-        #print("ScipyenWindow slot_selectionChanged: currentVarName %s" % self.workspaceModel.currentItemName)
-
     @pyqtSlot("QStandardItem*")
     @safeWrapper
     def slot_variableItemNameChanged(self, item):
         """Called when itemChanged was emitted by workspaceModel.
+        Conected to workspace model `itemChanged` signal.
         
         Typically this is called after a variable has been renamed following an
         "Edit" key press (which on Unix/KDE and Windows is usually "F2").
@@ -3236,41 +3244,42 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if len(originalVarName.strip()) == 0:
             return
         
+        obj = self.workspace[originalVarName]
+        
+        varType = type(obj)
+        
+        if isinstance(varType, (scipyenviewer.ScipyenViewer, QtWidgets.QWidget)):
+            start_counter = 0
+        else:
+            start_counter = 1
+        
         newVarName = item.text()
-        #print("slot_variableItemNameChanged old", originalVarName, "new", newVarName)
+        varNames = list(self.workspace.keys())
+        
+        if newVarName in self.workspace:
+            obj_ = self.workspace[newVarName]
+            # print(f"slot_variableItemNameChanged obj_ {type(obj_).__name__}")
+        
+        # print(f"slot_variableItemNameChanged old = {originalVarName}, new = {newVarName}")
             
-        if len(newVarName.strip()) == 0: # no change, really; prevent accidental deletion
+        # print(f"slot_variableItemNameChanged {originalVarName} in workspace: {originalVarName in self.workspace}")
+        # print(f"slot_variableItemNameChanged {newVarName} in workspace: {newVarName in self.workspace}")
+        if len(newVarName.strip()) == 0: # prevent accidental deletion
             self.workspaceModel.itemChanged.disconnect(self.slot_variableItemNameChanged)
             item.setText(originalVarName)
             self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
             return
         
         if newVarName != originalVarName:
-            if originalVarName in self.workspace:
-                data = self.workspace.pop(originalVarName)
-                self.workspace[newVarName] = data
+            if any(s in self.workspace for s in (originalVarName, newVarName)):
+                data = self.workspace.pop(originalVarName, None)
+                # print(f"slot_variableItemNameChanged old data = {type(data).__name__}")
+                newVarName = validate_varname(newVarName, self.workspace, start_counter = 1)
+                # print(f"slot_variableItemNameChanged new newVarName = {newVarName}")
+                self.workspace[newVarName] = obj
+                item.setText(newVarName)
                 self.workspaceModel.update()
                 
-            # NOTE: 2017-09-22 21:57:23
-            # check newVarName for sanity
-            # FIXME 2021-10-03 22:21:36 
-            
-            #newVarNameOK = validate_varname(newVarName, self.workspace)
-            
-            #if newVarNameOK != newVarName: # also update the item's text
-                #self.workspaceModel.itemChanged.disconnect(self.slot_variableItemNameChanged)
-                #item.setText(newVarNameOK)
-                #self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
-                
-            #data = self.workspace.pop(originalVarName, None)
-            
-            ##print("slot_variableItemNameChanged old", originalVarName, "new", newVarName, "new2", newVarNameOK)
-            
-            #if data is None:
-                #return
-            
-            #self.workspace[newVarNameOK] = data
-            #self.workspaceModel.update()
                 
     @pyqtSlot()
     @safeWrapper

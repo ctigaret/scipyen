@@ -624,19 +624,23 @@ def validate_varname(arg, ws=None, start_counter=0, sep = "_", return_counter:bo
     #   0 (as in <variable of given type>_0, etc)
     # • otherwise, start the counter at 1 ('cause an instance with same name 
     # already exists)
-    if arg in ws.keys():
-        if inspect.isclass(ws[arg]) or isinstance(ws[arg], type):
-            start_counter = 0 # 
-        else:
-            start_counter = 1
-    else:
+    if arg not in ws.keys():
         # not need to append suffix since arg symbol is not in the ws
         if return_counter:
             return arg, None
         
         return arg
+    else:
+        # print(f"validate_varname arg {arg} exists")
+        if inspect.isclass(ws[arg]) or isinstance(ws[arg], type):
+            start_counter = 0 # 
+        else:
+            start_counter = 1
+            
+        # print(f"validate_varname start_counter = {start_counter}")
         
-    arg = counter_suffix(arg, ws.keys(), sep=sep, start=start_counter, ret=return_counter)
+    arg = counter_suffix(arg, list(ws.keys()), sep=sep, start=start_counter, ret=return_counter)
+    # print(f"validate_varname return {arg}")
         
     return arg
     

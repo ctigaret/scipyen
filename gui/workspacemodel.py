@@ -895,6 +895,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 #                 self.addRowForVariable(*item)
             
         current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        # print(f"WorkspaceModel.update: {len(current_vars)} current_vars {current_vars}")
         
         self.observed_vars.update(current_vars)
         
