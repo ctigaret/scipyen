@@ -886,14 +886,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         for vname in del_vars:
             self.removeRowForVariable(vname)
         
-#         if len(del_vars) == 1:
-#             self.removeRowForVariable(del_vars[0])
-#             
-#         elif len(del_vars) > 1:
-#             self.clear()
-#             for item in self.observed_vars.items():
-#                 self.addRowForVariable(*item)
-            
         current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         # print(f"WorkspaceModel.update: {len(current_vars)} current_vars {current_vars}")
         

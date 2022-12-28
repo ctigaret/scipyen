@@ -38,8 +38,9 @@ from core.strutils import str2float
 
 from core.prog import (safeWrapper, )
 
+from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType)
 from core.triggerprotocols import TriggerProtocol
-from core.triggerprotocols import (TriggerEvent, TriggerEventType,)
+from core.datazone import DataZone
 
 import core.datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
@@ -1242,7 +1243,6 @@ class TableEditor(ScipyenViewer):#, Ui_TableEditor):
     # finish implementing all these
     viewer_for_types = {pd.DataFrame: 99, 
                         pd.Series: 99, 
-                        neo.core.baseneo.BaseNeo: 0,
                         neo.AnalogSignal: 0, 
                         neo.IrregularlySampledSignal: 0,
                         neo.Epoch: 0, 
@@ -1250,7 +1250,10 @@ class TableEditor(ScipyenViewer):#, Ui_TableEditor):
                         neo.SpikeTrain: 0,
                         DataSignal: 0, 
                         IrregularlySampledDataSignal: 0,
-                        TriggerEvent: 0, TriggerProtocol: 0,
+                        DataMark: 0,
+                        DataZone: 0,
+                        TriggerEvent: 0, 
+                        TriggerProtocol: 0,
                         np.ndarray: 0, 
                         vigra.VigraArray: 0, 
                         vigra.filters.Kernel1D: 0,

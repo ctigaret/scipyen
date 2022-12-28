@@ -2975,7 +2975,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 # view (display) object in console is no handler exists
                 self.console.execute(self.workspaceModel.currentItemName)
                 
-    def showVariable(self, name:str, newWindow:bool=True):
+    def showVariable(self, name:str, newWindow:bool=True, viewerType = None):
         """Shows obj in a suitable new window
         """
         obj = self.workspace.get(name, None)
@@ -2990,7 +2990,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self._raiseWindow(obj)
             
         else:
-            if not self.viewVar(name, newWindow=newWindow):
+            if not self.viewVar(name, newWindow=newWindow, winType=viewerType):
                 # view (display) object in console is no handler exists
                 self.console.execute(name)
                 

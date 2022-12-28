@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Superclass for Scipyen viewer windows
 """
-import typing, warnings
+import typing, warnings, inspect
 from dataclasses import MISSING
 from abc import (ABC, ABCMeta, abstractmethod,)
 from traitlets import Bunch
@@ -377,8 +377,9 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
     def _check_supports_parameter_type_(self, value):
         def __check_val_type_is_supported__(val):
-            mro = type(value).mro()
-            types = list(v[0] for v in self.viewer_for_types)
+            mro = inspect.getmro(type(value))
+            # types = list(v[0] for v in self.viewer_for_types)
+            types = list(self.viewer_for_types)
             
             return any(t in types for t in mro)
             
