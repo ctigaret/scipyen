@@ -4738,17 +4738,17 @@ def analyse_AP_step_injection_series(data, **kwargs):
         
     Iinj_0: python quantity (pA), float scalar, or None: amplitude of the first 
         current injection in the series; optional default is None.
-        
+    
         NOTE: When None, the value of the first will be determined from the Im 
         signal of the segment
     
     delta_I: python quantity (pA), float scalar, or None; current injection 
-        increment.
+        increment. ΔI
         When None (defaut) the value will be determined from the Im signal
         
     Istart, Istop: time quantities for current step injection, or None
         When given, all segments in the block must start at the same time
-        
+    
     Itimes_relative:bool, default is True; 
         When True, then Istart and Istop are considered RELATIVE to the sweep's 
         t0, in every sweep (this is the default, because usually Istart and Istop
@@ -4829,7 +4829,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         
         default is 0 (no boxcar filtering)
         
-    method: str, one of "state_levels" (default) or "kmeans": methiod for detection
+    method: str, one of "state_levels" (default) or "kmeans": method for detection
         "up" vs "down" states of the step current injection waveform
     
     adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
