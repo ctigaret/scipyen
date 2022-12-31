@@ -2321,7 +2321,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
         raise TypeError("'signal' expected to be a neo.AnalogSignal; got %s instead" % type(signal).__name__)
         
     if resample_with_period is not None:
-        signal = ephys.resample_pchip(signal, resample_with_period)
+        signal = sigp.resample_pchip(signal, resample_with_period)
             
     if isinstance(t0, numbers.Real):
         t0 *= signal.times.units
@@ -3022,11 +3022,11 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
         current injection.
         
         See also the functions:
-        ephys.parse_step_waveform_signal
+        signalprocessing.parse_step_waveform_signal
     
     adcres, adcrange, adcscale: float scalars
         See also the functions:
-        ephys.parse_step_waveform_signal and signalprocessing.state_levels.
+        signalprocessing.parse_step_waveform_signal and signalprocessing.state_levels.
     
         Used only when method is "state_levels"
         
@@ -3091,7 +3091,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             # up   = time point of the down-up transition
             # inj  = injected current (difference between centroids )
             # label = int array "mask" with 0 for down and 1 for up; same shape as im
-            d, u, inj, c, l = ephys.parse_step_waveform_signal(im,
+            d, u, inj, c, l = sigp.parse_step_waveform_signal(im,
                                                                 method=method,
                                                                 box_size=box_size, 
                                                                 adcres=adcres,
@@ -3180,7 +3180,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
         if resample_with_period > vstep.sampling_period:
             warnings.warn("A sampling period larger than the signal's sampling period (%s) was requested (%s); the signal will be DOWNSAMPLED" % (vstep.sampling_period, resample_with_period), RuntimeWarning)
 
-        vstep = ephys.resample_pchip(vstep, resample_with_period)
+        vstep = sigp.resample_pchip(vstep, resample_with_period)
         
         if vstep.size == 0:
             raise RuntimeError("Check resampling; new period requested was %s and the resampled signal has vanished" % resample_with_period)
@@ -4601,7 +4601,7 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
         im = segment.analogsignals[ImSignal]
         vm = segment.analogsignals[VmSignal]
         if isinstance(im, neo.AnalogSignal):
-            d,u,_,_,_ = ephys.parse_step_waveform_signal(im)
+            d,u,_,_,_ = sigp.parse_step_waveform_signal(im)
             
             start_stop = list((d,u))
 
@@ -4833,7 +4833,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         "up" vs "down" states of the step current injection waveform
     
     adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
-        called from ephys.parse_step_waveform_signal() 
+        called from signalprocessing.parse_step_waveform_signal() 
         
         Used only when method is "state_levels"
         
@@ -5312,15 +5312,17 @@ def analyse_AP_step_injection_series(data, **kwargs):
             if isinstance(seg_res["AP_analysis"]["AP_train"], neo.SpikeTrain) and len(seg_res["AP_analysis"]["AP_train"]):
                 val = seg_res["AP_analysis"]["AP_train"].annotations["AP_onset_Vm"]
                 if val is None:
-                    apThr.append(np.nan * vstep.units)
+                    apThr.append(np.nan)
                 else:
-                    apThr.append(val[0])
+                    apThr.append(float(val[0]))
                     
                 apLatency.append(seg_res["AP_analysis"]["AP_train"][0] - seg_res["AP_analysis"]["AP_train"].t_start)
                 
             else:
-                apThr.append(np.nan * vstep.units)
+                apThr.append(np.nan)
                 apLatency.append(np.nan * vstep.times.units)
+                
+        apThr = (np.array(apThr))[:,np.newaxis] * vstep.units
         
         #apThr = [seg_res["AP_analysis"]["AP_train"].annotations["AP_onset_Vm"][0] for seg_res in ret["Depolarising_steps"]]
         
@@ -5332,6 +5334,8 @@ def analyse_AP_step_injection_series(data, **kwargs):
         
         nAPs = [seg_res["AP_analysis"]["Number_of_APs"] for seg_res in ret["Depolarising_steps"]]
         
+        # print(f"Iinj = {Iinj}")
+        # print(f"apThr = {apThr}")
         ret["First_AP_threshold"]   = IrregularlySampledDataSignal(domain = Iinj,
                                                                    signal = apThr,
                                                                    units = vstep.units,
@@ -5782,7 +5786,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     method: str, one of "state_levels" (default) or "kmeans"
     
     adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
-        called from ephys.parse_step_waveform_signal() 
+        called from signalprocessing.parse_step_waveform_signal() 
         
         Used only when method is "state_levels"
         

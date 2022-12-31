@@ -1318,12 +1318,25 @@ class IrregularlySampledDataSignal(BaseSignal):
                           "file_origin", "description", "array_annotations",
                           "annotations")
         
+        call_args = dict()
+        
         if isinstance(signal, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
             call_args = dict((name, getattr(signal, name, None)) for name in call_arg_names)
             call_args["copy"] = True
             call_args["domain_units"] = getattr(signal, "times", 0.*pq.s).units
+        elif isinstance(signal, (tuple, list)):
+            signal = np.array(signal)
+            
+        elif isinstance(signal, np.ndarray):
+            if isinstance(signal, pq.Quantity):
+                call_args["units"] = signal.units
+                
         else:    
-            call_args = dict()
+            raise TypeError(f"Unexpected type ({type(signal).__name__}) for signal's data")
+        
+        # print(f"signal.shape")
+        siglen = signal.shape[0]
+        channels = 1 if signal.ndim == 1 else signal.shape[1]
         
         for v in call_arg_names:
             val = eval(v) # evals locally, so available only if given as named param 
@@ -1354,7 +1367,8 @@ class IrregularlySampledDataSignal(BaseSignal):
                     annots["array_annotations"] = v
                     
                 elif isinstance(v, dict): # can be array_annotations or anotations; brrr...
-                    if len(v) == signal.shape[1]: # likely array annotations, too
+                    # if len(v) == signal.shape[1]: # likely array annotations, too
+                    if len(v) == channels: # likely array annotations, too
                         if annots["array_annotations"] is None:
                             arr_ann = ArrayDict(signal.shape[1])
                             for ka,va in v.items():

@@ -23,6 +23,7 @@ import sys
 import time
 import traceback
 import typing
+import types
 import warnings
 import weakref
 from copy import (deepcopy, copy,)
@@ -143,7 +144,78 @@ RELATIVE_TOLERANCE = 1e-4
 ABSOLUTE_TOLERANCE = 1e-4
 EQUAL_NAN = True
 
+def is_routine(x):
+    """ Similar to is_callable but excludes classes with __call__ method.
+    """
+    
+    function_types = (types.FunctionType, types.LambdaType, types.MethodType,
+                      types.BuiltinFunctionType, types.BuiltinMethodType,
+                      types.WrapperDescriptorType, types.MethodWrapperType,
+                      types.CoroutineType, types.MethodDescriptorType,
+                      types.ClassMethodDescriptorType)
+    
+    # testers = (inspect.isfunction, inspect.ismethod, 
+    #            inspect.isgeneratorfunction, 
+    #            inspect.iscoroutinefunction,
+    #            inspect.isasyncgenfunction,
+    #            inspect.isbuiltin, 
+    #            inspect.isroutine # NOTE: is this redundant? (isfunction or ismethod or isbuiltin)
+    #            )
+    
+    
+    return isinstance(x, function_types)
+    
 
+#     if not ret:
+#         ret = any(f(x) for f in testers)
+#         
+#     return ret
+    
+def is_callable(x):
+    """Brief reminder:
+    An object is callable if it is:
+
+    • a Python function (including created by a lambda expression) ↔ inspect.isfunction
+        
+        e.g., `def f(x): ... ` in a module
+
+    • a bound method written in Python ↔ inspect.ismethod
+
+        e.g. `def f(self, ...): ... ` inside a class definition block
+
+    • a generator function ↔ inspect.isgeneratorfunction
+
+        a function which returns a generator iterator by way of `yield` 
+            instead of `return`
+
+        e.f. `def f(x): ... yield x+1`
+
+    • a coroutine function ↔ inspect.iscoroutinefunction
+
+        a function which returns a coroutine object; these are defined with
+        `async def` statement
+
+    • an asynchronous generator ↔ inspect.isasyncgenfunction
+
+        a function which returns an asynchronous generator iterator; these are
+        defined with `async def` statement and use `yield` (not `return`)
+
+    • a builtin function ↔ inspect.isbuiltin
+
+        a built-in function or bound built-in method
+
+    • a routine: user-defined or built-in function or method
+
+    • an instance of a class that has a __call__ method
+
+    """
+    ret = is_routine(x)
+    
+    if not ret:
+        ret = callable(x)
+        # ret = inspect.ismethod(getattr(x, "__call__", None))
+    
+    return ret
 
 def is_vector(x):
     """Returns True if x is a numpy array encapsulating a vector.
@@ -726,3 +798,35 @@ class TypeEnum(IntEnum):
         return self.strand(self.name, name)
         
     
+def inspect_members(obj, predicate=None):
+    skips = ("__class__", "__module__", "__name__", "__qualname__", "__func__",
+             "__self__", "__code__", "__defaults__", "__kwdefaults__", 
+             "__globals__", "__builtins__", "__annotations__", "__doc__",
+             "__dict__", "__delattr__", "__dir__")
+    
+    specials = ("fb_", "f_", "co_", "gi_", "cr_", "__")
+    
+    # print(f"inspect_members predicate: {predicate}")
+    
+    names = tuple(n for n in dir(obj) if n not in skips and all(not n.startswith(s) for s in specials))
+    
+    mb = tuple((n, getattr(obj, n, None)) for n in names)
+    
+    if inspect.isfunction(predicate):
+        mb = tuple(filter(lambda x: predicate(x[1]), mb))
+        
+    # mb = tuple(map(lambda x: x[:97] + "..." if isinstance(x, (str, bytes)) and len(x)> 100 else x, mb))
+                   
+    return dict(mb)
+                   
+#     if inspect.isfunction(predicate):
+#         
+#         mb = inspect.getmembers(obj, predicate)
+#     else:
+#         mb = inspect.getmembers(obj)
+#         
+#     
+#     mb = filter(lambda x: x[0] not in skips and all(not x[0].startswith(s) for s in specials), mb)
+#         
+#     return dict(mb)
+        

@@ -129,7 +129,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     viewer_for_types = ((object, 0))
     view_action_name = None
     
-    def __init__(self, data: object = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, **kwargs):
+    def __init__(self, data: object = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, deleteOnClose=False, **kwargs):
         """Constructor.
         
         Sets up attributes common to all Scipyen's viewers.
@@ -166,6 +166,15 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             
             When None (the default) the window title will contain only the
             viewer name suffixed with the window ID.
+    
+        deleteOnClose: When True, informs the parent that the this instance of
+            viewer should be removed (deleted) from the window management
+            attributes of the owner. 
+            Default is False.
+    
+            NOTE: In this context, "deleting" just removes the symbol bound to 
+            the python object (viewer instance). The object may still lurk
+            around in memory until the garbage collector wipes it out.
         
         *args, **kwargs: variadic argument and keywords specific to the constructor of the
             derived subclass.
@@ -181,6 +190,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self._linkedViewers_ = list()
         
         self._data_ = None # holds a reference to data!
+        
+        self._delete_on_close_ = deleteOnClose
         
         # NOTE: 2019-11-09 09:30:38
         # _data_var_name_ is either None, or the symbol bound to the data in user's namespace
@@ -584,32 +595,17 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # also de-register the viewer with Scipyen's main window, if this viewer
         # is NOT a client (child) of another Scipyen app (e.g. LSCaTWindow)
         
-        if self.isTopLevel:
-            # NOTE: 2021-07-11 09:48:50
-            # Save window settings only for top level viewer windows
-            # NOTE: 2021-05-04 21:53:04
-            # Here, saveSettings will have access to all the subclass attributes (it
-            # is fully initialized, etc)
-            # see NOTE: 2019-11-09 09:30:38 for details
-            #self.saveSettings()
+        if self._delete_on_close_:
+            if self.isTopLevel:
+                if any([v is self for v in self.appWindow.workspace.values()]):
+                    self.appWindow.deRegisterViewer(self) # this will also save settings and close the viewer window
+                    self.appWindow.removeFromWorkspace(self, by_name=False)
+            
+            else:
+                self.sig_closeMe.emit()
         
-            if any([v is self for v in self.appWindow.workspace.values()]):
-                self.appWindow.deRegisterViewer(self) # this will also save settings and close the viewer window
-                self.appWindow.removeFromWorkspace(self, by_name=False)
-
-            # if self.close():
-            #     evt.accept()
-            # return
-#             
-#             if self.close():
-#                 evt.accept()
-#             else:
-#                 evt.ignore()
-                
-        else:
-            self.sig_closeMe.emit()
-            # self.setVisible(False)
-            # evt.ignore()
+        # if not self.isTopLevel:
+        #     self.sig_closeMe.emit()
 
         if self.close():
             evt.accept()

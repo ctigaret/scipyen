@@ -6,4 +6,7 @@
 ## call
 ```python
 membrane.analyse_AP_step_injection_series()
-``
+```
+### breakdown
+
+1. 

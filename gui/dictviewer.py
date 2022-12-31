@@ -6,7 +6,7 @@ Qt5-based viewer window for dict and subclasses
 #### BEGIN core python modules
 from __future__ import print_function
 
-import os, warnings, types, traceback, itertools
+import os, warnings, types, traceback, itertools, inspect, dataclasses, numbers
 from collections import deque
 from dataclasses import MISSING
 import math
@@ -207,7 +207,8 @@ class InteractiveTreeWidget(DataTreeWidget):
         self.top_title = "/"
         self._last_active_item_ = None
         self._last_active_item_column_ = 0
-        
+        self.has_dynamic_private = False
+        self._private_data_ = None
         super(InteractiveTreeWidget, self).__init__(*args, **kwargs)
         self.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerItem)
         self.setColumnCount(3)
@@ -240,10 +241,15 @@ class InteractiveTreeWidget(DataTreeWidget):
         self._last_active_item_ = item.data(0,QtCore.Qt.DisplayRole)
         self._last_active_item_column_ = column
     
-    def setData(self, data, top_title:str = "", hideRoot=False):
+    def setData(self, data, predicate=None, top_title:str = "", dataTypeStr = None, hideRoot=False):
         """data should be a dictionary."""
         # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> set data")
         self._visited_.clear()
+        self.predicate = predicate
+        self._private_data_, self.has_dynamic_private = self._parse_data_(data)
+        
+        # print(f"{self.__class__.__name__}.setData: {type(data).__name__}, dynamic: {self.has_dynamic_private}")
+        
         if len(top_title.strip()) == 0:
             self.top_title = "/"
         else:
@@ -254,7 +260,8 @@ class InteractiveTreeWidget(DataTreeWidget):
         self.clear()
         self.widgets = []
         self.nodes = {}
-        self.buildTree(data, self.invisibleRootItem(), hideRoot=hideRoot)
+        #              data, parent,                   predicate,           hideRoot
+        self.buildTree(self._private_data_, self.invisibleRootItem(), typeStr = dataTypeStr, predicate=predicate, hideRoot=hideRoot)
         self.expandToDepth(3)
         self.resizeColumnToContents(0)
         
@@ -272,145 +279,18 @@ class InteractiveTreeWidget(DataTreeWidget):
                     self.scrollToItem(target, self._last_active_item_column_)
                     target.setSelected(True)
                     self.scrollTo(index, QtWidgets.QAbstractItemView.PositionAtCenter)
-    
-    def parse(self, data):
-        """
-        Overrides pyqtgraph.DataTreeWidget.parse()
-        
-        Given any python object, returns:
-        * typeStr - a string representation of the data type
-        * a short string representation
-        * a dict of sub-objects to be parsed further
-        * optional widget to display as sub-node
-        * NOTE 2021-07-24 14:13:10
-        * keytype: the type of the key (for dict data) or of the index (for 
-            sequences, this is always an int, except for namedtuples where it can
-            be a str).
-        
-        CHANGELOG (most recent first):
-        ------------------------------
-        
-        2022-03-04 10:00:57:
-        TableEditorWidget or ScipyenTableWidget selectable at initialization
-        TableEditorWidget is enabled by default
-        
-        NOTE: 2021-10-18 14:03:13
-        ScipyenTableWidget DEPRECATED in favour of tableeditor.TableEditorWidget
-                
-        NOTE: 2020-10-11 13:48:51
-        override superclass parse to use ScipyenTableWidget instead
-        
-        """
-        from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
-        from collections import OrderedDict
-        #from pyqtgraph.python2_3 import asUnicode
-        from core.datatypes import is_namedtuple
-        
-
-        # defaults for all objects
-        typeStr = type(data).__name__
-        typeTip = ""
-        
-        if typeStr == "instance":
-            typeStr += ": " + data.__class__.__name__
-            typeTip = data.__class__.__name__
-            
-        elif typeStr == "type":
-            typeStr = data.__name__
-            typeTip = str(data)
-            
-        if is_namedtuple(data):
-            typeTip = "(namedtuple)"
-            
-        widget = None
-        desc = ""
-        children = {}
-        
-        # type-specific changes
-        if isinstance(data, NestedFinder.nesting_types):
-            if data not in SINGLETONS and id(data) in self._visited_.keys():
-                objtype = self._visited_[id(data)][0]
-                path = "/".join(list(self._visited_[id(data)][1]))
-                if len(path.strip()) == 0:
-                    full_path = self.top_title
-                else:
-                    if self.top_title == "/":
-                        full_path = "/" + path
-                    else:
-                        full_path = "/".join([self.top_title, path])
-                desc = "<reference to %s at %s >" % (objtype, full_path)
-            else:
-                if isinstance(data, dict):
-                    desc = "length=%d" % len(data)
-                    if isinstance(data, OrderedDict):
-                        children = data
-                        
-                    else:
-                        # NOTE: 2021-07-20 09:52:34
-                        # dict objects with mixed key types cannot be sorted
-                        # therefore we resort to an indexing vector
-                        ndx = [i[1] for i in sorted((str(k[0]), k[1]) for k in zip(data.keys(), range(len(data))))]
-                        items = [i for i in data.items()]
-                        children = OrderedDict([items[k] for k in ndx])
-                        
-                elif isinstance(data, (list, tuple, deque)):
-                    desc = "length=%d" % len(data)
-                    # NOTE: 2021-07-24 14:57:02
-                    # accommodate namedtuple types
-                    if is_namedtuple(data):
-                        children = data._asdict()
-                    else:
-                        children = OrderedDict(enumerate(data))
-            
-        elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
-            children = OrderedDict([
-                ('data', data.view(np.ndarray)),
-                ('meta', data.infoCopy())
-            ])
-            
-        elif isinstance(data, pd.DataFrame):
-            desc = "length=%d, columns=%d" % (len(data), len(data.columns))
-            widget = self._makeTableWidget_(data)
-            
-        elif isinstance(data, pd.Series):
-            desc = "length=%d, dtype=%s" % (len(data), data.dtype)
-            widget = self._makeTableWidget_(data)
-            
-        elif isinstance(data, pd.Index):
-            desc = "length=%d" % len(data)
-            widget = self._makeTableWidget_(data)
-            
-        elif isinstance(data, neo.core.dataobject.DataObject):
-            desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-            if data.size == 1:
-                widget = QtWidgets.QLabel(str(data))
-            else:
-                widget = self._makeTableWidget_(data)
-                
-        elif isinstance(data, pq.Quantity):
-            desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-            if data.size == 1:
-                widget = QtWidgets.QLabel(str(data))
-            else:
-                widget = self._makeTableWidget_(data)
-                
-        elif isinstance(data, np.ndarray):
-            desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-            widget = self._makeTableWidget_(data)
-            
-        elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
-            frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
-            widget = QtWidgets.QPlainTextEdit(str('\n'.join(frames)))
-            widget.setMaximumHeight(200)
-            widget.setReadOnly(True)
-            
+                    
+    def _parse_data_(self, data):
+        if type(data) not in list(DataViewer.viewer_for_types)[:-1] and not inspect.isroutine(data) and data is not None:
+            return dt.inspect_members(data, self.predicate), True
         else:
-            desc = str(data)
+            return data, False
         
-        return typeStr, desc, children, widget, typeTip
+        
     
-    def buildTree(self, data:object, parent:QtWidgets.QTreeWidgetItem, name:str="", nameTip:str="", hideRoot:bool=False, path:tuple=()):
-        """Overrides pyqtgraph.DataTreeWidget.buildTree
+    def buildTree(self, data:object, parent:QtWidgets.QTreeWidgetItem, name:str="", nameTip:str="", typeStr = None, predicate=None, hideRoot:bool=False, path:tuple=()):
+        """
+        Overrides pyqtgraph.DataTreeWidget.buildTree()
         
         Positional parameters:
         ----------------------
@@ -483,6 +363,8 @@ class InteractiveTreeWidget(DataTreeWidget):
         else:
             node = QtWidgets.QTreeWidgetItem([name, "", ""])
             parent.addChild(node)
+            
+        # print(f"{self.__class__.__name__}.buildTree: predicate = {predicate}")
         
         # record the path to the node so it can be retrieved later
         # (this is used by the tree widget)
@@ -493,7 +375,10 @@ class InteractiveTreeWidget(DataTreeWidget):
         # hashable, hence usable as dict key
         self.nodes[path] = node
         
-        typeStr, desc, children, widget, typeTip = self.parse(data)
+        typeStr_, desc, children, widget, typeTip = self.parse(data, predicate=predicate)
+        
+        if not isinstance(typeStr, str) or len(typeStr.strip()) == 0:
+            typeStr = typeStr_
         
         # NOTE: 2022-03-04 09:04:50
         # nameTip is NOT set when this method is called by super().setData()
@@ -524,7 +409,7 @@ class InteractiveTreeWidget(DataTreeWidget):
             self.setFirstItemColumnSpanned(subnode, True)
             
         # recurse to children
-        for key, data in children.items():
+        for key, child_data in children.items():
             if isinstance(key, type):
                 keyrepr = f"{key.__module__}.{key.__name__}"
                 keytip = str(key)
@@ -541,8 +426,184 @@ class InteractiveTreeWidget(DataTreeWidget):
                 keytip = type(key).__name__
                 
             keyTypeTip = "key / index type: %s" % keytip
-            self.buildTree(data, node, keyrepr, keyTypeTip, path=path+(keyrepr,))
+            self.buildTree(child_data, node, keyrepr, keyTypeTip, predicate=predicate, path=path+(keyrepr,))
 
+    def parse(self, data, predicate=None, typeStr=None):
+        """
+        Overrides pyqtgraph.DataTreeWidget.parse()
+        
+        Returns:
+        ========
+        • typeStr - a string representation of the data type
+        • description  - a short string representation
+        • a dict of sub-objects (children) to be parsed further
+        • optional widget to display as sub-node
+        • typeTip: a string indicating the type of the key (for dict data) or of
+            the index (for sequences, this is always an int, except for namedtuples
+            where it can be a str)
+        
+        CHANGELOG (most recent first):
+        ------------------------------
+        
+        2022-03-04 10:00:57:
+        TableEditorWidget or ScipyenTableWidget selectable at initialization
+        TableEditorWidget is enabled by default
+        
+        NOTE: 2021-10-18 14:03:13
+        ScipyenTableWidget DEPRECATED in favour of tableeditor.TableEditorWidget
+                
+        NOTE: 2020-10-11 13:48:51
+        override superclass parse to use ScipyenTableWidget instead
+        
+        """
+        from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
+        from collections import OrderedDict
+        #from pyqtgraph.python2_3 import asUnicode
+        from core.datatypes import is_namedtuple
+        
+#         print(f"{self.__class__.__name__}.parse data is a {type(data).__name__}")
+#         
+#         print(f"{self.__class__.__name__}.parse: predicate = {predicate}")
+
+        # NOTE: 2022-12-30 11:37:05
+        # allow pre-empting the type string (e.g. when passed a dict created
+        # dynamically from an object of some type)
+        if not isinstance(typeStr, str):
+            # defaults for all objects; ho
+            typeStr = type(data).__name__
+            typeTip = ""
+        else:
+            typeTip = typeStr
+        
+        if typeStr == "instance":
+            typeStr += ": " + data.__class__.__name__
+            typeTip = data.__class__.__name__
+            
+        elif typeStr == "type":
+            typeStr = data.__name__
+            typeTip = str(data)
+            
+        if is_namedtuple(data):
+            typeTip = "(namedtuple)"
+            
+        widget = None
+        desc = ""
+        children = {}
+        
+        if data is None:
+            typeStr = ""
+            return typeStr, desc, children, widget, typeTip 
+        
+        elif data is dataclasses.MISSING:
+            desc = str(MISSING)
+            return typeStr, desc, children, widget, typeTip 
+            
+        
+        # type-specific changes
+        try:
+            if isinstance(data, NestedFinder.nesting_types):
+                if data not in SINGLETONS and id(data) in self._visited_.keys():
+                    objtype = self._visited_[id(data)][0]
+                    path = "/".join(list(self._visited_[id(data)][1]))
+                    if len(path.strip()) == 0:
+                        full_path = self.top_title
+                    else:
+                        if self.top_title == "/":
+                            full_path = "/" + path
+                        else:
+                            full_path = "/".join([self.top_title, path])
+                    desc = "<reference to %s at %s >" % (objtype, full_path)
+                else:
+                    if isinstance(data, dict):
+                        desc = "length=%d" % len(data)
+                        if isinstance(data, OrderedDict):
+                            children = data
+                            
+                        else:
+                            # NOTE: 2021-07-20 09:52:34
+                            # dict objects with mixed key types cannot be sorted
+                            # therefore we resort to an indexing vector
+                            ndx = [i[1] for i in sorted((str(k[0]), k[1]) for k in zip(data.keys(), range(len(data))))]
+                            items = [i for i in data.items()]
+                            children = OrderedDict([items[k] for k in ndx])
+                            
+                    elif isinstance(data, (list, tuple, deque)):
+                        desc = "length=%d" % len(data)
+                        # NOTE: 2021-07-24 14:57:02
+                        # accommodate namedtuple types
+                        if is_namedtuple(data):
+                            children = data._asdict()
+                        else:
+                            children = OrderedDict(enumerate(data))
+                
+            elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
+                children = OrderedDict([
+                    ('data', data.view(np.ndarray)),
+                    ('meta', data.infoCopy())
+                ])
+                
+            elif isinstance(data, pd.DataFrame):
+                desc = "length=%d, columns=%d" % (len(data), len(data.columns))
+                widget = self._makeTableWidget_(data)
+                
+            elif isinstance(data, pd.Series):
+                desc = "length=%d, dtype=%s" % (len(data), data.dtype)
+                widget = self._makeTableWidget_(data)
+                
+            elif isinstance(data, pd.Index):
+                desc = "length=%d" % len(data)
+                widget = self._makeTableWidget_(data)
+                
+            elif isinstance(data, neo.core.dataobject.DataObject):
+                desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+                if data.size == 1:
+                    widget = QtWidgets.QLabel(str(data))
+                else:
+                    widget = self._makeTableWidget_(data)
+                    
+            elif isinstance(data, pq.Quantity):
+                desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+                if data.size == 1:
+                    widget = QtWidgets.QLabel(str(data))
+                else:
+                    widget = self._makeTableWidget_(data)
+                    
+            elif isinstance(data, np.ndarray):
+                desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+                widget = self._makeTableWidget_(data)
+                
+            elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
+                frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
+                widget = QtWidgets.QPlainTextEdit(str('\n'.join(frames)))
+                widget.setMaximumHeight(200)
+                widget.setReadOnly(True)
+                
+            elif isinstance(data, str):
+                if len(data)> 100:
+                    _data = data[:97] + "..."
+                else:
+                    _data = data
+                desc = f"string with {len(data)} characters"
+                widget = QtWidgets.QPlainTextEdit(data)
+                widget.setMaximumHeight(200)
+                widget.setReadOnly(True)
+                
+            else:
+                # NOTE: 2022-12-30 14:26:46
+                # Descending into the data's members is too prone for infinite recurson.
+                # Hence, we STOP here (i.e. at first level).
+                desc = str(data)
+                
+#             elif isinstance(data, (type, numbers.Number, str, bytes, types.FrameType)) or dt.is_routine(data):
+#                 desc = str(data)
+#                 
+#             else:
+#                 children = dt.inspect_members(data, predicate)
+                    
+            return typeStr, desc, children, widget, typeTip 
+        except:
+            print(f"{self.__class__.__name__}.parse data type : {type(data).__name__}, data: {data}")
+            raise
         
 class DataViewer(ScipyenViewer):
     """Viewer for hierarchical (nesting) collection types.
@@ -575,16 +636,70 @@ class DataViewer(ScipyenViewer):
     viewer_for_types = {dict:99, 
                         list:99, 
                         tuple:99,
+                        pd.DataFrame:99,
+                        pd.Series:99,
+                        pd.Index:99,
+                        neo.core.dataobject.DataObject:99,
+                        types.TracebackType:99,
+                        pq.Quantity:0,
+                        np.ndarray:0,
                         AnalysisUnit:0,
-                        AxesCalibration:99,
+                        AxesCalibration:0,
                         neo.core.baseneo.BaseNeo:0,
                         ScanData:0, 
-                        TriggerProtocol:0}
+                        TriggerProtocol:0,
+                        object:0}
     
     # view_action_name = "Object"
     
-    def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None,  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, useTableEditor:bool = True, *args, **kwargs):
+    def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None,  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, useTableEditor:bool = True, predicate = None, hideRoot:bool=False, *args, **kwargs):
+        """
+        Parameters:
+        ===========
+        data: a Python object
+        parent: a QMainWindow, a QWidget, or None (default).
+            When parent is the Scipyen main window this will be a "top level" viewer
+    
+        ID: int: the ID of the viewer's window (mainly useful for managing several
+                top level isntances of the data viewer
+    
+        win_title: when specified, overrides the default window title
+    
+        doc_title: when specified, it will be combined with win_title to generate the
+            actual window title
+    
+        useTableEditor: default is True → will use gui.tableeditor.TableEditor to
+            display tabular data; else uses ScipyenTableWidget defined in this
+            module.
+    
+        predicate: a unary python function returning a bool, or None (default)
+            When not None, this will effectively filter what contents are displayed
+            in the dataviewer, based on the predicate.
+    
+            For example, see the 'is*' functions in Python's inspect module.
+            Mostly useful with objects.
+    
+        hideRoot: When false (default) the root of the tree hierarchy is displayed.
+    
+        *args, **kwargs ⇒ passed on to ScipyenViewer superclass.
+    
+        """
         self._useTableEditor_ = useTableEditor
+        
+        if inspect.isfunction(predicate):
+            self.predicate = predicate
+        else:
+            self.predicate=None
+            
+        self.hideRoot = hideRoot
+        
+        self._obj_cache_ = list()
+        self._cache_index_ = 0
+        
+        self._top_title_ = ""
+        
+        self._dataTypeStr_ = None
+        
         super().__init__(data=data, parent=parent, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs)
         
     def _configureUI_(self):
@@ -614,9 +729,21 @@ class DataViewer(ScipyenViewer):
         expandAllAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("expand-all"), "Expand All")
         expandAllAction.triggered.connect(self.slot_expandAll)
         
+        self.goFirst = self.toolBar.addAction(QtGui.QIcon.fromTheme("go-first-symbolic"), "First view")
+        self.goFirst.triggered.connect(self.slot_goFirst)
+        self.goFirst.setEnabled(False)
+        
+        self.goBack = self.toolBar.addAction(QtGui.QIcon.fromTheme("go-previous-symbolic"), "Previous")
+        self.goBack.triggered.connect(self.slot_goBack)
+        self.goBack.setEnabled(False)
+        
+        self.goNext = self.toolBar.addAction(QtGui.QIcon.fromTheme("go-next-symbolic"), "Next view")
+        self.goNext.triggered.connect(self.slot_goNext)
+        self.goNext.setEnabled(False)
+        
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
         
-    def _set_data_(self, data:object, *args, **kwargs):
+    def _set_data_(self, data:object, predicate=None, hideRoot=False, *args, **kwargs):
         """
         Display new data
         # TODO 2019-09-14 10:16:03: NOTE: 2021-10-03 13:10:00 SCRAP THAT
@@ -627,17 +754,30 @@ class DataViewer(ScipyenViewer):
         # to treat other data types as well.
         # Solutions to be implemented in the InteractiveTreeWidget in this module
         """
-        #print(data)
-        
         #if not isinstance(data, dict):
             #data = data.__dict__
         
+        if inspect.isfunction(predicate):
+            self.predicate=predicate
+            
+        self.hideRoot = hideRoot
+        
+        # print(f"{self.__class__.__name__}._set_data_ predicate = {self.predicate}")
+        
         if data is not self._data_:
+            # print(f"{self.__class__.__name__}._set_data_ data is a {type(data).__name__}")
             self._data_ = data
+            self._dataTypeStr_ = type(self._data_).__name__
+            self._top_title_ = self._docTitle_ if (isinstance(self._docTitle_, str) and len(self._docTitle_.strip())) else "/"
             
-            top_title = self._docTitle_ if (isinstance(self._docTitle_, str) and len(self._docTitle_.strip())) else "/"
+            self._obj_cache_.clear()
+            self._cache_index_ = 0
+            for w in (self.goFirst, self.goBack, self.goNext):
+                w.setEnabled(False)
             
-            self.treeWidget.setData(self._data_, top_title)
+            self._obj_cache_.append((self._top_title_, self._data_))
+            
+            self._populate_tree_widget_()
             
             #if self.treeWidget.topLevelItemCount() == 1:
                 #self.treeWidget.topLevelItem(0).setText(0, top_title)
@@ -648,19 +788,46 @@ class DataViewer(ScipyenViewer):
                 
         if kwargs.get("show", True):
             self.activateWindow()
+            
+    def _populate_tree_widget_(self):
+        self.treeWidget.clear()
+        if len(self._obj_cache_):
+            if self._cache_index_ >= len(self._obj_cache_):
+                self._cache_index_ = len(self._obj_cache_) - 1
+            obj_tuple = self._obj_cache_[self._cache_index_]
+            self.treeWidget.setData(obj_tuple[1], 
+                                    predicate = self.predicate, 
+                                    top_title=obj_tuple[0], 
+                                    dataTypeStr=type(obj_tuple[1]).__name__, 
+                                    # dataTypeStr=self._dataTypeStr_, 
+                                    hideRoot=self.hideRoot)
+            
+            for k in range(self.treeWidget.topLevelItemCount()):
+                self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
 
     @pyqtSlot()
     @safeWrapper
     def slot_refreshDataDisplay(self):
-        top_title = self._docTitle_ if (isinstance(self._docTitle_, str) and len(self._docTitle_.strip())) else "/"
+        self._top_title_ = self._docTitle_ if (isinstance(self._docTitle_, str) and len(self._docTitle_.strip())) else "/"
         
-        self.treeWidget.setData(self._data_, top_title)
-
+        if len(self._obj_cache_):
+            self._obj_cache_[0] = (self._top_title_, self._data_)
+            if len(self._obj_cache_) > 1:
+                self._obj_cache_[1:] = []
+                
+        else:
+            self._obj_cache_.append((self._top_title_, self._data_))
+        
+        self._cache_index_ = 0
+        for w in (self.goFirst, self.goBack, self.goNext):
+            w.setEnabled(False)
+        self._populate_tree_widget_()
+            
         #if self.treeWidget.topLevelItemCount() == 1:
             #self.treeWidget.topLevelItem(0).setText(0, top_title)
             
-        for k in range(self.treeWidget.topLevelItemCount()):
-            self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
+        # for k in range(self.treeWidget.topLevelItemCount()):
+        #     self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
             #self._collapseRecursive_(self.treeWidget.topLevelItem(k), collapseCurrent=False)
 
     @pyqtSlot(QtWidgets.QTreeWidgetItem, int)
@@ -680,16 +847,71 @@ class DataViewer(ScipyenViewer):
             parent = parent.parent()
         
         item_path.reverse()
-        
-        obj = get_nested_value(self._data_, item_path[1:]) # because 1st item is the insivible root name
+        # print(f"item_path {item_path}")
+        # obj = get_nested_value(self._data_, item_path[1:]) # because 1st item is the insivible root name
+        if self.treeWidget.has_dynamic_private:
+            obj = getattr(self._obj_cache_[self._cache_index_][1], item_path[-1], None)
+        else:
+            obj = get_nested_value(self._obj_cache_[self._cache_index_][1], item_path[1:]) # because 1st item is the insivible root name
         
         objname = " > ".join(item_path)
         
         newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
         
-        self._scipyenWindow_.viewObject(obj, objname, 
-                                       newWindow=newWindow)
+        # print(f"slot_itemDoubleClicked obj: {objname} =  {type(obj).__name__}")
+        if obj is None:
+            return
         
+        if newWindow:
+            self._scipyenWindow_.viewObject(obj, objname, 
+                                        newWindow=newWindow)
+            
+        else:
+            if objname in tuple(t[0] for t in self._obj_cache_):
+                ndx = [k for k in range(len(self._obj_cache_)) if self._obj_cache_[k][0] == objname]
+                if len(ndx):
+                    self._cache_index_ = ndx[0]
+                
+            else:
+                self._obj_cache_.append((objname, obj))
+                self._cache_index_ = self._cache_index_ + 1
+                
+            for w in (self.goFirst, self.goBack):
+                w.setEnabled(len(self._obj_cache_) > 1)
+                
+            self.goNext.setEnabled(self._cache_index_ < len(self._obj_cache_)-1)
+            
+            self._populate_tree_widget_()
+            
+    @pyqtSlot()
+    def slot_goBack(self):
+        self._cache_index_ = self._cache_index_ - 1
+        
+        if self._cache_index_ < 0:
+            self._cache_index_ = 0
+            
+        elif self._cache_index_ >= len(self._obj_cache_):
+            self._cache_index_ = len(self._obj_cache_) - 1
+            
+        self.goNext.setEnabled(self._cache_index_ < len(self._obj_cache_)-1)
+        self.goBack.setEnabled(self._cache_index_ >0)
+            
+        self._populate_tree_widget_()
+        
+    @pyqtSlot()
+    def slot_goFirst(self):
+        self._cache_index_ = 0
+        self._populate_tree_widget_()
+        
+    @pyqtSlot()
+    def slot_goNext(self):
+        self._cache_index_ = self._cache_index_ + 1
+        if self._cache_index_ >= len(self._obj_cache_):
+            self._cache_index_ = len(self._obj_cache_) - 1
+            
+        self.goNext.setEnabled(self._cache_index_ < len(self._obj_cache_)-1)   
+        self.goBack.setEnabled(self._cache_index_ >0)
+        self._populate_tree_widget_()
         
     @pyqtSlot(QtCore.QPoint)
     @safeWrapper
@@ -935,7 +1157,7 @@ class DataViewer(ScipyenViewer):
     
     
     @safeWrapper
-    def _parse_item(self, item):
+    def _parse_item_(self, item):
         item_name = item.text(0)
         
         if len(item_name.strip()) == 0:
@@ -975,7 +1197,7 @@ class DataViewer(ScipyenViewer):
         """
         item_path = list()
         
-        ndx = self._parse_item(item)
+        ndx = self._parse_item_(item)
         
         if ndx is not None:
             item_path.append(ndx)
@@ -984,7 +1206,7 @@ class DataViewer(ScipyenViewer):
         
         while parent is not None:
             if parent.parent() is not None:
-                ndx = self._parse_item(parent)
+                ndx = self._parse_item_(parent)
                 if ndx is not None:
                     item_path.append(ndx)
                 
@@ -1051,15 +1273,19 @@ class DataViewer(ScipyenViewer):
                 name = strutils.str2symbol("%s" % path[-1])
                 
             #print("name", name)
-            
-            objs = NestedFinder.getvalue(self._data_, path, single=True)
+            src = self._obj_cache_[self._cache_index_][1]
+            if self.treeWidget.has_dynamic_private:
+                objs = [getattr(src,path[-1], None)]
+            else:
+                # objs = NestedFinder.getvalue(self._data_, path, single=True)
+                objs = NestedFinder.getvalue(src, path, single=True)
             
             if len(objs) == 0:
                 continue
             
             if len(objs) > 1:
                 raise RuntimeError("More than one value was returned")
-            
+                
             names.append(name)
             objects += objs
                 

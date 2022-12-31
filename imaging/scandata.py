@@ -45,7 +45,7 @@ from core.triggerprotocols import (TriggerProtocol,
 
 from core.neoutils import (clear_events, get_index_of_named_signal, is_empty,)
 #from core.neoutils import (clear_events, get_index_of_named_signal, neo_copy, is_empty,)
-from ephys.ephys import (average_segments, )
+from core.neoutils import (average_segments, )
 
 from imaging.vigrautils import (proposeLayout, concatenateImages, croppedView, 
                                 imageIndexTuple, resampleImage, resampleImageAxis,
