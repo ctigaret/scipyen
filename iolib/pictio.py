@@ -990,14 +990,6 @@ def loadAxonFile(fileName:str, create_group_across_segment:typing.Union[bool, di
     data : neo.Block; its "annotations" attribute is updated to include
         the axon_info "meta data" augumented with t_start and sampling_rate
         
-    NOTE: 2020-02-17 09:31:05
-    This now handles only axon binary files, and returns the data AND the metadata
-    in axon file as well.
-    
-    NOTE: 2020-02-17 18:07:53
-    Reverting back to a single return variable: a neo.Block. The metadata is
-    appended to the annotation block of the variable.
-    The "protocol_sweeps" are not useful: all signals contain zeros!
     """
     
     if not os.path.isfile(fileName):

@@ -581,12 +581,12 @@ class InteractiveTreeWidget(DataTreeWidget):
             elif isinstance(data, str):
                 if len(data)> 100:
                     _data = data[:97] + "..."
+                    desc = f"string with {len(data)} characters"
+                    widget = QtWidgets.QPlainTextEdit(data)
+                    widget.setMaximumHeight(200)
+                    widget.setReadOnly(True)
                 else:
-                    _data = data
-                desc = f"string with {len(data)} characters"
-                widget = QtWidgets.QPlainTextEdit(data)
-                widget.setMaximumHeight(200)
-                widget.setReadOnly(True)
+                    desc = data
                 
             else:
                 # NOTE: 2022-12-30 14:26:46

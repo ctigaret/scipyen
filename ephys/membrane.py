@@ -57,7 +57,7 @@ from core.quantities import units_convertible
 import core.neoutils as neoutils
 #import core.triggerprotocols
 from core.triggerevent import (TriggerEvent, TriggerEventType)
-from core.triggerprotocols import (TriggerProtocol)
+from core.triggerprotocols import (TriggerProtocol, auto_define_trigger_events, auto_detect_trigger_protocols)
 #import imaging.scandata
 from imaging.scandata import ScanData
 
@@ -229,7 +229,7 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
         raise RuntimeError("Cannot determine signal interval boundaries")
         
     if isinstance(Im, str):
-        Im = ephys.get_index_of_named_signal(segment, Im)
+        Im = neoutils.get_index_of_named_signal(segment, Im)
         
     elif not isinstance(Im, int):
         raise TypeError("Im expected to be a str or int; got %s instead" % type(Im).__name__)
@@ -255,7 +255,7 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
         # get the vm signal and measure vstep based on the specified regions:
         # use Irin region and Ibase region to determine the amplitude of vstep.
         if isinstance(Vm, str):
-            Vm = ephys.get_index_of_named_signal(segment, Vm)
+            Vm = neoutils.get_index_of_named_signal(segment, Vm)
         
         elif not isinstance(Vm, int):
             raise TypeError("Vm expected to be a str or int; got %s instead" % type(Vm).__name__)
@@ -1186,7 +1186,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
     data = neoutils.set_relative_time_start(data)
     
     if t_start is not None and t_stop is not None:
-        data = ephys.get_time_slice(data, t0=t_start, t1=t_stop)
+        data = neoutils.get_time_slice(data, t0=t_start, t1=t_stop)
         
     if isinstance(data, neo.Block):
         segments = data.segments
@@ -1201,7 +1201,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
         raise TypeError("'data' expected to be a neo.Block, neo.Segment, or a sequence of neo.Segment; got %s instead" % type(data).__name__)
     
     if isinstance(VmSignal, str):
-        vmsignalindex = utilities.unique(ephys.get_index_of_named_signal(data, VmSignal))[0]
+        vmsignalindex = utilities.unique(neoutils.get_index_of_named_signal(data, VmSignal))[0]
         
     elif isinstance(VmSignal, int):
         vmsignalindex = VmSignal
@@ -1210,7 +1210,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
         raise TypeError("'VmSignal' expected to be a str or an int; got %s instead" % type(VmSignal).__name__)
     
     if isinstance(ImSignal, str):
-        imsignalindex = utilities.unique(ephys.get_index_of_named_signal(data, ImSignal))[0]
+        imsignalindex = utilities.unique(neoutils.get_index_of_named_signal(data, ImSignal))[0]
         
     elif isinstance(ImSignal, int):
         imsignalindex = ImSignal
@@ -1575,7 +1575,7 @@ def PassiveMembranePropertiesAnalysis(block:neo.Block, Vm_index:(int,str) = "Vm_
     else:
         if isinstance(Im_index, str):
             try:
-                Im_index = ephys.get_index_of_named_signal(block.segments[0], Im_index)
+                Im_index = neoutils.get_index_of_named_signal(block.segments[0], Im_index)
             except Exception as e:
                 raise RuntimeError("%s signal not found" % Im_index)
             
@@ -1584,7 +1584,7 @@ def PassiveMembranePropertiesAnalysis(block:neo.Block, Vm_index:(int,str) = "Vm_
         
     if isinstance(Vm_index, str):
         try:
-            Vm_index = ephys.get_index_of_named_signal(block.segments[0], Vm_index)
+            Vm_index = neoutils.get_index_of_named_signal(block.segments[0], Vm_index)
         except Exception as e:
             raise RuntimeError("%s signal not found" % Vm_index)
         
@@ -2117,7 +2117,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr
         if len(signal_index.strip()) == 0:
             raise ValueError("signal_index is an empty string!")
         
-        signal_index = ephys.get_index_of_named_signal(segment, signal_index, silent=True)
+        signal_index = neoutils.get_index_of_named_signal(segment, signal_index, silent=True)
         
         if isinstance(signal_index, (tuple, list)):
             if len(signal_index) and isinstance(signal_index[0], int):
@@ -2359,7 +2359,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
     if t0 is not None and t1 is not None:
         signal = signal.time_slice(t0, t1)
             
-    dsdt = ephys.ediff1d(signal).rescale(pq.V/pq.s)
+    dsdt = sigp.ediff1d(signal).rescale(pq.V/pq.s)
     
     if isinstance(thr, numbers.Real):
         thr *= pq.V/pq.s
@@ -2371,12 +2371,12 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
         thr = thr.rescale(pq.V/pq.s)
 
     if smooth_window is not None:
-        dsdt = ephys.convolve(dsdt, boxcar(smooth_window)/smooth_window)
+        dsdt = sigp.convolve(dsdt, boxcar(smooth_window)/smooth_window)
         
-    d2sdt2 = ephys.ediff1d(dsdt).rescale(dsdt.units/dsdt.times.units)
+    d2sdt2 = sigp.ediff1d(dsdt).rescale(dsdt.units/dsdt.times.units)
     
     if smooth_window is not None:
-        d2sdt2 = ephys.convolve(d2sdt2, boxcar(smooth_window)/smooth_window)
+        d2sdt2 = sigp.convolve(d2sdt2, boxcar(smooth_window)/smooth_window)
     
     ap_waves = extract_pulse_triggered_APs(signal, times, tail=tail)
     ap_dvdt = extract_pulse_triggered_APs(dsdt, times, tail=tail)
@@ -3077,10 +3077,10 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             raise TypeError("new sampling rate expected to be a scalar float, Quantity, or None; got %s instead" % type(resample_with_rate).__name__)
         
         if resample_with_rate is not None and resample_with_period is None:
-            resample_with_period = ephys.sampling_rate_or_period(resample_with_rate, resample_with_period)
+            resample_with_period = neoutils.sampling_rate_or_period(resample_with_rate, resample_with_period)
             
         elif resample_with_rate is not None and resample_with_period is not None:
-            if not ephys.sampling_rate_or_period(resample_with_rate, resample_with_period):
+            if not neoutils.sampling_rate_or_period(resample_with_rate, resample_with_period):
                 raise ValueError("resample_with_rate (%s) and resample_with_period (%s) are incompatible" % (resample_with_rate, resample_with_period))
     
 
@@ -3244,10 +3244,10 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5, min_ap_isi= 6e-3*pq.s
                              units = pq.V, t_start = sig.t_start, time_units = pq.s, name=sig.name)
     vmsig.annotate(**sig.annotations)
     
-    dv_dt = ephys.ediff1d(vmsig).rescale(pq.V/pq.s)  # 1st derivative of the Vm signal
+    dv_dt = sigp.ediff1d(vmsig).rescale(pq.V/pq.s)  # 1st derivative of the Vm signal
     
     if w is not None:
-        dv_dt_smooth = ephys.convolve(dv_dt, w)        # and its smoothed version
+        dv_dt_smooth = sigp.convolve(dv_dt, w)        # and its smoothed version
         dv_dt_smooth.name = "%s_1st_derivative" % sig.name
         
     else:
@@ -3266,10 +3266,10 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5, min_ap_isi= 6e-3*pq.s
     
     dvmsig.annotate(**dv_dt_smooth.annotations)
     
-    d2v_dt2 = ephys.ediff1d(dvmsig).rescale(pq.V/(pq.s**2)) # 2nd derivative of the Vm signal
+    d2v_dt2 = sigp.ediff1d(dvmsig).rescale(pq.V/(pq.s**2)) # 2nd derivative of the Vm signal
     
     if w is not None:
-        d2v_dt2_smooth = ephys.convolve(d2v_dt2, w)                   # and its smoothed version 
+        d2v_dt2_smooth = sigp.convolve(d2v_dt2, w)                   # and its smoothed version 
         d2v_dt2_smooth.name = "%s_2nd_derivative" % sig.name
         
     else:
@@ -4283,10 +4283,10 @@ def ap_phase_plot_data(vm, dvdt=None, smooth_window=None):
         h = None
         
     if dvdt is None:
-        dvdt = ephys.ediff1d(vm).rescale(pq.V/pq.s)
+        dvdt = sigp.ediff1d(vm).rescale(pq.V/pq.s)
         
         if h is not None:
-            dvdt = ephys.convolve(dvdt, h)
+            dvdt = sigp.convolve(dvdt, h)
             
     ret = IrregularlySampledDataSignal(vm.magnitude * vm.units, 
                                           dvdt.magnitude * dvdt.units, 
@@ -4338,10 +4338,10 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relati
         h = None
         
     if dvdt is None:
-        dvdt = ephys.ediff1d(vm).rescale(pq.V/pq.s)
+        dvdt = sigp.ediff1d(vm).rescale(pq.V/pq.s)
         
         if h is not None:
-            dvdt = ephys.convolve(dvdt, h)
+            dvdt = sigp.convolve(dvdt, h)
             
     if isinstance(dvdt_thr, numbers.Real):
         dvdt_thr *= dvdt.units
@@ -4353,10 +4353,10 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relati
         dvdt_thr = dvdt_thr.rescale(dvdt.units)
 
     if d2vdt2 is None:
-        d2vdt2 = ephys.ediff1d(dvdt).rescale(pq.V/(pq.s**2))
+        d2vdt2 = sigp.ediff1d(dvdt).rescale(pq.V/(pq.s**2))
         
         if h is not None:
-            d2vdt2 = ephys.convolve(d2vdt2, h)
+            d2vdt2 = sigp.convolve(d2vdt2, h)
     
     dvdt_ge_thr = dvdt >= dvdt_thr
     
@@ -4532,10 +4532,10 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
         raise ValueError("There are no segments in the block")
     
     if isinstance(VmSignal, str):
-        VmSignal = ephys.get_index_of_named_signal(block.segments[0], VmSignal)
+        VmSignal = neoutils.get_index_of_named_signal(block.segments[0], VmSignal)
         
     if isinstance(ImSignal, str):
-        ImSignal = ephys.get_index_of_named_signal(block.segments[0], ImSignal)
+        ImSignal = neoutils.get_index_of_named_signal(block.segments[0], ImSignal)
         
         
     #times = None
@@ -5936,12 +5936,12 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     # 
     
     if isinstance(VmSignal, str):
-        VmSignal = ephys.get_index_of_named_signal(segment, VmSignal)
+        VmSignal = neoutils.get_index_of_named_signal(segment, VmSignal)
     
     vm = segment.analogsignals[VmSignal].copy()
         
     if isinstance(ImSignal, str):
-        im = segment.analogsignals[ephys.get_index_of_named_signal(segment, ImSignal)].copy()
+        im = segment.analogsignals[neoutils.get_index_of_named_signal(segment, ImSignal)].copy()
         
     elif isinstance(ImSignal, int):
         im = segment.analogsignals[ImSignal].copy()
@@ -6071,12 +6071,12 @@ def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
         Iinj: Quantity = the actual value of injected current calculated from the command signal
     
     """
-    averaged_block = ephys.average_blocks(*data_blocks, step_index = step_index, signal_index = [Vm_index, Iinj_index], name=name_prefix)
+    averaged_block = neoutils.average_blocks(*data_blocks, step_index = step_index, signal_index = [Vm_index, Iinj_index], name=name_prefix)
     
     neoutils.set_relative_time_start(averaged_block)
     
-    ephys.auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = True, label = "Ion", append=False)
-    ephys.auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
+    auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = True, label = "Ion", append=False)
+    auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
     
     Ion = averaged_block.segments[0].events[0].times
     
@@ -6117,12 +6117,11 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
     
     for b in data_blocks:
         bb = deepcopy(b)
-        #bb = ephys.neo_copy(b)
         
         neoutils.set_relative_time_start(bb)
         
-        ephys.auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = True, label="Ion", append=False)
-        ephys.auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
+        auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = True, label="Ion", append=False)
+        auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
         
         Ion.append(bb.segments[0].events[0].times)
         
@@ -6153,7 +6152,7 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
         
     ret = neo.Block()
     
-    ret.segments[:] = ephys.average_segments(*segments, signal_index = [Vm_index, Iinj_index],
+    ret.segments[:] = neoutils.average_segments(*segments, signal_index = [Vm_index, Iinj_index],
                                                 name = name_prefix)
     
     AHP = ret.segments[0].analogsignals[Vm_index].time_slice(Ioff[-1], ret.segments[0].analogsignals[Vm_index].t_stop)
@@ -7254,7 +7253,7 @@ def batch_EventDetection(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[
         
         try:
             if isinstance(Im, str):
-                im = s.analogsignals[ephys.get_index_of_named_signal(s, Im)].copy()
+                im = s.analogsignals[neoutils.get_index_of_named_signal(s, Im)].copy()
                 
             elif isinstance(Im, int):
                 im = s.analogsignals[Im].copy()
