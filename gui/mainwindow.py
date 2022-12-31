@@ -583,9 +583,8 @@ class WindowManager(__QMainWindow__):
         winClass : str, type, or sip.wrappertype
             The only acceptable type is mpl.figure.Figure (where mpl is an alias to matplotlib)
             
-            The only acceptable sip.wrappertype objects are the viewer classes
-            defined in the variable "gui_viewers" in the user workspace. These
-            classes are:
+            The only acceptable sip.wrappertype objects are the ones loaded by 
+            slot_loadPlugins:
             
             DataViewer, MatrixViewer, ImageViewer, SignalViewer, TableEditor, 
             TextViewer, XMLViewer.
@@ -606,11 +605,9 @@ class WindowManager(__QMainWindow__):
         if isinstance(winClass, str) and len(winClass.replace("&","").strip()):
             wClass = winClass.replace("&","")
             
-            # if wClass not in [v.__name__ for v in gui_viewers]:
             if wClass not in list(v.__name__ for v in self.viewers):
                 raise ValueError("Unexpected viewer class name %s" % wClass)
             
-            # win_classes = [v for v in gui_viewers if v.__name__ == wClass]
             win_classes = list(filter(lambda x: x.__name__ == wClass, self.viewers))
             
             if len(win_classes):
@@ -1131,10 +1128,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
 #class VTH(QtCore.QObject):
 class VTH(object):
     """Variable Type Handler.
-    Handles variable types
-    TODO 2019-09-12 12:24:11
-    Edit all gui viewer classes so that they advertise what variable types they
-    support.
+    Centralized the handling of Python object types with Scipyen viewers.
     """
     # NOTE:
     # actioName: a str or None
@@ -1184,17 +1178,18 @@ class VTH(object):
         
         vartypemro = inspect.getmro(vartype)
         act_np = set()
+        
         for vtype in vartypemro:
             for k,v in VTH.gui_handlers.items():
                 if vtype in v["types"]:
-                    act_np.add((k, v["action"], v["types"][vtype]))
+                    #           viewer type,   action name   priority
+                    act_np.add((k,             v["action"],  v["types"][vtype]))
                     
         if len(act_np):
+            # sort in ascending order by action name, and in descending order by
+            # priority
             actions = sorted(sorted(list(act_np), key=lambda x: x[1]), key = lambda x: x[2], reverse=True)
             return actions
-            
-            # handler_types = list(a[0] for a in actions)
-            # return handler_types
         
         return list()
                     
@@ -3075,6 +3070,18 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     for handler_spec in handler_specs:
                         action = specialViewMenu.addAction(handler_spec[1])
                         action.triggered.connect(self.slot_autoSelectViewer)
+                        
+                    if "DataViewer" not in [h[0].__name__ for h in handler_specs]:
+                        act = specialViewMenu.addAction("DataViewer")
+                        act.triggered.connect(self.slot_useDataViewer)
+                        
+                    # act2 = specialViewMenu.addAction("Console")
+                    # act2.triggered.connect(self.slot_showInConsole)
+                        
+                else:
+                    act1 = cm.addAction("Show in DataViewer")
+                    act1.triggered.connect(self.slot_useDataViewer)
+                    
                 
         else:
             # several variables selected
@@ -6082,6 +6089,71 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             pio.writeCsv(self.workspace[varname], fileName=filename)
             
     @pyqtSlot()
+    def slot_useDataViewer(self):
+        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+            newWindow = True
+            
+        else:
+            newWindow = False
+            
+        varname = self.workspaceModel.currentItemName
+        
+        if varname is None:
+            indexList = self.workspaceView.selectedIndexes()
+            
+            if len(indexList) == 0:
+                return
+            
+            varname = self.workspaceModel.item(indexList[0].row(),0).text()
+            
+            if varname is None or isinstance(varname, str) and len(varname.strip()) == 0:
+                return
+            
+            if varname not in self.workspace.keys():
+                return
+        
+        variable = self.workspace[varname]
+        vartype = type(variable)
+        
+        viewers = [v for v in self.viewers.keys() if v.__name__ == "DataViewer"]
+        
+        if len(viewers):
+            viewer = viewers[0]
+            if not self.viewObject(variable, varname, 
+                                winType = viewer,
+                                newWindow = newWindow):
+                self.console.execute(varname)
+        else:
+            self.console.execute(varname)
+            
+    @pyqtSlot()
+    def slot_showInConsole(self):
+        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+            newWindow = True
+            
+        else:
+            newWindow = False
+            
+        varname = self.workspaceModel.currentItemName
+        
+        if varname is None:
+            indexList = self.workspaceView.selectedIndexes()
+            
+            if len(indexList) == 0:
+                return
+            
+            varname = self.workspaceModel.item(indexList[0].row(),0).text()
+            
+            if varname is None or isinstance(varname, str) and len(varname.strip()) == 0:
+                return
+            
+            if varname not in self.workspace.keys():
+                return
+        
+        self.console.execute(varname)
+        
+        
+    @pyqtSlot()
     @safeWrapper
     def slot_autoSelectViewer(self):
         if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
@@ -6125,7 +6197,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             else:
                 viewer = viewers[0]
                 
-                if not self.viewObject(variable, varname, winType = viewer, newWindow=newWindow):
+                if not self.viewObject(variable, varname, winType = viewer, 
+                                       newWindow=newWindow):
                     self.console.execute(varname)
         else:
             self.console.execute(varname)
@@ -6907,6 +6980,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: 2022-12-25 23:17:47
         # to prevent re-sorting the newViewersMenu each time, a new view action
         # is added in slot_loadPlugins
+        
+        # FIXME/TODO: 2022-12-31 12:39:25
+        # what if the viewer is already registered?
         if hasattr(x, "viewer_for_types"):
             action_name = getattr(x, "view_action_name", None)
             if not isinstance(action_name, str) or len(action_name.strip()) == 0:

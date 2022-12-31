@@ -126,7 +126,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     
     # tuple of 2-tuples (python type, priority)
     # if you don;t want this to be registered as a viewer, then make this attribute empty
-    viewer_for_types = ((object, 0))
+    viewer_for_types = {object:0}
     view_action_name = None
     
     def __init__(self, data: object = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, deleteOnClose=False, **kwargs):
@@ -451,11 +451,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #
         
         if len(args):
-            # print(f"ScipyenViewer<{self.__class__.__name__}>setData:")
-            # for k,a in enumerate(args):
-            #     print(f"\targ{k}: {type(a)}")
             if len(self.viewer_for_types) and not any([self._check_supports_parameter_type_(a) for a in args]):
-                raise TypeError("Expecting one of the supported types: %s" % " ".join([s.__name__ for s[0] in self.viewer_for_types]))
+                raise TypeError("Expecting one of the supported types: %s" % " ".join([s.__name__ for s in self.viewer_for_types]))
             
         get_focus = kwargs.get("get_focus", False)
         

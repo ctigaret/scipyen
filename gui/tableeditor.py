@@ -1243,6 +1243,7 @@ class TableEditor(ScipyenViewer):#, Ui_TableEditor):
     # finish implementing all these
     viewer_for_types = {pd.DataFrame: 99, 
                         pd.Series: 99, 
+                        pd.Index: 99,
                         neo.AnalogSignal: 0, 
                         neo.IrregularlySampledSignal: 0,
                         neo.Epoch: 0, 

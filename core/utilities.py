@@ -2552,7 +2552,12 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
     objtype = type(obj)
     typename = objtype.__name__
-    ttip = typename
+    typemodulename = objtype.__module__
+    objcls = obj.__class__
+    clsname = objcls.__name__
+    
+    fqual = ".".join([objcls.__module__, clsname])
+    ttip = ".".join([typemodulename, typename])
     
     wspace_name = "Namespace: %s" % namespace
     
@@ -2573,13 +2578,11 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
     tt = abbreviated_type_names.get(typename, typename)
     
+    
     if tt in signal_types and hasattr(obj, "dimensionality"):
         tt += " (%s)" % obj.dimensionality
     
     if tt == "instance":
-        objcls = obj.__class__
-        clsname = objcls.__name__
-        
         tt = abbreviated_type_names.get(clsname, clsname)
 
     if objtype is type:
@@ -2630,6 +2633,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     if ismemberdescriptor(obj):
         ttip += " (member descriptor)"
             
+    ttip += f"\n({fqual})"
     result["Type"] = {"display": tt, "tooltip": "type: %s" % ttip}
     
     # these get assigned values below

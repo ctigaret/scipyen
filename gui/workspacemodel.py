@@ -649,7 +649,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         
     def _gen_item_for_object_(self, propdict:dict, editable:typing.Optional[bool] = False, elidetip:typing.Optional[bool] = False, background:typing.Optional[QtGui.QBrush]=None, foreground:typing.Optional[QtGui.QBrush]=None):
-        #print(propdict)
+        # print(f"_gen_item_for_object_ propdict = {propdict}")
         item = QtGui.QStandardItem(propdict["display"])
         
         ttip = propdict["tooltip"]
@@ -684,6 +684,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def genRowFromPropDict(self, obj_props:dict, background:typing.Optional[QtGui.QBrush]=None, foreground:typing.Optional[QtGui.QBrush]=None):
         """Returns a row of QStandardItems
         """
+        # print(f"genRowFromPropDict obj_props = {obj_props}")
         return [self._gen_item_for_object_(obj_props[key], 
                 editable = (key == "Name"), 
                 elidetip = (key == "Name"),

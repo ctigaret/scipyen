@@ -39,15 +39,16 @@ def getEpochTables(x:object, as_dataFrame:bool=False):
     if not isinstance(x, pyabf.ABF):
         raise TypeError(f"Expecting a pyabf.ABF object; got {type(x).__name__} instead")
     
-    etable = [pyabf.waveform.EpochTable(x, c) for c in x.channelList]
-    
     # NOTE: 2022-03-04 15:30:22
-    # only return the epoch tables that actually contain any non-OFF epochs
+    # only return the epoch tables that actually contain any non-OFF epochs (filtered here)
+    etables = list(filter(lambda e: len(e.epochs) > 0, (pyabf.waveform.EpochTable(x, c) for c in x.channelList)))
+    
     
     if as_dataFrame:
-        return [epochTable2DF(e, x) for e in etable if len(e.epochs)]
+        return list(epochTable2DF(e, x) for e in etables)
     
-    return [e for e in etable if len(e.epochs)]
+    return etables
+    # return [e for e in etables if len(e.epochs)]
 
 def epochTable2DF(x:object, abf:typing.Optional[pyabf.ABF] = None):
     """Returns a pandas.DataFrame with the data from the epoch table 'x'
