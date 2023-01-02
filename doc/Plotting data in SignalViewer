@@ -30,7 +30,13 @@ sequence of neo.Segment:
     
     • each segment is a "frame"
     
-neo.AnalogSignal, DataSignal, neo.IrregularlySampledSignal, IrregularlySampledDataSignal:
+signal object: 
+    These are objects of one of the following types:
+        neo.AnalogSignal, 
+        neo.IrregularlySampledSignal, 
+        scipyen.core.datasignal.DataSignal
+        scipyen.core.datasignal.IrregularlySampledDataSignal.
+        
     • plotted in a single PlotItem, UNLESS separateSignalChannels flag is True, in
         which case each channel is plotted in its own PlotItem
         
@@ -40,4 +46,9 @@ neo.AnalogSignal, DataSignal, neo.IrregularlySampledSignal, IrregularlySampledDa
             is orthgonal to the data axis)
     
     
-    
+sequence (i.e. tuple, list) of signal objects:
+    • In the general case, these are considered to be disparate signals and it is
+        assumed that they do not have the same domain. This is unlike the signal
+        objects collected in a segment, where (at least theoretically) they 
+        should be defined in the same domain (t_start, duration and, for analog
+        signals, the same sampling rate) (really ?!?)

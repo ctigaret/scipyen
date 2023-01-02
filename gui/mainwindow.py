@@ -6594,6 +6594,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 # Do this independently of installing self advertised menus (see
                 # below)
                 viewerClasses = list(filter(lambda x: inspect.isclass(x[1]) and prog.is_class_defined_in_module(x[1], module) and self._is_scipyen_viewer_class_(x[1]), inspect.getmembers(module)))
+                # print(f"viewer classes {viewerClasses} in module {module}")
                 for viewerClass in viewerClasses:
                     self._register_viewer_class_(*viewerClass)
                     viewers.append(viewerClass)

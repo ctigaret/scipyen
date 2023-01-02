@@ -263,6 +263,7 @@ def find_plugins(path):
 
 def check_load_module(spec):
     module = prog.get_loaded_module(spec)
+    # print(f"check_load_module get_loaded_module module {module}")
     if isinstance(module, types.ModuleType): # module found, no beef here
         reloaded_module = importlib.reload(module) # reload plugin to reflect changes
         loaded_plugins[module.__name__] = module
@@ -270,9 +271,10 @@ def check_load_module(spec):
     else: # module not found ⇒ create and load module
         try:
             module = importlib.util.module_from_spec(spec)
+            # print(f"check_load_module module from spec {spec} ⇒ {module}")
             sys.modules[spec.name] = module
             spec.loader.exec_module(module)
             loaded_plugins[spec.name] = module
         except:
-            traceback.print_exc
+            traceback.print_exc()
     

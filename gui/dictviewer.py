@@ -209,7 +209,8 @@ class InteractiveTreeWidget(DataTreeWidget):
         self._last_active_item_column_ = 0
         self.has_dynamic_private = False
         self._private_data_ = None
-        super(InteractiveTreeWidget, self).__init__(*args, **kwargs)
+        # super(InteractiveTreeWidget, self).__init__(*args, **kwargs)
+        DataTreeWidget.__init__(self, *args, **kwargs)
         self.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerItem)
         self.setColumnCount(3)
         self.setHeaderLabels(['key / index', 'type', 'value / info'])
