@@ -451,8 +451,9 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #
         
         if len(args):
-            if len(self.viewer_for_types) and not any([self._check_supports_parameter_type_(a) for a in args]):
-                raise TypeError("Expecting one of the supported types: %s" % " ".join([s.__name__ for s in self.viewer_for_types]))
+            if "DataViewer" not in self.__class__.__name__:
+                if len(self.viewer_for_types) and not any([self._check_supports_parameter_type_(a) for a in args]):
+                    raise TypeError("Expecting one of the supported types: %s" % " ".join([s.__name__ for s in self.viewer_for_types]))
             
         get_focus = kwargs.get("get_focus", False)
         

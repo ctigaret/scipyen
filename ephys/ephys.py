@@ -28,9 +28,9 @@ using, respectively, signalviewer.SignalCursor objects or a neo.Epoch.
 
 The type of SignalCursor objects must be:
 
-SignalCursor.SignalCursorTypes.vertical, 
+SignalCursorTypes.vertical, 
 or 
-SignalCursor.SignalCursorTypes.horizontal.
+SignalCursorTypes.horizontal.
 
 The difference between cursor- and epoch-based functions consist in the way the 
 functions calculate the signal values at the interval boundaries, and in the
@@ -206,6 +206,7 @@ from enum import Enum, IntEnum
 import numpy as np
 import quantities as pq
 import neo
+import pyabf
 import matplotlib as mpl
 # import pyqtgraph as pg
 from gui.pyqtgraph_patch import pyqtgraph as pg
@@ -223,19 +224,22 @@ from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities
 from core import neoutils
+from core import quantities as spq
+from core import pyabfbridge
 from core.utilities import normalized_index
 from core.neoutils import get_index_of_named_signal
 from core.quantities import (units_convertible, check_time_units)
 
+from gui.cursors import (SignalCursor, SignalCursorTypes)
 
 #from .patchneo import neo
 
 
 #### END pict.core modules
 
-class SignalCursor:
-    # dummy
-    pass
+# class SignalCursor:
+#     # dummy
+#     pass
 
 if __debug__:
     global __debug_count__
@@ -335,8 +339,8 @@ def cursors2epoch(*args, **kwargs):
     
     SignalCursor objects are defined in the signalviewer module; this function
     expects vertical and crosshair cursors (i.e., with cursorType one of
-    SignalCursor.SignalCursorTypes.vertical, 
-    SignalCursor.SignalCursorTypes.horizontal). 
+    SignalCursorTypes.vertical, 
+    SignalCursorTypes.horizontal). 
     
     SignalCursors can also be represented by tuples of cursor  "parameters" 
     (see below), although tuples and cursor objects cannot be mixed.
@@ -458,7 +462,7 @@ def cursors2epoch(*args, **kwargs):
     >> interval == interval2
     True
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
+    # from gui.signalviewer import SignalCursor as SignalCursor
 
     intervals = kwargs.get("intervals", False)
     
@@ -539,7 +543,7 @@ def cursors2epoch(*args, **kwargs):
                     raise TypeError("All cursor parameter tuples must have two or three elements")
                          
         elif isinstance(args[0], SignalCursor):
-            if args[0].cursorType is SignalCursor.SignalCursorTypes.horizontal:
+            if args[0].cursorType is SignalCursorTypes.horizontal:
                 raise TypeError("Expecting a vertical or crosshair cursor")
             
             t_d_i = __parse_cursors_tuples__([args[0].parameters])
@@ -707,7 +711,7 @@ def cursor_reduce(func:types.FunctionType, signal: typing.Union[neo.AnalogSignal
     cursors, just call max(), min(), argmax() argmin() on a signal time slice 
     obtained using the two cursor's x values.
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
+    # from gui.signalviewer import SignalCursor as SignalCursor
     
     if not isinstance(func, types.FunctionType):
         raise TypeError(f"Expecting a function as first argument; got {type(func).__name__} instead")
@@ -918,7 +922,7 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal], cursor: typi
     when channel is specified.
     
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
+    # from gui.signalviewer import SignalCursor as SignalCursor
     
     data_index = cursor_index(signal, cursor)
     
@@ -954,7 +958,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal], cursor: typi
     An int: index of the sample
     
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
+    # from gui.signalviewer import SignalCursor as SignalCursor
 
     # NOTE: specifying a channel doesn't make sense here because all
     # channels in the signal sharethe domain and have the same number of
@@ -963,7 +967,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal], cursor: typi
         t = cursor * signal.time.units
         
     elif isinstance(cursor, SignalCursor):
-        if cursor.cursorType not in (SignalCursor.SignalCursorTypes.vertical, SignalCursor.SignalCursorTypes.crosshair):
+        if cursor.cursorType not in (SignalCursorTypes.vertical, SignalCursorTypes.crosshair):
             raise TypeError("Expecting a vertical or crosshair cursor; got %s instead" % cursor.cursorType)
         
         t = cursor.x * signal.times.units
@@ -1281,7 +1285,7 @@ def epoch2cursors(epoch: neo.Epoch, axis: typing.Optional[typing.Union[pg.PlotIt
         # cursor constructor accepts python Quantity objects for its numeric
         # parameters x, y, xwindow, ywindow, xBounds and yBounds
         cursors = [SignalCursor(axis, x=t, xwindow=d,
-                                cursor_type=SignalCursor.SignalCursorTypes.vertical,
+                                cursor_type=SignalCursorTypes.vertical,
                                 cursorID=l) for (t,d,l) in ret]
         return cursors
     
@@ -1529,7 +1533,7 @@ def intervals2cursors(*args, **kwargs):
     if xwl is not None:
         if axis is not None:
             cursors = [SignalCursor(axis, x=p[0], xwindow=p[1], cursorID=p[2], 
-                                    cursor_type=SignalCursor.SignalCursorTypes.vertical) for p in xwl]
+                                    cursor_type=SignalCursorTypes.vertical) for p in xwl]
                 
             return cursors
         
@@ -1969,8 +1973,8 @@ def generate_spike_trace(spike_times, start, duration, sampling_frequency, spike
         return result
 
 
-class ElectrophysiologyDataParser(object):
-    """Encapsulate acquisition parameters and protocols for electrophysiology data
+class ElectrophysiologyProtocol(object):
+    """Electrophysiology data acquisition protocols
     
     Intended to provide a common denominator for data acquired with various 
         electrophysiology software vendors. 

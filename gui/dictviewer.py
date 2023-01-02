@@ -281,7 +281,9 @@ class InteractiveTreeWidget(DataTreeWidget):
                     self.scrollTo(index, QtWidgets.QAbstractItemView.PositionAtCenter)
                     
     def _parse_data_(self, data):
-        if type(data) not in list(DataViewer.viewer_for_types)[:-1] and not inspect.isroutine(data) and data is not None:
+        # if type(data) not in list(DataViewer.viewer_for_types)[:-1] and not inspect.isroutine(data) and data is not None:
+        mro = inspect.getmro(type(data))
+        if all(t not in list(DataViewer.viewer_for_types) for t in mro) and not inspect.isroutine(data) and data is not None:
             return dt.inspect_members(data, self.predicate), True
         else:
             return data, False
@@ -647,8 +649,7 @@ class DataViewer(ScipyenViewer):
                         AxesCalibration:0,
                         neo.core.baseneo.BaseNeo:0,
                         ScanData:0, 
-                        TriggerProtocol:0,
-                        object:0}
+                        TriggerProtocol:0}
     
     # view_action_name = "Object"
     

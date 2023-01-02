@@ -178,7 +178,7 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
         rm_epoch = regions
         
     elif isinstance(regions, (tuple, list)) and len(regions) == 3:
-        if all([isinstance(r, SignalCursor) and (r.cursorType is SignalCursor.SignalCursorTypes.vertical or r.cursorType is SignalCursor.SignalCursorTypes.crosshair) for r in regions]):
+        if all([isinstance(r, SignalCursor) and (r.cursorType is SignalCursorTypes.vertical or r.cursorType is SignalCursorTypes.crosshair) for r in regions]):
             cIDs = [c.ID for c in regions]
             
             if any([n not in cIDs for n in ["baseline", "Rs", "Rin"]]):
@@ -3103,19 +3103,29 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
                 d = d[0]
             if u.ndim > 0:
                 u = u[0]
+                
+            start, stop = (min(d,u), max(d,u))
             
-            if d > u:
-                vstep = vm.time_slice(u, d + tail)
-                istep = im.time_slice(u, d + tail)
-                
-            elif d < u:
-                vstep = vm.time_slice(d, u + tail)
-                istep = im.time_slice(d, u + tail)
+            if d < u:
                 inj *= -1.0
+            
+            vstep = vm.time_slice(start, stop + tail)
+            istep = im.time_slice(start, stop + tail)
+            
+#             if d > u:
+#                 vstep = vm.time_slice(u, d + tail)
+#                 istep = im.time_slice(u, d + tail)
+#                 
+#             elif d < u:
+#                 vstep = vm.time_slice(d, u + tail)
+#                 istep = im.time_slice(d, u + tail)
+#                 inj *= -1.0
+#                 
+#             else:
+#                 vstep = vm.time_slice(d, d + tail)
+#                 istep = im.time_slice(d, d + tail)
                 
-            else:
-                vstep = vm.time_slice(d, d + tail)
-                istep = im.time_slice(d, d + tail)
+            print(f"extract_AP_train: start = {start}, stop = {stop}")
                 
             Ihold = istep.mean()
             
@@ -5964,6 +5974,9 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
                                     resample_with_rate=resample_with_rate,
                                     Itimes_relative = Itimes_relative,
                                     Itimes_samples = Itimes_samples)
+    
+    
+    # print(f"analyse_AP_step_injection_sweep: istep = {istep}")
     
     # adjust the smooth window for the new sampling_period
     if smooth_window > 0:

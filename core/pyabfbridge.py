@@ -25,23 +25,18 @@ import pandas as pd
 import quantities as pq
 
 from core import quantities as spq
+import pyabf
 
-try:
-    import pyabf
-    hasPyABF=True
-except:
-    hasPyABF = False
-    
-def getEpochTables(x:object, as_dataFrame:bool=False):
-    if not hasPyABF:
-        return
-
+def getEpochTables(x:object, as_dataFrame:bool=False, allTables:bool=False):
     if not isinstance(x, pyabf.ABF):
         raise TypeError(f"Expecting a pyabf.ABF object; got {type(x).__name__} instead")
     
     # NOTE: 2022-03-04 15:30:22
     # only return the epoch tables that actually contain any non-OFF epochs (filtered here)
-    etables = list(filter(lambda e: len(e.epochs) > 0, (pyabf.waveform.EpochTable(x, c) for c in x.channelList)))
+    if allTables:
+        etables = list(pyabf.waveform.EpochTable(x, c) for c in x.channelList)
+    else:
+        etables = list(filter(lambda e: len(e.epochs) > 0, (pyabf.waveform.EpochTable(x, c) for c in x.channelList)))
     
     
     if as_dataFrame:
@@ -53,9 +48,6 @@ def getEpochTables(x:object, as_dataFrame:bool=False):
 def epochTable2DF(x:object, abf:typing.Optional[pyabf.ABF] = None):
     """Returns a pandas.DataFrame with the data from the epoch table 'x'
     """
-    if not hasPyABF:
-        return
-    
     if not isinstance(x, pyabf.waveform.EpochTable):
         raise TypeError(f"Expecting an EpochTable; got {type(x).__name__} instead")
 

@@ -576,7 +576,7 @@ Waveform:
 
 TODO 2020-10-20 21:45:35
 
-1) finalize ephys.ElectrophysiologyDataParser, to "guess" the Clampex protocol
+1) finalize ephys.ElectrophysiologyProtocol, to "guess" the Clampex protocol
 configuration from the ABF files (this metadata is stored in the "annotations"
 attribute of the neo.Block objects)
 2) GUI for LTP experiments - with fields to modify these parameters

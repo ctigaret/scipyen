@@ -1,0 +1,43 @@
+2023-01-01 16:24:16
+
+neo.Block:
+    • each segment is a "frame"
+    
+    • for each segment:
+        ∘ the signals (analog and irregularly sampled) are plotted
+            in their own PlotItem
+            ★ to keep it simple, the separateChannelAxis flag is NOT used
+                (if you want to plot each channel of a multi-channel signal in 
+                 separate PlotItems, then pass the signal to the 
+                 SignalViewer.view() and set this flag to True)
+             
+        ∘ events are all plotted in the same PlotItem (NOTE: they can also be
+            overlaid in a signal PlotItem using the `overlayTargets` method)
+
+        ∘ spike trains (contained in the segment's `spiketrains` attribute, which
+            is a neo.core.spiketrainlist.SpikeTrainList) are plotted all in the
+            same PlotItem (NOTE: they can also be overlaid in a signal PlotItem 
+            using the `overlayTargets` method)
+            
+            
+neo.Segment:
+    • treated as a segment in the neo.Block
+    
+    • there is only one "frame"
+    
+sequence of neo.Segment:
+    • treated as a neo.Block
+    
+    • each segment is a "frame"
+    
+neo.AnalogSignal, DataSignal, neo.IrregularlySampledSignal, IrregularlySampledDataSignal:
+    • plotted in a single PlotItem, UNLESS separateSignalChannels flag is True, in
+        which case each channel is plotted in its own PlotItem
+        
+    • there is only one frame, UNLESS:
+        ∘ separateSignalChannels is False, AND
+        ∘ frameAxis is 1 (i.e., frameAxis is the same as signalChannelAxis which
+            is orthgonal to the data axis)
+    
+    
+    
