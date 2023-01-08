@@ -2958,8 +2958,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         item = self.workspace[self.workspaceModel.currentItemName]
         
         if QtWidgets.QWidget in inspect.getmro(type(item)):
-            item.show()
-        
+            if isinstance(item, QtWidgets.QMainWindow) and item.isMinimized():
+                # if item.windowHandle().visibility() == QtGui.QWindow.Minimized:
+                item.showNormal()
+            else:
+                item.show()
+            
         if isinstance(item, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
             self._raiseWindow(item)
             

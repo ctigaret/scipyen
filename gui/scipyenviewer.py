@@ -7,13 +7,14 @@ from abc import (ABC, ABCMeta, abstractmethod,)
 from traitlets import Bunch
 #from abc import (abstractmethod,)
 
-from PyQt5 import (QtCore, QtWidgets, QtGui,)
+from PyQt5 import (QtCore, QtWidgets, QtGui, QtDBus)
 from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 
 from core.utilities import safeWrapper
 # from core import workspacefunctions as wfunc
 from .workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 from gui.widgets.spinboxslider import SpinBoxSlider
+from core import sysutils
 from pandas import NA
 
 
@@ -129,7 +130,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     viewer_for_types = {object:0}
     view_action_name = None
     
-    def __init__(self, data: object = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, deleteOnClose=False, **kwargs):
+    def __init__(self, data: object = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, deleteOnClose:bool=False, **kwargs):
         """Constructor.
         
         Sets up attributes common to all Scipyen's viewers.
@@ -182,7 +183,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #print(f"ScipyenViewer<{self.__class__.__name__}>.__init__ data: {type(data).__name__}")
         super().__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
-        
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose, on=False)
         self._docTitle_ = None
         self._winTitle_ = None # force auto-set in update_title()
         self._custom_viewer_name_ = None
@@ -191,7 +192,27 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self._data_ = None # holds a reference to data!
         
-        self._delete_on_close_ = deleteOnClose
+        # NOTE: 2023-01-08 00:54:17
+        # nothing to do with WA_DeleteOnClose; this flags whether the main window
+        # should remove the symbol bound to this instance from the user workspace,
+        # once the window was closed
+        self._delete_on_close_ = deleteOnClose 
+        
+        # NOTE: 2023-01-07 23:52:06
+        # dirty hack to restore global menu after the window is closed (but not
+        # deleted)
+        
+        self._global_menu_service_ = None
+        
+        if not QtWidgets.qApp.testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
+            if "startplasma" in sysutils.get_desktop() or "KDE" in sysutils.get_desktop("desktop"):
+                appMenuServiceNames = list(name for name in QtDBus.QDBusConnection.sessionBus().interface().registeredServiceNames().value() if "AppMenu" in name)
+                
+                if len(appMenuServiceNames):
+                    self._global_menu_service_ = appMenuServiceNames[0]
+        
+                
+                
         
         # NOTE: 2019-11-09 09:30:38
         # _data_var_name_ is either None, or the symbol bound to the data in user's namespace
@@ -216,6 +237,10 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # NOTE: 2021-09-16 12:26:09
         # This SHOULD be implemented in the derived class
         self._configureUI_()
+        self._menu_bar_ = self.menuBar()
+        self.windowHandle().visibilityChanged.connect(self._slot_visibility_changed)
+        # self.windowHandle().visibleChanged.connect(self._slot_visible_changed)
+        # self._menu_bar_.setParent(None)
         
         # self.qsettings = QtCore.QSettings() 
         # NOTE: 2021-05-04 21:42:12 About settings
@@ -257,6 +282,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             
         else:
             self.update_title(win_title = win_title, doc_title = doc_title)
+            
+        self._prev_init_ = False
             
     def update_title(self, doc_title: (str, type(None)) = None, win_title: (str, type(None)) = None, enforce: bool = False):
         """Sets up the window title according to the pattern document - viewer.
@@ -355,7 +382,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def setDataDisplayEnabled(self, value):
         """Enable/disable the central data display widget.
         Abstract method; it must be implemented in subclasses, which have full
-        control if and how a central data duisplay widget is implemented.
+        control if and how a central data display widget is implemented.
         """
         w = getattr(self, "viewerWidget", None)
         if w:
@@ -469,6 +496,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self.update_title(doc_title = doc_title, win_title=self._winTitle_)
         
+        # print(f"ScipyenViewer<{self.__class__.__name__}>.setData")
+        
         self._set_data_(*args, **kwargs)
         
         #print(f"In ScipyenViewer<{self.__class__.__name__}>.setData(): is visible: {self.isVisible()}")
@@ -489,8 +518,10 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     @property
     def ID(self):
         """An unique ID for this viewer.
-        The ID is typically the winId() of this viewer's QMainWindow instance
-        and should NOT be confused with the python id 
+        Do NOT confuse with the following available "id"s:
+        • python's id (objetc identofier, typically the memory address in CPython)
+        • self.winId() which is a sip voidptr to the QMainWindow
+        • the pointer to the window manager window handler (e.g., a QWindow)
         """
         return self._ID_
     
@@ -606,6 +637,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #     self.sig_closeMe.emit()
 
         if self.close():
+            self._prev_init_ = True # patch to flag this was already initialized, to sthat we can restore menu bar when using GlobalMenu in Linux desktops
             evt.accept()
     
     def event(self, evt:QtCore.QEvent):
@@ -619,6 +651,39 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             return True
 
         return super().event(evt)
+    
+    @pyqtSlot(QtGui.QWindow.Visibility)
+    def _slot_visibility_changed(self, val):
+        if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
+            # print(f"{self.__class__.__name__}._slot_visibility_changed: {val}")
+            # print(f"QMainWindow id: {self.winId()}")
+            # print(f"QWindow id: {self.windowHandle().winId()}")
+            if val > QtGui.QWindow.Hidden and not self._menu_bar_.isVisible():
+                self._restore_menuBar_()
+    
+    @pyqtSlot(bool)
+    def _slot_visible_changed(self, val):
+        print(f"{self.__class__.__name__}._slot_visibile_changed: {val}")
+        if val == True:
+            self._restore_menuBar_()
+            
+            
+    def _restore_menuBar_(self):
+        """Very dirty hack to restore the global menu being lost after the 
+        window was closed - only necessary when running Scipyen in KDE AND
+        kde global menu service running.
+        Another (simpler) option is to avoid the use of global menu by
+        setting the attribute QtCore.Qt.AA_DontUseNativeMenuBar of the Scipyen 
+        QApplication to True
+        """
+        print(f"{self.__class__.__name__}._restore_menuBar_")
+        if self._prev_init_ and isinstance(self._menu_bar_, QtWidgets.QMenuBar) and not self._menu_bar_.isVisible():
+            self._menu_bar_.setParent(None)
+            olf_menu_bar = self.menuBar()
+            self.setMenuBar(self._menu_bar_)
+            self._menu_bar_.setVisible(True)
+        # pass
+        # if isinstance(self.menuBar())
     
     @pyqtSlot()
     @safeWrapper

@@ -65,7 +65,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QComboBox" name="selectSignalComboBox"/>
+       <widget class="QComboBox" name="analogSignalComboBox"/>
       </item>
       <item>
        <widget class="QCheckBox" name="plotIrregularSignalsCheckBox">
@@ -78,7 +78,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QComboBox" name="selectIrregularSignalComboBox"/>
+       <widget class="QComboBox" name="irregularSignalComboBox"/>
       </item>
       <item>
        <widget class="QLabel" name="label">
@@ -169,7 +169,7 @@
      <x>0</x>
      <y>0</y>
      <width>726</width>
-     <height>30</height>
+     <height>28</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

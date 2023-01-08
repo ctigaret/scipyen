@@ -913,16 +913,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # what's this for?
         # self.signalsMenu = QtWidgets.QMenu("Signals", self)
         
-        self.selectSignalComboBox.clear()
-        self.selectSignalComboBox.setCurrentIndex(0)
-        self.selectSignalComboBox.currentIndexChanged[int].connect(self.slot_analogSignalsComboBoxIndexChanged)
+        self.analogSignalComboBox.clear()
+        self.analogSignalComboBox.setCurrentIndex(0)
+        self.analogSignalComboBox.currentIndexChanged[int].connect(self.slot_analogSignalsComboBoxIndexChanged)
         
         self.plotAnalogSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
         self.plotAnalogSignalsCheckBox.stateChanged[int].connect(self.slot_plotAnalogSignalsCheckStateChanged)
         
-        self.selectIrregularSignalComboBox.clear()
-        self.selectIrregularSignalComboBox.setCurrentIndex(0)
-        self.selectIrregularSignalComboBox.currentIndexChanged[int].connect(self.slot_irregularSignalsComboBoxIndexChanged)
+        self.irregularSignalComboBox.clear()
+        self.irregularSignalComboBox.setCurrentIndex(0)
+        self.irregularSignalComboBox.currentIndexChanged[int].connect(self.slot_irregularSignalsComboBoxIndexChanged)
         
         self.plotIrregularSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
         self.plotIrregularSignalsCheckBox.stateChanged[int].connect(self.slot_plotIrregularSignalsCheckStateChanged)
@@ -1755,20 +1755,20 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """TODO/FIXME - where's the BUG?'
         """
         from core.utilities import unique
-        sigBlock = [QtCore.QSignalBlocker(widget) for widget in (self.selectSignalComboBox, self.selectIrregularSignalComboBox)]
+        sigBlock = [QtCore.QSignalBlocker(widget) for widget in (self.analogSignalComboBox, self.irregularSignalComboBox)]
         
         if analog is None or (isinstance(analog, (tuple, list)) and len(analog) == 0):
-            self.selectSignalComboBox.clear()
+            self.analogSignalComboBox.clear()
             
         elif isinstance(analog, np.ndarray):
-            self.selectSignalComboBox.clear()
-            self.selectIrregularSignalComboBox.clear()
+            self.analogSignalComboBox.clear()
+            self.irregularSignalComboBox.clear()
 
         else:
-            current_ndx = self.selectSignalComboBox.currentIndex()
-            current_txt = self.selectSignalComboBox.currentText()
+            current_ndx = self.analogSignalComboBox.currentIndex()
+            current_txt = self.analogSignalComboBox.currentText()
             
-            sig_names = ["All"] +  unique([s.name if hasattr(s, "name") and isinstance(s.name, str) and len(s.name.strip()) else f"Analog signal {k}" for k, s in enumerate(analog)]) + ["Choose"]
+            sig_names = ["All"] +  list(unique([s.name if hasattr(s, "name") and isinstance(s.name, str) and len(s.name.strip()) else f"Analog signal {k}" for k, s in enumerate(analog)])) + ["Choose"]
             
             if current_txt in sig_names:
                 new_ndx = sig_names.index(current_txt)
@@ -1784,16 +1784,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if new_ndx < 0:
                 new_ndx = 0
                 
-            self.selectSignalComboBox.clear()
-            self.selectSignalComboBox.addItems(sig_names)
-            self.selectSignalComboBox.setCurrentIndex(new_ndx)
+            self.analogSignalComboBox.clear()
+            self.analogSignalComboBox.addItems(sig_names)
+            self.analogSignalComboBox.setCurrentIndex(new_ndx)
             
         if irregular is None or (isinstance(irregular, (tuple, list)) and len(irregular) == 0):
-            self.selectIrregularSignalComboBox.clear()
+            self.irregularSignalComboBox.clear()
             
         else:
-            current_ndx = self.selectIrregularSignalComboBox.currentIndex()
-            current_txt = self.selectIrregularSignalComboBox.currentText()
+            current_ndx = self.irregularSignalComboBox.currentIndex()
+            current_txt = self.irregularSignalComboBox.currentText()
             
             sig_names = ["All"] +  unique([s.name if isinstance(s.name, str) and len(s.name.strip()) else "Irregularly sampled signal %d" % k for k, s in enumerate(irregular)]) + ["Choose"]
             
@@ -1811,9 +1811,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if new_ndx < 0:
                 new_ndx = 0
                 
-            self.selectIrregularSignalComboBox.clear()
-            self.selectIrregularSignalComboBox.addItems(sig_names)
-            self.selectIrregularSignalComboBox.setCurrentIndex(new_ndx)
+            self.irregularSignalComboBox.clear()
+            self.irregularSignalComboBox.addItems(sig_names)
+            self.irregularSignalComboBox.setCurrentIndex(new_ndx)
             
         # if all([seq is None or (isinstance(seq, (tuple, list)) and len(seq)==0) for seq in (analog, irregular)]):
         #     return
@@ -2571,13 +2571,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if index == 0: # "All" selected
             self.guiSelectedSignalNames.clear()
             
-        elif index == self.selectSignalComboBox.count()-1: # "Choose" selected
+        elif index == self.analogSignalComboBox.count()-1: # "Choose" selected
             self.guiSelectedSignalNames.clear()
             # TODO call selection dialog
             
-            current_txt = self.selectSignalComboBox.currentText()
+            current_txt = self.analogSignalComboBox.currentText()
             
-            available = [self.selectSignalComboBox.itemText(k) for k in range(1, self.selectSignalComboBox.count()-1)]
+            available = [self.analogSignalComboBox.itemText(k) for k in range(1, self.analogSignalComboBox.count()-1)]
             
             if current_txt in available:
                 preSelected = current_txt
@@ -2599,7 +2599,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self.guiSelectedSignalNames[:] = sel_items[:]
                     
         else:
-            self.guiSelectedSignalNames = [self.selectSignalComboBox.currentText()]
+            self.guiSelectedSignalNames = [self.analogSignalComboBox.currentText()]
 
         self.displayFrame()
         
@@ -2782,12 +2782,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if index == 0:
             self.guiSelectedIrregularSignalNames.clear()
             
-        elif index == self.selectIrregularSignalComboBox.count()-1:
+        elif index == self.irregularSignalComboBox.count()-1:
             self.guiSelectedIrregularSignalNames.clear()
             
-            current_txt = self.selectIrregularSignalComboBox.currentText()
+            current_txt = self.irregularSignalComboBox.currentText()
         
-            available = [self.selectIrregularSignalComboBox.itemText(k) for k in range(1, self.selectIrregularSignalComboBox.count()-1)]
+            available = [self.irregularSignalComboBox.itemText(k) for k in range(1, self.irregularSignalComboBox.count()-1)]
             
             if current_txt in available:
                 preSelected = current_txt
@@ -2809,7 +2809,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self.guiSelectedIrregularSignalNames[:] = sel_items[:]
                     
         else:
-            self.guiSelectedIrregularSignalNames = [self.selectIrregularSignalComboBox.currentText()]
+            self.guiSelectedIrregularSignalNames = [self.irregularSignalComboBox.currentText()]
     
         self.displayFrame()
          
@@ -5808,7 +5808,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             raise TypeError("Plotting is not implemented for %s data types" % type(self.yData).__name__)
 
-        with self.observed_vars.hold_trait_notifications():
+        with self.observed_vars.observer.hold_trait_notifications():
             self.observed_vars["x"] = self.xData
             self.observed_vars["y"] = self.yData
             
@@ -7134,7 +7134,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # BEGIN prepare to plot regular (analog) signals
         if self._plot_analogsignals_:
                 # now try to get the signal selections from the combo boxes
-            current_ndx = self.selectSignalComboBox.currentIndex() 
+            current_ndx = self.analogSignalComboBox.currentIndex() 
             
             if current_ndx == 0: # "All" selected
                 selected_analogs[:] = analog[:]
@@ -7146,7 +7146,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     else:
                         selected_analog_names.append("Analog signal %d" % k)
                 
-            elif current_ndx == self.selectSignalComboBox.count() - 1: # "Choose" selected
+            elif current_ndx == self.analogSignalComboBox.count() - 1: # "Choose" selected
                 # read the multiple choices previously set up by a dialog
                 # selected_analogs = list()
                 if len(self.guiSelectedSignalNames):
@@ -7173,8 +7173,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
           
         # BEGIN prepate to plot irregular signals
         if self._plot_irregularsignals_:
-            current_ndx = self.selectIrregularSignalComboBox.currentIndex()
-            current_txt = self.selectIrregularSignalComboBox.currentText()
+            current_ndx = self.irregularSignalComboBox.currentIndex()
+            current_txt = self.irregularSignalComboBox.currentText()
             
             if current_ndx == 0:
                 selected_irregs[:] = irregs[:]
@@ -7186,7 +7186,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     else:
                         selected_irregs_names.append("Irregularly sampled signal %d" % k)
                 
-            elif current_ndx == self.selectIrregularSignalComboBox.count() - 1:
+            elif current_ndx == self.irregularSignalComboBox.count() - 1:
                 if len(self.guiSelectedIrregularSignalNames):
                     for k, s in enumerate(irregs):
                         if isinstance(s.name, str) and len(s.name.strip()):
@@ -8456,11 +8456,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # and also exception-safe
         
         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in \
-            (self.selectSignalComboBox, self.selectIrregularSignalComboBox,
+            (self.analogSignalComboBox, self.irregularSignalComboBox,
              self.framesQSlider, self.framesQSpinBox)]
         
-        self.selectSignalComboBox.clear()
-        self.selectIrregularSignalComboBox.clear()
+        self.analogSignalComboBox.clear()
+        self.irregularSignalComboBox.clear()
         self.framesQSlider.setMinimum(0)
         self.framesQSlider.setMaximum(0)
         self.framesQSpinBox.setMinimum(0)

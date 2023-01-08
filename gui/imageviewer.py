@@ -3507,7 +3507,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.widthAxis  = layout.horizontalAxis
             self.heightAxis = layout.verticalAxis
             
-            with self.observed_vars.hold_trait_notifications():
+            with self.observed_vars.observer.hold_trait_notifications():
                 self.observed_vars["data"] = self._data_
             
             return True

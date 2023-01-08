@@ -10,7 +10,7 @@ DataBag = behaves like a dictionary where its keys are also
 accessed using attribute syntax.
 
 """
-import traceback
+import traceback, contextlib
 from inspect import getcallargs, isfunction, ismethod
 from functools import partial
 from pprint import pformat
@@ -175,7 +175,21 @@ class DataBag(Bunch):
         ret.allow_none = True
         ret.use_mutable = True
         ret.verbose=False
-        return ret
+        return ret#
+    
+    # hold_trait_notifications = self._observer__.hold_trait_notifications
+    # @contextlib.contextmanager
+    # def hold_trait_notifications(self):
+    #     """Context manager to hold trait change notifications in self.__observer__
+    #     """
+    #     with self.__observer__.hold_trait_notifications() as holder:
+    #         yield holder
+    #     # return self.__observer__.hold_trait_notifications
+    #     # if self.__observer__._cross_validation_lock:
+    #     #     yield
+    #     #     return
+    #     # else:
+    #     #     return self.__observer__.hold_trait_notifications
     
     def __init__(self, *args, **kwargs):
         """Constructor for a DataBag.

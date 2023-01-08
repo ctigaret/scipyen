@@ -138,7 +138,7 @@ class SignalCursor(QtCore.QObject):
 
     default_precision = 3
     
-    def __init__(self, plot_item:typing.Union[pg.PlotItem, pg.GraphicsScene], x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, xwindow:float=0.0, ywindow:float=0.0, cursor_type:typing.Optional[typing.Union[str,SignalCursorTypes, tuple, list]] = None, cursorID:str="c", follower:bool=False, relative:bool=False, parent:typing.Optional[pg.GraphicsItem]=None, xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, pen:typing.Optional[QtGui.QPen]=None, hoverPen:typing.Optional[QtGui.QPen]=None, linkedPen:typing.Optional[QtGui.QPen]=None, movable_label:bool=True, show_value:bool=False, precision:int=3, **kwargs):
+    def __init__(self, plot_item:typing.Union[pg.PlotItem, pg.GraphicsScene], /, x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, xwindow:float=0.0, ywindow:float=0.0, cursor_type:typing.Optional[typing.Union[str,SignalCursorTypes, tuple, list]] = None, cursorID:str="c", follower:bool=False, relative:bool=False, parent:typing.Optional[typing.Union[pg.GraphicsItem,pg.PlotItem, QtWidgets.QWidget]]=None, xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, pen:typing.Optional[QtGui.QPen]=None, hoverPen:typing.Optional[QtGui.QPen]=None, linkedPen:typing.Optional[QtGui.QPen]=None, movable_label:bool=True, show_value:bool=False, precision:int=3, **kwargs):
         """ SignalCursor constructor.
             
             By default, this creates a crosshair cursor.
@@ -212,13 +212,14 @@ class SignalCursor(QtCore.QObject):
         """
         super(SignalCursor, self).__init__(parent=parent)
         
-        self._parent_plot_window_ = None
+        # self._parent_widget_ = None
         
         self._host_graphics_item_ = None
         
-        if not isinstance(parent, (pg.PlotItem, pg.GraphicsScene)):
-            if not type(parent).__name__ == "SignalViewer":
-                raise TypeError("parent object of a SignalCursor can only be a pyqtgraph PlotItem or a SignalViewer; got %s instead" % type(parent).__name__)
+        # if not isinstance(parent, (pg.PlotItem, pg.GraphicsScene)):
+        #     # if "SignalViewer" not in type(parent).__name__ :
+        #     if not isinstance(parent, QtWidgets.QWidget):
+        #         raise TypeError("parent object of a SignalCursor can only be a pyqtgraph PlotItem, GraphicsScene, or a SignalViewer; got %s instead" % type(parent).__name__)
         
         
         if isinstance(plot_item, (pg.PlotItem, pg.GraphicsScene)):
@@ -227,12 +228,12 @@ class SignalCursor(QtCore.QObject):
         else:
             raise TypeError("plot_item expected to be a pyqtgraph.PlotItem object or a pyqtgraph.GraphicsScene object got %s instead" % type(plot_items).__name__)
         
-        if type(parent).__name__ == "SignalViewer":
-            # only set parent plot window if parent is SignalViewer
-            self._parent_plot_window_ = parent
-            
-        elif isinstance(parent, (pg.PlotItem, pg.GraphicsScene)) and self._host_graphics_item_ is None:
-            self._host_graphics_item_ = parent
+#         if "SignalViewer" in type(parent).__name__:
+#             # only set parent plot window if parent is SignalViewer or later version
+#             self._parent_widget_ = parent
+#             
+#         elif isinstance(parent, (pg.PlotItem, pg.GraphicsScene)) and self._host_graphics_item_ is None:
+#             self._host_graphics_item_ = parent
             
         self._cursorId_ = None
         

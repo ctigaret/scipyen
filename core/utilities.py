@@ -3213,11 +3213,11 @@ def sort_with_none(iterable, none_last = True):
     return sorted(iterable, key=lambda x: x if x is not None else noneph)
 
 def unique(seq, key=None):
-    """Returns a sequence of unique elements in sequence 'seq'.
-    Function vrsion of gen_unique
+    """Returns a sequence of unique elements in the iterable 'seq'.
+    Functional version of gen_unique
     Parameters:
     -----------
-    seq: an iterable sequence (tuple, list, range)
+    seq: an iterable (tuple, list, range, map)
     
     key: predicate for uniqueness (optional, default is None)
         Typically, this is an object returned by a lambda function
@@ -3228,35 +3228,26 @@ def unique(seq, key=None):
     
     Returns:
     =======
-    A sequence containing unique elements in 'seq'.
+    A tuple containing unique elements in 'seq'.
     
     NOTE: Does not guarantee the order of the unique elements is the same as 
             their order in 'seq'
             
-    WARNING: Only works with sequences of hashable types.
-    
     See also gen_unique for a generator version.
     
     """
-    if not isinstance(seq, collections.abc.Sequence):
-        raise TypeError(f"Expecting a Sequence; got {type(seq).__name__} instead")
+    # if not isinstance(seq, collections.abc.Sequence):
+    if not hasattr(seq, "__iter__"):
+        raise TypeError(f"Expecting an iterable; got {type(seq).__name__} instead")
+    
+    return tuple(item for item in gen_unique(seq, key=key))
 
-    if isinstance(seq, tuple):
-        return tuple((item for item in gen_unique(seq, key=key)))
-    
-    else:
-        return [item for item in gen_unique(seq, key=key)]
+#     if isinstance(seq, tuple):
+#         return tuple((item for item in gen_unique(seq, key=key)))
+#     
+#     else:
+#         return [item for item in gen_unique(seq, key=key)]
             
-    #if not isinstance(seq, (tuple, list, range)):
-        #raise TypeError("expecting an iterable sequence (i.e., a tuple, a list, or a range); got %sinstead" % type(seq).__name__)
-    
-    #seen = set()
-    
-    #if key is None:
-        #return [x for x in seq if x not in seen and not seen.add(x)]
-    
-    #else:
-        #return [x for x in seq if key not in seen and not seen.add(key)]
 
 def gen_unique(seq, key=None):
     """Iterates through unique elements in seq
@@ -3295,8 +3286,9 @@ def gen_unique(seq, key=None):
     unique for a function version
     
     """
-    if not isinstance(seq, (tuple, list, range, deque, str)):
-        raise TypeError("expecting an iterable sequence (i.e., a tuple, a list, or a range); got %s instead" % type(seq).__name__)
+    # if not isinstance(seq, (tuple, list, range, deque, str)):
+    if not hasattr(seq, "__iter__"):
+        raise TypeError("expecting an iterable; got %s instead" % type(seq).__name__)
     
     seen = set()
     

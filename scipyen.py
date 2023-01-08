@@ -106,9 +106,14 @@ def main():
         # NOTE: 2021-08-17 10:07:11 is this needed?
         QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
         
+        
         # BEGIN 
         # 1. create the pyqt5 app
         app = QtWidgets.QApplication(sys.argv)
+        
+        # NOTE: 2023-01-08 00:48:47
+        # avoid global menus - must be called AFTER we have an instance of app!
+        QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_DontUseNativeMenuBar)
         
         if has_breeze_resources_for_win32:
             file = QtCore.QFile(":/dark/stylesheet.qss")

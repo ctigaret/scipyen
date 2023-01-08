@@ -142,7 +142,8 @@ from iolib import pictio as pio
 #### BEGIN pict.core modules
 import core.signalprocessing as sgp
 from core import (xmlutils, strutils, neoutils, )
-from core.neoutils import (get_non_empty_spike_trains,
+from core.neoutils import (get_domain_name,
+                           get_non_empty_spike_trains,
                            get_non_empty_events,
                            normalized_signal_index,
                            check_ephys_data, 
@@ -480,6 +481,11 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self._show_legends_ = False
         
+        # NOTE: 2023-01-04 22:06:48
+        # guard against replotting signals when there's no actual frame change
+        # when True, ALL signals in the data "frame" are (re)plotted - subject to the signal selectors
+        self._new_frame_ = True
+        
         self._plot_names_ = dict() # maps item row position to name
         
         self._cursorWindowSizeX_ = self.defaultCursorWindowSizeX
@@ -690,7 +696,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # list of analog signal names selected from what is available in the current 
         # frame, using the combobox for analog signals
         # this includes signals in numpy arrays
-        self.guiSelectedSignalNames = list() # list of signal names sl
+        self.guiSelectedAnalogSignalNames = list() # list of signal names sl
         
         #self.guiSelectedIrregularSignals = list() # signal indices in collection
         # list of irregularly sampled signal names selected from what is available
@@ -996,16 +1002,16 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # what's this for?
         # self.signalsMenu = QtWidgets.QMenu("Signals", self)
         
-        self.selectSignalComboBox.clear()
-        self.selectSignalComboBox.setCurrentIndex(0)
-        self.selectSignalComboBox.currentIndexChanged[int].connect(self.slot_analogSignalsComboBoxIndexChanged)
+        self.analogSignalComboBox.clear()
+        self.analogSignalComboBox.setCurrentIndex(0)
+        self.analogSignalComboBox.currentIndexChanged[int].connect(self.slot_analogSignalsComboBoxIndexChanged)
         
         self.plotAnalogSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
         self.plotAnalogSignalsCheckBox.stateChanged[int].connect(self.slot_plotAnalogSignalsCheckStateChanged)
         
-        self.selectIrregularSignalComboBox.clear()
-        self.selectIrregularSignalComboBox.setCurrentIndex(0)
-        self.selectIrregularSignalComboBox.currentIndexChanged[int].connect(self.slot_irregularSignalsComboBoxIndexChanged)
+        self.irregularSignalComboBox.clear()
+        self.irregularSignalComboBox.setCurrentIndex(0)
+        self.irregularSignalComboBox.currentIndexChanged[int].connect(self.slot_irregularSignalsComboBoxIndexChanged)
         
         self.plotIrregularSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
         self.plotIrregularSignalsCheckBox.stateChanged[int].connect(self.slot_plotIrregularSignalsCheckStateChanged)
@@ -1067,7 +1073,21 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @property
     def dockWidgets(self):
         return dict(((name, w) for name, w in self.__dict__.items() if isinstance(w, QtWidgets.QDockWidget)))
-        
+
+    @property
+    def signalAxes(self):
+        """Read-only list of PlotItem objects dedicated to plotting signals
+        """
+        return self._signal_axes_
+    
+    @property
+    def eventsAxis(self):
+        return self._events_axis_
+    
+    @property
+    def spikeTrainAxis(self):
+        return self._spiketrains_axis_
+    
     @property
     def visibleDocks(self):
         return dict(((name, w.isVisible()) for name, w in self.__dict__.items() if isinstance(w, QtWidgets.QDockWidget)))
@@ -1836,28 +1856,31 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if self.annotationsViewer.topLevelItemCount() == 1:
             self.annotationsViewer.topLevelItem(0).setText(0, "Data")
         
-    def _setup_signal_choosers_(self, analog = None, irregular = None):
+    def _setup_signal_choosers_(self, analog:typing.Optional[list] = None, irregular:typing.Optional[list] = None):
         """TODO/FIXME - where's the BUG?'
         """
         from core.utilities import unique
-        sigBlock = [QtCore.QSignalBlocker(widget) for widget in (self.selectSignalComboBox, self.selectIrregularSignalComboBox)]
+        sigBlock = [QtCore.QSignalBlocker(widget) for widget in (self.analogSignalComboBox, self.irregularSignalComboBox)]
         
-        if analog is None or (isinstance(analog, (tuple, list)) and len(analog) == 0):
-            self.selectSignalComboBox.clear()
+        if not isinstance(analog, (tuple, list)) or len(analog) == 0:
+            self.analogSignalComboBox.clear()
             
-        elif isinstance(analog, np.ndarray):
-            self.selectSignalComboBox.clear()
-            self.selectIrregularSignalComboBox.clear()
+        # elif isinstance(analog, np.ndarray):
+            # self.analogSignalComboBox.clear()
+            # self.irregularSignalComboBox.clear()
 
         else:
-            current_ndx = self.selectSignalComboBox.currentIndex()
-            current_txt = self.selectSignalComboBox.currentText()
+            analog_sig_names = list(unique(map(lambda x: x[1] if isinstance(x[1], str) and len(x[1].strip()) else f"Analog signal {x[0]}" , ((k,getattr(s, "name", "Analog signal {k}")) for k,s in enumerate(analog)))))
             
-            sig_names = ["All"] +  unique([s.name if hasattr(s, "name") and isinstance(s.name, str) and len(s.name.strip()) else f"Analog signal {k}" for k, s in enumerate(analog)]) + ["Choose"]
+            current_ndx = self.analogSignalComboBox.currentIndex()
+            current_txt = self.analogSignalComboBox.currentText()
+            
+            # current_names = list(self.analogSignalComboBox.itemText(k) for k in range(self.analogSignalComboBox.count()))
+            
+            sig_names = ["All"] + analog_sig_names + ["Choose"]
             
             if current_txt in sig_names:
                 new_ndx = sig_names.index(current_txt)
-                #new_txt = current_txt
                 
             elif current_ndx < len(sig_names):
                 new_ndx = current_ndx
@@ -1869,18 +1892,19 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if new_ndx < 0:
                 new_ndx = 0
                 
-            self.selectSignalComboBox.clear()
-            self.selectSignalComboBox.addItems(sig_names)
-            self.selectSignalComboBox.setCurrentIndex(new_ndx)
+            self.analogSignalComboBox.clear()
+            self.analogSignalComboBox.addItems(sig_names)
+            self.analogSignalComboBox.setCurrentIndex(new_ndx)
             
         if irregular is None or (isinstance(irregular, (tuple, list)) and len(irregular) == 0):
-            self.selectIrregularSignalComboBox.clear()
+            self.irregularSignalComboBox.clear()
             
         else:
-            current_ndx = self.selectIrregularSignalComboBox.currentIndex()
-            current_txt = self.selectIrregularSignalComboBox.currentText()
+            irreg_sig_names = list(unique(map(lambda x: x[1] if isinstance(x[1], str) and len(x[1].strip()) else f"Irregular signal {x[0]}", ((k, getattr(s, "name", f"Irregular signal {k}")) for k,s in enumerate(irregular)))))
+            current_ndx = self.irregularSignalComboBox.currentIndex()
+            current_txt = self.irregularSignalComboBox.currentText()
             
-            sig_names = ["All"] +  unique([s.name if isinstance(s.name, str) and len(s.name.strip()) else "Irregularly sampled signal %d" % k for k, s in enumerate(irregular)]) + ["Choose"]
+            sig_names = ["All"] + irreg_sig_names + ["Choose"]
             
             if current_txt in sig_names:
                 new_ndx = sig_names.index(current_txt)
@@ -1896,14 +1920,10 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if new_ndx < 0:
                 new_ndx = 0
                 
-            self.selectIrregularSignalComboBox.clear()
-            self.selectIrregularSignalComboBox.addItems(sig_names)
-            self.selectIrregularSignalComboBox.setCurrentIndex(new_ndx)
+            self.irregularSignalComboBox.clear()
+            self.irregularSignalComboBox.addItems(sig_names)
+            self.irregularSignalComboBox.setCurrentIndex(new_ndx)
             
-        # if all([seq is None or (isinstance(seq, (tuple, list)) and len(seq)==0) for seq in (analog, irregular)]):
-        #     return
-        
-
     # ### END private methods
     
     def setDataDisplayEnabled(self, value):
@@ -2654,15 +2674,15 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @safeWrapper
     def slot_analogSignalsComboBoxIndexChanged(self, index):
         if index == 0: # "All" selected
-            self.guiSelectedSignalNames.clear()
+            self.guiSelectedAnalogSignalNames.clear()
             
-        elif index == self.selectSignalComboBox.count()-1: # "Choose" selected
-            self.guiSelectedSignalNames.clear()
+        elif index == self.analogSignalComboBox.count()-1: # "Choose" selected
+            self.guiSelectedAnalogSignalNames.clear()
             # TODO call selection dialog
             
-            current_txt = self.selectSignalComboBox.currentText()
+            current_txt = self.analogSignalComboBox.currentText()
             
-            available = [self.selectSignalComboBox.itemText(k) for k in range(1, self.selectSignalComboBox.count()-1)]
+            available = [self.analogSignalComboBox.itemText(k) for k in range(1, self.analogSignalComboBox.count()-1)]
             
             if current_txt in available:
                 preSelected = current_txt
@@ -2681,12 +2701,14 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 sel_items = dlg.selectedItemsText
                 
                 if len(sel_items):
-                    self.guiSelectedSignalNames[:] = sel_items[:]
+                    self.guiSelectedAnalogSignalNames[:] = sel_items[:]
                     
         else:
-            self.guiSelectedSignalNames = [self.selectSignalComboBox.currentText()]
+            self.guiSelectedAnalogSignalNames = [self.analogSignalComboBox.currentText()]
 
+        self._new_frame_ = False # guard against replotting signals when there's no actual frame change
         self.displayFrame()
+        self._new_frame_ = True
         
     @pyqtSlot(int)
     @safeWrapper
@@ -2867,12 +2889,12 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if index == 0:
             self.guiSelectedIrregularSignalNames.clear()
             
-        elif index == self.selectIrregularSignalComboBox.count()-1:
+        elif index == self.irregularSignalComboBox.count()-1:
             self.guiSelectedIrregularSignalNames.clear()
             
-            current_txt = self.selectIrregularSignalComboBox.currentText()
+            current_txt = self.irregularSignalComboBox.currentText()
         
-            available = [self.selectIrregularSignalComboBox.itemText(k) for k in range(1, self.selectIrregularSignalComboBox.count()-1)]
+            available = [self.irregularSignalComboBox.itemText(k) for k in range(1, self.irregularSignalComboBox.count()-1)]
             
             if current_txt in available:
                 preSelected = current_txt
@@ -2894,9 +2916,11 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self.guiSelectedIrregularSignalNames[:] = sel_items[:]
                     
         else:
-            self.guiSelectedIrregularSignalNames = [self.selectIrregularSignalComboBox.currentText()]
+            self.guiSelectedIrregularSignalNames = [self.irregularSignalComboBox.currentText()]
     
+        self._new_frame_ = False # guard against replotting signals when there's no actual frame change
         self.displayFrame()
+        self._new_frame_ = True
          
     # ### END PyQt slots
     
@@ -3318,7 +3342,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                    linkedPen = linkedPen,
                                    pen = pen, 
                                    hoverPen=hoverPen,
-                                   parent = self, 
+                                   # parent = self, 
+                                   parent = axis, 
                                    follower = follows_mouse, 
                                    relative = True,
                                    xBounds = xBounds,
@@ -5709,10 +5734,14 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         else:
             raise TypeError("Plotting is not implemented for %s data types" % type(self.yData).__name__)
+        
+        self._setup_axes_()
 
-        with self.observed_vars.hold_trait_notifications():
-            self.observed_vars["x"] = self.xData
-            self.observed_vars["y"] = self.yData
+        self.observed_vars["xData"] = self.xData
+        self.observed_vars["yData"] = self.yData
+        # with self.observed_vars.observer.hold_trait_notifications():
+        #     self.observed_vars["xData"] = self.xData
+        #     self.observed_vars["yData"] = self.yData
             
         return True
     
@@ -5741,68 +5770,68 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.plot_start = interval[0]
             self.plot_stop = interval[1]
             
-        try:
-            # remove gremlins from previous plot
-            self._plotEpochs_(clear=True)
-            self._cached_epochs_.pop(self.currentFrame, None)
+        with self.observed_vars.observer.hold_trait_notifications():
+            try:
+                # remove gremlins from previous plot
+                self._plotEpochs_(clear=True)
+                self._cached_epochs_.pop(self.currentFrame, None)
 
-            dataOK = self._parse_data_(x=x,
-                                       y=y, 
-                                       frameIndex=frameIndex, 
-                                       frameAxis=frameAxis,
-                                       signalIndex=signalIndex, 
-                                       signalChannelAxis=signalChannelAxis,
-                                       signalChannelIndex=signalChannelIndex,
-                                       irregularSignalIndex=irregularSignalIndex,
-                                       irregularSignalChannelAxis=irregularSignalChannelAxis,
-                                       irregularSignalChannelIndex=irregularSignalChannelIndex,
-                                       separateSignalChannels=separateSignalChannels,
-                                       singleFrame=singleFrame)
-            
-            self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self.yData))
+                dataOK = self._parse_data_(x=x,
+                                        y=y, 
+                                        frameIndex=frameIndex, 
+                                        frameAxis=frameAxis,
+                                        signalIndex=signalIndex, 
+                                        signalChannelAxis=signalChannelAxis,
+                                        signalChannelIndex=signalChannelIndex,
+                                        irregularSignalIndex=irregularSignalIndex,
+                                        irregularSignalChannelAxis=irregularSignalChannelAxis,
+                                        irregularSignalChannelIndex=irregularSignalChannelIndex,
+                                        separateSignalChannels=separateSignalChannels,
+                                        singleFrame=singleFrame)
+                
+                # print(f"self._set_data_ dataOK = {dataOK}")
+                
+                self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self.yData))
+                            
+                if isinstance(showFrame, int):
+                    if showFrame < 0:
+                        showFrame = 0
                         
-            if isinstance(showFrame, int):
-                if showFrame < 0:
-                    showFrame = 0
-                    
-                elif showFrame > self._number_of_frames_:
-                    showFrame = self._number_of_frames_ - 1
-                    
-                self._current_frame_index_ = showFrame
-                    
+                    elif showFrame > self._number_of_frames_:
+                        showFrame = self._number_of_frames_ - 1
+                        
+                    self._current_frame_index_ = showFrame
+                        
 
-            if plotStyle is not None and isinstance(plotStyle, str):
-                self.plotStyle = plotStyle
-                
-            elif style is not None and isinstance(style, str):
-                self.plotStyle = style
-                
-            self.framesQSlider.setMaximum(self._number_of_frames_ - 1)
-            self.framesQSpinBox.setMaximum(self._number_of_frames_ - 1)
+                if plotStyle is not None and isinstance(plotStyle, str):
+                    self.plotStyle = plotStyle
+                    
+                elif style is not None and isinstance(style, str):
+                    self.plotStyle = style
+                    
+                self.framesQSlider.setMaximum(self._number_of_frames_ - 1)
+                self.framesQSpinBox.setMaximum(self._number_of_frames_ - 1)
 
-            self.framesQSlider.setValue(self._current_frame_index_)
-            self.framesQSpinBox.setValue(self._current_frame_index_)
-            
-            self.nFramesLabel.setText("of %d" % self._number_of_frames_)
-            
-            # NOTE: 2022-11-01 10:37:06
-            # overwrites self.docTitle set by self._parse_data_
-            if isinstance(doc_title, str) and len(doc_title.strip()):
-                self.docTitle = doc_title
-            else:
-                self.docTile = self._cached_title
+                self.framesQSlider.setValue(self._current_frame_index_)
+                self.framesQSpinBox.setValue(self._current_frame_index_)
                 
-            if dataOK:
-                self._setup_axes_()
-                self.displayFrame()
-            else:
-                warnings.warn(f"Could not parse the data x: {x}, y: {y}")
-                return
-            
-            self.frameChanged.emit(self._current_frame_index_)
+                self.nFramesLabel.setText("of %d" % self._number_of_frames_)
+                
+                # NOTE: 2022-11-01 10:37:06
+                # overwrites self.docTitle set by self._parse_data_
+                if isinstance(doc_title, str) and len(doc_title.strip()):
+                    self.docTitle = doc_title
+                else:
+                    self.docTile = self._cached_title
+                    
+                if not dataOK:
+                    warnings.warn(f"Could not parse the data x: {x}, y: {y}")
+                    return
+                
+                self.frameChanged.emit(self._current_frame_index_)
 
-        except Exception as e:
-            traceback.print_exc()
+            except Exception as e:
+                traceback.print_exc()
             
     @safeWrapper
     def setData(self, x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), /, y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,doc_title:(str, type(None)) = None, frameAxis:(int, str, vigra.AxisInfo, type(None)) = None, signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, singleFrame:bool=False, interval:(tuple, list, neo.Epoch, type(None)) = None, plotStyle:str = "plot", get_focus:bool = False, showFrame = None, *args, **kwargs):
@@ -6034,6 +6063,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 #warngins.warn("I need something to plot")
                 return
             
+        # print(f"{self.__class__.__name__} self.setData")
+            
         self._set_data_(x,y, 
                         doc_title = doc_title,
                         frameAxis = frameAxis, 
@@ -6078,7 +6109,10 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             self.setDataDisplayEnabled(True)
             
-        self._current_frame_index_ = int(val)
+        val = int(val)
+        
+        self._new_frame_ = self._current_frame_index_ != val
+        self._current_frame_index_ = val
         
         # NOTE: 2018-09-25 23:06:55
         # recipe to block re-entrant signals in the code below
@@ -6091,14 +6125,16 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.framesQSpinBox.setValue(self._current_frame_index_)
         self.framesQSlider.setValue(self._current_frame_index_)
 
-
         self.displayFrame()
-        self.frameChanged.emit(self._current_frame_index_)
+        if self._new_frame_:
+            self.frameChanged.emit(self._current_frame_index_)
 
     @property
     def plotItemsWithLayoutPositions(self):
         """ A zipped list of tuples (PlotItem, grid coordinates).
         Aliased to the axesWithLayoutPositions property
+        
+        This includes the signal axes, and the events and spiketrains axes.
         
         The structure is derived from the dictionary
         pyqtgraph.graphicsItems.GraphicsLayout.GraphicsLayout.items:
@@ -6118,7 +6154,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     @property
     def plotItems(self):
-        """A tuple of PlotItems
+        """A tuple of PlotItems.
+        This includes the signal axes, and the events and spiketrains axes
         """
         px = self.plotItemsWithLayoutPositions
         
@@ -6485,6 +6522,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         Anything else                   ↦ ignored
         
         """
+        # print(f"self.displayFrame {type(self.yData).__name__}")
         if self.yData is None:
             return
         
@@ -6492,202 +6530,212 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         # print(f"SignalViewer2.displayFrame {self.yData}")
         
-        #### BEGIN self.yData is a sequence of objects
-        if isinstance(self.yData, (tuple, list)): 
-            # a sequence of objects
-            #
-            # can be a sequence of signals, with "signal" being one of:
-            # neo.AnalogSignal
-            # neo.IrregularlySampledSignal
-            # datatypes.DataSignal
-            # numpy array (vector with shape (n,) or (n, 1)) or matrix (columns
-            # vectors) shaped (n, m)
-            # vigra.Kernel1D
-            
-            # NOTE: because the signals in the collection do not necessarily 
-            # have a common "domain" (e.g. time domain, sampling rate, etc) each 
-            # signal is considered to belong to its own hypothetical data "frame"
-            # ("sweep", or "segment")
-            #
-            # when the 2nd dimension of the "signals" is non-singleton, the data
-            # is interpreted as "multi-channel"
-            #
-            # vigra.Kernel1D are a special case, as they are converted on-the-fly
-            # to a tuple of 1D arrays (x, y)
-            #
-            # see setData() for list of kernel1D, datatypes.DataSignal, and np.ndarrays
-            #print("displayFrame: self.xData: ", self.xData)
-            
-            if all([isinstance(y_, (DataSignal, 
-                                    neo.core.AnalogSignal, 
-                                    neo.core.IrregularlySampledSignal,
-                                    IrregularlySampledDataSignal)) for y_ in self.yData]):
-                
-                if self.frameAxis is None:
-                    for k,signal in enumerate(self.yData):
-                        if isinstance(signal, (neo.AnalogSignal, neo.IrregularlySampledSignal)):
-                            domain_name = "Time"
-                            
-                        else:
-                            domain_name = signal.domain_name
-                                            
-                        self._plot_numeric_data_(self.axis(k), 
-                                                 np.array(signal.times),
-                                                 np.array(signal.magnitude),
-                                                 ylabel = f"{signal.name} ({signal.units.dimensionality})",
-                                                 xlabel = f"{domain_name} ({signal.times.units.dimensionality})",
-                                                 *args, **kwargs)
-                        self.axis(k).register(signal.name)
-                        self.axis(k).setVisible(True)
-                else:
-                    if self._current_frame_index_ in self.frameIndex:
-                        ndx = self.frameIndex[self._current_frame_index_]
-                    else:
-                        self._current_frame_index_ = 0
-                        ndx = self._current_frame_index_
-                
-                    self._plotSignal_(self.yData[ndx], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
-                    self.currentFrameAnnotations = {type(self.yData[ndx]).__name__: self.yData[ndx].annotations}
-                    
-                
-            elif all([isinstance(y_, (neo.core.Epoch, DataZone)) for y_ in self.yData]): 
-                # plot Epoch(s) independently of data; there is a single frame
-                
-                epochs_start_end = np.array([(e[0], e[-1] + e.durations[-1]) for e in self.yData])
-                x_min, x_max = (np.min(epochs_start_end[:,0]), np.max(epochs_start_end[:,1]))
-                # self._prepareAxes_(1)
-                self._plotEpochs_(self.yData, **self.epoch_plot_options)
-                self.axes[0].showAxis("bottom", True)
-                
-            elif all([isinstance(y_, neo.Segment) for y_ in self.yData]):
-                segment = self.yData[self.frameIndex[self._current_frame_index_]]
-                self._plotSegment_(segment, *self.plot_args, **self.plot_kwargs)
-                self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
-                
-            elif all([isinstance(y_, neo.Block) for y_ in self.yData]):
-                frIndex = self.frameIndex[self._current_frame_index_]
-                
-                # NOTE: 2021-01-04 11:13:33
-                # sequence-block-segment indexing array, e.g.:
-                # array([[0, 0, 0],
-                #        [1, 1, 0],
-                #        [2, 2, 0]])
-
-                # i.e. [[sequence index, block index, segment index in block]]:
-                # column 0 = overall running index of Segment in "virtual" sequence
-                # column 1 = running index of the Block
-                # column 2 = running index of Segment in Block with current 
-                #            running block index
-                sqbksg = np.array([(q, *kg) for q, kg in enumerate(enumerate(chain(*((k for k in range(len(b.segments))) for b in self.yData))))])
-                
-                (blockIndex, blockSegmentIndex) = sqbksg[frIndex,1:]
-                
-                segment = self.yData[blockIndex].segments[blockSegmentIndex]
-                
-                plotTitle = "Block %d (%s), segment %d (%s)" % (blockIndex, self.yData[blockIndex].name,
-                                                                blockSegmentIndex, segment.name)
-                
-                kwargs = dict()
-                kwargs.update(self.plot_kwargs)
-                kwargs["plotTitle"] = plotTitle
-                
-                self._plotSegment_(segment, *self.plot_args, **kwargs)
-                
-                self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
-                
-            elif all(isinstance(y_, (neo.Event, DataMark)) for y_ in self.yData):
-                self._plotEvents_(self.yData)
-                
-            elif all(isinstance(y_, neo.SpikeTrain) for y_ in self.yData):
-                self._plotSpikeTrains_(self.yData)
-            
-            else: # accepts sequence of np.ndarray or VigraKernel1D objects
-                self._setup_signal_choosers_(self.yData)
-                
-                if self.singleFrame == True:
-                    self._plotNumpyArrays_(self.xData, self.yData, *self.plot_args, **self.plot_kwargs)
-                    
-                else:
-                
-                    if isinstance(self.xData, list):
-                        self._plotNumpyArray_(self.xData[self._current_frame_index_], self.yData[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
-                        
-                    else:
-                        self._plotNumpyArray_(self.xData, self.yData[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
-                    
-        #### END self.yData is a sequence of objects
+        self._plot_data_(self.yData, *self.plot_args, **self.plot_kwargs)
         
-        #### BEGIN self.yData is a single object
-        else:
-            if isinstance(self.yData, neo.core.Block):
-                # NOTE: 2019-11-24 22:31:26
-                # select a segment then delegate to _plotSegment_()
-                # Segment selection is based on self.frameIndex, or on self.channelIndex # NOTE 2021-10-03 12:59:10 ChannelIndex is no more
-                if len(self.yData.segments) == 0:
-                    return
-                
-                if self._current_frame_index_ not in self.frameIndex:
-                    return
-                
-                segmentNdx = self.frameIndex[self._current_frame_index_]
-                
-                if segmentNdx >= len(self.yData.segments):
-                    return
-                
-                segment = self.yData.segments[segmentNdx]
-                
-                self._plotSegment_(segment, *self.plot_args, **self.plot_kwargs) # calls _setup_signal_choosers_() and _prepareAxes_()
-                
-                self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
-                
-            elif isinstance(self.yData, neo.core.Segment):
-                # delegate straight to _plotSegment_()
-                self._plotSegment_(self.yData, *self.plot_args, **self.plot_kwargs) # calls _setup_signal_choosers_() and _prepareAxes_()
-                
-            elif isinstance(self.yData, (neo.core.AnalogSignal, 
-                                     DataSignal, 
-                                     neo.core.IrregularlySampledSignal,
-                                     IrregularlySampledDataSignal)):
-                if self.frameAxis == 1:
-                    if self._current_frame_index_ in self.frameIndex:
-                        ndx = self.frameIndex[self._current_frame_index_]
-                    else:
-                        self._current_frame_index_ = 0
-                        ndx = 0
-                        
-                    self._plotSignal_(self.yData[:,ndx], *self.plot_args, **self.plot_kwargs)
-                else:
-                    self._plotSignal_(self.yData, *self.plot_args, **self.plot_kwargs)
-
-            elif isinstance(self.yData, (neo.core.Epoch, DataZone)): # plot an Epoch independently of data
-                x_min, x_max = (self.yData[0], self.yData[-1] + self.yData.durations[-1])
-                self._prepareAxes_(1)
-                self._plotEpochs_(self.yData, **self.epoch_plot_options)
-                self.axes[0].showAxis("bottom", True)
-                
-            elif isinstance(self.yData, (neo.Event, DataMark)):
-                self._plotEvents_(self.yData)
-                
-            elif isinstance(self.yData, (neo.SpikeTrain)):
-                self._plotSpikeTrains_(self.yData)
-
-            elif isinstance(self.yData, np.ndarray):
-                try:
-                    if self.yData.ndim > 3:
-                        raise TypeError("Numpy arrays with more than three dimensions are not supported")
-                    
-                    self._plotNumpyArray_(self.xData, self.yData, *self.plot_args, **self.plot_kwargs)
-                    
-                except Exception as e:
-                    traceback.print_exc()
-                    
-            elif self.yData is None:
-                pass
-                
-            # else:
-            #     raise TypeError("Plotting of data of type %s not yet implemented" % str(type(self.yData)))
-        #### END self.yData is a single object
-            
+#         #### BEGIN self.yData is a sequence of objects
+#         if isinstance(self.yData, (tuple, list)): 
+#             # a sequence of objects
+#             #
+#             # can be a sequence of signals, with "signal" being one of:
+#             # neo.AnalogSignal
+#             # neo.IrregularlySampledSignal
+#             # datatypes.DataSignal
+#             # numpy array (vector with shape (n,) or (n, 1)) or matrix (columns
+#             # vectors) shaped (n, m)
+#             # vigra.Kernel1D
+#             
+#             # NOTE: because the signals in the collection do not necessarily 
+#             # have a common "domain" (e.g. time domain, sampling rate, etc) each 
+#             # signal is considered to belong to its own hypothetical data "frame"
+#             # ("sweep", or "segment")
+#             #
+#             # when the 2nd dimension of the "signals" is non-singleton, the data
+#             # is interpreted as "multi-channel"
+#             #
+#             # vigra.Kernel1D are a special case, as they are converted on-the-fly
+#             # to a tuple of 1D arrays (x, y)
+#             #
+#             # see setData() for list of kernel1D, datatypes.DataSignal, and np.ndarrays
+#             #print("displayFrame: self.xData: ", self.xData)
+#             
+#             if all([isinstance(y_, (DataSignal, 
+#                                     neo.core.AnalogSignal, 
+#                                     neo.core.IrregularlySampledSignal,
+#                                     IrregularlySampledDataSignal)) for y_ in self.yData]):
+#                 
+#                 if self.frameAxis is None:
+#                     for k,signal in enumerate(self.yData):
+#                         if isinstance(signal, (neo.AnalogSignal, neo.IrregularlySampledSignal)):
+#                             domain_name = "Time"
+#                             
+#                         else:
+#                             domain_name = signal.domain_name
+#                                             
+#                         self._plot_numeric_data_(self.axis(k), 
+#                                                  np.array(signal.times),
+#                                                  np.array(signal.magnitude),
+#                                                  ylabel = f"{signal.name} ({signal.units.dimensionality})",
+#                                                  xlabel = f"{domain_name} ({signal.times.units.dimensionality})",
+#                                                  *args, **kwargs)
+#                         self.axis(k).register(signal.name)
+#                         self.axis(k).setVisible(True)
+#                 else:
+#                     if self._current_frame_index_ in self.frameIndex:
+#                         ndx = self.frameIndex[self._current_frame_index_]
+#                     else:
+#                         self._current_frame_index_ = 0
+#                         ndx = self._current_frame_index_
+#                 
+#                     self._plotSignal_(self.yData[ndx], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
+#                     self.currentFrameAnnotations = {type(self.yData[ndx]).__name__: self.yData[ndx].annotations}
+#                     
+#                 
+#             elif all([isinstance(y_, (neo.core.Epoch, DataZone)) for y_ in self.yData]): 
+#                 # plot Epoch(s) independently of data; there is a single frame
+#                 
+#                 epochs_start_end = np.array([(e[0], e[-1] + e.durations[-1]) for e in self.yData])
+#                 x_min, x_max = (np.min(epochs_start_end[:,0]), np.max(epochs_start_end[:,1]))
+#                 # self._prepareAxes_(1)
+#                 self._plotEpochs_(self.yData, **self.epoch_plot_options)
+#                 self.axes[0].showAxis("bottom", True)
+#                 
+#             elif all([isinstance(y_, neo.Segment) for y_ in self.yData]):
+#                 segment = self.yData[self.frameIndex[self._current_frame_index_]]
+#                 self._plotSegment_(segment, *self.plot_args, **self.plot_kwargs)
+#                 self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
+#                 
+#             elif all([isinstance(y_, neo.Block) for y_ in self.yData]):
+#                 frIndex = self.frameIndex[self._current_frame_index_]
+#                 
+#                 # NOTE: 2021-01-04 11:13:33
+#                 # sequence-block-segment indexing array, e.g.:
+#                 # array([[0, 0, 0],
+#                 #        [1, 1, 0],
+#                 #        [2, 2, 0]])
+# 
+#                 # i.e. [[sequence index, block index, segment index in block]]:
+#                 # column 0 = overall running index of Segment in "virtual" sequence
+#                 # column 1 = running index of the Block
+#                 # column 2 = running index of Segment in Block with current 
+#                 #            running block index
+#                 sqbksg = np.array([(q, *kg) for q, kg in enumerate(enumerate(chain(*((k for k in range(len(b.segments))) for b in self.yData))))])
+#                 
+#                 (blockIndex, blockSegmentIndex) = sqbksg[frIndex,1:]
+#                 
+#                 segment = self.yData[blockIndex].segments[blockSegmentIndex]
+#                 
+#                 plotTitle = "Block %d (%s), segment %d (%s)" % (blockIndex, self.yData[blockIndex].name,
+#                                                                 blockSegmentIndex, segment.name)
+#                 
+#                 kwargs = dict()
+#                 kwargs.update(self.plot_kwargs)
+#                 kwargs["plotTitle"] = plotTitle
+#                 
+#                 self._plotSegment_(segment, *self.plot_args, **kwargs)
+#                 
+#                 self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
+#                 
+#             elif all(isinstance(y_, (neo.Event, DataMark)) for y_ in self.yData):
+#                 self._plotEvents_(self.yData)
+#                 
+#             elif all(isinstance(y_, neo.SpikeTrain) for y_ in self.yData):
+#                 self._plotSpikeTrains_(self.yData)
+#             
+#             else: # accepts sequence of np.ndarray or VigraKernel1D objects
+#                 self._setup_signal_choosers_(self.yData)
+#                 
+#                 if self.singleFrame == True:
+#                     self._plotNumpyArrays_(self.xData, self.yData, *self.plot_args, **self.plot_kwargs)
+#                     
+#                 else:
+#                 
+#                     if isinstance(self.xData, list):
+#                         self._plotNumpyArray_(self.xData[self._current_frame_index_], self.yData[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+#                         
+#                     else:
+#                         self._plotNumpyArray_(self.xData, self.yData[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+#                     
+#         #### END self.yData is a sequence of objects
+#         
+#         #### BEGIN self.yData is a single object
+#         else:
+#             if isinstance(self.yData, neo.core.Block):
+#                 # NOTE: 2019-11-24 22:31:26
+#                 # select a segment then delegate to _plotSegment_()
+#                 # Segment selection is based on self.frameIndex, or on self.channelIndex
+#                 # NOTE 2021-10-03 12:59:10 ChannelIndex is no more
+#                 if len(self.yData.segments) == 0:
+#                     return
+#                 
+#                 if self._current_frame_index_ not in self.frameIndex:
+#                     return
+#                 
+#                 segmentNdx = self.frameIndex[self._current_frame_index_]
+#                 
+#                 if segmentNdx >= len(self.yData.segments):
+#                     return
+#                 
+#                 segment = self.yData.segments[segmentNdx]
+#                 
+#                 # NOTE: 2023-01-03 22:53:13 
+#                 # singledispatchmethod here
+#                 self._plot_data_(segment, *self.plot_args, **self.plot_kwargs) # calls _setup_signal_choosers_() and _prepareAxes_()
+#                 # self._plotSegment_(segment, *self.plot_args, **self.plot_kwargs) # calls _setup_signal_choosers_() and _prepareAxes_()
+#                 
+#                 self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
+#                 
+#             elif isinstance(self.yData, neo.core.Segment):
+#                 # delegate straight to _plotSegment_()
+#                 #
+#                 # NOTE: 2023-01-03 22:53:13 
+#                 # singledispatchmethod here
+#                 self._plot_data_(self.yData, *self.plot_args, **self.plot_kwargs) # calls _setup_signal_choosers_() and _prepareAxes_()
+#                 # self._plotSegment_(self.yData, *self.plot_args, **self.plot_kwargs) # calls _setup_signal_choosers_() and _prepareAxes_()
+#                 
+#             elif isinstance(self.yData, (neo.core.AnalogSignal, 
+#                                      DataSignal, 
+#                                      neo.core.IrregularlySampledSignal,
+#                                      IrregularlySampledDataSignal)):
+#                 if self.frameAxis == 1:
+#                     if self._current_frame_index_ in self.frameIndex:
+#                         ndx = self.frameIndex[self._current_frame_index_]
+#                     else:
+#                         self._current_frame_index_ = 0
+#                         ndx = 0
+#                         
+#                     self._plotSignal_(self.yData[:,ndx], *self.plot_args, **self.plot_kwargs)
+#                 else:
+#                     self._plotSignal_(self.yData, *self.plot_args, **self.plot_kwargs)
+# 
+#             elif isinstance(self.yData, (neo.core.Epoch, DataZone)): # plot an Epoch independently of data
+#                 x_min, x_max = (self.yData[0], self.yData[-1] + self.yData.durations[-1])
+#                 self._prepareAxes_(1)
+#                 self._plotEpochs_(self.yData, **self.epoch_plot_options)
+#                 self.axes[0].showAxis("bottom", True)
+#                 
+#             elif isinstance(self.yData, (neo.Event, DataMark)):
+#                 self._plotEvents_(self.yData)
+#                 
+#             elif isinstance(self.yData, (neo.SpikeTrain)):
+#                 self._plotSpikeTrains_(self.yData)
+# 
+#             elif isinstance(self.yData, np.ndarray):
+#                 try:
+#                     if self.yData.ndim > 3:
+#                         raise TypeError("Numpy arrays with more than three dimensions are not supported")
+#                     
+#                     self._plotNumpyArray_(self.xData, self.yData, *self.plot_args, **self.plot_kwargs)
+#                     
+#                 except Exception as e:
+#                     traceback.print_exc()
+#                     
+#             elif self.yData is None:
+#                 pass
+#                 
+#             # else:
+#             #     raise TypeError("Plotting of data of type %s not yet implemented" % str(type(self.yData)))
+#         #### END self.yData is a single object
+#             
         # NOTE: 2020-03-10 22:09:51
         # reselect an axis according to its index (if one had been selected before)
         # CAUTION: this may NOT be the same PlotItem object!
@@ -7017,7 +7065,387 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(plotLabelText, str) and len(plotLabelText.strip()):
             self.plotTitleLabel.setText(plotLabelText, color = "#000000")
             
+    @singledispatchmethod
+    def _plot_data_(self, obj, *args, **kwargs):
+        raise NotImplementedError(f"Objects of type {type(obj).__name__} are not supported")
+    
+    @_plot_data_.register(neo.Block)
+    def _(self, obj, *args, **kwargs):
+        # NOTE: 2019-11-24 22:31:26
+        # select a segment then delegate to _plotSegment_()
+        # Segment selection is based on self.frameIndex, or on self.channelIndex
+        # NOTE 2021-10-03 12:59:10 ChannelIndex is no more
+        if len(obj.segments) == 0:
+            return
         
+        if self._current_frame_index_ not in self.frameIndex:
+            return
+        
+        segmentNdx = self.frameIndex[self._current_frame_index_]
+        
+        if segmentNdx >= len(self.yData.segments):
+            return
+        
+        segment = obj.segments[segmentNdx]
+        
+        # NOTE: 2023-01-03 22:53:13 
+        # singledispatchmethod here
+        self._plot_data_(segment, *self.plot_args, **self.plot_kwargs) 
+        
+        self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
+    
+    @_plot_data_.register
+    def _(self, obj:neo.Segment, *args, **kwargs):
+        """Plots a neo.Segment.
+        Plots the signals (optionally the selected ones) present in a segment, 
+        and the associated epochs, events, and spike trains.
+        """
+        plotTitle = kwargs.pop("plotTitle", getattr(obj, "name", "Segment"))
+        
+        analog = obj.analogsignals
+        irregs = obj.irregularlysampledsignals
+        spiketrains = get_non_empty_spike_trains(obj.spiketrains)
+        events = get_non_empty_events(obj.events)
+
+        assert len(self.signalAxes) == len(analog) + len(irregs), "Mistmatch between number of signal axes and available signals"
+        
+        self._setup_signal_choosers_(analog = analog, irregular = irregs) 
+        
+        selected_analogs = list()
+        selected_analog_names = list()
+        selected_analog_ndx = list()
+        selected_irregs = list()
+        selected_irreg_names = list()
+        selected_irreg_ndx = list()
+        
+        ax_ndx = 0
+        
+        #### BEGIN plot regular (analog) signals
+        # NOTE: update only those plotItems where a selected signal should be
+        # all other plotItems are hidden
+        if self._plot_analogsignals_: # flag set up by `Analog` checkbox
+            selected_analogs, selected_analog_names, selected_analog_ndx = self._signals_select_(analog, self.analogSignalComboBox)
+            
+            for k, signal in enumerate(analog):
+                plotItem = self.signalAxes[ax_ndx]
+                if k in selected_analog_ndx:
+                    # NOTE: 2023-01-04 22:14:55
+                    # avoid plotting if frame hasn't changed - just change plotItem's visibility
+                    if self._new_frame_: 
+                        sig_name = selected_analog_names[selected_analog_ndx.index(k)]
+                        self._plot_signal_data_(signal, sig_name, plotItem, *args, **kwargs)
+                        
+                    plotItem.setVisible(True)
+    
+                else:
+                    plotItem.setVisible(False)
+                    
+                ax_ndx += 1
+
+        else: # hide all analog signal plotItems
+            for k, in range(len(analog)):
+                plotItem = self.signalAxes[ax_ndx]
+                plotItem.setVisible(False)
+                ax_ndx += 1
+                
+            
+        #### END plot regular (analog) signals
+        
+        #### BEGIN plot irregular signals
+        if self._plot_irregularsignals_: # flag set up by `Irregular` checkbox
+            selected_irregs, selected_irreg_names, selected_irreg_ndx = self._signals_select_(irregs, self.irregularSignalComboBox)
+            
+            
+            for k, signal in enumerate(irregs):
+                plotItem = self.signalAxes[ax_ndx]
+                if k in selected_irreg_ndx:
+                    if self._new_frame:
+                        sig_name = selected_irreg_names[selected_irreg_ndx.index(k)]
+                        self._plot_signal_data_(signal, sig_name, plotItem, *args, **kwargs)
+            
+                    plotItem.setVisible(True)
+                else:
+                    plotItem.setVisible(False)
+        else:
+            for k in range(len(irregs)):
+                plotItem = self.signalAxes[ax_ndx]
+                plotItem.setVisible(False)
+                ax_ndx += 1
+        #### END plot irregular signals
+
+        if len(spiketrains):
+            if self._new_frame_:
+                # plot all spike trains in this segment stacked in a single axis
+                self._spiketrains_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
+                                                                    QtWidgets.QSizePolicy.Minimum, 
+                                                                    QtWidgets.QSizePolicy.Frame))
+                
+                symbolcolors = cycle(self.defaultLineColorsList)
+                symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
+                symbolPen.setCosmetic(True)
+                
+                labelStyle = {"color": "#000000"}
+                
+                height_interval = 1/len(spiketrains) 
+                
+                self._plot_discrete_entities_(spiketrains, axis=self._spiketrains_axis_, **kwargs)
+                self._spiketrains_axis_.update()
+                
+            self._spiketrains_axis_.setVisible(True)
+        else:
+            self._spiketrains_axis_.setVisible(False)
+            
+        if isinstance(events, (tuple, list)) and len(events):
+            if self._new_frame_:
+                self._events_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
+                                                            QtWidgets.QSizePolicy.Minimum, 
+                                                            QtWidgets.QSizePolicy.Frame))
+                
+                symbolcolors = cycle(self.defaultLineColorsList)
+                symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
+                symbolPen.setCosmetic(True)
+                
+                labelStyle = {"color": "#000000"}
+                
+                height_interval = 1/len(events)
+                
+                self._plot_discrete_entities_(events, axis=kAx, **kwargs)
+                self._events_axis_.update() 
+                
+            self._events_axis_.setVisible(True)
+            
+        else:
+            self._events_axis_.setVisible(False)
+            
+        visibleAxes = [i for i in self.signalAxes if i.isVisible()]
+        for k, plotItem in enumerate(visibleAxes):
+            test = k == len(visibleAxes)-1
+            plotItem.getAxis("bottom").showLabel(test)
+            plotItem.getAxis("bottom").setStyle(showValues=test)
+
+        if self._spiketrains_axis_.isVisible():
+            self._spiketrains_axis_.getAxis("bottom").showLabel(False)
+            self._spiketrains_axis_.getAxis("bottom").setStyle(showValues=False)
+            
+        if self._events_axis_.isVisible():
+            self._events_axis_.getAxis("bottom").showLabel(False)
+            self._events_axis_.getAxis("bottom").setStyle(showValues=False)
+            
+            
+        seg_name = getattr(obj, "name", "")
+        
+        if not isinstance(plotTitle, str) or len(plotTitle.strip()) == 0:
+            self.plotTitleLabel.setText(seg_name, color = "#000000")
+                
+        else:
+            self.plotTitleLabel.setText(plotTitle, color = "#000000")
+                
+        if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
+            self.docTitle = seg_name
+        
+        
+    @_plot_data_.register(neo.AnalogSignal)
+    @_plot_data_.register(neo.IrregularlySampledSignal)
+    @_plot_data_.register(DataSignal)
+    @_plot_data_.register(IrregularlySampledDataSignal)
+    def _(self, obj, *args, **kwargs):
+        if self.frameAxis == 1:
+            if self._current_frame_index_ in self.frameIndex:
+                ndx = self.frameIndex[self._current_frame_index_]
+            else:
+                self._current_frame_index_ = 0
+                ndx = 0
+                
+            self._plotSignal_(obj[:,ndx], *args, **kwargs)
+        else:
+            self._plotSignal_(obj, *args, **kwargs)
+            
+    @_plot_data_.register(neo.Epoch)
+    @_plot_data_.register(DataZone)
+    def _(self, obj, *args, **kwargs):
+        x_min, x_max = (self.yData[0], self.yData[-1] + self.yData.durations[-1])
+        # self._prepareAxes_(1)
+        self._plotEpochs_(obj, **self.epoch_plot_options)
+        self.axes[0].showAxis("bottom", True)
+        
+    @_plot_data_.register(neo.Event)
+    @_plot_data_.register(DataMark)
+    def _(self, obj, *args, **kwargs):
+        self._plotEvents_(obj)
+    
+    @_plot_data_.register
+    def _(self, obj:neo.SpikeTrain, *args, **kwargs):
+        self._plotSpikeTrains_(obj)
+        
+    @_plot_data_.register
+    def _(self, obj:np.ndarray, *args, **kwargs):
+        try:
+            if self.yData.ndim > 3:
+                raise TypeError("Numpy arrays with more than three dimensions are not supported")
+            
+            self._plotNumpyArray_(self.xData, obj, *args, **kwargs)
+            
+        except Exception as e:
+            traceback.print_exc()
+            
+    @_plot_data_.register
+    def _(self, obj:type(None), *args, **kwargs):
+        pass
+    
+    @_plot_data_.register(tuple)
+    @_plot_data_.register(list)
+    def _(self, obj, *args, **kwargs):
+        if all([isinstance(y_, (DataSignal, 
+                                neo.core.AnalogSignal, 
+                                neo.core.IrregularlySampledSignal,
+                                IrregularlySampledDataSignal)) for y_ in self.yData]):
+            
+            if self.frameAxis is None:
+                for k, signal in enumerate(self.yData):
+                    if isinstance(signal, (neo.AnalogSignal, neo.IrregularlySampledSignal)):
+                        domain_name = "Time"
+                        
+                    else:
+                        domain_name = signal.domain_name
+                                        
+                    self._plot_numeric_data_(self.axis(k), 
+                                                np.array(signal.times),
+                                                np.array(signal.magnitude),
+                                                ylabel = f"{signal.name} ({signal.units.dimensionality})",
+                                                xlabel = f"{domain_name} ({signal.times.units.dimensionality})",
+                                                *args, **kwargs)
+                    self.axis(k).register(signal.name)
+                    self.axis(k).setVisible(True)
+            else:
+                if self._current_frame_index_ in self.frameIndex:
+                    ndx = self.frameIndex[self._current_frame_index_]
+                else:
+                    self._current_frame_index_ = 0
+                    ndx = self._current_frame_index_
+            
+                self._plotSignal_(self.yData[ndx], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
+                self.currentFrameAnnotations = {type(self.yData[ndx]).__name__: self.yData[ndx].annotations}
+                
+
+        elif all([isinstance(y_, (neo.core.Epoch, DataZone)) for y_ in self.yData]): 
+            # plot Epoch(s) independently of data; there is a single frame
+            
+            epochs_start_end = np.array([(e[0], e[-1] + e.durations[-1]) for e in self.yData])
+            x_min, x_max = (np.min(epochs_start_end[:,0]), np.max(epochs_start_end[:,1]))
+            # self._prepareAxes_(1)
+            self._plotEpochs_(self.yData, **self.epoch_plot_options)
+            self.axes[0].showAxis("bottom", True)
+            
+        elif all([isinstance(y_, neo.Segment) for y_ in self.yData]):
+            segment = self.yData[self.frameIndex[self._current_frame_index_]]
+            self._plotSegment_(segment, *self.plot_args, **self.plot_kwargs)
+            self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
+            
+        elif all([isinstance(y_, neo.Block) for y_ in self.yData]):
+            frIndex = self.frameIndex[self._current_frame_index_]
+            
+            # NOTE: 2021-01-04 11:13:33
+            # sequence-block-segment indexing array, e.g.:
+            # array([[0, 0, 0],
+            #        [1, 1, 0],
+            #        [2, 2, 0]])
+
+            # i.e. [[sequence index, block index, segment index in block]]:
+            # column 0 = overall running index of Segment in "virtual" sequence
+            # column 1 = running index of the Block
+            # column 2 = running index of Segment in Block with current 
+            #            running block index
+            sqbksg = np.array([(q, *kg) for q, kg in enumerate(enumerate(chain(*((k for k in range(len(b.segments))) for b in self.yData))))])
+            
+            (blockIndex, blockSegmentIndex) = sqbksg[frIndex,1:]
+            
+            segment = self.yData[blockIndex].segments[blockSegmentIndex]
+            
+            plotTitle = "Block %d (%s), segment %d (%s)" % (blockIndex, self.yData[blockIndex].name,
+                                                            blockSegmentIndex, segment.name)
+            
+            kwargs = dict()
+            kwargs.update(self.plot_kwargs)
+            kwargs["plotTitle"] = plotTitle
+            
+            self._plotSegment_(segment, *self.plot_args, **kwargs)
+            
+            self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
+            
+        elif all(isinstance(y_, (neo.Event, DataMark)) for y_ in self.yData):
+            self._plotEvents_(self.yData)
+            
+        elif all(isinstance(y_, neo.SpikeTrain) for y_ in self.yData):
+            self._plotSpikeTrains_(self.yData)
+        
+        else: # accepts sequence of np.ndarray or VigraKernel1D objects
+            self._setup_signal_choosers_(self.yData)
+            
+            if self.singleFrame == True:
+                self._plotNumpyArrays_(self.xData, self.yData, *self.plot_args, **self.plot_kwargs)
+                
+            else:
+            
+                if isinstance(self.xData, list):
+                    self._plotNumpyArray_(self.xData[self._current_frame_index_], self.yData[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+                    
+                else:
+                    self._plotNumpyArray_(self.xData, self.yData[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+                
+    def _signals_select_(self, signals, signalCBox):
+        """Helper method for setting up the collection of selected signals to plot
+        signals: collection of signals in a frame
+        signalCBox: the combo box for selecting which signal to plot, in GUI
+        """
+        selected_signals = list()
+        selected_signal_names = list()
+        selected_signal_ndx = list()
+        
+        current_ndx = signalCBox.currentIndex() 
+        cboxSignames = list(signalCBox.itemText(k) for k in range(1, signalCBox.count()-1))
+        
+        if current_ndx == 0: # "All" selected
+            selected_signals[:] = signals[:]
+            selected_signal_ndx = range(len(signals))
+            selected_signal_names = cboxSignames
+            
+        elif current_ndx == signalCBox.count() - 1: # "Choose" selected
+            if signalCBox == self.analogSignalComboBox:
+                guiSelection = self.guiSelectedAnalogSignalNames
+            else:
+                guiSelection = self.guiSelectedIrregularSignalNames
+            # read the multiple choices previously set up by a dialog
+            # selected_analogs = list()
+            if len(guiSelection):
+                for k, s in enumerate(signals):
+                    if isinstance(s.name, str) and len(s.name.strip()):
+                        if s.name in guiSelection:
+                            selected_signals.append(s)
+                            selected_signal_names.append(s.name)
+                            selected_signal_ndx.append(k)
+                            
+                    elif f"signal {k}" in [n for n in guiSelection]:
+                        n_ = [n for n in guiSelection if f"signal {k}" in n]
+                        if len(n_):
+                            n_ = n_[0]
+                            selected_signals.append(s)
+                            selected_signal_names.append(n_)
+                            selected_signal_ndx.append(k)
+            
+        elif current_ndx > -1: # any single signal selected
+            selected_signals = [signals[current_ndx-1]]
+            selected_signal_ndx.append(current_ndx-1)
+            s_name = selected_signals[0].name
+            
+            if isinstance(s_name, str) and len(s_name.strip()):
+                selected_signal_names = [s_name]
+                
+            else:
+                selected_signal_names = cboxSignames[current_ndx-1]
+                
+                
+        return selected_signals, selected_signal_names, selected_signal_ndx
+    
     @safeWrapper
     def _plotSegment_(self, seg, *args, **kwargs):
         """Plots a neo.Segment.
@@ -7025,6 +7453,11 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         and the associated epochs, events, and spike trains.
         """
         # NOTE: 2021-10-03 12:55:21 ChannelIndex is OUT of neo
+        
+        # print(f"_plotSegment_")
+        # stack = inspect.stack()
+        # for s in stack:
+        #     print(f"\t\tcaller = {s.function}")
         
         if not isinstance(seg, neo.Segment):
             raise TypeError("Expecting a neo.Segment; got %s instead" % type(seg).__name__)
@@ -7059,8 +7492,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         # BEGIN prepare to plot regular (analog) signals
         if self._plot_analogsignals_:
-                # now try to get the signal selections from the combo boxes
-            current_ndx = self.selectSignalComboBox.currentIndex() 
+            # now try to get the signal selections from the combo boxes
+            current_ndx = self.analogSignalComboBox.currentIndex() 
             
             if current_ndx == 0: # "All" selected
                 selected_analogs[:] = analog[:]
@@ -7072,17 +7505,17 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     else:
                         selected_analog_names.append("Analog signal %d" % k)
                 
-            elif current_ndx == self.selectSignalComboBox.count() - 1: # "Choose" selected
+            elif current_ndx == self.analogSignalComboBox.count() - 1: # "Choose" selected
                 # read the multiple choices previously set up by a dialog
                 # selected_analogs = list()
-                if len(self.guiSelectedSignalNames):
+                if len(self.guiSelectedAnalogSignalNames):
                     for k,s in enumerate(analog):
                         if isinstance(s.name, str) and len(s.name.strip()):
-                            if s.name in self.guiSelectedSignalNames:
+                            if s.name in self.guiSelectedAnalogSignalNames:
                                 selected_analogs.append(s)
                                 selected_analog_names.append(s.name)
                                 
-                        elif "Analog signal %d" % k in self.guiSelectedSignalNames:
+                        elif "Analog signal %d" % k in self.guiSelectedAnalogSignalNames:
                             selected_analogs.append(s)
                             selected_analog_names.append("Analog signal %d" % k)
                 
@@ -7095,12 +7528,12 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
                 else:
                     selected_analog_names = ["Analog signal %d" % (current_ndx-1, )]
-        # END   prepate to plot regular (analog) signals
+        # END   prepare to plot regular (analog) signals
           
-        # BEGIN prepate to plot irregular signals
+        # BEGIN prepare to plot irregular signals
         if self._plot_irregularsignals_:
-            current_ndx = self.selectIrregularSignalComboBox.currentIndex()
-            current_txt = self.selectIrregularSignalComboBox.currentText()
+            current_ndx = self.irregularSignalComboBox.currentIndex()
+            current_txt = self.irregularSignalComboBox.currentText()
             
             if current_ndx == 0:
                 selected_irregs[:] = irregs[:]
@@ -7112,7 +7545,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     else:
                         selected_irregs_names.append("Irregularly sampled signal %d" % k)
                 
-            elif current_ndx == self.selectIrregularSignalComboBox.count() - 1:
+            elif current_ndx == self.irregularSignalComboBox.count() - 1:
                 if len(self.guiSelectedIrregularSignalNames):
                     for k, s in enumerate(irregs):
                         if isinstance(s.name, str) and len(s.name.strip()):
@@ -7134,7 +7567,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     selected_irregs_names = ["Irregularly sampled signal %d" % (current_ndx-1,)]
         
-#         # END   prepate to plot irregular signals
+#         # END   prepare to plot irregular signals
 #         
 #         # BEGIN initial set up axes
 #         nAnalogAxes = len(selected_analogs) 
@@ -7176,6 +7609,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #### BEGIN plot regular (analog) signals 
         # for k, signal in enumerate(selected_analogs):
         for k, signal in enumerate(analog):
+            # print(f"kAx = {kAx}")
             # plotItem = self.signalsLayout.getItem(kAx,0)
             plotItem = self._signal_axes_[kAx]
             if isinstance(signal, neo.AnalogSignal):
@@ -7294,12 +7728,11 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #### BEGIN plot spike trains
         if len(spiketrains):
             # plot all spike trains in this segment stacked in a single axis
-            spike_train_axis = self._spiketrains_axis_
-            # spike_train_axis = self.signalsLayout.getItem(kAx,0)
+            # self._spiketrains_axis_ = self.signalsLayout.getItem(kAx,0)
             
             # NOTE: 2022-11-29 23:09:46
             # try to see if we can set this to a smaller height; currently it has the same expanding policy as axes for signals
-            spike_train_axis.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
+            self._spiketrains_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
                                                                  QtWidgets.QSizePolicy.Minimum, 
                                                                  QtWidgets.QSizePolicy.Frame))
             
@@ -7312,22 +7745,23 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             height_interval = 1/len(spiketrains) 
             
-            self._plot_discrete_entities_(spiketrains, axis=spike_train_axis, **kwargs)
-            spike_train_axis.setVisible(True)
-            spike_train_axis.update()
+            self._plot_discrete_entities_(spiketrains, axis=self._spiketrains_axis_, **kwargs)
+            self._spiketrains_axis_.setVisible(True)
+            self._spiketrains_axis_.update()
             kAx +=1
-                
+        else:
+            self._spiketrains_axis_.setVisible(False)
+            
         #### END plot spike trains
         
         #### BEGIN plot events
         if isinstance(events, (tuple, list)) and len(events):
             # plot all event arrays in this segment stacked in a single axis
             #print("_plotSegment_ events", kAx)
-            event_axis = self._events_axis_
             # event_axis = self.signalsLayout.getItem(kAx, 0)
             
             # NOTE: 2022-11-29 23:14:42 see NOTE: 2022-11-29 23:09:46
-            event_axis.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
+            self._events_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
                                                            QtWidgets.QSizePolicy.Minimum, 
                                                            QtWidgets.QSizePolicy.Frame))
             
@@ -7340,9 +7774,13 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             height_interval = 1/len(events)
             
             self._plot_discrete_entities_(events, axis=kAx, **kwargs)
-            event_axis.setVisible(True)
-            event_axis.update() 
+            self._events_axis_.setVisible(True)
+            self._events_axis_.update() 
             kAx +=1
+            
+        else:
+            self._events_axis_.setVisible(False)
+            
             
         #### END plot events
         
@@ -7691,6 +8129,52 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.statusBar().clearMessage()
         
+    def _plot_signal_data_(self, signal:typing.Union[neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal], plot_name:str, plotItem:pg.PlotItem, *args, **kwargs):
+        domain_name = get_domain_name(signal)
+        
+        if self.plot_start is not None:
+            if self.plot_stop is not None:
+                sig = signal.time_slice(self.plot_start, self.plot_stop)
+                
+            else:
+                sig = signal.time_slice(self.plot_start, signal.t_top)
+                
+        else:
+            if self.plot_stop is not None:
+                sig = signal.time_slice(signal.t_start, self.plot_stop)
+                
+            else:
+                sig = signal
+        
+        if sig.shape[1] > 10:
+            self.sig_plot.emit(self._make_sig_plot_dict_(plotItem,
+                                    sig.times,
+                                    sig.magnitude,
+                                    xlabel = "%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
+                                    ylabel = "%s (%s)" % (plot_name, signal.units.dimensionality),
+                                    name=plot_name,
+                                    symbol=None,
+                                    **kwargs))
+        else:
+            self._plot_numeric_data_(plotItem,
+                                    sig.times,
+                                    sig.magnitude,
+                                    xlabel = "%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
+                                    ylabel = "%s (%s)" % (plot_name, signal.units.dimensionality),
+                                    name=plot_name,
+                                    symbol=None,
+                                    **kwargs)
+            
+        if plot_name != plotItem.vb.name:
+            plotItem.register(plot_name)
+            # plotItem.vb.unregister()
+            # plotItem.vb.register(plot_name)
+            # plotItem.vb.name = plot_name
+            
+        plotItem.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
+                                                autoReduceTextSpace=False)
+        plotItem.update()
+        
     @safeWrapper
     def _plot_numeric_data_(self, plotItem: pg.PlotItem, x:np.ndarray, y:np.ndarray, xlabel:(str, type(None))=None, ylabel:(str, type(None))=None, title:(str, type(None))=None, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
         """ The workhorse that does the actual plotting of signals
@@ -7951,36 +8435,113 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         plotItem.close()
         self.signalsLayout.removeItem(plotItem)
         if self.currentAxis == plotItem:
-            self.currentAxis = self.axes[0]
+            self.currentAxis = self.axes[0] if len(self.axes) else None
             
     def _setup_axes_(self):
         """Call this ONCE after parsing the data.
+        In SignalViewer2 there n + 2 PlotItem objects:
+        n PlotItem to represent signals
+        1 PlotItem to represent events (e.g. triggers, etc)
+        1 PlotItem to represent spiketrains (all spiketrains are plotted in the 
+            same PlotItem)
+        
+        This function updates, creates when needed, and removes excess PlotItems
+        dedicated to plotting signals, once a new data has been sent to the 
+        instance of SignalViewer2 e.g. via `plot`, `view`, `setData` (`plot` and
+        `view` are aliases to `setData`), or at initialization (`__init__`) which
+        calls `setData`.
+        
+        The number of PlotItem objects needed to plot signals is stored in the 
+        attribute `self._n_signal_axes_` which is set by `_parse_data_`.
         """
         # nRequiredAxes = self._n_signal_axes_ + self._n_event_axes_ + self._n_spiketrain_axes_
         self._plot_names_.clear()
-        # if len(self.axes):
-            
-        for k in range(self._n_signal_axes_):
-            # plotitem = self.signalsLayout.addPlot(row=k, col=0)
-            plotname = f"signal_axis_{k}"
-            plotitem = pg.PlotItem(name = plotname)
-            # plotitem.register(plotname)
-            plotitem.setVisible(False)
-            self._signal_axes_.append(plotitem)
-            self._plot_names_[k] = plotname # to go out
-            self.signalsLayout.addItem(plotitem, row=k, col=0)
-            
-        self._events_axis_ = pg.PlotItem(name=self._default_events_axis_name_)
-        self.signalsLayout.addItem(self._events_axis_, row=self._n_signal_axes_, col=0)
-        self._spiketrains_axis_ = pg.PlotItem(name=self._default_spiketrains_axis_name_)
-        self.signalsLayout.addItem(self._spiketrains_axis_, row = self._n_signal_axes_ + 1, col = 0)
+
+        # retrieve (cache) the events axis and ths spiketrains axis, if they exist
+        # print(f"{self.__class__.__name__}._setup_axes_ self._n_signal_axes_ = {self._n_signal_axes_}, and {len(self.signalAxes)} signal axes")
         
-        
+        if len(self.plotItems) - len(self.signalAxes) >= 2:
+            self._events_axis_, self._spiketrains_axis_ = self.plotItems[-2:]
+            # there should be at least two: an event axis and a spiketrains axis
+        elif len(self.plotItems) - len(self.signalAxes) == 1:
+            self._events_axis_ = self.plotItems[-1]
             
-           
+        # for plotItem in self.plotItems:
+        #     self._remove_axes_(plotItem)
+        
+        if len(self.signalAxes) < self._n_signal_axes_:
+            # not enough signal axes yet - create here as necessary
+            for k, plotItem in enumerate(self.signalAxes):
+                # re-use existing PlotItem objects
+                plotname = f"signal_axis_{k}"
+                plotItem.register(plotname)
+                # plotItem.vb.unregister()
+                # plotItem.vb.register(plotname)
+                # plotItem.vb.name = plotname
+                plotItem.setVisible(False)
+                
+            for k in range(len(self.signalAxes), self._n_signal_axes_):
+                # create new PlotItem objects as necessary, add to layout
+                plotname = f"signal_axis_{k}"
+                plotItem = pg.PlotItem(name = plotname)
+                self.signalsLayout.addItem(plotItem, row=k, col=0)
+                plotItem.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
+                plotItem.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
+                plotItem.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
+                # plotItem.vb.register(plotname)
+                # plotItem.vb.name = plotname
+                plotItem.setVisible(False)
+                self._signal_axes_.append(plotItem)
+                
+        elif len(self.signalAxes) > self._n_signal_axes_:
+            # more signal axes than necessary
+            for k in range(self._n_signal_axes_):
+                # re-use the ones that are still needed
+                plotname = f"signal_axis_{k}"
+                plotItem = self.signalAxes[k]
+                plotItem.register(plotname)
+                # plotItem.vb.unregister()
+                # plotItem.vb.register(plotname)
+                # plotItem.vb.name = plotname
+                plotItem.setVisible(False)
+                
+            # remove the rest of them
+            for plotItem in self.signalAxes[self._n_signal_axes_:]:
+                self._remove_axes_(plotItem)
+                
+            self._signal_axes_ = self._signal_axes_[:self._n_signal_axes_]
+                
+        else: 
+            # there already are as many PlotItems for signals, as needed
+            for k, plotItem in enumerate(self.signalAxes):
+                # re-use them
+                plotname = f"signal_axis_{k}"
+                plotItem.register(plotname)
+                # plotItem.vb.unregister()
+                # plotItem.vb.register(plotname)
+                # plotItem.vb.name = plotname
+                plotItem.setVisible(False)
+                
+        if not isinstance(self._events_axis_, pg.PlotItem):
+            self._events_axis_ = pg.PlotItem(name=self._default_events_axis_name_)
+        
+        if self._events_axis_ not in self.signalsLayout.items:
+            self.signalsLayout.addItem(self._events_axis_, row=self._n_signal_axes_, col=0)
+            
+        if not isinstance(self._spiketrains_axis_, pg.PlotItem):
+            self._spiketrains_axis_ = pg.PlotItem(name=self._default_spiketrains_axis_name_)
+                
+        if self._spiketrains_axis_ not in self.signalsLayout.items:
+            self.signalsLayout.addItem(self._spiketrains_axis_, row = self._n_signal_axes_ + 1, col = 0)
+            
+        if self.signalsLayout.scene() is not None:
+            self.signalsLayout.scene().sigMouseClicked.connect(self._slot_mouseClickSelectPlotItem)
+        # print(f"{self.__class__.__name__}._setup_axes_ {len(self.signalAxes)} signal axes")
+        
     @safeWrapper
     def _prepareAxes_(self, nRequiredAxes, sigNames=list()):
-        """sigNames: a sequence of str or None objects - either empty, or with as many elements as nRequiredAxes
+        """DEPRECATED
+        
         """
         plotitems = self.plotItems
         
@@ -8405,7 +8966,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.frameIndex = [0]
         self.signalIndex = 1 # NOTE: 2017-04-08 23:00:48 in effect number of signals /frame !!!
         
-        self.guiSelectedSignalNames.clear()
+        self.guiSelectedAnalogSignalNames.clear()
         
         self.guiSelectedIrregularSignalNames.clear()
         
@@ -8425,11 +8986,11 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # and also exception-safe
         
         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in \
-            (self.selectSignalComboBox, self.selectIrregularSignalComboBox,
+            (self.analogSignalComboBox, self.irregularSignalComboBox,
              self.framesQSlider, self.framesQSpinBox)]
         
-        self.selectSignalComboBox.clear()
-        self.selectIrregularSignalComboBox.clear()
+        self.analogSignalComboBox.clear()
+        self.irregularSignalComboBox.clear()
         self.framesQSlider.setMinimum(0)
         self.framesQSlider.setMaximum(0)
         self.framesQSpinBox.setMinimum(0)

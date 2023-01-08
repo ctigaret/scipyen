@@ -604,7 +604,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
 
         # need to withhold notifications here
-        with self.observed_vars.hold_trait_notifications():
+        with self.observed_vars.observer.hold_trait_notifications():
             observed_set = set(self.observed_vars.keys())
             cached_set = set(self.cached_vars)
             
@@ -881,7 +881,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         # print(f"WorkspaceModel.update: {len(del_vars)} del_vars {del_vars}")
         
-        # with self.observed_vars.hold_trait_notifications:
+        # with self.observed_vars.observer.hold_trait_notifications:
         self.observed_vars.remove_members(*del_vars)
         
         for vname in del_vars:

@@ -190,7 +190,7 @@ from .prog import (safeWrapper, deprecation,
 from .datatypes import (is_string, is_vector,
                         RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
 
-from .quantities import units_convertible, check_time_units
+from .quantities import (units_convertible, check_time_units, name_from_unit)
 from .datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from .datazone import DataZone
 from .triggerevent import (DataMark, TriggerEvent, TriggerEventType,)
@@ -302,7 +302,30 @@ def segment_start(data:neo.Segment):
     return min([s.t_start for s in data.analogsignals] + 
                [s.t_start for s in data.spiketrains] +
                [min(s.times) for s in data.irregularlysampledsignals])
-        
+
+@singledispatch
+def get_domain_name(obj):
+    raise NotImplementedError(f"Objects of type {type(obj).__name__} are not suported")
+
+@get_domain_name.register(neo.AnalogSignal)
+@get_domain_name.register(neo.IrregularlySampledSignal)
+@get_domain_name.register(neo.Epoch)
+@get_domain_name.register(neo.Event)
+@get_domain_name.register(neo.SpikeTrain)
+def _(obj):
+    return name_from_unit(obj.times)
+
+@get_domain_name.register(DataSignal)
+@get_domain_name.register(IrregularlySampledDataSignal)
+def _(obj):
+    return obj.domain_name
+
+@get_domain_name.register(DataZone)
+@get_domain_name.register(DataMark)
+@get_domain_name.register(TriggerEvent)
+def _(obj):
+    return name_from_unit(obj.times)
+
 @singledispatch
 def set_relative_time_start(data, t = 0):
     # TODO: dispatch for neo.ImageSequence; neo.Group; neo.ChannelView, SpikeTrainList
