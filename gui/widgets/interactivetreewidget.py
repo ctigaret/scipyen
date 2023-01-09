@@ -83,6 +83,9 @@ class InteractiveTreeWidget(DataTreeWidget):
         self._last_active_item_column_ = 0
         self.has_dynamic_private = False
         self._private_data_ = None
+        self._supported_data_types_ = kwargs.pop("supported_data_types", tuple())
+        if not isinstance(self._supported_data_types_, tuple) or not all(isinstance(v, type) for v in self._supported_data_types_):
+            self._supported_data_types_ = tuple()
         # super(InteractiveTreeWidget, self).__init__(*args, **kwargs)
         DataTreeWidget.__init__(self, *args, **kwargs)
         self.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerItem)
@@ -123,8 +126,6 @@ class InteractiveTreeWidget(DataTreeWidget):
         self.predicate = predicate
         self._private_data_, self.has_dynamic_private = self._parse_data_(data)
         
-        # print(f"{self.__class__.__name__}.setData: {type(data).__name__}, dynamic: {self.has_dynamic_private}")
-        
         if len(top_title.strip()) == 0:
             self.top_title = "/"
         else:
@@ -156,9 +157,8 @@ class InteractiveTreeWidget(DataTreeWidget):
                     self.scrollTo(index, QtWidgets.QAbstractItemView.PositionAtCenter)
                     
     def _parse_data_(self, data):
-        # if type(data) not in list(DataViewer.viewer_for_types)[:-1] and not inspect.isroutine(data) and data is not None:
         mro = inspect.getmro(type(data))
-        if all(t not in list(DataViewer.viewer_for_types) for t in mro) and not inspect.isroutine(data) and data is not None:
+        if all(t not in self._supported_data_types_ for t in mro) and not inspect.isroutine(data) and data is not None:
             return dt.inspect_members(data, self.predicate), True
         else:
             return data, False

@@ -1022,11 +1022,14 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         #### BEGIN set up annotations dock widget
         #print("_configureUI_ sets up annotations dock widget")
-        self.annotationsDockWidget = QtWidgets.QDockWidget("Annotations", self, objectName="annotationsDockWidget")
-        self.annotationsDockWidget.setWindowTitle("Annotations")
-        self.annotationsDockWidget.setFeatures(QtWidgets.QDockWidget.DockWidgetClosable | QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
+        # self.annotationsDockWidget = QtWidgets.QDockWidget("Annotations", self, objectName="annotationsDockWidget")
+        # self.annotationsDockWidget.setWindowTitle("Annotations")
+        # self.annotationsDockWidget.setFeatures(QtWidgets.QDockWidget.DockWidgetClosable | QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
         
-        self.annotationsViewer = InteractiveTreeWidget(self.annotationsDockWidget)
+        
+        # NOTE: 2023-01-09 18:02:42
+        # now defined in the ui file ("signalviewer2.ui")
+        # self.annotationsViewer = InteractiveTreeWidget(self.annotationsDockWidget)
         self.annotationsViewer.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.annotationsViewer.setDragDropMode(QtWidgets.QAbstractItemView.DragOnly)
         self.annotationsViewer.setDragEnabled(True)
@@ -1035,14 +1038,14 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # items selected in the annotations viewer
         #self.annotationsViewer.customContextMenuRequested[QtCore.QPoint].connect(self.slot_annotationsContextMenuRequested)
         
-        self.annotationsDockWidget.setWidget(self.annotationsViewer)
+        # self.annotationsDockWidget.setWidget(self.annotationsViewer)
         
         #print("_configureUI_ sets up annotations dock widget action")
         #### END set up annotations dock widget
         
         #### BEGIN set up coordinates dock widget - defined in the UI file
         #print("_configureUI_ sets up coordinates dock widget")
-        self.coordinatesDockWidget.setWindowTitle("Cursors")
+        # self.coordinatesDockWidget.setWindowTitle("Cursors")
         
         #print("_configureUI_ sets up coordinates dock widget action")
         
@@ -5741,7 +5744,12 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self._setup_axes_()
 
+        if self.observed_vars.get("xData", None) is not None:
+            self.observed_vars["xData"] = None
         self.observed_vars["xData"] = self.xData
+            
+        if self.observed_vars.get("yData", None) is not None:
+            self.observed_vars["yData"] = None
         self.observed_vars["yData"] = self.yData
         # with self.observed_vars.observer.hold_trait_notifications():
         #     self.observed_vars["xData"] = self.xData
@@ -8452,7 +8460,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
     def _setup_axes_(self):
         """Call this ONCE after parsing the data.
-        In SignalViewer2 there n + 2 PlotItem objects:
+        In SignalViewer2 there are n + 2 PlotItem objects:
         n PlotItem to represent signals
         1 PlotItem to represent events (e.g. triggers, etc)
         1 PlotItem to represent spiketrains (all spiketrains are plotted in the 
@@ -8479,9 +8487,6 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         elif len(self.plotItems) - len(self.signalAxes) == 1:
             self._events_axis_ = self.plotItems[-1]
             
-        # for plotItem in self.plotItems:
-        #     self._remove_axes_(plotItem)
-        
         if len(self.signalAxes) < self._n_signal_axes_:
             # not enough signal axes yet - create here as necessary
             for k, plotItem in enumerate(self.signalAxes):
@@ -8549,7 +8554,6 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         if self.signalsLayout.scene() is not None:
             self.signalsLayout.scene().sigMouseClicked.connect(self._slot_mouseClickSelectPlotItem)
-        # print(f"{self.__class__.__name__}._setup_axes_ {len(self.signalAxes)} signal axes")
         
     @safeWrapper
     def _prepareAxes_(self, nRequiredAxes, sigNames=list()):

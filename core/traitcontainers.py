@@ -28,6 +28,15 @@ from .strutils import str2symbol
 class DataBagTraitsObserver(HasTraits):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._verbose_ = False
+        
+    @property
+    def verbose(self):
+        return self._verbose_
+    
+    @verbose.setter
+    def verbose(self, val):
+        self._verbose_ = (val == True)
     
     def remove_traits(self, **traits):
         current_traits = self.traits()
@@ -41,6 +50,13 @@ class DataBagTraitsObserver(HasTraits):
         
         self.add_traits(**keep_traits)
         
+    def notify_change(self, change):
+        """Notify observers of a change event"""
+        if self._verbose_:
+            print(f"notify_change: event = {event}")
+            
+        return self._notify_observers(change)
+
 class DataBag(Bunch):
     """Dictionary with semantics for direct attribute reference and attribute change observer.
     
@@ -169,6 +185,7 @@ class DataBag(Bunch):
         if not issubclass(cls, DataBag):
             raise TypeError(f"Expecting a DataBag or a type derived from DataBag; got {cls.__name__} instead")
         
+        # print(f"DataBag._make_hidden {kwargs}")
         ret = Bunch([(name, kwargs.pop(name, False)) for name in list(cls.hidden_traits) + ["mutable_types"]])
         #ret = Bunch([(name, kwargs.pop(name, False)) for name in list(DataBag.hidden_traits) + ["mutable_types"]])
         ret.length = 0
@@ -241,6 +258,7 @@ class DataBag(Bunch):
         self.__observer__ = DataBagTraitsObserver()
         # NOTE: so that derived types can use their OWN hidden_traits 
         self.__hidden__ = self.__class__._make_hidden(**kwargs)
+        self.__observer__.verbose = self.__hidden__.verbose
 
         for name in self.__hidden__.keys():
             kwargs.pop(name, None)
@@ -649,6 +667,7 @@ class DataBag(Bunch):
     @verbose.setter
     def verbose(self, val):
         self.__hidden__.verbose = (val == True)
+        self.__observer__.verbose = (val == True)
         
     @property
     def allow_none(self):

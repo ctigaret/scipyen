@@ -709,7 +709,9 @@ class DataViewer(ScipyenViewer):
         super().__init__(data=data, parent=parent, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs)
         
     def _configureUI_(self):
-        self.treeWidget = InteractiveTreeWidget(parent = self, useTableEditor = self._useTableEditor_)
+        self.treeWidget = InteractiveTreeWidget(parent = self, 
+                                                useTableEditor = self._useTableEditor_,
+                                                supported_data_types = tuple(self.viewer_for_types))
         
         self.treeWidget.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         
