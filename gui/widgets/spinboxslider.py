@@ -35,7 +35,6 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         super().__init__(parent=parent)
         self._configureUI_()
         
-        
     def _configureUI_(self):
         self.setupUi(self)
         self.descriptionLabel.setText(self._label_)

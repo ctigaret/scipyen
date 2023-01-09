@@ -226,7 +226,7 @@ DEPRECATED here
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-Ui_SignalViewerWindow, QMainWindow = __loadUiType__(os.path.join(__module_path__,'signalviewer.ui'))
+Ui_SignalViewerWindow, QMainWindow = __loadUiType__(os.path.join(__module_path__,'signalviewer2.ui'))
 
 #class PlotWorker(QtCore.QObject):
     
@@ -985,18 +985,22 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.mainLayout.nextRow()
         self.mainLayout.addItem(self.signalsLayout)
         
-        self.framesQSlider.setMinimum(0)
-        self.framesQSlider.setMaximum(0)
-        self.framesQSlider.valueChanged.connect(self.slot_setFrameNumber)
+        self._frames_spinBoxSlider_.label = "Sweep:"
+        self._frames_spinBoxSlider_.setRange(0, self._number_of_frames_)
+        self._frames_spinBoxSlider_.valueChanged.connect(self.slot_setFrameNumber) # slot inherited from ScipyenFrameViewer
+
+#         self.framesQSlider.setMinimum(0)
+#         self.framesQSlider.setMaximum(0)
+#         self.framesQSlider.valueChanged.connect(self.slot_setFrameNumber)
+#         
+#         self._frames_slider_ = self.framesQSlider
         
-        self._frames_slider_ = self.framesQSlider
+        # self.framesQSpinBox.setKeyboardTracking(False)
+        # self.framesQSpinBox.setMinimum(0)
+        # self.framesQSpinBox.setMaximum(0)
+        # self.framesQSpinBox.valueChanged.connect(self.slot_setFrameNumber)
         
-        self.framesQSpinBox.setKeyboardTracking(False)
-        self.framesQSpinBox.setMinimum(0)
-        self.framesQSpinBox.setMaximum(0)
-        self.framesQSpinBox.valueChanged.connect(self.slot_setFrameNumber)
-        
-        self._frames_spinner_ = self.framesQSpinBox
+        # self._frames_spinner_ = self.framesQSpinBox
         
         # FIXME/TODO? 2022-11-17 09:59:51
         # what's this for?
@@ -5809,13 +5813,15 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 elif style is not None and isinstance(style, str):
                     self.plotStyle = style
                     
-                self.framesQSlider.setMaximum(self._number_of_frames_ - 1)
-                self.framesQSpinBox.setMaximum(self._number_of_frames_ - 1)
+                self._frames_spinBoxSlider_.setMaximum(self._number_of_frames_ - 1)
+                self._frames_spinBoxSlider_.setValue(self._current_frame_index_)
+                # self.framesQSlider.setMaximum(self._number_of_frames_ - 1)
+                # self.framesQSpinBox.setMaximum(self._number_of_frames_ - 1)
 
-                self.framesQSlider.setValue(self._current_frame_index_)
-                self.framesQSpinBox.setValue(self._current_frame_index_)
+                # self.framesQSlider.setValue(self._current_frame_index_)
+                # self.framesQSpinBox.setValue(self._current_frame_index_)
                 
-                self.nFramesLabel.setText("of %d" % self._number_of_frames_)
+                # self.nFramesLabel.setText("of %d" % self._number_of_frames_)
                 
                 # NOTE: 2022-11-01 10:37:06
                 # overwrites self.docTitle set by self._parse_data_
@@ -6119,11 +6125,13 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # cleaner than manually connecting and re-connecting
         # and also exception-safe
         
-        signalBlockers = [QtCore.QSignalBlocker(widget) for widget in \
-            (self.framesQSpinBox, self.framesQSlider)]
-        
-        self.framesQSpinBox.setValue(self._current_frame_index_)
-        self.framesQSlider.setValue(self._current_frame_index_)
+        signalBlocker = QtCore.QSignalBlocker(self._frames_spinBoxSlider_)
+        self._frames_spinBoxSlider_.setValue(self._current_frame_index_)
+#         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in \
+#             (self.framesQSpinBox, self.framesQSlider)]
+#         
+#         self.framesQSpinBox.setValue(self._current_frame_index_)
+#         self.framesQSlider.setValue(self._current_frame_index_)
 
         self.displayFrame()
         if self._new_frame_:
@@ -7148,7 +7156,6 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 plotItem.setVisible(False)
                 ax_ndx += 1
                 
-            
         #### END plot regular (analog) signals
         
         #### BEGIN plot irregular signals
@@ -7189,6 +7196,12 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 height_interval = 1/len(spiketrains) 
                 
                 self._plot_discrete_entities_(spiketrains, axis=self._spiketrains_axis_, **kwargs)
+                
+                # if len(self.signalAxes):
+                #     xmin, xman = zip(*list((ax.viewRange[0][0], ax.viewRange))) 
+                #     min(ax.viewRange[0][0] for ax in self.signalAxes)
+                #     xmax = max(ax.view)
+                
                 self._spiketrains_axis_.update()
                 
             self._spiketrains_axis_.setVisible(True)
@@ -8982,20 +8995,23 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         # NOTE: 2018-09-25 23:12:46
         # recipe to block re-entrant signals in the code below
-        # cleaner than manually docinenctign and re-connecting
+        # cleaner than manually connecting and re-connecting
         # and also exception-safe
         
         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in \
             (self.analogSignalComboBox, self.irregularSignalComboBox,
-             self.framesQSlider, self.framesQSpinBox)]
+             self._frames_spinBoxSlider_)]
+             # self.framesQSlider, self.framesQSpinBox)]
         
         self.analogSignalComboBox.clear()
         self.irregularSignalComboBox.clear()
-        self.framesQSlider.setMinimum(0)
-        self.framesQSlider.setMaximum(0)
-        self.framesQSpinBox.setMinimum(0)
-        self.framesQSpinBox.setMaximum(0)
-        self.nFramesLabel.setText(f"of {self._number_of_frames_}")
+        self._frames_spinBoxSlider_.setMinimum(0)
+        self._frames_spinBoxSlider_.setMaximum(0)
+        # self.framesQSlider.setMinimum(0)
+        # self.framesQSlider.setMaximum(0)
+        # self.framesQSpinBox.setMinimum(0)
+        # self.framesQSpinBox.setMaximum(0)
+        # self.nFramesLabel.setText(f"of {self._number_of_frames_}")
         self.docTitle = None # to completely remove the data name from window title
         
         for p in self.plotItems:

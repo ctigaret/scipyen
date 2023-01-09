@@ -15,7 +15,7 @@ event handlers pre_execute() and post_execute().
 # filter/finder in workspace viewer
 #
 
-import traceback, typing, inspect, os, asyncio
+import traceback, typing, inspect, os, asyncio, warnings
 from copy import deepcopy
 import json
 
@@ -78,17 +78,17 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         # NOTE: 2021-07-28 09:58:38
         # currentItem/Name are set by selecting/activating an item in workspace view
-        self.currentItem = None
+        # self.currentItem = None
         # NOTE: 2017-09-22 21:33:47
         # cache for the current var name to allow renaming workspace variables
         # this should be updated whenever the variable name is selected/activated in the model table view
-        self.currentItemName = "" # name of currently selected variable
+        # self.currentItemName = "" # name of currently selected variable
         # NOTE: 2021-06-12 12:11:25
         # cache symbol when the data it is bound to has changed; needed e.g. 
         # for updateRowForVariable
         # CAUTION this is volatile, DO NOT USE it to retrieve current var name
         # e.g., for the purpose of renaming
-        self.originalVarName = "" # varname cache for individual row changes
+        # self.originalVarName = "" # varname cache for individual row changes
         self.setColumnCount(len(standard_obj_summary_headers))
         self.setHorizontalHeaderLabels(standard_obj_summary_headers) # defined in core.utilities
         
@@ -746,33 +746,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         return v if v in self.shell.user_ns else None # <- this is the workspace
 
-    def getCurrentVarName(self):
-        """DEPRECATED
-        """
-        warnings.warn("Deprecated", DeprecationWarning)
-        
-        varname = self.currentItemName
-        
-        if varname is None or (isinstance(varname, str) and len(varname.strip()) == 0):
-            if self.parent():
-                if hasattr(self.parent(),"workspaceView"):
-                    wv = self.parent().workspaceView
-                    indexList = wv.selectedIndexes()
-                    if len(indexList) == 0:
-                        return
-                    
-                    varname = wv.item(indexList[0].row(),0).text()
-                    
-                if varname is None or isinstance(varname, str) and len(varname.strip()) == 0:
-                    return
-                
-                if varname not in self.shell.user_ns.keys():
-                    return
-                
-                self.currentItemName = varname
-            
-        return varname
-            
     def updateRowForVariable(self, dataname, data, ns=None):
         # CAUTION This is only for internal workspace, but 
         # TODO 2020-07-30 22:18:35 merge & factor code for both internal and foreign

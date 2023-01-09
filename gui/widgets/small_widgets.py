@@ -527,9 +527,6 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         # self.setSuffix(sfx)
         
         return ret
-                
-                
-        
         
     def setValue(self, value:typing.Union[pq.Quantity, float, type(pd.NA)]):
         """Also allows changing the units if not convertible to current ones.
