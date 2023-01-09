@@ -352,9 +352,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             
                 return result
             
-            
-        
-            
     def update_title(self, doc_title: (str, type(None)) = None, win_title: (str, type(None)) = None, enforce: bool = False):
         """Sets up the window title according to the pattern document - viewer.
         

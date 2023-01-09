@@ -274,20 +274,20 @@ class DataBag(Bunch):
         else:
             dd = kwargs
             
-        traits = dict(map(lambda x: (x[0], self._light_trait_(x[1])), dd.items()))
+        traits = dict(map(lambda x: (x[0], self._make_trait_(x[1])), dd.items()))
         
         self.__hidden__.length = len(traits)
 
         self.__observer__.add_traits(**traits)
         
-        # FIXME:L 2021-10-10 15:59:37
+        # FIXME: 2021-10-10 15:59:37
         # Why is this needed: because otherwise DataBag shows no contents
         for k,v in dd.items():
             object.__setattr__(self.__observer__, k, v)
             
         super().__init__(**dd)
         
-    def _light_trait_(self, obj):
+    def _make_trait_(self, obj):
         # NOTE: 2022-01-29 19:29:56 dynamic_trait is from traitutils
         if obj is self:
             dtrait = partial(dynamic_trait, 
@@ -414,7 +414,7 @@ class DataBag(Bunch):
         else: # NOTE: 2022-11-03 12:02:34 add a new trait
             
             if key not in ("__observer__", "__hidden__") and key not in self.__hidden__.keys():
-                trdict = {key: self._light_trait_(val)}
+                trdict = {key: self._make_trait_(val)}
                 obs.add_traits(**trdict)
                 object.__setattr__(obs, key, val)
                 object.__getattribute__(self, "__hidden__").length = len(trdict)
@@ -542,8 +542,7 @@ class DataBag(Bunch):
         old_trait = obs.traits()[key]
         old_type = type(object.__getattribute__(obs, key))
         
-        #new_trait = dynamic_trait(val, allow_none = self.allow_none, content_traits=True)
-        new_trait = self._light_trait_(val)
+        new_trait = self._make_trait_(val)
         new_type = type(val)
         
         # NOTE 2020-07-05 16:17:27

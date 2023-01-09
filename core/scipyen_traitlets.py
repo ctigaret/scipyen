@@ -20,6 +20,7 @@ from collections import deque
 import numpy as np
 import quantities as pq
 import pandas as pd
+import neo
 
 from traitlets.utils.bunch import Bunch
 from traitlets.utils.descriptions import describe, class_of, add_article, repr_type
@@ -28,6 +29,10 @@ from traitlets.traitlets import (TraitError, TraitType, Instance, Container,
                                  Undefined, Unicode, is_trait)
 
 from .traitcontainers import DataBag
+from .datasignal import DataSignal, IrregularlySampledDataSignal
+from .datazone import DataZone
+from .triggerevent import DataMark, TriggerEvent
+from .triggerprotocols import TriggerProtocol
 #from .traitutils import (enhanced_traitlet_set, standard_traitlet_set)
 
 from .utilities import gethash
@@ -158,18 +163,182 @@ class _NotifierDeque_(deque):
         else:
             super().rotate(n)
             
-class QuantityTrait(Instance):
+class NeoBlockTrait(Instance):
+    info_text = "Trais for neo.Block"
+    default_value = neo.Block()
+    klass = neo.Block
+    _cast_types = tuple()
+    _valid_defaults = (neo.Block,)
+    
+    def __init__(self, value_trait=None, default_value = Undefined, **kwargs):
+        trait = kwargs.pop('trait', None)
+        if trait is not None:
+            if value_trait is not None:
+                raise TypeError("Found a value for both `value_trait` and its deprecated alias `trait`.")
+            value_trait = trait
+            warn(
+                "Keyword `trait` is deprecated in traitlets 5.0, use `value_trait` instead",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            
+        if default_value is None and not kwargs.get("allow_none", False):
+            default_value = Undefined
+            
+        if default_value is Undefined and value_trait is not None:
+            if not is_trait(value_trait):
+                default_value = value_trait
+                value_trait = None
+                
+        if default_value is Undefined:
+            default_value = pq.Quantity([])
+            args = ()
+            
+        elif isinstance(default_value, self._valid_defaults):
+            args = (default_value,)
+            
+        else:
+            raise TypeError(f"default_value expected to be {None} or one of {self._valid_defaults}")
+        
+        if is_trait(value_trait):
+            self._trait = value_trait() if isinstance(value_trait, type) else value_trait
+            
+        elif trait is not None:
+            raise TypeError(f"Expecting 'value_trait to be a Trait or None; got {type(value_trait_.__name__)}")
+        
+        super().__init__(klass = self.klass, args=args, **kwargs)
+    
+    def validate_elements(self, obj, value):
+        return super().validate_elements(obj, value) # returns value if value is an instance of self.klass
+
+    def make_dynamic_default(self):
+        return neo.Block()
+            
+    def set(self, obj, value):
+        new_value = self._validate(obj, value)
+            
+        # NOTE: 82021-10-20 09:13:51
+        # to also flag addition of this trait:
+        # when DataBag is empty, its hashed value will be 0 thus not different 
+        # from the default; therefore when and old_value of this trait does not
+        # exist we should be notifying the observer
+        silent = True 
+        
+        try:
+            old_value = obj._trait_values[self.name]
+        except KeyError:
+            silent=False    # this will be the first time the observed sees us
+                            # therefore forcibly notify it
+            old_value = self.default_value
+            
+        obj._trait_values[self.name] = new_value
+        
+        try:
+            # check class
+            silent = type(new_value) == type(old_value) and isinstance(new_value, self.klass)
+            
+            if silent:
+                # check attributes
+                attrs = tuple((getattr(new_value, a), getattr(old_value, a) for a in self.klass._all_attrs)
+                silent = all(np.all(c_new == c_old) for (c_new, c_old) in attrs)
+                
+            if silent:
+                # check container children count
+                silent = len(new_value.container_children_recur) == len(old_value.container_children_recur)
+                
+            if silent:
+                # check data children count
+                silent = len(new_value.data_children_recur) == len(old_value.data_children_recur)
+                
+                if silent:
+                    # check data children
+                    silent = all(np.all(c_new == c_old) for (c_new, c_old) in zip(new_value.data_children_recur, old_value.data_children_recur))
+                    
+            if silent:
+                # check annotations
+                silent = len(new_value.annotations) == len(old_value.annotations)
+                
+                if silent:
+                    # check annotation keys
+                    silent = all(np.all(c_new == c_old) for (c_new, c_old) in zip(new_value.annotations.keys(), old_value.annotations.keys()))
+                    
+                # NOTE: 2023-01-09 23:46:04
+                # since annotations can hold virtually any serializable python object
+                # including dicts, it would be quite epensive to check for their equality,
+                # and even more so if it were to be done recursively;
+                #
+                # furthermore, if any single change in annotations were to trigger
+                # a trait notification, this could result in spending too much time
+                # with expensive operations downstream (such as plotting, etc)
+                # just because one bit of information was changed in a section of the data
+                # that MAY not be relevant to the user 
+                #
+                # therefore, we're limiting ourselves to the number of the keys and their 
+                # identity
+                
+            if silent:
+                # so far silent is True when the observed knows about us
+                # check it we changed and notify
+                # silent = (new_hash == self.hashed)
+                silent = new_value == old_value
+            
+        except:
+            traceback.print_exc()
+            silent = False
+            
+        #print(f"silent {silent}")
+                
+        if silent is not True:
+            obj._notify_trait(self.name, old_value, new_value)
+        
+    def info(self):
+        if isinstance(self.klass, six.string_types):
+            klass = self.klass
+        else:
+            klass = self.klass.__name__
+            
+        result = "%s with dimensionality (units) of %s " % (class_of(klass), self.default_value.dimensionality)
+        
+        if self.allow_none:
+            result += ' or None'
+
+        return result
+
+    def error(self, obj, value):
+        kind = type(value)
+        if six.PY2 and kind is InstanceType:
+            msg = 'class %s' % value.__class__.__name__
+        else:
+            msg = '%s (i.e. %s)' % ( str( kind )[1:-1], repr( value ) )
+
+        if obj is not None:
+            if isinstance(value, pq.Quantity):
+                e = "The '%s' trait of %s instance must be %s, but a Quantity with dimensionality (units) of %s was specified." \
+                    % (self.name, class_of(obj),
+                    self.info(), value.dimensionality)
+                
+            else:
+                e = "The '%s' trait of %s instance must be %s, but a value of %s was specified." \
+                    % (self.name, class_of(obj),
+                    self.info(), msg)
+        else:
+            if isinstance(value, pq.Quantity):
+                e = "The '%s' trait must be %s, but a Quantity with dimensionality (units) of %s was specified." \
+                    % (self.name, self.info(), value.dimensionality)
+            else:
+                e = "The '%s' trait must be %s, but a value of %r was specified." \
+                    % (self.name, self.info(), msg)
+            
+        raise TraitError(e)
+    
+ class QuantityTrait(Instance):
     info_text = "Trait for python quantities"
     default_value = pq.Quantity([]) # array([], dtype=float64) * dimensionless
     klass = pq.Quantity
     _cast_types = (np.ndarray, )
     _valid_defaults = (pq.Quantity,)
     
-    def __init__(self, value_trait=None,
-                 default_value = Undefined,
-                 minlen = 0,
-                 maxlen = sys.maxsize,
-                 **kwargs):
+    def __init__(self, value_trait=None, default_value = Undefined, minlen = 0, maxlen = sys.maxsize, **kwargs):
         self._minlen = minlen
         self._maxlen = maxlen
         # self.hashed = 0
