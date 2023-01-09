@@ -12,7 +12,8 @@ from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 
 from core.utilities import safeWrapper
 # from core import workspacefunctions as wfunc
-from .workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
+from .workspacegui import (WorkspaceGuiMixin, _X11WMBridge_, 
+                           saveWindowSettings, loadWindowSettings)
 from gui.widgets.spinboxslider import SpinBoxSlider
 from core import sysutils
 from pandas import NA
@@ -201,18 +202,32 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # NOTE: 2023-01-07 23:52:06
         # dirty hack to restore global menu after the window is closed (but not
         # deleted)
+        # 
+        # The problem:
+        # When run in a KDE environment with global appmenu service running, the 
+        # menu bar of any ScipyenViewer window is shown in the global menu (top of
+        # Desktop) upon its first initialization.
+        #
+        # If the window is then closed (but neither its Qt/C++ side is deleted, 
+        # nor its Python/sip wrapper binding - i.e., the symbol to which this 
+        # sip wrapper is bound remains in scope) the window's menu is taken out 
+        # from the global appmenu(*) - as expected, I guess.
+        #
+        # The actual problem is that when the window is shown again (e.g. by 
+        # calling any of the show(), setVisible(),  raise_(), activateWidow()
+        # methods) its menubar is not shown again in the global menu
+        # 
+        # *) or the "system-wide menu bar"
         
         self._global_menu_service_ = None
         
         if not QtWidgets.qApp.testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
-            if "startplasma" in sysutils.get_desktop() or "KDE" in sysutils.get_desktop("desktop"):
+            # if "startplasma" in sysutils.get_desktop() or "KDE" in sysutils.get_desktop("desktop"):
+            if sysutils.is_kde_x11():
                 appMenuServiceNames = list(name for name in QtDBus.QDBusConnection.sessionBus().interface().registeredServiceNames().value() if "AppMenu" in name)
                 
                 if len(appMenuServiceNames):
                     self._global_menu_service_ = appMenuServiceNames[0]
-        
-                
-                
         
         # NOTE: 2019-11-09 09:30:38
         # _data_var_name_ is either None, or the symbol bound to the data in user's namespace
@@ -232,7 +247,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             self._ID_ = ID
             
         else:
-            self._ID_  = self.winId()
+            self._ID_  = int(self.winId()) # this is the wm ID of the window
             
         # NOTE: 2021-09-16 12:26:09
         # This SHOULD be implemented in the derived class
@@ -283,7 +298,62 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         else:
             self.update_title(win_title = win_title, doc_title = doc_title)
             
-        self._prev_init_ = False
+        # NOTE: 2023-01-08 23:41:40
+        # do NOT delete (see NOTE: 2023-01-08 23:40:30)
+        # self._prev_init_ = False
+        
+        # NOTE: 2023-01-08 21:21:20
+        # int(winId()) is the same for QMainWindow, QWindow, AND
+        # the WM_ID reported by wmctrl 
+        self._wm_id_ = int(self.winId())
+        
+        self._app_menu_ = self.getAppMenu()
+        
+        # print(f"{self.__class__.__name__}.__init__ AppMenu: {self._app_menu_}")
+        
+        # self._x11bridge_ = _X11WMBridge_()
+        # self._x11bridge_.sig_wm_inspect_done.connect(self._slot_set_WM_winID_)
+        # self._x11bridge_.inspect_wm()
+        
+    def getAppMenu(self):
+        if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
+            service_name = self._global_menu_service_
+            service_path = "/com/canonical/AppMenu/Registrar"
+            interface = "com.canonical.AppMenu.Registrar"
+            dbusinterface = QtDBus.QDBusInterface(service_name, service_path,
+                                                  interface)
+            dbusinterface.setTimeout(100)
+            
+            # v = QtCore.QVariant(self._wm_id_)
+            v = QtCore.QVariant(int(self.winId()))
+            
+            if v.convert(QtCore.QVariant.UInt): # NOTE: 2023-01-08 23:10:14 MUST convert to UInt
+                # NOTE: 2023-01-08 22:58:38
+                # When all OK, result should be a list with:
+                # • str: address of the connection on DBus (e.g.: ':1.383')
+                # • str: The path to the object which implements the com.canonical.dbusmenu interface.
+                #           (e.g., /MenuBar/4') as a str (NOT QDBusObjectPath!) 
+                #
+                #       If you use QDBusViewer, the address points to /MenuBar/x 
+                #       where x is an int >= 1, and it has the following interfaces:
+                #       ∘ com.canonical.dbusmenu (AHA!)
+                #       ∘ the next three are generic and present on all objects on DBus
+                #           ▷ org.freedesktop.DBus.Properties
+                #           ▷ org.freedesktop.DBus.Introspectable
+                #           ▷ org.freedesktop.DBus.Peer
+                #
+                result = dbusinterface.call("GetMenuForWindow", v).arguments()
+            
+                if len(result) == 1: # oops!
+                    # warnings.warn(result[0])
+                    return
+            
+                    # address, objpath = result
+            
+                return result
+            
+            
+        
             
     def update_title(self, doc_title: (str, type(None)) = None, win_title: (str, type(None)) = None, enforce: bool = False):
         """Sets up the window title according to the pattern document - viewer.
@@ -402,6 +472,11 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         by loadUiType().
         """
         pass
+    
+    # def _get_WM_ID_(self):
+    #     if isinstance(self.windowHandle(), QtGui.QWindow):
+    #         self._wm_id_
+    #     pass
     
     def view(self, data: (object, type(None)), doc_title: (str, type(None)) = None, *args, **kwargs):
         """Set the data to be displayed by this viewer.
@@ -623,7 +698,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # NOTE: 2021-07-08 12:07:35
         # also de-register the viewer with Scipyen's main window, if this viewer
         # is NOT a client (child) of another Scipyen app (e.g. LSCaTWindow)
-        
         if self._delete_on_close_:
             if self.isTopLevel:
                 if any([v is self for v in self.appWindow.workspace.values()]):
@@ -631,14 +705,29 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                     self.appWindow.removeFromWorkspace(self, by_name=False)
             
             else:
-                self.sig_closeMe.emit()
-        
-        # if not self.isTopLevel:
-        #     self.sig_closeMe.emit()
-
+                self.sig_closeMe.emit
+                
+            # NOTE: 2023-01-08 23:42:22
+            # It is graceful to unregister with the global menu via DBus, 
+            # if/when it does exist
+            if self._app_menu_ is not None and self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
+                service_name = self._global_menu_service_
+                service_path = "/com/canonical/AppMenu/Registrar"
+                interface = "com.canonical.AppMenu.Registrar"
+                dbusinterface = QtDBus.QDBusInterface(service_name, service_path,
+                                                    interface)
+                dbusinterface.setTimeout(100)
+                
+                old_v = QtCore.QVariant(self._wm_id_)
+                
+                if old_v.convert(QtCore.QVariant.UInt):
+                    reply = dbusinterface.call("UnregisterWindow", old_v)
+                
         if self.close():
-            self._prev_init_ = True # patch to flag this was already initialized, to sthat we can restore menu bar when using GlobalMenu in Linux desktops
+            # self._prev_init_ = True # patch to flag this was already initialized, to sthat we can restore menu bar when using GlobalMenu in Linux desktops
             evt.accept()
+            
+        # print(f"End of closeEvent handler: \n\tQMainWindow.winId() → {int(self.winId())}\n\tQWindow.winId() → {int(self.windowHandle().winId())}")
     
     def event(self, evt:QtCore.QEvent):
         """Generic event handler
@@ -654,36 +743,62 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     
     @pyqtSlot(QtGui.QWindow.Visibility)
     def _slot_visibility_changed(self, val):
-        if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
-            # print(f"{self.__class__.__name__}._slot_visibility_changed: {val}")
-            # print(f"QMainWindow id: {self.winId()}")
-            # print(f"QWindow id: {self.windowHandle().winId()}")
-            if val > QtGui.QWindow.Hidden and not self._menu_bar_.isVisible():
+        if self._wm_id_ != int(self.winId()):
+            if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
                 self._restore_menuBar_()
     
-    @pyqtSlot(bool)
-    def _slot_visible_changed(self, val):
-        print(f"{self.__class__.__name__}._slot_visibile_changed: {val}")
-        if val == True:
-            self._restore_menuBar_()
+    # @pyqtSlot(bool)
+    # def _slot_visible_changed(self, val):
+    #     print(f"{self.__class__.__name__}._slot_visibile_changed: {val}")
+    #     if val == True:
+    #         self._restore_menuBar_()
             
             
     def _restore_menuBar_(self):
-        """Very dirty hack to restore the global menu being lost after the 
-        window was closed - only necessary when running Scipyen in KDE AND
-        kde global menu service running.
-        Another (simpler) option is to avoid the use of global menu by
-        setting the attribute QtCore.Qt.AA_DontUseNativeMenuBar of the Scipyen 
-        QApplication to True
+        """Hack to restore the window's menubar in the desktop's global menu.
+        
+        Only necessary when running Scipyen in a windowing system / desktop
+        environment that provides such service, such as GNOME AND KDE on UN*X.
+        
         """
-        print(f"{self.__class__.__name__}._restore_menuBar_")
-        if self._prev_init_ and isinstance(self._menu_bar_, QtWidgets.QMenuBar) and not self._menu_bar_.isVisible():
-            self._menu_bar_.setParent(None)
-            olf_menu_bar = self.menuBar()
-            self.setMenuBar(self._menu_bar_)
-            self._menu_bar_.setVisible(True)
-        # pass
-        # if isinstance(self.menuBar())
+        currentAppMenu = self.getAppMenu()
+        
+        if self._app_menu_ is None:
+            # nothing to restore
+            return
+        
+        if currentAppMenu is None:
+            if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
+                service_name = self._global_menu_service_
+                service_path = "/com/canonical/AppMenu/Registrar"
+                interface = "com.canonical.AppMenu.Registrar"
+                dbusinterface = QtDBus.QDBusInterface(service_name, service_path,
+                                                    interface)
+                dbusinterface.setTimeout(100)
+                
+                old_v = QtCore.QVariant(self._wm_id_)
+                new_v = QtCore.QVariant(int(self.winId()))
+                
+                if old_v.convert(QtCore.QVariant.UInt) and new_v.convert(QtCore.QVariant.UInt):
+                    # deregister old WM window ID, then register the new one
+                    # to the same DBus object path (i.e. dbusmenu instance)
+                    dereg_reply = dbusinterface.call("UnregisterWindow", old_v)
+                    newreg_reply = dbusinterface.call("RegisterWindow", new_v, QtDBus.QDBusObjectPath(self._app_menu_[1]))
+            
+            
+            
+         
+        # NOTE: 2023-01-08 23:40:30
+        # this is a dirty but OK hack, although it is imposing on AppMenu service;
+        # keep for reference (make sure self._prev_init_ is defined in __init__)
+        #
+        # if self._prev_init_ and isinstance(self._menu_bar_, QtWidgets.QMenuBar) and not self._menu_bar_.isVisible():
+        #     self._menu_bar_.setParent(None)
+        #     old_menu_bar = self.menuBar()
+        #     self.setMenuBar(self._menu_bar_)
+        #     self._menu_bar_.setVisible(True)
+        
+        
     
     @pyqtSlot()
     @safeWrapper

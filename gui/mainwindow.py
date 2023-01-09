@@ -186,6 +186,7 @@ import core.xmlutils as xmlutils
 import core.tiwt as tiwt
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
+import core.sysutils as sysutils
 import core.strutils as strutils
 from core.strutils import InflectEngine
 #import core.simulations as sim
@@ -490,6 +491,67 @@ class WindowManager(__QMainWindow__):
         
         self.currentViewers = {mpl.figure.Figure: None}
         
+#         # NOTE: 2023-01-08 13:19:59
+#         # these below are from 
+#         # https://stackoverflow.com/questions/65816656/how-to-detect-when-a-foreign-window-embedded-with-qwidget-createwindowcontainer
+#         # used here to get the window manager's ID of this window
+#         self.wmctrl = None
+#         self.timer=None
+#         
+#         # NOTE: 2023-01-08 16:09:33
+#         # maps windowID to window instance;
+#         # for now, used specifically for managing global app menu on Linux desktops
+#         self.windows = dict()
+# 
+#         if sysutils.is_kde_x11():
+#             self.wmctrl = QtCore.QProcess()
+#             self.wmctrl.setProgram("wmctrl")
+#             self.wmctrl.setArguments(["-lpx"])
+#             self.wmctrl.readyReadStandardOutput.connect(self._slot_parseWindowsList)
+#             self.timer = QtCore.QTimer(self)
+#             self.timer.setSingleShot(True)
+#             self.timer.setInterval(25)
+#             self.timer.timeout.connect(self.wmctrl.start)
+#             self.timer.start()
+#             
+#     @pyqtSlot()
+#     def _slot_parseWindowsList(self):
+#         if not isinstance(self.wmctrl, QtCore.QProcess):
+#             return
+#         windows = dict()
+#         # NOTE: 2023-01-08 16:19:02
+#         # a line returned by `wmctrl -lpx` is like:
+#         # column:       0       1   2       3                   4       5
+#         #           0x05000009  0 31264  scipyen.py.Scipyen    Hermes Scipyen Console
+#         #
+#         # columns meanings (remember: this was called with the `-lpx` arguments;
+#         #           see `man wmctrl` for details):
+#         #
+#         # 0 → window identity
+#         #
+#         # 1 → virtual desktop number (-1 is a `sticky` window i.e. on all desktops)
+#         #                   WARNING: virtual desktop numbers start at 0, which may 
+#         #                   not be obvious, depending on how they are labeled
+#         #
+#         # 2 → the PID for the window (int) - this is the PID of the process that
+#         #       started the window (same as os.getpid());
+#         #
+#         # 3 → the WM_CLASS (Scipyen windows all seem to have scipyen.py.Scipyen)
+#         #
+#         # 4 → the client machine name
+#         #
+#         # 5 → the window title (with spaces)
+#         
+#         scipyen_window_lines = list(map(lambda x: x.split(maxsplit=5), filter(lambda x: f"{os.getpid()}" in x, bytes(self.wmctrl.readAll()).decode().splitlines())))
+#         
+#         for line in scipyen_window_lines:
+#             # print(f"line = {line}")
+#             wm_winid = int(line[0], 16)
+#             print(f"wm_winid = {wm_winid}")
+#             print(f"window title = {line[-1]}")
+#             self.windows[line[-1]] = wm_winid
+                
+    
     @pyqtSlot(object)
     @safeWrapper
     def slot_windowActivated(self, obj):
@@ -1526,6 +1588,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         parent: QtWidgets.QWidget or None (default).
         """
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: QMainWindow python3 way
+        
+        # NOTE: 2023-01-08 16:14:26
+        # this below is the same as:
+        # • app.instance()
+        # • QtWidgets.qApp.instance()
+        # i.e. the global singleton instance of the QApplication running Scipyen
         self.app = app
         
         # NOTE: 2022-12-25 10:41:12

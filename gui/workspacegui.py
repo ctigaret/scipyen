@@ -16,12 +16,82 @@ from core.scipyen_config import (ScipyenConfigurable,
                                  loadWindowSettings,
                                  saveWindowSettings,
                                  confuse)
-from core import strutils
+from core import strutils, sysutils
 from core.strutils import InflectEngine
 import gui.quickdialog as qd
 from gui.itemslistdialog import ItemsListDialog
 
 #ScipyenConfigurable = ScipyenConfigurable2 # NOTE remove before release
+
+class _X11WMBridge_(QtCore.QObject):
+    sig_wm_inspect_done = pyqtSignal(name="sig_wm_inspect_done")
+    
+    def __init__(self, parent=None):
+        # NOTE: 2023-01-08 13:19:59
+        # these below are from 
+        # https://stackoverflow.com/questions/65816656/how-to-detect-when-a-foreign-window-embedded-with-qwidget-createwindowcontainer
+        # used here to get the window manager's ID of this window
+        self.wmctrl = None
+        self.timer=None
+        
+        # NOTE: 2023-01-08 16:09:33
+        # maps windowID to window instance;
+        # for now, used specifically for managing global app menu on Linux desktops
+        self.windows = dict()
+
+        if sysutils.is_kde_x11():
+            self.wmctrl = QtCore.QProcess()
+            self.wmctrl.setProgram("wmctrl")
+            self.wmctrl.setArguments(["-lpx"])
+            self.wmctrl.readyReadStandardOutput.connect(self._slot_parseWindowsList)
+            self.timer = QtCore.QTimer(self)
+            self.timer.setSingleShot(True)
+            self.timer.setInterval(25)
+            self.timer.timeout.connect(self.wmctrl.start)
+            
+    @pyqtSlot()
+    def _slot_parseWindowsList(self):
+        if not isinstance(self.wmctrl, QtCore.QProcess):
+            self.sig_wm_inspect_done.emit()
+            return
+        # NOTE: 2023-01-08 16:19:02
+        # a line returned by `wmctrl -lpx` is like:
+        # column:       0       1   2       3                   4       5
+        #           0x05000009  0 31264  scipyen.py.Scipyen    Hermes Scipyen Console
+        #
+        # columns meanings (remember: this was called with the `-lpx` arguments;
+        #           see `man wmctrl` for details):
+        #
+        # 0 → window identity
+        #
+        # 1 → virtual desktop number (-1 is a `sticky` window i.e. on all desktops)
+        #                   WARNING: virtual desktop numbers start at 0, which may 
+        #                   not be obvious, depending on how they are labeled
+        #
+        # 2 → the PID for the window (int) - this is the PID of the process that
+        #       started the window (same as os.getpid());
+        #
+        # 3 → the WM_CLASS (Scipyen windows all seem to have scipyen.py.Scipyen)
+        #
+        # 4 → the client machine name
+        #
+        # 5 → the window title (with spaces)
+        
+        scipyen_window_lines = list(map(lambda x: x.split(maxsplit=5), filter(lambda x: f"{os.getpid()}" in x, bytes(self.wmctrl.readAll()).decode().splitlines())))
+        
+        for line in scipyen_window_lines:
+            # print(f"line = {line}")
+            wm_winid = int(line[0], 16)
+            # print(f"wm_winid = {wm_winid}")
+            # print(f"window title = {line[-1]}")
+            self.windows[line[-1]] = wm_winid
+            
+        self.sig_wm_inspect_done.emit()
+                
+    def inspect_wm(self):
+        if isinstance(self.timer, QtCore.QTimer):
+            self.timer.start()
+        
 
 class GuiMessages(object):
     @safeWrapper
@@ -459,7 +529,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         return get_symbol_in_namespace(data, ws)        
     
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None, title="", *args, **kwargs):
-                
         self._scipyenWindow_ = None
         
         if isinstance(parent, QtWidgets.QMainWindow) and type(parent).__name__ == "ScipyenWindow":
@@ -486,7 +555,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             self.setWindowTitle(title)  
             
         ScipyenConfigurable.__init__(self, *args, **kwargs)
-            
+        
     @property
     def scipyenWindow(self):
         """Returns a reference to the main Scipyen window.

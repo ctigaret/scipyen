@@ -6,7 +6,7 @@
 
 import sys, os
 
-import atexit, re, inspect, gc, io, traceback
+import atexit, re, inspect, gc, io, traceback, platform
 import faulthandler
 #import cProfile
 
@@ -113,7 +113,7 @@ def main():
         
         # NOTE: 2023-01-08 00:48:47
         # avoid global menus - must be called AFTER we have an instance of app!
-        QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_DontUseNativeMenuBar)
+        # QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_DontUseNativeMenuBar)
         
         if has_breeze_resources_for_win32:
             file = QtCore.QFile(":/dark/stylesheet.qss")
