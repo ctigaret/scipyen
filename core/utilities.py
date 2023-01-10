@@ -2657,7 +2657,9 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     memsztip = ""
 
     try:
-        if isinstance(obj, sequence_types):
+        if isinstance(obj, type):
+            pass
+        elif isinstance(obj, sequence_types):
             if len(obj) and all([isinstance(v, Number) for v in obj]):
                 datamin = str(min(obj))
                 mintip = "min: "

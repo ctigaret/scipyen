@@ -32,12 +32,24 @@ from .traitcontainers import DataBag
 from .datasignal import DataSignal, IrregularlySampledDataSignal
 from .datazone import DataZone
 from .triggerevent import DataMark, TriggerEvent
-from .triggerprotocols import TriggerProtocol
+# import core.triggerprotocols import TriggerProtocol # circular import !
 #from .traitutils import (enhanced_traitlet_set, standard_traitlet_set)
 
 from .utilities import gethash
 
 # NOTE: DataBagTrait <- Instance <- ClassBasedTraitType <- TraitType <- BaseDescriptor
+
+# NOTE: neo and neo-like types that take 0-argument __init__ (a.k.a default c'tor):
+# Block, Segment, Group, Epoch, Event, DataZone, DataMark, TriggerEvent
+#
+# neo and neo-lke objects that require positional arguments in the c'tor:
+# AnalogSignal, IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal,
+# ImageSequence, ChannelView, and pretty much everything else in the neo's core
+# types hierarchy
+#
+# Other neo types outside neo's core types hierarchy:
+# ArrayDict, SpikeTrainList, 
+# RegionOfInterest, CircularRegionOfInterest, RectangularRegionOfInterest, PolygonRegionOfInterest
 
 class _NotifierDeque_(deque):
     # TODO: 2022-01-29 23:42:54
@@ -63,7 +75,6 @@ class _NotifierDeque_(deque):
             
         else:
             super().append(x)
-            
         
     def appendleft(self, x):
         if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
@@ -163,12 +174,14 @@ class _NotifierDeque_(deque):
         else:
             super().rotate(n)
             
-class NeoBlockTrait(Instance):
-    info_text = "Trais for neo.Block"
-    default_value = neo.Block()
-    klass = neo.Block
+class NeoBaseTrait(Instance):
+    """IT IS RECOMMENDED THAT SUBCLASSES OVERRIDE THE `compare_elements` METHOD
+    """
+    info_text = "Trais for neo.baseneo.BaseNeo"
+    default_value = neo.baseneo.BaseNeo()
+    klass = neo.baseneo.BaseNeo
     _cast_types = tuple()
-    _valid_defaults = (neo.Block,)
+    _valid_defaults = (neo.baseneo.BaseNeo,)
     
     def __init__(self, value_trait=None, default_value = Undefined, **kwargs):
         trait = kwargs.pop('trait', None)
@@ -208,14 +221,104 @@ class NeoBlockTrait(Instance):
         
         super().__init__(klass = self.klass, args=args, **kwargs)
     
+    def info(self):
+        if isinstance(self.klass, six.string_types):
+            klass = self.klass
+        else:
+            klass = self.klass.__name__
+            
+        result = klass
+        
+        if self.allow_none:
+            result += ' or None'
+
+        return result
+            
+    def make_dynamic_default(self):
+        return self.klass()
+            
     def validate_elements(self, obj, value):
         return super().validate_elements(obj, value) # returns value if value is an instance of self.klass
-
-    def make_dynamic_default(self):
-        return neo.Block()
+    
+    def compare_element(self, x,y):
+        result = False
+        if all(isinstance(v, np.ndarray) for v in (x,y)):
+            result = x.shape == y.shape
+            if result:
+                result = x.dtype == y.dtype
+                
+                if result:
+                    result = np.all(x == y)
+                    
+        elif not any(isinstance(v, np.ndarray) for v in (x,y)):
+            result = x == y
             
+        return result
+    
+    def compare_elements(self, old_value, new_value):
+        """Returns True if old_value and new_value are identical.
+        Identity can mean anything from them being the same class, or their
+        children (up to a certain nesting level) are identical.
+        
+        This method does NOT serve as a validation mechanism for the trait purpose.
+        Instead, it merely determines whether values passed to the trait's `set` 
+        method is worthy of launching a change notification through the 
+        `HasTraits` traits observing mechanism.
+        
+        This SHOULD be overloaded in subclasses...
+    
+        Furthermore,this method should be called from inside the `set` method
+        of the traitlet
+        """
+        
+        try:
+            # check class
+            result = type(new_value) == type(old_value) and isinstance(new_value, self.klass)
+            
+            if result:
+                # check attributes
+                attrs = tuple((getattr(new_value, a[0]), getattr(old_value, a[0])) for a in old_value._all_attrs)
+                
+                result = all(self.compare_element(c_new, c_old) for (c_new, c_old) in attrs)
+                
+                
+            if result:
+                # check annotations
+                result = new_value.annotations == old_value.annotations
+            
+            
+            if result:
+                # so far silent is True when the observed knows about us
+                # check it we changed and notify
+                # silent = (new_hash == self.hashed)
+                result = new_value == old_value
+        except:
+            traceback.print_exc()
+            result = False
+            
+        return result
+            
+    def error(self, obj, value):
+        kind = type(value)
+        if six.PY2 and kind is InstanceType:
+            msg = 'class %s' % value.__class__.__name__
+        else:
+            msg = '%s (i.e. %s)' % ( str( kind )[1:-1], repr( value ) )
+
+        if obj is not None and not isinstance(value, self.klass):
+            e = f"The {self.name} trait of {class_of(obj)} instance must be {self.info()}, but a value of {msg} was specified."
+        else:
+            types = (self.klass, type(None)) if self.allow_none else (self.klass, )
+            if not isinstance(value, types):
+                e = f"The {self.name} trait must be {self.info()}, but a value of {msg} was specified."
+
+        raise TraitError(e)
+    
     def set(self, obj, value):
-        new_value = self._validate(obj, value)
+        """See traitlets.traitlets.TraitType.set for details
+        """
+        # this one simply checks if value is the appropriate class, or None (if allow_none is True)
+        new_value = self._validate(obj, value) 
             
         # NOTE: 82021-10-20 09:13:51
         # to also flag addition of this trait:
@@ -234,53 +337,7 @@ class NeoBlockTrait(Instance):
         obj._trait_values[self.name] = new_value
         
         try:
-            # check class
-            silent = type(new_value) == type(old_value) and isinstance(new_value, self.klass)
-            
-            if silent:
-                # check attributes
-                attrs = tuple((getattr(new_value, a), getattr(old_value, a) for a in self.klass._all_attrs)
-                silent = all(np.all(c_new == c_old) for (c_new, c_old) in attrs)
-                
-            if silent:
-                # check container children count
-                silent = len(new_value.container_children_recur) == len(old_value.container_children_recur)
-                
-            if silent:
-                # check data children count
-                silent = len(new_value.data_children_recur) == len(old_value.data_children_recur)
-                
-                if silent:
-                    # check data children
-                    silent = all(np.all(c_new == c_old) for (c_new, c_old) in zip(new_value.data_children_recur, old_value.data_children_recur))
-                    
-            if silent:
-                # check annotations
-                silent = len(new_value.annotations) == len(old_value.annotations)
-                
-                if silent:
-                    # check annotation keys
-                    silent = all(np.all(c_new == c_old) for (c_new, c_old) in zip(new_value.annotations.keys(), old_value.annotations.keys()))
-                    
-                # NOTE: 2023-01-09 23:46:04
-                # since annotations can hold virtually any serializable python object
-                # including dicts, it would be quite epensive to check for their equality,
-                # and even more so if it were to be done recursively;
-                #
-                # furthermore, if any single change in annotations were to trigger
-                # a trait notification, this could result in spending too much time
-                # with expensive operations downstream (such as plotting, etc)
-                # just because one bit of information was changed in a section of the data
-                # that MAY not be relevant to the user 
-                #
-                # therefore, we're limiting ourselves to the number of the keys and their 
-                # identity
-                
-            if silent:
-                # so far silent is True when the observed knows about us
-                # check it we changed and notify
-                # silent = (new_hash == self.hashed)
-                silent = new_value == old_value
+            silent = self.compare_elements(old_value, new_value)
             
         except:
             traceback.print_exc()
@@ -291,48 +348,201 @@ class NeoBlockTrait(Instance):
         if silent is not True:
             obj._notify_trait(self.name, old_value, new_value)
         
-    def info(self):
-        if isinstance(self.klass, six.string_types):
-            klass = self.klass
-        else:
-            klass = self.klass.__name__
-            
-        result = "%s with dimensionality (units) of %s " % (class_of(klass), self.default_value.dimensionality)
-        
-        if self.allow_none:
-            result += ' or None'
-
-        return result
-
-    def error(self, obj, value):
-        kind = type(value)
-        if six.PY2 and kind is InstanceType:
-            msg = 'class %s' % value.__class__.__name__
-        else:
-            msg = '%s (i.e. %s)' % ( str( kind )[1:-1], repr( value ) )
-
-        if obj is not None:
-            if isinstance(value, pq.Quantity):
-                e = "The '%s' trait of %s instance must be %s, but a Quantity with dimensionality (units) of %s was specified." \
-                    % (self.name, class_of(obj),
-                    self.info(), value.dimensionality)
-                
-            else:
-                e = "The '%s' trait of %s instance must be %s, but a value of %s was specified." \
-                    % (self.name, class_of(obj),
-                    self.info(), msg)
-        else:
-            if isinstance(value, pq.Quantity):
-                e = "The '%s' trait must be %s, but a Quantity with dimensionality (units) of %s was specified." \
-                    % (self.name, self.info(), value.dimensionality)
-            else:
-                e = "The '%s' trait must be %s, but a value of %r was specified." \
-                    % (self.name, self.info(), msg)
-            
-        raise TraitError(e)
+class NeoContainerTrait(NeoBaseTrait):
+    klass = neo.container.Container
+    info_text = f"Traitlet for {klass}"
+    default_value = klass()
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
     
- class QuantityTrait(Instance):
-    info_text = "Trait for python quantities"
+    def compare_elements(self, old_value, new_value):
+        try:
+            result = super().compare_elements(old_value, new_value)
+            
+            if result:
+                # check container children count
+                result = len(new_value.container_children_recur) == len(old_value.container_children_recur)
+                
+                if result:
+                    # check data children count
+                    result = len(new_value.data_children_recur) == len(old_value.data_children_recur)
+                    
+                    if result:
+                        # check data children
+                        result = all(np.all(c_new == c_old) for (c_new, c_old) in zip(new_value.data_children_recur, old_value.data_children_recur))
+        except:
+            traceback.print_exc()
+            result = False
+            
+        return result
+    
+class NeoBlockTrait(NeoContainerTrait):
+    klass = neo.Block
+    info_text = f"Traitlet for {klass}"
+    default_value = klass()
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+class NeoGroupTrait(NeoContainerTrait):
+    klass = neo.Group
+    info_text = f"Traitlet for {klass}"
+    default_value = klass()
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+class NeoSegmentTrait(NeoContainerTrait):
+    klass = neo.Group
+    info_text = f"Traitlet for {klass}"
+    default_value = klass()
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+class NeoChannelViewTrait(NeoBaseTrait):
+    klass = neo.view.ChannelView
+    info_text = f"Traitlet for {klass}"
+    default_value = Undefined
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+class NeoDataObjectTrait(NeoBaseTrait):
+    klass = neo.dataobject.DataObject
+    info_text = f"Traitlet for {klass}"
+    default_value = Undefined
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+    def compare_elements(self, old_value, new_value):
+        try:
+            result = super().compare_elements(old_value, new_value)
+            if result:
+                result = old_value.array_annotations == new_value_array_annotations
+                
+        except:
+            traceback.print_exc()
+            result = False
+            
+        return result
+    
+class NeoAnalogSignalTrait(NeoDataObjectTrait):
+    klass = neo.AnalogSignal
+    info_text = f"Traitlet for {klass}"
+    default_value = Undefined
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+class NeoIrregularlySampledSignalTrait(NeoDataObjectTrait):
+    klass = neo.IrregularlySampledSignal
+    info_text = f"Traitlet for {klass}"
+    default_value = Undefined
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+class NeoEpochTrait(NeoDataObjectTrait):
+    klass = neo.Epoch
+    info_text = f"Traitlet for {klass}"
+    default_value = klass()
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+class NeoEventTrait(NeoDataObjectTrait):
+    klass = neo.Event
+    info_text = f"Traitlet for {klass}"
+    default_value = klass()
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+class DataMarkTrait(NeoDataObjectTrait):
+    klass = DataMark
+    info_text = f"Traitlet for {klass}"
+    default_value = klass()
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+    def compare_elements(self, old_value, new_value):
+        try:
+            result = super().compare_elements(old_value, new_value)
+            if result:
+                result = old_value.mark_type == new_value.mark_type
+                
+        except:
+            traceback.print_exc()
+            result = False
+            
+        return result
+    
+class TrigggerEventTrait(NeoDataObjectTrait):
+    klass = TriggerEvent
+    info_text = f"Traitlet for {klass}"
+    default_value = klass()
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+    def compare_elements(self, old_value, new_value):
+        try:
+            result = super().compare_elements(old_value, new_value)
+            if result:
+                result = old_value.event_type == new_value.event_type
+                
+        except:
+            traceback.print_exc()
+            result = False
+            
+        return result
+    
+class DataZoneTrait(NeoDataObjectTrait):
+    klass = DataZone
+    info_text = f"Traitlet for {klass}"
+    default_value = klass()
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+class NeoSpikeTrainTrait(NeoDataObjectTrait):
+    klass = neo.SpikeTrain
+    info_text = f"Traitlet for {klass}"
+    default_value = Undefined
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+class NeoSpikeTrainListTrait(NeoBaseTrait):
+    klass = neo.spiketrainlist.SpikeTrainList
+    info_text = f"Traitlet for {klass}"
+    default_value = Undefined
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+    def compare_elements(self, old_value, new_value):
+        try:
+            result = type(old_value) == type(new_value)
+            
+            if result and isinstance(old_value, self.klass):
+                result = np.all(old_value == new_value)
+                
+                if result:
+                    result = old_value.all_channel_ids() == new_value.all_channel_ids() and old_value.t_start == new_value.t_start and old_value.t_stop == new_value.t_stop
+                    
+        except:
+            traceback.print_exc()
+            result = False
+            
+        return result
+    
+class NeoImageSequenceTrait(NeoDataObjectTrait):
+    klass = neo.ImageSequence
+    info_text = f"Traitlet for {klass}"
+    default_value = Undefined
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+    # def compare_elements(self, old_value, new_value):
+    #     try:
+    #         result = super().compare_elements(old_value, new_value)
+    #         if result:
+    #             result = old_value.frame_duration == new_value.frame_duration
+    
+                
+    
+class QuantityTrait(Instance):
+    info_text = "Traitlet for python quantities"
     default_value = pq.Quantity([]) # array([], dtype=float64) * dimensionless
     klass = pq.Quantity
     _cast_types = (np.ndarray, )
@@ -774,6 +984,7 @@ class DataBagTrait(Instance):
             obj._notify_trait(self.name, old_value, new_value)
 
 class DequeTrait(Instance):
+    info_text = "Traitled for deque"
     klass = _NotifierDeque_
     #klass = deque
     _cast_types = (list, tuple)
@@ -879,5 +1090,4 @@ class DequeTrait(Instance):
                 
         if silent is not True:
             obj._notify_trait(self.name, old_value, new_value)
-        
         
