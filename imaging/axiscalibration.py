@@ -26,7 +26,7 @@ from core.datatypes import (is_numeric, is_numeric_string,
                             RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
 
 from core.utilities import (reverse_mapping_lookup, unique, counter_suffix,
-                            isclose, all_or_not_all)
+                            isclose, all_or_all_not)
 
 from core.traitcontainers import DataBag
 

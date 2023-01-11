@@ -3,9 +3,7 @@
 
 Plots a multi-frame 1D signal (i.e. a matrix where each column is a `frame'), one frame at a time. 
 
-Data is plotted in a Qt4 matplotlib figure.
-
-Frame browsing is enabled by a slider & spin box.
+Data is plotted using Pyqtgraph framework
 
 Usage examples:
 
@@ -75,10 +73,6 @@ numpy (for python 3)
 quantities (for python 3)
 mpldatacursor (for python 3)
 
-CHANGELOG
-2020-02-17 14:01:06
-    Fixed behaviour for plotting a list of neo.Segment objects
-
 '''
 #### BEGIN core python modules
 #from __future__ import print_function
@@ -127,11 +121,8 @@ from matplotlib.backends.backend_qt5agg import (FigureCanvasQTAgg as FigureCanva
                                                 NavigationToolbar2QT as NavigationToolbar)
 
 import neo
-
 import vigra
 
-
-from traitlets import Bunch
 
 #### END 3rd party modules
 
@@ -228,10 +219,6 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 Ui_SignalViewerWindow, QMainWindow = __loadUiType__(os.path.join(__module_path__,'signalviewer2.ui'))
 
-#class PlotWorker(QtCore.QObject):
-    
-    #pass
-     
 class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     """ A plotter for multi-sweep signals ("frames" or "segments"), with cursors.
     
@@ -474,8 +461,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         super(QMainWindow, self).__init__(parent)
         
         # define these early
-        self.xData = None
-        self.yData = None
+        self._xData_ = None
+        self._yData_ = None
         
         self._cached_title = None
         
@@ -1646,27 +1633,16 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     # def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list], axis:typing.Optional[int]=None, clear:bool=True, **kwargs):
     @safeWrapper
-    def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list], axis:pg.PlotItem, clear:bool=True, **kwargs):
+    def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list], axis:pg.PlotItem, clear:bool=True, auto_X_range:bool=False, **kwargs):
         """For plotting events and spike trains on their own (separate) axis
         Epochs & DataZones are represented as regions between vertical lines 
         across all axes, and therefore they are not dealt with, here.
+        auto_X_range determines the x range (you may want to pass a custom one if needed)
         """
         if len(entities) == 0:
             return
         
         try:
-#             if len(self.axes) == 0:
-#                 self._prepareAxes_(1)
-#                 if axis is None or isinstance(axes, int) and axis != 0:
-#                     axis = 0
-#                     
-#             if not isinstance(axis, int):
-#                 axis = 0 # (by default)
-#                 
-#             else:
-#                 if axis < 0 or axis >= len(self.axes):
-#                     raise ValueError(f"Wrong axis index {axis} for {len(self.axes)} axes")
-            
             # this is the PlotItem, not the array axis
             entities_axis = axis
             # entities_axis = self.signalsLayout.getItem(axis, 0)
@@ -1765,6 +1741,11 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                                 symbolPen=QtGui.QPen(QtGui.QColor(next(symbolcolors))))
                         
                 yLabel = "Spike Trains"
+                
+                if auto_X_range:
+                    x_min = min((float(t.t_start) for t in entities_list))
+                    x_max = max((float(t.t_stop) for t in entities_list))
+                    entities_axis.setXRange(x_min, x_max)
                 
             elif all(isinstance(v, pg.TargetItem) for v in entities_list):
                 # print(f"_plot_discrete_entities_ {len(entities_list)} entities")
@@ -2750,9 +2731,9 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot()
     @safeWrapper
     def slot_detectTriggers(self):
-        if isinstance(self.yData, (neo.Block, neo.Segment)) or (isinstance(self.yData, (tuple, list)) and all([isinstance(v, (neo.Block, neo.Segment)) for v in self.yData])):
+        if isinstance(self._yData_, (neo.Block, neo.Segment)) or (isinstance(self._yData_, (tuple, list)) and all([isinstance(v, (neo.Block, neo.Segment)) for v in self._yData_])):
             from gui.triggerdetectgui import TriggerDetectDialog
-            tdlg = TriggerDetectDialog(ephysdata=self.yData, ephysViewer=self, parent=self)
+            tdlg = TriggerDetectDialog(ephysdata=self._yData_, ephysViewer=self, parent=self)
             tdlg.open()
         
     @pyqtSlot(str)
@@ -2932,6 +2913,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     # ### END PyQt slots
     
     def var_observer(self, change):
+        # print(f"{self.__class__.__name__}.var_observer change = {change}")
         self.displayFrame()
         
 
@@ -3412,18 +3394,18 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
     @pyqtSlot()
     def slot_exportDataToWorkspace(self):
-        if self.yData is None:
+        if self._yData_ is None:
             return
         
-        if self.xData is None:
-            var_name = getattr(self.yData, "name", None)
+        if self._xData_ is None:
+            var_name = getattr(self._yData_, "name", None)
             if not isinstance(var_name, str) or len(var_name.strip()) == 0:
                 var_name = "data"
             
-            self.exportDataToWorkspace(self.yData, var_name)
+            self.exportDataToWorkspace(self._yData_, var_name)
             
         else:
-            data = (self.xData, self.yData)
+            data = (self._xData_, self._yData_)
             var_name ="data"
             self.exportDataToWorkspace(data, var_name)
         
@@ -4162,8 +4144,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             cursors = [c for c in vertAndCrossCursors.values()]
             
-        if hasattr(self.yData, "name") and isinstance(self.yData.name, str) and len(self.yData.name.strip()):
-            name = "%s_Epoch" % self.yData.name
+        if hasattr(self._yData_, "name") and isinstance(self._yData_.name, str) and len(self._yData_.name.strip()):
+            name = "%s_Epoch" % self._yData_.name
             
         else:
             name = "Epoch"
@@ -4237,13 +4219,13 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # else:
             #     cursors = [c for c in vertAndCrossCursors.values()]
                     
-        if hasattr(self.yData, "name") and isinstance(self.yData.name, str) and len(self.yData.name.strip()):
-            name = "%s_Epoch" % self.yData.name
+        if hasattr(self._yData_, "name") and isinstance(self._yData_.name, str) and len(self._yData_.name.strip()):
+            name = "%s_Epoch" % self._yData_.name
             
         else:
             name ="Epoch"
         
-        if isinstance(self.yData, (neo.Block, neo.Segment)) or (isinstance(self.yData, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self.yData])):
+        if isinstance(self._yData_, (neo.Block, neo.Segment)) or (isinstance(self._yData_, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self._yData_])):
             #print("prompt me")
             d = qd.QuickDialog(self, "Attach epoch to data")
 
@@ -4289,14 +4271,14 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if len(vertAndCrossCursors) == 0:
             return
         
-        if isinstance(self.yData, (neo.Block, neo.Segment)) or (isinstance(self.yData, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self.yData])):
+        if isinstance(self._yData_, (neo.Block, neo.Segment)) or (isinstance(self._yData_, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self._yData_])):
             d = qd.QuickDialog(self, "Make Epoch From SignalCursor:")
             d.promptWidgets = list()
             d.namePrompt = qd.StringInput(d, "Name:")
             
             d.epoch_name = "Epoch"
             
-            if hasattr(self.yData, "name") and isinstance(self.yData.name, str) and len(self.yData.name.strip()):
+            if hasattr(self._yData_, "name") and isinstance(self._yData_.name, str) and len(self._yData_.name.strip()):
                 d.epoch_name = "%s_Epoch"
             
             if isinstance(self.selectedDataCursor, SignalCursor) and self.selectedDataCursor.cursorType in (SignalCursorTypes.vertical, SignalCursorTypes.crosshair):
@@ -4349,7 +4331,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                           f"Please add {a} vertical or crosshair {InflectEngine.plural('cursor', a)} first")
             return
         
-        if isinstance(self.yData, (neo.Block, neo.Segment)):
+        if isinstance(self._yData_, (neo.Block, neo.Segment)):
             d = qd.QuickDialog(self, "Make Epoch From Interval Between Cursors:")
             #d = vigra.pyqt.qd.QuickDialog(self, "Make Epoch From Interval Between Cursors:")
             # d.promptWidgets = list()
@@ -4462,7 +4444,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         d.epoch_name = "Epoch"
         
-        if hasattr(self.yData, "name") and isinstance(self.yData.name, str) and len(self.yData.name.strip()):
+        if hasattr(self._yData_, "name") and isinstance(self._yData_.name, str) and len(self._yData_.name.strip()):
             d.epoch_name = "%s_Epoch"
         
         if isinstance(self.selectedDataCursor, SignalCursor) and self.selectedDataCursor.cursorType in (SignalCursorTypes.vertical, SignalCursorTypes.crosshair):
@@ -4639,8 +4621,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 raise ValueError("Expecting only vertical or crosshair cursors")
                 
         if name is None or (isinstance(name, str) and len(name.strip())) == 0:
-            if hasattr(self.yData, "name") and isinstance(self.yData.name, str) and len(self.yData.name.strip()):
-                name = "%_Epoch" % self.yData.name
+            if hasattr(self._yData_, "name") and isinstance(self._yData_.name, str) and len(self._yData_.name.strip()):
+                name = "%_Epoch" % self._yData_.name
                 
             else:
                 name = "Epoch"
@@ -4658,18 +4640,18 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # when calculating segment t_start we use the minimum of `t_start` 
             # of signals and spiketrains ONLY, to avoid any existing events or
             # epochs that are out of the signal domain, in each segment
-            if isinstance(self.yData, neo.Block):
-                segments = self.yData.segments
-            elif isinstance(self.yData, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self.yData):
-                segments = self.yData
-            elif isinstance(self.yData, neo.Segment):
-                segments = [self.yData]
+            if isinstance(self._yData_, neo.Block):
+                segments = self._yData_.segments
+            elif isinstance(self._yData_, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self._yData_):
+                segments = self._yData_
+            elif isinstance(self._yData_, neo.Segment):
+                segments = [self._yData_]
                 
-            elif isinstance(self.yData, neo.core.basesignal.BaseSignal):
-                if self.yData.segment is None:
+            elif isinstance(self._yData_, neo.core.basesignal.BaseSignal):
+                if self._yData_.segment is None:
                     return
                 
-                segments = [self.yData.segment]
+                segments = [self._yData_.segment]
                 
             else:
                 return
@@ -4702,88 +4684,88 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # FIXME/TODO: 2022-10-23 23:57:00
         # use self.FrameIndex[self.currentFrame] instead (that is because we'd
         # be adapting this to multi-frame indices as in LSCaT !!!)
-        if isinstance(self.yData, neo.Block):
-            # t_units = self.yData.segments[self.currentFrame].t_start.units
-            t_units = self.yData.segments[self.frameIndex[self._current_frame_index_]].t_start.units
-        elif isinstance(self.yData, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self.yData):
-            # t_units = self.yData[self.currentFrame].t_start.units
-            t_units = self.yData[self.frameIndex[self._current_frame_index_]].t_start.units
-        elif isinstance(self.yData, neo.Segment):
-            t_units = self.yData.t_start.units
-        elif isinstance(self.yData, neo.core.basesignal.BaseSignal):
-            if self.yData.segment is None:
+        if isinstance(self._yData_, neo.Block):
+            # t_units = self._yData_.segments[self.currentFrame].t_start.units
+            t_units = self._yData_.segments[self.frameIndex[self._current_frame_index_]].t_start.units
+        elif isinstance(self._yData_, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self._yData_):
+            # t_units = self._yData_[self.currentFrame].t_start.units
+            t_units = self._yData_[self.frameIndex[self._current_frame_index_]].t_start.units
+        elif isinstance(self._yData_, neo.Segment):
+            t_units = self._yData_.t_start.units
+        elif isinstance(self._yData_, neo.core.basesignal.BaseSignal):
+            if self._yData_.segment is None:
                 return
-            t_units = self.yData.times[0].units
+            t_units = self._yData_.times[0].units
         else:
             t_units = pq.s # reasonable default (although not necessarily always applicable !!!)
         
         epoch = cursors2epoch(*cursors, name=name, sort=True, units = t_units)
         
         if embed:
-            if isinstance(self.yData, neo.Block):
-                if len(self.yData.segments) == 0:
+            if isinstance(self._yData_, neo.Block):
+                if len(self._yData_.segments) == 0:
                     warnings.warn("Plotted data is a neo.Block without segments")
                     #return epoch
                 
-                elif len(self.yData.segments) == 1:
+                elif len(self._yData_.segments) == 1:
                     if overwrite:
-                        self.yData.segments[0].epochs = [epoch]
+                        self._yData_.segments[0].epochs = [epoch]
                     else:
-                        self.yData.segments[0].epochs.append(epoch)
+                        self._yData_.segments[0].epochs.append(epoch)
                     
                 else:
                     if all_segments:
                         for ndx in self.frameIndex:
                             if overwrite:
-                                self.yData.segments[ndx].epochs = [epoch]
+                                self._yData_.segments[ndx].epochs = [epoch]
                                 
                             else:
-                                self.yData.segments[ndx].epochs.append(epoch)
+                                self._yData_.segments[ndx].epochs.append(epoch)
                             
                     else:
                         if overwrite:
-                            self.yData.segments[self.frameIndex[self._current_frame_index_]].epochs = [epoch]
+                            self._yData_.segments[self.frameIndex[self._current_frame_index_]].epochs = [epoch]
                         else:
-                            self.yData.segments[self.frameIndex[self._current_frame_index_]].epochs.append(epoch)
+                            self._yData_.segments[self.frameIndex[self._current_frame_index_]].epochs.append(epoch)
                             
-            elif isinstance(self.yData, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self.yData]):
-                if len(self.yData) == 0:
+            elif isinstance(self._yData_, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self._yData_]):
+                if len(self._yData_) == 0:
                     warnings.warn("Plotted data is an empty sequence!")
                 
-                elif len(self.yData) == 1:
+                elif len(self._yData_) == 1:
                     if overwrite:
-                        self.yData[0].epochs = [epoch]
+                        self._yData_[0].epochs = [epoch]
                     else:
-                        self.yData[0].epochs.append(epoch)
+                        self._yData_[0].epochs.append(epoch)
                     
                 else:
                     if all_segments:
                         for ndx in self.frameIndex:
                             if overwrite:
-                                self.yData[ndx].epochs = [epoch]
+                                self._yData_[ndx].epochs = [epoch]
                                 
                             else:
-                                self.yData[ndx].epochs.append(epoch)
+                                self._yData_[ndx].epochs.append(epoch)
                             
                     else:
                         if overwrite:
-                            self.yData[self.rameIndex[self._current_frame_index_]].epochs = [epoch]
+                            self._yData_[self.rameIndex[self._current_frame_index_]].epochs = [epoch]
                         else:
-                            self.yData[self.rameIndex[self._current_frame_index_]].epochs.append(epoch)
+                            self._yData_[self.rameIndex[self._current_frame_index_]].epochs.append(epoch)
                             
-            elif isinstance(self.yData, neo.Segment):
+            elif isinstance(self._yData_, neo.Segment):
                 if overwrite:
-                    self.yData.epochs = [epoch]
+                    self._yData_.epochs = [epoch]
                     
                 else:
-                    self.yData.epochs.append(epoch)
+                    self._yData_.epochs.append(epoch)
                     
-            elif isinstance(self.yData, neo.core.basesignal.BaseSignal):
-                if hasattr(self.yData, "segment") and isinstance(self.yData.segment, neo.Segment):
+            elif isinstance(self._yData_, neo.core.basesignal.BaseSignal):
+                if hasattr(self._yData_, "segment") and isinstance(self._yData_.segment, neo.Segment):
                     if overwrite:
-                        self.yData.segment.epochs = [epoch]
+                        self._yData_.segment.epochs = [epoch]
                     else:
-                        self.yData.segment.epocha.append(epoch)
+                        self._yData_.segment.epocha.append(epoch)
                         
             else:
                 warnings.warn("Epochs can only be embeded in neo.Segment objects (either stand-alone, collected in a tuple or list, or inside a neo.Block)")
@@ -4826,16 +4808,16 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         cursors = sorted([c0, c1], key=attrgetter('x'))
         
         if not isinstance(name, str) or len(name.strip()) == 0:
-            if hasattr(self.yData, "name") and isinstance(self.yData.name, str) and len(self.yData.name.strip()):
-                name = f"{self.yData.name}_Epoch"
+            if hasattr(self._yData_, "name") and isinstance(self._yData_.name, str) and len(self._yData_.name.strip()):
+                name = f"{self._yData_.name}_Epoch"
             else:
                 name = "Epoch"
                 
         if all_segments and relative_to_segment_start:
-            if isinstance(self.yData, neo.Block):
-                segments = self.yData.segments
-            elif isinstance(self.yData, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self.yData):
-                segments = self.yData
+            if isinstance(self._yData_, neo.Block):
+                segments = self._yData_.segments
+            elif isinstance(self._yData_, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self._yData_):
+                segments = self._yData_
             else:
                 return
             
@@ -4866,18 +4848,18 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         # FIXME/TODO: 2022-10-23 23:58:06
         # see FIXME/TODO: 2022-10-23 23:57:00
-        if isinstance(self.yData, neo.Block):
-            # t_units = self.yData.segments[self.currentFrame].t_start.units
-            t_units = self.yData.segments[self.frameIndex[self._current_frame_index_]].t_start.units
-        elif isinstance(self.yData, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self.yData):
-            # t_units = self.yData[self.currentFrame].t_start.units
-            t_units = self.yData[self.frameIndex[self._current_frame_index_]].t_start.units
-        elif isinstance(self.yData, neo.Segment):
-            t_units = self.yData.t_start.units
-        elif isinstance(self.yData, neo.core.basesignal.BaseSignal):
-            if self.yData.segment is None:
+        if isinstance(self._yData_, neo.Block):
+            # t_units = self._yData_.segments[self.currentFrame].t_start.units
+            t_units = self._yData_.segments[self.frameIndex[self._current_frame_index_]].t_start.units
+        elif isinstance(self._yData_, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self._yData_):
+            # t_units = self._yData_[self.currentFrame].t_start.units
+            t_units = self._yData_[self.frameIndex[self._current_frame_index_]].t_start.units
+        elif isinstance(self._yData_, neo.Segment):
+            t_units = self._yData_.t_start.units
+        elif isinstance(self._yData_, neo.core.basesignal.BaseSignal):
+            if self._yData_.segment is None:
                 return
-            t_units = self.yData.times[0].units
+            t_units = self._yData_.times[0].units
         else:
             t_units = pq.s # reasonable default (although not necessarily always applicable !!!)
         
@@ -4886,70 +4868,70 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                           name = name)
         
         if embed:
-            if isinstance(self.yData, neo.Block):
-                if len(self.yData.segments) == 0:
+            if isinstance(self._yData_, neo.Block):
+                if len(self._yData_.segments) == 0:
                     warnings.warn("Plotted data is a neo.Block without segments")
                     #return epoch
                 
-                elif len(self.yData.segments) == 1:
+                elif len(self._yData_.segments) == 1:
                     if overwrite:
-                        self.yData.segments[0].epochs = [epoch]
+                        self._yData_.segments[0].epochs = [epoch]
                     else:
-                        self.yData.segments[0].epochs.append(epoch)
+                        self._yData_.segments[0].epochs.append(epoch)
                     
                 else:
                     if all_segments:
                         for ndx in self.frameIndex:
                             if overwrite:
-                                self.yData.segments[ndx].epochs = [epoch]
+                                self._yData_.segments[ndx].epochs = [epoch]
                                 
                             else:
-                                self.yData.segments[ndx].epochs.append(epoch)
+                                self._yData_.segments[ndx].epochs.append(epoch)
                             
                     else:
                         if overwrite:
-                            self.yData.segments[self.frameIndex[self._current_frame_index_]].epochs = [epoch]
+                            self._yData_.segments[self.frameIndex[self._current_frame_index_]].epochs = [epoch]
                         else:
-                            self.yData.segments[self.frameIndex[self._current_frame_index_]].epochs.append(epoch)
+                            self._yData_.segments[self.frameIndex[self._current_frame_index_]].epochs.append(epoch)
                             
-            elif isinstance(self.yData, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self.yData]):
-                if len(self.yData) == 0:
+            elif isinstance(self._yData_, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self._yData_]):
+                if len(self._yData_) == 0:
                     warnings.warn("Plotted data is an empty sequence!")
                 
-                elif len(self.yData) == 1:
+                elif len(self._yData_) == 1:
                     if overwrite:
-                        self.yData[0].epochs = [epoch]
+                        self._yData_[0].epochs = [epoch]
                     else:
-                        self.yData[0].epochs.append(epoch)
+                        self._yData_[0].epochs.append(epoch)
                     
                 else:
                     if all_segments:
                         for ndx in self.frameIndex:
                             if overwrite:
-                                self.yData[ndx].epochs = [epoch]
+                                self._yData_[ndx].epochs = [epoch]
                                 
                             else:
-                                self.yData[ndx].epochs.append(epoch)
+                                self._yData_[ndx].epochs.append(epoch)
                             
                     else:
                         if overwrite:
-                            self.yData[self.rameIndex[self._current_frame_index_]].epochs = [epoch]
+                            self._yData_[self.rameIndex[self._current_frame_index_]].epochs = [epoch]
                         else:
-                            self.yData[self.rameIndex[self._current_frame_index_]].epochs.append(epoch)
+                            self._yData_[self.rameIndex[self._current_frame_index_]].epochs.append(epoch)
                             
-            elif isinstance(self.yData, neo.Segment):
+            elif isinstance(self._yData_, neo.Segment):
                 if overwrite:
-                    self.yData.epochs = [epoch]
+                    self._yData_.epochs = [epoch]
                     
                 else:
-                    self.yData.epochs.append(epoch)
+                    self._yData_.epochs.append(epoch)
                     
-            elif isinstance(self.yData, neo.core.basesignal.BaseSignal):
-                if hasattr(self.yData, "segment") and isinstance(self.yData.segment, neo.Segment):
+            elif isinstance(self._yData_, neo.core.basesignal.BaseSignal):
+                if hasattr(self._yData_, "segment") and isinstance(self._yData_.segment, neo.Segment):
                     if overwrite:
-                        self.yData.segment.epochs = [epoch]
+                        self._yData_.segment.epochs = [epoch]
                     else:
-                        self.yData.segment.epocha.append(epoch)
+                        self._yData_.segment.epocha.append(epoch)
                         
             else:
                 warnings.warn("Epochs can only be embeded in neo.Segment objects (either stand-alone, collected in a tuple or list, or inside a neo.Block)")
@@ -5034,18 +5016,18 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.globalAnnotations = {type(y).__name__ : y.annotations}
         
         if isinstance(y, neo.core.Block):
-            # self.xData = None # domain is contained in the signals inside the block
-            self.yData = y
+            # self._xData_ = None # domain is contained in the signals inside the block
+            self._yData_ = y
             self._cached_title = getattr(y, "name", None)
             
             # NOTE : 2022-01-17 14:17:23
             # if frameIndex was passed, then self._number_of_frames_ might turn
             # out to be different than self._data_frames_!
-            self._data_frames_ = self._number_of_frames_ = len(self.yData.segments)
+            self._data_frames_ = self._number_of_frames_ = len(self._yData_.segments)
             
             #### BEGIN NOTE 2019-11-24 22:32:46: 
             # no need for these so reset to None
-            # but definitely used when self.yData is a signal, not a container of signals!
+            # but definitely used when self._yData_ is a signal, not a container of signals!
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1 
             self.irregularSignalChannelAxis = 1
@@ -5069,7 +5051,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.irregularSignalIndex  = irregularSignalIndex
             #### END NOTE: 2019-11-22 08:37:38 
             
-            # NOTE: this is used when self.yData is a structured signal object,
+            # NOTE: this is used when self._yData_ is a structured signal object,
             # but not for a block, channel index, or segment
 
             # NOTE: 2021-11-13 19:00:47
@@ -5087,7 +5069,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.frameIndex = normalized_index(self._data_frames_, frameIndex)
             self._number_of_frames_ = len(self.frameIndex)
             
-            self._n_signal_axes_ = max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in self.yData.segments)
+            self._n_signal_axes_ = max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in self._yData_.segments)
             self._n_spiketrain_axes_ = 1
             self._n_event_axes_ = 1
             
@@ -5098,8 +5080,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             #### END NOTE: 2019-11-21 23:09:52 
 
         elif isinstance(y, neo.core.Segment):
-            # self.xData = None # NOTE: x can still be supplied externally
-            self.yData = y
+            # self._xData_ = None # NOTE: x can still be supplied externally
+            self._yData_ = y
             self._cached_title = getattr(y, "name", None)
             self._plotEpochs_(clear=True)
             
@@ -5128,8 +5110,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._n_event_axes_ = 1
             
         elif isinstance(y, (neo.core.AnalogSignal, DataSignal)):
-            # self.xData = None
-            self.yData = y
+            # self._xData_ = None
+            self._yData_ = y
             self._cached_title = getattr(y, "name", None)
             
             # NOTE: no need for these as there is only one signal
@@ -5149,7 +5131,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 raise TypeError("For AnalogSignal and DataSignal, frameAxis must be an int or None; got %s instead" % type(frameAxis).__name__)
 
             self.signalChannelAxis = 1
-            self.signalChannelIndex = normalized_sample_index(self.yData.as_array(), self.signalChannelAxis, signalChannelIndex)
+            self.signalChannelIndex = normalized_sample_index(self._yData_.as_array(), self.signalChannelAxis, signalChannelIndex)
             
             self._data_frames_ = 1
             
@@ -5161,23 +5143,23 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.separateSignalChannels = separateSignalChannels
                 
             else:
-                frameAxis = normalized_axis_index(self.yData.as_array(), frameAxis)
+                frameAxis = normalized_axis_index(self._yData_.as_array(), frameAxis)
                 if frameAxis != self.signalChannelAxis:
                     raise ValueError("For structured signals, frame axis and signal channel axis must be identical")
                 
                 self.frameAxis = frameAxis
-                self.frameIndex = normalized_sample_index(self.yData.as_array(), self.frameAxis, frameIndex)
+                self.frameIndex = normalized_sample_index(self._yData_.as_array(), self.frameAxis, frameIndex)
                 self._number_of_frames_ = len(self.frameIndex)
                 self.separateSignalChannels = False
                 
-            self._n_signal_axes_ = self.yData.shape[self.signalChannelAxis] if self.separateSignalChannels else 1
+            self._n_signal_axes_ = self._yData_.shape[self.signalChannelAxis] if self.separateSignalChannels else 1
             
             self._n_spiketrain_axes_ = 0
             self._n_event_axes_ = 0
             
         elif isinstance(y, (neo.core.IrregularlySampledSignal,  IrregularlySampledDataSignal)):
-            # self.xData = None
-            self.yData = y
+            # self._xData_ = None
+            self._yData_ = y
             self._cached_title = getattr(y, "name", None)
             self.frameIndex = range(1)
             self.dataAxis = 0 # data as column vectors
@@ -5200,16 +5182,16 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.separateSignalChannels         = separateSignalChannels
                 
             else:
-                frameAxis = normalized_axis_index(self.yData.as_array(), frameAxis)
+                frameAxis = normalized_axis_index(self._yData_.as_array(), frameAxis)
                 if frameAxis != self.signalChannelAxis:
                     raise ValueError("For structured signals, frame axis and signal channel axis must be identical")
                 
                 self.frameAxis = frameAxis
-                self.frameIndex = normalized_sample_index(self.yData.as_array(), self.frameAxis, frameIndex)
+                self.frameIndex = normalized_sample_index(self._yData_.as_array(), self.frameAxis, frameIndex)
                 self._number_of_frames_ = len(self.frameIndex)
                 self.separateSignalChannels  = False
                 
-            self._n_signal_axes_ = self.yData.shape[self.signalChannelAxis] if self.separateSignalChannels else 1
+            self._n_signal_axes_ = self._yData_.shape[self.signalChannelAxis] if self.separateSignalChannels else 1
             
             self._n_spiketrain_axes_ = 0
             self._n_event_axes_ = 0
@@ -5220,8 +5202,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._n_signal_axes_ = 0
             self._n_event_axes_ = 0
             self._n_spiketrain_axes_ = 1
-            # self.xData = None
-            self.yData = y
+            # self._xData_ = None
+            self._yData_ = y
             self._cached_title = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
@@ -5230,8 +5212,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             #self._plotSpikeTrains_(y) # let displayFrame do it
         
         elif isinstance(y, (neo.core.Event, DataMark )): # plot an event independently of data
-            # self.xData = None
-            self.yData = y
+            # self._xData_ = None
+            self._yData_ = y
             self._cached_title = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
@@ -5246,8 +5228,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         elif isinstance(y, (neo.core.Epoch, DataZone)): # plot an Epoch independently of data
             #self.dataAnnotations.append({"Epoch %s" % y.name: y.annotations})
             #pass # delegated to displayFrame()
-            # self.xData = None
-            self.yData = y
+            # self._xData_ = None
+            self._yData_ = y
             self._cached_title = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
@@ -5256,7 +5238,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._n_signal_axes_ = 0
             self._n_event_axes_ = 1
             self._n_spiketrain_axes_ = 0
-            #self._plotEpochs_(self.yData) # let displayFrame do it
+            #self._plotEpochs_(self._yData_) # let displayFrame do it
             
             if self._docTitle_ is None or (isinstance(self._docTitle_, str) and len(self._docTitle_.strip()) == 0):
                 #because these may be plotted as an add-on so we don't want to mess up the title
@@ -5264,10 +5246,10 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self._doctTitle_ = y.name
                     
                 else:
-                    self._docTitle_ = self.yData.name
+                    self._docTitle_ = self._yData_.name
         
         elif isinstance(y, vigra.filters.Kernel1D):
-            self.xData, self.yData = kernel2array(y)
+            self._xData_, self._yData_ = kernel2array(y)
             self._cached_title = "Vigra Kernel 1D"
             self._plotEpochs_(clear=True)
             
@@ -5316,26 +5298,25 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if y.ndim > 3: 
                 raise ValueError('\nCannot plot data with more than 3 dimensions\n')
             
-            self.xData = None
-            self.yData = y
+            self._xData_ = None
+            self._yData_ = y
             self._cached_title = "Numpy array"
             
             self._n_event_axes_ = 0
             self._n_spiketrain_axes_ = 0
             
-            if self.yData.ndim == 1: # one frame, one channel
-                self.dataAxis = 0 # data as column vectors
+            if self._yData_.ndim == 1: # one frame, one channel
+                self.dataAxis = 0 # data as column vectors; there is only one axis
                 self.signalChannelAxis = None
                 self.frameAxis = None
                 self.frameIndex = range(1)
                 self.signalChannelIndex = range(1)
                 self._number_of_frames_ = 1
-                self.dataAxis = 0 # there is only one axis
                 self.separateSignalChannels = False
                 
                 self._n_signal_axes_ = 1
                 
-            elif self.yData.ndim == 2:
+            elif self._yData_.ndim == 2:
                 if not isinstance(frameAxis, (int, str, vigra.AxisInfo, type(None))):
                     raise TypeError("Frame axis must be None, or an int (vigra arrays also accept str or AxisInfo); got %s instead" % type(frameAxis))
                 
@@ -5343,16 +5324,16 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     raise TypeError("Signal channel axis must be None, or an int (vigra arrays also accept str or AxisInfo); got %s instead" % type(signalChannelAxis))
                 
                 if signalChannelAxis is None:
-                    if isinstance(self.yData, vigra.VigraArray):
+                    if isinstance(self._yData_, vigra.VigraArray):
                         # this is the only case where we allow for signalChannelAxis
                         # to be omitted from the call parameters (for array with 
                         # at least 2D)
-                        if self.yData.channelIndex == self.yData.ndim: # no real channel axis
-                            # take columns as signal channels (consider self.yData as
+                        if self._yData_.channelIndex == self._yData_.ndim: # no real channel axis
+                            # take columns as signal channels (consider self._yData_ as
                             # an horizontal vector of column vectors)
                             signalChannelAxis = 1
                         else:
-                            signalChannelAxis = self.yData.channelIndex
+                            signalChannelAxis = self._yData_.channelIndex
                     else:
                         signalChannelAxis = 1 # by defult we consider channels as column vectors
                         
@@ -5360,7 +5341,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         # raise TypeError("signalChannelAxis must be specified when plotting numpy arrays")
                     
                 else:
-                    if isinstance(self.yData, vigra.VigraArray):
+                    if isinstance(self._yData_, vigra.VigraArray):
                         if isinstance(signalChannelAxis, str) and signalChannelAxis.lower().strip() != "c":
                                 warnings.warn("Channel axis index is specificed by non-canonical axis key %s" % signalChannelAxis)
                                 
@@ -5368,13 +5349,13 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             if signalChannelAxis.key.lower().strip() != "c":
                                 warnings.warn("Channel axis index is specificed by non-canonical axis key %s" % signalChannelAxis)
                                 
-                    signalChannelAxis = normalized_axis_index(self.yData, signalChannelAxis)
+                    signalChannelAxis = normalized_axis_index(self._yData_, signalChannelAxis)
                     
                 self.signalChannelAxis = signalChannelAxis
                 
                 self.dataAxis = 1 if self.signalChannelAxis == 0 else 0
                 
-                self.signalChannelIndex = normalized_sample_index(self.yData, self.signalChannelAxis, signalChannelIndex)
+                self.signalChannelIndex = normalized_sample_index(self._yData_, self.signalChannelAxis, signalChannelIndex)
                 
                 self.separateSignalChannels = separateSignalChannels
                 
@@ -5392,7 +5373,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     # for 2D arrays, specifying a frameAxis forces the plotting 
                     # of one channel per frame
-                    frameAxis = normalized_axis_index(self.yData, frameAxis)
+                    frameAxis = normalized_axis_index(self._yData_, frameAxis)
                     
                     # NOTE: 2019-11-22 14:24:16
                     # for a 2D array it does not make sense to have frameAxis
@@ -5402,15 +5383,15 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
                     self.frameAxis = frameAxis
                     
-                    self.frameIndex = normalized_sample_index(self.yData, self.frameAxis, frameIndex)
+                    self.frameIndex = normalized_sample_index(self._yData_, self.frameAxis, frameIndex)
                     
                     self._number_of_frames_ = len(self.frameIndex)
                     
                     # NOTE: displayframe() should now disregard separateSignalChannels
                 
-                self._n_signal_axes_ = self.yData.shape[self.signalChannelAxis] if self.separateSignalChannels else 1 
+                self._n_signal_axes_ = self._yData_.shape[self.signalChannelAxis] if self.separateSignalChannels else 1 
                 
-            elif self.yData.ndim == 3: 
+            elif self._yData_.ndim == 3: 
                 # NOTE: 2019-11-22 13:33:27
                 # both frameAxis and signalChannelAxis SHOULD be specified
                 #
@@ -5453,8 +5434,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     # raise TypeError("For 3D arrays the frame axis must be specified")
                 
                 
-                frameAxis = normalized_axis_index(self.yData, frameAxis)
-                signalChannelAxis = normalized_axis_index(self.yData, signalChannelAxis)
+                frameAxis = normalized_axis_index(self._yData_, frameAxis)
+                signalChannelAxis = normalized_axis_index(self._yData_, signalChannelAxis)
                 
                 if frameAxis  ==  signalChannelAxis:
                     raise ValueError("For 3D arrays the index of the frame axis must be different from the index of the signal channel axis")
@@ -5462,16 +5443,16 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.frameAxis = frameAxis
                 self.signalChannelAxis = signalChannelAxis
                 
-                axes = set([k for k in range(self.yData.ndim)])
+                axes = set([k for k in range(self._yData_.ndim)])
                 
                 axes.remove(self.frameAxis)
                 axes.remove(self.signalChannelAxis)
                 
-                self.frameIndex = normalized_sample_index(self.yData, self.frameAxis, frameIndex)
+                self.frameIndex = normalized_sample_index(self._yData_, self.frameAxis, frameIndex)
                 
                 self._number_of_frames_ = len(self.frameIndex)
 
-                self.signalChannelIndex = normalized_sample_index(self.yData, self.signalChannelAxis, signalChannelIndex)
+                self.signalChannelIndex = normalized_sample_index(self._yData_, self.signalChannelAxis, signalChannelIndex)
                 
                 self.dataAxis = list(axes)[0]
 
@@ -5482,27 +5463,27 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 # (when separateSignalChannels is True)
                 self.separateSignalChannels = separateSignalChannels
                 
-                self._n_signal_axes_ = self.yData.shape[self.signalChannelAxis] if self.separateSignalChannels else 1 
+                self._n_signal_axes_ = self._yData_.shape[self.signalChannelAxis] if self.separateSignalChannels else 1 
                 
             if x is not None:
                 if isinstance(x, (tuple, list)):
-                    if len(x) != self.yData.shape[self.dataAxis]:
+                    if len(x) != self._yData_.shape[self.dataAxis]:
                         raise TypeError("The supplied signal domain (x) must have the same size as the data axis %s" % self.dataAxis)
                     
-                    self.xData = np.array(x)
+                    self._xData_ = np.array(x)
                     
                 elif isinstance(x, np.ndarray):
                     if not is_vector(x):
                         raise TypeError("The supplied signal domain (x) must be a vector")
                     
-                    if len(x) != self.yData.shape[self.dataAxis]:
+                    if len(x) != self._yData_.shape[self.dataAxis]:
                         raise TypeError("The supplied signal domain (x) must have the same size as the data axis %s" % self.dataAxis)
                         
                     if is_column_vector(x):
-                        self.xData = x
+                        self._xData_ = x
                         
                     else:
-                        self.xData = x.T # x left unchanged if 1D
+                        self._xData_ = x.T # x left unchanged if 1D
                         
                 else:
                     raise TypeError("Signal domain (x) must be None, a Python iterable of scalars or a numpy array (vector)")
@@ -5553,9 +5534,9 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     else:
                         raise TypeError("Invalid x specified")
                     
-                self.xData = x
+                self._xData_ = x
                     
-                self.yData = yy
+                self._yData_ = yy
                 self._cached_title = "Vigra Kernel1D objects"
                 
                 self._n_signal_axes_ = 1
@@ -5580,8 +5561,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.irregularSignalChannelAxis     = None
                 self.irregularSignalChannelIndex    = None
                 
-                # self.xData = None
-                self.yData = y
+                # self._xData_ = None
+                self._yData_ = y
                 self._cached_title = "Neo segments"
                 
                 self.signalIndex                    = signalIndex
@@ -5595,8 +5576,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 # NOTE 2021-01-02 11:31:05
                 # treat this as a sequence of segments, but do NOT concatenate
                 # the blocks!
-                # self.xData = None
-                self.yData = y 
+                # self._xData_ = None
+                self._yData_ = y 
                 self.frameAxis = None
                 self.dataAxis = 0
                 self.signalChannelAxis = 1 
@@ -5604,7 +5585,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.irregularSignalChannelAxis = None
                 self.irregularSignalChannelIndex = None
                 self.separateSignalChannels = False
-                self._data_frames_ = tuple(accumulate((len(b.segments) for b in self.yData)))[-1]
+                self._data_frames_ = tuple(accumulate((len(b.segments) for b in self._yData_)))[-1]
                 self.frameIndex = range(self._data_frames_)
                 self._number_of_frames_ = len(self.frameIndex)
                 self.signalIndex                    = signalIndex
@@ -5649,8 +5630,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._number_of_frames_ = len(self.frameIndex)
                 self.signalIndex = 0
                 
-                # self.xData = None
-                self.yData = y
+                # self._xData_ = None
+                self._yData_ = y
                 self._cached_title = "Neo signals"
                 
                 self._n_event_axes_ = 0
@@ -5658,26 +5639,26 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             elif all([isinstance(i, (neo.Event, DataMark)) for i in y]):
                 #self.dataAnnotations = [{s.name: s.annotations} for s in y]
-                self.yData = y
+                self._yData_ = y
                 self._cached_title = "Events and marks"
                 self.dataAxis = 0
                 self.signalChannelAxis = 1
                 self.frameIndex = range(1)
                 self._number_of_frames_ = 1
-                # self._plotEpochs_(self.yData)
+                # self._plotEpochs_(self._yData_)
             
                 self._n_signal_axes_ = 0
                 self._n_event_axes_ = 1
                 self._n_spiketrain_axes_ = 0
                 
             elif all(isinstance(i, (neo.Epoch, DataZone)) for i in y):
-                self.yData = y
+                self._yData_ = y
                 self._cached_title = "Epochs and zones"
                 self.dataAxis = 0
                 self.signalChannelAxis = 1
                 self.frameIndex = range(1)
                 self._number_of_frames_ = 1
-                # self._plotEpochs_(self.yData) # why?
+                # self._plotEpochs_(self._yData_) # why?
             
                 self._n_signal_axes_ = 1
                 self._n_event_axes_ = 0
@@ -5687,10 +5668,10 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             elif all([isinstance(i, neo.SpikeTrain) for i in y]):
                 #self.dataAnnotations = [{s.name: s.annotations} for s in y]
-                self.yData = y
+                self._yData_ = y
                 self.dataAxis = 0
                 self.signalChannelAxis = 1
-                self._plotEpochs_(self.yData)
+                self._plotEpochs_(self._yData_)
                 self.frameIndex = range(1)
                 self._number_of_frames_ = 1
                 self._cached_title = "Spike trains"
@@ -5723,13 +5704,13 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             
                     elif isinstance(x,(tuple, list)) and \
                         not all([isinstance(x_, np.ndarray) and x_.ndim <= 2 for x_ in x]):
-                            raise TypeError("'x' has incompatible shape %s" % self.xData.shape)
+                            raise TypeError("'x' has incompatible shape %s" % self._xData_.shape)
 
                     else:
                         raise TypeError("Invalid x specified")
                     
-                self.xData = x
-                self.yData = y
+                self._xData_ = x
+                self._yData_ = y
                 self._cached_title = "Numpy arrays"
             
                 self._n_signal_axes_ = len(y)
@@ -5740,20 +5721,17 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 raise TypeError("Can only plot a list of 1D vigra filter kernels, 1D/2D numpy arrays, or neo-like signals")
             
         else:
-            raise TypeError("Plotting is not implemented for %s data types" % type(self.yData).__name__)
+            raise TypeError("Plotting is not implemented for %s data types" % type(self._yData_).__name__)
         
         self._setup_axes_()
 
         if self.observed_vars.get("xData", None) is not None:
             self.observed_vars["xData"] = None
-        self.observed_vars["xData"] = self.xData
+        self.observed_vars["xData"] = self._xData_
             
         if self.observed_vars.get("yData", None) is not None:
             self.observed_vars["yData"] = None
-        self.observed_vars["yData"] = self.yData
-        # with self.observed_vars.observer.hold_trait_notifications():
-        #     self.observed_vars["xData"] = self.xData
-        #     self.observed_vars["yData"] = self.yData
+        self.observed_vars["yData"] = self._yData_
             
         return True
     
@@ -5788,22 +5766,22 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._plotEpochs_(clear=True)
                 self._cached_epochs_.pop(self.currentFrame, None)
 
-                dataOK = self._parse_data_(x=x,
-                                        y=y, 
-                                        frameIndex=frameIndex, 
-                                        frameAxis=frameAxis,
-                                        signalIndex=signalIndex, 
-                                        signalChannelAxis=signalChannelAxis,
-                                        signalChannelIndex=signalChannelIndex,
-                                        irregularSignalIndex=irregularSignalIndex,
-                                        irregularSignalChannelAxis=irregularSignalChannelAxis,
-                                        irregularSignalChannelIndex=irregularSignalChannelIndex,
-                                        separateSignalChannels=separateSignalChannels,
-                                        singleFrame=singleFrame)
+                dataOK = self._parse_data_( x=x,
+                                            y=y, 
+                                            frameIndex=frameIndex, 
+                                            frameAxis=frameAxis,
+                                            signalIndex=signalIndex, 
+                                            signalChannelAxis=signalChannelAxis,
+                                            signalChannelIndex=signalChannelIndex,
+                                            irregularSignalIndex=irregularSignalIndex,
+                                            irregularSignalChannelAxis=irregularSignalChannelAxis,
+                                            irregularSignalChannelIndex=irregularSignalChannelIndex,
+                                            separateSignalChannels=separateSignalChannels,
+                                            singleFrame=singleFrame)
                 
                 # print(f"self._set_data_ dataOK = {dataOK}")
                 
-                self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self.yData))
+                self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self._yData_))
                             
                 if isinstance(showFrame, int):
                     if showFrame < 0:
@@ -6228,6 +6206,45 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return self.plotItem(index)
     
     @property
+    def yData(self):
+        return self._yData_
+    
+    @yData.setter
+    def yData(self, value):
+        self.setData(self._xData_, value)
+        
+    @property
+    def xData(self):
+        return self._xData_
+    
+    @xData.setter
+    def xData(self, value):
+        self.setData(value, self._yData_)
+        
+    @property
+    def data(self):
+        """Tuple X data, Y data.
+        X data may be None, depending on the type of Y data
+        """
+        return self.xData, self.yData
+    
+    @data.setter
+    def data(self, value:tuple):
+        if isinstance(value, tuple):
+            if len(value) == 2:
+                try:
+                    self.setData(*value)
+                except:
+                    traceback.print_exc()
+                    raise TypeError(f"Could not parse X data type ({type(value[0]).__name__}) or Y data type ({type(value[1]).__name__})")
+            else:
+                raise ValueError(f"Expecting a 2-tuple; got {len(value)}-tuple instead")
+            
+        else:
+            raise TypeError(f"Expecting a 2-tuple; got {type(value).__name__} instead")
+            
+    
+    @property
     def selectedPlotItem(self):
         """Alias to currentPlotItem"""
         return self.currentPlotItem
@@ -6538,18 +6555,18 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         Anything else                   ↦ ignored
         
         """
-        # print(f"self.displayFrame {type(self.yData).__name__}")
-        if self.yData is None:
+        # print(f"self.displayFrame {type(self._yData_).__name__}")
+        if self._yData_ is None:
             return
         
         self.currentFrameAnnotations = None
         
-        # print(f"SignalViewer2.displayFrame {self.yData}")
+        # print(f"SignalViewer2.displayFrame {self._yData_}")
         
-        self._plot_data_(self.yData, *self.plot_args, **self.plot_kwargs)
+        self._plot_data_(self._yData_, *self.plot_args, **self.plot_kwargs)
         
-#         #### BEGIN self.yData is a sequence of objects
-#         if isinstance(self.yData, (tuple, list)): 
+#         #### BEGIN self._yData_ is a sequence of objects
+#         if isinstance(self._yData_, (tuple, list)): 
 #             # a sequence of objects
 #             #
 #             # can be a sequence of signals, with "signal" being one of:
@@ -6572,15 +6589,15 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
 #             # to a tuple of 1D arrays (x, y)
 #             #
 #             # see setData() for list of kernel1D, datatypes.DataSignal, and np.ndarrays
-#             #print("displayFrame: self.xData: ", self.xData)
+#             #print("displayFrame: self._xData_: ", self._xData_)
 #             
 #             if all([isinstance(y_, (DataSignal, 
 #                                     neo.core.AnalogSignal, 
 #                                     neo.core.IrregularlySampledSignal,
-#                                     IrregularlySampledDataSignal)) for y_ in self.yData]):
+#                                     IrregularlySampledDataSignal)) for y_ in self._yData_]):
 #                 
 #                 if self.frameAxis is None:
-#                     for k,signal in enumerate(self.yData):
+#                     for k,signal in enumerate(self._yData_):
 #                         if isinstance(signal, (neo.AnalogSignal, neo.IrregularlySampledSignal)):
 #                             domain_name = "Time"
 #                             
@@ -6602,25 +6619,25 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
 #                         self._current_frame_index_ = 0
 #                         ndx = self._current_frame_index_
 #                 
-#                     self._plotSignal_(self.yData[ndx], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
-#                     self.currentFrameAnnotations = {type(self.yData[ndx]).__name__: self.yData[ndx].annotations}
+#                     self._plotSignal_(self._yData_[ndx], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
+#                     self.currentFrameAnnotations = {type(self._yData_[ndx]).__name__: self._yData_[ndx].annotations}
 #                     
 #                 
-#             elif all([isinstance(y_, (neo.core.Epoch, DataZone)) for y_ in self.yData]): 
+#             elif all([isinstance(y_, (neo.core.Epoch, DataZone)) for y_ in self._yData_]): 
 #                 # plot Epoch(s) independently of data; there is a single frame
 #                 
-#                 epochs_start_end = np.array([(e[0], e[-1] + e.durations[-1]) for e in self.yData])
+#                 epochs_start_end = np.array([(e[0], e[-1] + e.durations[-1]) for e in self._yData_])
 #                 x_min, x_max = (np.min(epochs_start_end[:,0]), np.max(epochs_start_end[:,1]))
 #                 # self._prepareAxes_(1)
-#                 self._plotEpochs_(self.yData, **self.epoch_plot_options)
+#                 self._plotEpochs_(self._yData_, **self.epoch_plot_options)
 #                 self.axes[0].showAxis("bottom", True)
 #                 
-#             elif all([isinstance(y_, neo.Segment) for y_ in self.yData]):
-#                 segment = self.yData[self.frameIndex[self._current_frame_index_]]
+#             elif all([isinstance(y_, neo.Segment) for y_ in self._yData_]):
+#                 segment = self._yData_[self.frameIndex[self._current_frame_index_]]
 #                 self._plotSegment_(segment, *self.plot_args, **self.plot_kwargs)
 #                 self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
 #                 
-#             elif all([isinstance(y_, neo.Block) for y_ in self.yData]):
+#             elif all([isinstance(y_, neo.Block) for y_ in self._yData_]):
 #                 frIndex = self.frameIndex[self._current_frame_index_]
 #                 
 #                 # NOTE: 2021-01-04 11:13:33
@@ -6634,13 +6651,13 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
 #                 # column 1 = running index of the Block
 #                 # column 2 = running index of Segment in Block with current 
 #                 #            running block index
-#                 sqbksg = np.array([(q, *kg) for q, kg in enumerate(enumerate(chain(*((k for k in range(len(b.segments))) for b in self.yData))))])
+#                 sqbksg = np.array([(q, *kg) for q, kg in enumerate(enumerate(chain(*((k for k in range(len(b.segments))) for b in self._yData_))))])
 #                 
 #                 (blockIndex, blockSegmentIndex) = sqbksg[frIndex,1:]
 #                 
-#                 segment = self.yData[blockIndex].segments[blockSegmentIndex]
+#                 segment = self._yData_[blockIndex].segments[blockSegmentIndex]
 #                 
-#                 plotTitle = "Block %d (%s), segment %d (%s)" % (blockIndex, self.yData[blockIndex].name,
+#                 plotTitle = "Block %d (%s), segment %d (%s)" % (blockIndex, self._yData_[blockIndex].name,
 #                                                                 blockSegmentIndex, segment.name)
 #                 
 #                 kwargs = dict()
@@ -6651,36 +6668,36 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
 #                 
 #                 self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
 #                 
-#             elif all(isinstance(y_, (neo.Event, DataMark)) for y_ in self.yData):
-#                 self._plotEvents_(self.yData)
+#             elif all(isinstance(y_, (neo.Event, DataMark)) for y_ in self._yData_):
+#                 self._plotEvents_(self._yData_)
 #                 
-#             elif all(isinstance(y_, neo.SpikeTrain) for y_ in self.yData):
-#                 self._plotSpikeTrains_(self.yData)
+#             elif all(isinstance(y_, neo.SpikeTrain) for y_ in self._yData_):
+#                 self._plotSpikeTrains_(self._yData_)
 #             
 #             else: # accepts sequence of np.ndarray or VigraKernel1D objects
-#                 self._setup_signal_choosers_(self.yData)
+#                 self._setup_signal_choosers_(self._yData_)
 #                 
 #                 if self.singleFrame == True:
-#                     self._plotNumpyArrays_(self.xData, self.yData, *self.plot_args, **self.plot_kwargs)
+#                     self._plotNumpyArrays_(self._xData_, self._yData_, *self.plot_args, **self.plot_kwargs)
 #                     
 #                 else:
 #                 
-#                     if isinstance(self.xData, list):
-#                         self._plotNumpyArray_(self.xData[self._current_frame_index_], self.yData[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+#                     if isinstance(self._xData_, list):
+#                         self._plotNumpyArray_(self._xData_[self._current_frame_index_], self._yData_[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
 #                         
 #                     else:
-#                         self._plotNumpyArray_(self.xData, self.yData[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+#                         self._plotNumpyArray_(self._xData_, self._yData_[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
 #                     
-#         #### END self.yData is a sequence of objects
+#         #### END self._yData_ is a sequence of objects
 #         
-#         #### BEGIN self.yData is a single object
+#         #### BEGIN self._yData_ is a single object
 #         else:
-#             if isinstance(self.yData, neo.core.Block):
+#             if isinstance(self._yData_, neo.core.Block):
 #                 # NOTE: 2019-11-24 22:31:26
 #                 # select a segment then delegate to _plotSegment_()
 #                 # Segment selection is based on self.frameIndex, or on self.channelIndex
 #                 # NOTE 2021-10-03 12:59:10 ChannelIndex is no more
-#                 if len(self.yData.segments) == 0:
+#                 if len(self._yData_.segments) == 0:
 #                     return
 #                 
 #                 if self._current_frame_index_ not in self.frameIndex:
@@ -6688,10 +6705,10 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
 #                 
 #                 segmentNdx = self.frameIndex[self._current_frame_index_]
 #                 
-#                 if segmentNdx >= len(self.yData.segments):
+#                 if segmentNdx >= len(self._yData_.segments):
 #                     return
 #                 
-#                 segment = self.yData.segments[segmentNdx]
+#                 segment = self._yData_.segments[segmentNdx]
 #                 
 #                 # NOTE: 2023-01-03 22:53:13 
 #                 # singledispatchmethod here
@@ -6700,15 +6717,15 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
 #                 
 #                 self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
 #                 
-#             elif isinstance(self.yData, neo.core.Segment):
+#             elif isinstance(self._yData_, neo.core.Segment):
 #                 # delegate straight to _plotSegment_()
 #                 #
 #                 # NOTE: 2023-01-03 22:53:13 
 #                 # singledispatchmethod here
-#                 self._plot_data_(self.yData, *self.plot_args, **self.plot_kwargs) # calls _setup_signal_choosers_() and _prepareAxes_()
-#                 # self._plotSegment_(self.yData, *self.plot_args, **self.plot_kwargs) # calls _setup_signal_choosers_() and _prepareAxes_()
+#                 self._plot_data_(self._yData_, *self.plot_args, **self.plot_kwargs) # calls _setup_signal_choosers_() and _prepareAxes_()
+#                 # self._plotSegment_(self._yData_, *self.plot_args, **self.plot_kwargs) # calls _setup_signal_choosers_() and _prepareAxes_()
 #                 
-#             elif isinstance(self.yData, (neo.core.AnalogSignal, 
+#             elif isinstance(self._yData_, (neo.core.AnalogSignal, 
 #                                      DataSignal, 
 #                                      neo.core.IrregularlySampledSignal,
 #                                      IrregularlySampledDataSignal)):
@@ -6719,38 +6736,38 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
 #                         self._current_frame_index_ = 0
 #                         ndx = 0
 #                         
-#                     self._plotSignal_(self.yData[:,ndx], *self.plot_args, **self.plot_kwargs)
+#                     self._plotSignal_(self._yData_[:,ndx], *self.plot_args, **self.plot_kwargs)
 #                 else:
-#                     self._plotSignal_(self.yData, *self.plot_args, **self.plot_kwargs)
+#                     self._plotSignal_(self._yData_, *self.plot_args, **self.plot_kwargs)
 # 
-#             elif isinstance(self.yData, (neo.core.Epoch, DataZone)): # plot an Epoch independently of data
-#                 x_min, x_max = (self.yData[0], self.yData[-1] + self.yData.durations[-1])
+#             elif isinstance(self._yData_, (neo.core.Epoch, DataZone)): # plot an Epoch independently of data
+#                 x_min, x_max = (self._yData_[0], self._yData_[-1] + self._yData_.durations[-1])
 #                 self._prepareAxes_(1)
-#                 self._plotEpochs_(self.yData, **self.epoch_plot_options)
+#                 self._plotEpochs_(self._yData_, **self.epoch_plot_options)
 #                 self.axes[0].showAxis("bottom", True)
 #                 
-#             elif isinstance(self.yData, (neo.Event, DataMark)):
-#                 self._plotEvents_(self.yData)
+#             elif isinstance(self._yData_, (neo.Event, DataMark)):
+#                 self._plotEvents_(self._yData_)
 #                 
-#             elif isinstance(self.yData, (neo.SpikeTrain)):
-#                 self._plotSpikeTrains_(self.yData)
+#             elif isinstance(self._yData_, (neo.SpikeTrain)):
+#                 self._plotSpikeTrains_(self._yData_)
 # 
-#             elif isinstance(self.yData, np.ndarray):
+#             elif isinstance(self._yData_, np.ndarray):
 #                 try:
-#                     if self.yData.ndim > 3:
+#                     if self._yData_.ndim > 3:
 #                         raise TypeError("Numpy arrays with more than three dimensions are not supported")
 #                     
-#                     self._plotNumpyArray_(self.xData, self.yData, *self.plot_args, **self.plot_kwargs)
+#                     self._plotNumpyArray_(self._xData_, self._yData_, *self.plot_args, **self.plot_kwargs)
 #                     
 #                 except Exception as e:
 #                     traceback.print_exc()
 #                     
-#             elif self.yData is None:
+#             elif self._yData_ is None:
 #                 pass
 #                 
 #             # else:
-#             #     raise TypeError("Plotting of data of type %s not yet implemented" % str(type(self.yData)))
-#         #### END self.yData is a single object
+#             #     raise TypeError("Plotting of data of type %s not yet implemented" % str(type(self._yData_)))
+#         #### END self._yData_ is a single object
 #             
         # NOTE: 2020-03-10 22:09:51
         # reselect an axis according to its index (if one had been selected before)
@@ -6890,7 +6907,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         Epochs is always a non-empty sequence (tuple or list) of neo.Epochs
         We keep this as a nested function to avoid calling it directly. Thus
         there is no need to check if the epochs argument is the same as 
-        self.yData (or contained within)
+        self._yData_ (or contained within)
         """
         
         # print(f"SignalViewer2._plot_epochs_seq_ {args}")
@@ -7032,13 +7049,13 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         if epochs is None or len(epochs) == 0:
             # None, an empty sequence of epochs or an empty epoch
-            if isinstance(self.yData, neo.Epoch):
+            if isinstance(self._yData_, neo.Epoch):
                 # self._prepareAxes_(1) # use a brand new single axis
-                epoch_seq = [self.yData]
+                epoch_seq = [self._yData_]
                 
-            elif isinstance(self.yData, typing.Sequence) and all([isinstance(y_, (neo.Epoch, DataZone)) for y_ in self.yData]):
+            elif isinstance(self._yData_, typing.Sequence) and all([isinstance(y_, (neo.Epoch, DataZone)) for y_ in self._yData_]):
                 # self._prepareAxes_(1) # use a brand new single axis
-                epoch_seq = self.yData
+                epoch_seq = self._yData_
                 
         elif isinstance(epochs, (neo.Epoch, DataZone)):
             epoch_seq = [epochs]
@@ -7099,7 +7116,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         segmentNdx = self.frameIndex[self._current_frame_index_]
         
-        if segmentNdx >= len(self.yData.segments):
+        if segmentNdx >= len(self._yData_.segments):
             return
         
         segment = obj.segments[segmentNdx]
@@ -7203,13 +7220,14 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 height_interval = 1/len(spiketrains) 
                 
+                # kwargs["auto_X_range"] = True
+                
                 self._plot_discrete_entities_(spiketrains, axis=self._spiketrains_axis_, **kwargs)
                 
                 # if len(self.signalAxes):
                 #     xmin, xman = zip(*list((ax.viewRange[0][0], ax.viewRange))) 
                 #     min(ax.viewRange[0][0] for ax in self.signalAxes)
                 #     xmax = max(ax.view)
-                
                 self._spiketrains_axis_.update()
                 
             self._spiketrains_axis_.setVisible(True)
@@ -7284,7 +7302,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @_plot_data_.register(neo.Epoch)
     @_plot_data_.register(DataZone)
     def _(self, obj, *args, **kwargs):
-        x_min, x_max = (self.yData[0], self.yData[-1] + self.yData.durations[-1])
+        x_min, x_max = (self._yData_[0], self._yData_[-1] + self._yData_.durations[-1])
         # self._prepareAxes_(1)
         self._plotEpochs_(obj, **self.epoch_plot_options)
         self.axes[0].showAxis("bottom", True)
@@ -7301,10 +7319,10 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @_plot_data_.register
     def _(self, obj:np.ndarray, *args, **kwargs):
         try:
-            if self.yData.ndim > 3:
+            if self._yData_.ndim > 3:
                 raise TypeError("Numpy arrays with more than three dimensions are not supported")
             
-            self._plotNumpyArray_(self.xData, obj, *args, **kwargs)
+            self._plotNumpyArray_(self._xData_, obj, *args, **kwargs)
             
         except Exception as e:
             traceback.print_exc()
@@ -7319,10 +7337,10 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if all([isinstance(y_, (DataSignal, 
                                 neo.core.AnalogSignal, 
                                 neo.core.IrregularlySampledSignal,
-                                IrregularlySampledDataSignal)) for y_ in self.yData]):
+                                IrregularlySampledDataSignal)) for y_ in self._yData_]):
             
             if self.frameAxis is None:
-                for k, signal in enumerate(self.yData):
+                for k, signal in enumerate(self._yData_):
                     if isinstance(signal, (neo.AnalogSignal, neo.IrregularlySampledSignal)):
                         domain_name = "Time"
                         
@@ -7344,25 +7362,25 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self._current_frame_index_ = 0
                     ndx = self._current_frame_index_
             
-                self._plotSignal_(self.yData[ndx], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
-                self.currentFrameAnnotations = {type(self.yData[ndx]).__name__: self.yData[ndx].annotations}
+                self._plotSignal_(self._yData_[ndx], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
+                self.currentFrameAnnotations = {type(self._yData_[ndx]).__name__: self._yData_[ndx].annotations}
                 
 
-        elif all([isinstance(y_, (neo.core.Epoch, DataZone)) for y_ in self.yData]): 
+        elif all([isinstance(y_, (neo.core.Epoch, DataZone)) for y_ in self._yData_]): 
             # plot Epoch(s) independently of data; there is a single frame
             
-            epochs_start_end = np.array([(e[0], e[-1] + e.durations[-1]) for e in self.yData])
+            epochs_start_end = np.array([(e[0], e[-1] + e.durations[-1]) for e in self._yData_])
             x_min, x_max = (np.min(epochs_start_end[:,0]), np.max(epochs_start_end[:,1]))
             # self._prepareAxes_(1)
-            self._plotEpochs_(self.yData, **self.epoch_plot_options)
+            self._plotEpochs_(self._yData_, **self.epoch_plot_options)
             self.axes[0].showAxis("bottom", True)
             
-        elif all([isinstance(y_, neo.Segment) for y_ in self.yData]):
-            segment = self.yData[self.frameIndex[self._current_frame_index_]]
+        elif all([isinstance(y_, neo.Segment) for y_ in self._yData_]):
+            segment = self._yData_[self.frameIndex[self._current_frame_index_]]
             self._plotSegment_(segment, *self.plot_args, **self.plot_kwargs)
             self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
             
-        elif all([isinstance(y_, neo.Block) for y_ in self.yData]):
+        elif all([isinstance(y_, neo.Block) for y_ in self._yData_]):
             frIndex = self.frameIndex[self._current_frame_index_]
             
             # NOTE: 2021-01-04 11:13:33
@@ -7376,13 +7394,13 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # column 1 = running index of the Block
             # column 2 = running index of Segment in Block with current 
             #            running block index
-            sqbksg = np.array([(q, *kg) for q, kg in enumerate(enumerate(chain(*((k for k in range(len(b.segments))) for b in self.yData))))])
+            sqbksg = np.array([(q, *kg) for q, kg in enumerate(enumerate(chain(*((k for k in range(len(b.segments))) for b in self._yData_))))])
             
             (blockIndex, blockSegmentIndex) = sqbksg[frIndex,1:]
             
-            segment = self.yData[blockIndex].segments[blockSegmentIndex]
+            segment = self._yData_[blockIndex].segments[blockSegmentIndex]
             
-            plotTitle = "Block %d (%s), segment %d (%s)" % (blockIndex, self.yData[blockIndex].name,
+            plotTitle = "Block %d (%s), segment %d (%s)" % (blockIndex, self._yData_[blockIndex].name,
                                                             blockSegmentIndex, segment.name)
             
             kwargs = dict()
@@ -7393,25 +7411,25 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
             
-        elif all(isinstance(y_, (neo.Event, DataMark)) for y_ in self.yData):
-            self._plotEvents_(self.yData)
+        elif all(isinstance(y_, (neo.Event, DataMark)) for y_ in self._yData_):
+            self._plotEvents_(self._yData_)
             
-        elif all(isinstance(y_, neo.SpikeTrain) for y_ in self.yData):
-            self._plotSpikeTrains_(self.yData)
+        elif all(isinstance(y_, neo.SpikeTrain) for y_ in self._yData_):
+            self._plotSpikeTrains_(self._yData_)
         
         else: # accepts sequence of np.ndarray or VigraKernel1D objects
-            self._setup_signal_choosers_(self.yData)
+            self._setup_signal_choosers_(self._yData_)
             
             if self.singleFrame == True:
-                self._plotNumpyArrays_(self.xData, self.yData, *self.plot_args, **self.plot_kwargs)
+                self._plotNumpyArrays_(self._xData_, self._yData_, *self.plot_args, **self.plot_kwargs)
                 
             else:
             
-                if isinstance(self.xData, list):
-                    self._plotNumpyArray_(self.xData[self._current_frame_index_], self.yData[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+                if isinstance(self._xData_, list):
+                    self._plotNumpyArray_(self._xData_[self._current_frame_index_], self._yData_[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
                     
                 else:
-                    self._plotNumpyArray_(self.xData, self.yData[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+                    self._plotNumpyArray_(self._xData_, self._yData_[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
                 
     def _signals_select_(self, signals, signalCBox):
         """Helper method for setting up the collection of selected signals to plot
@@ -8012,7 +8030,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def _plotSignal_(self, signal, *args, **kwargs):
         """Plots individual signal objects.
         
-        Called by self.displayFrame when self.yData is a signal, or a sequence
+        Called by self.displayFrame when self._yData_ is a signal, or a sequence
         of signals.
         
         Signal objects are those defined in the Neuralensemble's neo package 
@@ -8034,7 +8052,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if not isinstance(signal, neo.core.baseneo.BaseNeo):
             raise TypeError("_plotSignal_ expects an object from neo framework, or a datatypes.DataSignal or datatypes.IrregularlySampledDataSignal; got %s instead" % (type(signal).__name__))
             
-        self._setup_signal_choosers_(self.yData)
+        self._setup_signal_choosers_(self._yData_)
         
         signal_name = getattr(signal, "name", "Signal")
         
@@ -8544,16 +8562,24 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._events_axis_ = pg.PlotItem(name=self._default_events_axis_name_)
         
         if self._events_axis_ not in self.signalsLayout.items:
+            self._events_axis_.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
             self.signalsLayout.addItem(self._events_axis_, row=self._n_signal_axes_, col=0)
+            
+        
             
         if not isinstance(self._spiketrains_axis_, pg.PlotItem):
             self._spiketrains_axis_ = pg.PlotItem(name=self._default_spiketrains_axis_name_)
                 
         if self._spiketrains_axis_ not in self.signalsLayout.items:
+            self._spiketrains_axis_.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
             self.signalsLayout.addItem(self._spiketrains_axis_, row = self._n_signal_axes_ + 1, col = 0)
             
         if self.signalsLayout.scene() is not None:
             self.signalsLayout.scene().sigMouseClicked.connect(self._slot_mouseClickSelectPlotItem)
+            
+        for item in (self._events_axis_, self._spiketrains_axis_):
+            item.showAxis("bottom", True)
+            item.showAxes([True, False, False, True], showValues=[True, False, False, True])
         
 #     @safeWrapper
 #     def _prepareAxes_(self, nRequiredAxes, sigNames=list()):
@@ -8988,8 +9014,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.guiSelectedIrregularSignalNames.clear()
         
-        self.yData = None
-        self.xData = None
+        self._yData_ = None
+        self._xData_ = None
         
         self.plot_start = None
         self.plot_stop = None

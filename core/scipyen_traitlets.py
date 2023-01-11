@@ -17,16 +17,29 @@ in place)
 import sys, typing, dataclasses, traceback
 from warnings import warn, warn_explicit
 from collections import deque
+import enum
+from enum import (EnumMeta, Enum, IntEnum, )
 import numpy as np
 import quantities as pq
 import pandas as pd
 import neo
 
-from traitlets.utils.bunch import Bunch
-from traitlets.utils.descriptions import describe, class_of, add_article, repr_type
+import six
 
-from traitlets.traitlets import (TraitError, TraitType, Instance, Container, 
-                                 Undefined, Unicode, is_trait)
+import traitlets
+
+from traitlets import (HasTraits, MetaHasTraits, TraitType, All, Any, Bool, CBool, Bytes, CBytes, 
+    Dict, Enum, Set, Int, CInt, Long, CLong, Integer, Float, CFloat, 
+    Complex, CComplex, Unicode, CUnicode, CRegExp, TraitError, Union, Undefined, 
+    Type, This, Instance, TCPAddress, List, Tuple, UseEnum, ObjectName, 
+    DottedObjectName, CRegExp, ForwardDeclaredType, ForwardDeclaredInstance, 
+    link, directional_link, validate, observe, default,
+    observe_compat, BaseDescriptor, HasDescriptors, Container,
+    )
+from traitlets.utils.bunch import Bunch
+from traitlets.utils.descriptions import (describe, class_of, add_article, repr_type)
+
+from traitlets.traitlets import is_trait
 
 from .traitcontainers import DataBag
 from .datasignal import DataSignal, IrregularlySampledDataSignal
@@ -50,6 +63,34 @@ from .utilities import gethash
 # Other neo types outside neo's core types hierarchy:
 # ArrayDict, SpikeTrainList, 
 # RegionOfInterest, CircularRegionOfInterest, RectangularRegionOfInterest, PolygonRegionOfInterest
+
+TRAITSMAP = {           # use casting versions
+    None:       (Any,),
+    type(None): (Any,),
+    bool:       (CBool,),
+    int:        (CInt,),
+    float:      (CFloat,),
+    complex:    (CComplex,),
+    bytes:      (CBytes,),
+    str:        (Unicode,),
+    # str:        (CUnicode,),
+    list:       (List,),
+    #deque:      (List,),
+    set:        (Set,),
+    frozenset:  (Set,),
+    tuple:      (Tuple,),
+    dict:       (Dict,),
+    EnumMeta:   (Any,),
+    Enum:       (Any,), # IntEnum inherits from int and Enum
+    #EnumMeta:   (UseEnum,),
+    #Enum:       (UseEnum,), # IntEnum inherits from int and Enum
+    type:       (Any,),    # e.g., type(type(None))
+    #type:       (Instance,),    # e.g., type(type(None)) # Instance requires arguments to instantiate default value
+    property:   (Any,),
+    #property:   (DottedObjectName,),
+    #type:       (Type,),    # e.g., type(type(None))
+    #function:   (Any,)
+    }
 
 class _NotifierDeque_(deque):
     # TODO: 2022-01-29 23:42:54
@@ -174,7 +215,206 @@ class _NotifierDeque_(deque):
         else:
             super().rotate(n)
             
-class NeoBaseTrait(Instance):
+class ListTrait(List): # inheritance chain: List <- Container <- Instance
+    """TraitType that ideally should notify:
+    a) when a list contents has changed (i.e., gained/lost members)
+    b) when an element in the list has changed (either a new value, or a new type)
+    c) when the order of the elements has changed
+    FIXME: 2022-01-29 15:22:27
+    This doesn't do what is promised above?
+    TODO: Revisit this.
+    See also FIXME/TODO:2022-01-29 13:29:19 in scipyen_traitlets module.
+    """
+    _trait = None
+    default_value = []
+    klass = list
+    _valid_defaults = (list,tuple)
+    
+    info_text = "Trait for lists that is sensitive to changes in content"
+    
+    def __init__(self, trait=None, traits=None, default_value=Undefined, **kwargs):
+        """
+        trait: in the super() List traitype, `traits` restricts the type of elements
+                in the container to that TraitType -- i.e. all must be of the same type
+    
+                this is OK for homogeneous sequences
+    
+        traits: when specified, is a sequence of TypeTrais, so that the instance 
+                is valid when the list's elements are of these types - the intention
+                is to accomodate heterogeneous sequences
+    
+            FIXME/TODO: there are two options:
+                • we pass a list of traitlets with the same number of elements as the
+                instance of ListTrait - meaning that it will be valid if 
+                traitlet[k] validates the kth element in the ListTrait
+                 - a bit of overkill: for large lists we effectively pass a second
+                list as large as the list 
+    
+                • we pass a list of traitlets such that an element in the ListTrait
+                is valid IF it can be validated by at least one of the traitlets
+                in here - question is, how to do that?
+                WARNING this may introduce a BUG by casting a value to another
+                type, depending on thhe _cast_types of the particular trait used
+                to validate
+    
+        default_value: list, tuple, set 
+        """
+        self._traits = traits # a list of traits, one per element
+        self._length = 0
+        
+        self.hashed = 0
+        
+        allow_none = kwargs.pop("allow_none", True) # make this True by default
+        
+        
+        # initialize the List (<- Container <- Instance) NOW
+        # NOTE: 2022-11-02 22:45:46
+        # this will also set the super() defaults:
+        # self._minlen = tratielts.Int(0), 
+        # self._maxlen = traitlets.Int(sys.maxsize)
+        super(ListTrait, self).__init__(trait=trait, default_value=default_value, **kwargs)
+        
+        # NOTE: for our purposes we don't really need the validation logic!
+            
+    def instance_init(self, obj=None):
+        # print(f"ListTrait {self.__class__.__name__}")
+        if obj is None:
+            obj = self
+        if isinstance(self._trait, TraitType):
+            self._trait.instance_init(obj)
+        super(Container, self).instance_init(obj)
+        
+    def validate_elements(self, obj, value):
+        # NOTE: 2021-08-19 11:28:10 do the inherited validation first
+        value = super(ListTrait, self).validate_elements(obj, value)
+        # NOTE: 2021-08-19 11:18:25 then the customized one
+        # imitates see traitlets.Dict.validate_elements
+        use_list = bool(self._traits) # may be None
+        default_to = (self._trait or Any())
+        validated = []
+        
+        if not use_list and isinstance(default_to, Any):
+            return value
+        
+        for k,v in enumerate(value):
+            vv = list()
+            for t in self._traits:
+                # FIXME: 2022-11-02 23:18:08 potential BUG
+                try:
+                    v_ = self._traits[k]._validate(obj, v)
+                    vv.append(v_)
+                except TraitError:
+                    pass
+            if len(vv):
+                validated.append(vv[0])
+                    
+#             if k < len(self._traits):
+#                 try:
+#                     v = self._traits[k]._validate(obj, v)
+#                 except TraitError:
+#                     pass
+#                     self.element_error(obj, v, self._traits[k])
+#                 else:
+#                     validated.append(v)
+#                     
+#             else:
+#                 validated.append(v)
+
+        return self.klass(validated)
+
+    def set(self, obj, value):
+        """Overrides List.set to check for special hash.
+        This is supposed to also detect changes in the order of elements.
+        """
+        new_value = self._validate(obj, value)
+        try:
+            old_value = obj._trait_values[self.name]
+        except KeyError:
+            old_value = self.default_value
+
+        obj._trait_values[self.name] = new_value
+        
+        try:
+            silent = bool(old_value == new_value)
+            
+            # NOTE: 2021-08-19 16:17:23
+            # check for change in contents
+            if silent is not False:
+                new_hash = gethash(new_value)
+                silent = (new_hash == self.hashed)
+                if not silent:
+                    self.hashed = new_hash
+        except:
+            # if there is an error in comparing, default to notify
+            silent = False
+            
+        if silent is not True:
+            # we explicitly compare silent to True just in case the equality
+            # comparison above returns something other than True/False
+            obj._notify_trait(self.name, old_value, new_value)
+            
+# class StringTrait(CUnicode):
+#     def __init__(self, default_value=Undefined, allow_none=True, read_only=None,help=None,config=None, **kwargs):
+#         super(StringTrait, self).__init__(default_value=default_value,
+#                                           allow_none=allow_none,
+#                                           read_only=read_only,
+#                                           help=help,
+#                                           config=config,
+#                                           **kwargs)
+#         
+#     def set(self, obj, value):
+#         new_value = self._validate(obj, value)
+#         try:
+#             old_value = obj._trait_values[self.name]
+#         except KeyError:
+#             old_value = self.default_value
+# 
+#         obj._trait_values[self.name] = new_value
+#         
+#         if bool(old_value != new_value) is not True:
+#             obj._notify_trait(self.name, old_value, new_value)
+        
+class NdarrayTrait(Instance):
+    info_text = "Trait for numpy arrays"
+    default_value = np.array([])
+    klass = np.ndarray
+    
+    def __init__(self, args=None, kw=None, **kwargs):
+        # allow 1st argument to be the array instance
+        default_value = kwargs.pop("default_value", None)
+        self.allow_none = kwargs.pop("allow_none", False)
+        
+        if isinstance(args, np.ndarray):
+            self.default_value = args
+            
+        elif isinstance(args, (tuple, list)):
+            if len(args):
+                if isinstance(args[0], np.ndarray):
+                    self.default_value = args[0]
+                    
+                else:
+                    self.default_value = np.array(*args, **kwargs)
+                    
+            else:
+                self.default_value = np.array([])
+                
+        else:
+            self.default_value = np.array([])
+                
+        args = None
+        super().__init__(klass = self.klass, args=args, kw=kw, 
+                         default_value=default_value, **kwargs)
+        
+    def validate(self, obj, value):
+        if isinstance(value, np.ndarray):
+            return value
+        
+        self.error(obj, value)
+        
+    def make_dynamic_default(self):
+        return np.array(self.default_value)
+ 
+class NeoBaseNeoTrait(Instance):
     """IT IS RECOMMENDED THAT SUBCLASSES OVERRIDE THE `compare_elements` METHOD
     """
     info_text = "Trais for neo.baseneo.BaseNeo"
@@ -275,7 +515,7 @@ class NeoBaseTrait(Instance):
             # check class
             result = type(new_value) == type(old_value) and isinstance(new_value, self.klass)
             
-            if result:
+            if result and hasattr(self.klass, "_all_attrs"):
                 # check attributes
                 attrs = tuple((getattr(new_value, a[0]), getattr(old_value, a[0])) for a in old_value._all_attrs)
                 
@@ -348,7 +588,7 @@ class NeoBaseTrait(Instance):
         if silent is not True:
             obj._notify_trait(self.name, old_value, new_value)
         
-class NeoContainerTrait(NeoBaseTrait):
+class NeoContainerTrait(NeoBaseNeoTrait):
     klass = neo.container.Container
     info_text = f"Traitlet for {klass}"
     default_value = klass()
@@ -397,14 +637,14 @@ class NeoSegmentTrait(NeoContainerTrait):
     _cast_types = tuple()
     _valid_defaults = (klass,)
     
-class NeoChannelViewTrait(NeoBaseTrait):
+class NeoChannelViewTrait(NeoBaseNeoTrait):
     klass = neo.view.ChannelView
     info_text = f"Traitlet for {klass}"
     default_value = Undefined
     _cast_types = tuple()
     _valid_defaults = (klass,)
     
-class NeoDataObjectTrait(NeoBaseTrait):
+class NeoDataObjectTrait(NeoBaseNeoTrait):
     klass = neo.dataobject.DataObject
     info_text = f"Traitlet for {klass}"
     default_value = Undefined
@@ -503,7 +743,10 @@ class NeoSpikeTrainTrait(NeoDataObjectTrait):
     _cast_types = tuple()
     _valid_defaults = (klass,)
     
-class NeoSpikeTrainListTrait(NeoBaseTrait):
+    def make_dynamic_default(self):
+        return self.klass([0.]*pq.s, 0.)
+            
+class NeoSpikeTrainListTrait(NeoBaseNeoTrait):
     klass = neo.spiketrainlist.SpikeTrainList
     info_text = f"Traitlet for {klass}"
     default_value = Undefined
@@ -539,7 +782,86 @@ class NeoImageSequenceTrait(NeoDataObjectTrait):
     #         if result:
     #             result = old_value.frame_duration == new_value.frame_duration
     
+class NeoCircularRegionOfInterestTrait(NeoBaseNeoTrait):
+    klass = neo.regionofinterest.CircularRegionOfInterest
+    info_text = f"Traitlet for {klass}"
+    default_value = Undefined
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+    def compare_elements(self, old_value, new_value):
+        try:
+            result = super().compare_element(old_value, new_value)
+            
+            if result:
+                result = all(getattr(old_value, a) == getattr(new_value, a) for a in ("x", "y", "radius"))
                 
+        except:
+            traceback.print_exc()
+            result = False
+            
+        return result
+    
+class NeoRectangularRegionOfInterestTrait(NeoBaseNeoTrait):
+    klass = neo.regionofinterest.RectangularRegionOfInterest
+    info_text = f"Traitlet for {klass}"
+    default_value = Undefined
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+    def compare_elements(self, old_value, new_value):
+        try:
+            result = super().compare_element(old_value, new_value)
+            
+            if result:
+                result = all(getattr(old_value, a) == getattr(new_value, a) for a in ("x", "y", "height", "width"))
+                
+        except:
+            traceback.print_exc()
+            result = False
+            
+        return result
+    
+class NeoPolygonRegionOfInterestTrait(NeoBaseNeoTrait):
+    klass = neo.regionofinterest.PolygonRegionOfInterest
+    info_text = f"Traitlet for {klass}"
+    default_value = Undefined
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+    def compare_elements(self, old_value, new_value):
+        try:
+            result = super().compare_element(old_value, new_value)
+            
+            if result:
+                result = old_value.vertices == new_value.vertices
+                
+        except:
+            traceback.print_exc()
+            result = False
+            
+        return result
+    
+class NeoArrayDictTrait(NeoBaseNeoTrait):
+    klass = neo.dataobject.ArrayDict
+    def compare_elements(self, old_value, new_value):
+        try:
+            result = super().compare_element(old_value, new_value)
+            
+            if result:
+                result = old_value.vertices == new_value.vertices
+                
+        except:
+            traceback.print_exc()
+            result = False
+            
+        return result
+    
+    info_text = f"Traitlet for {klass}"
+    default_value = Undefined
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
     
 class QuantityTrait(Instance):
     info_text = "Traitlet for python quantities"

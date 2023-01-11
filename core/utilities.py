@@ -429,7 +429,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     
     return reduce(operator.and_, (f_isclose(x_, y_) for x_, y_ in ((getattr(x, name), getattr(y, name)) for name in ("real", "imag"))))
 
-def all_or_not_all(*args):
+def all_or_all_not(*args):
     """Returns True when elements in args are either all True or all False.
     """
     return all(args) or all(not(arg) for arg in args)
@@ -865,6 +865,9 @@ def safe_identity_test2(x, y):
 def safe_identity_test(x, y, idcheck=False):
     ret = True
     
+    if all(isinstance(v, type) for v in (x,y)):
+        return x==y
+    
     if idcheck:
         ret &= id(x) == id(y)
         
@@ -894,7 +897,12 @@ def safe_identity_test(x, y, idcheck=False):
         if not ret:
             return ret
         
-        ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
+        if all(isinstance(v, dict) for v in (x,y)):
+            ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x.items(), y.items())))
+            if not ret:
+                return ret
+        else:
+            ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
         
         if not ret:
             return ret
@@ -925,7 +933,7 @@ def safe_identity_test(x, y, idcheck=False):
     
         if not ret:
             return ret
-    
+        
     ret &= eq(x,y)
     
     return ret ## good fallback, though potentially expensive

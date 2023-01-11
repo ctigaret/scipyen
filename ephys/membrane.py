@@ -3112,20 +3112,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             vstep = vm.time_slice(start, stop + tail)
             istep = im.time_slice(start, stop + tail)
             
-#             if d > u:
-#                 vstep = vm.time_slice(u, d + tail)
-#                 istep = im.time_slice(u, d + tail)
-#                 
-#             elif d < u:
-#                 vstep = vm.time_slice(d, u + tail)
-#                 istep = im.time_slice(d, u + tail)
-#                 inj *= -1.0
-#                 
-#             else:
-#                 vstep = vm.time_slice(d, d + tail)
-#                 istep = im.time_slice(d, d + tail)
-                
-            print(f"extract_AP_train: start = {start}, stop = {stop}")
+            # print(f"extract_AP_train: start = {start}, stop = {stop}")
                 
             Ihold = istep.mean()
             
@@ -3321,7 +3308,7 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5, min_ap_isi= 6e-3*pq.s
     return ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_fast_rise_durations, ap_peak_times, dv_dt, d2v_dt2
     
     
-def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = None, min_fast_rise_duration = None, min_ap_isi = 6e-3*pq.s, rtol = 1e-5, atol = 1e-8, use_min_detected_isi=True,smooth_window = 5,interpolate_roots = False,decay_intercept_approx = "linear",decay_ref = "hm",get_duration_at_Vm=None,return_all = False, vm_thr=0):
+def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = None, min_fast_rise_duration = None, min_ap_isi = 6e-3*pq.s, rtol = 1e-5, atol = 1e-8, use_min_detected_isi=True,smooth_window = 5,interpolate_roots = False,decay_intercept_approx = "linear",decay_ref = "hm",get_duration_at_Vm=None,return_all = False, vm_thr=0, **kwargs):
     """Detects action potentials in a Vm signal.
     For use with experiments using "steps" of depolarizing current injections.
     
@@ -3463,6 +3450,12 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
     
         When True, the function will also return a dictionary with various
         internal variables used or calculated during the AP waveform detection.
+    
+    t_start, t_stop: start, stop time of the spiketrain - relevant when detection
+        takes place on a slice of the original signal; these values should reflect 
+        the entire extend of the original signal
+        
+        Optional; default values are taken from `sig`.
         
     Returns:
     --------
@@ -3681,6 +3674,8 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
     else:
         raise TypeError("get_duration_at_Vm expected to be a scalar real, Quantity or None; got %s instead" % type(get_duration_at_Vm).__name__)
     
+    t_start = kwargs.pop("t_start", sig.t_start)
+    t_stop = kwargs.pop("t_start", sig.t_stop)
     # ### END parse parameters
     
     #### BEGIN Detect APs by thresholding on the 1st derivative of the Vm signal
@@ -3717,8 +3712,8 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
     train_annotations["AP_dV_dt_waveforms"]      = None
     train_annotations["AP_d2V_dt2_waveforms"]    = None
     
-    
-    ap_train = neo.SpikeTrain([], t_stop = 0*pq.s, units = pq.s)
+    # print(f"detect_AP_waveforms_in_train t_start {t_start} t_stop {t_stop}")
+    ap_train = neo.SpikeTrain([], t_start=t_start, t_stop = t_stop, units = pq.s)
     
     if ap_fast_rise_start_times is None:
         ap_train.annotations.update(train_annotations)
@@ -4149,8 +4144,8 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
     #
     if len(ap_fast_rise_start_times):
         ap_train = neo.SpikeTrain(ap_fast_rise_start_times,
-                                t_start = sig.t_start,
-                                t_stop = sig.t_stop,
+                                t_start = t_start,
+                                t_stop = t_stop,
                                 left_sweep = ap_fast_rise_start_times - sig.t_start,
                                 sampling_rate = sig.sampling_rate,
                                 name="%s_AP_train" % (sig.name),
@@ -6000,18 +5995,26 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     
     # NOTE: 2019-08-16 13:30:43
     # ap_train is always a SpikeTrain, even if empty
+    kwargs["t_start"] = vm.t_start
+    kwargs["t_stop"] = vm.t_stop
     ap_train, ap_waveform_signals = detect_AP_waveforms_in_train(vstep, istep, **kwargs)
+    # print(f"analyse_AP_step_injection_sweep ap_train t_start = {ap_train.t_start}, t_stop = {ap_train.t_stop}")
     
     result = collections.OrderedDict() #dict()
     
     #if isinstance(ap_train, neo.SpikeTrain) and len(ap_train):
     if len(segment.spiketrains) > 0: 
         # check to see if there already is a spike train of APs; don't just append
-        for k, st in enumerate(segment.spiketrains):
-            if is_AP_spiketrain(st):
-                #segment.spiketrains[k] = ap_train
-                # NOTE: in neo >= 0.10.0 segment.spiketrains is a neo.SpikeTrainList
-                list(segment.spiketrains)[k] = ap_train
+        ndx = list(filter(lambda x: is_AP_spiketrain(x[1]), ((k,s) for k,s in enumerate(segment.spiketrains))))
+        
+        if len(ndx):
+            segment = neoutils.remove_spiketrain(segment, ndx)
+                   
+        # for k, st in enumerate(segment.spiketrains):
+        #     if is_AP_spiketrain(st):
+        #         #segment.spiketrains[k] = ap_train
+        #         # NOTE: in neo >= 0.10.0 segment.spiketrains is a neo.SpikeTrainList
+        #         list(segment.spiketrains)[k] = ap_train
                 
     else:
         segment.spiketrains.append(ap_train)
