@@ -1079,7 +1079,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return self._events_axis_
     
     @property
-    def spikeTrainAxis(self):
+    def spikeTrainsAxis(self):
         return self._spiketrains_axis_
     
     @property
@@ -1727,10 +1727,6 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     x = train.times.magnitude.flatten() # vector
                     y = np.full(x.shape, height_interval * k_train + height_interval/2) # column vector
                         
-                    # if x[0] > x_min:
-                    #     pass
-                        
-                    
                     trains_x_list.append(x)
                     trains_y_list.append(y)
                     
@@ -6844,9 +6840,9 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     for tgt in targetItems:
                         ax.addItem(tgt)
                         
-        if len(self.axes):
-            self.axes[-1].showAxis("bottom", True)
-            self.axes[-1].showAxes([True, False, False, True], showValues=[True, False, False, True])
+        # if len(self.axes):
+        #     self.axes[-1].showAxis("bottom", True)
+        #     self.axes[-1].showAxes([True, False, False, True], showValues=[True, False, False, True])
             
             
                         
@@ -7176,6 +7172,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         self._plot_signal_data_(signal, sig_name, plotItem, *args, **kwargs)
                         
                     plotItem.setVisible(True)
+                    
+                    # print(f"plotItem {ax_ndx} left axis width {plotItem.getAxis('left').width()}")
     
                 else:
                     plotItem.setVisible(False)
@@ -7194,7 +7192,6 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if self._plot_irregularsignals_: # flag set up by `Irregular` checkbox
             selected_irregs, selected_irreg_names, selected_irreg_ndx = self._signals_select_(irregs, self.irregularSignalComboBox)
             
-            
             for k, signal in enumerate(irregs):
                 plotItem = self.signalAxes[ax_ndx]
                 if k in selected_irreg_ndx:
@@ -7203,6 +7200,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         self._plot_signal_data_(signal, sig_name, plotItem, *args, **kwargs)
             
                     plotItem.setVisible(True)
+                    # print(f"plotItem {ax_ndx} left axis width {plotItem.getAxis('left').width()}")
                 else:
                     plotItem.setVisible(False)
         else:
@@ -7219,13 +7217,13 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                                                     QtWidgets.QSizePolicy.Minimum, 
                                                                     QtWidgets.QSizePolicy.Frame))
                 
-                symbolcolors = cycle(self.defaultLineColorsList)
-                symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
-                symbolPen.setCosmetic(True)
-                
-                labelStyle = {"color": "#000000"}
-                
-                height_interval = 1/len(spiketrains) 
+#                 symbolcolors = cycle(self.defaultLineColorsList)
+#                 symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
+#                 symbolPen.setCosmetic(True)
+#                 
+#                 labelStyle = {"color": "#000000"}
+#                 
+#                 height_interval = 1/len(spiketrains) 
                 
                 kwargs["auto_X_range"] = True
                 
@@ -7247,13 +7245,13 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                                             QtWidgets.QSizePolicy.Minimum, 
                                                             QtWidgets.QSizePolicy.Frame))
                 
-                symbolcolors = cycle(self.defaultLineColorsList)
-                symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
-                symbolPen.setCosmetic(True)
-                
-                labelStyle = {"color": "#000000"}
-                
-                height_interval = 1/len(events)
+#                 symbolcolors = cycle(self.defaultLineColorsList)
+#                 symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
+#                 symbolPen.setCosmetic(True)
+#                 
+#                 labelStyle = {"color": "#000000"}
+#                 
+#                 height_interval = 1/len(events)
                 
                 self._plot_discrete_entities_(events, axis=kAx, **kwargs)
                 self._events_axis_.update() 
@@ -7269,13 +7267,25 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             plotItem.getAxis("bottom").showLabel(test)
             plotItem.getAxis("bottom").setStyle(showValues=test)
 
+        # align left axis for all plot items for signals
+        maxLeftAxisWidth = max(ax.getAxis("left").width() for ax in visibleAxes)
+        
+        print(f"maxLeftAxisWidth {maxLeftAxisWidth}")
+        
+        # for ax in visibleAxes:
+        #     ax.getAxis("left").setWidth(maxLeftAxisWidth)
+
         if self._spiketrains_axis_.isVisible():
             self._spiketrains_axis_.getAxis("bottom").showLabel(False)
             self._spiketrains_axis_.getAxis("bottom").setStyle(showValues=False)
+            # also align to left
+            # self._spiketrains_axis_.getAxis("left").setWidth(maxLeftAxisWidth)
             
         if self._events_axis_.isVisible():
             self._events_axis_.getAxis("bottom").showLabel(False)
             self._events_axis_.getAxis("bottom").setStyle(showValues=False)
+            # also align to left
+            # self._events_axis_.getAxis("left").setWidth(maxLeftAxisWidth)
             
             
         seg_name = getattr(obj, "name", "")
@@ -8575,8 +8585,6 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if self._events_axis_ not in self.signalsLayout.items:
             self._events_axis_.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
             self.signalsLayout.addItem(self._events_axis_, row=self._n_signal_axes_, col=0)
-            
-        
             
         if not isinstance(self._spiketrains_axis_, pg.PlotItem):
             self._spiketrains_axis_ = pg.PlotItem(name=self._default_spiketrains_axis_name_)
