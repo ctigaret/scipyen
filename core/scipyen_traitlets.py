@@ -517,7 +517,7 @@ class NeoBaseNeoTrait(Instance):
             
             if result and hasattr(self.klass, "_all_attrs"):
                 # check attributes
-                attrs = tuple((getattr(new_value, a[0]), getattr(old_value, a[0])) for a in old_value._all_attrs)
+                attrs = tuple((getattr(new_value, a[0], None), getattr(old_value, a[0], None)) for a in old_value._all_attrs)
                 
                 result = all(self.compare_element(c_new, c_old) for (c_new, c_old) in attrs)
                 
@@ -670,6 +670,9 @@ class NeoAnalogSignalTrait(NeoDataObjectTrait):
     _cast_types = tuple()
     _valid_defaults = (klass,)
     
+    def make_dynamic_default(self):
+        return self.klass([0.], units=pq.s, sampling_rate=1*pq.Hz)
+            
 class NeoIrregularlySampledSignalTrait(NeoDataObjectTrait):
     klass = neo.IrregularlySampledSignal
     info_text = f"Traitlet for {klass}"
@@ -677,6 +680,9 @@ class NeoIrregularlySampledSignalTrait(NeoDataObjectTrait):
     _cast_types = tuple()
     _valid_defaults = (klass,)
     
+    def make_dynamic_default(self):
+        return self.klass([0.]*pq.s, 0)
+            
 class NeoEpochTrait(NeoDataObjectTrait):
     klass = neo.Epoch
     info_text = f"Traitlet for {klass}"
@@ -1012,7 +1018,28 @@ class QuantityTrait(Instance):
             
         raise TraitError(e)
     
-  
+class DataSignalTrait(NeoDataObjectTrait):
+    klass = DataSignal
+    info_text = f"Traitlet for {klass}"
+    default_value = Undefined
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+    def make_dynamic_default(self):
+        return self.klass([0.], units=pq.dimensionless,sampling_rate=1*pq.dimensionless)
+        
+class IrregularlySampledDataSignal(NeoDataObjectTrait):
+    klass = IrregularlySampledDataSignal
+    info_text = f"Traitlet for {klass}"
+    default_value = Undefined
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+    
+    def make_dynamic_default(self):
+        return self.klass([0.]*pq.dimensionless, 0)
+        
+    
+    
 class DataBagTrait(Instance):
     """Avoid slicing the DataBag type to dict.
     

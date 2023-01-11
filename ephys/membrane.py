@@ -3675,7 +3675,9 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
         raise TypeError("get_duration_at_Vm expected to be a scalar real, Quantity or None; got %s instead" % type(get_duration_at_Vm).__name__)
     
     t_start = kwargs.pop("t_start", sig.t_start)
-    t_stop = kwargs.pop("t_start", sig.t_stop)
+    t_stop = kwargs.pop("t_stop", sig.t_stop)
+    
+    # print(f"detect_AP_waveforms_in_train kwargs t_start {t_start} t_stop {t_stop}")
     # ### END parse parameters
     
     #### BEGIN Detect APs by thresholding on the 1st derivative of the Vm signal
@@ -4172,6 +4174,8 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
         train_annotations["AP_d2V_dt2_waveforms"]    = ap_d2vdt2_waveform_signals
     
     ap_train.annotations.update(train_annotations)
+    
+    # print(f"detect_AP_waveforms_in_train ap_train t_start {ap_train.t_start} t_stop {ap_train.t_stop}")
     
     return ap_train, ap_waveform_signals
         
@@ -5997,6 +6001,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     # ap_train is always a SpikeTrain, even if empty
     kwargs["t_start"] = vm.t_start
     kwargs["t_stop"] = vm.t_stop
+    # print(f"analyse_AP_step_injection_sweep kwargs t_start {kwargs['t_start']}, t_stop {kwargs['t_stop']}")
     ap_train, ap_waveform_signals = detect_AP_waveforms_in_train(vstep, istep, **kwargs)
     # print(f"analyse_AP_step_injection_sweep ap_train t_start = {ap_train.t_start}, t_stop = {ap_train.t_stop}")
     
@@ -6521,20 +6526,20 @@ def calculate_template_scale_offset(x, h):
     σ = np.sqrt(ε/(N-1))
     θ = β/σ
     
-    print(f" sum_h = {sum_h}")
-    print(f" sum_h_N = {sum_h_N}")
-    print(f" sum_y = {sum_y}")
-    print(f" sum_y_N = {sum_y_N}")
-    print(f" h_dot = {h_dot}")
-    print(f" y_dot = {y_dot}")
-    print(f" hy_dot = {hy_dot}")
-    print(f" sum_h * sum_y_N = {sum_h * sum_y_N }")
-    print(f" β_denom = {beta_denom}")
-    print(f" α = {α}")
-    print(f" β = {β}")
-    print(f" ε = {ε}")
-    print(f" σ = {σ}")
-    print(f" θ = {θ}")
+    # print(f" sum_h = {sum_h}")
+    # print(f" sum_h_N = {sum_h_N}")
+    # print(f" sum_y = {sum_y}")
+    # print(f" sum_y_N = {sum_y_N}")
+    # print(f" h_dot = {h_dot}")
+    # print(f" y_dot = {y_dot}")
+    # print(f" hy_dot = {hy_dot}")
+    # print(f" sum_h * sum_y_N = {sum_h * sum_y_N }")
+    # print(f" β_denom = {beta_denom}")
+    # print(f" α = {α}")
+    # print(f" β = {β}")
+    # print(f" ε = {ε}")
+    # print(f" σ = {σ}")
+    # print(f" θ = {θ}")
     
     return  h_
 
@@ -6553,7 +6558,7 @@ def test_sliding(x, y, h, viewer, step_size=100):
                               axis=1)
     
     for k in range(0, M-N, 100):
-        print(f"k = {k}")
+        # print(f"k = {k}")
         y_ = y[k:(N+k)]
         scaled_h = calculate_template_scale_offset(y_, h)
         if k > 0:

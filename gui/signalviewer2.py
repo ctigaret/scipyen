@@ -1715,13 +1715,21 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             elif all(isinstance(v, neo.SpikeTrain) for v in entities_list):
                 trains_x_list = list()
                 trains_y_list = list()
+                # entities_axis.vb.disableAutoRange(entities_axis.vb.XAxis)
+                
+                x_min = min((float(t.t_start) for t in entities_list))
+                x_max = max((float(t.t_stop) for t in entities_list))
                 
                 for k_train, train in enumerate(entities_list):
                     data_name = getattr(train, "name", None)
                     data_name = data_name if isinstance(data_name, str) and len(data_name.strip()) else "%d" % k_train
                     
-                    x = train.times.magnitude.flatten() # column vector
+                    x = train.times.magnitude.flatten() # vector
                     y = np.full(x.shape, height_interval * k_train + height_interval/2) # column vector
+                        
+                    # if x[0] > x_min:
+                    #     pass
+                        
                     
                     trains_x_list.append(x)
                     trains_y_list.append(y)
@@ -1742,9 +1750,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         
                 yLabel = "Spike Trains"
                 
+                
                 if auto_X_range:
-                    x_min = min((float(t.t_start) for t in entities_list))
-                    x_max = max((float(t.t_stop) for t in entities_list))
                     entities_axis.setXRange(x_min, x_max)
                 
             elif all(isinstance(v, pg.TargetItem) for v in entities_list):
@@ -7220,7 +7227,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 height_interval = 1/len(spiketrains) 
                 
-                # kwargs["auto_X_range"] = True
+                kwargs["auto_X_range"] = True
                 
                 self._plot_discrete_entities_(spiketrains, axis=self._spiketrains_axis_, **kwargs)
                 
@@ -7304,6 +7311,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def _(self, obj, *args, **kwargs):
         x_min, x_max = (self._yData_[0], self._yData_[-1] + self._yData_.durations[-1])
         # self._prepareAxes_(1)
+        # FIXME/BUG 2023-01-11 15:54:38
         self._plotEpochs_(obj, **self.epoch_plot_options)
         self.axes[0].showAxis("bottom", True)
         
@@ -7362,7 +7370,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self._current_frame_index_ = 0
                     ndx = self._current_frame_index_
             
-                self._plotSignal_(self._yData_[ndx], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
+                self._plot_data_(self._yData_[ndx], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
+                # self._plotSignal_(self._yData_[ndx], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
                 self.currentFrameAnnotations = {type(self._yData_[ndx]).__name__: self._yData_[ndx].annotations}
                 
 
@@ -7377,7 +7386,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         elif all([isinstance(y_, neo.Segment) for y_ in self._yData_]):
             segment = self._yData_[self.frameIndex[self._current_frame_index_]]
-            self._plotSegment_(segment, *self.plot_args, **self.plot_kwargs)
+            self._plot_data_(segment, *self.plot_args, **self.plot_kwargs)
+            # self._plotSegment_(segment, *self.plot_args, **self.plot_kwargs)
             self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
             
         elif all([isinstance(y_, neo.Block) for y_ in self._yData_]):
@@ -7407,7 +7417,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             kwargs.update(self.plot_kwargs)
             kwargs["plotTitle"] = plotTitle
             
-            self._plotSegment_(segment, *self.plot_args, **kwargs)
+            self._plot_data_(segment, *self.plot_args, **kwargs)
+            # self._plotSegment_(segment, *self.plot_args, **kwargs)
             
             self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
             
