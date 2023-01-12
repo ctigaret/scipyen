@@ -1861,17 +1861,12 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if not isinstance(analog, (tuple, list)) or len(analog) == 0:
             self.analogSignalComboBox.clear()
             
-        # elif isinstance(analog, np.ndarray):
-            # self.analogSignalComboBox.clear()
-            # self.irregularSignalComboBox.clear()
-
         else:
             analog_sig_names = list(unique(map(lambda x: x[1] if isinstance(x[1], str) and len(x[1].strip()) else f"Analog signal {x[0]}" , ((k,getattr(s, "name", "Analog signal {k}")) for k,s in enumerate(analog)))))
             
             current_ndx = self.analogSignalComboBox.currentIndex()
             current_txt = self.analogSignalComboBox.currentText()
             
-            # current_names = list(self.analogSignalComboBox.itemText(k) for k in range(self.analogSignalComboBox.count()))
             
             sig_names = ["All"] + analog_sig_names + ["Choose"]
             
@@ -7161,79 +7156,12 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         irregs = obj.irregularlysampledsignals
         spiketrains = get_non_empty_spike_trains(obj.spiketrains)
         events = get_non_empty_events(obj.events)
-
-        assert len(self.signalAxes) == len(analog) + len(irregs), "Mistmatch between number of signal axes and available signals"
         
-        self._setup_signal_choosers_(analog = analog, irregular = irregs) 
-        
-        selected_analogs = list()
-        selected_analog_names = list()
-        selected_analog_ndx = list()
-        
-        selected_irregs = list()
-        selected_irreg_names = list()
-        selected_irreg_ndx = list()
-        
-        ax_ndx = 0
-        
-        #### BEGIN plot regular (analog) signals
-        # NOTE: update only those plotItems where a selected signal should be
-        # all other plotItems are hidden
-        if self._plot_analogsignals_: # flag set up by `Analog` checkbox
-            selected_analogs, selected_analog_names, selected_analog_ndx = self._signals_select_(analog, self.analogSignalComboBox)
-            
-            for k, signal in enumerate(analog):
-                plotItem = self.signalAxes[ax_ndx]
-                if k in selected_analog_ndx:
-                    # NOTE: 2023-01-04 22:14:55
-                    # avoid plotting if frame hasn't changed - just change plotItem's visibility
-                    # if new_data: 
-                    if self._new_frame_: 
-                        sig_name = selected_analog_names[selected_analog_ndx.index(k)]
-                        self._plot_signal_data_(signal, sig_name, plotItem, *args, **kwargs)
-                        
-                    plotItem.setVisible(True)
-                    
-                else:
-                    plotItem.setVisible(False)
-                    
-                ax_ndx += 1
-
-        else: # hide all analog signal plotItems
-            for ax in self.signalAxes:
-                ax.setVisible(False)
-            # for k, in range(len(analog)):
-            #     plotItem = self.signalAxes[ax_ndx]
-            #     plotItem.setVisible(False)
-            #     ax_ndx += 1
-                
-        #### END plot regular (analog) signals
-        
-        #### BEGIN plot irregular signals
-        if self._plot_irregularsignals_: # flag set up by `Irregular` checkbox
-            selected_irregs, selected_irreg_names, selected_irreg_ndx = self._signals_select_(irregs, self.irregularSignalComboBox)
-            
-            for k, signal in enumerate(irregs):
-                plotItem = self.signalAxes[ax_ndx]
-                if k in selected_irreg_ndx:
-                    # if new_data:
-                    if self._new_frame_:
-                        sig_name = selected_irreg_names[selected_irreg_ndx.index(k)]
-                        self._plot_signal_data_(signal, sig_name, plotItem, *args, **kwargs)
-            
-                    plotItem.setVisible(True)
-                else:
-                    plotItem.setVisible(False)
-        else:
-            for k in range(len(irregs)):
-                plotItem = self.signalAxes[ax_ndx]
-                plotItem.setVisible(False)
-                ax_ndx += 1
-        #### END plot irregular signals
+        self._plot_signals_(analog, irregs, *args, **kwargs)
 
         if self._plot_spiketrains_:
             if len(spiketrains):
-                if new_data:
+                if self._new_frame_:
                     # plot all spike trains in this segment stacked in a single axis
                     self._spiketrains_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
                                                                         QtWidgets.QSizePolicy.Minimum, 
@@ -7347,35 +7275,12 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 neo.core.IrregularlySampledSignal,
                                 IrregularlySampledDataSignal)) for y_ in self._yData_]):
             
-            if self.frameAxis is None:
-                for k, signal in enumerate(self._yData_):
-                    if isinstance(signal, (neo.AnalogSignal, neo.IrregularlySampledSignal)):
-                        domain_name = "Time"
-                        
-                    else:
-                        domain_name = signal.domain_name
-                                        
-                    self._plot_numeric_data_(self.axis(k), 
-                                                np.array(signal.times),
-                                                np.array(signal.magnitude),
-                                                ylabel = f"{signal.name} ({signal.units.dimensionality})",
-                                                xlabel = f"{domain_name} ({signal.times.units.dimensionality})",
-                                                *args, **kwargs)
-                    self.axis(k).register(signal.name)
-                    self.axis(k).setVisible(True)
-            else:
-                if self._current_frame_index_ in self.frameIndex:
-                    ndx = self.frameIndex[self._current_frame_index_]
-                else:
-                    self._current_frame_index_ = 0
-                    ndx = self._current_frame_index_
+            analog = [s for s in self._yData_ if isinstance(s, (neo.AnalogSignal, DataSignal))]
             
-                self._plot_data_(self._yData_[ndx], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
-                # self._plotSignal_(self._yData_[ndx], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
-                self.currentFrameAnnotations = {type(self._yData_[ndx]).__name__: self._yData_[ndx].annotations}
-                self.spikeTrainsAxis.setVisible(False)
-                self.eventsAxis.setVisible(False)
-
+            irregs = [s for s in self._yData_ if isinstance(s, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal))]
+            
+            self._plot_signals_(analog, irregs, *args, **kwargs)
+            
         elif all([isinstance(y_, (neo.core.Epoch, DataZone)) for y_ in self._yData_]): 
             # plot Epoch(s) independently of data; there is a single frame
             
@@ -7498,377 +7403,108 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return selected_signals, selected_signal_names, selected_signal_ndx
     
     @safeWrapper
-    def _plotSegment_(self, seg, *args, **kwargs):
-        """Plots a neo.Segment.
-        Plots the signals (optionally the selected ones) present in a segment, 
-        and the associated epochs, events, and spike trains.
+    def _plot_signals_(self, analog, irregs, *args, **kwargs):
+        """Common landing zone for plotting collections (sequences) of signals.
+        
+        By signals I mean neo.AnalogSignal, DataSignal, neo.IrregularlySampledSignal
+        and IrregularlySampledDataSignal.
+        
+        The collections are passed as part of a segment, or as standalone objects.
+        
+        NOTE: 2023-01-12 17:26:43
+        To keep to code more manageable the possibility to plot each channel of 
+        a multi-channel signal in its own frame or axis on the same frame has 
+        been removed for multi channel signals when they are part of a collection.
+        
+        One channel - one axis is the golden rule here.
+        
         """
-        # NOTE: 2021-10-03 12:55:21 ChannelIndex is OUT of neo
-        
-        # print(f"_plotSegment_")
-        # stack = inspect.stack()
-        # for s in stack:
-        #     print(f"\t\tcaller = {s.function}")
-        
-        if not isinstance(seg, neo.Segment):
-            raise TypeError("Expecting a neo.Segment; got %s instead" % type(seg).__name__)
-        
-        # NOTE: 2021-01-02 11:54:50
-        # allow custom plot title - handy e.g., for plotting segments from across
-        # a list of blocks
-        plotTitle = kwargs.pop("plotTitle", getattr(seg, "name", "Segment"))
-        
-        
-#         # NOTE: 2019-11-24 23:21:13#
-#         # 1) Select which signals to display
-#         self.signalIndex = normalized_signal_index(seg, self.signalIndex, ctype = neo.AnalogSignal)
-#         self.irregularSignalIndex = normalized_signal_index(seg, self.irregularSignalIndex, ctype = neo.IrregularlySampledSignal)
-#         
-#         analog = [seg.analogsignals[k] for k in self.signalIndex]
-#         irregs = [seg.irregularlysampledsignals[k] for k in self.irregularSignalIndex]
+        assert len(self.signalAxes) == len(analog) + len(irregs), "Mistmatch between number of signal axes and available signals"
 
-        analog = seg.analogsignals
-        irregs = seg.irregularlysampledsignals
-
-        # this updates the available choices in the comboboxes
-        # any previous selection is kept, if still available
+        # NOTE: 2023-01-12 16:45:48
+        # by convention, analog signals are plotted in order, BEFORE the 
+        # irregularly sampled signals
+        # 
+        # so a mapping of signal index to axis index is used here for bookkeeping
+        
+        analog_ndx = range(len(analog))
+        
+        irregs_ndx = range(len(irregs))
+        
+        axes_ndx   = range(len(self.signalAxes))
+        # say you have 5 analog signals and 3 irregularly sampled signals; this
+        # means a total of eight signal axes
+        
+        # this gives somehting like {0: 0, 1: 1, 2: 2, 3: 3, 4: 4} (signal index ↦ axis index)
+        analog_axes = dict(zip(analog_ndx, list(axes_ndx)[:len(analog_ndx)]))
+        
+        # this gives something like {0: 5, 1: 6, 2: 7} (signal index ↦ axis index)
+        irregs_axes = dict(zip(irregs_ndx, list(axes_ndx)[len(analog_ndx):]))
+        
         self._setup_signal_choosers_(analog = analog, irregular = irregs) 
         
-        # lists with signals and signal names for the ones that will be actually
-        # # plotted
         selected_analogs = list()
         selected_analog_names = list()
+        selected_analog_ndx = list()
+        
         selected_irregs = list()
-        selected_irregs_names = list()
+        selected_irreg_names = list()
+        selected_irreg_ndx = list()
         
-        # BEGIN prepare to plot regular (analog) signals
-        if self._plot_analogsignals_:
-            # now try to get the signal selections from the combo boxes
-            current_ndx = self.analogSignalComboBox.currentIndex() 
+        # ax_ndx = 0
+        
+        #### BEGIN plot regular (analog) signals
+        # NOTE: update only those plotItems where a selected signal should be
+        # all other plotItems are hidden
+        if self._plot_analogsignals_: # flag set up by `Analog` checkbox
+            selected_analogs, selected_analog_names, selected_analog_ndx = self._signals_select_(analog, self.analogSignalComboBox)
             
-            if current_ndx == 0: # "All" selected
-                selected_analogs[:] = analog[:]
-                
-                for k, s in enumerate(analog):
-                    if isinstance(s.name, str) and len(s.name.strip()):
-                        selected_analog_names.append(s.name)
+            for k, signal in enumerate(analog):
+                ax_ndx = analog_axes[k]
+                plotItem = self.signalAxes[ax_ndx]
+                if k in selected_analog_ndx:
+                    # NOTE: 2023-01-04 22:14:55
+                    # avoid plotting if frame hasn't changed - just change plotItem's visibility
+                    # if new_data: 
+                    if self._new_frame_: 
+                        sig_name = selected_analog_names[selected_analog_ndx.index(k)]
+                        self._plot_signal_data_(signal, sig_name, plotItem, *args, **kwargs)
                         
-                    else:
-                        selected_analog_names.append("Analog signal %d" % k)
-                
-            elif current_ndx == self.analogSignalComboBox.count() - 1: # "Choose" selected
-                # read the multiple choices previously set up by a dialog
-                # selected_analogs = list()
-                if len(self.guiSelectedAnalogSignalNames):
-                    for k,s in enumerate(analog):
-                        if isinstance(s.name, str) and len(s.name.strip()):
-                            if s.name in self.guiSelectedAnalogSignalNames:
-                                selected_analogs.append(s)
-                                selected_analog_names.append(s.name)
-                                
-                        elif "Analog signal %d" % k in self.guiSelectedAnalogSignalNames:
-                            selected_analogs.append(s)
-                            selected_analog_names.append("Analog signal %d" % k)
-                
-            elif current_ndx > -1:
-                selected_analogs = [analog[current_ndx-1]]
-                s_name = selected_analogs[0].name
-                
-                if isinstance(s_name, str) and len(s_name.strip()):
-                    selected_analog_names = [s_name]
+                    plotItem.setVisible(True)
                     
                 else:
-                    selected_analog_names = ["Analog signal %d" % (current_ndx-1, )]
-        # END   prepare to plot regular (analog) signals
-          
-        # BEGIN prepare to plot irregular signals
-        if self._plot_irregularsignals_:
-            current_ndx = self.irregularSignalComboBox.currentIndex()
-            current_txt = self.irregularSignalComboBox.currentText()
-            
-            if current_ndx == 0:
-                selected_irregs[:] = irregs[:]
-                
-                for k,s  in enumerate(irregs):
-                    if isinstance(s.name, str) and len(s.name.strip()):
-                        selected_irregs_names.append(s.name)
-                        
-                    else:
-                        selected_irregs_names.append("Irregularly sampled signal %d" % k)
-                
-            elif current_ndx == self.irregularSignalComboBox.count() - 1:
-                if len(self.guiSelectedIrregularSignalNames):
-                    for k, s in enumerate(irregs):
-                        if isinstance(s.name, str) and len(s.name.strip()):
-                            if s.name in self.guiSelectedIrregularSignalNames:
-                                selected_irregs.append(s)
-                                selected_irregs_names.append(s.name)
-                                
-                        elif "Irregularly sampled signal %d" % k in self.guiSelectedIrregularSignalNames:
-                            selected_irregs.append(s)
-                            selected_irregs_names.append("Irregularly sampled signal %d" % k)
-                            
-            elif current_ndx > -1:
-                selected_irregs = [irregs[current_ndx-1]]
-                s_name = selected_irregs[0].name
-                
-                if isinstance(s_name, str) and len(s_name.strip()):
-                    selected_irregs_names = [s_name]
+                    plotItem.setVisible(False)
                     
-                else:
-                    selected_irregs_names = ["Irregularly sampled signal %d" % (current_ndx-1,)]
-        
-#         # END   prepare to plot irregular signals
-#         
-#         # BEGIN initial set up axes
-#         nAnalogAxes = len(selected_analogs) 
-#         
-#         nIrregAxes = len(selected_irregs)
-#         
-#         nRequiredAxes = nAnalogAxes + nIrregAxes
-#         # END   initial set up axes
-#         
-#         signames = selected_analog_names + selected_irregs_names # required for prepare axes and caching of cursors (see comments in _prepareAxes_())
-#         
-#         # BEGIN prepare to plot spike trains
-        # NOTE: 2019-11-25 15:19:16
-        # for segments we do not plot signals with their channels separate
-        # if needed, then get a reference to the signal and plot it individually
-        # with separateSignalChannels set to True
-        spiketrains = get_non_empty_spike_trains(seg.spiketrains)
-        # if len(spiketrains):
-            # nRequiredAxes += 1
-            # signames += ["spike trains"]
-#         # END   prepare to plot spike trains
-#         
-#         # BEGIN prepare to plot events
-        events = get_non_empty_events(seg.events)
-        
-        # if isinstance(events, (tuple, list)) and len(events):
-        #     nRequiredAxes += 1
-        #     signames += ["events"]
-#         # END   prepare to plot events
-#            
-#         # BEGIN finalize set up axes
-#         # self._prepareAxes_(nRequiredAxes, sigNames=signames)
-        
-        axes = self.plotItems
-        # END   finalize set up axes
-        
-        kAx = 0
-        
-        #### BEGIN plot regular (analog) signals 
-        # for k, signal in enumerate(selected_analogs):
-        for k, signal in enumerate(analog):
-            # print(f"kAx = {kAx}")
-            # plotItem = self.signalsLayout.getItem(kAx,0)
-            plotItem = self._signal_axes_[kAx]
-            if isinstance(signal, neo.AnalogSignal):
-                domain_name = "Time"
-                
-            else:
-                domain_name = signal.domain_name # alternative is a DataSignal
-                
-            # apply whatever time slicing was required by arguments to setData()
-            if self.plot_start is not None:
-                if self.plot_stop is not None:
-                    sig = signal.time_slice(self.plot_start, self.plot_stop)
-                    
-                else:
-                    sig = signal.time_slice(self.plot_start, signal.t_top)
-                    
-            else:
-                if self.plot_stop is not None:
-                    sig = signal.time_slice(signal.t_start, self.plot_stop)
-                    
-                else:
-                    sig = signal
+                # ax_ndx += 1
 
-            if isinstance(sig.name, str) and len(sig.name.strip()):
-                sig_name = sig.name
+        else: # hide all analog signal plotItems
+            for ax_ndx in analog_axes.values():
+                self.signalAxes[ax_ndx].setVisible(False)
                 
-            else:
-                sig_name = "Analog signal %d" % k
-            
-            
-            if sig.shape[1] > 10:
-                self.sig_plot.emit(self._make_sig_plot_dict_(plotItem,
-                                        sig.times,
-                                        sig.magnitude,
-                                        xlabel = "%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
-                                        ylabel = "%s (%s)" % (sig_name, signal.units.dimensionality),
-                                        name=sig_name,
-                                        symbol=None,
-                                        **kwargs))
-            else:
-                self._plot_numeric_data_(plotItem,
-                                        sig.times,
-                                        sig.magnitude,
-                                        xlabel = "%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
-                                        ylabel = "%s (%s)" % (sig_name, signal.units.dimensionality),
-                                        name=sig_name,
-                                        symbol=None,
-                                        **kwargs)
-                
-            plotItem.register(sig_name)
-            plotItem.setVisible(sig_name in selected_analog_names)
-            
-            plotItem.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
-                                               autoReduceTextSpace=False)
-            # plotItem.setTitle(plotTitle)
-            plotItem.update()
-            kAx += 1
-         
-        #### END   plot regular (analog) signals
+        #### END plot regular (analog) signals
         
-        #### BEGIN plot irregularly sampled signals
-        # for k, signal in enumerate(selected_irregs):
-        for k, signal in enumerate(irregs):
-            # plotItem = self.signalsLayout.getItem(kAx, 0)
-            plotItem = self._signal_axes_[kAx]
-            if isinstance(signal, neo.IrregularlySampledSignal):
-                domain_name = "Time"
-                
-            else:
-                domain_name = signal.domain_name # alternative is a IrregularlySampledDataSignal
-        
-            if self.plot_start is not None:
-                if self.plot_stop is not None:
-                    sig = signal.time_slice(self.plot_start, self.plot_stop)
-                    
+        #### BEGIN plot irregular signals
+        if self._plot_irregularsignals_: # flag set up by `Irregular` checkbox
+            selected_irregs, selected_irreg_names, selected_irreg_ndx = self._signals_select_(irregs, self.irregularSignalComboBox)
+            
+            for k, signal in enumerate(irregs):
+                ax_ndx = irregs_axes[k]
+                plotItem = self.signalAxes[ax_ndx]
+                if k in selected_irreg_ndx:
+                    # if new_data:
+                    if self._new_frame_:
+                        sig_name = selected_irreg_names[selected_irreg_ndx.index(k)]
+                        self._plot_signal_data_(signal, sig_name, plotItem, *args, **kwargs)
+            
+                    plotItem.setVisible(True)
                 else:
-                    sig = signal.time_slice(self.plot_start, signal.t_top)
-                    
-            else:
-                if self.plot_stop is not None:
-                    sig = signal.time_slice(signal.t_start, self.plot_stop)
-                    
-                else:
-                    sig = signal
-                        
-            
-            if sig.shape[1] > 10:
-                self.sig_plot.emit(self._make_sig_plot_dict_(plotItem,
-                                        sig.times,
-                                        sig.magnitude,
-                                        xlabel = "Time (%s)" % sig.t_start.units.dimensionality,
-                                        ylabel = "%s (%s)" % (sig.name, signal.units.dimensionality),
-                                        symbol = None,
-                                        name=sig.name,
-                                        **kwargs))
-            else:
-                self._plot_numeric_data_(plotItem,
-                                        sig.times,
-                                        sig.magnitude,
-                                        xlabel = "Time (%s)" % sig.t_start.units.dimensionality,
-                                        ylabel = "%s (%s)" % (sig.name, signal.units.dimensionality),
-                                        symbol = None,
-                                        name = sig.name,
-                                        **kwargs)
-            
-            plotItem.register(sig_name)
-            plotItem.setVisible(sig_name in selected_irregs_names)
-            
-            plotItem.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
-                                               autoReduceTextSpace=False)
-            plotItem.update()
-            kAx += 1
-        
-        #### END   plot irregularly sampled signals
-        
-        #### BEGIN plot spike trains
-        if len(spiketrains):
-            # plot all spike trains in this segment stacked in a single axis
-            # self._spiketrains_axis_ = self.signalsLayout.getItem(kAx,0)
-            
-            # NOTE: 2022-11-29 23:09:46
-            # try to see if we can set this to a smaller height; currently it has the same expanding policy as axes for signals
-            self._spiketrains_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
-                                                                 QtWidgets.QSizePolicy.Minimum, 
-                                                                 QtWidgets.QSizePolicy.Frame))
-            
-            symbolcolors = cycle(self.defaultLineColorsList)
-            symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
-            symbolPen.setCosmetic(True)
-            
-            
-            labelStyle = {"color": "#000000"}
-            
-            height_interval = 1/len(spiketrains) 
-            
-            self._plot_discrete_entities_(spiketrains, axis=self._spiketrains_axis_, **kwargs)
-            self._spiketrains_axis_.setVisible(True)
-            self._spiketrains_axis_.update()
-            kAx +=1
+                    plotItem.setVisible(False)
         else:
-            self._spiketrains_axis_.setVisible(False)
-            
-        #### END plot spike trains
+            for ax_ndx in irregs_axes.values():
+                self.signalAxes[ax_ndx].setVisible(False)
+                # ax_ndx += 1
+        #### END plot irregular signals
         
-        #### BEGIN plot events
-        if isinstance(events, (tuple, list)) and len(events):
-            # plot all event arrays in this segment stacked in a single axis
-            #print("_plotSegment_ events", kAx)
-            # event_axis = self.signalsLayout.getItem(kAx, 0)
-            
-            # NOTE: 2022-11-29 23:14:42 see NOTE: 2022-11-29 23:09:46
-            self._events_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
-                                                           QtWidgets.QSizePolicy.Minimum, 
-                                                           QtWidgets.QSizePolicy.Frame))
-            
-            symbolcolors = cycle(self.defaultLineColorsList)
-            symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
-            symbolPen.setCosmetic(True)
-            
-            labelStyle = {"color": "#000000"}
-            
-            height_interval = 1/len(events)
-            
-            self._plot_discrete_entities_(events, axis=kAx, **kwargs)
-            self._events_axis_.setVisible(True)
-            self._events_axis_.update() 
-            kAx +=1
-            
-        else:
-            self._events_axis_.setVisible(False)
-            
-            
-        #### END plot events
-        
-        #### BEGIN plot epochs
-        # common logic for stand-alone epochs and for epochs associated with
-        # a neo.Segment
-        self._plotEpochs_(seg.epochs)
-        #### END plot epochs
-        
-        # hide X axis spine in all but the last signal axes only if all signals
-        # in the segment share the domain
-        
-        for k_ax in range(0, kAx-1):
-            plotitem = self.signalsLayout.getItem(k_ax,0)
-            if isinstance(plotitem, pg.PlotItem):
-                # self.signalsLayout.getItem(k_ax,0).hideAxis("bottom")
-                # NOTE: 2022-11-21 13:32:52
-                # completely hiding the bottom axis prevents grid display on X
-                # because in PyQtGraph the grid is made of extended tickmarks;
-                # therefore keep this axis showing, but without axis label and
-                # without values attached to th tick marks
-                self.signalsLayout.getItem(k_ax,0).getAxis("bottom").showLabel(False)
-                self.signalsLayout.getItem(k_ax,0).getAxis("bottom").setStyle(showValues=False)
-        
-        if not isinstance(plotTitle, str) or len(plotTitle.strip()) == 0:
-            if isinstance(seg.name, str) and len(seg.name.strip()):
-                self.plotTitleLabel.setText(seg.name, color = "#000000")
-                
-            else:
-                self.plotTitleLabel.setText("", color = "#000000")
-                
-        else:
-            self.plotTitleLabel.setText(plotTitle, color = "#000000")
-            
-        if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
-            self.docTitle = seg.name
-            
     @safeWrapper
     def _plotNumpyArrays_(self, x, y, plotLabelText = None, *args, **kwargs):
         """Plots several signals in one frame"""
