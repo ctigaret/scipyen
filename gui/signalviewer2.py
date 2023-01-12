@@ -1633,11 +1633,11 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     # def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list], axis:typing.Optional[int]=None, clear:bool=True, **kwargs):
     @safeWrapper
-    def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list], axis:pg.PlotItem, clear:bool=True, auto_X_range:bool=False, **kwargs):
+    def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list], axis:pg.PlotItem, clear:bool=True, adapt_X_range:bool=False, **kwargs):
         """For plotting events and spike trains on their own (separate) axis
         Epochs & DataZones are represented as regions between vertical lines 
         across all axes, and therefore they are not dealt with, here.
-        auto_X_range determines the x range (you may want to pass a custom one if needed)
+        adapt_X_range determines the x range (you may want to pass a custom one if needed)
         """
         if len(entities) == 0:
             return
@@ -1720,6 +1720,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 x_min = min((float(t.t_start) for t in entities_list))
                 x_max = max((float(t.t_stop) for t in entities_list))
                 
+                entities_axis.clear()
+                
                 for k_train, train in enumerate(entities_list):
                     data_name = getattr(train, "name", None)
                     data_name = data_name if isinstance(data_name, str) and len(data_name.strip()) else "%d" % k_train
@@ -1727,27 +1729,36 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     x = train.times.magnitude.flatten() # vector
                     y = np.full(x.shape, height_interval * k_train + height_interval/2) # column vector
                         
-                    trains_x_list.append(x)
-                    trains_y_list.append(y)
-                    
-                    xx_ = np.concatenate(trains_x_list, axis=np.newaxis)
-                    yy_ = np.concatenate(trains_y_list, axis=np.newaxis)
-                    
-                    #print("spiketrains xx_.shape", xx_.shape, "yy_.shape", yy_.shape, "self.dataAxis", self.dataAxis, "self.signalChannelAxis", self.signalChannelAxis)
-                    
-                    if yy_.ndim > 1 and yy_.shape[self.signalChannelAxis] > 10:
-                        self.sig_plot.emit(self._make_sig_plot_dict_(entities_axis, xx_, yy_, symbol="spike",
+                    self._plot_numeric_data_(entities_axis, x, y, 
+                                                symbol="spike",
                                                 pen=None, name=data_name,
-                                                symbolPen=QtGui.QPen(QtGui.QColor(next(symbolcolors)))))
-                    else:
-                        self._plot_numeric_data_(entities_axis, xx_, yy_, symbol="spike",
-                                                pen=None, name=data_name,
-                                                symbolPen=QtGui.QPen(QtGui.QColor(next(symbolcolors))))
+                                                symbolPen=QtGui.QPen(QtGui.QColor(next(symbolcolors))),
+                                                clearItems=False)
+#                     trains_x_list.append(x)
+#                     trains_y_list.append(y)
+#                     
+#                     xx_ = np.concatenate(trains_x_list, axis=np.newaxis)
+#                     yy_ = np.concatenate(trains_y_list, axis=np.newaxis)
+#                     
+#                     #print("spiketrains xx_.shape", xx_.shape, "yy_.shape", yy_.shape, "self.dataAxis", self.dataAxis, "self.signalChannelAxis", self.signalChannelAxis)
+#                     
+#                     if yy_.ndim > 1 and yy_.shape[self.signalChannelAxis] > 10:
+#                         self.sig_plot.emit(self._make_sig_plot_dict_(entities_axis, xx_, yy_, 
+#                                                                      symbol="spike",
+#                                                                      pen=None, name=data_name,
+#                                                                      symbolcolorcycle = symbolcolors))
+#                                                                      # symbolPen=QtGui.QPen(QtGui.QColor(next(symbolcolors)))))
+#                     else:
+#                         self._plot_numeric_data_(entities_axis, xx_, yy_, 
+#                                                  symbol="spike",
+#                                                  pen=None, name=data_name,
+#                                                  symbolcolorcycle = symbolcolors)
+#                                                  # symbolPen=QtGui.QPen(QtGui.QColor(next(symbolcolors))))
                         
                 yLabel = "Spike Trains"
                 
                 
-                if auto_X_range:
+                if adapt_X_range:
                     entities_axis.setXRange(x_min, x_max)
                 
             elif all(isinstance(v, pg.TargetItem) for v in entities_list):
@@ -2918,6 +2929,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def var_observer(self, change):
         # print(f"{self.__class__.__name__}.var_observer change = {change}")
         self.displayFrame()
+        # self.currentFrame = self._current_frame_index_
         
 
     def linkCursors(self, id1, *ids):
@@ -6845,6 +6857,10 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #     self.axes[-1].showAxes([True, False, False, True], showValues=[True, False, False, True])
             
             
+        for ax in self.axes:
+            if ax.isVisible():
+                ax.getAxis("left").setWidth(60)
+        
                         
     @safeWrapper
     def _plotSpikeTrains_(self, trains:typing.Optional[typing.Union[neo.SpikeTrain, neo.core.spiketrainlist.SpikeTrainList, tuple, list]] = None, clear:bool = False, plotLabelText = None, **kwargs):
@@ -7225,7 +7241,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
 #                 
 #                 height_interval = 1/len(spiketrains) 
                 
-                kwargs["auto_X_range"] = True
+                kwargs["adapt_X_range"] = True
                 
                 self._plot_discrete_entities_(spiketrains, axis=self._spiketrains_axis_, **kwargs)
                 
@@ -7262,28 +7278,29 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._events_axis_.setVisible(False)
             
         visibleAxes = [i for i in self.signalAxes if i.isVisible()]
+        
         for k, plotItem in enumerate(visibleAxes):
             test = k == len(visibleAxes)-1
             plotItem.getAxis("bottom").showLabel(test)
             plotItem.getAxis("bottom").setStyle(showValues=test)
 
         # align left axis for all plot items for signals
-        maxLeftAxisWidth = max(ax.getAxis("left").width() for ax in visibleAxes)
-        
-        print(f"maxLeftAxisWidth {maxLeftAxisWidth}")
+#         maxLeftAxisWidth = max(ax.getAxis("left").width() for ax in visibleAxes)
+#         
+#         print(f"maxLeftAxisWidth {maxLeftAxisWidth}")
         
         # for ax in visibleAxes:
         #     ax.getAxis("left").setWidth(maxLeftAxisWidth)
 
         if self._spiketrains_axis_.isVisible():
             self._spiketrains_axis_.getAxis("bottom").showLabel(False)
-            self._spiketrains_axis_.getAxis("bottom").setStyle(showValues=False)
+            # self._spiketrains_axis_.getAxis("bottom").setStyle(showValues=False)
             # also align to left
             # self._spiketrains_axis_.getAxis("left").setWidth(maxLeftAxisWidth)
             
         if self._events_axis_.isVisible():
             self._events_axis_.getAxis("bottom").showLabel(False)
-            self._events_axis_.getAxis("bottom").setStyle(showValues=False)
+            # self._events_axis_.getAxis("bottom").setStyle(showValues=False)
             # also align to left
             # self._events_axis_.getAxis("left").setWidth(maxLeftAxisWidth)
             
@@ -8236,7 +8253,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         plotItem.update()
         
     @safeWrapper
-    def _plot_numeric_data_(self, plotItem: pg.PlotItem, x:np.ndarray, y:np.ndarray, xlabel:(str, type(None))=None, ylabel:(str, type(None))=None, title:(str, type(None))=None, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
+    def _plot_numeric_data_(self, plotItem: pg.PlotItem, x:np.ndarray, y:np.ndarray, xlabel:(str, type(None))=None, ylabel:(str, type(None))=None, title:(str, type(None))=None, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, clearItems:bool = True, *args, **kwargs):
         """ The workhorse that does the actual plotting of signals
         Parameters:
         ----------
@@ -8258,12 +8275,25 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
         symbolcolorcycle: itertools.cycle for colors ; optional, default is None
             Used when there are several channels for the Y data
+        
+        cleaItems:bool, default is True, meaning that existing PlotDataItem will
+            be reused to plot the data channels, new PlotDataItems will be added
+            if necessry, and excess PlotDataItems (if they exist) will be removed.
+            
+            When False, new PlotDataItems will be added to the axis (PlotItem)
+            - useful to plot several data arrays without overwriting exising
+            plots (e.g. inside a loop), when the arrays cannot be conatenated 
+            in a single matrix due to shape constraints. NOTE: In this case you 
+            should clear the plotitem (the axis) beforehand.
             
         args, kwargs: additional parameters for PlotItem.plot() function (and
             indirectly PlotDataItem constructor and methods).
             See pyqtgraph PlotItem.plot() and pyqtgrapg PlotDataItem
     
             symbol
+            pen
+            symbolPen
+            
         
         Returns
         ------
@@ -8271,8 +8301,6 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         """
         # ATTENTION: y is a numpy arrays here; x is either None, or a numpy array
-        
-        #traceback.print_stack(limit=8)
         
         #### BEGIN debug
         # stack = inspect.stack()
@@ -8285,6 +8313,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if y.ndim > 2:
             raise TypeError("y expected to be an array with up to 2 dimensions; for %s dimensions instead" % y.ndim)
         
+        # print(f"_plot_numeric_data_: y dims = {y.ndim}")
         dataAxis = self.dataAxis if isinstance(self.dataAxis, int) else 0
         
         # NOTE: 2019-04-06 09:37:51 
@@ -8350,21 +8379,25 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 xx = None
             
             # print(f"{self.__class__.__name__}._plot_numeric_data_ y.ndim == 1; plotdataitem kwargs {kwargs}")
-            # NOTE 2019-09-15 18:53:56:
-            # FIXME find a way to circumvent clearing the plotItem in prepareAxes
-            # beacuse it causes too much flicker
-            # see NOTE 2019-09-15 18:53:40
-            if len(plotDataItems):
-                if len(plotDataItems) > 1:
-                    for item in plotDataItems[1:]:
-                        plotItem.removeItem(item)
-                        
-                plotDataItems[0].clear()
-                if xx is not None:
-                    plotDataItems[0].setData(x=xx, y=yy, **kwargs)
+            
+            if clearItems:
+                if len(plotDataItems):
+                    if len(plotDataItems) > 1:
+                        for item in plotDataItems[1:]:
+                            plotItem.removeItem(item)
+                            
+                    plotDataItems[0].clear()
+                    if xx is not None:
+                        plotDataItems[0].setData(x=xx, y=yy, **kwargs)
+                    else:
+                        plotDataItems[0].setData(y=yy, **kwargs)
+                    
                 else:
-                    plotDataItems[0].setData(y=yy, **kwargs)
-                
+                    if xx is not None:
+                        plotItem.plot(x=xx, y=yy, **kwargs)
+                    else:
+                        plotItem.plot(y=yy, **kwargs)
+                        
             else:
                 if xx is not None:
                     plotItem.plot(x=xx, y=yy, **kwargs)
@@ -8372,21 +8405,12 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     plotItem.plot(y=yy, **kwargs)
         
         elif y.ndim == 2:
-            # if y.shape[0] == 1:
-            #     y = y.T
-                
-            # if y.shape[0] < y.shape[1]:
-            #     y = y.T
-                
             colors = cycle(self.defaultLineColorsList)
             
-            if y.shape[1] < len(plotDataItems):
+            if clearItems and y.shape[1] < len(plotDataItems):
                 for item in plotDataItems[y.shape[1]:]:
                     plotItem.removeItem(item)
             
-            # for k in range(y.shape[self.signalChannelAxis]):
-            #     y_ = np.atleast_1d(y[array_slice(y, {self.signalChannelAxis:k})].squeeze())
-                
             # print("y.shape", y.shape)
             for k in range(y.shape[1]):
                 y_ = np.atleast_1d(y[array_slice(y, {1:k})].squeeze())
@@ -8445,27 +8469,30 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     else:
                         kwargs["symbolPen"] = symbolPen # same symbol pen as defined above!
                         
-                # print(f"{self.__class__.__name__}._plot_numeric_data_ y.ndim == 2; k = {k}; plotdataitem kwargs {kwargs}")
-                if k < len(plotDataItems):
-                    plotDataItems[k].clear()
-                    if xx is not None:
-                        plotDataItems[k].setData(x = xx, y = yy, **kwargs)
+                if clearItems:
+                    if k < len(plotDataItems):
+                        plotDataItems[k].clear()
+                        if xx is not None:
+                            plotDataItems[k].setData(x = xx, y = yy, **kwargs)
+                        else:
+                            plotDataItems[k].setData(y = yy, **kwargs)
+                        
                     else:
-                        plotDataItems[k].setData(y = yy, **kwargs)
-                    
+                        if xx is not None:
+                            plotItem.plot(x = xx, y = yy, **kwargs)
+                        else:
+                            plotItem.plot(y = yy, **kwargs)
+                            
                 else:
                     if xx is not None:
                         plotItem.plot(x = xx, y = yy, **kwargs)
                     else:
                         plotItem.plot(y = yy, **kwargs)
-
         
         plotItem.setLabels(bottom = [xlabel], left=[ylabel])
         
         if isinstance(title, str) and len(title.strip()):
             plotItem.setTitle(title)
-        
-        # plotItem.replot()
         
         if plotItem is self._current_plot_item_:
             lbl = "<B>%s</B>" % self._current_plot_item_.axes["left"]["item"].labelText
@@ -8478,7 +8505,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 lbl = lbl[3 : lbl.find("</B>")]
                 plotItem.setLabel("left", lbl)
         
-        plotItem.replot()
+        plotItem.replot() # must be called NOW, and NOT earlier !
         return plotItem
     
     def _remove_axes_(self, plotItem:pg.PlotItem):
