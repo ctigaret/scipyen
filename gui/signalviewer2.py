@@ -692,6 +692,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self._plot_analogsignals_ = True
         self._plot_irregularsignals_ = True
+        self._plot_spiketrains_ = True
+        self._plot_events_ = True
         #### END GUI signal selectors and options for compound neo objects
         #### END options for neo objects
         #### END attributes controlling neo object representations
@@ -976,19 +978,6 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._frames_spinBoxSlider_.setRange(0, self._number_of_frames_)
         self._frames_spinBoxSlider_.valueChanged.connect(self.slot_setFrameNumber) # slot inherited from ScipyenFrameViewer
 
-#         self.framesQSlider.setMinimum(0)
-#         self.framesQSlider.setMaximum(0)
-#         self.framesQSlider.valueChanged.connect(self.slot_setFrameNumber)
-#         
-#         self._frames_slider_ = self.framesQSlider
-        
-        # self.framesQSpinBox.setKeyboardTracking(False)
-        # self.framesQSpinBox.setMinimum(0)
-        # self.framesQSpinBox.setMaximum(0)
-        # self.framesQSpinBox.valueChanged.connect(self.slot_setFrameNumber)
-        
-        # self._frames_spinner_ = self.framesQSpinBox
-        
         # FIXME/TODO? 2022-11-17 09:59:51
         # what's this for?
         # self.signalsMenu = QtWidgets.QMenu("Signals", self)
@@ -998,14 +987,19 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.analogSignalComboBox.currentIndexChanged[int].connect(self.slot_analogSignalsComboBoxIndexChanged)
         
         self.plotAnalogSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
-        self.plotAnalogSignalsCheckBox.stateChanged[int].connect(self.slot_plotAnalogSignalsCheckStateChanged)
+        self.plotAnalogSignalsCheckBox.stateChanged[int].connect(self._slot_plotAnalogSignalsCheckStateChanged_)
         
         self.irregularSignalComboBox.clear()
         self.irregularSignalComboBox.setCurrentIndex(0)
         self.irregularSignalComboBox.currentIndexChanged[int].connect(self.slot_irregularSignalsComboBoxIndexChanged)
         
         self.plotIrregularSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
-        self.plotIrregularSignalsCheckBox.stateChanged[int].connect(self.slot_plotIrregularSignalsCheckStateChanged)
+        self.plotIrregularSignalsCheckBox.stateChanged[int].connect(self._slot_plotIrregularSignalsCheckStateChanged_)
+        
+        self.spikeTrainsCheckBox.setCheckState(QtCore.Qt.Checked)
+        self.spikeTrainsCheckBox.stateChanged[int].connect(self._slot_plotSpikeTrainsCheckStateChanged_)
+        self.eventsCheckBox.setCheckState(QtCore.Qt.Checked)
+        self.eventsCheckBox.stateChanged[int].connect(self._slot_plotEventsCheckStateChanged_)
         
         #### BEGIN set up annotations dock widget
         #print("_configureUI_ sets up annotations dock widget")
@@ -2713,23 +2707,25 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._new_frame_ = True
         
     @pyqtSlot(int)
-    @safeWrapper
-    def slot_plotAnalogSignalsCheckStateChanged(self, state):
-        if state == QtCore.Qt.Checked:
-            self._plot_analogsignals_ = True
-            
-        else:
-            self._plot_analogsignals_ = False
-            
+    def _slot_plotSpikeTrainsCheckStateChanged_(self, state):
+        self._plot_spiketrains_ = state == QtCore.Qt.Checked
+        self.displayFrame()
+        
+    @pyqtSlot(int)
+    def _slot_plotEventsCheckStateChanged_(self, state):
+        self._plot_events_ = state == QtCore.Qt.Checked
+        self.displayFrame()
+        
     @pyqtSlot(int)
     @safeWrapper
-    def slot_plotIrregularSignalsCheckStateChanged(self, state):
-        if state == QtCore.Qt.Checked:
-            self._plot_irregularsignals_ = True
-            
-        else:
-            self._plot_irregularsignals_ = False
-            
+    def _slot_plotAnalogSignalsCheckStateChanged_(self, state):
+        self._plot_analogsignals_ = state == QtCore.Qt.Checked
+        self.displayFrame()
+
+    @pyqtSlot(int)
+    @safeWrapper
+    def _slot_plotIrregularSignalsCheckStateChanged_(self, state):
+        self._plot_irregularsignals_ = state == QtCore.Qt.Checked
         self.displayFrame()
         
     @pyqtSlot()
@@ -6538,10 +6534,22 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # self.displayFrame()
         
     @safeWrapper
-    def displayFrame(self):
+    def displayFrame(self, new_data:bool=True):
         """ Plots individual frame (data "sweep" or "segment")
         
         Implements gui.scipyenviewer.ScipyenFrameViewer.displayFrame
+        
+        Parameters:
+        -----------
+        new_data: optional, default is True
+            By default this is called whenever new data has been passed to the
+            signal viewer to be plotted.
+        
+            The exceptions are when there is only a change in axes' visibility
+            but the data had not been changed. In this case it is recommended
+            to pass new-data=False to avoid unnecessary function calls related
+            to plotting the same data again
+            
         
         Delegates plotting as follows:
         ------------------------------
@@ -6578,7 +6586,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         # print(f"SignalViewer2.displayFrame {self._yData_}")
         
-        self._plot_data_(self._yData_, *self.plot_args, **self.plot_kwargs)
+        self._plot_data_(self._yData_, new_data=new_data, *self.plot_args, **self.plot_kwargs)
         
 #         #### BEGIN self._yData_ is a sequence of objects
 #         if isinstance(self._yData_, (tuple, list)): 
@@ -6851,11 +6859,6 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if len(targetItems):
                     for tgt in targetItems:
                         ax.addItem(tgt)
-                        
-        # if len(self.axes):
-        #     self.axes[-1].showAxis("bottom", True)
-        #     self.axes[-1].showAxes([True, False, False, True], showValues=[True, False, False, True])
-            
             
         for ax in self.axes:
             if ax.isVisible():
@@ -7118,11 +7121,11 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.plotTitleLabel.setText(plotLabelText, color = "#000000")
             
     @singledispatchmethod
-    def _plot_data_(self, obj, *args, **kwargs):
+    def _plot_data_(self, obj, new_data:bool=True, *args, **kwargs):
         raise NotImplementedError(f"Objects of type {type(obj).__name__} are not supported")
     
     @_plot_data_.register(neo.Block)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj, new_data:bool=True, *args, **kwargs):
         # NOTE: 2019-11-24 22:31:26
         # select a segment then delegate to _plotSegment_()
         # Segment selection is based on self.frameIndex, or on self.channelIndex
@@ -7147,7 +7150,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
     
     @_plot_data_.register
-    def _(self, obj:neo.Segment, *args, **kwargs):
+    def _(self, obj:neo.Segment, new_data:bool=True, *args, **kwargs):
         """Plots a neo.Segment.
         Plots the signals (optionally the selected ones) present in a segment, 
         and the associated epochs, events, and spike trains.
@@ -7166,6 +7169,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         selected_analogs = list()
         selected_analog_names = list()
         selected_analog_ndx = list()
+        
         selected_irregs = list()
         selected_irreg_names = list()
         selected_irreg_ndx = list()
@@ -7183,24 +7187,25 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if k in selected_analog_ndx:
                     # NOTE: 2023-01-04 22:14:55
                     # avoid plotting if frame hasn't changed - just change plotItem's visibility
+                    # if new_data: 
                     if self._new_frame_: 
                         sig_name = selected_analog_names[selected_analog_ndx.index(k)]
                         self._plot_signal_data_(signal, sig_name, plotItem, *args, **kwargs)
                         
                     plotItem.setVisible(True)
                     
-                    # print(f"plotItem {ax_ndx} left axis width {plotItem.getAxis('left').width()}")
-    
                 else:
                     plotItem.setVisible(False)
                     
                 ax_ndx += 1
 
         else: # hide all analog signal plotItems
-            for k, in range(len(analog)):
-                plotItem = self.signalAxes[ax_ndx]
-                plotItem.setVisible(False)
-                ax_ndx += 1
+            for ax in self.signalAxes:
+                ax.setVisible(False)
+            # for k, in range(len(analog)):
+            #     plotItem = self.signalAxes[ax_ndx]
+            #     plotItem.setVisible(False)
+            #     ax_ndx += 1
                 
         #### END plot regular (analog) signals
         
@@ -7211,12 +7216,12 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             for k, signal in enumerate(irregs):
                 plotItem = self.signalAxes[ax_ndx]
                 if k in selected_irreg_ndx:
-                    if self._new_frame:
+                    # if new_data:
+                    if self._new_frame_:
                         sig_name = selected_irreg_names[selected_irreg_ndx.index(k)]
                         self._plot_signal_data_(signal, sig_name, plotItem, *args, **kwargs)
             
                     plotItem.setVisible(True)
-                    # print(f"plotItem {ax_ndx} left axis width {plotItem.getAxis('left').width()}")
                 else:
                     plotItem.setVisible(False)
         else:
@@ -7226,56 +7231,38 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 ax_ndx += 1
         #### END plot irregular signals
 
-        if len(spiketrains):
-            if self._new_frame_:
-                # plot all spike trains in this segment stacked in a single axis
-                self._spiketrains_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
-                                                                    QtWidgets.QSizePolicy.Minimum, 
-                                                                    QtWidgets.QSizePolicy.Frame))
-                
-#                 symbolcolors = cycle(self.defaultLineColorsList)
-#                 symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
-#                 symbolPen.setCosmetic(True)
-#                 
-#                 labelStyle = {"color": "#000000"}
-#                 
-#                 height_interval = 1/len(spiketrains) 
-                
-                kwargs["adapt_X_range"] = True
-                
-                self._plot_discrete_entities_(spiketrains, axis=self._spiketrains_axis_, **kwargs)
-                
-                # if len(self.signalAxes):
-                #     xmin, xman = zip(*list((ax.viewRange[0][0], ax.viewRange))) 
-                #     min(ax.viewRange[0][0] for ax in self.signalAxes)
-                #     xmax = max(ax.view)
-                self._spiketrains_axis_.update()
-                
-            self._spiketrains_axis_.setVisible(True)
-        else:
-            self._spiketrains_axis_.setVisible(False)
+        if self._plot_spiketrains_:
+            if len(spiketrains):
+                if new_data:
+                    # plot all spike trains in this segment stacked in a single axis
+                    self._spiketrains_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
+                                                                        QtWidgets.QSizePolicy.Minimum, 
+                                                                        QtWidgets.QSizePolicy.Frame))
+                    
+                    kwargs["adapt_X_range"] = True
+                    
+                    self._plot_discrete_entities_(spiketrains, axis=self._spiketrains_axis_, **kwargs)
+                    
+                    self._spiketrains_axis_.update()
+                    
+                self._spiketrains_axis_.setVisible(True)
+            else:
+                self._spiketrains_axis_.setVisible(False)
             
-        if isinstance(events, (tuple, list)) and len(events):
-            if self._new_frame_:
-                self._events_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
-                                                            QtWidgets.QSizePolicy.Minimum, 
-                                                            QtWidgets.QSizePolicy.Frame))
+        if self._plot_events_:
+            if isinstance(events, (tuple, list)) and len(events):
+                if self._new_frame_:
+                    self._events_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
+                                                                QtWidgets.QSizePolicy.Minimum, 
+                                                                QtWidgets.QSizePolicy.Frame))
+                    
+                    self._plot_discrete_entities_(events, axis=kAx, **kwargs)
+                    self._events_axis_.update() 
+                    
+                self._events_axis_.setVisible(True)
                 
-#                 symbolcolors = cycle(self.defaultLineColorsList)
-#                 symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
-#                 symbolPen.setCosmetic(True)
-#                 
-#                 labelStyle = {"color": "#000000"}
-#                 
-#                 height_interval = 1/len(events)
-                
-                self._plot_discrete_entities_(events, axis=kAx, **kwargs)
-                self._events_axis_.update() 
-                
-            self._events_axis_.setVisible(True)
-            
-        else:
-            self._events_axis_.setVisible(False)
+            else:
+                self._events_axis_.setVisible(False)
             
         visibleAxes = [i for i in self.signalAxes if i.isVisible()]
         
@@ -7284,26 +7271,12 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             plotItem.getAxis("bottom").showLabel(test)
             plotItem.getAxis("bottom").setStyle(showValues=test)
 
-        # align left axis for all plot items for signals
-#         maxLeftAxisWidth = max(ax.getAxis("left").width() for ax in visibleAxes)
-#         
-#         print(f"maxLeftAxisWidth {maxLeftAxisWidth}")
-        
-        # for ax in visibleAxes:
-        #     ax.getAxis("left").setWidth(maxLeftAxisWidth)
 
         if self._spiketrains_axis_.isVisible():
             self._spiketrains_axis_.getAxis("bottom").showLabel(False)
-            # self._spiketrains_axis_.getAxis("bottom").setStyle(showValues=False)
-            # also align to left
-            # self._spiketrains_axis_.getAxis("left").setWidth(maxLeftAxisWidth)
             
         if self._events_axis_.isVisible():
             self._events_axis_.getAxis("bottom").showLabel(False)
-            # self._events_axis_.getAxis("bottom").setStyle(showValues=False)
-            # also align to left
-            # self._events_axis_.getAxis("left").setWidth(maxLeftAxisWidth)
-            
             
         seg_name = getattr(obj, "name", "")
         
@@ -7321,7 +7294,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @_plot_data_.register(neo.IrregularlySampledSignal)
     @_plot_data_.register(DataSignal)
     @_plot_data_.register(IrregularlySampledDataSignal)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj, new_data=True, *args, **kwargs):
         if self.frameAxis == 1:
             if self._current_frame_index_ in self.frameIndex:
                 ndx = self.frameIndex[self._current_frame_index_]
@@ -7335,7 +7308,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
     @_plot_data_.register(neo.Epoch)
     @_plot_data_.register(DataZone)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj, new_data=True, *args, **kwargs):
         x_min, x_max = (self._yData_[0], self._yData_[-1] + self._yData_.durations[-1])
         # self._prepareAxes_(1)
         # FIXME/BUG 2023-01-11 15:54:38
@@ -7344,15 +7317,15 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
     @_plot_data_.register(neo.Event)
     @_plot_data_.register(DataMark)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj, new_data=True, *args, **kwargs):
         self._plotEvents_(obj)
     
     @_plot_data_.register
-    def _(self, obj:neo.SpikeTrain, *args, **kwargs):
+    def _(self, obj:neo.SpikeTrain, new_data=True, *args, **kwargs):
         self._plotSpikeTrains_(obj)
         
     @_plot_data_.register
-    def _(self, obj:np.ndarray, *args, **kwargs):
+    def _(self, obj:np.ndarray, new_data=True, *args, **kwargs):
         try:
             if self._yData_.ndim > 3:
                 raise TypeError("Numpy arrays with more than three dimensions are not supported")
@@ -7363,12 +7336,12 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             traceback.print_exc()
             
     @_plot_data_.register
-    def _(self, obj:type(None), *args, **kwargs):
+    def _(self, obj:type(None), new_data=True, *args, **kwargs):
         pass
     
     @_plot_data_.register(tuple)
     @_plot_data_.register(list)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj, new_data=True, *args, **kwargs):
         if all([isinstance(y_, (DataSignal, 
                                 neo.core.AnalogSignal, 
                                 neo.core.IrregularlySampledSignal,
@@ -7400,7 +7373,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._plot_data_(self._yData_[ndx], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
                 # self._plotSignal_(self._yData_[ndx], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
                 self.currentFrameAnnotations = {type(self._yData_[ndx]).__name__: self._yData_[ndx].annotations}
-                
+                self.spikeTrainsAxis.setVisible(False)
+                self.eventsAxis.setVisible(False)
 
         elif all([isinstance(y_, (neo.core.Epoch, DataZone)) for y_ in self._yData_]): 
             # plot Epoch(s) independently of data; there is a single frame
@@ -8596,9 +8570,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._signal_axes_ = self._signal_axes_[:self._n_signal_axes_]
                 
         else: 
-            # there already are as many PlotItems for signals, as needed
+            # there already are as many PlotItems for signals as needed → reuse
             for k, plotItem in enumerate(self.signalAxes):
-                # re-use them
                 plotname = f"signal_axis_{k}"
                 plotItem.register(plotname)
                 # plotItem.vb.unregister()
