@@ -3123,7 +3123,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """Creates a cursor.
         kwargs: var-keyword parameters for SignalCursor constructor (pen, etc)
         """
-        #print("_addCursor_ x,y", x, y)
+        # print(f"{self.__class__.__name__}_addCursor_ cursor_type = {cursor_type}, x = {x} ,y = {y}, xwindow = {xwindow}, ywindow = {ywindow},xBounds = {xBounds},yBounds = {yBounds}, axis={axis}, label= {label}, follows_mouse = {follows_mouse}")
         
         if xwindow is None:
             xwindow = self.defaultCursorWindowSizeX
@@ -3148,7 +3148,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # plot items (axes); nevertheless the cursor can and should be added
         # to the GraphicsScene
         if len(self.signalsLayout.items) == 0:
-            axis = self.signalsLayout.scene() # a pg.GraphicsScene
+            axis = self.signalsLayout.scene() # force adding to the pg.GraphicsScene when there are not plot items available
             
         elif axis is None:
             if self._current_plot_item_ is None:
@@ -3596,6 +3596,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                   label=label, follows_mouse=True)
     
     def _construct_multi_axis_vertical_(self, label=None, dynamic=False):
+        # print(f"{self.__class__.__name__}._construct_multi_axis_vertical_ label = {label}, dynamic = {dynamic}")
         # NOTE: 2020-02-26 14:37:50
         # code being migrated to _addCursor_()
         # with allowing for cursors to be added to an empty scene (i.e. with no
