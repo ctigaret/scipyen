@@ -710,9 +710,9 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #### END interval plotting
         
         #### BEGIN plot items management
-        self._focussed_plot_item_ = None
-        self._current_plot_item_ = None
-        self._current_plot_item_index_ = -1
+        self._hovered_plot_item_ = None
+        self._selected_plot_item_ = None
+        self._selected_plot_item_index_ = -1
         #### END plot items management
         
         self._mouse_coordinates_text_ = ""
@@ -2744,135 +2744,135 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def slot_reportCursorPosition(self, crsId = None):
         self.reportCursors()
         
-    @pyqtSlot(str)
-    @safeWrapper
-    def slot_reportCursorPosition2(self, crsId = None):
-        cursor = None
-        
-        if crsId is not None:
-            cursor = self.dataCursor(crsId)
-        
-        if cursor is None:
-            cursor = self.sender()
-        
-        if isinstance(cursor, SignalCursor):
-            text = []
-            
-            if cursor.isDynamic:
-                cursor_label_text = "Dynamic %s" % cursor.ID
-                    
-            else:
-                cursor_label_text = "SignalCursor %s" % cursor.ID
-                
-            if cursor.isSingleAxis:
-                if isinstance(cursor.hostItem.vb.name, str) and len(cursor.hostItem.vb.name.strip()):
-                    cursor_label_text += " in %s:" % cursor.hostItem.vb.name
-                
-                text.append(cursor_label_text)
-                
-                x = cursor.getX()
-                y = cursor.getY()
-                
-                cursor_pos_text = list()
-                
-                if cursor.cursorTypeName in ("crosshair", "vertical"):
-                    cursor_pos_text.append("X: %f" % x)
-                    
-                if cursor.cursorTypeName in ("crosshair", "horizontal"):
-                    cursor_pos_text.append("Y: %f" % y)
-                    
-                text.append("\n".join(cursor_pos_text))
-                    
-                if cursor.cursorTypeName in ("vertical", "crosshair"): 
-                    # data value reporting only makes sense for vertical cursor types
-                    data_text = []
-                    
-                    #if isinstance(cursor.hostItem, pg.PlotItem) and x is not np.nan:
-                    dataitems = cursor.hostItem.dataItems
-                    
-                    for kdata, dataitem in enumerate(dataitems):
-                        data_x, data_y = dataitem.getData()
-                        ndx = np.where(data_x >= x)[0]
-                        if len(ndx):
-                            if len(dataitems) > 1:
-                                data_text.append("Y (%d/%d): %f" % (kdata, len(dataitems), data_y[ndx[0]]))
-                                
-                            else:
-                                data_text.append("Y: %f" % data_y[ndx[0]])
-                                
-                    if len(data_text) > 1:
-                        text.append("\n".join(data_text))
-                        
-                    else:
-                        text.append(data_text[0])
-                                
-            else:
-                text.append(cursor_label_text)
-                
-                plot_item_texts = []
-                
-                for plotitem in self.plotItems:
-                    plot_item_text = list()
-                    
-                    plot_item_cursor_pos_text = list()
-                    
-                    if isinstance(plotitem.vb.name, str) and len(plotitem.vb.name.strip()):
-                        plot_item_cursor_pos_text.append("%s:"% plotitem.vb.name)
-                        
-                    x = cursor.getX(plotitem)
-                    y = cursor.getY(plotitem)
-                    
-                    if cursor.cursorTypeName in ("crosshair", "vertical"):
-                        plot_item_cursor_pos_text.append("X: %f" % x)
-                        
-                    if cursor.cursorTypeName in ("crosshair", "horizontal"):
-                        plot_item_cursor_pos_text.append("Y: %f" % y)
-                        
-                    plot_item_text.append("\n".join(plot_item_cursor_pos_text))
-                    
-                    if cursor.cursorTypeName in ("vertical", "crosshair"): 
-                        # data value reporting only makes sense for vertical cursor types
-                        data_text = []
-                        
-                        dataitems = plotitem.dataItems
-                        
-                        if len(dataitems) > 0:
-                            for kdata, dataitem in enumerate(dataitems):
-                                data_x, data_y = dataitem.getData()
-                                
-                                ndx = np.where(data_x >= x)[0]
-                                
-                                if len(ndx):
-                                    data_text.append("Y (%d/%d): %f" % (kdata, len(dataitems), data_y[ndx[0]]))
-                                    
-                        if len(data_text) > 0:
-                            plot_item_text.append("\n".join(data_text))
-                            
-                    if len(plot_item_text) > 1:
-                        plot_item_texts.append("\n".join(plot_item_text))
-                        
-                    elif len(plot_item_text) == 1:
-                        plot_item_texts.append(plot_item_text[0])
-                        
-                if len(plot_item_texts) > 1:
-                    text.append("\n".join(plot_item_texts))
-                    
-                elif len(plot_item_texts) == 1:
-                    text.append(plot_item_texts[0])
-                    
-            if len(text) > 1:
-                self._cursor_coordinates_text_ = "\n".join(text)
-                
-            elif len(text) == 1:
-                self._cursor_coordinates_text_ = text[0]
-                
-            else:
-                self._cursor_coordinates_text_ = ""
-        
-            self._update_coordinates_viewer_()
-            
-        else:
-            self._cursor_coordinates_text_ = ""
+#     @pyqtSlot(str)
+#     @safeWrapper
+#     def slot_reportCursorPosition2(self, crsId = None):
+#         cursor = None
+#         
+#         if crsId is not None:
+#             cursor = self.dataCursor(crsId)
+#         
+#         if cursor is None:
+#             cursor = self.sender()
+#         
+#         if isinstance(cursor, SignalCursor):
+#             text = []
+#             
+#             if cursor.isDynamic:
+#                 cursor_label_text = "Dynamic %s" % cursor.ID
+#                     
+#             else:
+#                 cursor_label_text = "SignalCursor %s" % cursor.ID
+#                 
+#             if cursor.isSingleAxis:
+#                 if isinstance(cursor.hostItem.vb.name, str) and len(cursor.hostItem.vb.name.strip()):
+#                     cursor_label_text += " in %s:" % cursor.hostItem.vb.name
+#                 
+#                 text.append(cursor_label_text)
+#                 
+#                 x = cursor.getX()
+#                 y = cursor.getY()
+#                 
+#                 cursor_pos_text = list()
+#                 
+#                 if cursor.cursorTypeName in ("crosshair", "vertical"):
+#                     cursor_pos_text.append("X: %f" % x)
+#                     
+#                 if cursor.cursorTypeName in ("crosshair", "horizontal"):
+#                     cursor_pos_text.append("Y: %f" % y)
+#                     
+#                 text.append("\n".join(cursor_pos_text))
+#                     
+#                 if cursor.cursorTypeName in ("vertical", "crosshair"): 
+#                     # data value reporting only makes sense for vertical cursor types
+#                     data_text = []
+#                     
+#                     #if isinstance(cursor.hostItem, pg.PlotItem) and x is not np.nan:
+#                     dataitems = cursor.hostItem.dataItems
+#                     
+#                     for kdata, dataitem in enumerate(dataitems):
+#                         data_x, data_y = dataitem.getData()
+#                         ndx = np.where(data_x >= x)[0]
+#                         if len(ndx):
+#                             if len(dataitems) > 1:
+#                                 data_text.append("Y (%d/%d): %f" % (kdata, len(dataitems), data_y[ndx[0]]))
+#                                 
+#                             else:
+#                                 data_text.append("Y: %f" % data_y[ndx[0]])
+#                                 
+#                     if len(data_text) > 1:
+#                         text.append("\n".join(data_text))
+#                         
+#                     else:
+#                         text.append(data_text[0])
+#                                 
+#             else:
+#                 text.append(cursor_label_text)
+#                 
+#                 plot_item_texts = []
+#                 
+#                 for plotitem in self.plotItems:
+#                     plot_item_text = list()
+#                     
+#                     plot_item_cursor_pos_text = list()
+#                     
+#                     if isinstance(plotitem.vb.name, str) and len(plotitem.vb.name.strip()):
+#                         plot_item_cursor_pos_text.append("%s:"% plotitem.vb.name)
+#                         
+#                     x = cursor.getX(plotitem)
+#                     y = cursor.getY(plotitem)
+#                     
+#                     if cursor.cursorTypeName in ("crosshair", "vertical"):
+#                         plot_item_cursor_pos_text.append("X: %f" % x)
+#                         
+#                     if cursor.cursorTypeName in ("crosshair", "horizontal"):
+#                         plot_item_cursor_pos_text.append("Y: %f" % y)
+#                         
+#                     plot_item_text.append("\n".join(plot_item_cursor_pos_text))
+#                     
+#                     if cursor.cursorTypeName in ("vertical", "crosshair"): 
+#                         # data value reporting only makes sense for vertical cursor types
+#                         data_text = []
+#                         
+#                         dataitems = plotitem.dataItems
+#                         
+#                         if len(dataitems) > 0:
+#                             for kdata, dataitem in enumerate(dataitems):
+#                                 data_x, data_y = dataitem.getData()
+#                                 
+#                                 ndx = np.where(data_x >= x)[0]
+#                                 
+#                                 if len(ndx):
+#                                     data_text.append("Y (%d/%d): %f" % (kdata, len(dataitems), data_y[ndx[0]]))
+#                                     
+#                         if len(data_text) > 0:
+#                             plot_item_text.append("\n".join(data_text))
+#                             
+#                     if len(plot_item_text) > 1:
+#                         plot_item_texts.append("\n".join(plot_item_text))
+#                         
+#                     elif len(plot_item_text) == 1:
+#                         plot_item_texts.append(plot_item_text[0])
+#                         
+#                 if len(plot_item_texts) > 1:
+#                     text.append("\n".join(plot_item_texts))
+#                     
+#                 elif len(plot_item_texts) == 1:
+#                     text.append(plot_item_texts[0])
+#                     
+#             if len(text) > 1:
+#                 self._cursor_coordinates_text_ = "\n".join(text)
+#                 
+#             elif len(text) == 1:
+#                 self._cursor_coordinates_text_ = text[0]
+#                 
+#             else:
+#                 self._cursor_coordinates_text_ = ""
+#         
+#             self._update_coordinates_viewer_()
+#             
+#         else:
+#             self._cursor_coordinates_text_ = ""
             
     @pyqtSlot(int)
     @safeWrapper
@@ -3151,11 +3151,11 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             axis = self.signalsLayout.scene() # force adding to the pg.GraphicsScene when there are not plot items available
             
         elif axis is None:
-            if self._current_plot_item_ is None:
+            if self._selected_plot_item_ is None:
                 axis = self.axis(0)
                 
             else:
-                axis = self._current_plot_item_
+                axis = self._selected_plot_item_
             
         elif isinstance(axis, int):
             if axis < 0 or axis >= len(self.axes):
@@ -3256,6 +3256,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
                 elif not isinstance(x, numbers.Number):
                     raise TypeError("Unexpected type for x coordinate: %s" % type(x).__name__)
+                
+                print(f"{self.__class__.__name__}._addCursor_ multi-axis x = {x}")
                 
                 if y is None:
                     y = min_point.y() + (max_point.y() - min_point.y())/2.
@@ -3472,21 +3474,21 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot()
     @safeWrapper
     def slot_addVerticalCursor(self, label = None, follows_mouse=False):
-        return self._addCursor_("vertical", axis=self._current_plot_item_, 
+        return self._addCursor_("vertical", axis=self._selected_plot_item_, 
                                   label=label, follows_mouse=follows_mouse,
                                   show_value=self.setCursorsShowValue.isChecked())
     
     @pyqtSlot()
     @safeWrapper
     def slot_addHorizontalCursor(self, label=None, follows_mouse=False):
-        return self._addCursor_("horizontal", axis=self._current_plot_item_, 
+        return self._addCursor_("horizontal", axis=self._selected_plot_item_, 
                                   label=label, follows_mouse=follows_mouse,
                                   show_value=self.setCursorsShowValue.isChecked())
         
     @pyqtSlot()
     @safeWrapper
     def slot_addCrosshairCursor(self, label=None, follows_mouse=False):
-        return self._addCursor_("crosshair", axis=self._current_plot_item_, 
+        return self._addCursor_("crosshair", axis=self._selected_plot_item_, 
                                   label=label, follows_mouse=follows_mouse,
                                   show_value=self.setCursorsShowValue.isChecked())
     
@@ -3580,19 +3582,19 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot()
     @safeWrapper
     def slot_addDynamicCrosshairCursor(self, label=None):
-        return self._addCursor_("crosshair", item=self._current_plot_item_, 
+        return self._addCursor_("crosshair", item=self._selected_plot_item_, 
                                   label=label, follows_mouse=True)
     
     @pyqtSlot()
     @safeWrapper
     def slot_addDynamicVerticalCursor(self, label=None):
-        return self._addCursor_("vertical", item=self._current_plot_item_, 
+        return self._addCursor_("vertical", item=self._selected_plot_item_, 
                                   label=label, follows_mouse=True)
     
     @pyqtSlot()
     @safeWrapper
     def slot_addDynamicHorizontalCursor(self, label=None):
-        return self._addCursor_("horizontal", item=self._current_plot_item_, 
+        return self._addCursor_("horizontal", item=self._selected_plot_item_, 
                                   label=label, follows_mouse=True)
     
     def _construct_multi_axis_vertical_(self, label=None, dynamic=False):
@@ -6265,7 +6267,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         The setter counterpart sets the current plot item to be a reference to
         the PlotItem with the specified index.
         """
-        return self._current_plot_item_
+        return self._selected_plot_item_
     
     @currentPlotItem.setter
     def currentPlotItem(self, index: typing.Union[int, pg.PlotItem]):
@@ -6277,8 +6279,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         if len(plotitems_coords) == 0:
             #QtWidgets.QMessageBox.critical(self, "Set current axes:", "Must plot something first!")
-            self._current_plot_item_ = None
-            self._current_plot_item_index_ = -1
+            self._selected_plot_item_ = None
+            self._selected_plot_item_index_ = -1
             return False
         
         plotitems, _ = zip(*plotitems_coords)
@@ -6290,28 +6292,28 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #system_palette = QtGui.QGuiApplication.palette()
         #default_border_color = self.axis(0).vb.border.color()
         
-            self._current_plot_item_ = plotitems[index]
-            self._current_plot_item_index_ = index
+            self._selected_plot_item_ = plotitems[index]
+            self._selected_plot_item_index_ = index
             
         elif isinstance (index, pg.PlotItem) and index in self.axes:
-            self._current_plot_item_ = index
-            self._current_plot_item_index_ = plotitems.index(index)
+            self._selected_plot_item_ = index
+            self._selected_plot_item_index_ = plotitems.index(index)
             
         else:
             return
             
-        self._setAxisIsActive(self._current_plot_item_, True)
+        self._setAxisIsActive(self._selected_plot_item_, True)
         self._statusNotifyAxisSelection(index)
         
         for ax in self.axes:
-            if ax is not self._current_plot_item_:
+            if ax is not self._selected_plot_item_:
                 self._setAxisIsActive(ax, False)
         
         # self.statusBar().showMessage(f"Selected axes: {index} ({self._plot_names_.get(index)})")
         
     @property
     def currentAxisIndex(self):
-        return self._current_plot_item_index_
+        return self._selected_plot_item_index_
     
     @currentAxisIndex.setter
     def currentAxisIndex(self, index:int):
@@ -6349,7 +6351,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
     def _statusNotifyAxisSelection(self, index=None):
         if index is None:
-            index = self._current_plot_item_index_
+            index = self._selected_plot_item_index_
         elif not isinstance(index, int) or index not in range(len(self.axes)):
             return
         
@@ -6791,29 +6793,29 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # CAUTION: this may NOT be the same PlotItem object!
         # also makes sure we always have an axis selected
         if len(self.plotItems):
-            if self._current_plot_item_ is None:
-                self._current_plot_item_index_ = 0 # by default
-                self._current_plot_item_ =  self.plotItems[self._current_plot_item_index_] 
+            if self._selected_plot_item_ is None:
+                self._selected_plot_item_index_ = 0 # by default
+                self._selected_plot_item_ =  self.plotItems[self._selected_plot_item_index_] 
                 
-            elif self._current_plot_item_ not in self.plotItems:
-                if self._current_plot_item_index_ < 0: # this is prev index
-                    self._current_plot_item_index_ = 0
+            elif self._selected_plot_item_ not in self.plotItems:
+                if self._selected_plot_item_index_ < 0: # this is prev index
+                    self._selected_plot_item_index_ = 0
                     
-                elif self._current_plot_item_index_ >= len(self.plotItems):
-                        self._current_plot_item_index_ = len(self.plotItems) -1
+                elif self._selected_plot_item_index_ >= len(self.plotItems):
+                        self._selected_plot_item_index_ = len(self.plotItems) -1
                     
-                self._current_plot_item_ = self.plotItems[self._current_plot_item_index_]
+                self._selected_plot_item_ = self.plotItems[self._selected_plot_item_index_]
                 
             else:
-                self._current_plot_item_index_ = self.plotItems.index(self._current_plot_item_)
+                self._selected_plot_item_index_ = self.plotItems.index(self._selected_plot_item_)
                 
-            self._setAxisIsActive(self._current_plot_item_, True)
+            self._setAxisIsActive(self._selected_plot_item_, True)
                     
         else:
             # have no axis selected as current, only when there are no axes
             # (pg.PlotItem objects)
-            self._current_plot_item_ = None
-            self._current_plot_item_index_ = -1
+            self._selected_plot_item_ = None
+            self._selected_plot_item_index_ = -1
                     
         self._update_annotations_()
         
@@ -8122,9 +8124,9 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(title, str) and len(title.strip()):
             plotItem.setTitle(title)
         
-        if plotItem is self._current_plot_item_:
-            lbl = "<B>%s</B>" % self._current_plot_item_.axes["left"]["item"].labelText
-            self._current_plot_item_.setLabel("left", lbl)
+        if plotItem is self._selected_plot_item_:
+            lbl = "<B>%s</B>" % self._selected_plot_item_.axes["left"]["item"].labelText
+            self._selected_plot_item_.setLabel("left", lbl)
             
         else:
             lbl = plotItem.axes["left"]["item"].labelText
@@ -8530,17 +8532,20 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #default_border_color = self.axis(0).vb.border.color()
         
         if len(obj) and isinstance(obj[0], pg.PlotItem):
-            self._focussed_plot_item_ = obj[0]
+            self._hovered_plot_item_ = obj[0]
         else:
-            self._focussed_plot_item_ = None
+            self._hovered_plot_item_ = None
             
     @pyqtSlot(object)
     @safeWrapper
     def _slot_mouseMovedInPlotItem(self, pos): # pos is a QPointF
         # connected to a PlotItem's scene!
         # at this stage there should already be a _focussed_plot_item_
-        if isinstance(self._focussed_plot_item_, pg.PlotItem):
-            self._reportMouseCoordinatesInAxis_(pos, self._focussed_plot_item_)
+        # NOTE _hovered_plot_item_ is the PlotItem that is hovered by the mouse;
+        # this is NOT necessarily the _selected_plot_item_, which is set after
+        # a LMB click ! 
+        if isinstance(self._hovered_plot_item_, pg.PlotItem):
+            self._reportMouseCoordinatesInAxis_(pos, self._hovered_plot_item_)
                 
         else:
             self._update_coordinates_viewer_()
@@ -8550,17 +8555,6 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(plotitem, pg.PlotItem):
             if plotitem.sceneBoundingRect().contains(pos):  
                 plot_name = plotitem.vb.name
-#                 plots, rc = zip(*self.plotItemsWithLayoutPositions)
-#                 
-#                 if plotitem in plots:
-#                     plot_index = plots.index(plotitem)
-#                     
-#                     plot_row = rc[plot_index][0][0]
-#                     
-#                     plot_name = self._plot_names_.get(plot_row, "")
-#                     
-#                 else:
-#                     plot_name = ""
                 
                 mousePoint = plotitem.vb.mapSceneToView(pos)
                 
@@ -8598,36 +8592,29 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             focusedPlotItems = [i for i in plotitems if i.vb is focusItem]
             
             if len(focusedPlotItems):
-                self._current_plot_item_ = focusedPlotItems[0]
-                plot_index = plotitems.index(self._current_plot_item_)
-                self._current_plot_item_index_ = plot_index
-                self._setAxisIsActive(self._current_plot_item_, True)
+                self._selected_plot_item_ = focusedPlotItems[0]
+                plot_index = plotitems.index(self._selected_plot_item_)
+                self._selected_plot_item_index_ = plot_index
+                self._setAxisIsActive(self._selected_plot_item_, True)
                 self._statusNotifyAxisSelection(plot_index)
                     
                 for ax in self.axes:
-                    if ax is not self._current_plot_item_:
+                    if ax is not self._selected_plot_item_:
                         self._setAxisIsActive(ax, False)
                             
             else:
-                self._current_plot_item_ = None
-                self._current_plot_item_index_ = -1
+                self._selected_plot_item_ = None
+                self._selected_plot_item_index_ = -1
                 
                 for ax in self.axes:
                     self._setAxisIsActive(ax, False)
 
         else:
-            self._current_plot_item_ = None
-            self._current_plot_item_index_ = -1
+            self._selected_plot_item_ = None
+            self._selected_plot_item_index_ = -1
 
             for ax in self.axes:
                 self._setAxisIsActive(ax, False)
-#                 lbl = ax.axes["left"]["item"].labelText
-#                 
-#                 if lbl.startswith("<B>") and lbl.endswith("</B>"):
-#                     lbl = lbl[3 : lbl.find("</B>")]
-#                     ax.setLabel("left", lbl)
-#                     
-#                 ax.vb.border.setStyle(QtCore.Qt.NoPen)
             
     @safeWrapper
     def clearEpochs(self):
@@ -8642,9 +8629,9 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         #self.fig.clear() # both mpl.Figure and pg.GraphicsLayoutWidget have this method
         #print("SignalViewer2.clear() %s" % self.windowTitle())
-        self._current_plot_item_ = None
-        self._current_plot_item_index_ = -1
-        self._focussed_plot_item_ = None
+        self._selected_plot_item_ = None
+        self._selected_plot_item_index_ = -1
+        self._hovered_plot_item_ = None
         
         for axis in self.axes:
             self.removeLegend(axis)
@@ -8748,6 +8735,12 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """Alias to cursors property
         """
         return self.cursors
+    
+    @property
+    def selectedAxis(self):
+        return self._selected_plot_item_
+    
+    
     
     # aliases to setData
     plot = setData

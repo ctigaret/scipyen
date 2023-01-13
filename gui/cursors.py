@@ -214,6 +214,8 @@ class SignalCursor(QtCore.QObject):
         
         # self._parent_widget_ = None
         
+        print(f"{self.__class__.__name__}.__init__ xBounds = {xBounds}, yBounds = {yBounds}")
+        
         self._host_graphics_item_ = None
         
         # if not isinstance(parent, (pg.PlotItem, pg.GraphicsScene)):
@@ -227,13 +229,6 @@ class SignalCursor(QtCore.QObject):
             
         else:
             raise TypeError("plot_item expected to be a pyqtgraph.PlotItem object or a pyqtgraph.GraphicsScene object got %s instead" % type(plot_items).__name__)
-        
-#         if "SignalViewer" in type(parent).__name__:
-#             # only set parent plot window if parent is SignalViewer or later version
-#             self._parent_widget_ = parent
-#             
-#         elif isinstance(parent, (pg.PlotItem, pg.GraphicsScene)) and self._host_graphics_item_ is None:
-#             self._host_graphics_item_ = parent
             
         self._cursorId_ = None
         
@@ -275,8 +270,8 @@ class SignalCursor(QtCore.QObject):
             self._linkedPen_ = None
         
         # valid ranges where the cursor lines can go
-        self._x_range_ = None
-        self._y_range_ = None
+        self._x_range_ = xBounds
+        self._y_range_ = yBounds
         
         if self._pen_ is None:
             self._pen_ = kwargs.pop("pen", None)
@@ -606,23 +601,6 @@ class SignalCursor(QtCore.QObject):
                     else:
                         l.label.setFormat(self._cursorId_)
                         
-#         if isinstance(self._vl_, pg.InfiniteLine):
-#             if isinstance(self._vl_.label, pg.InfLineLabel):
-#                 if self._show_value_:
-#                     format_str = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_)
-#                     #print(format_str)
-#                     self._vl_.label.setFormat(format_str)
-#                 else:
-#                     self._vl_.label.setFormat(self._cursorId_)
-#                     
-#         if isinstance(self._hl_, pg.InfiniteLine):
-#             if isinstance(self._hl_.label, pg.InfLineLabel):
-#                 if self._show_value_:
-#                     format_str = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_)
-#                     self._hl_.label.setFormat(format_str)
-#                 else:
-#                     self._hl_.label.setFormat(self._cursorId_)
-                    
     def update(self):
         for l in (self._hl_, self._vl_):
             if isinstance(l, pg.InfiniteLine):
@@ -643,14 +621,6 @@ class SignalCursor(QtCore.QObject):
             if isinstance(l, pg.InfiniteLine):
                 if isinstance(getattr(l, "label", None), pg.InfLineLabel):
                     l.label.setmovable(value==True)
-#         if isinstance(self._vl_, pg.InfiniteLine):
-#             if isinstance(self._vl_.label, pg.InfLineLabel):
-#                 self._vl_.label.setMovable(value==True)
-#                 
-#         if isinstance(self._hl_, pg.InfiniteLine):
-#             if isinstance(self._hl_.label, pg.InfLineLabel):
-#                 self._hl_.label.setMovable(value==True)
-                
                 
     def setShowValue(self, val:bool, precision:typing.Optional[int]=None):
         if isinstance(precision, int):
