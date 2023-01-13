@@ -150,6 +150,7 @@
      <string>Settings</string>
     </property>
     <addaction name="actionShow_Legends"/>
+    <addaction name="actionIgnore_empty_spike_trains"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuTools"/>
@@ -286,6 +287,14 @@
    </property>
    <property name="text">
     <string>Show Legends</string>
+   </property>
+  </action>
+  <action name="actionIgnore_empty_spike_trains">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Ignore empty spike trains</string>
    </property>
   </action>
  </widget>

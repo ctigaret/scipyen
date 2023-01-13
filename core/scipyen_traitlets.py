@@ -631,7 +631,7 @@ class NeoGroupTrait(NeoContainerTrait):
     _valid_defaults = (klass,)
     
 class NeoSegmentTrait(NeoContainerTrait):
-    klass = neo.Group
+    klass = neo.Segment
     info_text = f"Traitlet for {klass}"
     default_value = klass()
     _cast_types = tuple()
@@ -764,10 +764,16 @@ class NeoSpikeTrainListTrait(NeoBaseNeoTrait):
             result = type(old_value) == type(new_value)
             
             if result and isinstance(old_value, self.klass):
+                result = len(old_value) == len(new_value)
+                
+            if result:
                 result = np.all(old_value == new_value)
                 
-                if result:
-                    result = old_value.all_channel_ids() == new_value.all_channel_ids() and old_value.t_start == new_value.t_start and old_value.t_stop == new_value.t_stop
+            if result:
+                result = len(old_value.all_channel_ids) == len(new_value.all_channel_ids)
+                    
+            if result:
+                result = old_value.all_channel_ids == new_value.all_channel_ids and old_value.t_start == new_value.t_start and old_value.t_stop == new_value.t_stop
                     
         except:
             traceback.print_exc()
