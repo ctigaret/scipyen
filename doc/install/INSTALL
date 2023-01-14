@@ -420,10 +420,24 @@ For each of these, cd into their source tree and run:
 After installing pip requirements below, test that PyQt5  was installed OK
 by launching 'jupyter qtconsole' - Qt widgets should have the style used by your
 desktop.
+
+NOTE: 2023-01-14 22:10:08
+Building (and using) PyQt5-5-15.7 : still needs to be built locally
+    WITH scipyenv ACTIVE:   
+    install sip directly from PyPI: pip install sip
+    install PyQt5-builder for PyPI: pip install PyQt5-builder
+    download PyQt5-5.15.7.tar.gz from PyPI: https://pypi.org/project/PyQt5/#files
+        extract the archive, cd to the source tree then run sip-install --qmake=`which qmake-qt5`
+        (this will detect and use the pyproject.toml and project.py files located 
+         in the PyQt5-5-15.7 source tree)
+        if succesful, you DO NOT need to separately build PyQt5_sip module
     
 --------------------------------------------------------------------------------
-5.2 BUILD AND INSTALL BOOST LIBRARIES (OPTIONAL; you can use system's software management)
+5.2 BUILD AND INSTALL BOOST LIBRARIES 
 --------------------------------------------------------------------------------
+(OPTIONAL; you can use the system-wide boost libraries installed by your system's
+software management, HOWEVER this may mean you need to rebuild VIGRA after 
+upgrading your OS)
 
 NOTE: Optional, ONLY IF if the system-wide boost libraries are not available for the
 version of Python used to build vigranumpy, below. This may include the situation

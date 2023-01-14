@@ -3172,7 +3172,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #### END Figure out cursors destination: axis or scene
         
         #### BEGIN check cursors coordinates
-        if isinstance(axis, pg.PlotItem):
+        if isinstance(axis, pg.PlotItem): # single-axis cursor - a.k.a cursor in axis
             if axis not in self.signalsLayout.items:
                 return
             
@@ -3201,40 +3201,43 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             if yBounds is None:
                 yBounds = view_range[1]
+                
+            # print(f"{self.__class__.__name__}._addCursor_ single-axis x = {x}")
             
-        elif isinstance(axis, pg.GraphicsScene): # generate a multi-axis cursor
+        elif isinstance(axis, pg.GraphicsScene): # multi-axis cursor - a.k.a cursor in scene
             if axis is not self.signalsLayout.scene():
                 return
             
             if len(self.signalsLayout.items) == 0:
-                # there is no axis (plotitem)
-                warnings.warn("There is no axis in the viewer; have you plotted anything yet?\nThe cursor's coordinates will be reset when plotting")
+                # there is no axis (plotitem) - never executed, see NOTE: 2023-01-14 23:23:06
+                # warnings.warn("There is no axis in the viewer; have you plotted anything yet?\nThe cursor's coordinates will be reset when plotting")
                 
                 scene_rect = self.signalsLayout.scene().sceneRect()
-                
-                if x is None:
-                    x = scene_rect.width()/2
-                    
-                elif isinstance(x, pq.Quantity):
-                    x = float(x.magnitude.flatten()[0])
-                    
-                elif not isinstance(x, numbers.Number):
-                    raise TypeError("Unexpected type for x coordinate: %s" % type(x).__name__)
                 
                 if xBounds is None:
                     xBounds = (scene_rect.x(), scene_rect.x() + scene_rect.width())
                 
-                if y is None:
-                    y = scene_rect.height()/2
-                    
-                elif isinstance(y, pq.Quantity):
-                    y = float(y.magnitude.flatten()[0])
-                    
-                elif not isinstance(y, numbers.Number):
-                    raise TypeError("Unexpected type for y coordinate: %s" % type(y).__name__)
-                
                 if yBounds is None:
                     yBounds = (scene_rect.y(), scene_rect.y() + scene_rect.height())
+                    
+#                 if x is None:
+#                     x = scene_rect.width()/2
+#                     
+#                 elif isinstance(x, pq.Quantity):
+#                     x = float(x.magnitude.flatten()[0])
+#                     
+#                 elif not isinstance(x, numbers.Number):
+#                     raise TypeError("Unexpected type for x coordinate: %s" % type(x).__name__)
+#                 
+#                 if y is None:
+#                     y = scene_rect.height()/2
+#                     
+#                 elif isinstance(y, pq.Quantity):
+#                     y = float(y.magnitude.flatten()[0])
+#                     
+#                 elif not isinstance(y, numbers.Number):
+#                     raise TypeError("Unexpected type for y coordinate: %s" % type(y).__name__)
+                
                 
             else:
                 pIs = self.plotItems
@@ -3248,32 +3251,34 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 min_point = pIs[0].vb.mapViewToScene(QtCore.QPointF(min_x_axis,topAxis_y_max ))
                 max_point = pIs[-1].vb.mapViewToScene(QtCore.QPointF(max_x_axis, bottomAxis_y_min))
                 
-                if x is None:
-                    x = min_point.x() + (max_point.x() - min_point.x())/2.
-                    
-                elif isinstance(x, pq.Quantity):
-                    x = float(x.magnitude.flatten()[0])
-                    
-                elif not isinstance(x, numbers.Number):
-                    raise TypeError("Unexpected type for x coordinate: %s" % type(x).__name__)
-                
-                print(f"{self.__class__.__name__}._addCursor_ multi-axis x = {x}")
-                
-                if y is None:
-                    y = min_point.y() + (max_point.y() - min_point.y())/2.
-                    
-                elif isinstance(y, pq.Quantity):
-                    y = float(y.magnitude.flatten()[0])
-                    
-                elif not isinstance(y, numbers.Number):
-                    raise TypeError("Unexpected type for y coordinate: %s" % type(y).__name__)
-                    
                 if xBounds is None:
                     xBounds = [min_point.x(), max_point.x()]
                 
                 if yBounds is None:
                     yBounds = [min_point.y(), max_point.y()]
                 
+            if x is None:
+                x = float(xBounds[0] + np.diff(xBounds)/2)
+                # print(f"auto x = {x}")
+                
+            elif isinstance(x, pq.Quantity):
+                x = float(x.magnitude.flatten()[0])
+                
+            elif not isinstance(x, numbers.Number):
+                raise TypeError("Unexpected type for x coordinate: %s" % type(x).__name__)
+            
+            if y is None:
+                # y = min_point.y() + (max_point.y() - min_point.y())/2.
+                x = float(yBounds[0] + np.diff(yBounds)/2)
+                
+            elif isinstance(y, pq.Quantity):
+                y = float(y.magnitude.flatten()[0])
+                
+            elif not isinstance(y, numbers.Number):
+                raise TypeError("Unexpected type for y coordinate: %s" % type(y).__name__)
+                    
+            # print(f"{self.__class__.__name__}._addCursor_ multi-axis x = {x}")
+            
         #### END check cursors coordinates
         
         if not isinstance(cursor_type, str):
@@ -3323,12 +3328,14 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             crsId = label
             
-        if isinstance(axis, pg.PlotItem):
-            precision = self.get_axis_xData_precision(axis)
-                
-        else:
-            pi_precisions = [self.get_axis_xData_precision(ax) for ax in self.plotItems]
-            precision = min(pi_precisions)
+        if precision is None:
+            if isinstance(axis, pg.PlotItem):
+                precision = self.get_axis_xData_precision(axis)
+                    
+            else:
+                if len(self.plotItems):
+                    pi_precisions = [self.get_axis_xData_precision(ax) for ax in self.plotItems]
+                    precision = min(pi_precisions)
             
         cursorDict[crsId] = SignalCursor(axis, 
                                    x = x, y = y, xwindow=xwindow, ywindow=ywindow,
@@ -3605,23 +3612,31 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # axes) on the condition that their coordinates must be reset once
         # something has been plotted
         if self.signalsLayout.scene() is not None:
-            ax_cx = self.axesWithLayoutPositions
+            # ax_cx = self.axesWithLayoutPositions
+            pIs = self.plotItems
             
-            if len(ax_cx) == 0:
-                return
-            
-            pIs, _ = zip(*ax_cx)
-            
-            min_x_axis = np.min([p.viewRange()[0][0] for p in pIs])
-            max_x_axis = np.max([p.viewRange()[0][1] for p in pIs])
-            
-            min_point = pIs[0].vb.mapViewToScene(QtCore.QPointF(min_x_axis, 0))
-            max_point = pIs[0].vb.mapViewToScene(QtCore.QPointF(max_x_axis, 0))
-            
-            xbounds = [min_point.x(), max_point.x()]
+            # NOTE: 2023-01-14 23:23:06
+            # always expect at least on PlotItem present
+            if len(pIs) == 0: #
+                scene_rect = self.signalsLayout.scene().sceneRect()
+                xbounds = (scene_rect.x(), scene_rect.x() + scene_rect.width())
+                precision=None
+            else:
+                # pIs, _ = zip(*ax_cx)
+                
+                min_x_axis = np.min([p.viewRange()[0][0] for p in pIs])
+                max_x_axis = np.max([p.viewRange()[0][1] for p in pIs])
+                
+                min_point = pIs[0].vb.mapViewToScene(QtCore.QPointF(min_x_axis, 0))
+                max_point = pIs[0].vb.mapViewToScene(QtCore.QPointF(max_x_axis, 0))
+                
+                xbounds = [min_point.x(), max_point.x()]
 
+                pi_precisions = [self.get_axis_xData_precision(ax) for ax in self.plotItems]
+                precision = min(pi_precisions)
             return self._addCursor_("vertical", axis=self.signalsLayout.scene(), 
-                                    label=label, follows_mouse=dynamic, xBounds=xbounds)
+                                    label=label, follows_mouse=dynamic, xBounds=xbounds,
+                                    precision=precision)
         
     
     @pyqtSlot()

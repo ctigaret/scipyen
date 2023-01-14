@@ -214,15 +214,9 @@ class SignalCursor(QtCore.QObject):
         
         # self._parent_widget_ = None
         
-        print(f"{self.__class__.__name__}.__init__ xBounds = {xBounds}, yBounds = {yBounds}")
+        # print(f"{self.__class__.__name__}.__init__ x = {x}, y = {y}, xBounds = {xBounds}, yBounds = {yBounds}")
         
         self._host_graphics_item_ = None
-        
-        # if not isinstance(parent, (pg.PlotItem, pg.GraphicsScene)):
-        #     # if "SignalViewer" not in type(parent).__name__ :
-        #     if not isinstance(parent, QtWidgets.QWidget):
-        #         raise TypeError("parent object of a SignalCursor can only be a pyqtgraph PlotItem, GraphicsScene, or a SignalViewer; got %s instead" % type(parent).__name__)
-        
         
         if isinstance(plot_item, (pg.PlotItem, pg.GraphicsScene)):
             self._host_graphics_item_ = plot_item
@@ -269,10 +263,16 @@ class SignalCursor(QtCore.QObject):
         else:
             self._linkedPen_ = None
         
+        # NOTE: 2023-01-14 14:01:17
         # valid ranges where the cursor lines can go
-        self._x_range_ = xBounds
-        self._y_range_ = yBounds
+        # NOTE: 2023-01-14 14:01:24
+        # will be configured by self.setBounds called from self._setup_
+        self._x_range_ = None
+        self._y_range_ = None
         
+#         self._x_range_ = xBounds
+#         self._y_range_ = yBounds
+#         
         if self._pen_ is None:
             self._pen_ = kwargs.pop("pen", None)
             
@@ -317,6 +317,8 @@ class SignalCursor(QtCore.QObject):
         else:
             pos = QtCore.QPointF(self._x_, self._y_)
             
+        # print(f"{self.__class__.__name__}._setup_lines_ pos = {pos}")
+            
         scene = self.hostScene
         
         if h:
@@ -328,13 +330,14 @@ class SignalCursor(QtCore.QObject):
                     label = None
                 
                 self._hl_ = CursorLine(pos=pos, 
-                                            angle=0, 
-                                            movable=not self._follows_mouse_, 
-                                            name="%s_h" % name, 
-                                            label=label,
-                                            labelOpts = {"movable": self._movable_label_},
-                                            pen=self._pen_, 
-                                            hoverPen = self._hoverPen_)
+                                        angle=0, 
+                                        bounds = self._y_range_,
+                                        movable=not self._follows_mouse_, 
+                                        name="%s_h" % name, 
+                                        label=label,
+                                        labelOpts = {"movable": self._movable_label_},
+                                        pen=self._pen_, 
+                                        hoverPen = self._hoverPen_)
                 
                 self._hl_.sig_double_clicked.connect(self.slot_line_doubleClicked)
                 self._hl_.sigClicked.connect(self.slot_line_Clicked)
@@ -379,13 +382,16 @@ class SignalCursor(QtCore.QObject):
                 label = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_) if self._show_value_ else self._cursorId_
                 #print(self._value_precision_)
                 self._vl_ = CursorLine(pos=pos, 
-                                            angle=90, 
-                                            movable=not self._follows_mouse_,
-                                            name="%s_v" % name, 
-                                            label=label,
-                                            labelOpts={"movable": self._movable_label_},
-                                            pen=self._pen_, 
-                                            hoverPen = self._hoverPen_)
+                                        angle=90, 
+                                        bounds = self._x_range_,
+                                        movable=not self._follows_mouse_,
+                                        name="%s_v" % name, 
+                                        label=label,
+                                        labelOpts={"movable": self._movable_label_},
+                                        pen=self._pen_, 
+                                        hoverPen = self._hoverPen_)
+                
+                # print(f"{self.__class__.__name__}._setup_lines__vl_.pos = {self._vl_.pos()}")
                 
                 self._vl_.sig_double_clicked.connect(self.slot_line_doubleClicked)
                 self._vl_.sigClicked.connect(self.slot_line_Clicked)
@@ -444,8 +450,7 @@ class SignalCursor(QtCore.QObject):
         self.update()
             
     def _get_host_boundaries_(self, host):
-        """Get the useful boundaries for cursor lines, from the host
-        (unless they've been specified by caller)
+        """Get the useful boundaries for cursor lines, from the host.
         Boundaries are returned in the same format as from PlotItem.viewRange()
         
         NOTE: 2022-11-21 22:04:49
@@ -561,6 +566,8 @@ class SignalCursor(QtCore.QObject):
             
         else:
             pos = QtCore.QPointF(self._x_, 0.0)
+            
+        # print(f"{self.__class__.__name__}._add_lines_to_host_ pos = {pos}")
         
         if self._hl_ is not None:
             if isinstance(self._host_graphics_item_, pg.PlotItem):
@@ -702,6 +709,12 @@ class SignalCursor(QtCore.QObject):
                 self._is_selected_ = val
             
     def setBounds(self, host:typing.Optional[pg.GraphicsItem]=None, xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None):
+        """ Sets the X and Y allowed range for the cursor lines
+        """
+        # NOTE: 2023-01-14 14:04:31
+        # this is also called from __init__-> _setup_ so the xBounds and yBounds
+        # parameters passed to __init__ land here
+        # sets _x_range_ and _y_range
         if host is None:
             host = self._host_graphics_item_
             
@@ -938,6 +951,7 @@ class SignalCursor(QtCore.QObject):
         
         self._cursor_type_ = cursor_type
             
+        # will set self._x_range_ and self._y_range
         self.setBounds(host, xBounds=xBounds, yBounds=yBounds)
         
         if isinstance(x, numbers.Number):
@@ -1013,10 +1027,16 @@ class SignalCursor(QtCore.QObject):
         
         if "name" not in kwargs.keys():
             kwargs["name"] = self._cursor_type_
+            
+        # print(f"{self.__class__.__name__}._setup_ _x_ = {self._x_} _y_ = {self._y_}")
 
         self._setup_lines_(*show_lines, **kwargs)
         
+        # print(f"{self.__class__.__name__} in _setup_ after _setup_lines_ _x_ = {self._x_} _y_ = {self._y_}")
+        
         self._add_lines_to_host_()
+        
+        # print(f"{self.__class__.__name__} in _setup_ after _add_lines_to_host_ _x_ = {self._x_} _y_ = {self._y_}")
         
     def _interpret_scene_mouse_events_(self, scene=None):
         """for crosshair only
