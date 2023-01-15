@@ -78,16 +78,32 @@
        <widget class="QComboBox" name="irregularSignalComboBox"/>
       </item>
       <item>
-       <widget class="QCheckBox" name="spikeTrainsCheckBox">
+       <widget class="QCheckBox" name="plotSpikeTrainsCheckBox">
         <property name="text">
          <string>Spike trains</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QCheckBox" name="eventsCheckBox">
+       <widget class="QCheckBox" name="plotEventsCheckBox">
         <property name="text">
          <string>Events</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="plotEpochsCheckBox">
+        <property name="text">
+         <string>Epochs</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
@@ -117,7 +133,7 @@
      <x>0</x>
      <y>0</y>
      <width>900</width>
-     <height>28</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

@@ -655,8 +655,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.plotSpikesAsEvents   = False
         self.plotEventsAsSpikes   = False
         self.plotEpochsAsEvents   = False
-        self._overlay_spikes_events_epochs_ = True
         self.epoch_plot_options = dict()
+        self._overlay_spikes_events_epochs_ = True
         # NOTE: 2019-04-28 18:03:20
         # contrary to online documentation for pyqtgraph 0.10.0, the source code
         # indicates that LinearRegionItem constructor only accepts "brush";
@@ -696,6 +696,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._plot_irregularsignals_ = True
         self._plot_spiketrains_ = True
         self._plot_events_ = True
+        self._plot_epochs_ = True
         #### END GUI signal selectors and options for compound neo objects
         #### END options for neo objects
         #### END attributes controlling neo object representations
@@ -998,10 +999,14 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.plotIrregularSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
         self.plotIrregularSignalsCheckBox.stateChanged[int].connect(self._slot_plotIrregularSignalsCheckStateChanged_)
         
-        self.spikeTrainsCheckBox.setCheckState(QtCore.Qt.Checked)
-        self.spikeTrainsCheckBox.stateChanged[int].connect(self._slot_plotSpikeTrainsCheckStateChanged_)
-        self.eventsCheckBox.setCheckState(QtCore.Qt.Checked)
-        self.eventsCheckBox.stateChanged[int].connect(self._slot_plotEventsCheckStateChanged_)
+        self.plotSpikeTrainsCheckBox.setCheckState(QtCore.Qt.Checked)
+        self.plotSpikeTrainsCheckBox.stateChanged[int].connect(self._slot_plotSpikeTrainsCheckStateChanged_)
+        
+        self.plotEventsCheckBox.setCheckState(QtCore.Qt.Checked)
+        self.plotEventsCheckBox.stateChanged[int].connect(self._slot_plotEventsCheckStateChanged_)
+        
+        self.plotEpochsCheckBox.setCheckState(QtCore.Qt.Checked)
+        self.plotEpochsCheckBox.stateChanged[int].connect(self._slot_plotEpochsCheckStateChanged_)
         
         #### BEGIN set up annotations dock widget
         #print("_configureUI_ sets up annotations dock widget")
@@ -2707,6 +2712,11 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot(int)
     def _slot_plotEventsCheckStateChanged_(self, state):
         self._plot_events_ = state == QtCore.Qt.Checked
+        self.displayFrame()
+        
+    @pyqtSlot(int)
+    def _slot_plotEpochsCheckStateChanged_(self, state):
+        self._plot_epochs_ = state == QtCore.Qt.Checked
         self.displayFrame()
         
     @pyqtSlot(int)
@@ -6943,7 +6953,33 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
 #         if isinstance(plotLabelText, str) and len(plotLabelText.strip()):
 #             self.plotTitleLabel.setText(plotLabelText, color = "#000000")
 
-    def _plot_epochs_seq_(self, *args, **kwargs):
+    def _plot_epoch_data_(self, epoch, **kwargs):
+        """ Plots the time intervals defined in a single neo.Epoch or DataZone """
+        brush = kwargs.pop("brush", self.epoch_plot_options["epoch_brush"])
+        
+        x0 = epoch.times.flatten().magnitude
+        x1 = x0 + epoch.durations.flatten().magnitude
+        
+        # brush = next(brushes)
+        
+        for k in range(len(self.axes)):
+            self.axes[k].update() # to update its viewRange()
+            
+            regions = [v for v in zip(x0,x1)]
+            
+            lris = [pg.LinearRegionItem(values=value, 
+                                        brush=brush, 
+                                        orientation=pg.LinearRegionItem.Vertical, 
+                                        movable=False) for value in regions]
+            
+            for kl, lri in enumerate(lris):
+                self.axes[k].addItem(lri)
+                lri.setZValue(10)
+                lri.setVisible(True)
+                lri.setRegion(regions[kl])
+    
+
+    def _plot_epochs_sequence_(self, *args, **kwargs):
         """Does the actual plotting of epoch data.
         Epochs is always a non-empty sequence (tuple or list) of neo.Epochs
         We keep this as a nested function to avoid calling it directly. Thus
@@ -6951,7 +6987,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._yData_ (or contained within)
         """
         
-        # print(f"SignalViewer2._plot_epochs_seq_ {args}")
+        # print(f"SignalViewer2._plot_epochs_sequence_ {args}")
         
         if len(args) == 0:
             return
@@ -6993,7 +7029,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 brushes = cycle([None])
                 
         for epoch in args:
-            # print(f"SignalViewer2._plot_epochs_seq_ epoch times {epoch.times} durations {epoch.durations}")
+            # print(f"SignalViewer2._plot_epochs_sequence_ epoch times {epoch.times} durations {epoch.durations}")
             x0 = epoch.times.flatten().magnitude
             x1 = x0 + epoch.durations.flatten().magnitude
             
@@ -7067,7 +7103,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             # END plot epochs from cache: clear current displayed epoch if requested
             
-            self._plot_epochs_seq_(*epoch_seq, **kwargs)
+            self._plot_epochs_sequence_(*epoch_seq, **kwargs)
                 
             if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
                 self.docTitle = "Epochs"
@@ -7119,7 +7155,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             raise TypeError("Expecting a neo.Epoch or a Sequence of neo.Epoch objects; got %s instead" % type(epochs).__name__)
         
         if len(epoch_seq):
-            self._plot_epochs_seq_(*epoch_seq, **kwargs)
+            self._plot_epochs_sequence_(*epoch_seq, **kwargs)
             
             if self.currentFrame in self._cached_epochs_:
                 if len(self._cached_epochs_[self.currentFrame]):
@@ -7206,6 +7242,9 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             self._events_axis_.setVisible(False)
             
+        if self._plot_epochs_:
+            pass
+            
         visibleAxes = [i for i in self.signalAxes if i.isVisible()]
         
         for k, plotItem in enumerate(visibleAxes):
@@ -7254,10 +7293,13 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @_plot_data_.register(neo.Epoch)
     @_plot_data_.register(DataZone)
     def _(self, obj, *args, **kwargs):
-        x_min, x_max = (self._yData_[0], self._yData_[-1] + self._yData_.durations[-1])
+        """ Plots a single neo.Epoch 
+        NOTE: a single Epoch MAY contain several time intervals.
+        """
+        x_min, x_max = (obj[0], obj[-1] + obj.durations[-1])
         # self._prepareAxes_(1)
         # FIXME/BUG 2023-01-11 15:54:38
-        self._plotEpochs_(obj, **self.epoch_plot_options)
+        # self._plotEpochs_(obj, **self.epoch_plot_options)
         self.axes[0].showAxis("bottom", True)
         
     @_plot_data_.register(neo.Event)
