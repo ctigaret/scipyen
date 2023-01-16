@@ -1735,23 +1735,30 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 if len(self.signalAxes):
                     # x_ranges = [ax.viewRange()[0] for ax in self.signalAxes]
-                    max_pad = [ax.vb.state["defaultPadding"] for ax in self.signalAxes]
+                    max_pad = max([ax.vb.state["defaultPadding"] for ax in self.signalAxes])
                     minX = list()
                     maxX = list()
                     for ax in self.signalAxes:
                         if ax.isVisible():
-                            ax_data_items = [i for i in ax.items if isinstance(i, pg.PlotDataItem)]
-                            if len(ax_data_items):
-                                rect = ax.vb.childrenBoundingRect(items=ax_data_items)
-                                minX.append(rect.x())
-                                maxX.append(rect.x() + rect.width())
+                            # ax_data_items = [i for i in ax.items if isinstance(i, pg.PlotDataItem)]
+                            # if len(ax_data_items):
+                            #     rect = ax.vb.childrenBoundingRect(items=ax_data_items)
+                            #     minX.append(rect.x())
+                            #     maxX.append(rect.x() + rect.width())
+                                
+                            ax_target_range = ax.vb.state["targetRange"]
+                            minX.append(ax_target_range[0][0])
+                            maxX.append(ax_target_range[0][1])
                                 
                     min_x = min(minX)
                     max_x = max(maxX)
                                 
-                    
-                    
-                    entities_axis.setXRange(min_x, max_x, padding = max_pad)
+                    print(f"min_x = {min_x}, max_x = {max_x}, max_pad = {max_pad}")
+                    entities_axis.vb.state["targetRange"][0][0] = min_x
+                    entities_axis.vb.state["targetRange"][0][1] = max_x
+                    entities_axis.vb.state["defaultPadding"] = max_pad
+                    entities_axis.vb.sigStateChanged.emit(self)
+                    entities_axis.setXRange(min_x, max_x, padding = 0.)
                 
             elif all(isinstance(v, neo.SpikeTrain) for v in entities_list):
                 trains_x_list = list()
