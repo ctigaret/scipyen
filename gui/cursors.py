@@ -49,7 +49,7 @@ class SignalCursorTypes(enum.Enum):
         return list(cls)
     
     @classmethod
-    def getType(cls, value: tuple):
+    def getType(cls, value:typing.Union[tuple, str]):
         """Inverse-lookup: returns signal cursor type mapped to value.
         
         Returns None if no signal cursor type is mapped to this value.
@@ -59,6 +59,12 @@ class SignalCursorTypes(enum.Enum):
             types = [c for c in cls if c.value == value]
             if len(types):
                 return types[0]
+            
+        elif isinstance(value, str):
+            name = [n for n in cls.names() if n.startswith(value.lower())]
+            # print(f"name = {name}")
+            if len(name):
+                return getattr(cls, name[0], None)
             
     @classmethod
     def getName(cls, value: tuple):

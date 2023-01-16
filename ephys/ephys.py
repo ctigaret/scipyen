@@ -324,8 +324,6 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], s
         stamps = data[start:(start+span+1)]
         return (1/(stamps[-1]-stamps[start])).rescale(pq.Hz)
     
-
-    
 @safeWrapper
 def cursors2epoch(*args, **kwargs):
     """Constructs a neo.Epoch from a sequence of SignalCursor objects.
@@ -351,7 +349,7 @@ def cursors2epoch(*args, **kwargs):
     
         • SignalCursor objects - all of either 'vertical' or 'crosshair' type.
         
-        • SignalCursor tuples (2, 3 or 5 elements) of cursor parameters:
+        • SignalCursor parameter tuples (2, 3 or 5 elements):
         
             ∘ 2-tuples are interpreted as (time, window) pairs of coordinates
                 for a notional vertical cursor
@@ -1292,145 +1290,6 @@ def epoch2cursors(epoch: neo.Epoch, axis: typing.Optional[typing.Union[pg.PlotIt
     return ret
 
 @safeWrapper
-def epoch2intervals(epoch: neo.Epoch, keep_units:bool = False):
-    """Generates a sequence of intervals as triplets (t_start, t_stop, label).
-    
-    Each interval coresponds to the epoch's interval.
-    
-    Parameters:
-    ----------
-    epoch: neo.Epoch
-    
-    keep_units: bool (default False)
-        When True, the t_start and t_stop in each interval are scalar python 
-        Quantity objects (units borrowed from the epoch)
-    
-    """
-    if keep_units:
-        return [(t, t+d, l) for (t,d,l) in zip(epoch.times, epoch.durations, epoch.labels)]
-        
-    else:
-        return [(t, t+d, l) for (t,d,l) in zip(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels)]
-    
-@safeWrapper
-def intervals2epoch(*args, **kwargs):
-    """Construct a neo.Epoch from a sequence of interval tuples or triplets.
-    
-    Variadic parameters:
-    --------------------
-    tuples (t0,t1) or triplets (t0,t1,label), or a sequence of tuples or triplets
-    each specifying an interval
-    
-    """
-    units = kwargs.pop("units", pq.s)
-    if not isinstance(units, pq.Quantity) or units.size > 1:
-        raise TypeError("units expected to be a scalar python Quantity")
-
-    name = kwargs.pop("name", "Epoch")
-    if not isinstance(name, str):
-        raise TypeError("name expected to be a string")
-    
-    if len(name.strip())==0:
-        raise ValueError("name must not be empty")
-    
-    sort = kwargs.pop("sort", True)
-    if not isinstance(sort, bool):
-        raise TypeError("sort must be a boolean")
-    
-    def __generate_epoch_interval__(value):
-        if not isinstance(value, (tuple, list)) or len(value) not in (2,3):
-            raise TypeError("expecting a tuple of 2 or 3 elements")
-        
-        if len(value) == 3:
-            if not isinstance(value[2], str) or len(value[2].strip()) == 0:
-                raise ValueError("expecting a non-empty string as thirs element in the tuple")
-            
-            l = value[2]
-                
-        else:
-            l = None
-            
-        u = units # by default if boundaries are scalars
-        
-        if not all([isinstance(v, (pq.Quantity, numbers.Number)) for v in value[0:2]]):
-            raise TypeError("interval boundaries must be scalar numbers or quantities")
-        
-        if all([isinstance(v, pq.Quantity) for v in value[0:2]]):
-            if any([v.size != 1 for v in value[0:2]]):
-                raise TypeError("interval boundaries must be scalar quantities")
-            
-            u = value[0].units #store the units
-            
-            if value[0].units != value[1].units:
-                if not units_convertible(value[0], value[1]):
-                    raise TypeError("interval boundaries must have compatible units")
-                
-                else:
-                    value = [float(value[0]), float(value[1].rescale(value[0].units))]
-                    
-            else:
-                value = [float(v) for v in value[0:2]]
-            
-        t, d = (value[0], value[1] - value[0])
-        
-        if d < 0:
-            raise ValueError("interval cannot have negative duration")
-
-        return (t, d, u) if l is None else (t, d, u, l)
-     
-    tdl = None
-    
-    if len(args) == 1:
-        if isinstance(args[0], (tuple, list)):
-            if len(args[0]) in (2,3): # a sequence with one tuple of 2-3 elements
-                if all([isinstance(v, (numbers.Number, pq.Quantity)) for v in args[0][0:2]]):
-                    # this can be an interval tuple
-                    tdl = [__generate_epoch_interval__(args[0])]
-                    
-                elif all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
-                    # or a sequence of tuples -- feed this into __generate_epoch_interval__
-                    # and hope for the best
-                    if sort:
-                        tdl = [__generate_epoch_interval__(v) for v in sorted(args[0], key=lambda x: x[0])]
-                        
-                    else:
-                        tdl = [__generate_epoch_interval__(v) for v in args[0]]
-                    
-                else:
-                    raise TypeError("incorrect syntax")
-                
-            else:
-                if all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
-                    if sort:
-                        tdl = [__generate_epoch_interval__(v) for v in sorted(args[0], key=lambda x: x[0])]
-                    else:
-                        tdl = [__generate_epoch_interval__(v) for v in args[0]]
-
-        else:
-            raise TypeError("expecting a sequence of tuples, or a 2- or 3- tuple")
-        
-    else:
-        # sequence of 2- or 3- tuples
-        if all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args]):
-            if sort:
-                tdl = [__generate_epoch_interval__(v) for v in sorted(args, key=lambda x: x[0])]
-                
-            else:
-                tdl = [__generate_epoch_interval__(v) for v in args]
-        
-        else:
-            raise TypeError("expecting 2- or 3- tuples")
-        
-    if tdl is not None:
-        # all numeric elements in tdl are python quantities
-        if all([len(v) == 4 for v in tdl]):
-            times, durations, units, labels = [x_ for x_ in zip(*tdl)]
-            ret = neo.Epoch(times = times, durations = durations, units = units[0], labels=labels)
-        else:
-            times, durations, units = [x_ for x_ in zip(*tdl)]
-            ret = neo.Epoch(times = times, durations = durations, units=units[0])
-                
-        return ret
 
 @safeWrapper
 def intervals2cursors(*args, **kwargs):
