@@ -5219,7 +5219,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # self._xData_ = None # NOTE: x can still be supplied externally
             self._yData_ = y
             self._cached_title = getattr(y, "name", None)
-            self._plotEpochs_(clear=True)
+            # self._plotEpochs_(clear=True)
             
             # one segment is one frame
             self.frameAxis = None
@@ -5387,7 +5387,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         elif isinstance(y, vigra.filters.Kernel1D):
             self._xData_, self._yData_ = kernel2array(y)
             self._cached_title = "Vigra Kernel 1D"
-            self._plotEpochs_(clear=True)
+            # self._plotEpochs_(clear=True)
             
             self.dataAxis = 0 # data as column vectors
             self.frameIndex = range(1)
@@ -5624,7 +5624,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     raise TypeError("Signal domain (x) must be None, a Python iterable of scalars or a numpy array (vector)")
                 
-            self._plotEpochs_(clear=True)
+            # self._plotEpochs_(clear=True)
                         
         elif isinstance(y, (tuple, list)) or hasattr(y, "__iter__"): # second condition to cover things like neo.SpikeTrainList (v >= 0.10.0)
             if len(y) == 0:
@@ -5642,7 +5642,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.signalChannelAxis              = signalChannelAxis 
 
             if np.all([isinstance(i, vigra.filters.Kernel1D) for i in y]):
-                self._plotEpochs_(clear=True)
+                # self._plotEpochs_(clear=True)
                 self.frameIndex = range(len(y))
                 self._number_of_frames_ = len(self.frameIndex)
                 self.signalIndex = 1
@@ -5824,7 +5824,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.signalChannelAxis = signalChannelAxis
                 self.dataAxis = 1 if self.signalChannelAxis == 0 else 0
                     
-                self._plotEpochs_(clear=True)
+                # self._plotEpochs_(clear=True)
                 self.frameIndex = range(1) if self.singleFrame else range(len(y))
                 self._number_of_frames_ = len(self.frameIndex)
                 self.signalIndex = 1
@@ -5899,6 +5899,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         with self.observed_vars.observer.hold_trait_notifications():
             try:
                 # remove gremlins from previous plot
+                self._clear_lris_()
                 # self._plotEpochs_(clear=True)
                 # self._cached_epochs_.pop(self.currentFrame, None)
 
@@ -6366,6 +6367,9 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     @data.setter
     def data(self, value:tuple):
+        """Calls self.setData (x,y) and default values for the other parameters.
+        See self.setData (aliased to self.plot and to self.view) for details.
+        """
         if isinstance(value, tuple):
             if len(value) == 2:
                 try:
@@ -7165,6 +7169,19 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._clear_lris_()
             # pass
             
+        # NOTE: 2023-01-16 22:59:30 TODO:
+        # delegate this to _plot_signals_
+        # where you should test for adjacent plotItems with the same labelText 
+        # for their getAxis("bottom"); for contiguous runs of plotItems with 
+        # identical x labels, set this label invisible except for the last plotItem
+        # in the run
+        #
+        # do the same for irregular signal as well
+        #
+        # this is so that signals with different domains get their proper
+        # x axis label
+        #
+        # in fact extend this idea to ALL axes
         visibleAxes = [i for i in self.signalAxes if i.isVisible()]
         
         for k, plotItem in enumerate(visibleAxes):
@@ -7172,10 +7189,13 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             plotItem.getAxis("bottom").showLabel(test)
             plotItem.getAxis("bottom").setStyle(showValues=test)
 
-
+        # NOTE: 2023-01-16 23:03:38 TODO:
+        # see NOTE: 2023-01-16 22:59:30 TODO
         if self.spikeTrainsAxis.isVisible():
             self.spikeTrainsAxis.getAxis("bottom").showLabel(False)
             
+        # NOTE: 2023-01-16 23:03:38 TODO:
+        # see NOTE: 2023-01-16 22:59:30 TODO
         if self._events_axis_.isVisible():
             self._events_axis_.getAxis("bottom").showLabel(False)
             
@@ -7512,8 +7532,6 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         selected_irreg_names = list()
         selected_irreg_ndx = list()
         
-        # ax_ndx = 0
-        
         min_x, max_x = zip(*list((float(signal.t_start), float(signal.t_stop)) for signal in analog + irregs))
         
         minX = min(min_x)
@@ -7546,8 +7564,16 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else: # hide all analog signal plotItems
             for ax_ndx in analog_axes.values():
                 self.signalAxes[ax_ndx].setVisible(False)
-                
+        
+        # NOTE: 2023-01-16 23:04:00 TODO:
+        # concieve an algorithm to detect contiguous runs of plot items with the
+        # same x axis label ⇒ only show the label for the last plot item in the run
+        # if the label of the next plot item is different then show it
+        # see NOTE: 2023-01-16 22:59:30 TODO
+        
         #### END plot regular (analog) signals
+        
+        
         
         #### BEGIN plot irregular signals
         if self._plot_irregularsignals_: # flag set up by `Irregular` checkbox
@@ -7569,9 +7595,16 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             for ax_ndx in irregs_axes.values():
                 self.signalAxes[ax_ndx].setVisible(False)
                 # ax_ndx += 1
+
+        # NOTE: 2023-01-16 23:04:00 TODO:
+        # concieve an algorithm to detect contiguous runs of plot items with the
+        # same x axis label ⇒ only show the label for the last plot item in the run
+        # if the label of the next plot item is different then show it
+        # see NOTE: 2023-01-16 22:59:30 TODO
+        
         #### END plot irregular signals
         
-        return minX, maxX
+        return minX, maxX # needed for events plotting - set the X range of their axis right
         
     @safeWrapper
     def _plotNumpyArrays_(self, x, y, plotLabelText = None, *args, **kwargs):

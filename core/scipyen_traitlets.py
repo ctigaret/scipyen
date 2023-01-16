@@ -655,7 +655,7 @@ class NeoDataObjectTrait(NeoBaseNeoTrait):
         try:
             result = np.all(super().compare_elements(old_value, new_value))
             if result:
-                result = old_value.array_annotations == new_value_array_annotations
+                result = old_value.array_annotations == new_value.array_annotations
                 
         except:
             traceback.print_exc()
