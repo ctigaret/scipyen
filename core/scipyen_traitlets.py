@@ -653,7 +653,7 @@ class NeoDataObjectTrait(NeoBaseNeoTrait):
     
     def compare_elements(self, old_value, new_value):
         try:
-            result = super().compare_elements(old_value, new_value)
+            result = np.all(super().compare_elements(old_value, new_value))
             if result:
                 result = old_value.array_annotations == new_value_array_annotations
                 
@@ -681,7 +681,7 @@ class NeoIrregularlySampledSignalTrait(NeoDataObjectTrait):
     _valid_defaults = (klass,)
     
     def make_dynamic_default(self):
-        return self.klass([0.]*pq.s, 0)
+        return self.klass([0.]*pq.s, [0], units = pq.dimensionless)
             
 class NeoEpochTrait(NeoDataObjectTrait):
     klass = neo.Epoch
@@ -1032,7 +1032,7 @@ class DataSignalTrait(NeoDataObjectTrait):
     _valid_defaults = (klass,)
     
     def make_dynamic_default(self):
-        return self.klass([0.], units=pq.dimensionless,sampling_rate=1*pq.dimensionless)
+        return self.klass([0.], units=pq.dimensionless, sampling_rate=1*pq.dimensionless)
         
 class IrregularlySampledDataSignal(NeoDataObjectTrait):
     klass = IrregularlySampledDataSignal
@@ -1042,7 +1042,7 @@ class IrregularlySampledDataSignal(NeoDataObjectTrait):
     _valid_defaults = (klass,)
     
     def make_dynamic_default(self):
-        return self.klass([0.]*pq.dimensionless, 0)
+        return self.klass([0.]*pq.dimensionless, [0], units=pq.dimensionless)
         
     
     

@@ -7351,7 +7351,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                         **kwargs)
             
             signal_axis.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
-                                               autoReduceTextSpace=False)
+                                                      autoReduceTextSpace=False)
             signal_axis.update()
             kAx += 1
         

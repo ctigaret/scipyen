@@ -1655,7 +1655,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     # def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list], axis:typing.Optional[int]=None, clear:bool=True, **kwargs):
     @safeWrapper
-    def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list, neo.core.spiketrainlist.SpikeTrainList], axis:pg.PlotItem, clear:bool=True, adapt_X_range:bool=False, **kwargs):
+    def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list, neo.core.spiketrainlist.SpikeTrainList], axis:pg.PlotItem, clear:bool=True, adapt_X_range:bool=False, minX:typing.Optional[float]=None, maxX:typing.Optional[float]=None, **kwargs):
         """For plotting events and spike trains on their own (separate) axis
         Epochs & DataZones are represented as regions between vertical lines 
         across all axes, and therefore they are not dealt with, here.
@@ -1733,33 +1733,29 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 yLabel = "Events"
                 
-                if len(self.signalAxes):
-                    # x_ranges = [ax.viewRange()[0] for ax in self.signalAxes]
-                    max_pad = max([ax.vb.state["defaultPadding"] for ax in self.signalAxes])
-                    minX = list()
-                    maxX = list()
-                    for ax in self.signalAxes:
-                        if ax.isVisible():
-                            # ax_data_items = [i for i in ax.items if isinstance(i, pg.PlotDataItem)]
-                            # if len(ax_data_items):
-                            #     rect = ax.vb.childrenBoundingRect(items=ax_data_items)
-                            #     minX.append(rect.x())
-                            #     maxX.append(rect.x() + rect.width())
-                                
-                            ax_target_range = ax.vb.state["targetRange"]
-                            minX.append(ax_target_range[0][0])
-                            maxX.append(ax_target_range[0][1])
-                                
-                    min_x = min(minX)
-                    max_x = max(maxX)
-                                
-                    print(f"min_x = {min_x}, max_x = {max_x}, max_pad = {max_pad}")
-                    entities_axis.vb.state["targetRange"][0][0] = min_x
-                    entities_axis.vb.state["targetRange"][0][1] = max_x
-                    entities_axis.vb.state["defaultPadding"] = max_pad
-                    entities_axis.vb.sigStateChanged.emit(self)
-                    entities_axis.setXRange(min_x, max_x, padding = 0.)
-                
+                if all(isinstance(v, float) for v in (minX, maxX)):
+                    entities_axis.setXRange(minX, maxX)
+                    
+                elif adapt_X_range:
+                    # FIXME 2023-01-16 22:10:47 BUG
+                    axes = [ax for ax in self.signalAxes if ax.isVisible()]
+                    if len(axes):
+                        min_x = list()
+                        max_x = list()
+                        for ax in axes:
+                            ax_data_items = [i for i in ax.items if isinstance(i, pg.PlotDataItem)]
+                            if len(ax_data_items) == 0:
+                                continue
+                            items_min_x, items_max_x = zip(*list((float(np.nanmin(i.xData)), float(np.nanmax(i.xData))) for i in ax_data_items))
+                            min_x_.append(np.nanmin(items_min_x))
+                            max_x_.append(np.nanmax(items_max_x))
+                                    
+                        minX = min(min_x) if len(min_x) else None
+                        maxX = max(max_x) if len(max_x) else None
+                                    
+                        if all(isinstance(v, float) for v in (minX, maxX)):
+                            entities_axis.setXRange(minX, maxX)
+                            
             elif all(isinstance(v, neo.SpikeTrain) for v in entities_list):
                 trains_x_list = list()
                 trains_y_list = list()
@@ -6827,9 +6823,9 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             if len(obj_):
                 if self._new_frame_:
-                    self._spiketrains_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
-                                                                        QtWidgets.QSizePolicy.Minimum, 
-                                                                        QtWidgets.QSizePolicy.Frame))
+                    # self._spiketrains_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
+                    #                                                     QtWidgets.QSizePolicy.Minimum, 
+                    #                                                     QtWidgets.QSizePolicy.Frame))
                     
                     kwargs["adapt_X_range"] = True
                     
@@ -6847,7 +6843,9 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     # def _plotEvents_(self, events: typing.Optional[typing.Union[typing.Sequence[neo.Event], typing.Sequence[DataMark]]] = None, clear: bool = True, from_cache: bool = False, plotLabelText=None, **kwargs):
     @safeWrapper
     def _plotEvents_(self, events: typing.Optional[typing.Union[typing.Sequence[neo.Event], typing.Sequence[DataMark]]] = None, plotLabelText=None, **kwargs):
-        """ Common landing zone for Event/DataMark plotting"""
+        """ Common landing zone for Event/DataMark plotting 
+        Delegates further to _plot_discrete_entities_
+        """
             
         self._events_axis_.clear()
         
@@ -6857,11 +6855,14 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         if self._plot_events_:
             if self._new_frame_:
-                self._events_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
-                                                            QtWidgets.QSizePolicy.Minimum, 
-                                                            QtWidgets.QSizePolicy.Frame))
+                # self._events_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
+                #                                             QtWidgets.QSizePolicy.Minimum, 
+                #                                             QtWidgets.QSizePolicy.Frame))
                 kwargs["adapt_X_range"] = True
-                self._plot_discrete_entities_(events, axis=self._events_axis_, **kwargs)
+                minX = kwargs.pop("minX", None)
+                maxX = kwargs.pop("maxX", None)
+                
+                self._plot_discrete_entities_(events, axis=self._events_axis_, minX = minX, maxX = maxX, **kwargs)
                 self._events_axis_.update() 
                 
                 self._events_axis_.setVisible(True)
@@ -7144,14 +7145,18 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         events = get_non_empty_events(obj.events)
         epochs = get_non_empty_epochs(obj.epochs)
         
-        self._plot_signals_(analog, irregs, *args, **kwargs)
+        minX, maxX = self._plot_signals_(analog, irregs, *args, **kwargs)
+        # print(f"{self.__class__.__name__}._plot_data_(obj<{type(obj).__name__}>) minX = {minX}, maxX = {maxX}")
         
         if len(spiketrains):
             self._plot_data_(spiketrains, *args, **kwargs)
         else:
             self.spikeTrainsAxis.setVisible(False)
             
-        self._plotEvents_(events, **kwargs)
+        if len(events):
+            self._plotEvents_(events, minX = minX, maxX = maxX, **kwargs)
+        else:
+            self.eventsAxis.setVisible(False)
             
         if self._plot_epochs_ and len(epochs):
             # print(f"{self.__class__.__name__}._plot_data_(obj<{type(obj).__name__}>): self._plot_epochs_ = {self._plot_epochs_}, len(obj.epochs) = {len(obj.epochs)}")
@@ -7474,6 +7479,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # print(f"{len(self.signalAxes)} signal axes, {len(analog)} analog, and {len(irregs)} irregs")
         if len(analog) + len(irregs) == 0:
             return
+        
         assert len(self.signalAxes) == len(analog) + len(irregs), "Mistmatch between number of signal axes and available signals"
 
         # NOTE: 2023-01-12 16:45:48
@@ -7507,6 +7513,11 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         selected_irreg_ndx = list()
         
         # ax_ndx = 0
+        
+        min_x, max_x = zip(*list((float(signal.t_start), float(signal.t_stop)) for signal in analog + irregs))
+        
+        minX = min(min_x)
+        maxX = max(max_x)
         
         #### BEGIN plot regular (analog) signals
         # NOTE: update only those plotItems where a selected signal should be
@@ -7559,6 +7570,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.signalAxes[ax_ndx].setVisible(False)
                 # ax_ndx += 1
         #### END plot irregular signals
+        
+        return minX, maxX
         
     @safeWrapper
     def _plotNumpyArrays_(self, x, y, plotLabelText = None, *args, **kwargs):
@@ -8270,6 +8283,10 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 # plotItem.vb.name = plotname
                 plotItem.setVisible(False)
                 
+        for plotItem in self.signalAxes:
+            plotItem.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
+                                                    autoReduceTextSpace=False)
+            
         if not isinstance(self._events_axis_, pg.PlotItem):
             self._events_axis_ = pg.PlotItem(name=self._default_events_axis_name_)
         
@@ -8287,267 +8304,17 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if self.signalsLayout.scene() is not None:
             self.signalsLayout.scene().sigMouseClicked.connect(self._slot_mouseClickSelectPlotItem)
             
-        for item in (self._events_axis_, self._spiketrains_axis_):
-            item.showAxis("bottom", True)
-            item.showAxes([True, False, False, True], showValues=[True, False, False, True])
+        for plotItem in (self._events_axis_, self._spiketrains_axis_):
+            plotItem.showAxis("bottom", True)
+            plotItem.showAxes([True, False, False, True], showValues=[True, False, False, True])
+            plotItem.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
+                                                   autoReduceTextSpace=False)
+#             plotItem.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
+#                                                                  QtWidgets.QSizePolicy.Minimum, 
+#                                                                  QtWidgets.QSizePolicy.Frame))
+#             
+            plotItem.setVisible(False)
         
-#     @safeWrapper
-#     def _prepareAxes_(self, nRequiredAxes, sigNames=list()):
-#         """DEPRECATED
-#         
-#         """
-#         plotitems = self.plotItems
-#         
-#         if not isinstance(sigNames, (tuple, list)):
-#             raise TypeError("Expecting sigNames to be a sequence; got %s instead" % type(sigNames).__name__)
-#         
-#         if len(sigNames):
-#             if len(sigNames) != nRequiredAxes:
-#                 raise ValueError("mismatch between number of signal names in sigNames (%d) and the number of new axes (%d))" % (len(sigNames), nRequiredAxes))
-#             
-#             elif not all([isinstance(s, (str, type(None))) for s in sigNames]):
-#                 raise TypeError("sigNames sequence must contain only strings, or None objects")
-#             
-#         else: # enforce naming of plot items!!!
-#             sigNames = ["signal_%d" % k for k in range(nRequiredAxes)]
-#             
-#         if nRequiredAxes == len(plotitems):
-#             #### requires as many axes as there already are;
-#             # number of axes not to be changed -- just update the names of the plotitems
-#             # see NOTE: 2019-03-07 09:53:38
-#             for k in range(len(plotitems)):
-#                 plotitem = self.signalsLayout.getItem(k, 0)
-#                 
-#                 if isinstance(plotitem, pg.PlotItem):
-#                     plotDataItems = [i for i in plotitem.listDataItems() if isinstance(i, pg.PlotDataItem)]
-#                     
-#                     for plotdataitem in plotDataItems:
-#                         plotdataitem.clear()
-#                         
-#                     self._plot_names_[k] = sigNames[k]
-#                     
-#                     try:
-#                         plotitem.vb.unregister()
-#                         plotitem.vb.register(sigNames[k])
-#                         plotitem.vb.name=sigNames[k]
-#                         
-#                     except:
-#                         if plotitem.vb.name in plotitem.vb.NamedViews:
-#                             plotitem.vb.NamedViews.pop(plotitem.vb.name, None)
-#                             plotitem.vb.NamedViews[sigNames[k]] = plotitem.vb
-#                             plotitem.vb.updateAllViewLists()
-#                             sid = id(plotitem.vb)
-#                             plotitem.vb.destroyed.connect(lambda: plotitem.vb.forgetView(sid, name) if (plotitem.vb is not None and 'sid' in locals() and 'name' in locals()) else None)
-#                             
-#                     # deal with any cursors that may exist here:
-#                     cursors = self.cursorsInAxis(plotitem)
-#                     self._cached_cursors_[k] = cursors
-#                         
-#             return
-#             
-#         if nRequiredAxes == 0:
-#             # no axes required => clear all plots
-#             if len(plotitems):
-#                 cursors = [c for c in self._crosshairSignalCursors_.values()] + \
-#                           [c for c in self._verticalSignalCursors_.values()] + \
-#                           [c for c in self._horizontalSignalCursors_.values()]
-#                       
-#                 for plotitem in plotitems:
-#                     for c in cursors:
-#                         c.detach()
-#             
-#             for clist in self._cached_cursors_.values(): # dict of lists of cursors!
-#                 for c in clist:
-#                     c.detach()
-#                 
-#             # FIXME there are issues in pyqtgraph when ViewBox objects are deleted from "outside" - maybe fixed already ?!?
-#             #if self.signalsLayout.scene() is not None:
-#                 #self.signalsLayout.clear()
-#                 
-#             for plotitem in plotitems:
-#                 self._remove_axes_(plotitem)
-#                 # self.signalsLayout.removeItem(plotitem)
-#                 
-#             self._plot_names_.clear()
-#                 
-#             self._crosshairSignalCursors_.clear()
-#             self._verticalSignalCursors_.clear()
-#             self._horizontalSignalCursors_.clear()
-#             
-#             self._cached_cursors_.clear()
-#             
-#         else:   # FIXME there are issues with ViewBox being deleted in pyqtgraph! - maybe fixed already - ?!?
-#             if nRequiredAxes < len(plotitems):
-#                 #### requires fewer axes than there currently are:
-#                 # adapt existing plotitems then remove extra axes (plot items)
-#                 
-#                 #### BEGIN adapt existing plot items
-#                 for k in range(nRequiredAxes): 
-#                     plotitem = self.signalsLayout.getItem(k, 0)
-#                     self._plot_names_[k] = sigNames[k]
-#                     # make sure no cached cursors exist for these plotitems
-#                     self._cached_cursors_.pop(k, None)
-#                     
-#                     # NOTE: 2019-03-07 09:53:38 change the name of plotitems to preserve
-#                     if isinstance(plotitem, pg.PlotItem):
-#                         plotDataItems = [i for i in plotitem.listDataItems() if isinstance(i, pg.PlotDataItem)]
-#                         
-#                         for plotdataitem in plotDataItems:
-#                             plotdataitem.clear()
-#                         
-#                         try:
-#                             plotitem.vb.unregister()
-#                             plotitem.vb.register(sigNames[k]) # always update this!
-#                             plotitem.vb.name=sigNames[k]
-#                             
-#                         except:
-#                             if plotitem.vb.name is not None:
-#                                 if plotitem.vb.name in plotitem.vb.NamedViews:
-#                                     plotitem.vb.NamedViews.pop(plotitem.vb.name, None)
-#                                     plotitem.vb.NamedViews[sigNames[k]] = plotitem.vb
-#                                     plotitem.vb.updateAllViewLists()
-#                                     sid = id(plotitem.vb)
-#                                     plotitem.vb.destroyed.connect(lambda: plotitem.vb.forgetView(sid, name) if (plotitem.vb is not None and 'sid' in locals() and 'name' in locals()) else None)
-#                                     
-#                 #### END adapt existing plot items          
-#                 
-#                 # NOTE: 2019-02-07 23:21:55
-#                 # if fewer plot items are needed than they currenty exist,
-#                 # remove the extra ones
-#                 #
-#                 # the consequence is that a signal plotted on a plot item at 
-#                 # some position (index in the layout) may now be plotted on a
-#                 # pre-existing plot item at a different position ("left behind")
-#                 # that's allright until we have to manage the cursors of the plot
-#                 # item(s) that are to be removed
-#                 #
-#                 # TODO there are two options:
-#                 #
-#                 # a) simple option: also lose the cursor registered with
-#                 # the plotitem that will be removed
-#                 #
-#                 # b) cache the cursor and wait until a new plotitem is constructed,
-#                 # to plot the data of a signal with the same name
-#                 #
-#                 # CAUTION: what if the name is the same
-#                 # but it represents something else altogether? i.e.different scales etc
-#                 #
-#                 # Anyway, it is bad practice to have a neo.Block with segments 
-#                 # that contain different numbers of signals in their fields (analogsignals,
-#                 # irregularlysampledsignals, etc). However this can happen !
-#                 #
-#                 # So we would need to "detach" the cursor, then "attach" it to the new
-#                 # plot item plotting a signal with same name when it comes back
-#                 # -- pretty convoluted
-#                 #
-#                 # step-by-step:
-#                 # 1. cache the cursors in the to-be-removed plot item by storing
-#                 # references in a list, in a dictionare keyed on the signal's name
-#                 # 2. when the signal's name become available again (in another segment)
-#                 # then attached the cached cursors to the corresponding (new) plot item
-#                 
-#                 #### BEGIN remove extra plot items
-#                 for k in range(nRequiredAxes, len(plotitems)):
-#                     plotitem = self.signalsLayout.getItem(k, 0)
-#                     
-#                     if isinstance(plotitem, pg.PlotItem):# and plotitem in self.__plot_items__:
-#                         # are there any cursors in this plotitem?
-#                         cursors = self.cursorsInAxis(plotitem)
-#                         
-#                         if len(cursors):
-#                             for cursor in cursors:
-#                                 
-#                                 cursor.detach() # option (b)
-# 
-#                             # see NOTE: 2019-03-08 13:20:50
-#                             self._cached_cursors_[k] = cursors
-#                             
-#                         self._remove_axes_(plotitem)
-#                         self._plot_names_.pop(k, None)
-#                 #### END remove extra plot items
-#                 
-#             elif nRequiredAxes > len(plotitems):
-#                 # requires more axes that there actually are:
-#                 # adapt existing plotitems then add new axes
-#                 
-#                 #### BEGIN adapt existing plot items
-#                 for k in range(len(plotitems)): # see NOTE: 2019-03-07 09:53:38
-#                     plotitem = self.signalsLayout.getItem(k, 0)
-#                     self._plot_names_[k] = sigNames[k]
-#                     
-#                     # clear cached cursors for these:
-#                     self._cached_cursors_.pop(k, None)
-#                     
-#                     # NOTE 2019-09-15 18:53:40:
-#                     # FIXME: this creates a nasty flicker but if we don't call
-#                     # it we'll get a nasty stacking of curves
-#                     plotitem.clear()
-#                     
-#                     # now update plotitem's registered namme
-#                     if isinstance(plotitem, pg.PlotItem):# and plotitem.vb.name is None:
-#                         try:
-#                             plotitem.vb.unregister()
-#                             plotitem.vb.register(sigNames[k])
-#                             plotitem.vb.name=sigNames[k]
-#                         except:
-#                             if plotitem.vb.name is not None:
-#                                 if plotitem.vb.name in plotitem.vb.NamedViews:
-#                                     plotitem.vb.NamedViews.pop(plotitem.vb.name, None)
-#                                     plotitem.vb.NamedViews[sigNames[k]] = plotitem.vb
-#                                     plotitem.vb.updateAllViewLists()
-#                                     sid = id(plotitem.vb)
-#                                     plotitem.vb.destroyed.connect(lambda: plotitem.vb.forgetView(sid, name) if (plotitem.vb is not None and 'sid' in locals() and 'name' in locals()) else None)
-#                 
-#                 #### END adapt existing plot items
-#                 
-#                 #### BEGIN add more plotitems as required
-#                 for k in range(len(plotitems), nRequiredAxes):
-#                     plotitem = self.signalsLayout.addPlot(row=k, col=0)
-#                     plotitem.register(sigNames[k])
-#                     self._plot_names_[k] = sigNames[k]
-#                     
-#                     plotitem.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
-#                     
-#                     # restore cached cursors if any
-#                     cursors = self._cached_cursors_.get(k, None)
-#                     
-#                     if isinstance(cursors, (tuple, list)) and len(cursors):
-#                         for c in cursors:
-#                             c.attach(plotitem)
-#                             
-#                 #### END add more plotitems as required
-#                         
-#             p0 = None
-#             
-#             plotitems = sorted([i for i in self.signalsLayout.items.items()], key = lambda x: x[1][0])
-#             
-#             if len(plotitems):
-#                 p0 = self.signalsLayout.getItem(0,0)
-#                 
-#                 if isinstance(p0, pg.PlotItem):
-#                     for k in range(1,len(plotitems)):
-#                         plotitem = self.signalsLayout.getItem(k,0) # why would this return None?
-#                         if isinstance(plotitem, pg.PlotItem):
-#                             plotitem.setXLink(p0)
-#                         
-#             # FIXME this shouldn't really be here? if it's already connected then what?
-#             if self.signalsLayout.scene() is not None:
-#                 self.signalsLayout.scene().sigMouseClicked.connect(self._slot_mouseClickSelectPlotItem)
-#                 
-#             if nRequiredAxes == 1:
-#                 p = self.signalsLayout.getItem(0,0)
-#                 #reattach multi-axes cursors
-#                 for c in [c for c in self._data_cursors_.values() if c.isDynamic]:
-#                     c.detach()
-#                     c.attach(p)
-#                     
-#         # connect plot items scene hover events to report mouse cursor coordinates
-#         for p in self.axes:
-#             if p.scene():
-#                 p.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
-#                 p.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
-#             
-                
     @pyqtSlot(object)
     @safeWrapper
     def _slot_mouseHoverInPlotItem(self, obj): 
