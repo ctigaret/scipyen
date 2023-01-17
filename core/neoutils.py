@@ -2564,7 +2564,7 @@ def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_
             signals = args[0]
             
         else:
-            raise TypeError("Expecting a sequence; got %s instead" % type(args[0]).__name__)
+            raise TypeError("Expecting a sequence (tuple, or list); got %s instead" % type(args[0]).__name__)
     else:
         signals = args
         
@@ -2615,7 +2615,7 @@ def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_
             
             signal_data = [signals[0].magnitude] + [sig.rescale(units_0).magnitude if sig.units != units_0 else sig.magnitude for sig in signals[1:]]
             
-        action = "merged" if axis == 1 else "concatenated"
+        actionStr = "merged" if axis == 1 else "concatenated"
         
         descr, names, files, annots, aannots = tuple(((zip(*tuple(tuple(__get_attrs__(s)) for s in signals)))))
         #descr, names, files, annots, aannots = tuple(((zip(*tuple(tuple(map(lambda x: "" if x is None else x, __get_attrs__(s))) for s in signals)))))
@@ -2623,14 +2623,17 @@ def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_
         kwargs = dict()
         
         if sum(len(x) for x in descr) > 0:
-            kwargs["description"] = f"{action}(" + ", ".join(descr) + ")"
+            kwargs["description"] = f"{actionStr}(" + ", ".join(descr) + ")"
             
         if sum(len(x) for x in names) > 0:
-            kwargs["name"] = f"{action}(" + ", ".join(names) + ")"
-            
+            if len(names) > 3:
+                kwargs["name"] = f"{actionStr} {len(signals)} signals "
+            else:
+                collated = ", ".join(names)
+                kwargs["name"] = f"{actionStr}( {collated} )"
                                
         if sum(len(x) for x in files) > 0:
-            kwargs["file_origin"] = f"{action}(" + ", ".join(files) + ")"
+            kwargs["file_origin"] = f"{actionStr}(" + ", ".join(files) + ")"
         
         if not ignore_annotations:
             f_annots = intersect_annotations if axis == 0 else merge_annotations
