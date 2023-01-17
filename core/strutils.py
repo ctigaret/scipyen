@@ -168,6 +168,7 @@ def is_pathname_valid(pathname: str):
     #
     # Did we mention this should be shipped with Python already?
 
+# def get_int_sfx(s, sep = "_", bracketed=False):
 def get_int_sfx(s, sep = "_"):
     """Parses an integral suffix from the string.
     
@@ -201,6 +202,10 @@ def get_int_sfx(s, sep = "_"):
     base = sep.join(parts[0:-1])
     
     try:
+        # if bracketed:
+        #     sfx = sfx[1:-1]
+            # sfx = sfx.lstrip("(").strip(")")
+        # print(f"sfx = {sfx}")
         sfx = int(sfx)
     except:
         sfx = None

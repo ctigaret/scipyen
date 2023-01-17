@@ -470,11 +470,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """
         pass
     
-    # def _get_WM_ID_(self):
-    #     if isinstance(self.windowHandle(), QtGui.QWindow):
-    #         self._wm_id_
-    #     pass
-    
     def view(self, data: (object, type(None)), doc_title: (str, type(None)) = None, *args, **kwargs):
         """Set the data to be displayed by this viewer.
         NOTE: Should be reimplemented in the derived :class:.

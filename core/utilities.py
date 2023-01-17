@@ -2995,6 +2995,7 @@ def elements_types(s):
     return gen_unique(map(lambda x: type(x).__name__, s))
 
 
+# def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, bracketed:bool = False, ret:bool=False):
 def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, ret:bool=False):
     """Appends a counter suffix to x if x is found in the list of strings
     
@@ -3031,8 +3032,8 @@ def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, re
     if not isinstance(sep, str):
         raise TypeError("Separator must be a str; got %s instead" % type(sep).__name__)
     
-    if len(sep.strip()) == 0:
-        raise ValueError("Separator cannot be an empty string")
+    # if len(sep.strip()) == 0:
+    #     raise ValueError("Separator cannot be an empty string")
     
     if not isinstance(start, int):
         raise TypeError(f"'start' expected to be an int; got {type(start).__name__} instead")
@@ -3044,11 +3045,15 @@ def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, re
     # print(f"counter_suffix: x = {x}, start = {start}, ret = {ret}")
     
     if len(strings):
-        base, cc = get_int_sfx(x, sep=sep)
+        base, cc = get_int_sfx(x, sep=sep)#, bracketed=bracketed)
         
         # print(f"counter_suffix: base = {base}, cc = {cc}")
         
         #p = re.compile(base)
+        # if bracketed:
+        #     p = re.compile("^%s%s{0,1}\(\d*\)$" % (base, sep))
+        # else:
+        #     p = re.compile("^%s%s{0,1}\d*$" % (base, sep))
         p = re.compile("^%s%s{0,1}\d*$" % (base, sep))
         
         items = sorted(list(filter(lambda x: p.match(x), strings)))
@@ -3058,6 +3063,7 @@ def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, re
         if len(items):
             full_ndx = list(range(start, len(items)))
             currentsfx = list(x[1] for x in sorted(list(filter(lambda x: isinstance(x[1], int), (map(lambda x: get_int_sfx(x, sep=sep), items)))), key=lambda x: x[1]))
+            # currentsfx = list(x[1] for x in sorted(list(filter(lambda x: isinstance(x[1], int), (map(lambda x: get_int_sfx(x, sep=sep, bracketed=bracketed), items)))), key=lambda x: x[1]))
             if len(currentsfx):
                 min_current = min(currentsfx)
                 max_current = max(currentsfx)
@@ -3080,10 +3086,15 @@ def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, re
             else:
                 newsfx = start   
                 
+            # if bracketed:
+            #     result = sep.join([base, "(%d)" % newsfx])
+            # else:
+            #     result = sep.join([base, "%d" % newsfx])
             result = sep.join([base, "%d" % newsfx])
             
             if ret:
                 return result, newsfx
+            
             return result
         
         else:
