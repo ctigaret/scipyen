@@ -39,8 +39,8 @@ CHANGELOG:
 # NOTE: 2021-10-21 13:24:24
 # all things imported below will be available in the user workspace
 #### BEGIN core python modules
-import faulthandler, importlib, subprocess
 import sys, os, types, atexit, re, inspect, gc, sip, io, warnings, numbers
+import faulthandler, importlib, subprocess, platform
 import traceback, keyword, inspect, weakref, itertools, typing, functools, operator
 import json
 from pprint import pprint
@@ -119,7 +119,9 @@ import matplotlib.mlab as mlb
 mpl.rcParams["savefig.format"] = "svg"
 mpl.rcParams["xtick.direction"] = "in"
 mpl.rcParams["ytick.direction"] = "in"
+
 # NOTE: 2017-08-24 22:48:45 
+# required to enable interaction with matplotlib plots
 plt.ion()
 
 #### END configure matplotlib
@@ -316,6 +318,14 @@ from core import scipyen_plugin_loader
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 __scipyendir__ = os.path.dirname(__module_path__)
+
+
+if "darwin" in sys.platform:
+    altKeyDescr = "<Option>"
+    ctrlKeyDescr = "<Command>"
+else:
+    altKeyDescr = "<ALT>"
+    ctrlKeyDescr = "<CTRL>"
 
 
 #### BEGIN NOTE: 2022-04-07 22:39:44 
@@ -3165,17 +3175,23 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     specialViewMenu = cm.addMenu("View with")
                     for handler_spec in handler_specs:
                         action = specialViewMenu.addAction(handler_spec[1])
+                        action.setToolTip(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        action.setStatusTip(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        action.setWhatsThis(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                         action.triggered.connect(self.slot_autoSelectViewer)
                         
                     if "DataViewer" not in [h[0].__name__ for h in handler_specs]:
                         act = specialViewMenu.addAction("DataViewer")
+                        act.setToolTip(f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        act.setStatusTip(f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        act.setWhatsThis(f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                         act.triggered.connect(self.slot_useDataViewer)
-                        
-                    # act2 = specialViewMenu.addAction("Console")
-                    # act2.triggered.connect(self.slot_showInConsole)
                         
                 else:
                     act1 = cm.addAction("Show in DataViewer")
+                    act1.setToolTip(f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                    act1.setStatusTip(f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                    act1.setWhatsThis(f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                     act1.triggered.connect(self.slot_useDataViewer)
                     
                 
@@ -3183,9 +3199,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # several variables selected
             viewVars = cm.addAction("View")
             viewVars.triggered.connect(self.slot_viewSelectedVariables) # always goes to new window
-            viewVars.setToolTip("Show variables in default viewer windows")
-            viewVars.setStatusTip("Show variables in default viewer windows")
-            viewVars.setWhatsThis("Show variables in default viewer windows")
+            viewVars.setToolTip(f"Show variables in default viewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewVars.setStatusTip(f"Show variables in default viewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewVars.setWhatsThis(f"Show variables in default viewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
             viewVars.hovered.connect(self._slot_showActionStatusMessage_)
             
         viewInConsoleAction = cm.addAction("Display in console")
@@ -6270,11 +6286,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_autoSelectViewer(self):
-        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier):
             newWindow = True
             
         else:
             newWindow = False
+            
+        askForParams = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+        
+        # print(f"{self.__class__.__name__}.slot_autoSelectViewer askForParams = {askForParams}")
             
         # varname = self.workspaceModel.currentItemName
         varname = self.currentVarItemName
@@ -6318,7 +6338,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 viewer = viewers[0]
                 
                 if not self.viewObject(variable, varname, winType = viewer, 
-                                       newWindow=newWindow):
+                                       newWindow=newWindow,
+                                       askForParams = askForParams):
                     self.console.execute(varname)
         else:
             self.console.execute(varname)
@@ -6480,7 +6501,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         return False
     
-    def viewObject(self, obj, objname, winType=None, newWindow=False):
+    def viewObject(self, obj, objname, winType=None, newWindow=False, askForParams=False):
         """Actually displays a python object in user's workspace
         Delegates to appropriate viewer according to object type, creates a new
         viewer if necessary.
@@ -6572,7 +6593,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 win.canvas.activateWindow()
            
         else:
-            win.setData(obj, doc_title=objname) # , varname=objname)
+            win.setData(obj, doc_title=objname, uiParamsPrompt=askForParams) # , varname=objname)
             win.activateWindow()
     
         return True

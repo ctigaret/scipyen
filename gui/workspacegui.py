@@ -21,8 +21,6 @@ from core.strutils import InflectEngine
 import gui.quickdialog as qd
 from gui.itemslistdialog import ItemsListDialog
 
-#ScipyenConfigurable = ScipyenConfigurable2 # NOTE remove before release
-
 class _X11WMBridge_(QtCore.QObject):
     sig_wm_inspect_done = pyqtSignal(name="sig_wm_inspect_done")
     

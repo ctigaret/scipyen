@@ -523,6 +523,9 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             Subclasses can enforce their own behaviour by reimplementing this
             method.
             
+        
+        uiParamsPrompt:bool, default False;l when True, a dialog asking for 
+            further parameters is shown (if the viewer supports it)
         """
         
         # NOTE: 2020-09-25 10:35:34

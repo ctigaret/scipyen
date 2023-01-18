@@ -320,13 +320,55 @@ def sequence_element_type(s):
     
 def array_slice(data:np.ndarray, slicing:(dict, type(None))):
     """Dynamic slicing of nD arrays and introducing new axis in the array.
-    Returns an indexing tuple
+    
+    Parameters:
+    ===========
+    data: the array
+    
+    slicing: a dict with axis index ↦ axis coordinate, specifying the axis (or 
+            dimension) from which a single coordinate needs to be retrieved. 
+            For the array axes (or dimensions) that are excluded from the `slicing`,
+            the entire extent of the array data alog those axes will be used.
+    
+            
+        • The keys can be:
+            ∘ a vigra.AxisInfo (when data is a VigraArray)
+            ∘ an int on the half-open interval [ 0, data.ndim )
+        
+        • The coordinate can be:
+            ∘ an int on the half-open interval [ 0, data.shape[key] )
+            
+    Examples:
+    =========
+    
+    1) Let x a 2D array of shape (400, 215) (i.e. a matrix with 400 columns and 255 rows).
+    
+    To create an indexing tuple to access the array values at coordinate 0 on the
+    second axis (effectively, the first "column", having 400 data points):
+    
+    ndx = array_slice(x, {1:0}) # ⇒ (slice(0, 400, None), 0)
+    
+    `ndx` can then be used to slice the array:
+    
+    x_slice = x[ndx] # ⇒ array with shape (400,)
+    
+    2) Indexing the array in Example 1 along the fist axis to obtain the first
+    row (215 data points)
+    
+    ndx = array_slice(x, {0:0})
+    
+    x[ndx] # ⇒ array with shape (215,0)
+    
+    Returns
+    =======
+    
+    An indexing tuple suitable to use for advanced numpy indexing.
+    
     """
     if not isinstance(data, np.ndarray):
         raise TypeError("data expected to be a numpy ndarray or a type derived from numpy ndarray; got %s instead" % type(data).__name__)
     
     indexobj = [slice(0,k) for k in data.shape]
-    
     
     oldaxisNdx = list()
     oldaxisSlc = list()
