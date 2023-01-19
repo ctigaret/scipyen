@@ -5404,6 +5404,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # self._plotEpochs_(clear=True)
             
             self.dataAxis = 0 # data as column vectors
+            self.frameAxis = None
             self.frameIndex = range(1)
             self.signalIndex = range(1)
             self._number_of_frames_ = 1
@@ -5872,6 +5873,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._n_signal_axes_ = 0
                 
             elif all([isinstance(i, np.ndarray) for i in y]):
+                self.criticalMessage(f"Set data ({y.__class__.__name__})","Sequence of arrays are not supported; concatenate into one array first")
+                return
                 if not all(i.ndim <= 2 for i in y):
                     self.criticalMessage(f"Set data ({y.__class__.__name__})", f"Cannot plot sequences containing arrays with more than two dimensions")
                     return
@@ -5884,7 +5887,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.dataAxis = 1 if self.signalChannelAxis == 0 else 0
                     
                 # self._plotEpochs_(clear=True)
-                self.frameIndex = range(1) if self.singleFrame else range(len(y))
+                # self.frameIndex = range(1) if self.singleFrame else range(len(y))
+                self.frameIndex = range(len(y))
                 self._number_of_frames_ = len(self.frameIndex)
                 self.signalIndex = 1
 
@@ -5895,6 +5899,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if isinstance(x, np.ndarray):
                         if x.ndim  == 2:
                             if x.shape[1] > 1:
+                                
                                 raise TypeError("for 'x', the 2nd axis of a 2D array must have shape of 1")
                             
                     elif isinstance(x,(tuple, list)) and \
@@ -5907,16 +5912,20 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._xData_ = x
                 self._yData_ = y
                 self._cached_title = "Numpy arrays"
-            
-                self._n_signal_axes_ = len(y)
+                # FIXME
+                self._n_signal_axes_ = max(list(map(lambda x: 1 if x.ndim == 1 else x.shape[1], y)))
                 # self._n_event_axes_ = 0
                 # self._n_spiketrain_axes_ = 0
                 
             else:
-                raise TypeError("Can only plot a list of 1D vigra filter kernels, 1D/2D numpy arrays, or neo-like signals")
+                self.criticalMessage(f"Set data ({y.__class__.__name__})", 
+                                     "Can only plot a list of 1D vigra filter kernels, 1D/2D numpy arrays, or neo-like signals")
+                return False
             
         else:
-            raise TypeError("Plotting is not implemented for %s data types" % type(self._yData_).__name__)
+            self.criticalMessage(f"Set data ({y.__class__.__name__})", 
+                                 f"Plotting is not implemented for {type(self._yData_).__name__} data types")
+            return False
         
         self._setup_axes_()
 
@@ -7605,19 +7614,25 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         elif all(isinstance(y_, neo.SpikeTrain) for y_ in obj):
             self._plotSpikeTrains_(obj, **kwargs)
         
-        else: # accepts sequence of np.ndarray or VigraKernel1D objects
+        else: # accepts sequence of np.ndarray or VigraKernel1D objects (they have been converted to np arrays by _parse_data_)
             # FIXME
-            self._setup_signal_choosers_(analogs = [obj])
+            self._setup_signal_choosers_(analog = [obj])
             
-            if self.singleFrame == True:
-                self._plotNumpyArrays_(self._xData_, self._yData_, *self.plot_args, **self.plot_kwargs)
+            if isinstance(self._xData_, list):
+                self._plot_data_(self._xData_[self._current_frame_index_], self._yData_[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
                 
             else:
-                if isinstance(self._xData_, list):
-                    self._plotNumpyArray_(self._xData_[self._current_frame_index_], self._yData_[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
-                    
-                else:
-                    self._plotNumpyArray_(self._xData_, self._yData_[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+                self._plotNumpyArray_(self._xData_, self._yData_[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+                
+#             if self.singleFrame == True:
+#                 self._plotNumpyArrays_(self._xData_, self._yData_, *self.plot_args, **self.plot_kwargs)
+#                 
+#             else:
+#                 if isinstance(self._xData_, list):
+#                     self._plotNumpyArray_(self._xData_[self._current_frame_index_], self._yData_[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+#                     
+#                 else:
+#                     self._plotNumpyArray_(self._xData_, self._yData_[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
                     
         return True
     
