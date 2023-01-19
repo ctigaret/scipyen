@@ -3,7 +3,7 @@
 Various utilities
 '''
 import traceback, re, itertools, functools, time, typing, warnings, operator, inspect
-import random, math
+import random, math, pprint
 from numbers import Number
 from sys import getsizeof, stderr
 from copy import (copy, deepcopy,)
@@ -2704,7 +2704,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsztip = "memory size: "
             
         elif isinstance(obj, NeoContainer):
-            sz = str(obj.size)
+            sz = pprint.pformat(obj.size)
             sizetip = "size: "
                 
             memsz = str(getsizeof(obj))

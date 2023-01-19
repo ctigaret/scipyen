@@ -819,7 +819,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # signal/slot connections & UI for pg.PlotItem objects are configured in
         # self._prepareAxes_()
         
-        self.sig_plot.connect(self._slot_plot_numeric_data_threaded_, type = QtCore.Qt.QueuedConnection)
+        self.sig_plot.connect(self._slot_plot_numeric_data_, type = QtCore.Qt.QueuedConnection)
         
         if self.viewerWidgetContainer.layout() is None:
             self.viewerWidgetContainer.setLayout(QtWidgets.QGridLayout(self.viewerWidgetContainer))
@@ -1872,10 +1872,6 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                                 symbolPen=QtGui.QPen(QtGui.QColor(next(symbolcolors))),
                                                 clearItems=False)
                         
-                # if adapt_X_range:
-                #     self._adapt_X_range_(entities_axis)
-                    # entities_axis.setXRange(x_min, x_max)
-
                 yLabel = "Spike Trains"
                 xlabel = f"{get_domain_name(entities_list[0])} ({entities_list[0].times.units.dimensionality})"
                 entities_axis.setLabels(bottom = [xlabel])
@@ -2022,7 +2018,10 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if len(mapping):
             entries = ["All"] + list(mapping.keys()) + ["Choose"]
             current_ndx = combo.currentIndex()
-            current_txt = combo.currentText()
+            if current_ndx < 0: # for empty combo this is -1
+                current_ndx = 0
+                
+            current_txt = combo.currentText() # for empty ombo this is ""
             
             if current_txt in entries:
                 new_ndx = entries.index(current_txt)
@@ -2037,6 +2036,11 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if new_ndx < 0:
                 new_ndx = 0
                 
+            if new_ndx >= len(entries) - 1:
+                new_ndx = 0
+                
+            # print(f"new_ndx = {new_ndx}")
+                
             combo.clear()
             combo.addItems(entries)
             combo.setCurrentIndex(new_ndx)
@@ -2046,8 +2050,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def _setup_signal_choosers_(self, analog:typing.Optional[list] = None, irregular:typing.Optional[list] = None):
         """ Populates the GUI signal combo boxes based on the signals
         """
+        # print(f"{len(analog) if isinstance(analog, (tuple, list)) else analog} analogs")
         if not isinstance(analog, (tuple, list)) or len(analog) == 0:
-            # self.analogSignalComboBox.clear()
             self._frame_analog_map_.clear()
             
         else:
@@ -2055,12 +2059,12 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         self._populate_signal_chooser_(self._frame_analog_map_, self.analogSignalComboBox)
             
+        # print(f"{len(irregular) if isinstance(irregular, (tuple, list)) else irregular} irregulars")
         if irregular is None or (isinstance(irregular, (tuple, list)) and len(irregular) == 0):
-            self.irregularSignalComboBox.clear()
             self._frame_irregs_map_.clear()
             
         else:
-            self._frame_irregs_map_ = self._gen_signal_ndx_name_map_(irregs)
+            self._frame_irregs_map_ = self._gen_signal_ndx_name_map_(irregular)
             
         self._populate_signal_chooser_(self._frame_irregs_map_, self.irregularSignalComboBox)
 
@@ -5683,12 +5687,25 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
             if np.all([isinstance(i, vigra.filters.Kernel1D) for i in y]):
                 # self._plotEpochs_(clear=True)
-                self.frameIndex = range(len(y))
-                self._number_of_frames_ = len(self.frameIndex)
+                self.signalChannelAxis = 1 
                 self.signalIndex = 1
                 self.dataAxis = 0
-                self.signalChannelAxis = 1 
-                xx, yy = [kernel2array(i) for i in y]
+                if frameAxis is None:
+                    if self.separateSignalChannels:
+                        self._n_signal_axes_ = len(y)
+                        self._number_of_frames_ = 1
+                        self.frameIndex = range(self._number_of_frames_)
+                    else:
+                        self._number_of_frames_ = len(y)
+                        self.frameIndex = range(self._number_of_frames_)
+                        self._n_signal_axes_ = 1
+                else:
+                    self._number_of_frames_ = len(y)
+                    self.frameIndex = range(self._number_of_frames_)
+                    self._n_signal_axes_ = 1
+                    self.separateSignalChannels = False
+                
+                xx, yy = zip(*list(map(kernel2array, y)))
                 
                 if x is None:
                     x = xx
@@ -5873,8 +5890,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._n_signal_axes_ = 0
                 
             elif all([isinstance(i, np.ndarray) for i in y]):
-                self.criticalMessage(f"Set data ({y.__class__.__name__})","Sequence of arrays are not supported; concatenate into one array first")
-                return
+                # self.criticalMessage(f"Set data ({y.__class__.__name__})","Sequence of arrays are not supported; concatenate into one array first")
+                # return
                 if not all(i.ndim <= 2 for i in y):
                     self.criticalMessage(f"Set data ({y.__class__.__name__})", f"Cannot plot sequences containing arrays with more than two dimensions")
                     return
@@ -5882,7 +5899,11 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if signalChannelAxis is None:
                     signalChannelAxis = 1 # the default
                     # raise TypeError("signalChannelAxis must be specified for 2D arrays")
-                
+                    
+                elif signalChannelAxis not in (0,1):
+                    self.criticalMessage(f"Set data ({y.__class__.__name__})", f"signalChannelAxis expected an int () or 1) or None")
+                    return
+                    
                 self.signalChannelAxis = signalChannelAxis
                 self.dataAxis = 1 if self.signalChannelAxis == 0 else 0
                     
@@ -5898,8 +5919,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     # in this case force x as a list also!
                     if isinstance(x, np.ndarray):
                         if x.ndim  == 2:
-                            if x.shape[1] > 1:
-                                
+                            if x.shape[1] > 1: # TODO use is_vector()
                                 raise TypeError("for 'x', the 2nd axis of a 2D array must have shape of 1")
                             
                     elif isinstance(x,(tuple, list)) and \
@@ -5912,8 +5932,8 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._xData_ = x
                 self._yData_ = y
                 self._cached_title = "Numpy arrays"
-                # FIXME
-                self._n_signal_axes_ = max(list(map(lambda x: 1 if x.ndim == 1 else x.shape[1], y)))
+                # FIXME - in progress 2023-01-19 08:17:25
+                self._n_signal_axes_ = max(list(map(lambda x: 1 if x.ndim == 1 or not self.separateSignalChannels else x.shape[self.signalChannelAxis], y)))
                 # self._n_event_axes_ = 0
                 # self._n_spiketrain_axes_ = 0
                 
@@ -6856,14 +6876,6 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         except:
             cFrame = self.frameIndex[0]
             
-        # if len(self.axes) and cFrame in self._target_overlays_:
-        #     for axNdx, ax in enumerate(self.axes):
-        #         self._clear_targets_overlay_(ax)
-        #         targetItems = self._target_overlays_[cFrame].get(axNdx, list())
-        #         if len(targetItems):
-        #             for tgt in targetItems:
-        #                 ax.addItem(tgt)
-            
         for k, ax in enumerate(self.axes):
             if ax.isVisible():
                 if cFrame in self._target_overlays_:
@@ -6898,6 +6910,12 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if len(self.axes) == 0:
             return
         
+        visibleAxes = [ax for ax in self.axes if ax.isVisible()]
+        
+        if len(visibleAxes) == 1:
+            visibleAxes[0].enableAutoRange()
+            return
+        
         if padding is None:
             padding = self._common_axes_X_padding_
         
@@ -6917,11 +6935,6 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     minX = min_x
                     maxX = max_x
                     axes_with_X_overlap.append(ax)
-                    # also set range and display x label just in case
-                    # ax.setXRange(minX, maxX, padding=padding)
-                    # ax.getAxis("bottom").showLabel(True)
-                    # ax.getAxis("bottom").setStyle(showValues=True)
-                    
                     
                 else:
                     if min_x > maxX: 
@@ -6964,32 +6977,6 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.axes[-1].getAxis("bottom").showLabel(True)
                 self.axes[-1].getAxis("bottom").setStyle(showValues = True)
                     
-        
-            
-    
-#     def _adapt_X_range_(self, plotItem):
-#         axes = list(ax for ax in self.signalAxes if ax.isVisible())
-#         if plotItem in axes:
-#             return
-#         
-#         if len(axes):
-#             min_x = list()
-#             max_x = list()
-#             for ax in axes:
-#                 pdis = [i for i in ax.items if isinstance(i, pg.PlotDataItem)]
-#                 if len(pdis) == 0:
-#                     continue
-#                 items_min_x, items_max_x = zip(*list((float(np.nanmin(i.xData)), float(np.nanmax(i.xData))) for i in pdis))
-#                 min_x.append(np.nanmin(items_min_x))
-#                 max_x.append(np.nanmax(items_max_x))
-#                         
-#             minX = min(min_x) if len(min_x) else None
-#             maxX = max(max_x) if len(max_x) else None
-#                   
-#             if all(isinstance(v, float) for v in (minX, maxX)):
-#                 plotItem.setXRange(minX, maxX)
-#         
-                        
     @safeWrapper
     def _plotSpikeTrains_(self, trains:typing.Optional[typing.Union[neo.SpikeTrain, neo.core.spiketrainlist.SpikeTrainList, tuple, list]] = None, clear:bool = False, plotLabelText = None, **kwargs):
         """Common landing zone for SpikeTrainList or collection of SpikeTrain.
@@ -7524,7 +7511,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.eventsAxis.setVisible(False)
             
         elif all([isinstance(y_, (neo.Event, DataMark)) for y_ in obj]):
-            self._plotEvents_(obj, **kwargs)
+            self._plotEvents_(obj, *args, **kwargs)
             
         elif all([isinstance(y_, (neo.core.Epoch, DataZone)) for y_ in obj]): 
             # print(f"{self.__class__.__name__}._plot_data_(obj<{type(obj).__name__}>)")
@@ -7574,7 +7561,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         elif all([isinstance(y_, neo.Segment) for y_ in obj]):
             segment = obj[self.frameIndex[self._current_frame_index_]]
-            self._plot_data_(segment, *self.plot_args, **self.plot_kwargs)
+            self._plot_data_(segment, *args, **kwargs)
             self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
             
         elif all([isinstance(y_, neo.Block) for y_ in obj]):
@@ -7604,36 +7591,92 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             kwargs.update(self.plot_kwargs)
             kwargs["plotTitle"] = plotTitle
             
-            self._plot_data_(segment, *self.plot_args, **kwargs)
+            self._plot_data_(segment, *args, **kwargs)
             
             self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
             
         elif all(isinstance(y_, (neo.Event, DataMark)) for y_ in obj):
-            self._plotEvents_(obj, **kwargs)
+            self._plotEvents_(obj, *args, **kwargs)
             
         elif all(isinstance(y_, neo.SpikeTrain) for y_ in obj):
-            self._plotSpikeTrains_(obj, **kwargs)
+            self._plotSpikeTrains_(obj, *args, **kwargs)
         
-        else: # accepts sequence of np.ndarray or VigraKernel1D objects (they have been converted to np arrays by _parse_data_)
-            # FIXME
-            self._setup_signal_choosers_(analog = [obj])
+        else: # accepts sequence of np.ndarray (VigraKernel1D objects are converted to np arrays by _parse_data_)
+            # FIXME - in progress 2023-01-19 08:17:18
+            if not all(isinstance(v, np.ndarray) for v in obj):
+                self.criticalMessage("Plot data:", "Incompatible element types in the sequence")
+                return
             
-            if isinstance(self._xData_, list):
-                self._plot_data_(self._xData_[self._current_frame_index_], self._yData_[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+            frIndex = self.frameIndex[self._current_frame_index_]
+            
+            if isinstance(self._xData_, (tuple ,list)):
+                if len(self._xData_) != len(obj):
+                    raise ValueError(f"X, Y Sequence length mismatch x: {len(self._xData_)}; obj: {len(obj)}")
                 
+            if self.frameAxis is None:
+                if all(y.ndim == 1 for y in obj):
+                    if self.separateSignalChannels:
+                        for ky, y in enumerate(obj):
+                            if isinstance(self._xData_, (tuple, list)):
+                                x = self._xData_[ky]
+                            else:
+                                x = self._xData_
+                                        
+                            self._plotNumpyArray_(x, y, self.signalAxes[ky], *args, **kwargs)
+                            
+                        for ax in self.signalAxes[len(obj):]:
+                            ax.setVisible(False)
+                    else:
+                        if isinstance(self._xData_, (tuple, list)):
+                            x = self._xData_[frIndex]
+                        else:
+                            x = self._xData_
+                            
+                        self._plotNumpyArray_(x, obj[frIndex], self.signalAxes[0],
+                                              *args, **kwargs)
+                        
+                    return True
+                        
+            y = obj[frIndex]
+            
+            if isinstance(self._xData_, (tuple, list)):
+                x = self._xData_[frIndex]
             else:
-                self._plotNumpyArray_(self._xData_, self._yData_[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+                x = self._xData_
                 
-#             if self.singleFrame == True:
-#                 self._plotNumpyArrays_(self._xData_, self._yData_, *self.plot_args, **self.plot_kwargs)
-#                 
-#             else:
-#                 if isinstance(self._xData_, list):
-#                     self._plotNumpyArray_(self._xData_[self._current_frame_index_], self._yData_[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
-#                     
-#                 else:
-#                     self._plotNumpyArray_(self._xData_, self._yData_[self._current_frame_index_], *self.plot_args, **self.plot_kwargs)
+            if y.ndim == 1:
+                self._setup_signal_choosers_(analog = [y])
+                
+                self._plotNumpyArray_(x,y, self.signalAxes[0],
+                                    *args, **kwargs)
+                
+                # self.signalAxes[0].setVisible(True) # called by _plotNumpyArray_
                     
+                for ax in self.signalAxes[1:]:
+                    ax.setVibisle(False)
+            
+            elif y.ndim == 2:
+                if self.separateSignalChannels:
+                    self._setup_signal_choosers_(analog = list(y[array_slice(y, {self.signalChannelAxis:k})] for k in range(y.shape[self.signalChannelAxis])))
+                    # for k, ax in self.signalAxes:
+                    for k in range(y.shape[self.signalChannelAxis]):
+                        self._plotNumpyArray_(x, y[array_slice(y, {self.signalChannelAxis:k})],
+                                            self.signalAxes[k]
+                                            *args, **kwargs)
+                        
+                        # self.signalAxes[k].setVisible(True) # called by _plotNumpyArray_
+                        
+                    for ax in self.signalAxes[y.shape[self.signalChannelAxis]:]:
+                        ax.setVisible(False)
+                        
+                else:
+                    self._plotNumpyArray_(x, y, self.signalAxis(0), *args, **kwargs)
+                    for ax in self.signalAxes[1:]:
+                        ax.setVisible[False]
+                    
+            else:
+                return False
+                        
         return True
     
     def _register_plot_item_name_(self, plotItem, name):
@@ -7819,7 +7862,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._setup_signal_choosers_(analogs = [y]) # FIXME for a list of signals
         
         if not isinstance(y, (tuple, list)) or not all(isinstance(v, np.ndarray) for v in y):
-            raise TypeError(f"_plotNumpyArrays_ expects a seuence (tuple, list) of numpy arrays")
+            raise TypeError(f"_plotNumpyArrays_ expects a sequence (tuple, list) of numpy arrays")
         
         if isinstance (x, (tuple, list)):
             if len(x) not in (1,len(y)):
@@ -7850,7 +7893,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         if not isinstance(axis, pg.PlotItem):
             raise TypeError(f"axis expected to be a PlotItem; instead, got {type(axis).__name__}")
-        
+        # print(f"x: {x.shape}, y: {y.shape}")
         self._setup_signal_choosers_(analog=[y])
         
         plotDataItemName = kwargs.pop("name", None)
@@ -7910,7 +7953,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         if signal is None:
             return
-
+        
         if not isinstance(signal, neo.core.baseneo.BaseNeo):
             raise TypeError("_plot_signal_ expects an object from neo framework, or a datasignal.DataSignal or datasignal.IrregularlySampledDataSignal; got %s instead" % (type(signal).__name__))
             
@@ -7922,7 +7965,6 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
             irregs = [signal]
         else:
             raise TypeError(f"Expecting one of {SIGNAL_OBJECT_TYPES}; got {type(signal).__name__} instead")
-            
         
         self._setup_signal_choosers_(analog=analog, irregular=irregs)
         
@@ -7972,6 +8014,15 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     ch_name = ch_name[k]
                     
+                    
+                if isinstance(sig, (neo.AnalogSignal, DataSignal)) and not self._plot_analogsignals_:
+                    self.signalAxis(k).setVisible(False)
+                    return
+                
+                if isinstance(sig, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)) and not self._plot_irregularsignals_:
+                    self.signalAxis(k).setVisible(False)
+                    return
+                
                 self._plot_numeric_data_(self.signalAxis(k), 
                                          np.array(sig.times),
                                          np.array(sig[:,channel].magnitude),
@@ -7986,8 +8037,17 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.signalAxis(k).setVisible(True)
                     
         else:
-            # self._prepareAxes_(1, sigNames = [signal_name])
+            if isinstance(sig, (neo.AnalogSignal, DataSignal)) and not self._plot_analogsignals_:
+                self.signalAxis(0).setVibisle(False)
+                return
+            
+            if isinstance(sig, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)) and not self._plot_irregularsignals_:
+                self.signalAxis(0).setVibisle(False)
+                return
+            
             if sig.shape[1] > 10:
+                # print("mt")
+                self.setCursor(QtCore.Qt.WaitCursor)
                 self.sig_plot.emit(self._make_sig_plot_dict_(self.signalAxis(0), np.array(sig.times), 
                                        np.array(sig.magnitude), 
                                        name=sig.name,
@@ -8004,12 +8064,16 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             if sig.name != self.signalAxis(0).vb.name:
                 self._register_plot_item_name_(self.signalAxis(0), sig.name)
+                
             self.signalAxis(0).register(sig.name)
             self.signalAxis(0).setVisible(True)
                 
         self.plotTitleLabel.setText("", color = "#000000")
+        
         if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
             self.docTitle = signal_name
+            
+        self._align_X_range()
             
     def _make_sig_plot_dict_(self, plotItem:pg.PlotItem, x:np.ndarray, y:np.ndarray, xlabel:(str, type(None))=None,  ylabel:(str, type(None))=None, title:(str, type(None))=None, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
         return {"plotItem":plotItem, 
@@ -8021,11 +8085,11 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
     @safeWrapper
     @pyqtSlot(dict)
-    def _slot_plot_numeric_data_threaded_(self, data:dict):  
+    def _slot_plot_numeric_data_(self, data:dict):  
         """For dict's keys and values see parameters of self._plot_numeric_data_
         For threading...
         """
-        #print("_slot_plot_numeric_data_threaded_")
+        #print("_slot_plot_numeric_data_")
         self.statusBar().showMessage("Working...")
         
         plotItem            = data.pop("plotItem")
@@ -8041,10 +8105,11 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         args                = data.pop("args", tuple())
         kwargs              = data.pop("args", dict())
 
-        # print(f"_slot_plot_numeric_data_threaded_ y.shape {y.shape}")
+        # print(f"_slot_plot_numeric_data_ y.shape {y.shape}")
         self._plot_numeric_data_(plotItem,  x, y, xlabel, ylabel,
                                 title, name, symbolcolorcycle, *args, **kwargs)
         
+        self.setCursor(QtCore.Qt.ArrowCursor)
         self.statusBar().clearMessage()
         
     def _plot_events_or_marks_(self, entities_list, entities_axis, xLabel, yLabel, minX, maxX, adapt_X_range, height_interval, symbolStyle, **labelStyle):
@@ -8089,6 +8154,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         yy_ = np.concatenate(yy).T
         
         if yy_.shape[1] > 10:
+            self.setCursor(QtCore.Qt.WaitCursor)
             self.sig_plot.emit(self._make_sig_plot_dict_(entities_axis,
                                     xx_, yy_,
                                     pen=None,
@@ -8129,6 +8195,7 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 sig = signal
         
         if sig.shape[1] > 10:
+            self.setCursor(QtCore.Qt.WaitCursor)
             self.sig_plot.emit(self._make_sig_plot_dict_(plotItem,
                                     sig.times,
                                     sig.magnitude,
@@ -8205,11 +8272,11 @@ class SignalViewer2(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         # ATTENTION: y is a numpy arrays here; x is either None, or a numpy array
         
-        #### BEGIN debug
+        # ### BEGIN debug
         # stack = inspect.stack()
         # for s in stack:
         #     print(f"\tcaller\t {s.function} at line {s.lineno}")
-        #### END debug
+        # ### END debug
         
         y = np.atleast_1d(y)
         
