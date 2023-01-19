@@ -52,7 +52,8 @@ class TextViewer(ScipyenViewer):
         self._readOnly = edit!=True
         self._markdown = markdown==True
         super().__init__(data=data, parent=parent, ID = ID, win_title=win_title, doc_title=doc_title, *args, **kwargs)
-        
+        # super(QMainWindow, self).__init__(parent)
+        # self._wm_id_ = int(self.winId())
             
     def _configureUI_(self):
         self.fileMenu = self.menuBar().addMenu("&File")

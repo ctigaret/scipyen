@@ -50,6 +50,8 @@ from core.datatypes import array_slice
 
 #### BEGIN pict.gui modules
 from .scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
+from gui.widgets import tableeditorwidget
+from gui.widgets.tableeditorwidget import TableEditorWidget
 from . import quickdialog
 from . import resources_rc
 #### END pict.gui modules

@@ -738,17 +738,10 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     
     @pyqtSlot(QtGui.QWindow.Visibility)
     def _slot_visibility_changed(self, val):
-        if self._wm_id_ != int(self.winId()):
+        if hasattr(self, "_wm_id_") and self._wm_id_ != int(self.winId()):
             if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
                 self._restore_menuBar_()
     
-    # @pyqtSlot(bool)
-    # def _slot_visible_changed(self, val):
-    #     print(f"{self.__class__.__name__}._slot_visibile_changed: {val}")
-    #     if val == True:
-    #         self._restore_menuBar_()
-            
-            
     def _restore_menuBar_(self):
         """Hack to restore the window's menubar in the desktop's global menu.
         

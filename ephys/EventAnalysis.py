@@ -45,8 +45,10 @@ from core.workspacefunctions import get_symbol_in_namespace
 from gui import quickdialog as qd
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import ScipyenFrameViewer
+# import gui.signalviewer as sv
+# from gui.signalviewer import SignalCursor as SignalCursor
 import gui.signalviewer as sv
-from gui.signalviewer import SignalCursor as SignalCursor
+from gui.cursors import (SignalCursor, SignalCursorTypes)
 import gui.pictgui as pgui
 from gui.itemslistdialog import ItemsListDialog
 from gui.workspacegui import (GuiMessages, WorkspaceGuiMixin)
