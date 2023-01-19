@@ -612,7 +612,7 @@
      <x>0</x>
      <y>0</y>
      <width>808</width>
-     <height>30</height>
+     <height>28</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -671,11 +671,22 @@
      <addaction name="actionReset_to_factory"/>
      <addaction name="actionClear_default"/>
     </widget>
+    <widget class="QMenu" name="menuToolbars">
+     <property name="title">
+      <string>Toolbars</string>
+     </property>
+     <addaction name="actionLock_toolbars"/>
+     <addaction name="actionMain_toolbar"/>
+     <addaction name="actionDetection_toolbar"/>
+     <addaction name="actionTemplate_toolbar"/>
+     <addaction name="actionFilter_toolbar"/>
+     <addaction name="actionShow_all_toolbars"/>
+    </widget>
     <addaction name="menuPersistent_evebnt_template_location"/>
     <addaction name="actionOverlay_Template_with_Model"/>
     <addaction name="actionAll_waves_to_result"/>
-    <addaction name="actionLock_toolbars"/>
     <addaction name="actionWaves_alignment_on_rising_phase"/>
+    <addaction name="menuToolbars"/>
    </widget>
    <widget class="QMenu" name="menuDetect_Events">
     <property name="title">
@@ -1415,10 +1426,66 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="align-horizontal-left"/>
+    <iconset theme="align-horizontal-left">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Waves alignment on rising phase</string>
+   </property>
+  </action>
+  <action name="actionMain_toolbar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Main toolbar</string>
+   </property>
+  </action>
+  <action name="actionDetection_toolbar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Detection toolbar</string>
+   </property>
+  </action>
+  <action name="actionTemplate_toolbar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Template toolbar</string>
+   </property>
+  </action>
+  <action name="actionFilter_toolbar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Filter toolbar</string>
+   </property>
+  </action>
+  <action name="actionShow_all_toolbars">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show all</string>
    </property>
   </action>
  </widget>

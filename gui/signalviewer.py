@@ -1797,6 +1797,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         across all axes, and therefore they are not dealt with, here.
         adapt_X_range determines the x range (you may want to pass a custom one if needed)
         """
+        #### BEGIN debug
+        # stack = inspect.stack()
+        # print(f"_plot_discrete_entities_")
+        # for s in stack:
+        #     print(f"\t\tcaller {s.function} from {s.filename} at {s.lineno}")
+        #### END debug
         
         if len(entities) == 0:
             return
@@ -2139,7 +2145,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._target_overlays_[cFrame][axNdx] = targetItems
         
         # print(f"_target_overlays_ for axis {axNdx} in frame {cFrame}: {len(self._target_overlays_[cFrame][axNdx])}")
-        self._plot_discrete_entities_(self._target_overlays_[cFrame][axNdx], axNdx, clear=clear)
+        self._plot_discrete_entities_(self._target_overlays_[cFrame][axNdx], axis, clear=clear)
         
     def removeTargetsOverlay(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None):
         """Remove targets overlaid in this axis.
@@ -6871,6 +6877,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
         # NOTE: 2022-11-22 11:49:47
         # Finally, check for target overlays
+        
         try:
             cFrame = self.frameIndex[self.currentFrame]
         except:
@@ -6878,20 +6885,26 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         for k, ax in enumerate(self.axes):
             if ax.isVisible():
+                self._clear_targets_overlay_(ax)
                 if cFrame in self._target_overlays_:
-                    targetItems = self._target_overlays_[cFrame].get(axNdx, list())
+                    targetItems = self._target_overlays_[cFrame].get(k, list())
                     if len(targetItems):
                         for tgt in targetItems:
                             ax.addItem(tgt)
                     
                 ax.getAxis("left").setWidth(60)
                 
-                # if k > 0:
-                #     if ax.getAxis("bottom").labelText == self.axes[k-1].getAxis("bottom").labelText:
-                #         self.axes[k-1].getAxis("bottom").showLabel(False)
-                #         self.axes[k-1].getAxis("bottom").setStyle(showValues = False)
-                        
+        # visibleAxes = [ax for ax in self.axes if ax.isVisible()]
+        # if len(visibleAxes) > 0:
+        #     if len(visibleAxes) == 1:
+        #         visibleAxes[0].enableAutoRange()
+        #         visibleAxes[0].enableAutoRange()
+        #         visibleAxes[0].getAxis("bottom").showLabel(True)
+        #         visibleAxes[0].getAxis("bottom").setStyle(showValues = True)
+        #     else:
+        #         self._align_X_range()
         self._align_X_range()
+        
           
     def _align_X_range(self, padding:typing.Optional[float] = None):
         """ Heuristic to align plot items X axis:
@@ -6910,16 +6923,21 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if len(self.axes) == 0:
             return
         
+        if padding is None:
+            padding = self._common_axes_X_padding_
+            
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
         
         if len(visibleAxes) == 1:
-            visibleAxes[0].enableAutoRange()
+            ax = visibleAxes[0]
+            pdis = [i for i in ax.items if isinstance(i, pg.PlotDataItem)]
+            if len(pdis):
+                items_min_x, items_max_x = zip(*list((float(np.nanmin(i.xData)), float(np.nanmax(i.xData))) for i in pdis))
+                min_x = items_min_x[0] if isinstance(items_min_x, (tuple, list)) else items_min_x
+                max_x = items_max_x[0] if isinstance(items_max_x, (tuple, list)) else items_max_x
+            ax.setXRange(min_x, max_x, padding = padding)
             visibleAxes[0].getAxis("bottom").showLabel(True)
-            vibisleAxes[0].getAxis("bottom").setStyle(showValues = True)
-            return
-        
-        if padding is None:
-            padding = self._common_axes_X_padding_
+            visibleAxes[0].getAxis("bottom").setStyle(showValues = True)
         
         axes_with_X_overlap = list()
         minX, maxX = None, None
@@ -6979,7 +6997,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.axes[-1].getAxis("bottom").showLabel(True)
                 self.axes[-1].getAxis("bottom").setStyle(showValues = True)
                 
-                if self.aignalAxes[-1].isVisible:
+                if self.signalAxes[-1].isVisible:
                     self.signalAxes[-1].getAxis("bottom").showLabel(True)
                     self.signalAxes[-1].getAxis("bottom").setStyle(showValues = True)
                     
@@ -7660,7 +7678,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 # self.signalAxes[0].setVisible(True) # called by _plotNumpyArray_
                     
                 for ax in self.signalAxes[1:]:
-                    ax.setVibisle(False)
+                    ax.setVisible(False)
             
             elif y.ndim == 2:
                 if self.separateSignalChannels:
@@ -8045,11 +8063,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
         else:
             if isinstance(sig, (neo.AnalogSignal, DataSignal)) and not self._plot_analogsignals_:
-                self.signalAxis(0).setVibisle(False)
+                self.signalAxis(0).setVisible(False)
                 return
             
             if isinstance(sig, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)) and not self._plot_irregularsignals_:
-                self.signalAxis(0).setVibisle(False)
+                self.signalAxis(0).setVisible(False)
                 return
             
             if sig.shape[1] > 10:
@@ -8806,6 +8824,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         for p in self.plotItems:
             self._remove_axes_(p)
+        
+        # remove all PlotItems references
+        self._signal_axes_.clear()
+        self._events_axis_ = None 
+        self._spiketrains_axis_ = None
 
     def setTitlePrefix(self, value):
         """Sets the window-specific prefix of the window title

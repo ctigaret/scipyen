@@ -615,6 +615,15 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.actionChoose_persistent_event_template_file.triggered.connect(self._slot_choosePersistentTemplateFile)
         self.actionLock_toolbars.setChecked(self._toolbars_locked_ == True)
         self.actionLock_toolbars.triggered.connect(self._slot_lockToolbars)
+        self.actionMain_toolbar.triggered.connect(self._slot_setMainToolbarVisibility)
+        self.mainToolBar.visibilityChanged.connect(self._slot_setMainToolbarVisibility)
+        self.actionDetection_toolbar.triggered.connect(self._slot_setDetectionToolbarVisibility)
+        self.detectionToolBar.visibilityChanged.connect(self._slot_setDetectionToolbarVisibility)
+        self.actionTemplate_toolbar.triggered.connect(self._slot_setTemplateToolbarVisibility)
+        self.templateToolBar.visibilityChanged.connect(self._slot_setTemplateToolbarVisibility)
+        self.actionFilter_toolbar.triggered.connect(self._slot_setFilterToolbarVisibility)
+        self.filterToolBar.visibilityChanged.connect(self._slot_setFilterToolbarVisibility)
+        self.actionShow_all_toolbars.triggered.connect(self._slot_setToolBarsVisible)
         
         self.actionWaves_alignment_on_rising_phase.triggered.connect(self._slot_set_alignOnRisingPhase)
         # signal & epoch comboboxes
@@ -711,8 +720,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 if len(c.whatsThis().strip()) == 0:
                     c.setWhatsThis(s)
                     
-        # self.noiseFilterCheckBox.stateChanged.connect(self._slot_filterData)
-        # print(f"{self.__class__.__name__}._configureUI_ end...")
 #### END _configureUI_        
         
     def loadSettings(self):
@@ -1155,6 +1162,16 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             fitted_minis.append(fw)
 
         return fitted_minis
+    
+    def createPopupMenu(self):
+        menu = super().createPopupMenu()
+        currentActions = menu.actions()
+        if len(currentActions):
+            menu.insertAction(self.actionLock_toolbars, currentActions[0])
+        else:
+            menu.inseertAction(self.actionLock_toolbars, None)
+            
+        return menu
     
     def alignWaves(self, detectionChannel:typing.Optional[int]=None, on_rising:typing.Optional[bool]=None):
         """
@@ -1715,7 +1732,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             self._detected_Events_Viewer_.removeLabels(0)
             
         self._events_spinBoxSlider_.setRange(0, len(self._aligned_waves_)-1)
-        self._detected_Events_Viewer_.view(self._aligned_waves_, doc_title="Aligned events")
+        self._detected_Events_Viewer_.view(self._aligned_waves_, 
+                                           doc_title="Aligned events",
+                                           frameAxis=1)
         
     def _plot_all_events(self):
         if not isinstance(self._ephysViewer_, sv.SignalViewer):
@@ -1740,7 +1759,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             self._events_spinBoxSlider_.setRange(0, len(waves)-1)
             if len(self._detected_Events_Viewer_.axes):
                 self._detected_Events_Viewer_.removeLabels(0)
-            self._detected_Events_Viewer_.view(waves, doc_title="All events")
+            self._detected_Events_Viewer_.view(waves, 
+                                               doc_title="All events", 
+                                               frameAxis=1)
             
             self._indicate_events_(waves=waves)
             # self._indicate_events_(self._detected_Events_Viewer_.currentFrame, waves=waves)
@@ -1807,7 +1828,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             if len(self._detected_Events_Viewer_.axes):
                 self._detected_Events_Viewer_.removeLabels(0)
 
-            self._detected_Events_Viewer_.view(self._detected_events_, doc_title = f"Events in sweep {self.currentFrame}")
+            self._detected_Events_Viewer_.view(self._detected_events_, 
+                                               doc_title = f"Events in sweep {self.currentFrame}",
+                                               frameAxis=1)
             
             self._indicate_events_()
             
@@ -3890,6 +3913,38 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     def _slot_lockToolbars(self, value):
         self.toolbarsLocked = value
         
+    @pyqtSlot(bool)
+    def _slot_setToolBarsVisible(self, value):
+        toolbars = (self.mainToolBar, self.detectionToolBar, self.templateToolBar, self.filterToolBar)
+        for toolbar in toolbars:
+            toolbar.setVisible(value == True)
+            
+        tbactions = (self.actionShow_all_toolbars, self.actionMain_toolbar,
+                     self.actionDetection_toolbar, self.actionTemplate_toolbar,
+                     self.actionFilter_toolbar)
+        sigBlocks = [QtCore.QSignalBlocker(w) for w in tbactions]
+        self.actionShow_all_toolbars.setChecked(all(t.isVisible() for t in toolbars))
+        for k,t in enumerate(toolbars):
+            tbactions[k+1].setChecked(t.isVisible())
+            
+        
+    @pyqtSlot(bool)
+    def _slot_setMainToolbarVisibility(self, value):
+        self.mainToolBarVisible = value==True
+        
+        
+    @pyqtSlot(bool)
+    def _slot_setDetectionToolbarVisibility(self, value):
+        self.detectionToolBarVisible = value==True
+        
+    @pyqtSlot(bool)
+    def _slot_setTemplateToolbarVisibility(self, value):
+        self.templateToolBarVisible = value==True
+        
+    @pyqtSlot(bool)
+    def _slot_setFilterToolbarVisibility(self, value):
+        self.filterToolBarVisible = value==True
+        
     @pyqtSlot()
     def _slot_make_mPSCEpoch(self):
         if self._data_ is None:
@@ -4548,6 +4603,87 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
         signalBlocker = QtCore.QSignalBlocker(self.actionLock_toolbars)
         self.actionLock_toolbars.setChecked(self._toolbars_locked_)
+        
+    @property
+    def mainToolBarVisible(self):
+        return self.mainToolBar.isVisible()
+    
+    @markConfigurable("MainToolBarVisible", conftype="Qt")
+    @mainToolBarVisible.setter
+    def mainToolBarVisible(self, value):
+        if isinstance(value, str):
+            value = value.lower() == "true"
+            
+        self.mainToolBar.setVisible(value == True)
+        self.mainToolBar.setFloatable(not self._toolbars_locked_)
+        self.mainToolBar.setMovable(not self._toolbars_locked_)
+        
+        sigBlock = QtCore.QSignalBlocker(self.actionMain_toolbar)
+        self.actionMain_toolbar.setChecked(self.mainToolBar.isVisible())
+        toolbars = (self.mainToolBar, self.detectionToolBar, self.templateToolBar, self.filterToolBar)
+        sigBlock = QtCore.QSignalBlocker(self.actionShow_all_toolbars)
+        self.actionShow_all_toolbars.setChecked(all(t.isVisible() for t in toolbars))
+        
+    @property
+    def detectionToolBarVisible(self):
+        return self.detectionToolBar.isVisible()
+    
+    @markConfigurable("DetectionToolBarVisible", conftype="Qt")
+    @detectionToolBarVisible.setter
+    def detectionToolBarVisible(self, value):
+        if isinstance(value, str):
+            value = value.lower() == "true"
+            
+        self.detectionToolBar.setVisible(value == True)
+        self.detectionToolBar.setFloatable(not self._toolbars_locked_)
+        self.detectionToolBar.setMovable(not self._toolbars_locked_)
+        
+        sigBlock = QtCore.QSignalBlocker(self.actionDetection_toolbar)
+        self.actionDetection_toolbar.setChecked(self.detectionToolBar.isVisible())
+        toolbars = (self.mainToolBar, self.detectionToolBar, self.templateToolBar, self.filterToolBar)
+        sigBlock = QtCore.QSignalBlocker(self.actionShow_all_toolbars)
+        self.actionShow_all_toolbars.setChecked(all(t.isVisible() for t in toolbars))
+        
+    @property
+    def templateToolBarVisible(self):
+        return self.templateToolBar.isVisible()
+    
+    @markConfigurable("TemplateToolBarVisible", conftype="Qt")
+    @templateToolBarVisible.setter
+    def templateToolBarVisible(self, value):
+        if isinstance(value, str):
+            value = value.lower() == "true"
+            
+        self.templateToolBar.setVisible(value == True)
+        self.templateToolBar.setFloatable(not self._toolbars_locked_)
+        self.templateToolBar.setMovable(not self._toolbars_locked_)
+        
+        sigBlock = QtCore.QSignalBlocker(self.actionTemplate_toolbar)
+        self.actionTemplate_toolbar.setChecked(self.templateToolBar.isVisible())
+        toolbars = (self.mainToolBar, self.detectionToolBar, self.templateToolBar, self.filterToolBar)
+        sigBlock = QtCore.QSignalBlocker(self.actionShow_all_toolbars)
+        self.actionShow_all_toolbars.setChecked(all(t.isVisible() for t in toolbars))
+        
+    @property
+    def filterToolBarVisible(self):
+        return self.filterToolBar.isVisible()
+    
+    @markConfigurable("FilterToolBarVisible", conftype="Qt")
+    @filterToolBarVisible.setter
+    def filterToolBarVisible(self, value):
+        if isinstance(value, str):
+            value = value.lower() == "true"
+            
+        self.filterToolBar.setVisible(value == True)
+        self.filterToolBar.setFloatable(not self._toolbars_locked_)
+        self.filterToolBar.setMovable(not self._toolbars_locked_)
+        
+        sigBlock = QtCore.QSignalBlocker(self.actionFilter_toolbar)
+        self.actionFilter_toolbar.setChecked(self.filterToolBar.isVisible())
+        toolbars = (self.mainToolBar, self.detectionToolBar, self.templateToolBar, self.filterToolBar)
+        sigBlock = QtCore.QSignalBlocker(self.actionShow_all_toolbars)
+        self.actionShow_all_toolbars.setChecked(all(t.isVisible() for t in toolbars))
+        
         
     def modelWave(self):
         return self._get_event_template_or_waveform_(use_template = False)
