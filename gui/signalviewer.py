@@ -145,7 +145,7 @@ from core.neoutils import (get_domain_name,
                            segment_start,
                            )
 
-from core.prog import safeWrapper
+from core.prog import safeWrapper, show_caller_stack
 from core.datatypes import (array_slice, is_column_vector, is_vector, )
 
 from core.utilities import (normalized_index, normalized_axis_index, 
@@ -2196,6 +2196,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         Passed directly to pyqtgraph TextItem constructor, see below for details:
         https://pyqtgraph.readthedocs.io/en/latest/api_reference/graphicsItems/textitem.html
         """
+        #### BEGIN debug
+        # print(f"{self.__class__.__name__}.addLabel(text={text})")
+        # stack = inspect.stack()
+        # show_caller_stack(stack)
+        #### END debug
         axis, axNdx = self._check_axis_spec_ndx_(axis)
         
         if pos is None:
@@ -2210,6 +2215,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         elif not isinstance(pos, pg.Point):
             raise TypeError(f"pos expected a 2-tuple or number, QPoint, QPointF or pg.Point; got {type(pos).__name__} instead")
         
+        # print(f"{self.__class__.__name__}.addLabel(text={text})")
         textItem = pg.TextItem(text, **kwargs)
         textItem.setPos(pos)
         
@@ -3038,7 +3044,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     def var_observer(self, change):
         # print(f"{self.__class__.__name__}.var_observer change = {change}")
+        self._new_frame_ = True # to force re-plotting
         self.displayFrame()
+        self._new_frame_ = False
         # self.currentFrame = self._current_frame_index_
         
 
@@ -6814,6 +6822,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         # print(f"self.displayFrame {type(self._yData_).__name__}")
         if self._yData_ is None:
+            self.clear()
             return
         
         self.currentFrameAnnotations = None

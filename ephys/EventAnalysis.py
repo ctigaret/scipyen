@@ -392,6 +392,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         self._detected_Events_Viewer_.frameChanged.connect(self._slot_mPSCViewer_frame_changed)
         
+        # NOTE: 2023-01-20 10:14:38
+        # this MUST be def'ed here because of parent (self) needs its super() intialized too
         self._reportWindow_ = TableEditor(win_title = "Detection Result", parent=self)
         self._reportWindow_.setVisible(False)
         
@@ -1157,7 +1159,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 msg = f"Event {kw} in sweep {segment}:\n{excstr[-1]}"
                 self.criticalMessage("Fitting event",
                                         "\n".join(excstr))
-                return e
+                return
             
             fitted_minis.append(fw)
 
@@ -1282,15 +1284,23 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         for wave in waves:
             kw = wave.annotations["wave_index"]
-            wave.annotate(channel_id = train.annotations["channel_id"],
-                          amplitude = train.annotations["amplitude"][kw],
-                          peak_time = train.annotations["peak_time"][kw],
-                          event_fit = train.annotations["event_fit"][kw],
-                          Accept = train.annotations["Accept"][kw],
-                          signal_origin = train.annotations["signal_origin"],
-                          Aligned = train.annotations["Aligned"],
-                          using_template = train.annotations.get("using_template", False))
-            
+            try:
+                wave.annotate(channel_id = train.annotations["channel_id"],
+                            amplitude = train.annotations["amplitude"][kw],
+                            peak_time = train.annotations["peak_time"][kw],
+                            event_fit = train.annotations["event_fit"][kw],
+                            Accept = train.annotations["Accept"][kw],
+                            signal_origin = train.annotations["signal_origin"],
+                            Aligned = train.annotations["Aligned"],
+                            using_template = train.annotations.get("using_template", False))
+            except Exception as e:
+                traceback.print_exc()
+                excstr = traceback.format_exception(exc)
+                msg = f"Event {kw} in sweep {segment}:\n{excstr[-1]}"
+                self.criticalMessage("Extract waves",
+                                        "\n".join(excstr))
+                return
+                
         return waves
 
     def _make_aligned_waves_(self, train:neo.SpikeTrain, by_max_rise:bool=False):
@@ -1828,6 +1838,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             if len(self._detected_Events_Viewer_.axes):
                 self._detected_Events_Viewer_.removeLabels(0)
 
+            # sigBlock = QtCore.QSignalBlocker(self._detected_Events_Viewer_)
             self._detected_Events_Viewer_.view(self._detected_events_, 
                                                doc_title = f"Events in sweep {self.currentFrame}",
                                                frameAxis=1)
@@ -1933,7 +1944,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         [[x0,x1], [y0,y1]]  = waxis.viewRange()
         
-        self._detected_Events_Viewer_.addLabel(wavelabel, 0, pos = (x0,y1), 
+        # self._detected_Events_Viewer_.addLabel(wavelabel, 0, pos = (x0,y1), 
+        #                                     color=(0,0,0), anchor=(0,1))
+        self._detected_Events_Viewer_.addLabel(wavelabel, waxis, pos = (x0,y1), 
                                             color=(0,0,0), anchor=(0,1))
         #### END decorate the event plot in the event viewer
                 
@@ -2432,6 +2445,16 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                  
     def _update_report_(self):
         if self._data_ is None:
+            if isinstance(getattr(self, "_reportWindow_", None), QtWidgets.QMainWindow):
+                # NOTE: 2023-01-20 10:13:49
+                # because this is called early from loadSettings (when setting up
+                # whether to iinclude all waves or just accepted ones in the result)
+                # and at that time, self is not fully initialized; notably, self._reportWindow_
+                # does not yet exist
+                # See NOTE: 2023-01-20 10:14:38 for why we cannot define 
+                # self._reportWindow_ early in self.__init__
+                if self._reportWindow_.isVisible():
+                    self._reportWindow_.clear()
             return
         
         results = self.result() 
@@ -4337,6 +4360,10 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             self.actionPlot_all_events.setToolTip("Plot all accepted waveforms")
             self.actionPlot_all_events.setStatusTip("Plot all accepted waveforms")
             self.actionPlot_all_events.setWhatsThis("Plot all accepted waveforms")
+            
+        if isinstance(getattr(self, "_reportWindow_", None), QtWidgets.QMainWindow):
+            if self._reportWindow_.isVisible():
+                self._update_report_()
         
     @property
     def useTemplateWaveForm(self):

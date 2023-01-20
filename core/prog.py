@@ -8,7 +8,7 @@ decorators, context managers, and descriptor validators.
 
 #print("{}: {}".format(__file__, __name__))
 
-from pprint import pprint
+import pprint
 
 from abc import ABC, abstractmethod
 import enum, io, os, re, itertools, sys, time, traceback, types, typing
@@ -2169,4 +2169,14 @@ def is_class_defined_in_module(x:typing.Any, m:types.ModuleType):
     return x_module.__spec__.origin == m.__spec__.origin
 
     
+def show_caller_stack(stack):
+    for s in stack:
+        # print(f"\tcaller\t {s.function} at line {s.lineno} in context: {pprint.pformat(s.code_context)}")
+        print(f"\tcaller\t {s.function} at line {s.lineno} in {s.filename}")
+        # fcn = s.function
+        # if inspect.ismethod(fcn):
+        #     ftxt = f"{s.function.__self__.__class__.__name__}.{s.function} in {s.function.__module__} at line {s.lineno}"
+        # else:
+        #     ftxt = f"{s.function} in {s.function.__module__} at line {s.lineno}"
+        # print(f"\tcaller\t {ftxt}")
     

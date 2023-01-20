@@ -864,6 +864,9 @@ class SignalCursor(QtCore.QObject):
             
     @safeWrapper
     def detach(self):
+        if self._host_graphics_item_ is None:
+            return
+        
         if self._hl_:
             self._host_graphics_item_.removeItem(self._hl_)
             
