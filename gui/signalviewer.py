@@ -3044,10 +3044,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     def var_observer(self, change):
         # print(f"{self.__class__.__name__}.var_observer change = {change}")
-        self._new_frame_ = True # to force re-plotting
-        self.displayFrame()
-        self._new_frame_ = False
-        # self.currentFrame = self._current_frame_index_
+        if self.currentFrame not in self.frameIndex:
+            self.currentFrame = self.frameIndex[-1]
+        else:
+            self._new_frame_ = True # to force re-plotting
+            self.displayFrame()
+            self._new_frame_ = False
         
 
     def linkCursors(self, id1, *ids):

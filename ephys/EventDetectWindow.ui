@@ -8,7 +8,7 @@
     <x>0</x>
     <y>0</y>
     <width>808</width>
-    <height>726</height>
+    <height>690</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -37,71 +37,22 @@
            </property>
           </widget>
          </item>
-         <item row="0" column="2" colspan="2">
-          <widget class="QComboBox" name="signalNameComboBox">
+         <item row="6" column="0" colspan="3">
+          <widget class="QCheckBox" name="clearPreviousDetectionCheckBox">
            <property name="toolTip">
-            <string>Signal name</string>
+            <string>Replace previous detection</string>
            </property>
            <property name="statusTip">
-            <string>Signal name</string>
+            <string>Replace previous detection</string>
            </property>
            <property name="whatsThis">
-            <string>Signal name</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0" colspan="2">
-          <widget class="QLabel" name="label">
-           <property name="text">
-            <string>Epoch:</string>
-           </property>
-           <property name="buddy">
-            <cstring>epochComboBox</cstring>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="2" colspan="2">
-          <widget class="QComboBox" name="epochComboBox">
-           <property name="toolTip">
-            <string>Select mPSC epoch</string>
-           </property>
-           <property name="statusTip">
-            <string>Select mPSC epoch</string>
-           </property>
-           <property name="whatsThis">
-            <string>Select mPSC epoch</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="0" colspan="4">
-          <widget class="QCheckBox" name="use_eventTemplate_CheckBox">
-           <property name="toolTip">
-            <string>Use mPSC template waveform instead of model-generated waveform</string>
-           </property>
-           <property name="statusTip">
-            <string>Use mPSC template waveform instead of model-generated waveform</string>
-           </property>
-           <property name="whatsThis">
-            <string>Use mPSC template waveform instead of model-generated waveform</string>
+            <string>Replace previous detection</string>
            </property>
            <property name="text">
-            <string>Use Event Template</string>
+            <string>Replace</string>
            </property>
-          </widget>
-         </item>
-         <item row="3" column="0" colspan="3">
-          <widget class="QCheckBox" name="useSlidingDetectionCheckBox">
-           <property name="toolTip">
-            <string>Use template sliding algorithm (Clements &amp; Bekkers '97)</string>
-           </property>
-           <property name="statusTip">
-            <string>Use template sliding algorithm (Clements &amp; Bekkers '97)</string>
-           </property>
-           <property name="whatsThis">
-            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Checked:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Use template sliding algorithm (Clements &amp;amp; Bekkers '97, Biophys. J.)&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Unchecked:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Use cross-correlation of signal with template&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-           </property>
-           <property name="text">
-            <string>Sliding</string>
+           <property name="checked">
+            <bool>true</bool>
            </property>
           </widget>
          </item>
@@ -121,6 +72,48 @@
            </property>
            <property name="buddy">
             <cstring>detectionThresholdSpinBox</cstring>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0" colspan="2">
+          <widget class="QLabel" name="label">
+           <property name="text">
+            <string>Epoch:</string>
+           </property>
+           <property name="buddy">
+            <cstring>epochComboBox</cstring>
+           </property>
+          </widget>
+         </item>
+         <item row="5" column="0" colspan="3">
+          <widget class="QCheckBox" name="rsqThresholdCheckBox">
+           <property name="toolTip">
+            <string>Threshold on R²</string>
+           </property>
+           <property name="statusTip">
+            <string>Threshold on R²</string>
+           </property>
+           <property name="whatsThis">
+            <string>Threshold on R²</string>
+           </property>
+           <property name="text">
+            <string>Min R²</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0" colspan="4">
+          <widget class="QCheckBox" name="use_eventTemplate_CheckBox">
+           <property name="toolTip">
+            <string>Use mPSC template waveform instead of model-generated waveform</string>
+           </property>
+           <property name="statusTip">
+            <string>Use mPSC template waveform instead of model-generated waveform</string>
+           </property>
+           <property name="whatsThis">
+            <string>Use mPSC template waveform instead of model-generated waveform</string>
+           </property>
+           <property name="text">
+            <string>Use Event Template</string>
            </property>
           </widget>
          </item>
@@ -149,22 +142,6 @@
            </property>
           </widget>
          </item>
-         <item row="5" column="0" colspan="3">
-          <widget class="QCheckBox" name="rsqThresholdCheckBox">
-           <property name="toolTip">
-            <string>Threshold on R²</string>
-           </property>
-           <property name="statusTip">
-            <string>Threshold on R²</string>
-           </property>
-           <property name="whatsThis">
-            <string>Threshold on R²</string>
-           </property>
-           <property name="text">
-            <string>Min R²</string>
-           </property>
-          </widget>
-         </item>
          <item row="5" column="3">
           <widget class="QDoubleSpinBox" name="rsqThresholdDoubleSpinBox">
            <property name="toolTip">
@@ -187,24 +164,60 @@
            </property>
           </widget>
          </item>
-         <item row="6" column="0" colspan="3">
-          <widget class="QCheckBox" name="clearPreviousDetectionCheckBox">
+         <item row="1" column="2" colspan="2">
+          <widget class="QComboBox" name="epochComboBox">
            <property name="toolTip">
-            <string>Replace previous detection</string>
+            <string>Select mPSC epoch</string>
            </property>
            <property name="statusTip">
-            <string>Replace previous detection</string>
+            <string>Select mPSC epoch</string>
            </property>
            <property name="whatsThis">
-            <string>Replace previous detection</string>
-           </property>
-           <property name="text">
-            <string>Replace</string>
-           </property>
-           <property name="checked">
-            <bool>true</bool>
+            <string>Select mPSC epoch</string>
            </property>
           </widget>
+         </item>
+         <item row="0" column="2" colspan="2">
+          <widget class="QComboBox" name="signalNameComboBox">
+           <property name="toolTip">
+            <string>Signal name</string>
+           </property>
+           <property name="statusTip">
+            <string>Signal name</string>
+           </property>
+           <property name="whatsThis">
+            <string>Signal name</string>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="0" colspan="3">
+          <widget class="QCheckBox" name="useSlidingDetectionCheckBox">
+           <property name="toolTip">
+            <string>Use template sliding algorithm (Clements &amp; Bekkers '97)</string>
+           </property>
+           <property name="statusTip">
+            <string>Use template sliding algorithm (Clements &amp; Bekkers '97)</string>
+           </property>
+           <property name="whatsThis">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Checked:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Use template sliding algorithm (Clements &amp;amp; Bekkers '97, Biophys. J.)&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Unchecked:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Use cross-correlation of signal with template&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
+           <property name="text">
+            <string>Sliding</string>
+           </property>
+          </widget>
+         </item>
+         <item row="7" column="0">
+          <spacer name="verticalSpacer_2">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>40</height>
+            </size>
+           </property>
+          </spacer>
          </item>
         </layout>
        </widget>
