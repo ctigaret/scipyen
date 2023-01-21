@@ -140,6 +140,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         self._align_waves_on_rise_ = False
         
+        self._plots_all_waves_ = False
+        
         # NOTE: 2022-11-20 11:36:08
         # For each segment in data, if there are spike trains with event time
         # stamps, store them here - see membrane.batch_mPSC() for how such a 
@@ -290,6 +292,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         # the _detected_events_ will change with each segment !
         self._detected_events_ = list()
         self._aligned_waves_ = list()
+        self._all_waves_ = list()
         self._waveform_frames = 0
         self._currentWaveformIndex_ = 0
         
@@ -390,7 +393,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         self._detected_Events_Viewer_.sig_closeMe.connect(self._slot_detected_mPSCViewer_closed)
         
-        self._detected_Events_Viewer_.frameChanged.connect(self._slot_mPSCViewer_frame_changed)
+        self._detected_Events_Viewer_.frameChanged.connect(self._slot_eventsViewer_frame_changed)
         
         # NOTE: 2023-01-20 10:14:38
         # this MUST be def'ed here because of parent (self) needs its super() intialized too
@@ -569,7 +572,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         self.actionPlot_Data.triggered.connect(self._slot_plotData)
         self.actionPlot_detected_events.triggered.connect(self._slot_plot_detected_events_in_sweep_)
-        self.actionPlot_all_events.triggered.connect(self._plot_all_events)
+        self.actionPlot_all_events.triggered.connect(self._slot_plot_all_events)
+        self.actionPlot_all_accepted_events.triggered.connect(self._slot_plot_all_accepted_events)
         self.actionPlot_aligned_event_waveforms.triggered.connect(self._plot_aligned_waves)
         self.actionPlot_aligned_event_waveforms.setEnabled(False)
         self.actionMake_Event_Detection_Epoch.triggered.connect(self._slot_make_mPSCEpoch)
@@ -1016,13 +1020,27 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 self._signal_index_ = index
                 
     def displayDetectedWaveform(self, index:int):
-        self.currentWaveformIndex = index
-        
-        if isinstance(self._detected_Events_Viewer_, sv.SignalViewer):
-            sigBlock = QtCore.QSignalBlocker(self._detected_Events_Viewer_)
-            # print(f"displayDetectedWaveform {len(self._detected_Events_Viewer_.yData)} waves")
-            self._detected_Events_Viewer_.currentFrame = index
-            self._indicate_events_()
+        if not self._template_showing_:
+            try:
+                if isinstance(self._detected_Events_Viewer_, sv.SignalViewer):
+                    sigBlock = QtCore.QSignalBlocker(self._detected_Events_Viewer_)
+                    sigBlockers = [QtCore.QSignalBlocker(w) for w in (self._detected_Events_Viewer_,
+                                                                    self._ephysViewer_,
+                                                                    self._frames_spinBoxSlider_)]
+                    # print(f"displayDetectedWaveform {len(self._detected_Events_Viewer_.yData)} waves")
+                    if index in range(-len(self._detected_Events_Viewer_.yData), len(self._detected_Events_Viewer_.yData)):
+                        self._detected_Events_Viewer_.currentFrame = index
+                        if self._plots_all_waves_:
+                            segment_index = self._detected_Events_Viewer_.yData[index].segment.index
+                            self._targets_cache_.clear()
+                            self._ephysViewer_.currentFrame = segment_index
+                            self.currentFrame = segment_index
+                            # self._frames_spinBoxSlider_.setValue(segment_index)
+                        
+                    self._currentWaveformIndex_ = index
+                    self._indicate_events_()
+            except Exception as e:
+                traceback.print_exc()
         
             
     def displayFrame(self):
@@ -1039,7 +1057,16 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         # self._detected_events_ = list()
         
         if self.currentFrame in range(-len(self._result_), len(self._result_)):
+            if self._plots_all_waves_ and len(self._all_waves_):
+                waves_in_current_frame = [w for w in self._all_waves_ if self._get_wave_segment_index_(w) == self.currentFrame]
+                if len(waves_in_current_frame):
+                    w = waves_in_current_frame[0]
+                    events_frame = self._all_waves_.index(w)
+                    self.eventsViewer.currentFrame = events_frame
+                    return
+                
             self._slot_plot_detected_events_in_sweep_()
+                
         
     def clear(self):
         if isinstance(self._ephysViewer_,sv.SignalViewer):
@@ -1715,7 +1742,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
 
             self._detected_Events_Viewer_.sig_closeMe.connect(self._slot_detected_mPSCViewer_closed)
 
-            self._detected_Events_Viewer_.frameChanged.connect(self._slot_mPSCViewer_frame_changed)
+            self._detected_Events_Viewer_.frameChanged.connect(self._slot_eventsViewer_frame_changed)
             
         if len(self._detected_Events_Viewer_.axes):
             self._detected_Events_Viewer_.removeLabels(0)
@@ -1725,39 +1752,96 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                                            doc_title="Aligned events",
                                            frameAxis=1)
         
-    def _plot_all_events(self):
+    def _get_wave_segment_index_(self, wave):
+        seg = getattr(wave, "segment", None)
+        if isinstance(seg, neo.Segment):
+            index = getattr(seg, "index", "None")
+            return index
+        
+    def _slot_plot_all_events(self):
         if not isinstance(self._ephysViewer_, sv.SignalViewer):
             return
+        
         if not isinstance(self._detected_Events_Viewer_, sv.SignalViewer):
             self._detected_Events_Viewer_ = sv.SignalViewer(win_title="Detected events", 
                                                         parent=self, configTag="mPSCViewer")
 
             self._detected_Events_Viewer_.sig_closeMe.connect(self._slot_detected_mPSCViewer_closed)
 
-            self._detected_Events_Viewer_.frameChanged.connect(self._slot_mPSCViewer_frame_changed)
+            self._detected_Events_Viewer_.frameChanged.connect(self._slot_eventsViewer_frame_changed)
         
-        result = self.result()
+        result = self.result(True)
         
         self._targets_cache_.clear()
         
         if result is not None:
+            self._plots_all_waves_ = True
             table, trains, waves = result
             if len(waves) == 0:
                 return
-            
-            self._events_spinBoxSlider_.range = range(0, len(waves))
+            self._all_waves_ = waves
+            waves_in_current_frame = [w for w in self._all_waves_ if w.segment.index == self.currentFrame]
+            waveIndex = self._all_waves_.index(waves_in_current_frame[0]) if len(waves_in_current_frame) else 0
+            self._events_spinBoxSlider_.range = range(0, len(self._all_waves_))
             if len(self._detected_Events_Viewer_.axes):
                 self._detected_Events_Viewer_.removeLabels(0)
-            self._detected_Events_Viewer_.view(waves, 
+                
+            
+            sigBlock = QtCore.QSignalBlocker(self._detected_Events_Viewer_)
+            self._detected_Events_Viewer_.view(self._all_waves_, 
                                                doc_title="All events", 
                                                frameAxis=1)
             
-            self._indicate_events_(waves=waves)
+            self._detected_Events_Viewer_.currentFrame = waveIndex
+            self._events_spinBoxSlider_.setValue(waveIndex)
+            
+            self._indicate_events_(waves=self._all_waves_)
+            # self._indicate_events_(self._detected_Events_Viewer_.currentFrame, waves=waves)
+            
+    def _slot_plot_all_accepted_events(self):
+        if not isinstance(self._ephysViewer_, sv.SignalViewer):
+            return
+        
+        if not isinstance(self._detected_Events_Viewer_, sv.SignalViewer):
+            self._detected_Events_Viewer_ = sv.SignalViewer(win_title="Detected events", 
+                                                        parent=self, configTag="mPSCViewer")
+
+            self._detected_Events_Viewer_.sig_closeMe.connect(self._slot_detected_mPSCViewer_closed)
+
+            self._detected_Events_Viewer_.frameChanged.connect(self._slot_eventsViewer_frame_changed)
+        
+        result = self.result(False)
+        
+        self._targets_cache_.clear()
+        
+        if result is not None:
+            self._plots_all_waves_ = True
+            table, trains, waves = result
+            if len(waves) == 0:
+                return
+            self._all_waves_ = waves
+            waves_in_current_frame = [w for w in self._all_waves_ if w.segment.index == self.currentFrame]
+            waveIndex = self._all_waves_.index(waves_in_current_frame[0]) if len(waves_in_current_frame) else 0
+            self._events_spinBoxSlider_.range = range(0, len(self._all_waves_))
+            if len(self._detected_Events_Viewer_.axes):
+                self._detected_Events_Viewer_.removeLabels(0)
+                
+            
+            sigBlock = QtCore.QSignalBlocker(self._detected_Events_Viewer_)
+            self._detected_Events_Viewer_.view(self._all_waves_, 
+                                               doc_title="All events", 
+                                               frameAxis=1)
+            
+            self._detected_Events_Viewer_.currentFrame = waveIndex
+            self._events_spinBoxSlider_.setValue(waveIndex)
+            
+            self._indicate_events_(waves=self._all_waves_)
             # self._indicate_events_(self._detected_Events_Viewer_.currentFrame, waves=waves)
             
     def _slot_plot_detected_events_in_sweep_(self):
         if not isinstance(self._ephysViewer_, sv.SignalViewer):
             return
+        
         frameResult = self._result_[self.currentFrame] # a spike train list or None !!!
         
         if not isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList) or len(frameResult) == 0:
@@ -1771,6 +1855,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                                                              self._ephysViewer_))
         self._template_showing_ = False
         self._targets_cache_.clear()
+        
+        self._plots_all_waves_ = False
         
         if isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList):
             nChannels = len(frameResult) # how many spike trains in there (one per channel)
@@ -1808,7 +1894,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
 
                 self._detected_Events_Viewer_.sig_closeMe.connect(self._slot_detected_mPSCViewer_closed)
 
-                self._detected_Events_Viewer_.frameChanged.connect(self._slot_mPSCViewer_frame_changed)
+                self._detected_Events_Viewer_.frameChanged.connect(self._slot_eventsViewer_frame_changed)
                 
             self._events_spinBoxSlider_.range = range(0, len(self._detected_events_))
             
@@ -4098,7 +4184,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             self._detection_epochs_.clear()
             
     @pyqtSlot(int)
-    def _slot_mPSCViewer_frame_changed(self, value):
+    def _slot_eventsViewer_frame_changed(self, value):
         signal_blockers = [QtCore.QSignalBlocker(w) for w in (self._detected_Events_Viewer_,)]
         self._events_spinBoxSlider_.value = value
         
@@ -4869,7 +4955,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         # self._lowpass_ = lowpass
         self._lowpass_ = scipy.signal.tf2sos(lowpass, [1])
         
-    def result(self):
+    def result(self, allWaves:typing.Optional[bool]=None):
         """Retrieve the detection result.
         
         Returns a tuple with three elements:
@@ -4956,6 +5042,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         field_id = list()
         tpl_used = list()
         
+        if not isinstance(allWaves, bool):
+            allWaves = self.allWavesToResult
+        
         for k, frameResult in enumerate(self._result_):
             if not isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList) or len(frameResult) == 0:
                 continue
@@ -4964,7 +5053,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 if st.annotations.get("source", None) != "Event_detection":
                     continue
                 psc_trains.append(st)
-                st_waves = self._extract_waves_(st, valid_only=not self.allWavesToResult)
+                st_waves = self._extract_waves_(st, valid_only=not allWaves)
                 for mini_wave in st_waves:
                     seg_index.append(mini_wave.segment.index)
                     accept.append(mini_wave.annotations["Accept"])

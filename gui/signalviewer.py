@@ -6356,7 +6356,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         missing = (isinstance(self._missing_frame_value_, (int, float)) and val == self._missing_frame_value_) or \
             self._missing_frame_value_ in (MISSING, NA) and val is self._missing_frame_value_
         
-        if missing or val not in self.frameIndex:
+        # print(f"{self.__class__.__name__}.currentFrame missing = {missing}")
+        
+        if missing or (val not in self.frameIndex):
             self.setDataDisplayEnabled(False)
             return
         else:

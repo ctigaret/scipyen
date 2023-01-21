@@ -803,6 +803,7 @@
    <addaction name="actionUndo"/>
    <addaction name="actionPlot_detected_events"/>
    <addaction name="actionPlot_all_events"/>
+   <addaction name="actionPlot_all_accepted_events"/>
    <addaction name="actionAlign_event_waveforms"/>
    <addaction name="actionPlot_aligned_event_waveforms"/>
    <addaction name="actionView_results"/>
@@ -1499,6 +1500,17 @@
    </property>
    <property name="text">
     <string>Show all</string>
+   </property>
+  </action>
+  <action name="actionPlot_all_accepted_events">
+   <property name="icon">
+    <iconset theme="graphics"/>
+   </property>
+   <property name="text">
+    <string>Plot all accepted events</string>
+   </property>
+   <property name="toolTip">
+    <string>Plot all accepted events only</string>
    </property>
   </action>
  </widget>
