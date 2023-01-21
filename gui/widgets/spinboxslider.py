@@ -162,7 +162,7 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         if not isinstance(value, range):
             raise TypeError(f"Expecting a range; instead, got {type(value).__name__}")
         self._range_ = value
-        avoid ∞ recursion
+        # avoid ∞ recursion
         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in (self, self.framesQSpinBox, self.framesQSlider)]
         self.framesQSpinBox.setMaximum(max(self._range_))
         self.framesQSlider.setMaximum(max(self._range_))
