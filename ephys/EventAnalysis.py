@@ -539,7 +539,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.tabWidget.currentChanged.connect(self._slot_currentTabChanged)
         
         self._frames_spinBoxSlider_.label = "Sweep:"
-        self._frames_spinBoxSlider_.setRange(0, self._number_of_frames_)
+        self._frames_spinBoxSlider_.range = range(0, self._number_of_frames_)
         self._frames_spinBoxSlider_.valueChanged.connect(self.slot_setFrameNumber) # slot inherited from ScipyenFrameViewer
         
         self._events_spinBoxSlider_.label = "Event:"
@@ -911,11 +911,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         self.metaDataWidget.dataDescription = description
         
-        self._frames_spinBoxSlider_.setRange(0, self._number_of_frames_)
+        self._frames_spinBoxSlider_.range = range(0, self._number_of_frames_)
         
         self._plot_data()
-        
-        # self._frames_spinBoxSlider_
         
         # NOTE: 2022-11-05 23:52:11
         # self._ephysViewer_ is not yet available when _set_data_ is called from __init__()
@@ -1722,7 +1720,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         if len(self._detected_Events_Viewer_.axes):
             self._detected_Events_Viewer_.removeLabels(0)
             
-        self._events_spinBoxSlider_.setRange(0, len(self._aligned_waves_)-1)
+        self._events_spinBoxSlider_.range = range(0, len(self._aligned_waves_))
         self._detected_Events_Viewer_.view(self._aligned_waves_, 
                                            doc_title="Aligned events",
                                            frameAxis=1)
@@ -1747,7 +1745,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             if len(waves) == 0:
                 return
             
-            self._events_spinBoxSlider_.setRange(0, len(waves)-1)
+            self._events_spinBoxSlider_.range = range(0, len(waves))
             if len(self._detected_Events_Viewer_.axes):
                 self._detected_Events_Viewer_.removeLabels(0)
             self._detected_Events_Viewer_.view(waves, 
@@ -1812,7 +1810,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
 
                 self._detected_Events_Viewer_.frameChanged.connect(self._slot_mPSCViewer_frame_changed)
                 
-            self._events_spinBoxSlider_.setRange(0, len(self._detected_events_)-1)
+            self._events_spinBoxSlider_.range = range(0, len(self._detected_events_))
             
             self.accept_eventCheckBox.setEnabled(True)
             
@@ -1824,7 +1822,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                                                doc_title = f"Events in sweep {self.currentFrame}",
                                                frameAxis=1)
             
-            print(f"events viewer has {len(self._detected_Events_Viewer_.yData)} frames")
+            # print(f"events viewer has {len(self._detected_Events_Viewer_.yData)} frames")
             
             self._indicate_events_()
             
@@ -1885,10 +1883,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             raise ValueError(f"No segment for wave {waveindex}")
         
         frame_index = current_wave.segment.index
-#         
-#         if frame_index != self._ephysViewer_.currentFrame:
-#             sigBlockers = [QtCore.QSignalBlocker(w) for w in (self._ephysViewer_, self.framesSpinBoxSlider)]
-#             self._ephysViewer_.currentFrame = frame_index
         
         sig_name = current_wave.annotations.get("signal_origin", None)
         # print(f"_indicate_events_ sig_name {sig_name}")
@@ -4110,7 +4104,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         if not self._template_showing_:
             try:
-                print(f"{len(self._detected_Events_Viewer_.yData)}, value = {value}")
+                # print(f"{len(self._detected_Events_Viewer_.yData)}, value = {value}")
                 wave = self._detected_Events_Viewer_.yData[value]
                 segment_index = wave.segment.index
                 if isinstance(self._ephysViewer_, sv.SignalViewer) and self._ephysViewer_.isVisible():
@@ -4123,7 +4117,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 self._indicate_events_()
             except Exception as e:
                 traceback.print_exc()
-            # self._indicate_events_(self.currentWaveformIndex)
         
     @pyqtSlot(int)
     def _slot_setWaveFormIndex(self, value):

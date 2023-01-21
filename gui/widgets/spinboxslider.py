@@ -10,7 +10,27 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 Ui_SpinBoxSlider, QWidget = __loadUiType__(os.path.join(__module_path__, "spinboxslider.ui"))
 
 class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
-    """Compound widget with a SpinBox and Slider.
+    """Compound widget with a QSpinBox and QSlider.
+    The widge is backed by a Python `range` object, meaning that its attributes
+    are as follows:
+    • minimum       ↦ min(self.range) = self.range.start
+    • maximum       ↦ max(self.range) ≠ self.range.stop
+    • singleStep    ↦ singleStep attribute of the QSpinBox component, independent 
+                        of self.range.step
+    • pageStep      ↦ pageStep attribute of the QSlider component, independent
+                        of self.range.step
+    
+    NOTE:
+    • self.range.step is 1 (one) ALWAYS
+    
+    A new range can be set up for this widget in two ways:
+    
+    ∘ by calling self.setRange(min, max) which behaves as the Qt counterpart i.e.,
+        passing the minimum and maximum values the widget can take (NOT the start
+        and stop values of a Python range !)
+        
+    ∘ by assigning a new Python range object to the self.range property
+    
     Only a minimal set of QSPinBox and QSlider are exposed.
     For more atomic changes access self.framesQSpinBox and self.framesQSlider 
     directly
@@ -20,8 +40,9 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
     def __init__(self, parent=None, **kwargs):
         self._singleStep_ = kwargs.pop("singleStep", 1)
         self._pageStep_ = kwargs.pop("pageStep", 10)
-        self._minimum_ = kwargs.pop("minimum", 0)
-        self._maximum_ = kwargs.pop("maximum", 0)
+        minimum = kwargs.pop("minimum", 0)
+        maximum = kwargs.pop("maximum", 0)
+        self._range_ = range(minimum, maximum, 1)
         self._tracking_ = kwargs.pop("tracking", True)
         self._prefix_ = kwargs.pop("prefix", "")
         self._label_ = kwargs.pop("label", "Frame:")
@@ -31,6 +52,7 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
 
         self._whatsThis_ = kwargs.pop("whatsThis", self._toolTip_)
         self._statusTip_ = kwargs.pop("statusTip", self._toolTip_)
+        
 
         super().__init__(parent=parent)
         self._configureUI_()
@@ -38,9 +60,19 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
     def _configureUI_(self):
         self.setupUi(self)
         self.descriptionLabel.setText(self._label_)
-        self.totalFramesCountLabel.setText(f"of {self._maximum_}")
-        self.framesQSpinBox.setKeyboardTracking(self._tracking_)
+        mn = min(self._range_)
+        mx = max(self._range_)
+        for w in (self.framesQSlider, self.framesQSpinBox):
+            w.setMinimum(mn)
+            w.setMaximum(mx)
+            w.setSingleStep(self._range_.step)
+            
+        self.framesQSlider.setPageStep(self._pageStep_)
+            
+        self.totalFramesCountLabel.setText(f"of {len(self._range_)}")
+        
         self.framesQSlider.setTracking(self._tracking_)
+        self.framesQSpinBox.setKeyboardTracking(self._tracking_)
         self.framesQSlider.valueChanged.connect(self.slot_setValue)
         self.framesQSpinBox.valueChanged.connect(self.slot_setValue)
         
@@ -64,39 +96,40 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         
     @property
     def minimum(self):
-        return self._minimum_
+        return min(self._range_)
     
     @minimum.setter
     def minimum(self, value:int):
-        # avoid ∞ recursion
-        signalBlockers = [QtCore.QSignalBlocker(widget) for widget in (self, self.framesQSpinBox, self.framesQSlider)]
         val = int(value)
-        self._minimum_ = val
-        self.framesQSpinBox.setMinimum(val)
-        self.framesQSlider.setMinimum(val)
+        # step = self._range_.step
+        mx = max(self._range_)
+        self.range = range(val, mx, 1)
+        # avoid ∞ recursion
+#         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in (self, self.framesQSpinBox, self.framesQSlider)]
+#         
+#         self._minimum_ = val
+#         self.framesQSpinBox.setMinimum(val)
+#         self.framesQSlider.setMinimum(val)
         
     @property
     def maximum(self):
         """The maximum value in the spinbox and slider.
         Also sets up the value in the "of..." label.
         """
-        return self._maximum_
+        return max(self._range_)
     
     @maximum.setter
     def maximum(self, value:int):
+        # step = self._range_.step
         val = int(value)
-        self._maximum_ = val
+        mn = min(self._range_)
+        self.range = range(mn, val, 1)
+        # self._maximum_ = val
         # avoid ∞ recursion
-        signalBlockers = [QtCore.QSignalBlocker(widget) for widget in (self, self.framesQSpinBox, self.framesQSlider)]
-        self.framesQSpinBox.setMaximum(self._maximum_)
-        self.framesQSlider.setMaximum(self._maximum_)
-        if self._maximum_ == self._minimum_:
-            if self._maximum_ == 0:
-                self.totalFramesCountLabel.setText(f"of {0}")
-            else:
-                self.totalFramesCountLabel.setText(f"of {1}")
-        else:
-            self.totalFramesCountLabel.setText(f"of {self._maximum_+1}")
+        # signalBlockers = [QtCore.QSignalBlocker(widget) for widget in (self, self.framesQSpinBox, self.framesQSlider)]
+        # self.framesQSpinBox.setMaximum(self._maximum_)
+        # self.framesQSlider.setMaximum(self._maximum_)
+        # self.totalFramesCountLabel.setText(f" of {len(range(self._minimum_, self._maximum_))}")
         
     @property
     def singleStep(self):
@@ -104,10 +137,9 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
     
     @singleStep.setter
     def singleStep(self, value:int):
-        val = int(val)
         self._singleStep_ = val
-        self.framesQSpinBox.setSingleStep(val)
-        self.framesQSlider.setSingleStep(val)
+        self.framesQSpinBox.setSingleStep(self._singleStep_)
+        self.framesQSlider.setSingleStep(self._singleStep_)
         
     @property
     def pageStep(self):
@@ -118,6 +150,23 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         val = int(value)
         self._pageStep_ = val
         self.framesQSlider.setPageStep(val)
+        
+    @property
+    def range(self):
+        """The Python range for this widget
+        """
+        return self._range_
+    
+    @range.setter
+    def range(self, value:range):
+        if not isinstance(value, range):
+            raise TypeError(f"Expecting a range; instead, got {type(value).__name__}")
+        self._range_ = value
+        avoid ∞ recursion
+        signalBlockers = [QtCore.QSignalBlocker(widget) for widget in (self, self.framesQSpinBox, self.framesQSlider)]
+        self.framesQSpinBox.setMaximum(max(self._range_))
+        self.framesQSlider.setMaximum(max(self._range_))
+        self.totalFramesCountLabel.setText(f" of {len(self._range_)}")
         
     @property
     def tracking(self):
@@ -158,11 +207,35 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         self.minimum = value
         
     def setMaximum(self, value:int):
+        """Qt compatible:
+        Set the maximum value displayed by this widget.
+        This is ≠ self.range.stop.
+        """
         self.maximum = value
         
     def setRange(self, minimum:int, maximum:int):
-        self.minimum = minimum
-        self.maximum = maximum
+        """Sets the minimum and maximum values.
+        Compatible with the Qt equivalent methods of QSlider and QSpinBox, 
+        meaning that `maximum` is the maximum value the widget can take
+        """
+                                                    
+        self._range_= range(start, maximum + 1, 1)
+        # avoid ∞ recursion
+        signalBlockers = [QtCore.QSignalBlocker(widget) for widget in (self, self.framesQSpinBox, self.framesQSlider)]
+        self.framesQSpinBox.setMinimum(min(self._range_))
+        self.framesQSpinBox.setMaximum(max(self._range_))
+        self.framesQSlider.setMinimum(min(self._range_))
+        self.framesQSlider.setMaximum(max(self._range_))
+        # self.framesQSpinBox.setSingleStep(self._range_.step)
+        # self.framesQSlider.setSingleStep(self._range_.step)
+        self.totalFramesCountLabel.setText(f" of {len(self._range_)}")
+        # self.minimum = minimum
+        # self.maximum = maximum-1 if maximum > minimum else minimum
+        
+    def getRange(self):
+        """Returns a (self.minimum, self.maximum) tuple.
+        """
+        return (self.minimum, self.maximum)
         
     def setSingleStep(self, value:int):
         self.singleStep = value
@@ -212,7 +285,8 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
     @pyqtSlot(int)
     def slot_setValue(self, value:int):
         val = int(value)
-        if val in range(self.minimum, self.maximum+1):
+        # if val in range(self.minimum, self.maximum+1):
+        if val in self._range_:
             self._value_ = val
             # avoid ∞ recursion
             signalBlockers = [QtCore.QSignalBlocker(widget) for widget in (self.framesQSpinBox, self.framesQSlider)]

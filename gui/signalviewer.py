@@ -983,7 +983,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.mainLayout.addItem(self.signalsLayout)
         
         self._frames_spinBoxSlider_.label = "Sweep:"
-        self._frames_spinBoxSlider_.setRange(0, self._number_of_frames_)
+        self._frames_spinBoxSlider_.setRange(0, self._number_of_frames_-1)
         self._frames_spinBoxSlider_.valueChanged.connect(self.slot_setFrameNumber) # slot inherited from ScipyenFrameViewer
 
         # FIXME/TODO? 2022-11-17 09:59:51
@@ -6057,7 +6057,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     elif style is not None and isinstance(style, str):
                         self.plotStyle = style
                         
-                    self._frames_spinBoxSlider_.setMaximum(self._number_of_frames_ - 1)
+                    self._frames_spinBoxSlider_.range = range(self._number_of_frames_)
                     self._frames_spinBoxSlider_.setValue(self._current_frame_index_)
                     
                     # NOTE: 2022-11-01 10:37:06

@@ -1055,10 +1055,10 @@ class ScipyenFrameViewer(ScipyenViewer):
         pass
     
     @property
-    def dataFrames(self):
+    def nDataFrames(self):
         """The number of "frames" (segments, sweeps) in which data is organized.
         This may be larger than nFrames which is the number of frames the viewer
-        can actually display.
+        can actually display - e.g. see LSCaT.
         
         See also: self.nFrames property.
         """
@@ -1077,19 +1077,19 @@ class ScipyenFrameViewer(ScipyenViewer):
         The displayed frames may be a subset of the frames that the data is 
         logically organized in, consisting of the frames selected for viewing.
         
-        See also: self.dataFrames property.
+        See also: self.nDataFrames property.
         
-        Generally, self.nFrames = self.dataFrames.
+        Generally, self.nFrames = self.nDataFrames.
         
-        When self.nFrames < self.dataFrames this signifies that only a subset 
+        When self.nFrames < self.nDataFrames this signifies that only a subset 
         of the frames available in the data are to be shown.
         
-        Conversely, self.nFrames > self.dataFrames happens when multi-channel 
+        Conversely, self.nFrames > self.nDataFrames happens when multi-channel 
         signals are plotted in SignalViewer with one channel per frame - hence, 
         there are several frames displayed one at a time, even if data is l
         ogically organized in just one frame.
         
-        The distinction between self.nFrames and self.dataFrames is useful for
+        The distinction between self.nFrames and self.nDataFrames is useful for
         multi-index displays (see CaTAnslysis.LSCaTWindow)
         """
         return self._number_of_frames_
@@ -1098,11 +1098,11 @@ class ScipyenFrameViewer(ScipyenViewer):
     def frameIndex(self):
         """Indices of frames.
         By default, this is range(self.nFrames). In turn, by default:
-        self.nFrames == self.dataFrames.
+        self.nFrames == self.nDataFrames.
         
         However, assigning a sequence of int (tuple, list, range) here or in the 
         initializer effectively limits the display to a subset of the available 
-        data frames (and thus self.nFrames becomes less than self.dataFrames)
+        data frames (and thus self.nFrames becomes less than self.nDataFrames)
         
         """
         return self._frameIndex_
@@ -1117,20 +1117,20 @@ class ScipyenFrameViewer(ScipyenViewer):
             if not all(isinstance(v, int) for v in value):
                 raise TypeError("'frameIndex' can only accept a sequence of int")
             
-            if len(range(self.dataFrames)) and not all(v in range(self.dataFrames) for v in value):
-                raise ValueError(f"'frameIndex' cannot contain values outside {range(self.dataFrames)}")
+            if len(range(self.nDataFrames)) and not all(v in range(self.nDataFrames) for v in value):
+                raise ValueError(f"'frameIndex' cannot contain values outside {range(self.nDataFrames)}")
             
             if len(set(value)) != len(value):
                 raise ValueError("'frameIndex' does not accept duplicate values")
             
         #elif isinstance(value, range):
-            #if len(value) > self.dataFrames:
-                #raise ValueError(f"'frameIndex {value} goes beyound the total number of data frames {self.dataFrames}")
+            #if len(value) > self.nDataFrames:
+                #raise ValueError(f"'frameIndex {value} goes beyound the total number of data frames {self.nDataFrames}")
             
         elif not isinstance(value, range):
-            raise TypeError(f"New frameIndex must be a range, or sequence (tuple, list) of int with unique values in {range(self.dataFrames)}; got {type(value).__name__} instead")
+            raise TypeError(f"New frameIndex must be a range, or sequence (tuple, list) of int with unique values in {range(self.nDataFrames)}; got {type(value).__name__} instead")
         #else:
-            #raise TypeError(f"New frameIndex must be a range, or sequence (tuple, list) of int with unique values in {range(self.dataFrames)}; got {type(value).__name__} instead")
+            #raise TypeError(f"New frameIndex must be a range, or sequence (tuple, list) of int with unique values in {range(self.nDataFrames)}; got {type(value).__name__} instead")
         self._frameIndex_ = value
         
     @property
