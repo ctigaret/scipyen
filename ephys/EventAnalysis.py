@@ -568,7 +568,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.actionExportEphysData.triggered.connect(self._slot_exportEphysData)
         
         self.actionPlot_Data.triggered.connect(self._slot_plotData)
-        self.actionPlot_detected_events.triggered.connect(self._plot_detected_events)
+        self.actionPlot_detected_events.triggered.connect(self._slot_plot_detected_events_in_sweep_)
         self.actionPlot_all_events.triggered.connect(self._plot_all_events)
         self.actionPlot_aligned_event_waveforms.triggered.connect(self._plot_aligned_waves)
         self.actionPlot_aligned_event_waveforms.setEnabled(False)
@@ -1041,21 +1041,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         # self._detected_events_ = list()
         
         if self.currentFrame in range(-len(self._result_), len(self._result_)):
-            self._plot_detected_events()
-#             frameResults = self._result_[self.currentFrame]
-#             if not isinstance(frameResults, neo.core.spiketrainlist.SpikeTrainList):
-#                 return
-#             
-#             if self.displayedDetectionChannel not in len(frameResults):
-#                 return
-#             
-#             st = frameResults[self.displayedDetectionChannel]
-#             if st.annotations.get("source", None) != "Event_detection":
-#                 return
-#             
-#             self._detected_events_ = neoutils.extract_spike_train_waveforms(st, st.annotations["signal_units"], prefix=st.annotations["signal_origin"])
-        
-        # self._plot_detected_events()
+            self._slot_plot_detected_events_in_sweep_()
         
     def clear(self):
         if isinstance(self._ephysViewer_,sv.SignalViewer):
@@ -1607,7 +1593,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             self._refresh_signalNameComboBox()
             self._refresh_epochComboBox()
             
-            self._plot_detected_events()
+            self._slot_plot_detected_events_in_sweep_()
             
     @pyqtSlot()
     def _slot_previewDetectionTheta(self):
@@ -1771,7 +1757,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             self._indicate_events_(waves=waves)
             # self._indicate_events_(self._detected_Events_Viewer_.currentFrame, waves=waves)
             
-    def _plot_detected_events(self):
+    def _slot_plot_detected_events_in_sweep_(self):
         if not isinstance(self._ephysViewer_, sv.SignalViewer):
             return
         frameResult = self._result_[self.currentFrame] # a spike train list or None !!!
@@ -1812,7 +1798,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             if not isinstance(sig_name, str) or len(sig_name.strip()) == 0:
                 sig_name = train.name
             
-            # print(f"*** {self.__class__.__name__}._plot_detected_events extract waves ***")
+            # print(f"*** {self.__class__.__name__}._slot_plot_detected_events_in_sweep_ extract waves ***")
             self._detected_events_ = self._extract_waves_(train)
             
             if len(self._detected_events_) == 0:
@@ -1837,6 +1823,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             self._detected_Events_Viewer_.view(self._detected_events_, 
                                                doc_title = f"Events in sweep {self.currentFrame}",
                                                frameAxis=1)
+            
+            print(f"events viewer has {len(self._detected_Events_Viewer_.yData)} frames")
             
             self._indicate_events_()
             
@@ -4117,15 +4105,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
     @pyqtSlot(int)
     def _slot_mPSCViewer_frame_changed(self, value):
-        # sender = self.sender()
-        # if isinstance(sender, QtWidgets.QMainWindow):
-        #     print(f"_slot_mPSCViewer_frame_changed sender {sender.__class__.__name__} {sender.windowTitle()}")
-        # else:
-        #     print(f"_slot_mPSCViewer_frame_changed sender {sender.__class__.__name__}")
         signal_blockers = [QtCore.QSignalBlocker(w) for w in (self._detected_Events_Viewer_,)]
-        # signal_blockers = [QtCore.QSignalBlocker(w) for w in (self._events_spinBoxSlider_,)]
-        # signal_blockers = [QtCore.QSignalBlocker(w) for w in (self._events_spinBoxSlider_,
-        #                                                      self._frames_spinBoxSlider_)]
         self._events_spinBoxSlider_.value = value
         
         if not self._template_showing_:
@@ -4161,7 +4141,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     @pyqtSlot(int)
     def _slot_displayedDetectionChannelChanged(self, val:int):
         self.displayedDetectionChannel = val
-        self._plot_detected_events()
+        self._slot_plot_detected_events_in_sweep_()
 
     @property
     def currentWaveformIndex(self):
@@ -4412,6 +4392,26 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         if isinstance(getattr(self, "_reportWindow_", None), QtWidgets.QMainWindow):
             if self._reportWindow_.isVisible():
                 self._update_report_()
+                
+    @property
+    def ephysViewer(self):
+        return self._ephysViewer_
+    
+    @property
+    def eventViewer(self):
+        return self._detected_Events_Viewer_
+    
+    @property
+    def eventsViewer(self):
+        return self._detected_Events_Viewer_
+    
+    @property
+    def waveformViewer(self):
+        return self._waveFormViewer_
+    
+    @property
+    def reportWindow(self):
+        return self._reportWindow_
         
     @property
     def useTemplateWaveForm(self):

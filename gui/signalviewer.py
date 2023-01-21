@@ -5170,17 +5170,18 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         if isinstance(y, neo.core.Block):
             # self._xData_ = None # domain is contained in the signals inside the block
-            self._yData_ = y
+            # self._yData_ = y
+            x = None
             self._cached_title = getattr(y, "name", None)
             
             # NOTE : 2022-01-17 14:17:23
             # if frameIndex was passed, then self._number_of_frames_ might turn
             # out to be different than self._data_frames_!
-            self._data_frames_ = self._number_of_frames_ = len(self._yData_.segments)
+            self._data_frames_ = self._number_of_frames_ = len(y.segments)
             
             #### BEGIN NOTE 2019-11-24 22:32:46: 
             # no need for these so reset to None
-            # but definitely used when self._yData_ is a signal, not a container of signals!
+            # but definitely used when y is a signal, not a container of signals!
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1 
             self.irregularSignalChannelAxis = 1
@@ -5222,7 +5223,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.frameIndex = normalized_index(self._data_frames_, frameIndex)
             self._number_of_frames_ = len(self.frameIndex)
             
-            self._n_signal_axes_ = max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in self._yData_.segments)
+            self._n_signal_axes_ = max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in y.segments)
             # self._n_spiketrain_axes_ = 1
             # self._n_event_axes_ = 1
             
@@ -5234,7 +5235,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         elif isinstance(y, neo.core.Segment):
             # self._xData_ = None # NOTE: x can still be supplied externally
-            self._yData_ = y
+            # self._yData_ = y
+            x = None
             self._cached_title = getattr(y, "name", None)
             # self._plotEpochs_(clear=True)
             
@@ -5264,7 +5266,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         elif isinstance(y, (neo.core.AnalogSignal, DataSignal)):
             # self._xData_ = None
-            self._yData_ = y
+            # self._yData_ = y
+            x = None
             self._cached_title = getattr(y, "name", None)
             
             # NOTE: no need for these as there is only one signal
@@ -5284,7 +5287,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 raise TypeError("For AnalogSignal and DataSignal, frameAxis must be an int or None; got %s instead" % type(frameAxis).__name__)
 
             self.signalChannelAxis = 1
-            self.signalChannelIndex = normalized_sample_index(self._yData_.as_array(), self.signalChannelAxis, signalChannelIndex)
+            self.signalChannelIndex = normalized_sample_index(y.as_array(), self.signalChannelAxis, signalChannelIndex)
             
             self._data_frames_ = 1
             
@@ -5298,24 +5301,22 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if self.separateSignalChannels:
                     if self.separateChannelsIn == "axes":
                         self._number_of_frames_ = 1
-                        self._n_signal_axes_ = self._yData_.shape[self.signalChannelAxis]
+                        self._n_signal_axes_ = y.shape[self.signalChannelAxis]
                     else:
                         # self.frameAxis = 1
-                        self._number_of_frames_ = self._yData_.shape[1]
+                        self._number_of_frames_ = y.shape[1]
                         self._n_signal_axes_ = 1
                         
                 else:
                     self._n_signal_axes_ = 1    
                 
-                # self._n_signal_axes_ = self._yData_.shape[self.signalChannelAxis] if self.separateSignalChannels else 1
-                
             else:
-                frameAxis = normalized_axis_index(self._yData_.as_array(), frameAxis)
+                frameAxis = normalized_axis_index(y.as_array(), frameAxis)
                 if frameAxis != self.signalChannelAxis:
                     raise ValueError("For structured signals, frame axis and signal channel axis must be identical")
                 
                 self.frameAxis = frameAxis
-                self.frameIndex = normalized_sample_index(self._yData_.as_array(), self.frameAxis, frameIndex)
+                self.frameIndex = normalized_sample_index(y.as_array(), self.frameAxis, frameIndex)
                 self._number_of_frames_ = len(self.frameIndex)
                 
                 self.separateSignalChannels = False
@@ -5323,7 +5324,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
         elif isinstance(y, (neo.core.IrregularlySampledSignal,  IrregularlySampledDataSignal)):
             # self._xData_ = None
-            self._yData_ = y
+            # self._yData_ = y
+            x = None
             self._cached_title = getattr(y, "name", None)
             # self.frameIndex = range(1)
             self.dataAxis = 0 # data as column vectors
@@ -5348,22 +5350,22 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if self.separateSignalChannels:
                     if self.separateChannelsIn == "axes":
                         self._number_of_frames_ = 1
-                        self._n_signal_axes_ = self._yData_.shape[self.signalChannelAxis]
+                        self._n_signal_axes_ = y.shape[self.signalChannelAxis]
                     else:
                         # self.frameAxis = 1
-                        self._number_of_frames_ = self._yData_.shape[1]
+                        self._number_of_frames_ = y.shape[1]
                         self._n_signal_axes_ = 1
                         
                 else:
                     self._n_signal_axes_ = 1
                 
             else:
-                frameAxis = normalized_axis_index(self._yData_.as_array(), frameAxis)
+                frameAxis = normalized_axis_index(y.as_array(), frameAxis)
                 if frameAxis != self.signalChannelAxis:
                     raise ValueError("For structured signals, frame axis and signal channel axis must be identical")
                 
                 self.frameAxis = frameAxis
-                self.frameIndex = normalized_sample_index(self._yData_.as_array(), self.frameAxis, frameIndex)
+                self.frameIndex = normalized_sample_index(y.as_array(), self.frameAxis, frameIndex)
                 self._number_of_frames_ = len(self.frameIndex)
                 self.separateSignalChannels  = False
                 self._n_signal_axes_ = 1
@@ -5375,7 +5377,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # self._n_event_axes_ = 0
             # self._n_spiketrain_axes_ = 1
             # self._xData_ = None
-            self._yData_ = y
+            # self._yData_ = y
+            x = None
             self._cached_title = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
@@ -5385,7 +5388,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         elif isinstance(y, (neo.core.Event, DataMark, TriggerEvent)): # plot an event independently of data
             # self._xData_ = None
-            self._yData_ = y
+            # self._yData_ = y
+            x = None
             self._cached_title = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
@@ -5399,7 +5403,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             #self.dataAnnotations.append({"Epoch %s" % y.name: y.annotations})
             #pass # delegated to displayFrame()
             # self._xData_ = None
-            self._yData_ = y
+            # self._yData_ = y
+            x = None
             self._cached_title = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
@@ -5416,10 +5421,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self._doctTitle_ = y.name
                     
                 else:
-                    self._docTitle_ = self._yData_.name
+                    self._docTitle_ = y.__class__.__name__
         
         elif isinstance(y, vigra.filters.Kernel1D):
-            self._xData_, self._yData_ = kernel2array(y)
+            # self._xData_, self._yData_ = kernel2array(y)
+            x, y = kernel2array(y)
             self._cached_title = "Vigra Kernel 1D"
             # self._plotEpochs_(clear=True)
             
@@ -5473,15 +5479,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # 
             if not issubclass(y.dtype.type, np.number):
                 self.criticalMessage(f"Set data ({y.__class__.__name__})", f"Cannot plot arrays with dtype {y.dtype.type.__name__}")
-                return
+                return False, None, None
             
             if y.ndim > 3: 
                 self.criticalMessage(f"Set data ({y.__class__.__name__})", f"Cannot plot data with {y.ndim} dimensions")
-                return
+                return False, None, None
             
             if y.ndim < 1:
                 self.criticalMessage(f"Set data ({y.__class__.__name__})", "Cannot plot a scalar")
-                return
+                return False, None, None
             
             # self._xData_ = None
             # self._yData_ = y
@@ -5569,7 +5575,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     # different from signalChannelAxis
                     if frameAxis != self.signalChannelAxis:
                         self.criticalMessage(f"Set data ({y.__class__.__name__})", "For 2D arrays, frame axis index %d must be the same as the channel axis index (%d)" % (frameAxis, self.signalChannelAxis))
-                        return
+                        return False, None, None
                     
                     self.frameAxis = frameAxis
                     
@@ -5591,11 +5597,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 # channel → data    → frame
                 if isinstance(signalChannelAxis, int) and signalChannelAxis not in range(-1*(y.ndim), y.ndim):
                     self.criticalMessage(f"Set data ({y.__class__.__name__})", f"signalChannelAxis {signalChannelAxis} out of range for array with {y.ndim} dimensions")
-                    return
+                    return False, None, None
                 
                 if isinstance(frameAxis, int) and frameAxis not in range(-1*(y.ndim), y.ndim):
                     self.criticalMessage(f"Set data ({y.__class__.__name__})", f"frameAxis {frameAxis} out of range for array with {y.ndim} dimensions")
-                    return
+                    return False, None, None
                 
                 if signalChannelAxis is None:
                     if frameAxis is None:
@@ -5621,7 +5627,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         
                 elif frameAxis == signalChannelAxis:
                     self.criticalMessage(f"Set data ({y.__class__.__name__})", f"frameAxis and signalChannelAxis cannot have the same index {frameAxis}")
-                    return
+                    return False, None, None
                     # raise TypeError("For 3D arrays the frame axis must be specified")
                 
                 
@@ -5660,36 +5666,37 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if isinstance(x, (tuple, list)):
                     if len(x) != y.shape[self.dataAxis]:
                         self.criticalMessage(f"Set data ({y.__class__.__name__})", "The supplied signal domain (x) must have the same size as the data axis %s" % self.dataAxis)
-                        return
+                        return False, None, None
                     
-                    self._xData_ = np.array(x)
+                    x = np.array(x)
                     
                 elif isinstance(x, np.ndarray):
                     if not is_vector(x):
                         self.criticalMessage(f"Set data ({y.__class__.__name__})", "The supplied signal domain (x) must be a vector")
-                        return
+                        return False, None, None
                     
                     if len(x) != y.shape[self.dataAxis]:
                         self.criticalMessage(f"Set data ({y.__class__.__name__})", "The supplied signal domain (x) must have the same size as the data axis %s" % self.dataAxis)
-                        return
+                        return False, None, None
                     
-                    if is_column_vector(x):
-                        self._xData_ = x
-                        
-                    else:
-                        self._xData_ = x.T # x left unchanged if 1D
+                    if not is_column_vector(x):
+                        x = x.T # x left unchanged if 1D
+#                         self._xData_ = x
+#                         
+#                     else:
+#                         self._xData_ = x.T # x left unchanged if 1D
                         
                 else:
                     self.criticalMessage(f"Set data ({y.__class__.__name__})", "Signal domain (x) must be None, a Python iterable of scalars or a numpy array (vector)")
             else:
-                self._xData_ = None
+                x = None
                 
-            self._yData_ = y
+            # self._yData_ = y
                         
         elif isinstance(y, (tuple, list)) or hasattr(y, "__iter__"): # second condition to cover things like neo.SpikeTrainList (v >= 0.10.0)
             if len(y) == 0:
                 self.clear()
-                return
+                return False, None, None
             # python sequence of stuff to plot
             # TODO 2020-03-08 11:05:06
             # code for sequence of neo.SpikeTrain, and sequence of neo.Event
@@ -5743,9 +5750,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     else:
                         raise TypeError("Invalid x specified")
                     
-                self._xData_ = x
+                # self._xData_ = x
                     
-                self._yData_ = yy
+                y = yy
                 self._cached_title = "Vigra Kernel1D objects"
                 
                 self._n_signal_axes_ = 1
@@ -5771,7 +5778,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.irregularSignalChannelIndex    = None
                 
                 # self._xData_ = None
-                self._yData_ = y
+                # self._yData_ = y
+                x = None
                 self._cached_title = "Neo segments"
                 
                 self.signalIndex                    = signalIndex
@@ -5786,7 +5794,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 # treat this as a sequence of segments, but do NOT concatenate
                 # the blocks!
                 # self._xData_ = None
-                self._yData_ = y 
+                # self._yData_ = y 
+                x = None
                 self.frameAxis = None
                 self.dataAxis = 0
                 self.signalChannelAxis = 1 
@@ -5867,12 +5876,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.signalIndex = 0 # FIXME is this needed anywhere?
                 
                 # self._xData_ = None
-                self._yData_ = y
+                # self._yData_ = y
+                x = None
                 self._cached_title = "Neo signals"
                 
             elif all([isinstance(i, (neo.Event, DataMark)) for i in y]):
                 #self.dataAnnotations = [{s.name: s.annotations} for s in y]
-                self._yData_ = y
+                # self._yData_ = y
+                x = None
                 self._cached_title = "Events and marks"
                 self.dataAxis = 0
                 self.signalChannelAxis = 1
@@ -5883,7 +5894,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._n_signal_axes_ = 0
 
             elif all(isinstance(i, (neo.Epoch, DataZone)) for i in y):
-                self._yData_ = y
+                # self._yData_ = y
+                x = None
                 self._cached_title = "Epochs and zones"
                 self.dataAxis = 0
                 self.signalChannelAxis = 1
@@ -5895,10 +5907,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             elif all([isinstance(i, neo.SpikeTrain) for i in y]):
                 #self.dataAnnotations = [{s.name: s.annotations} for s in y]
-                self._yData_ = y
+                # self._yData_ = y
+                x = None
                 self.dataAxis = 0
                 self.signalChannelAxis = 1
-                self._plotEpochs_(self._yData_)
+                self._plotEpochs_(y)
                 self.frameIndex = range(1)
                 self._number_of_frames_ = 1
                 self._cached_title = "Spike trains"
@@ -5906,11 +5919,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._n_signal_axes_ = 0
                 
             elif all([isinstance(i, np.ndarray) for i in y]):
-                # self.criticalMessage(f"Set data ({y.__class__.__name__})","Sequence of arrays are not supported; concatenate into one array first")
-                # return
                 if not all(i.ndim <= 2 for i in y):
                     self.criticalMessage(f"Set data ({y.__class__.__name__})", f"Cannot plot sequences containing arrays with more than two dimensions")
-                    return
+                    return False, None, None
                     
                 if signalChannelAxis is None:
                     signalChannelAxis = 1 # the default
@@ -5918,7 +5929,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
                 elif signalChannelAxis not in (0,1):
                     self.criticalMessage(f"Set data ({y.__class__.__name__})", f"signalChannelAxis expected an int () or 1) or None")
-                    return
+                    return False, None, None
                     
                 self.signalChannelAxis = signalChannelAxis
                 self.dataAxis = 1 if self.signalChannelAxis == 0 else 0
@@ -5945,8 +5956,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     else:
                         raise TypeError("Invalid x specified")
                     
-                self._xData_ = x
-                self._yData_ = y
+                # self._xData_ = x
+                # self._yData_ = y
                 self._cached_title = "Numpy arrays"
                 # FIXME - in progress 2023-01-19 08:17:25
                 self._n_signal_axes_ = max(list(map(lambda x: 1 if x.ndim == 1 or not self.separateSignalChannels else x.shape[self.signalChannelAxis], y)))
@@ -5956,24 +5967,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 self.criticalMessage(f"Set data ({y.__class__.__name__})", 
                                      "Can only plot a list of 1D vigra filter kernels, 1D/2D numpy arrays, or neo-like signals")
-                return False
+                return False, None, None
             
         else:
             self.criticalMessage(f"Set data ({y.__class__.__name__})", 
                                  f"Plotting is not implemented for {type(self._yData_).__name__} data types")
-            return False
+            return False, None, None
         
-        self._setup_axes_()
-
-        if self.observed_vars.get("xData", None) is not None:
-            self.observed_vars["xData"] = None
-        self.observed_vars["xData"] = self._xData_
-            
-        if self.observed_vars.get("yData", None) is not None:
-            self.observed_vars["yData"] = None
-        self.observed_vars["yData"] = self._yData_
-            
-        return True
+        return True, x, y
     
     @safeWrapper
     def _set_data_(self, x,  y = None, doc_title:(str, type(None)) = None, frameAxis:(int, str, vigra.AxisInfo, type(None)) = None, signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, separateChannelsIn:str="axes", singleFrame:bool=False, interval:(tuple, list, neo.Epoch, type(None)) = None, plotStyle:str = "plot", showFrame:int = None, *args, **kwargs):
@@ -6001,12 +6002,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         with self.observed_vars.observer.hold_trait_notifications():
             try:
-                # remove gremlins from previous plot
-                self._clear_lris_()
-                # self._plotEpochs_(clear=True)
-                # self._cached_epochs_.pop(self.currentFrame, None)
-
-                dataOK = self._parse_data_( x=x,
+                dataOK, x, y = self._parse_data_( x=x,
                                             y=y, 
                                             frameIndex=frameIndex, 
                                             frameAxis=frameAxis,
@@ -6022,46 +6018,61 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 # print(f"self._set_data_ dataOK = {dataOK}")
                 
-                self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self._yData_))
+                if dataOK:
+                    # remove gremlins from previous plot
+                    # self._plotEpochs_(clear=True)
+                    # self._cached_epochs_.pop(self.currentFrame, None)
+                    self._clear_lris_()
+                    self._setup_axes_()
+                    self._xData_ = x
+                    self._yData_ = y
+
+                    if self.observed_vars.get("xData", None) is not None:
+                        self.observed_vars["xData"] = None
+                    self.observed_vars["xData"] = self._xData_
+                        
+                    if self.observed_vars.get("yData", None) is not None:
+                        self.observed_vars["yData"] = None
+                    self.observed_vars["yData"] = self._yData_
+                
+                    self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self._yData_))
+                                
+                    if isinstance(showFrame, int):
+                        if showFrame < 0:
+                            showFrame = 0
                             
-                if isinstance(showFrame, int):
-                    if showFrame < 0:
-                        showFrame = 0
+                        elif showFrame > self._number_of_frames_:
+                            showFrame = self._number_of_frames_ - 1
+                            
+                        self._current_frame_index_ = showFrame
                         
-                    elif showFrame > self._number_of_frames_:
-                        showFrame = self._number_of_frames_ - 1
-                        
-                    self._current_frame_index_ = showFrame
-                        
+                    else:
+                        if self._current_frame_index_ not in self.frameIndex:
+                            self._current_frame_index_ = self.frameIndex[-1]
+                            
 
-                if plotStyle is not None and isinstance(plotStyle, str):
-                    self.plotStyle = plotStyle
+                    if plotStyle is not None and isinstance(plotStyle, str):
+                        self.plotStyle = plotStyle
+                        
+                    elif style is not None and isinstance(style, str):
+                        self.plotStyle = style
+                        
+                    self._frames_spinBoxSlider_.setMaximum(self._number_of_frames_ - 1)
+                    self._frames_spinBoxSlider_.setValue(self._current_frame_index_)
                     
-                elif style is not None and isinstance(style, str):
-                    self.plotStyle = style
+                    # NOTE: 2022-11-01 10:37:06
+                    # overwrites self.docTitle set by self._parse_data_
+                    if isinstance(doc_title, str) and len(doc_title.strip()):
+                        self.docTitle = doc_title
+                    else:
+                        self.docTile = self._cached_title
                     
-                self._frames_spinBoxSlider_.setMaximum(self._number_of_frames_ - 1)
-                self._frames_spinBoxSlider_.setValue(self._current_frame_index_)
-                # self.framesQSlider.setMaximum(self._number_of_frames_ - 1)
-                # self.framesQSpinBox.setMaximum(self._number_of_frames_ - 1)
-
-                # self.framesQSlider.setValue(self._current_frame_index_)
-                # self.framesQSpinBox.setValue(self._current_frame_index_)
-                
-                # self.nFramesLabel.setText("of %d" % self._number_of_frames_)
-                
-                # NOTE: 2022-11-01 10:37:06
-                # overwrites self.docTitle set by self._parse_data_
-                if isinstance(doc_title, str) and len(doc_title.strip()):
-                    self.docTitle = doc_title
+                    self.frameChanged.emit(self._current_frame_index_)
+                    
                 else:
-                    self.docTile = self._cached_title
-                    
-                if not dataOK:
                     warnings.warn(f"Could not parse the data x: {x}, y: {y}")
                     return
                 
-                self.frameChanged.emit(self._current_frame_index_)
 
             except Exception as e:
                 traceback.print_exc()
