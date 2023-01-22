@@ -712,6 +712,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         self.actionRefit_wave.triggered.connect(self._slot_refit_Event_Waveform)
         
+        self.actionSave_detection_prefs.triggered.connect(self.saveOptionsToUserFile)
+        self.actionLoad_detection_prefs.triggered.connect(self.loadOptionsFromUserFile)
+        
         for c in self.children():
             if isinstance(c, QtWidgets.QAction):
                 if len(c.toolTip().strip()) == 0:
@@ -1672,8 +1675,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         self._ephysViewer_.plot(segment)
         
-        
-            
     @pyqtSlot()
     def _slot_previewFilteredSignal(self):
         if self._data_ is None:
@@ -2710,12 +2711,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 if not isinstance(detection, neo.core.spiketrainlist.SpikeTrainList):
                     continue
                 
-                # check if raw waveforms are wanted; if not, and signal WAS
-                # humbugged and smoothed, then extract waves from the raw signal
-                
-                    
-                    
-                
                 # this below is a collection of spike train lists (one per epoch)!
                 # but each spiketrainlist should have up to the same max number 
                 # of spiketrains (i.e. as many as there are channels)
@@ -2759,7 +2754,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     st.segment = segment
                     
                     if len(θ_) > 1:
-                        θ = neoutils.splice_signals(*θ_, signal.times)
+                        θ = neoutils.splice_signals(*θ_, times = signal.times)
                         θ.name = "events"
                     else:
                         θ = θ_[0]
@@ -2844,7 +2839,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                         θ = channelθ[0]
                         
                     else:
-                        θ = neoutils.splice_signals(*channelθ, signal_times)
+                        θ = neoutils.splice_signals(*channelθ, times = signal.times)
                         
                     self._current_detection_θ.append(θ)
                 
@@ -4508,7 +4503,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     def alignWavesOnRisingPhase(self):
         return self._align_waves_on_rise_
     
-    @markConfigurable("AlighnWavesOnRisingPhase", trait_notifier=True)
+    @markConfigurable("AlignWavesOnRisingPhase", trait_notifier=True)
     @alignWavesOnRisingPhase.setter
     def alignWavesOnRisingPhase(self, val:bool):
         self._align_waves_on_rise_ = val == True

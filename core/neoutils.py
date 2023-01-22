@@ -2310,7 +2310,7 @@ def get_time_slice(data, t0, t1=None, window=0, segment_index=None, analog_index
 
 def splice_signals(*args, times=None):
     """ Splice-merge signals along the time axis.
-    The signal need not be contiguous (see also `concatenate_signals` and the
+    The signals need not be contiguous (see also `concatenate_signals` and the
     `merge` instance methods of neo signals)
     
     Parameters:
@@ -2456,7 +2456,7 @@ def splice_signals(*args, times=None):
         t_stop = args[-1].t_stop
         t = np.concatenate([s.times.magnitude for s in args], axis=0) * t_start.units
         waves = np.concatenate([s.waveforms for s in args], axis=0)
-        print(f"neoutils.splice_signals<SpikeTrain> waves shape {waves.shape}")
+        # print(f"neoutils.splice_signals<SpikeTrain> waves shape {waves.shape}")
         return neo.SpikeTrain(t, t_start=t_start, t_stop = t_stop, 
                               units = args[0].units,
                               sampling_rate = args[0].sampling_rate,

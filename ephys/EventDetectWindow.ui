@@ -695,11 +695,23 @@
      <addaction name="actionFilter_toolbar"/>
      <addaction name="actionShow_all_toolbars"/>
     </widget>
+    <widget class="QMenu" name="menuDetection_preferences">
+     <property name="title">
+      <string>Detection preferences</string>
+     </property>
+     <property name="icon">
+      <iconset theme="preferences">
+       <normaloff>.</normaloff>.</iconset>
+     </property>
+     <addaction name="actionSave_detection_prefs"/>
+     <addaction name="actionLoad_detection_prefs"/>
+    </widget>
     <addaction name="menuPersistent_evebnt_template_location"/>
     <addaction name="actionOverlay_Template_with_Model"/>
     <addaction name="actionAll_waves_to_result"/>
     <addaction name="actionWaves_alignment_on_rising_phase"/>
     <addaction name="menuToolbars"/>
+    <addaction name="menuDetection_preferences"/>
    </widget>
    <widget class="QMenu" name="menuDetect_Events">
     <property name="title">
@@ -1504,13 +1516,30 @@
   </action>
   <action name="actionPlot_all_accepted_events">
    <property name="icon">
-    <iconset theme="graphics"/>
+    <iconset theme="graphics">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Plot all accepted events</string>
    </property>
    <property name="toolTip">
     <string>Plot all accepted events only</string>
+   </property>
+  </action>
+  <action name="actionSave_detection_prefs">
+   <property name="icon">
+    <iconset theme="document-save"/>
+   </property>
+   <property name="text">
+    <string>Save detection prefernces</string>
+   </property>
+  </action>
+  <action name="actionLoad_detection_prefs">
+   <property name="icon">
+    <iconset theme="document-open"/>
+   </property>
+   <property name="text">
+    <string>Load detection preferences</string>
    </property>
   </action>
  </widget>

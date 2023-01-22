@@ -767,5 +767,58 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         if data is not None and isinstance(scipyenWindow, QtWidgets.QMainWindow) and scipyenWindow.__class__.__name__.startswith("ScipyenWindow"):
             return get_symbol_in_namespace(data, scipyenWindow.workspace)
     
+    def saveOptionsToUserFile(self):
+        """
+        Save non-Qt configurables to a user-defined file.
+        Not to be confused with self.saveSettings method
+        """
+        from iolib import pictio as pio
+        cfg = self.clsconfigurables
+        if len(cfg) == 0 or len(self.configurable_traits) == 0:
+            return
+        
+        # NOTE: 2023-01-22 16:22:18
+        # these are kept in sync with clsconfigurables by the ScipyenConfigurable superclass
+        configData = dict((k, self.get_configurable_attribute(k, cfg)) for k in cfg) 
+        
+        if len(configData):
+            fileFilters = ["JSON files (*.json)", "Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]
+            
+            fileName, fileFilter = self.chooseFile(caption="Save options",
+                                                    single=True,
+                                                    save=True,
+                                                    fileFilter = ";;".join(fileFilters))
+            
+            if isinstance(fileName,str) and len(fileName.strip()):
+                if "JSON" in fileFilter:
+                    pio.saveJSON(configData, fileName)
+                elif "HDF5" in fileFilter:
+                    pio.saveHDF5(configData, fileName)
+                else:
+                    pio.savePickleFile(configData, fileName)
+        
+    def loadOptionsFromUserFile(self):
+        from iolib import pictio as pio
+        fileFilters = ["JSON files (*.json)", "Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]
+        
+        fileName, fileFilter = self.chooseFile(caption="Save options",
+                                                single=True,
+                                                save=False,
+                                                fileFilter = ";;".join(fileFilters))
+            
+        if isinstance(fileName,str) and len(fileName.strip()):
+            if "JSON" in fileFilter:
+                configData = pio.loadJSON(fileName)
+            elif "HDF5" in fileFilter:
+                configData = pio.loadHDF5File(fileName)
+            else:
+                configData = pio.loadPickleFile(fileName)
+                
+            cfg = self.clsconfigurables
+            if len(cfg):
+                if isinstance(configData, dict) and len(configData):
+                    for k,v in configData.items():
+                        self.set_configurable_attribute(k,v,cfg)
+        
             
         

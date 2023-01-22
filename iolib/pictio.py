@@ -1289,6 +1289,15 @@ def segment_to_atf(segment, fileName=None, skipHeader=True, skipTimes=True, acqu
     except Exception as e:
         traceback.print_exc()
         csvfile.close()
+        
+def saveJSON(obj, fileName):
+    from . import jsonio
+    with open(fileName, mode="wt") as jsonfile:
+        jsonio.dump(obj, jsonfile)
+        
+def loadJSON(fileName):
+    from . import jsonio
+    return jsonio.load(fileName)
             
 def saveText(s, fileName):
     with open(fileName, mode="wt") as fileDest:

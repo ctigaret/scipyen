@@ -16,6 +16,7 @@ from .workspacegui import (WorkspaceGuiMixin, _X11WMBridge_,
                            saveWindowSettings, loadWindowSettings)
 from gui.widgets.spinboxslider import SpinBoxSlider
 from core import sysutils
+from iolib import pictio as pio
 from pandas import NA
 
 
@@ -188,6 +189,13 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self._docTitle_ = None
         self._winTitle_ = None # force auto-set in update_title()
         self._custom_viewer_name_ = None
+        
+        # NOTE: 2023-01-22 11:14:42
+        # A free-format state - stores volatile variables (that depend on the
+        # specifics of the data shown in the viewer)
+        # It is up to the subclass to manage its contents.
+        self._state_ = Bunch()
+        
 
         self._linkedViewers_ = list()
         
@@ -400,45 +408,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             self._winTitle_ = win_title
             self._custom_viewer_name_ = win_title
             
-#         else:
-#             # if enforce or self._winTitle_ is None or (isinstance(self._winTitle_, str) and len(self._winTitle_.strip()) == 0): 
-#             if enforce or self._winTitle_ is None or (isinstance(self._winTitle_, str) and len(self._winTitle_.strip()) == 0): 
-#                 # print(f"{self.__class__.__name__} update_title enforce {enforce} self._winTitle_ {self._winTitle_}")
-#                 # auto-set viewer title ONLY if not already set, or enforce is True
-#                 if self._scipyenWindow_ is not None:
-#                     if self.__class__ in self._scipyenWindow_.currentViewers:
-#                         currentViewer = self._scipyenWindow_.currentViewers[self.__class__]
-#                         
-#                     else:
-#                         currentViewer = None
-#                         
-#                     if currentViewer is None:
-#                         viewerVarName = []
-#                     else:
-#                         viewerVarName = [k for k in self._scipyenWindow_.workspace.keys() if \
-#                                         type(self._scipyenWindow_.workspace[k]).__name__ == type(self).__name__ and \
-#                                         self._scipyenWindow_.workspace[k].ID == currentViewer.ID]
-#                     
-#                     # print(f"{self.__class__.__name__} update_title enforce {enforce} viewerVarName {viewerVarName}")
-#                     # NOTE: 2019-11-09 13:40:54
-#                     # when called from __init__, self is not bound to any
-#                     # symbol in the user's namespace, yet.
-#                     # this binding will take place right after the constructor 
-#                     # is called e.g. by:
-#                     # some_window = Viewer()...
-#                     # some_window the is the name bound to the newly constructed
-#                     # viewer instance.
-#                     if len(viewerVarName):
-#                         self._winTitle_ = viewerVarName[-1]
-#                         self._custom_viewer_name_ = viewerVarName[-1]
-#                         
-#                     else:
-#                         self._winTitle_ = "%s%d" % (type(self).__name__, self._ID_)
-#                         self._custom_viewer_name_ = None
-#                 else:
-#                     self._winTitle_ = "%s%d" % (type(self).__name__, self._ID_)
-#                     self._custom_viewer_name_ = None
-                
         if isinstance(self._docTitle_, str) and len(self._docTitle_.strip()):
             self.setWindowTitle("%s - %s" % (self._docTitle_, self._winTitle_))
             

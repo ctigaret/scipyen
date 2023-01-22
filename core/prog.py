@@ -1771,8 +1771,14 @@ class WithDescriptors(object):
     
     These descriptors DO NOT implement the trait observer design pattern as found
     in the 'traitlets' package (https://traitlets.readthedocs.io/en/stable/).
-    Therefore they are ARE NOT a replacement for, nor are they intended for use 
-    with, the 'HasDescriptors' classes in the 'traitlets' package.
+    They are not a replacement for, nor are they intended for use with, the
+    'HasDescriptors' classes in the 'traitlets' package.
+    
+    Therefore, this mechanism is not used for storing configurables for various
+    GUI components in Scipyen.
+    
+    Rather, it should be used to provide a consistent data attributes structure 
+    for special Scipyen data types
     
     
     """

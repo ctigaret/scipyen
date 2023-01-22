@@ -941,7 +941,6 @@ def collect_configurables(cls):
     """
     if not inspect.isclass(cls):
         cls = cls.__class__
-    #cls = instance.__class__ # this is normally the derived type
     
     ret = Bunch({"qt": Bunch(), "conf": Bunch()})
     
@@ -952,15 +951,10 @@ def collect_configurables(cls):
         if isinstance(fn, property):
             if inspect.isfunction(fn.fget) or isinstance(fn.fget, partial):
                 confdict.update(getattr(fn.fget, "configurable_getter", Bunch()))
+
             if inspect.isfunction(fn.fset) or isinstance(fn.fset, partial):
                 confdict.update(getattr(fn.fset, "configurable_setter", Bunch()))
                 
-            #if inspect.isfunction(fn.fget) and hasattr(fn.fget, "configurable_getter"):
-                #getterdict = fn.fget.configurable_getter
-                
-            #if inspect.isfunction(fn.fset) and hasattr(fn.fset, "configurable_setter"):
-                #setterdict = fn.fset.configurable_setter
-                    
         elif inspect.isfunction(fn) or isinstance(fn, partial):
             confdict.update(getattr(fn, "configurable_getter", Bunch()))
             confdict.update(getattr(fn, "configurable_setter", Bunch()))
@@ -969,9 +963,6 @@ def collect_configurables(cls):
             continue # skip members that are not methods or properties
         
         if len(confdict):
-            #print("scipyen_config.collect_configurables %s confdict:" % cls.__name__)
-            #pprint(confdict)
-            #print("%s confdict" % cls.__name__, confdict)
             target = ret.qt if confdict.type.lower() == "qt" else ret.conf
 
             cfgget = confdict.get("getter", None)
@@ -996,7 +987,7 @@ def collect_configurables(cls):
             else:
                 target[confdict.name].update(cfgdict)
                 
-            
+    # adapt for "old" API
     ret.qt.update(getattr(cls, "_qtcfg", dict()))
     ret.qt.update(getattr(cls, "_ownqtcfg", dict()))
     ret.conf.update(getattr(cls, "_cfg", dict()))
@@ -1085,7 +1076,6 @@ class ScipyenConfigurable(object):
     _scipyen_settings_  = scipyen_config
     _user_settings_src_ = scipyen_user_config_source
     _user_settings_file_ = _user_settings_src_.filename
-    # _config_traits_ = dict()
     
     def __init__(self, configTag:typing.Optional[str]=None):
         self.configurable_traits = DataBag()
@@ -1241,7 +1231,7 @@ class ScipyenConfigurable(object):
             warnings.warn(f"The attempt to set configTag to {val} failed")
         
     @property
-    def configurables(self) -> Bunch:
+    def configurables(self):
         """All configurables
         
         Collects all configurables for this ::class:: in a mapping.
@@ -1352,10 +1342,6 @@ class ScipyenConfigurable(object):
             isTop = hasattr(self, "isTopLevel") and self.isTopLevel
             parent = self._get_parent_()
             tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
-            
-            # if self.__class__.__name__ == "EventAnalysis":
-            #     print(f"isTop: {isTop}, parent = {parent}, tag = {tag}")
-                
             user_conf = self._get_config_view_(isTop, parent, tag)
             
             # #### BEGIN debug - comment out when done
@@ -1364,28 +1350,21 @@ class ScipyenConfigurable(object):
             #     pprint(user_conf)
             #### END debug - comment out when done
 
-#             if isinstance(user_conf, dict):
-#                 for k, v in user_conf.items():
-#                     getset = cfg.get(k, {})
-#                     settername = getset.get("setter", None)
-#                     
-#                     if not isinstance(settername, str) or len(settername.strip())==0:
-#                         continue
-#                     
-#                     if self.__class__.__name__ == "EventAnalysis":
-#                         print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings key {k}: {settername} = {v}")
-#                     
-#                     self._assign_trait_from_config_(settername, v)
-                    
             if isinstance(user_conf, confuse.Subview):
                 for k, v in user_conf.items():
                     if k in cfg:
-                        getset = cfg.get(k, {})
-                        settername = getset.get("setter", None)
-                        
-                        if not isinstance(settername, str) or len(settername.strip()) == 0:
+                        try:
+                            self.set_configurable_attribute(k, v.get(), cfg)
+                        except Exception as e:
+                            traceback.print_exc()
                             continue
-                        self._assign_trait_from_config_(settername, v.get())
+#                         getset = cfg.get(k, {})
+#                         settername = getset.get("setter", None)
+#                         
+#                         if not isinstance(settername, str) or len(settername.strip()) == 0:
+#                             continue
+#                         
+#                         self._assign_trait_from_config_(settername, v.get())
                     
         if issubclass(self.__class__, QtWidgets.QWidget):
             self.loadWindowSettings() 
@@ -1417,37 +1396,37 @@ class ScipyenConfigurable(object):
                 
             parent = self._get_parent_()
             tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
-            
-            # if self.__class__.__name__ == "EventAnalysis":
-            #     print(f"isTop, {isTop}, parent, {parent}, tag {tag}")
-                
             user_conf = self._get_config_view_(isTop, parent, tag)
             
             #### BEGIN debug - comment out when done
             # if self.__class__.__name__ == "EventAnalysis":
             #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf:")
             #     pprint(user_conf)
-                
             #### END debug - comment out when done
             
             changed = False
             
             if isinstance(user_conf, dict):
                 for k, v in user_conf.items():
-                    getset = cfg.get(k, {})
-                    gettername = getset.get("getter", None)
-                    
-                    if not isinstance(gettername, str) or len(gettername.strip())==0:
+                    try:
+                        val = self.get_configurable_attribute(k, cfg)
+                    except Exception as e:
+                        traceback.print_exc()
                         continue
-                    
-                    getter = inspect.getattr_static(self, gettername, None)
-                    
-                    if isinstance(getter, property):
-                        val = getattr(self, gettername)
-                        
-                    elif getter is not None:
-                        getter = getattr(self, gettername)
-                        val  = getter()
+#                     getset = cfg.get(k, {})
+#                     gettername = getset.get("getter", None)
+#                     
+#                     if not isinstance(gettername, str) or len(gettername.strip())==0:
+#                         continue
+#                     
+#                     getter = inspect.getattr_static(self, gettername, None)
+#                     
+#                     if isinstance(getter, property):
+#                         val = getattr(self, gettername)
+#                         
+#                     elif getter is not None:
+#                         getter = getattr(self, gettername)
+#                         val  = getter()
 
                     #### BEGIN debug - comment out when done
                     # if self.__class__.__name__ == "EventAnalysis":
@@ -1473,7 +1452,6 @@ class ScipyenConfigurable(object):
                 # if self.__class__.__name__ == "EventAnalysis":
                 #     print(f"\twriting configuration file")
                 #### END debug - comment out when done
-                # self._update_config_view(user_conf, isTop, parent, tag)
                 write_config(scipyen_config)
                 #### BEGIN debug - comment out when done
                 # if self.__class__.__name__ == "EventAnalysis":
@@ -1482,6 +1460,38 @@ class ScipyenConfigurable(object):
                 
         if issubclass(self.__class__, (QtWidgets.QWidget, Figure)):
             self.saveWindowSettings()
+            
+    def get_configurable_attribute(self, name, config_dict):
+        """Helper to get the actual attribute value given a config entry"""
+        getset = config_dict.get(name, {})
+        gettername = getset.get("getter", None)
+        if not isinstance(gettername, str) or len(gettername.strip()) == 0:
+            raise RuntimeError(f"{name} is not a configurable")
+        
+        getter = inspect.getattr_static(self, gettername, None)
+        
+        if isinstance(getter, property):
+            return getattr(self, gettername)
+            
+        elif getter is not None:
+            getter = getattr(self, gettername)
+            return getter()
+            
+        else:
+            raise RuntimeError(f"{gettername} is not a `get` property")
+        
+    def set_configurable_attribute(self, name, val, config_dict):
+        """Helper function to assign a value to a configurable attribute
+        """
+        getset = config_dict.get(name, {})
+        settername = getset.get("setter", None)
+        if not isinstance(settername, str) or len(settername.strip()) == 0:
+            raise RuntimeError(f"{name} is not a configurable")
+        
+        self._assign_trait_from_config_(settername, val)
+        
+        
+        
         
 class ScipyenConfiguration(DataBag):
     """Superclass of all non-gui configurations
