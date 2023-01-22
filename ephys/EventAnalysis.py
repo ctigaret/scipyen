@@ -418,6 +418,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._detectWorker_ = None
         self._filterThread_ = None
         self._filterWorker_ = None
+        self._alignThread_  = None
+        self._alignWorker_  = None
         
         # NOTE: 2022-11-26 21:42:48
         # mutable control data for the detection loop, to communicate with the
@@ -601,7 +603,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.actionLoad_default_event_Template.triggered.connect(self._slot_loadDefaultTemplate)
         self.actionLoad_last_used_event_template.triggered.connect(self._slot_loadLastUsedTemplate)
         self.actionUndo_current_sweep.triggered.connect(self._slot_undoCurrentSweep)
-        self.actionAlign_event_waveforms.triggered.connect(self.alignWaves)
+        self.actionAlign_event_waveforms.triggered.connect(self._slot_alignThread)
         
         # self.actionDetect.triggered.connect(self._slot_detect)
         self.actionDetect.triggered.connect(self._slot_detectThread)
@@ -1138,6 +1140,10 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             self._detected_Events_Viewer_.clear()
             self._detected_Events_Viewer_.close()
             
+            
+        self._reportWindow_.clear()
+        self._reportWindow_.close()
+            
         self._detected_Events_Viewer_= None
         
         # this one is also supposed to call saveSettings()
@@ -1195,7 +1201,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
         return menu
     
-    def alignWaves(self, detectionChannel:typing.Optional[int]=None, on_rising:typing.Optional[bool]=None):
+    def alignWaves(self, detectionChannel:typing.Optional[int]=None, on_rising:typing.Optional[bool]=None, **kwargs):
         """
         Aligns all detected event waveforms on their onset.
         This requires that the event waveforms have been fitted already.
@@ -1223,6 +1229,12 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         if not isinstance(on_rising, bool):
             on_rising = self.alignWavesOnRisingPhase
         
+        loopControl = kwargs.pop("loopControl", None)
+        progressSignal = kwargs.pop("progressSignal", None)
+        finished = kwargs.pop("finished", None)
+        threaded = kwargs.pop("threaded", False)
+        trains = kwargs.pop("trains", None)
+        
         # NOTE: 2022-11-27 14:21:41 The logic is a follows:
         #
         # • only work on accepted waveforms
@@ -1248,16 +1260,36 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         #
         # 
         
-        result = self.result()
-        
-        if result is None:
-            return
-        
-        table, trains, waves = result
+        if trains is None:
+            result = self.result()
+            
+            if result is None:
+                return
+            
+            table, trains, waves = result
         
         aligned_waves = list()
         
-        for train in trains:
+        if not threaded:
+            self._enable_widgets(self.actionCreate_Event_Template,
+                                self.actionPlot_events_for_template,
+                                self.actionPlot_aligned_event_waveforms,
+                                self.actionDetect,
+                                self.actionUndo,
+                                self.actionDetect_in_current_sweep,
+                                self.actionUndo_current_sweep,
+                                self.actionClear_results,
+                                self.accept_eventCheckBox,
+                                self.actionView_results,
+                                self.actionExport_results,
+                                self.actionSave_results,
+                                self.use_eventTemplate_CheckBox,
+                                self.actionCreate_Event_Template,
+                                self.actionOpen_Event_Template,
+                                self.actionImport_Event_Template,
+                                enable=False)
+        
+        for k,train in enumerate(trains):
             alignment = self._make_aligned_waves_(train, by_max_rise = on_rising)
             if alignment is None:
                 continue
@@ -1265,19 +1297,58 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             aligned_waveforms, wave_ndx = alignment
             aligned_waves.extend(aligned_waveforms)
             
+            if isinstance(progressSignal, QtCore.pyqtBoundSignal):
+                progressSignal.emit(k)
+                
+            if isinstance(loopControl, dict) and loopControl.get("break",  None) == True:
+                break
+            
         if len(aligned_waves):    
             self._aligned_waves_[:] = aligned_waves
-            for action in (self.actionCreate_Event_Template,
-                           self.actionPlot_events_for_template,
-                           self.actionPlot_aligned_event_waveforms):
-                action.setEnabled(True)
-                
-            self._plot_aligned_waves()
+            if not threaded:
+                self._enable_widgets(self.actionCreate_Event_Template,
+                                    self.actionPlot_events_for_template,
+                                    self.actionPlot_aligned_event_waveforms,
+                                    self.actionDetect,
+                                    self.actionUndo,
+                                    self.actionDetect_in_current_sweep,
+                                    self.actionUndo_current_sweep,
+                                    self.actionClear_results,
+                                    self.accept_eventCheckBox,
+                                    self.actionView_results,
+                                    self.actionExport_results,
+                                    self.actionSave_results,
+                                    self.use_eventTemplate_CheckBox,
+                                    self.actionCreate_Event_Template,
+                                    self.actionOpen_Event_Template,
+                                    self.actionImport_Event_Template,
+                                    enable=True)
+        
+                self._plot_aligned_waves()
                 
         else:
             self._aligned_waves_.clear()
-            if isinstance(self._detected_Events_Viewer_, sv.SignalViewer):
-                self._detected_Events_Viewer_.clear()
+            if not threaded:
+                self._enable_widgets(self.actionCreate_Event_Template,
+                                    self.actionPlot_events_for_template,
+                                    self.actionPlot_aligned_event_waveforms,
+                                    self.actionDetect,
+                                    self.actionUndo,
+                                    self.actionDetect_in_current_sweep,
+                                    self.actionUndo_current_sweep,
+                                    self.actionClear_results,
+                                    self.accept_eventCheckBox,
+                                    self.actionView_results,
+                                    self.actionExport_results,
+                                    self.actionSave_results,
+                                    self.use_eventTemplate_CheckBox,
+                                    self.actionCreate_Event_Template,
+                                    self.actionOpen_Event_Template,
+                                    self.actionImport_Event_Template,
+                                    enable=True)
+        
+                if isinstance(self._detected_Events_Viewer_, sv.SignalViewer):
+                    self._detected_Events_Viewer_.clear()
             
             
     def _extract_waves_(self, train, valid_only=False):
@@ -1848,6 +1919,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         if not isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList) or len(frameResult) == 0:
             if isinstance(self._detected_Events_Viewer_, sv.SignalViewer):
                 self._detected_Events_Viewer_.clear()
+                
+            
             return
         
         signalBlockers = (QtCore.QSignalBlocker(w) for w in (self._events_spinBoxSlider_,
@@ -2431,6 +2504,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 break
                 
     def _undo_sweep(self, segment_index:typing.Optional[int]=None):
+        self._targets_cache_.clear()
         if segment_index is None:
             segment_index = self.currentFrame
             
@@ -2445,7 +2519,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         if segment_index not in range(-len(self._undo_buffer_), len(self._undo_buffer_)):
             return
-        
         
         # restore the spiketrains as a spiketrainlist containing the current 
         # non-PSC-detection spike trains and whatever is stored in the cache 
@@ -3142,6 +3215,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
     @pyqtSlot()
     def _slot_clearResults(self):
+        self._targets_cache_.clear()
         if self._data_ is None:
             self._result_ = None
             self._undo_buffer_ = None
@@ -3177,20 +3251,107 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         total_evts, acc_evts = self._tally_events()
         self._report_events_tally(total_evts, acc_evts)
+        
+    @pyqtSlot()
+    def _slot_alignThread(self):
+        if isinstance(self._data_, (neo.Block, neo.Segment)):
+            vartxt = f"in {self._data_.name}"
+        else:
+            vartxt = ""
+
+        if self._data_ is None:
+            return
+        
+        if all(v is None for v in self._result_):
+            return
+        
+        result = self.result()
+        
+        if result is None:
+            return
+        
+        table, trains, waves = result
+        
+        progressDisplay = QtWidgets.QProgressDialog(f"Aligning event waveforms {vartxt}", 
+                                                    "Abort", 
+                                                    0, len(self._result_), 
+                                                    self)
+        progressDisplay.canceled.connect(self._slot_breakLoop)
+        
+        self._alignThread_ = QtCore.QThread()
+        self._alignWorker_ = pgui.ProgressWorkerThreaded(self.alignWaves,
+                                                         loopControl = self.loopControl,
+                                                         threaded=True, trains = trains)
+        
+        self._alignWorker_.signals.signal_Progress.connect(progressDisplay.setValue)
+        
+        self._alignWorker_.moveToThread(self._alignThread_)
+        self._alignThread_.started.connect(self._alignWorker_.run)
+        self._alignWorker_.signals.signal_Finished.connect(self._alignThread_.quit)
+        self._alignWorker_.signals.signal_Finished.connect(self._alignWorker_.deleteLater)
+        self._alignWorker_.signals.signal_Finished.connect(self._alignThread_.deleteLater)
+        self._alignWorker_.signals.signal_Finished.connect(lambda: progressDisplay.setValue(progressDisplay.maximum()))
+        self._alignWorker_.signals.signal_Result[object].connect(self._slot_alignThread_ready)
+        
+        self._alignThread_.finished.connect(self._alignWorker_.deleteLater)
+        self._alignThread_.finished.connect(self._alignThread_.deleteLater)
+        
+        self._enable_widgets(self.actionCreate_Event_Template,
+                             self.actionPlot_events_for_template,
+                             self.actionPlot_aligned_event_waveforms,
+                             self.actionDetect,
+                             self.actionUndo,
+                             self.actionDetect_in_current_sweep,
+                             self.actionUndo_current_sweep,
+                             self.actionClear_results,
+                             self.accept_eventCheckBox,
+                             self.actionView_results,
+                             self.actionExport_results,
+                             self.actionSave_results,
+                             self.use_eventTemplate_CheckBox,
+                             self.actionCreate_Event_Template,
+                             self.actionOpen_Event_Template,
+                             self.actionImport_Event_Template,
+                             enable=False)
+        
+        self._alignThread_.start()
+        
+    @pyqtSlot()
+    def _slot_alignThread_ready(self):
+        self.loopControl["break"] = False
+        self._enable_widgets(self.actionCreate_Event_Template,
+                             self.actionPlot_events_for_template,
+                             self.actionPlot_aligned_event_waveforms,
+                             self.actionDetect,
+                             self.actionUndo,
+                             self.actionDetect_in_current_sweep,
+                             self.actionUndo_current_sweep,
+                             self.actionClear_results,
+                             self.accept_eventCheckBox,
+                             self.actionView_results,
+                             self.actionExport_results,
+                             self.actionSave_results,
+                             self.use_eventTemplate_CheckBox,
+                             self.actionCreate_Event_Template,
+                             self.actionOpen_Event_Template,
+                             self.actionImport_Event_Template,
+                             enable=True)
+        
+        self._plot_aligned_waves()
             
     @pyqtSlot()
     def _slot_detectThread(self):
         # NOTE: 2022-11-26 10:24:01 IT WORKS !!!
         if self._data_ is None:
-            self.criticalMessage("Detect mPSC in current sweep",
+            self.criticalMessage("Detect events",
                                  "No data!")
             return
             
         waveform = self._get_event_template_or_waveform_()
         
         if waveform is None:
-            self.criticalMessage("Detect mPSC in current sweep",
-                                 "No mPSC waveform or template is available")
+            self.criticalMessage("Detect events",
+                                 "No event waveform or template is available")
             return
         
         if isinstance(self._data_, (neo.Block, neo.Segment)):
@@ -3200,7 +3361,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
 
         self._clear_detection_flag_ = self.clearPreviousDetectionCheckBox.isChecked() # to make sure this is up to date
             
-        progressDisplay = QtWidgets.QProgressDialog(f"Detecting mPSCS {vartxt}", 
+        progressDisplay = QtWidgets.QProgressDialog(f"Detecting events {vartxt}", 
                                                     "Abort", 
                                                     0, self._number_of_frames_, 
                                                     self)
@@ -3270,10 +3431,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                                                         clearLastDetection=self._clear_detection_flag_)
         self._detectWorker_.signals.signal_Progress.connect(progressDisplay.setValue)
         
-        # self._detectWorker_ = pgui.ProgressWorkerThreaded(self._detect_all_, 
-        #                                                 progressDisplay, 
-        #                                                 clearLastDetection=self._clear_detection_flag_)
-        
         self._detectWorker_.moveToThread(self._detectThread_)
         self._detectThread_.started.connect(self._detectWorker_.run) # see NOTE: 2022-11-26 16:56:19 below
         self._detectWorker_.signals.signal_Finished.connect(self._detectThread_.quit)
@@ -3336,7 +3493,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._plot_data()
         self.loopControl["break"] = False
         
-        
     @pyqtSlot()
     def _slot_breakLoop(self):
         """To be connected to the `canceled` signal of a progress dialog.
@@ -3349,6 +3505,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         """Restores spiketrains before detection, in all data.
         TODO: update results
         """
+        self._targets_cache_.clear()
         if isinstance(self._data_, neo.Block):
             for k in range(len(self._data_.segments)):
                 self._undo_sweep(k)
@@ -3364,6 +3521,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         total_evts, acc_evts = self._tally_events()
         self._report_events_tally(total_evts, acc_evts)
+        
+        self._update_report_()
             
     @pyqtSlot()
     def _slot_ephysViewer_closed(self):
