@@ -710,6 +710,16 @@ class DataSignal(BaseSignal):
         new_signal = f(other, *args)
         new_signal._copy_data_complement(self)
         return new_signal
+    
+    def time_index(self, t):
+        """Copied from neo.AnalogSignal"""
+        i = (t - self.t_start) * self.sampling_rate
+        i  = np/rint(i.simplified.magitude).astype(np.int64)
+        
+        return i
+    
+    def domain_index(self, x):
+        return self.time_index(x)
 
     def as_array(self, units=None):
         """

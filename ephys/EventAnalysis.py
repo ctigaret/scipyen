@@ -781,6 +781,11 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         else:
             data = kwargs.pop("data", None)
             
+        self._targets_cache_.clear()
+        self._detected_events_ = list()
+        self._aligned_waves_ = list()
+        self._all_waves_ = list()
+            
         sigBlock = QtCore.QSignalBlocker(self.displayedDetectionChannelSpinBox)
             
         if neoutils.check_ephys_data_collection(data): # and self._check_supports_parameter_type_(data):
@@ -1094,6 +1099,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         self._data_ = None
         self._data_var_name_ = None
+        self._filtered_data_ = None
         self._data_frames_ = 0
         self._frameIndex_ = []
         self._number_of_frames_ = 0
@@ -1103,6 +1109,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._template_file_ = self._default_template_file
         
         self._detected_events_ = list()
+        self._aligned_waves_ = list()
+        self._all_waves_ = list()
         self._result_ = list()
         self._undo_buffer_ = list()
         self._currentWaveformIndex_ = 0
@@ -1116,6 +1124,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._params_lower_ = self._default_params_lower_
         self._params_upper_ = self._default_params_upper_
         self._event_duration_ = self._default_duration_
+        self._targets_cache_.clear()
         
     @pyqtSlot()
     def _slot_Close(self):
@@ -1508,7 +1517,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             # retrieve the fitted curve to figure out the max rise 
             fdata = [w[:,1] for w in waves] # requires fitted waves !!!
             # get the 1st order difference of the fitted curve: δy/δt
-            fdiff = [ephys.ediff1d(w) for w in fdata] 
+            fdiff = [sigp.ediff1d(w) for w in fdata] 
             ispos = [sigp.is_positive_waveform(w) for w in fdata]
             # The fastest rise is the maximum of δy/δt for positive waveforms -
             # i.e., outward PSCs - or the minimum of δy/δt, otherwise

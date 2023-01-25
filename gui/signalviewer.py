@@ -8580,6 +8580,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # if there are 2 more plotitems than signal axes, assign the 
             # last two to the events axis and spiketrains axis
             self._events_axis_, self._spiketrains_axis_ = self.plotItems[-2:]
+            
         elif len(self.plotItems) - len(self.signalAxes) == 1:
             # if there is only only one plotitem more than existing signal axes
             # then assign it to the events axis
@@ -8662,6 +8663,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.signalsLayout.scene().sigMouseClicked.connect(self._slot_mouseClickSelectPlotItem)
             
         for plotItem in self.axes:
+            self._clear_targets_overlay_(plotItem)
+            self._clear_labels_overlay_(plotItem)
             plotItem.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
                                                     autoReduceTextSpace=False)
             

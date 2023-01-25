@@ -25,7 +25,7 @@ import neo
 from . import tiwt
 from . import models
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
-#from . import datatypes as dt
+from core import datatypes as dt
 #from .patchneo import *
 #### END pict.core modules
 
@@ -779,6 +779,55 @@ def fit_Event_wave(data, wave):
     return 1 - sse/sst
     
     
+def scale_fit_waves(x, y, p0 = 1, method="nelder-mead"):
+    """ Finds a scale factor of y such that it matches x.
+    
+    The objective function being minimized is the scalar product x - p0 * y
+    
+    Parameters:
+    ----------
+    x: 1D vector to compare against
+    y: 1D vector with the same shape as x, which is to be scaled such that 
+        p * y ≈ x 
+    
+        in other words, 
+
+        Σ(x - p*y)² ≈ 0                                                 (1)
+    
+    p0: initial value of `p`
+    
+    Returns:
+    --------
+    a scipy.optimize.OptimizeResult data.
+    When optimization was successful, the `x` attribute of the result is the 
+    parameter value p that satisfies (1)
+    
+    WARNING: THIS FUNCTION DOES NOT SCALE ANY OF THE WAVES PASSED TO IT.
+    One should first inspect the `success` attribute  of the result, then if 
+    True, use the value of the `x` attribute of the result to scale the wave in 
+    `y` 
+    
+    """
+    if not all(isinstance(x, np.ndarray) for v in (x,y)):
+        raise TypeError("Expecting two numpy arrays")
+    
+    if not all(dt.is_vector(v) for v in (x,y)):
+        raise ValueError("Expecting two vectors")
+    
+    if x.ndim != y.ndim or x.shape != y.shape:
+        raise ValueError(f"x and y must have the same dimensionality and shape; gpt x with {x.ndim} dimensions and {x.shape} shape, and y with {y.ndim} dimensions and {y.shape} shape")
+
+    def __wave_fun__(x_, a, b):
+        """x_: scale; 
+           a : original wave
+           b: wave to be scaled"""
+        y = a - x_ * b
+        return np.dot(y.T, y)
+    
+    res = optimize.minimize(__wave_fun__, p0, args = (x,y),
+                            method = method)
+    
+    return res
     
 def fit_nsfa(data, p0, **kwargs):
     jac         = kwargs.pop("jac",         "2-point")

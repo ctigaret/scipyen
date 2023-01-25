@@ -1900,7 +1900,20 @@ def get_epoch_interval(epoch: neo.Epoch, index: typing.Union[str, bytes, np.str_
     
 def get_sample_at_time(data, t):
     """Returns the signal sample value at (or around) time t.
-    If a value is not found, returns np.nan * data.units.
+    
+    Returns np.nan * data.units if a value is not found (typically this happens 
+    when `t` is outside the signal's domain).
+    
+    To get the sample index at time `t` use:
+
+    • `data.time_index(t)` when data is a neo.AnalogSignal or DataSignal; NOTE
+        that the time_index method uses different algorithm than this function,
+        by calculating the sample index by multiplying the signal's sample rate
+        with the difference between t and the signal's domain origin (i.e. the
+        `t_start` attribute)
+    
+    • `get_domain_index(data, t)` function defined in this module when data is a
+        neo.IrregularlySampledSignal or a IrregularlySampledDataSignal
     
     NOTE: Unlike BaseSignal.time_slice, this function returns a scalar
     python Quantity, not a slice view of the signal!
@@ -1933,13 +1946,49 @@ def get_sample_at_time(data, t):
     else:
         i = np.where(np.isclose(data.times.magnitude, t.magnitude))[0]
         if len(i):
-            i = i[-1]
+            i = int(i[-1])
             ret = data[i]
         else:
             ret = np.nan*data.units
             # raise ValueError(f"domain value {t} not found")
         
     return ret
+
+def get_domain_index(data, t):
+    """Returns the sample index nearest to the domain scalar value `t`
+    """
+    u = data.times.units
+
+    if isinstance(t, float):
+        t *= u
+        
+    elif isinstance(t, np.ndarray):
+        if t.size > 1:
+            raise ValueError(f"Expecting a scalar")
+        
+        if isinstance(t, pq.Quantity):
+            t = t.rescale(u)
+        else:
+            t *= u
+            
+    if isinstance(data, IrregularlySampledDataSignal):
+        try:
+            i = np.where(np.isclose(data.times.magnitude, t.magnitude))[0]
+            if len(i):
+                return int(i[-1])
+            # else:
+            #     return None
+        except:
+            return None
+    else:
+        i = np.where(np.isclose(data.times.magnitude, t.magnitude))[0]
+        if len(i):
+            return int(i[-1])
+        # else:
+        #     return None
+            # raise ValueError(f"domain value {t} not found")
+        
+    # return ret
 
 def get_sample_at_domain_value(data, x):
     """Returns the signal sample value at (or around) domain value x
