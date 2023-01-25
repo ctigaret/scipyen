@@ -118,6 +118,10 @@ class InteractiveTreeWidget(DataTreeWidget):
         # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> _slot_setLastActive item {item.data(0,QtCore.Qt.DisplayRole)}")
         self._last_active_item_ = item.data(0,QtCore.Qt.DisplayRole)
         self._last_active_item_column_ = column
+        
+    def setSupportedDataTypes(self, types:tuple):
+        if isinstance(types, tuple) and len(types):
+            self._supported_data_types_ = types
     
     def setData(self, data, predicate=None, top_title:str = "", dataTypeStr = None, hideRoot=False):
         """data should be a dictionary."""

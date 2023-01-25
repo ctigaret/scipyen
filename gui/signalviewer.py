@@ -814,6 +814,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         """
         self.setupUi(self)
+        from gui.dictviewer import DataViewer
         
         # NOTE: 2021-11-13 23:24:12
         # signal/slot connections & UI for pg.PlotItem objects are configured in
@@ -1026,6 +1027,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.annotationsViewer.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.annotationsViewer.setDragDropMode(QtWidgets.QAbstractItemView.DragOnly)
         self.annotationsViewer.setDragEnabled(True)
+        self.annotationsViewer.setSupportedDataTypes(tuple(DataViewer.viewer_for_types))
         
         # NOTE: 2022-03-04 10:14:09 FIXME/TODO code to actually export to workspace
         # items selected in the annotations viewer
@@ -6918,15 +6920,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
                 ax.getAxis("left").setWidth(60)
                 
-        # visibleAxes = [ax for ax in self.axes if ax.isVisible()]
-        # if len(visibleAxes) > 0:
-        #     if len(visibleAxes) == 1:
-        #         visibleAxes[0].enableAutoRange()
-        #         visibleAxes[0].enableAutoRange()
-        #         visibleAxes[0].getAxis("bottom").showLabel(True)
-        #         visibleAxes[0].getAxis("bottom").setStyle(showValues = True)
-        #     else:
-        #         self._align_X_range()
         self._align_X_range()
         
           
@@ -7047,10 +7040,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             if len(obj_):
                 if self._new_frame_:
-                    # self._spiketrains_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
-                    #                                                     QtWidgets.QSizePolicy.Minimum, 
-                    #                                                     QtWidgets.QSizePolicy.Frame))
-                    
                     kwargs["adapt_X_range"] = True
                         
                     self._plot_discrete_entities_(obj_, axis=self._spiketrains_axis_, **kwargs)
@@ -7409,11 +7398,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
         if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
             self.docTitle = seg_name
+            
+        self.currentFrameAnnotations = {type(obj).__name__ : obj.annotations}
         
     @_plot_data_.register
     def _(self, obj:neo.core.spiketrainlist.SpikeTrainList, *args, **kwargs):
         self._plotSpikeTrains_(obj)
+        self.currentFrameAnnotations = {type(obj).__name__: [st.annotations for st in obj]}
                 
+    @_plot_data_.register(neo.SpikeTrain)
+    def _(self, obj, *args, **kwargs):
+        self._plotSpikeTrains_(obj)
+        self.currentFrameAnnotations = {type(obj).__name__: obj.annotations}
+        
     @_plot_data_.register(neo.AnalogSignal)
     @_plot_data_.register(neo.IrregularlySampledSignal)
     @_plot_data_.register(DataSignal)
@@ -7425,10 +7422,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 self._current_frame_index_ = 0
                 ndx = 0
-                
+            
             self._plot_signal_(obj[:,ndx], *args, **kwargs)
+            annotations = getattr(obj[:,ndx], "annotations", dict())
+            self.currentFrameAnnotations = {type(obj[:,ndx]).__name__: annotations}
         else:
             self._plot_signal_(obj, *args, **kwargs)
+            self.currentFrameAnnotations = {type(obj).__name__: obj.annotations}
             
     @_plot_data_.register(neo.Epoch)
     @_plot_data_.register(DataZone)
@@ -7440,8 +7440,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if clear_epochs:
             self._clear_lris_()
             
-        # print(f"{self.__class__.__name__}._plot_data_(obj<{type(obj).__name__}>)")
-        
         epoch_pen = kwargs.pop("epoch_pen", self.epoch_plot_options["epoch_pen"])
         epoch_brush = kwargs.pop("epoch_brush", self.epoch_plot_options["epoch_brush"])
         epoch_hoverPen = kwargs.pop("epoch_hoverPen", self.epoch_plot_options["epoch_hoverPen"])
@@ -7451,20 +7449,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                hoverBrush=epoch_hoverBrush,
                                hoverPen = epoch_hoverPen)
         
+        self.currentFrameAnnotations = {type(obj).__name__: obj.annotations}
+        
     @_plot_data_.register(neo.Event)
     @_plot_data_.register(DataMark)
     def _(self, obj, *args, **kwargs):
+        """Plot stand-alone events"""
         if len(obj) == 0:
             self._events_axis_.clear()
             self._events_axis_.setVisible(False)
         else:
             self._plotEvents_(obj)
-    
-    @_plot_data_.register(neo.SpikeTrain)
-    @_plot_data_.register(neo.core.spiketrainlist.SpikeTrainList)
-    def _(self, obj, *args, **kwargs):
-        self._plotSpikeTrains_(obj)
-        
+        self.currentFrameAnnotations = {type(obj).__name__: obj.annotations}
+            
     @_plot_data_.register(np.ndarray)
     def _(self, obj, *args, **kwargs):
         # print(f"{self.__class__.__name__}._plot_data_(obj<{type(obj).__name__}> dims: {obj.ndim})")
@@ -7526,6 +7523,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         except Exception as e:
             traceback.print_exc()
             
+        self.currentFrameAnnotations = dict()
+            
     @_plot_data_.register(type(None))
     def _(self, obj, *args, **kwargs):
         pass
@@ -7548,19 +7547,26 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             if self.frameAxis == 1:
                 self._plot_signal_(obj[dataFrameNdx])
+                self.currentFrameAnnotations = {type(obj[dataFrameNdx]).__name__: getattr(obj[dataFrameNdx], "annotations", dict())}
                 return
             
             analog = [s for s in obj if isinstance(s, (neo.AnalogSignal, DataSignal))]
             
+            analog_anns = [s.annotations for s in analog]
+            
             irregs = [s for s in obj if isinstance(s, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal))]
+            
+            irreg_anns = [s.annotations for s in irregs]
             
             self._plot_signals_(analog, irregs, *args, **kwargs)
             
             self.spikeTrainsAxis.setVisible(False)
             self.eventsAxis.setVisible(False)
+            self.currentFrameAnnotations = {type(obj).__name__: {"analog": analog_anns, "irregs": irreg_anns}}
             
         elif all([isinstance(y_, (neo.Event, DataMark)) for y_ in obj]):
             self._plotEvents_(obj, *args, **kwargs)
+            self.currentFrameAnnotations = {type(obj).__name__: [getattr(y_, "annotations", dict()) for y_ in obj]}
             
         elif all([isinstance(y_, (neo.core.Epoch, DataZone)) for y_ in obj]): 
             # print(f"{self.__class__.__name__}._plot_data_(obj<{type(obj).__name__}>)")
@@ -7607,11 +7613,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             for epoch in obj:
                 brush = next(brushes)
                 self._plot_epoch_data_(epoch, brush=brush,**kwargs)
+                
+            self.currentFrameAnnotations = {type(obj).__name__: [getattr(y_, "annotations", dict()) for y_ in obj]}
             
         elif all([isinstance(y_, neo.Segment) for y_ in obj]):
             segment = obj[self.frameIndex[self._current_frame_index_]]
             self._plot_data_(segment, *args, **kwargs)
-            self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
+            self.currentFrameAnnotations = {type(obj).__name__: [getattr(y_, "annotations", dict()) for y_ in obj]}
             
         elif all([isinstance(y_, neo.Block) for y_ in obj]):
             frIndex = self.frameIndex[self._current_frame_index_]
@@ -7642,13 +7650,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             self._plot_data_(segment, *args, **kwargs)
             
-            self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
-            
-        elif all(isinstance(y_, (neo.Event, DataMark)) for y_ in obj):
-            self._plotEvents_(obj, *args, **kwargs)
+            self.currentFrameAnnotations = {type(obj).__name__: [getattr(y_, "annotations", dict()) for y_ in obj]}
             
         elif all(isinstance(y_, neo.SpikeTrain) for y_ in obj):
             self._plotSpikeTrains_(obj, *args, **kwargs)
+            self.currentFrameAnnotations = {type(obj).__name__: [getattr(y_, "annotations", dict()) for y_ in obj]}
         
         else: # accepts sequence of np.ndarray (VigraKernel1D objects are converted to np arrays by _parse_data_)
             # FIXME - in progress 2023-01-19 08:17:18
@@ -7726,6 +7732,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 return False
                         
+            self.currentFrameAnnotations = {type(obj).__name__: dict()}
         return True
     
     def _register_plot_item_name_(self, plotItem, name):

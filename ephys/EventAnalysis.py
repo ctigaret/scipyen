@@ -1487,6 +1487,10 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         start_times = np.array([w.t_start for w in waves]) * waves[0].t_start.units
         peak_times = np.array([w.annotations["peak_time"] for w in waves]) * waves[0].t_start.units
         
+        # save these for annotating the aligned waveforms - useful to indicate
+        # where the peak is relative to the start of the aligned waveforms
+        relative_peak_times = peak_times - start_times
+        
         onset = np.array([w.annotations["event_fit"]["Coefficients"][2] for w in waves]) * waves[0].t_start.units
         
         wave_index = [w.annotations["wave_index"] for w in waves]
@@ -1500,13 +1504,27 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             # in order to do that we need to smooth the wave first !
             # also, if the wave if "inward", then we take the argmin() !
             # fdata = [self._lowpass_filter_signal(self._deHum(w[:,0], float(w.sampling_rate)), makeFilter=True) for w in waves]
+            
+            # retrieve the fitted curve to figure out the max rise 
             fdata = [w[:,1] for w in waves] # requires fitted waves !!!
+            # get the 1st order difference of the fitted curve: δy/δt
             fdiff = [ephys.ediff1d(w) for w in fdata] 
             ispos = [sigp.is_positive_waveform(w) for w in fdata]
-            maxrises = [w.argmax() if ispos[k] else w.argmin() for k, w in enumerate(fdiff)]
-            # time of fastest rise, relative to t_start
-            maxrisetimes = np.array([waves[k].times[t]-waves[k].t_start for k, t in enumerate(maxrises)]) * waves[0].t_start.units
-            corrections = maxrisetimes.max() - maxrisetimes
+            # The fastest rise is the maximum of δy/δt for positive waveforms -
+            # i.e., outward PSCs - or the minimum of δy/δt, otherwise
+            # Here we collect the sample indices correspondng to where the fastest
+            # rise is (see above for definition of fastest rise)
+            maxrise_samples = [w.argmax() if ispos[k] else w.argmin() for k, w in enumerate(fdiff)]
+            # Times of fastest rise, relative to t_start, across all the waves:
+            # the time values are the values of the time domain at the fastest 
+            # rise samples determined above (`maxrise_samples`).
+            maxrise_times = np.array([waves[k].times[t]-waves[k].t_start for k, t in enumerate(maxrise_samples)]) * waves[0].t_start.units
+            # corrections ↦ array of differences between the maximum time value 
+            # of the fastest rise across all waves and the time of the fastest 
+            # tise in individual waveforms
+            corrections = maxrise_times.max() - maxrise_times
+            
+            # calculate new start times for the waveforms:
             new_start_times = start_times - corrections
             
             stop_times = new_start_times + self._event_duration_
@@ -1531,9 +1549,11 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                             amplitude = train.annotations["amplitude"][kw],
                             peak_time = train.annotations["peak_time"][kw], # keep the original peak time
                             event_fit = train.annotations["event_fit"][kw],
-                            Accept = train.annotations["Accept"][kw],
+                            relative_peak_time = relative_peak_times[kw],
                             signal_origin = train.annotations["signal_origin"],
+                            Accept = train.annotations["Accept"][kw],
                             Aligned = np.array([True]),
+                            Alignment = "max rise",
                             wave_index = wave_ndx)
                 
                 aligned_waves.append(aligned_wave)
@@ -1563,9 +1583,11 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                             amplitude = train.annotations["amplitude"][kw],
                             peak_time = train.annotations["peak_time"][kw], # keep the original peak time
                             event_fit = train.annotations["event_fit"][kw],
-                            Accept = train.annotations["Accept"][kw],
+                            relative_peak_time = relative_peak_times[kw],
                             signal_origin = train.annotations["signal_origin"],
+                            Accept = train.annotations["Accept"][kw],
                             Aligned = np.array([True]),
+                            Alignment = "onset",
                             wave_index = wave_ndx)
                 
                 # if write_back:
