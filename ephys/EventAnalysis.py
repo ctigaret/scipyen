@@ -2669,8 +2669,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._reportWindow_.view(resultsDF, doc_title = f"{self._data_.name} Results")
         self._reportWindow_.show()
         
+    @safeWrapper
     def _detect_sweep_(self, segment_index:typing.Optional[int]=None, waveform=None, output_detection=False):
-        """ Event detection in a segment (a.k.a a sweep)
+        """ Event detection in a segment
         
         Returns a tuple containing :
         • a spiketrain
@@ -2766,251 +2767,256 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         mPSCTrains = None
         
-        if len(epochs):
-            mini_waves = list()
-            detections = list()
-            all_θ = list()
-            
-            # detect events in individual signal epochs (allowing to define more
-            # than one epoch in a signal)
-            for epoch in epochs:
-                sig = signal.time_slice(epoch.times[0], epoch.times[0]+epoch.durations[0])
-                # NOTE: 2022-12-15 11:56:46
-                # _process_signal_ checks whether there is any filter enabled
-                # if there is then a filtered copy is passed to the events 
-                # detection function
-                # ATTENTION: This will result in waves extracted from the filtered
-                # version of the signal. This is certainly NOT desirable for
-                # non-stationary fluctation analysis. In such case, if the signal
-                # is beign filtered, then the option "Waves from filtered signal"
-                # must be switched off. Alternatively, run the detection directly
-                # on the raw signal (or at least a signal NOT smoothed).
+        try:
+            if len(epochs):
+                mini_waves = list()
+                detections = list()
+                all_θ = list()
                 
-                if not processed:
-                    sig = self._process_signal_(sig, newFilter=True)
+                # detect events in individual signal epochs (allowing to define more
+                # than one epoch in a signal)
+                for epoch in epochs:
+                    sig = signal.time_slice(epoch.times[0], epoch.times[0]+epoch.durations[0])
+                    # NOTE: 2022-12-15 11:56:46
+                    # _process_signal_ checks whether there is any filter enabled
+                    # if there is then a filtered copy is passed to the events 
+                    # detection function
+                    # ATTENTION: This will result in waves extracted from the filtered
+                    # version of the signal. This is certainly NOT desirable for
+                    # non-stationary fluctation analysis. In such case, if the signal
+                    # is beign filtered, then the option "Waves from filtered signal"
+                    # must be switched off. Alternatively, run the detection directly
+                    # on the raw signal (or at least a signal NOT smoothed).
                     
+                    if not processed:
+                        sig = self._process_signal_(sig, newFilter=True)
+                        
+                    if not self.useFilteredWaves:
+                        quasi_raw = self._process_signal_(signal.time_slice(epoch.times[0], epoch.times[0]+epoch.durations[0]),
+                                                        dc_detrend_only=True)
+                        quasi_raw.name = signal.name
+                    else:
+                        quasi_raw = None
+                        
+                    detection = membrane.detect_Events(sig, waveform, 
+                                                    useCBsliding = self.useSlidingDetection,
+                                                    threshold = self._detection_threshold_,
+                                                    outputDetection = output_detection,
+                                                    raw_signal = quasi_raw)
+                    
+                    # print(f"detection {detection}")
+                    
+                    if detection is None:
+                        continue
+                    
+                    if output_detection:
+                        detection, thetas = detection
+                        # print(f"{[type(t).__name__ for t in thetas]}")
+                        all_θ.append(thetas)
+                        
+                    if not isinstance(detection, neo.core.spiketrainlist.SpikeTrainList):
+                        continue
+                    
+                    # this below is a collection of spike train lists (one per epoch)!
+                    # but each spiketrainlist should have up to the same max number 
+                    # of spiketrains (i.e. as many as there are channels)
+                    detections.append(detection) 
+                
+                # collate the detection spike trains into one single spike train
+                if len(detections):
+                    template = detections[0][0].annotations["waveform"]
+                    # splice individual detections in each separate epoch; these
+                    # individual epoch detections are SpikeTrainList objects, possibly
+                    # with more than one SpikeTrain inside (one per channel)
+                    max_channels = max(len(d) for d in detections)
+                    stt = list() #  will hold spliced spike trains, one per channel
+                    for kc in range(max_channels):
+                        wave_names = list()
+                        accept = list()
+                        fits = list()
+                        
+                        st_ = [d[kc] for d in detections if kc < len(d)]
+                        
+                        if len(st_) == 0:
+                            continue
+                        
+                        for t in st_:
+                            wave_names.extend(t.annotations["wave_name"])
+                            accept.extend(t.annotations["Accept"])
+                            fits.extend(t.annotations["event_fit"])
+                            
+                        pt = np.concatenate([t.annotations["peak_time"].magnitude for t in st_], axis=0) * st_[0].units
+                        
+                        if any(len(v) == 0 for v in (wave_names, accept, fits, pt)):
+                                continue
+                            
+                        θ_ = [t.annotations["θ"] for t in st_]
+                        
+                        # print(len(θ_), [type(t) for t in θ_])
+                        # print(*θ_)
+                        # print(type(*θ_))
+                        st = neoutils.splice_signals(*st_)
+                        st.name= "events"
+                        st.segment = segment
+                        
+                        if len(θ_) > 1:
+                            θ = neoutils.splice_signals(*θ_, times = signal.times)
+                            θ.name = "events"
+                        else:
+                            θ = θ_[0]
+                            
+                        θ.description = f"Detection criterion ({method})"
+                        
+                        if not self.useSlidingDetection:
+                            θmax = np.max(θ[~np.isnan(θ)])
+                            θnorm = θ.copy()  # θ is a neo signal
+                            θnorm = neo.AnalogSignal(sigp.scale_waveform(θnorm, 10, θmax),
+                                                    units = θ.units, t_start = θ.t_start,
+                                                    sampling_rate = θ.sampling_rate,
+                                                    name = f"{θ.name}_scaled",
+                                                    description = f"{θ.description} scaled to 10/{θmax}")
+                        else:
+                            θnorm = θ
+                            
+                        chids = signal.array_annotations.get("channel_ids", None)
+                        
+                        if chids is not None:
+                            chid = chids[kc]
+                            try:
+                                chid = int(chid)
+                            except:
+                                chid = kc
+                        else:
+                            chid = kc
+                            
+                        # print(f"accept {accept}")
+                        
+                        if all(isinstance(v, bool) for v in accept):
+                            accept = np.array(accept)
+                            
+                        elif all(isinstance(v, np.ndarray) for v in accept):
+                            accept = np.concatenate(accept)
+                            
+                        else:
+                            accept = np.full((st.shape[0],), fill_value = True, dtype=np.bool_)
+                        
+                        st.annotate(
+                                    peak_time = pt, 
+                                    wave_name = wave_names,
+                                    waveform=template,
+                                    event_fit = fits,
+                                    θ = θ,
+                                    θnorm = θnorm, 
+                                    channel_id = chid,
+                                    source = "Event_detection",
+                                    signal_units = signal.units,
+                                    signal_origin = signal.name,
+                                    datetime = datetime.datetime.now(),
+                                    Aligned = False,
+                                    Accept = accept,
+                                    segment_index = segment_index
+                                    )
+                        
+                        stt.append(st)
+                        
+                    if len(stt):
+                        mPSCTrains = neo.core.spiketrainlist.SpikeTrainList(items = stt,
+                                                                            segment = segment) # spike train list, one train per channel
+                        for st_ in mPSCTrains:
+                            st_.segment = segment
+                    else:
+                        mPSCTrains = None
+                    
+                else:
+                    mPSCTrains = None
+                    
+                if output_detection:
+                    testθ = list()
+                    for kc in range(signal.shape[1]):
+                        channelθ = list()
+                        for thetas in all_θ:
+                            if kc < len(thetas):
+                                channelθ.append(thetas[kc])
+                                
+                        if len(channelθ) == 0:
+                            continue
+                                
+                        if len(channelθ) == 1:
+                            θ = channelθ[0]
+                            
+                        else:
+                            θ = neoutils.splice_signals(*channelθ, times = signal.times)
+                            
+                        self._current_detection_θ.append(θ)
+                    
+            else: # no epochs - detect in the whole signal
+                # if self.useFilteredWaves:
+                if not processed:
+                    signal = self._process_signal_(signal, newFilter=True)
+
                 if not self.useFilteredWaves:
-                    quasi_raw = self._process_signal_(signal.time_slice(epoch.times[0], epoch.times[0]+epoch.durations[0]),
-                                                      dc_detrend_only=True)
+                    quasi_raw = self._process_signal_(signal, dc_detrend_only=True)
                     quasi_raw.name = signal.name
                 else:
                     quasi_raw = None
                     
-                detection = membrane.detect_Events(sig, waveform, 
-                                                 useCBsliding = self.useSlidingDetection,
-                                                 threshold = self._detection_threshold_,
-                                                 outputDetection = output_detection,
-                                                 raw_signal = quasi_raw)
-                
-                # print(f"detection {detection}")
+                detection = membrane.detect_Events(signal, waveform, 
+                                                useCBsliding = self.useSlidingDetection,
+                                                threshold = self._detection_threshold_,
+                                                outputDetection = output_detection,
+                                                raw_signal = quasi_raw)
                 
                 if detection is None:
-                    continue
+                    return
                 
                 if output_detection:
-                    detection, thetas = detection
-                    # print(f"{[type(t).__name__ for t in thetas]}")
-                    all_θ.append(thetas)
-                    
-                if not isinstance(detection, neo.core.spiketrainlist.SpikeTrainList):
-                    continue
-                
-                # this below is a collection of spike train lists (one per epoch)!
-                # but each spiketrainlist should have up to the same max number 
-                # of spiketrains (i.e. as many as there are channels)
-                detections.append(detection) 
-            
-            # collate the detection spike trains into one single spike train
-            if len(detections):
-                template = detections[0][0].annotations["waveform"]
-                # splice individual detections in each separate epoch; these
-                # individual epoch detections are SpikeTrainList objects, possibly
-                # with more than one SpikeTrain inside (one per channel)
-                max_channels = max(len(d) for d in detections)
-                stt = list() #  will hold spliced spike trains, one per channel
-                for kc in range(max_channels):
-                    wave_names = list()
-                    accept = list()
-                    fits = list()
-                    
-                    st_ = [d[kc] for d in detections if kc < len(d)]
-                    
-                    if len(st_) == 0:
-                        continue
-                    
-                    for t in st_:
-                        wave_names.extend(t.annotations["wave_name"])
-                        accept.extend(t.annotations["Accept"])
-                        fits.extend(t.annotations["event_fit"])
-                        
-                    pt = np.concatenate([t.annotations["peak_time"].magnitude for t in st_], axis=0) * st_[0].units
-                    
-                    if any(len(v) == 0 for v in (wave_names, accept, fits, pt)):
-                            continue
-                        
-                    θ_ = [t.annotations["θ"] for t in st_]
-                    
-                    # print(len(θ_), [type(t) for t in θ_])
-                    # print(*θ_)
-                    # print(type(*θ_))
-                    st = neoutils.splice_signals(*st_)
-                    st.name= "events"
-                    st.segment = segment
-                    
-                    if len(θ_) > 1:
-                        θ = neoutils.splice_signals(*θ_, times = signal.times)
-                        θ.name = "events"
-                    else:
-                        θ = θ_[0]
-                        
-                    θ.description = f"Detection criterion ({method})"
-                    
-                    if not self.useSlidingDetection:
-                        θmax = np.max(θ[~np.isnan(θ)])
-                        θnorm = θ.copy()  # θ is a neo signal
-                        θnorm = neo.AnalogSignal(sigp.scale_waveform(θnorm, 10, θmax),
-                                                units = θ.units, t_start = θ.t_start,
-                                                sampling_rate = θ.sampling_rate,
-                                                name = f"{θ.name}_scaled",
-                                                description = f"{θ.description} scaled to 10/{θmax}")
-                    else:
-                        θnorm = θ
-                        
-                    chids = signal.array_annotations.get("channel_ids", None)
-                    
-                    if chids is not None:
-                        chid = chids[kc]
-                        try:
-                            chid = int(chid)
-                        except:
-                            chid = kc
-                    else:
-                        chid = kc
-                        
-                    # print(f"accept {accept}")
-                    
-                    if all(isinstance(v, bool) for v in accept):
-                        accept = np.array(accept)
-                        
-                    elif all(isinstance(v, np.ndarray) for v in accept):
-                        accept = np.concatenate(accept)
-                        
-                    else:
-                        accept = np.full((st.shape[0],), fill_value = True, dtype=np.bool_)
-                    
-                    st.annotate(
-                                peak_time = pt, 
-                                wave_name = wave_names,
-                                waveform=template,
-                                event_fit = fits,
-                                θ = θ,
-                                θnorm = θnorm, 
-                                channel_id = chid,
-                                source = "Event_detection",
-                                signal_units = signal.units,
-                                signal_origin = signal.name,
-                                datetime = datetime.datetime.now(),
-                                Aligned = False,
-                                Accept = accept,
-                                segment_index = segment_index
-                                )
-                    
-                    stt.append(st)
-                    
-                if len(stt):
-                    mPSCTrains = neo.core.spiketrainlist.SpikeTrainList(items = stt,
-                                                                        segment = segment) # spike train list, one train per channel
-                    for st_ in mPSCTrains:
-                        st_.segment = segment
+                    mPSCTrains, thetas = detection
+                    self._current_detection_θ = thetas
                 else:
-                    mPSCTrains = None
+                    mPSCTrains = detection
+
+            if isinstance(mPSCTrains, neo.core.spiketrainlist.SpikeTrainList):
+                mPSCTrains.segment = segment
                 
-            else:
-                mPSCTrains = None
+                for st_ in mPSCTrains:
+                    st_.segment = segment
+                    st_.annotate(using_template = using_template,
+                                signal_origin = signal.name)
                 
-            if output_detection:
-                testθ = list()
-                for kc in range(signal.shape[1]):
-                    channelθ = list()
-                    for thetas in all_θ:
-                        if kc < len(thetas):
-                            channelθ.append(thetas[kc])
-                            
-                    if len(channelθ) == 0:
+                # now, fit the minis
+                for st in mPSCTrains:
+                    fitted_minis = self._fit_waves_(st, prefix = signal.name)
+                    if isinstance(fitted_minis, Exception):
+                        traceback.print_exc()
+                        excstr = traceback.format_exception(exc)
+                        msg = f"Event {kw} in sweep {segment}:\n{excstr[-1]}"
+                        self.criticalMessage("Fitting event",
+                                                "\n".join(excstr))
+                        return 
+                    if fitted_minis is None or len(fitted_minis) == 0:
                         continue
+                    
+                    st.annotations["amplitude"] = list()
+                    
+                    for kw, fw in enumerate(fitted_minis):
+                        if self._use_threshold_on_rsq_:
+                            accept = fw.annotations["event_fit"]["Rsq"] >= self.rSqThreshold
+                            st.annotations["Accept"][kw] = accept
+                        else:
+                            st.annotations["Accept"][kw] = fw.annotations["Accept"]
                             
-                    if len(channelθ) == 1:
-                        θ = channelθ[0]
-                        
-                    else:
-                        θ = neoutils.splice_signals(*channelθ, times = signal.times)
-                        
-                    self._current_detection_θ.append(θ)
-                
-        else: # no epochs - detect in the whole signal
-            # if self.useFilteredWaves:
-            if not processed:
-                signal = self._process_signal_(signal, newFilter=True)
+                        st.annotations["event_fit"][kw] = fw.annotations["event_fit"]
+                        st.annotations["amplitude"].append(fw.annotations["amplitude"])
 
-            if not self.useFilteredWaves:
-                quasi_raw = self._process_signal_(signal, dc_detrend_only=True)
-                quasi_raw.name = signal.name
-            else:
-                quasi_raw = None
+                    new_waves = np.concatenate([fw.magnitude[:,:,np.newaxis] for fw in fitted_minis], axis=2)
+                    st.waveforms = new_waves.T
                 
-            detection = membrane.detect_Events(signal, waveform, 
-                                              useCBsliding = self.useSlidingDetection,
-                                              threshold = self._detection_threshold_,
-                                              outputDetection = output_detection,
-                                              raw_signal = quasi_raw)
-            
-            if detection is None:
-                return
-            
-            if output_detection:
-                mPSCTrains, thetas = detection
-                self._current_detection_θ = thetas
-            else:
-                mPSCTrains = detection
-
-        if isinstance(mPSCTrains, neo.core.spiketrainlist.SpikeTrainList):
-            mPSCTrains.segment = segment
-            
-            for st_ in mPSCTrains:
-                st_.segment = segment
-                st_.annotate(using_template = using_template,
-                             signal_origin = signal.name)
-            
-            # now, fit the minis
-            for st in mPSCTrains:
-                fitted_minis = self._fit_waves_(st, prefix = signal.name)
-                if isinstance(fitted_minis, Exception):
-                    traceback.print_exc()
-                    excstr = traceback.format_exception(exc)
-                    msg = f"Event {kw} in sweep {segment}:\n{excstr[-1]}"
-                    self.criticalMessage("Fitting event",
-                                            "\n".join(excstr))
-                    return 
-                if fitted_minis is None or len(fitted_minis) == 0:
-                    continue
-                
-                st.annotations["amplitude"] = list()
-                
-                for kw, fw in enumerate(fitted_minis):
-                    if self._use_threshold_on_rsq_:
-                        accept = fw.annotations["event_fit"]["Rsq"] >= self.rSqThreshold
-                        st.annotations["Accept"][kw] = accept
-                    else:
-                        st.annotations["Accept"][kw] = fw.annotations["Accept"]
-                        
-                    st.annotations["event_fit"][kw] = fw.annotations["event_fit"]
-                    st.annotations["amplitude"].append(fw.annotations["amplitude"])
-
-                new_waves = np.concatenate([fw.magnitude[:,:,np.newaxis] for fw in fitted_minis], axis=2)
-                st.waveforms = new_waves.T
-            
-            return mPSCTrains
+                return mPSCTrains
         
+        except Exception as e:
+            print(f"In sweep {segment_index}")
+            traceback.print_exc()
+
     @pyqtSlot()
     def _slot_create_event_template(self):
         # FIXME 2022-12-14 18:54:04
@@ -3274,14 +3280,14 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
         self._plot_data()
             
-    @pyqtSlot()
-    def _slot_detectionDone(self):
-        # NOTE: 2022-11-26 09:06:05
-        # QRunnable paradigm, see # NOTE: 2022-11-26 09:06:16
-        self._plot_data()
-        
-        total_evts, acc_evts = self._tally_events()
-        self._report_events_tally(total_evts, acc_evts)
+#     @pyqtSlot()
+#     def _slot_detectionDone(self):
+#         # NOTE: 2022-11-26 09:06:05
+#         # QRunnable paradigm, see # NOTE: 2022-11-26 09:06:16
+#         self._plot_data()
+#         
+#         total_evts, acc_evts = self._tally_events()
+#         self._report_events_tally(total_evts, acc_evts)
         
     @pyqtSlot()
     def _slot_alignThread(self):
@@ -3502,6 +3508,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         """
         # print(f"{self.__class__.__name__}._slot_detectThread_ready(result = {result})")
         self._plot_data()
+        total_evts, acc_evts = self._tally_events()
+        self._report_events_tally(total_evts, acc_evts)
         self._enable_widgets(self.actionDetect,
                              self.actionUndo,
                              self.actionDetect_in_current_sweep,

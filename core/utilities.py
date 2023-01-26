@@ -3067,19 +3067,22 @@ def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, re
             if len(currentsfx):
                 min_current = min(currentsfx)
                 max_current = max(currentsfx)
-                if min_current > min(full_ndx):
-                    newsfx = min(full_ndx)
+                if  len(full_ndx) == 0:
+                    newsfx = 0
                 else:
-                    # find out missing indices
-                    if len(currentsfx) > 1:
-                        dsfx = np.ediff1d(currentsfx)
-                        locs = np.where(dsfx > 1)[0]
-                        if len(locs):
-                            newsfx = locs[0] + 1
+                    if min_current > min(full_ndx):
+                        newsfx = min(full_ndx)
+                    else:
+                        # find out missing indices
+                        if len(currentsfx) > 1:
+                            dsfx = np.ediff1d(currentsfx)
+                            locs = np.where(dsfx > 1)[0]
+                            if len(locs):
+                                newsfx = locs[0] + 1
+                            else:
+                                newsfx = currentsfx[-1] + 1
                         else:
                             newsfx = currentsfx[-1] + 1
-                    else:
-                        newsfx = currentsfx[-1] + 1
                         
                     # newsfx = full_ndx[-1]
                     

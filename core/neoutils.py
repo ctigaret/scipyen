@@ -2455,13 +2455,20 @@ def splice_signals(*args, times=None):
         y = np.full((tt.shape[0], args[0].shape[1]), fill_value = np.nan*args[0].units)
         
         for k,s in enumerate(args):
+            # print(f"y shape {y.shape}, s shape {s.shape}")
+            # start_index = np.where(tt >= s.t_start)[0][0]
+            # y[start_index:s.shape[0]] = s
             tndx = (tt >= s.t_start) & (tt <= s.t_start + s.duration) # s.times[-1]+s.sampling_period)
             # print(f"{k} index size = {np.where(tndx)[0].size}; signal size = {s.shape[0]}")
+            # print(f"y[tndx] shape {y[tndx].shape}, s shape {s.shape}")
             if s.shape[0] > y[tndx].shape[0]:
                 tndx = (tt >= s.t_start) & (tt <= s.times[-1] + s.sampling_period)
                 
             elif y[tndx].shape[0] > s.shape[0]:
                 tndx = (tt >= s.t_start) & (tt <= s.times[-1])
+                if y[tndx].shape[0] < s.shape[0]:
+                    s = s[:y[tndx].shape[0]]
+                # print(f"longer y[tndx] => new tndx: {y[tndx].shape}")
                 
             y[tndx] = s
             
