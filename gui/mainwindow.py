@@ -3060,10 +3060,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self._raiseWindow(obj)
             
         else:
-            newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+            askForParams = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+            newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
             
             # if not self.viewVar(self.workspaceModel.currentItemName, newWindow=newWindow):
-            if not self.viewVar(self.currentVarItemName, newWindow=newWindow):
+            if not self.viewVar(self.currentVarItemName, newWindow=newWindow, askForParams=askForParams):
                 # view (display) object in console is no handler exists
                 # self.console.execute(self.workspaceModel.currentItemName)
                 self.console.execute(self.currentVarItemName)
@@ -6286,12 +6287,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_autoSelectViewer(self):
-        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier):
-            newWindow = True
-            
-        else:
-            newWindow = False
-            
+        newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
         askForParams = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
         
         # print(f"{self.__class__.__name__}.slot_autoSelectViewer askForParams = {askForParams}")
@@ -6469,7 +6465,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if not self.viewVar(varname, newWindow=True):
             self.console.execute(varname) # will raise exception if varname not in workspace
         
-    def viewVar(self, varname, newWindow=False, winType=None): #, useSignalViewerForNdArrays=True):
+    def viewVar(self, varname, newWindow=False, winType=None, askForParams=False): #, useSignalViewerForNdArrays=True):
         """Displays a variable in the workspace.
         The variable is selected by its name
         """
@@ -6497,7 +6493,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
             return self.viewObject(obj, varname, 
                                    winType=winType,
-                                   newWindow=newWindow)
+                                   newWindow=newWindow,
+                                   askForParams=askForParams)
         
         return False
     
@@ -6573,7 +6570,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         win.show() # generic way also works for maplotlib figure
 
         if isinstance(win, mpl.figure.Figure):
-            plt.figure(win.number)
+            plt.figure(win.number) # select the mpl figure
+            if askForParams:
+                dlg = qd.QuickDialog(self, "Plot")
+                chkb = qd.CheckBox(dlg, "Clear previous plot")
+                dlg.resize(QtCore.QSize(-1,-1))
+                ret = dlg.exec_()
+                if ret == 1:
+                    if chkb.selection():
+                        plt.clf()
+                
             if isinstance(obj, neo.core.basesignal.BaseSignal) and hasattr(obj, "times"):
                 plt.plot(obj.times, obj)
                 times_units_str = obj.times.units.dimensionality.string
@@ -6588,7 +6594,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     plt.title(objname)
             else:
                 plt.plot(obj)
-                
+        
+            win.canvas.draw_idle()
             if isinstance(win.canvas, QtWidgets.QWidget):
                 win.canvas.activateWindow()
            

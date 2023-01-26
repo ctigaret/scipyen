@@ -779,7 +779,7 @@ def fit_Event_wave(data, wave):
     return 1 - sse/sst
     
     
-def scale_fit_waves(x, y, p0 = 1, method="nelder-mead"):
+def scale_fit_wave(x, y, p0 = 1, method="nelder-mead"):
     """ Finds a scale factor of y such that it matches x.
     
     The objective function being minimized is the scalar product x - p0 * y
@@ -828,6 +828,9 @@ def scale_fit_waves(x, y, p0 = 1, method="nelder-mead"):
                             method = method)
     
     return res
+
+def scale_fit_wave2(x, y, p0 = (1,0)):
+    """Two-params version """
     
 def fit_nsfa(data, p0, **kwargs):
     jac         = kwargs.pop("jac",         "2-point")
