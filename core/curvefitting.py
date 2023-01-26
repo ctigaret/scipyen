@@ -831,6 +831,23 @@ def scale_fit_wave(x, y, p0 = 1, method="nelder-mead"):
 
 def scale_fit_wave2(x, y, p0 = (1,0)):
     """Two-params version """
+    def __wave_fun__(x_, y_, a, b):
+        y = a - x_*b+y_
+        return np.dot(y.T, y)
+    
+    if not all(isinstance(x, np.ndarray) for v in (x,y)):
+        raise TypeError("Expecting two numpy arrays")
+    
+    if not all(dt.is_vector(v) for v in (x,y)):
+        raise ValueError("Expecting two vectors")
+    
+    if x.ndim != y.ndim or x.shape != y.shape:
+        raise ValueError(f"x and y must have the same dimensionality and shape; gpt x with {x.ndim} dimensions and {x.shape} shape, and y with {y.ndim} dimensions and {y.shape} shape")
+
+    scale, offset = p0
+    res = optimize.minimize(__wave_fun__, (scale, offset), args = (x,y),
+                            method=method)
+    return res
     
 def fit_nsfa(data, p0, **kwargs):
     jac         = kwargs.pop("jac",         "2-point")
