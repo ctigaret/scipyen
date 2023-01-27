@@ -62,9 +62,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     varModified = pyqtSignal(object, name="varModified")
     
     def __init__(self, shell, user_ns_hidden=dict(), parent=None, mpl_figure_close_callback=None, mpl_figure_click_callback=None, mpl_figure_enter_callback=None):
-        super(WorkspaceModel, self).__init__(parent)
+        super(WorkspaceModel, self).__init__(parent) # make sure parent is passed from ScipyenWindow as an instance of ScipyenWindow
         
-        self.loop = asyncio.get_event_loop()
+        # self.loop = asyncio.get_event_loop()
         self.shell = shell # reference to IPython InteractiveShell of the internal console
         
         self.cached_vars = dict()
@@ -82,10 +82,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # the figure's canvas
         
         self.observed_vars = DataBag(allow_none = True, mutable_types=True)
-        # NOTE: 2023-01-27 09:03:46 
-        # not here!
-        # with self.observed_vars.observer.hold_trait_notifications:
-        #     self.observed_vars."__mpl_figure_managers__" = Gcf.figs
         self.observed_vars.verbose = True
         self.observed_vars.observe(self.var_observer)
         
@@ -652,14 +648,17 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         for f in figs_not_in_cache:
             fig_var_name = f"Figure{f[0]}"
             fig = f[1]
-            if self.mpl_figure_close_callback:
-                fig.canvas.mpl_connect("close_event", self.mpl_figure_close_callback)
-                
-            if self.mpl_figure_click_callback:
-                fig.canvas.mpl_connect("button_press_event", self.mpl_figure_click_callback)
-                
-            if self.mpl_figure_enter_callback:
-                fig.canvas.mpl_connect("figure_enter_event", self.mpl_figure_enter_callback)
+            if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
+                self.parent().registerWindow(fig)
+            else:
+                if self.mpl_figure_close_callback:
+                    fig.canvas.mpl_connect("close_event", self.mpl_figure_close_callback)
+                    
+                if self.mpl_figure_click_callback:
+                    fig.canvas.mpl_connect("button_press_event", self.mpl_figure_click_callback)
+                    
+                if self.mpl_figure_enter_callback:
+                    fig.canvas.mpl_connect("figure_enter_event", self.mpl_figure_enter_callback)
                 
             self.shell.user_ns[fig_var_name] = f[1]
             self.observed_vars[fig_var_name] = f[1]
