@@ -583,6 +583,7 @@ class WindowManager(__QMainWindow__):
     @safeWrapper
     def handle_mpl_figure_click(self, evt):
         self._raiseWindow(evt.canvas.figure)
+        # plt.figure(evt.canvas.figure.number)
     
     @safeWrapper
     def handle_mpl_figure_enter(self, evt):
