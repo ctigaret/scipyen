@@ -593,58 +593,22 @@ class WindowManager(__QMainWindow__):
         """Removes the figure from the workspace and updates the workspace table.
         """
         fig_number = evt.canvas.figure.number
-        fig_varname = "Figure%d" % fig_number
+        # fig_varname = "Figure%d" % fig_number
+        fig_varname = f"Figure{fig_number}"
         plt.close(evt.canvas.figure)
         # NOTE: 2020-02-05 00:53:51
         # this also closes the figure window and removes it from self.currentViewers
-        self.deRegisterViewer(evt.canvas.figure) # does not remove symbol from workspace
+        # NOTE: 2023-01-27 13:46:51 
+        # but only if autoRemoveViewers is True
+        if self.autoRemoveViewers:
+            self.deRegisterViewer(evt.canvas.figure) # does not remove symbol from workspace
         
-        # NOTE: now remove the figure variable name from user workspace
-        ns_fig_names_objs = [x for x in self.shell.user_ns.items() if isinstance(x[1], mpl.figure.Figure) and x[1] is evt.canvas.figure]
+            # NOTE: now remove the figure variable name from user workspace
+            ns_fig_names_objs = [x for x in self.shell.user_ns.items() if isinstance(x[1], mpl.figure.Figure) and x[1] is evt.canvas.figure]
 
-        for ns_fig in ns_fig_names_objs:
-            self.sig_windowRemoved.emit(ns_fig)
-            #self.shell.user_ns.pop(ns_fig[0], None)
-            #self.workspaceModel.update(from_console=False)
-            
-#     @safeWrapper
-#     def _set_new_viewer_window_name_(self, winClass, name=None):
-#         """Sets up the name of a new window viewer variable in the workspace
-#         Should be called before initializing an instance of winClass.
-#         Can be bypassed by creating a viewer window instance directly in the 
-#         workspace by calling its constructor at the console.
-#         """
-#         # algorithm:
-#         # if name is a non-empty string, check if it is suitable as identifier,
-#         # and if it is already mapped to a variable in the workspace: 
-#         #   use validate_varname to get a version with a counter appended to it.
-#         #
-#         # if no name is given (name is either None, or an empty string), then
-#         # then compose the name based on the winClass name, append a counter based
-#         # on the number of viewers of winClass type, in self.viewers
-#         
-#         import keyword
-#         
-#         if winClass not in self.viewers:
-#             raise ValueError("Unexpected window class %s" % winClass.__name__)
-#         
-#         nViewers = len(self.viewers[winClass])
-#         
-#         if isinstance(name, str):
-#             if len(name.strip()):
-#                 win_name = validate_varname(name, self.workspace)
-#             
-#             else:
-#                 win_name = "%s_%d" % (winClass.__name__, nViewers)
-#                 
-#         elif name is None:
-#             win_name = "%s_%d" % (winClass.__name__, nViewers)
-#         
-#         else:
-#             raise TypeError("name can be either a valid string or None")
-#             
-#         return win_name
-            
+            for ns_fig in ns_fig_names_objs:
+                self.sig_windowRemoved.emit(ns_fig)
+
     @safeWrapper
     def newViewer(self, winClass, *args, **kwargs):
         """Factory method for a GUI Viewer or matplotlib figure.
@@ -1625,6 +1589,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._showFilesFilter           = False
         self._console_docked_           = False
         self._script_manager_autolaunch    = False
+        self._auto_remove_viewers_      = False
         
         # ### END configurables, but see NOTE:2022-01-28 23:16:57 below
         
@@ -1800,6 +1765,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def consoleDocked(self, value):
         self._console_docked_ = value is True
         
+    @property
+    def autoRemoveViewers(self):
+        return self._auto_remove_viewers_
+    
+    @markConfigurable("AutoRemoveViewers", "Qt", default=False)
+    @autoRemoveViewers.setter
+    def autoRemoveViewers(self, value):
+        if isinstance(value, str):
+            value = value.lower() == "true"
+            
+        self._auto_remove_viewers_ = value is True
+        
+        sigBlock = QtCore.QSignalBlocker(self.actionAuto_delete_viewer)
+        self.actionAuto_delete_viewer.setChecked(self._auto_remove_viewers_)
         
     @property
     def maxRecentFiles(self):
@@ -1836,7 +1815,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @markConfigurable("ScriptManagerAutoLaunch", "qt")
     @scriptManagerAutoLaunch.setter
     def scriptManagerAutoLaunch(self, val:typing.Union[bool, str]):
-        
         if isinstance(val, str):
             val = True if val.lower() == "true" else False
         
@@ -4017,6 +3995,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.actionManageScripts.triggered.connect(self.slot_showScriptsManagerWindow)
         self.menuScripts.addAction(self.actionManageScripts)
         
+        self.actionAuto_delete_viewer.triggered.connect(self._slot_setAutoRemoveViewers)
+        
         #### END scripts menu
         
         # NOTE: 2016-05-02 12:22:21 -- refactoring plugin codes
@@ -6127,6 +6107,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             self.app.setStyle(val)
             self._current_GUI_style_name = val
+            
+    @pyqtSlot(bool)
+    def _slot_setAutoRemoveViewers(self, value):
+        self.autoRemoveViewers = value == True
             
     @pyqtSlot()
     @safeWrapper

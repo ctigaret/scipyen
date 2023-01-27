@@ -99,10 +99,17 @@
     <property name="title">
      <string>Settings</string>
     </property>
+    <widget class="QMenu" name="menuCode_editor">
+     <property name="title">
+      <string>Code editor</string>
+     </property>
+     <addaction name="actionChoose_code_editor"/>
+     <addaction name="actionUse_system_s_default_code_editor"/>
+    </widget>
     <addaction name="actionGUI_Style"/>
     <addaction name="actionAuto_launch_Script_Manager"/>
-    <addaction name="actionChoose_code_editor"/>
-    <addaction name="actionUse_system_s_default_code_editor"/>
+    <addaction name="menuCode_editor"/>
+    <addaction name="actionAuto_delete_viewer"/>
    </widget>
    <widget class="QMenu" name="menuConsoles">
     <property name="title">
@@ -906,6 +913,27 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>Use system's default code editor</string>
+   </property>
+  </action>
+  <action name="actionAuto_delete_viewer">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="window-unpin">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Auto-delete viewers</string>
+   </property>
+   <property name="toolTip">
+    <string>Remove viewer when closed</string>
+   </property>
+   <property name="statusTip">
+    <string>Remove viewer when closed</string>
+   </property>
+   <property name="whatsThis">
+    <string>When a viewer is closed , also remove it from the user workspace</string>
    </property>
   </action>
  </widget>

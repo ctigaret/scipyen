@@ -28,6 +28,7 @@ import matplotlib as mpl
 mpl.use("Qt5Agg")
 import matplotlib.pyplot as plt
 import matplotlib.mlab as mlb
+from matplotlib._pylab_helpers import Gcf as Gcf
 
 import numpy as np
 import seaborn as sb
@@ -72,9 +73,35 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.deleted_vars = dict()
         self.user_ns_hidden = dict(user_ns_hidden)
         
+        # NOTE: 2023-01-27 08:57:52 about _pylab_helpers.Gcf:
+        # the `figs` attribute if an OrderedDict with:
+        # int (the figure number) ↦ manager (instance of FigureManager concrete subclass, backend-dependent)
+        #
+        # the matplotlib figure itself is stored (by reference) as the `figure`
+        # attribute of the manager's `canvas` attribute, which is a reference to 
+        # the figure's canvas
+        
         self.observed_vars = DataBag(allow_none = True, mutable_types=True)
+        # NOTE: 2023-01-27 09:03:46 
+        # not here!
+        # with self.observed_vars.observer.hold_trait_notifications:
+        #     self.observed_vars."__mpl_figure_managers__" = Gcf.figs
         self.observed_vars.verbose = True
         self.observed_vars.observe(self.var_observer)
+        
+        # NOTE: 2021-01-28 17:47:36 TODO to complete observables here
+        # management of workspaces in external kernels
+        # details in self.update_foreign_namespace docstring
+        self._foreign_workspace_count_ = -1
+        
+        self.foreign_namespaces = DataBag(allow_none=True, mutable_types=True)
+        # FIXME: 2021-08-19 21:45:17
+        #self.foreign_namespaces.observe(self._foreign_namespaces_count_changed_, names="length")
+        
+        # TODO/FIXME 2020-07-31 00:07:29
+        # low priority: choose pallette in a clever way to take into account the
+        # currently used GUI palette - VERY low priority!
+        #self.foreign_kernel_palette = list(sb.color_palette("pastel", 1))
         
         # NOTE: 2021-07-28 09:58:38
         # currentItem/Name are set by selecting/activating an item in workspace view
@@ -91,19 +118,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # self.originalVarName = "" # varname cache for individual row changes
         self.setColumnCount(len(standard_obj_summary_headers))
         self.setHorizontalHeaderLabels(standard_obj_summary_headers) # defined in core.utilities
-        
-        # NOTE: 2021-01-28 17:47:36
-        # management of workspaces in external kernels
-        # details in self.update_foreign_namespace docstring
-        self._foreign_workspace_count_ = -1
-        # TODO/FIXME 2020-07-31 00:07:29
-        # low priority: choose pallette in a clever way to take into account the
-        # currently used GUI palette - VERY low priority!
-        #self.foreign_kernel_palette = list(sb.color_palette("pastel", 1))
-        
-        self.foreign_namespaces = DataBag(allow_none=True, mutable_types=True)
-        # FIXME: 2021-08-19 21:45:17
-        #self.foreign_namespaces.observe(self._foreign_namespaces_count_changed_, names="length")
         
         self.mpl_figure_close_callback = mpl_figure_close_callback
         self.mpl_figure_click_callback = mpl_figure_click_callback
@@ -574,10 +588,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return True
     
     def var_observer(self, change):
-        self.varsChanged.emit(change)
+        self.varsChanged.emit(change) # connected to self.slot_observe, def'ed below
         
     @pyqtSlot(dict)
     def slot_observe(self, change):
+        """Connected (and triggered by) self.varsChanged Qt signal"""
         name = change.name
         displayed_vars_types = self.getDisplayedVariableNames()
         # displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
@@ -622,23 +637,61 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # check if there is a mpl Figure created in the console (but NOT bound to
         # a user-available identifier)
         
-        fig = self.shell.user_ns.get("_", None)
+        # mpl_figs_nums_in_ns = [(f.number, f) for f in self.shell.user_ns.values() if isinstance(f, mpl.figure.Figure)]
         
-        if isinstance(fig, mpl.figure.Figure):
-            figures = [v for v in self.cached_vars.values() if isinstance(v, mpl.figure.Figure)]
-            if fig not in figures:
-                num = fig.number
-                assert num in plt.get_fignums()
-                self.shell.user_ns[f"Figure{num}"] = fig
-                self.observed_vars[f"Figure{num}"] = fig
-                if self.mpl_figure_close_callback:
-                    fig.canvas.mpl_connect("close_event", self.mpl_figure_close_callback)
-                    
-                if self.mpl_figure_click_callback:
-                    fig.canvas.mpl_connect("button_press_event", self.mpl_figure_click_callback)
-                    
-                if self.mpl_figure_enter_callback:
-                    fig.canvas.mpl_connect("figure_enter_event", self.mpl_figure_enter_callback)
+        mpl_figs_nums_in_cache = [(f.number, f) for f in self.cached_vars.values() if isinstance(f, mpl.figure.Figure)]
+        
+        mpl_figs_nums = [(k, f.canvas.figure) for k,f in Gcf.figs.items()]
+        
+        cached_figs = [f for f in self.cached_vars.values() if isinstance(f, mpl.figure.Figure)]
+        
+        # figs_not_in_user_ns = [f for f in mpl_figs_nums if f[1] not in self.shell.user_ns.values()]
+        figs_not_in_cache = [f for f in mpl_figs_nums if f[1] not in cached_figs]
+        
+        # for f in figs_not_in_user_ns:
+        for f in figs_not_in_cache:
+            fig_var_name = f"Figure{f[0]}"
+            fig = f[1]
+            if self.mpl_figure_close_callback:
+                fig.canvas.mpl_connect("close_event", self.mpl_figure_close_callback)
+                
+            if self.mpl_figure_click_callback:
+                fig.canvas.mpl_connect("button_press_event", self.mpl_figure_click_callback)
+                
+            if self.mpl_figure_enter_callback:
+                fig.canvas.mpl_connect("figure_enter_event", self.mpl_figure_enter_callback)
+                
+            self.shell.user_ns[fig_var_name] = f[1]
+            self.observed_vars[fig_var_name] = f[1]
+            
+        for f in mpl_figs_nums_in_cache:
+            if f not in mpl_figs_nums: # figure has been deleted via pylab manager
+                fig_var_name = f"Figure{f[0]}"
+                if fig_var_name in self.shell.user_ns:
+                    self.shell.user_ns.pop(fig_var_name, None)
+                if fig_var_name in self.observed_vars:
+                    self.observed_vars.pop(fig_var_name, None)
+                if fig_var_name in self.cached_vars:
+                    self.cached_vars.pop(fig_var_name, None)
+                
+        
+#         fig = self.shell.user_ns.get("_", None)
+#         
+#         if isinstance(fig, mpl.figure.Figure):
+#             figures = [v for v in self.cached_vars.values() if isinstance(v, mpl.figure.Figure)]
+#             if fig not in figures:
+#                 num = fig.number
+#                 assert num in plt.get_fignums()
+#                 self.shell.user_ns[f"Figure{num}"] = fig
+#                 self.observed_vars[f"Figure{num}"] = fig
+#                 if self.mpl_figure_close_callback:
+#                     fig.canvas.mpl_connect("close_event", self.mpl_figure_close_callback)
+#                     
+#                 if self.mpl_figure_click_callback:
+#                     fig.canvas.mpl_connect("button_press_event", self.mpl_figure_click_callback)
+#                     
+#                 if self.mpl_figure_enter_callback:
+#                     fig.canvas.mpl_connect("figure_enter_event", self.mpl_figure_enter_callback)
 
         # just update the model directly
         self.update()
