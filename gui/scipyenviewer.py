@@ -194,8 +194,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # A free-format state - stores volatile variables (that depend on the
         # specifics of the data shown in the viewer)
         # It is up to the subclass to manage its contents.
-        self._state_ = Bunch()
-        
+        self._state_ = Bunch() # TODO - not used yet!!!
 
         self._linkedViewers_ = list()
         
@@ -244,7 +243,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # following a button click and is the symbol to which the displayed data 
         # is bound, in the workspace.
         # 
-        # When given (and indeee bound to the displayed data) this can be used 
+        # When given (and indeed bound to the displayed data) this can be used 
         # to refresh the data after it was modified
         # 
         # TODO: 2022-11-05 12:02:52 
@@ -262,35 +261,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self._configureUI_()
         self._menu_bar_ = self.menuBar()
         self.windowHandle().visibilityChanged.connect(self._slot_visibility_changed)
-        # self.windowHandle().visibleChanged.connect(self._slot_visible_changed)
-        # self._menu_bar_.setParent(None)
         
-        # self.qsettings = QtCore.QSettings() 
-        # NOTE: 2021-05-04 21:42:12 About settings
-        # GUI (Qt) settings saved are in $HOME/.config/Scipyen/Scipyen.conf
-        # 
-        # Hhandling settings in the superclass only works for window geometry
-        # and related stuff on the Qt side.
-        
-        # Purely "pythonic" settings requires the subclass to be initialized in
-        # order for these to work.
-        # The prime example is the colorMap settings in ImageViewer:
-        # if the settings are loaded during the superclass _init__() (i.e., here),
-        # the attributes referenced there (e.g. colorMap) are not yet available ,
-        # hence the assignment of a color map fails silently
-        # 
-        # The solution is to manage these non-Qt settings in the subclass code
-        # by using overloaded loadViewerSettings(); in contrast, loadWindowSettings
-        # defined here and inherited by the subclass works fine.
-        
-        # NOTE: 2021-08-17 12:59:47
-        # it maybe tempting to call this from inside self._configureUI_(), or 
-        # even before it.
-        # HOWEVER: self.loadSettings() calls self.loadWindowSettings() then 
-        # self.loadViewerSettings(), which MAY depend on some data being loaded
-        # already in the viewer window.
-        # Therefore, it is best to call self.loadSettings() now i.e., it at the 
-        # very end of the __init__(), after all essential stuff is done.
         self.loadSettings() # inherited from ScipyenConfigurable (via WorkspaceGuiMixin)
             
         
@@ -306,10 +277,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         else:
             self.update_title(win_title = win_title, doc_title = doc_title)
             
-        # NOTE: 2023-01-08 23:41:40
-        # do NOT delete (see NOTE: 2023-01-08 23:40:30)
-        # self._prev_init_ = False
-        
         # NOTE: 2023-01-08 21:21:20
         # int(winId()) is the same for QMainWindow, QWindow, AND
         # the WM_ID reported by wmctrl 
@@ -317,11 +284,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self._app_menu_ = self.getAppMenu()
         
-        # print(f"{self.__class__.__name__}.__init__ AppMenu: {self._app_menu_}")
-        
-        # self._x11bridge_ = _X11WMBridge_()
-        # self._x11bridge_.sig_wm_inspect_done.connect(self._slot_set_WM_winID_)
-        # self._x11bridge_.inspect_wm()
+        # if self.appWindow is self.scipyenWindow: # both attributes inherited from WorkspaceGuiMixin
+        #     self.appWindow.registerWindow(self)
         
     def getAppMenu(self):
         if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":

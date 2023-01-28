@@ -899,6 +899,9 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
             
             newval = loadQSettingsKey(qsettings, gname, key_prefix, confname, default)
             
+#             if settername == "autoRemoveViewers":
+#                 print(f"syncQtSettings: settername = {settername}, default = {default}, newval = {newval}")
+#             
             # if win.__class__.__name__ == "EventAnalysis":
             #     print(f" key {confname}, val {val}, {type(val)}, default {default}, {type(default)}, newval {newval}, {type(newval)}")
             
@@ -908,12 +911,25 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
                 if not isinstance(value_type, type):
                     value_type = type(default)
                     
+                # if settername == "autoRemoveViewers":
+                #     print(f"value_type {value_type}")
+                    
                 try:
-                    newval = value_type(newval)
+                    if value_type is bool:
+                        if isinstance(newval, str):
+                            newval = newval.lower()=="true"
+                        elif not isinstance(newval, bool):
+                            newval = False
+                            
+                    elif value_type is not None:
+                        newval = value_type(newval)
+                    
                 except:
                     warnings.warn(f"Cannot cast {type(newval).__name__} to {value_type.__name__}; reverting to default", category="RuntimeWarning")
                     newval = default
                 
+                # if settername == "autoRemoveViewers":
+                #     print(f"{win.__class__.__name__} syncQtSettings: settername = {settername},  newval = {newval}")
                 #print("\t\tsetter win.%s = %s" % (settername, newval))
                 setattr(win, settername, newval)
                 

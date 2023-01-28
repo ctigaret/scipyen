@@ -124,6 +124,7 @@ mpl.rcParams["ytick.direction"] = "in"
 # required to enable interaction with matplotlib plots
 plt.ion()
 
+from matplotlib._pylab_helpers import Gcf as Gcf
 #### END configure matplotlib
 
 #### END matplotlib modules
@@ -501,66 +502,6 @@ class WindowManager(__QMainWindow__):
         
         self.currentViewers = {mpl.figure.Figure: None}
         
-#         # NOTE: 2023-01-08 13:19:59
-#         # these below are from 
-#         # https://stackoverflow.com/questions/65816656/how-to-detect-when-a-foreign-window-embedded-with-qwidget-createwindowcontainer
-#         # used here to get the window manager's ID of this window
-#         self.wmctrl = None
-#         self.timer=None
-#         
-#         # NOTE: 2023-01-08 16:09:33
-#         # maps windowID to window instance;
-#         # for now, used specifically for managing global app menu on Linux desktops
-#         self.windows = dict()
-# 
-#         if sysutils.is_kde_x11():
-#             self.wmctrl = QtCore.QProcess()
-#             self.wmctrl.setProgram("wmctrl")
-#             self.wmctrl.setArguments(["-lpx"])
-#             self.wmctrl.readyReadStandardOutput.connect(self._slot_parseWindowsList)
-#             self.timer = QtCore.QTimer(self)
-#             self.timer.setSingleShot(True)
-#             self.timer.setInterval(25)
-#             self.timer.timeout.connect(self.wmctrl.start)
-#             self.timer.start()
-#             
-#     @pyqtSlot()
-#     def _slot_parseWindowsList(self):
-#         if not isinstance(self.wmctrl, QtCore.QProcess):
-#             return
-#         windows = dict()
-#         # NOTE: 2023-01-08 16:19:02
-#         # a line returned by `wmctrl -lpx` is like:
-#         # column:       0       1   2       3                   4       5
-#         #           0x05000009  0 31264  scipyen.py.Scipyen    Hermes Scipyen Console
-#         #
-#         # columns meanings (remember: this was called with the `-lpx` arguments;
-#         #           see `man wmctrl` for details):
-#         #
-#         # 0 → window identity
-#         #
-#         # 1 → virtual desktop number (-1 is a `sticky` window i.e. on all desktops)
-#         #                   WARNING: virtual desktop numbers start at 0, which may 
-#         #                   not be obvious, depending on how they are labeled
-#         #
-#         # 2 → the PID for the window (int) - this is the PID of the process that
-#         #       started the window (same as os.getpid());
-#         #
-#         # 3 → the WM_CLASS (Scipyen windows all seem to have scipyen.py.Scipyen)
-#         #
-#         # 4 → the client machine name
-#         #
-#         # 5 → the window title (with spaces)
-#         
-#         scipyen_window_lines = list(map(lambda x: x.split(maxsplit=5), filter(lambda x: f"{os.getpid()}" in x, bytes(self.wmctrl.readAll()).decode().splitlines())))
-#         
-#         for line in scipyen_window_lines:
-#             # print(f"line = {line}")
-#             wm_winid = int(line[0], 16)
-#             print(f"wm_winid = {wm_winid}")
-#             print(f"window title = {line[-1]}")
-#             self.windows[line[-1]] = wm_winid
-                
     
     @pyqtSlot(object)
     @safeWrapper
@@ -583,10 +524,10 @@ class WindowManager(__QMainWindow__):
     @safeWrapper
     def handle_mpl_figure_click(self, evt):
         self.raiseWindow(evt.canvas.figure)
-        # plt.figure(evt.canvas.figure.number)
     
     @safeWrapper
     def handle_mpl_figure_enter(self, evt):
+        """ DEPRECATED """
         pass
         # self.setCurrentWindow(evt.canvas.figure)
         
@@ -603,7 +544,7 @@ class WindowManager(__QMainWindow__):
         # NOTE: 2023-01-27 13:46:51 
         # but only if autoRemoveViewers is True
         if self.autoRemoveViewers:
-            self.deRegisterViewer(evt.canvas.figure) # does not remove symbol from workspace
+            self.deRegisterWindow(evt.canvas.figure) # does not remove symbol from workspace
         
             # NOTE: now remove the figure variable name from user workspace
             ns_fig_names_objs = [x for x in self.shell.user_ns.items() if isinstance(x[1], mpl.figure.Figure) and x[1] is evt.canvas.figure]
@@ -688,14 +629,14 @@ class WindowManager(__QMainWindow__):
             win.ID = counter_suffix
             workspace_win_varname = strutils.str2symbol(win_title)
         
-        self.registerViewer(win) # required !
+        self.registerWindow(win) # required !
         self.workspace[workspace_win_varname] = win
         self.workspaceModel.update()
         
         
         return win
     
-    def registerViewer(self, win):
+    def registerWindow(self, win):
         if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             return
     
@@ -730,7 +671,7 @@ class WindowManager(__QMainWindow__):
         self.currentViewers[winClass] = win
         
     @safeWrapper
-    def deRegisterViewer(self, win):
+    def deRegisterWindow(self, win):
         """Removes references to the viewer window 'win' from the manager.
         
         Parameters:
@@ -744,13 +685,6 @@ class WindowManager(__QMainWindow__):
         if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             return
         
-        # NOTE: 2022-03-15 11:28:09
-        # get_window_title is NOT a method of mpl Figue, but a DEPRECATED one
-        # of its canvas (backend)
-        #w_title = win.get_window_title() if isinstance(win, mpl.figure.Figure) else win.windowTitle()
-        
-        #print("WindowManager.deRegisterViewer %s %s" % (win.__class__, w_title))
-        
         viewer_type = type(win)
         
         old_viewer_index = None
@@ -759,17 +693,6 @@ class WindowManager(__QMainWindow__):
             if win in self.viewers[viewer_type]:
                 old_viewer_index = self.viewers[viewer_type].index(win)
                 self.viewers[viewer_type].remove(win)
-            
-        ## FIXME 2021-07-11 15:09:16
-        ## this is problematic when deRegisterViewer is called during a closeEvent
-        # and therefore land on a dead PyQt5 object which hasn't been garbage 
-        # collected yet
-        #if isinstance(win, mpl.figure.Figure):
-            #plt.close(win) # also removes figure number from pyplot figure manager
-            
-        #else:
-            #win.saveSettings()
-            #win.close()
             
         if viewer_type in self.currentViewers:
             if len(self.viewers[viewer_type]) == 0:
@@ -823,6 +746,7 @@ class WindowManager(__QMainWindow__):
             self.viewers[type(obj)].append(obj)
 
         if isinstance(obj, mpl.figure.Figure):
+            
             plt.figure(obj.number)
             
         self.currentViewers[type(obj)] = obj
@@ -1774,13 +1698,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def autoRemoveViewers(self):
         return self._auto_remove_viewers_
     
-    @markConfigurable("AutoRemoveViewers", "Qt", default=False)
+    @markConfigurable("AutoRemoveViewers", "Qt", default=False, value_type=bool)
     @autoRemoveViewers.setter
     def autoRemoveViewers(self, value):
+        # print(f"autoRemoveViewers.setter: value = {value}")
         if isinstance(value, str):
             value = value.lower() == "true"
             
-        self._auto_remove_viewers_ = value is True
+        self._auto_remove_viewers_ = value == True
         
         sigBlock = QtCore.QSignalBlocker(self.actionAuto_delete_viewer)
         self.actionAuto_delete_viewer.setChecked(self._auto_remove_viewers_)
@@ -3573,7 +3498,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 else:
                     obj.close()
 
-                self.deRegisterViewer(obj) # does not remove its symbol for workspace - this has already been removed by delete action
+                self.deRegisterWindow(obj) # does not remove its symbol for workspace - this has already been removed by delete action
                 
             self.removeWorkspaceSymbol(n)
             
@@ -3929,27 +3854,27 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.actionQuit.triggered.connect(self.slot_Quit)
         
-        self.actionConsole = QtWidgets.QAction("Scipyen Console")
+        self.actionConsole = QtWidgets.QAction(QtGui.QIcon.fromTheme("scriptnew"), "Scipyen Console", self)
         self.actionConsole.triggered.connect(self.slot_initQtConsole)
         self.menuConsoles.addAction(self.actionConsole)
         
-        self.actionExternalIPython = QtWidgets.QAction("External IPython")
+        self.actionExternalIPython = QtWidgets.QAction(QtGui.QIcon.fromTheme("scriptnew"), "External IPython", self)
         self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
         self.menuConsoles.addAction(self.actionExternalIPython)
         
         if has_neuron:
-            self.actionExternalNrnIPython = QtWidgets.QAction("External IPython for NEURON")
+            self.actionExternalNrnIPython = QtWidgets.QAction(QtGui.QIcon.fromTheme("scriptnew"), "External IPython for NEURON", self)
             self.actionExternalNrnIPython.triggered.connect(self.slot_launchExternalNeuronIPython)
             self.menuConsoles.addAction(self.actionExternalNrnIPython)
         
         self.menuWith_Running_Kernel = QtWidgets.QMenu("With Running Kernel", self)
         self.menuConsoles.addMenu(self.menuWith_Running_Kernel)
-        self.actionRunning_IPython = QtWidgets.QAction("Choose kernel ...")
+        self.actionRunning_IPython = QtWidgets.QAction(QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel ...", self)
         self.actionRunning_IPython.triggered.connect(self.slot_launchExternalRunningIPython)
         self.menuWith_Running_Kernel.addAction(self.actionRunning_IPython)
         
         if has_neuron:
-            self.actionRunning_IPython_for_Neuron = QtWidgets.QAction("Choose kernel and launch NEURON")
+            self.actionRunning_IPython_for_Neuron = QtWidgets.QAction(QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel and launch NEURON", self)
             self.actionRunning_IPython_for_Neuron.triggered.connect(self.slot_launchExternalRunningIPythonNeuron) 
             self.menuWith_Running_Kernel.addAction(self.actionRunning_IPython_for_Neuron)
         
@@ -3986,17 +3911,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # ### BEGIN scripts menu
         self.menuScripts = QtWidgets.QMenu("Scripts", self)
         self.menubar.insertMenu(self.menuHelp.menuAction(), self.menuScripts)
-        self.actionScriptRun = QtWidgets.QAction("Run...", self)
+        self.actionScriptRun = QtWidgets.QAction(QtGui.QIcon.fromTheme("system-run"), "Run...", self)
         self.actionScriptRun.triggered.connect(self.slot_runPythonScript)
         self.menuScripts.addAction(self.actionScriptRun)
-        self.actionScriptToConsole = QtWidgets.QAction("To Console...", self)
+        self.actionScriptToConsole = QtWidgets.QAction(QtGui.QIcon.fromTheme("scriptnew"), "To Console...", self)
         self.actionScriptToConsole.triggered.connect(self.slot_pastePythonScript)
         self.menuScripts.addAction(self.actionScriptToConsole)
         self.menuScripts.addSeparator()
         self.recentScriptsMenu = QtWidgets.QMenu("Recent Scripts", self)
         self.menuScripts.addMenu(self.recentScriptsMenu)
         self.menuScripts.addSeparator()
-        self.actionManageScripts = QtWidgets.QAction("Script Manager")
+        self.actionManageScripts = QtWidgets.QAction(QtGui.QIcon.fromTheme("scriptnew"), "Script Manager", self)
         self.actionManageScripts.triggered.connect(self.slot_showScriptsManagerWindow)
         self.menuScripts.addAction(self.actionManageScripts)
         
@@ -4075,12 +4000,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.newViewersMenu = QtWidgets.QMenu("New", self)
         self.newViewersMenu.setTearOffEnabled(True)
         self.newViewersMenu.setToolTipsVisible(True)
+        self.newViewersMenu.addAction("Figure", lambda : self.newViewer(mpl.figure.Figure))
         self.menuViewers.addMenu(self.newViewersMenu)
         
         # add new viewers menu as toolbar action, too
         self.newViewersAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("window-new"), "New Viewer")
         self.newViewersAction.setMenu(self.newViewersMenu)
-        self.consolesAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("utilities-terminal"), "Consoles")
+        self.consolesAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("akonadiconsole"), "Consoles")
         self.consolesAction.setMenu(self.menuConsoles) # this one is defined in the ui file mainwindow.ui
         self.scriptsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("dialog-scripts"), "Scripts")
         self.scriptsAction.setMenu(self.menuScripts)
@@ -5984,7 +5910,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 else:
                     obj.close()
                     
-                self.deRegisterViewer(obj) # does not remove its symbol for workspace - this has already been removed by delete action
+                self.deRegisterWindow(obj) # does not remove its symbol for workspace - this has already been removed by delete action
                 
             self.removeWorkspaceSymbol(n)
             

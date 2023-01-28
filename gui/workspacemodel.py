@@ -72,6 +72,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.new_vars = dict()
         self.deleted_vars = dict()
         self.user_ns_hidden = dict(user_ns_hidden)
+        self.mpl_figs = dict()
         
         # NOTE: 2023-01-27 08:57:52 about _pylab_helpers.Gcf:
         # the `figs` attribute if an OrderedDict with:
@@ -611,9 +612,21 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         """
         # ensure we observe only "user" variables in user_ns (i.e. excluding the "hidden"
         # ones like the ones used by ipython internally)
+        # NOTE: 2023-01-28 13:27:40
+        # we take a snapshot of the current user_ns HERE:
         self.cached_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         
-
+        # NOTE: 2023-01-28 13:27:47
+        # we also take a snapshot of the mpl figures 
+        # first, capture those registered in pyplot/pylab
+        self.cached_mpl_figs = set(f for f in Gcf.figs.values())
+        # then augment the snapshot by capturing those in user_ns but NOT in Gcf
+        # we avoid cached_vars because we also want the figures created in code
+        # without binding to a user-specific symbol
+        for v in self.shell.user_ns.values():
+            if isinstance(v, mpl.figure.Figure):
+                self.cached_mpl_figs.add(v)
+        
         # need to withhold notifications here
         with self.observed_vars.observer.hold_trait_notifications():
             observed_set = set(self.observed_vars.keys())
@@ -635,19 +648,59 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         # mpl_figs_nums_in_ns = [(f.number, f) for f in self.shell.user_ns.values() if isinstance(f, mpl.figure.Figure)]
         
-        mpl_figs_nums_in_cache = [(f.number, f) for f in self.cached_vars.values() if isinstance(f, mpl.figure.Figure)]
+        # NOTE: 2023-01-28 22:36:33
+        # • a figure was created using pyplot:
+        #   ∘ by calling plt.figure() ⇒ the new Figure instance will be present 
+        #       in user_ns AND will be referenced in Gcf.figs; 
+        #       the default identifier in the IPython shell's user_ns is '_'
+        #       (underscore) UNLESS the user binds the return from plt.figure()
+        #       to a specified identifier e..g figX = plt.figure()
+        #   ∘ by calling a plotting function in plt, e.g. plt.plot(x,y) ⇒ a new
+        #       Figure instance will be referenced in Gcf.figs, BUT NOT in user_ns
+        #       (the plt plotting functions return artist(s), but not the figure
+        #       object that renders the artist(s) on screen)
+        #
+        # • a figure was created directly via its c'tor ⇒ the new figure object
+        #   will be resent in user_ns, bound to the default symbol ('_') or to 
+        #   a user-specified symbol; in either case,
+        #   the new figure instance will NOT be referenced in Gcf.figs
         
-        mpl_figs_nums = [(k, f.canvas.figure) for k,f in Gcf.figs.items()]
+        # Also, NOTE that figures created via their c'tor do not usually have a
+        # figure manager (i.e. the fig.canvas.manager attribute is None) hence
+        # they also do NOT have a number (in the pyplot sense)
+        # 
+        # Hence we need to operate independently of whether there is a number
+        # associated with the figure, or not.
         
-        cached_figs = [f for f in self.cached_vars.values() if isinstance(f, mpl.figure.Figure)]
+        from core.workspacefunctions import validate_varname
         
-        # figs_not_in_user_ns = [f for f in mpl_figs_nums if f[1] not in self.shell.user_ns.values()]
-        figs_not_in_cache = [f for f in mpl_figs_nums if f[1] not in cached_figs]
+        # capture the figures referenced in Gcf
+        current_mpl_figs = set(f for f in Gcf.figs.values())
+        # augment with figs in user_ns (see pre_execute for the logic)
+        for v in self.shell.user_ns.values():
+            if isinstance(v, mpl.figure.Figure):
+                current_mpl_figs.add(v)
+                
+        deleted_mpl_figs = self.cached_mpl_figs - current_mpl_figs
         
-        # for f in figs_not_in_user_ns:
-        for f in figs_not_in_cache:
-            fig_var_name = f"Figure{f[0]}"
-            fig = f[1]
+        for f in deleted_mpl_figs:
+            f_names = list(k for k,v in self.shell.user_ns.values() if v == f and not k.startswith("_"))
+            if len(f_names):
+                for n in f_names:
+                    self.shell.user_ns.pop(n, None)
+                    
+        new_mpl_figs = current_mpl_figs - self.cached_mpl_figs
+        
+        for fig in new_mpl_figs:
+            fig_var_name = "Figure"
+            
+            if fig.canvas.manager is not None:
+                num = getattr(fig.canvas.manager, "number", None)
+                if num is not None:
+                    fig_var_name = f"Figure{num}"
+                    
+            fig_var_name = validate_varname(fig_var_name, ws = self.shell.user_ns)
+            
             if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
                 self.parent().registerWindow(fig)
             else:
@@ -660,38 +713,32 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 if self.mpl_figure_enter_callback:
                     fig.canvas.mpl_connect("figure_enter_event", self.mpl_figure_enter_callback)
                 
-            self.shell.user_ns[fig_var_name] = f[1]
-            self.observed_vars[fig_var_name] = f[1]
-            
-        for f in mpl_figs_nums_in_cache:
-            if f not in mpl_figs_nums: # figure has been deleted via pylab manager
-                fig_var_name = f"Figure{f[0]}"
-                if fig_var_name in self.shell.user_ns:
-                    self.shell.user_ns.pop(fig_var_name, None)
-                if fig_var_name in self.observed_vars:
-                    self.observed_vars.pop(fig_var_name, None)
-                if fig_var_name in self.cached_vars:
-                    self.cached_vars.pop(fig_var_name, None)
+            self.shell.user_ns[fig_var_name] = fig
+            self.observed_vars[fig_var_name] = fig
+#             
+#         for f in mpl_figs_nums_in_cache:
+#             if f not in current_plt_figs: # figure has been deleted via pylab manager
+#                 fig_var_name = f"Figure{f[0]}"
+#                 if fig_var_name in self.shell.user_ns:
+#                     self.shell.user_ns.pop(fig_var_name, None)
+#                 if fig_var_name in self.observed_vars:
+#                     self.observed_vars.pop(fig_var_name, None)
+#                 if fig_var_name in self.cached_vars:
+#                     self.cached_vars.pop(fig_var_name, None)
                 
+        if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
+            cached_viewers = [(wname, win) for (wname, win) in self.cached_vars.items() if isinstance(win, QtWidgets.QMainWindow)]
+            for w_name_obj in cached_viewers:
+                if w_name_obj[1] not in list(self.shell.user_ns.values()):
+                    self.cached_vars.pop(w_name_obj[0], None)
+                    
+                else:
+                    if type(w_name_obj[1]) in self.parent().viewers.keys():
+                        if w_name_obj[1] not in self.parent().viewers[type(w_name_obj[1])]:
+                            self.parent().registerWindow(w_name_obj[1])
+                    
         
-#         fig = self.shell.user_ns.get("_", None)
-#         
-#         if isinstance(fig, mpl.figure.Figure):
-#             figures = [v for v in self.cached_vars.values() if isinstance(v, mpl.figure.Figure)]
-#             if fig not in figures:
-#                 num = fig.number
-#                 assert num in plt.get_fignums()
-#                 self.shell.user_ns[f"Figure{num}"] = fig
-#                 self.observed_vars[f"Figure{num}"] = fig
-#                 if self.mpl_figure_close_callback:
-#                     fig.canvas.mpl_connect("close_event", self.mpl_figure_close_callback)
-#                     
-#                 if self.mpl_figure_click_callback:
-#                     fig.canvas.mpl_connect("button_press_event", self.mpl_figure_click_callback)
-#                     
-#                 if self.mpl_figure_enter_callback:
-#                     fig.canvas.mpl_connect("figure_enter_event", self.mpl_figure_enter_callback)
-
+        
         # just update the model directly
         self.update()
         
