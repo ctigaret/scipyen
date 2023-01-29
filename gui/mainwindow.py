@@ -636,6 +636,65 @@ class WindowManager(__QMainWindow__):
         
         return win
     
+    def _adopt_mpl_figure(self, fig:mpl.figure.Figure):#, integrate_in_pyplot:bool=True):
+        """Gives a FigureCanvasQTAgg to fig.
+        To be used only with mpl Figure created directly from their c'tor.
+        """
+        # NOTE: 2023-01-29 16:14:04 
+        # for mpl figures created manually
+        # add a manager backend to the figure - we FORCE the use of the
+        # qt5agg backend throughout
+        # -- code from matplotlib.pyplot.switch_backend
+        #
+        import matplotlib.cbook as cbook
+        backend_mod = importlib.import_module(cbook._backend_module_name("Qt5Agg"))
+        new_figure_manager = getattr(backend_mod, "new_figure_manager", None)
+        
+        class backend_mod(mpl.backend_bases._Backend):
+            locals().update(vars(backend_mod))
+            
+        if new_figure_manager is None:
+                # only try to get the canvas class if have opted into the new scheme
+                canvas_class = backend_mod.FigureCanvas
+                def new_figure_manager_given_figure(num, figure):
+                    return canvas_class.new_manager(figure, num)
+
+                def new_figure_manager(num, *args, FigureClass=Figure, **kwargs):
+                    fig = FigureClass(*args, **kwargs)
+                    return new_figure_manager_given_figure(num, fig)
+
+                def draw_if_interactive():
+                    if matplotlib.is_interactive():
+                        manager = _pylab_helpers.Gcf.get_active()
+                        if manager:
+                            manager.canvas.draw_idle()
+
+                backend_mod.new_figure_manager_given_figure = new_figure_manager_given_figure
+                backend_mod.new_figure_manager = new_figure_manager
+                backend_mod.draw_if_interactive = draw_if_interactive
+
+            
+        # fig.set_canvas(backend_mod.FigureCanvasQTAgg())
+        plt_fig_nums = list(Gcf.figs.keys())
+        num = 1
+        if len(plt_fig_nums) > 0:
+            missing_ndx = set(k for k in range(max(plt_fig_nums)) if k not in plt_fig_nums and k > 0)
+            if len(missing_ndx):
+                num = min(missing_ndx)
+            else:
+                num = max(plt_fig_nums) + 1
+                
+        fig.canvas.manager = backend_mod.new_figure_manager_given_figure(num, fig)
+        Gcf._set_new_active_manager(fig.canvas.manager)
+        # fig.canvas.manager = fig.canvas.new_manager(fig, num)
+        # fig.canvas.manager.number = num
+        fig.number=num
+        Gcf.figs[num] = fig.canvas.manager
+    
+        # if integrate_in_pyplot:
+        
+        return fig
+    
     def registerWindow(self, win):
         if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             return
@@ -655,7 +714,15 @@ class WindowManager(__QMainWindow__):
             #
             # this has the same effect as 
             evtFilter = WindowEventFilter(win, parent=self)
+            # NOTE: 2023-01-29 16:28:50
+            # We assume matplotlib Qt5Agg backend is used throughout Scipyen; 
+            # there may be figures created via the constructor, that will not 
+            # have a manager
+            if win.canvas.manager is None:
+                win = self._adopt_mpl_figure(win)#, integrate_in_pyplot=True)
             win.canvas.manager.window.installEventFilter(evtFilter)
+            # else:
+                
             
         else:
             if isinstance(getattr(win, "sig_activated", None), QtCore.pyqtBoundSignal):
@@ -721,11 +788,14 @@ class WindowManager(__QMainWindow__):
         self.setCurrentWindow(obj)
         
         if isinstance(obj, mpl.figure.Figure):
-            # plt.figure(obj.number)
-            plt.get_current_fig_manager().canvas.activateWindow() # steals focus!
-            plt.get_current_fig_manager().canvas.update()
-            plt.get_current_fig_manager().canvas.draw_idle()
-            obj.show() # steals focus!
+            # if not isinstance()
+            if obj.canvas.manager is not None:
+                if getattr(obj, "number", None) is not None:
+                    plt.figure(obj.number)
+                plt.get_current_fig_manager().canvas.activateWindow() # steals focus!
+                plt.get_current_fig_manager().canvas.update()
+                plt.get_current_fig_manager().canvas.draw_idle()
+                obj.show() # steals focus!
             
         else:
             obj.activateWindow()
@@ -746,8 +816,8 @@ class WindowManager(__QMainWindow__):
             self.viewers[type(obj)].append(obj)
 
         if isinstance(obj, mpl.figure.Figure):
-            
-            plt.figure(obj.number)
+            if hasattr(obj, "number"):
+                plt.figure(obj.number)
             
         self.currentViewers[type(obj)] = obj
         

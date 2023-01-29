@@ -619,13 +619,16 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # NOTE: 2023-01-28 13:27:47
         # we also take a snapshot of the mpl figures 
         # first, capture those registered in pyplot/pylab
-        self.cached_mpl_figs = set(f for f in Gcf.figs.values())
+        # REMEMBER Gcf holds references to instances of FigureManager concrete subclasses
+        self.cached_mpl_figs = set(fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
         # then augment the snapshot by capturing those in user_ns but NOT in Gcf
         # we avoid cached_vars because we also want the figures created in code
         # without binding to a user-specific symbol
-        for v in self.shell.user_ns.values():
+        for v in self.cached_vars.values():
             if isinstance(v, mpl.figure.Figure):
-                self.cached_mpl_figs.add(v)
+                self.cached_mpl_figs.add(v) # self.cached_mpl_figs is a set so duplicates won't be added
+        
+        # print(f"\npre_execute cached figs {self.cached_mpl_figs}")
         
         # need to withhold notifications here
         with self.observed_vars.observer.hold_trait_notifications():
@@ -674,32 +677,57 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         from core.workspacefunctions import validate_varname
         
+        # print(f"\npost_execute cached figs {self.cached_mpl_figs}")
+        
+        # print(f"\npost_execute Gcf figs {Gcf.figs}")
+        
         # capture the figures referenced in Gcf
-        current_mpl_figs = set(f for f in Gcf.figs.values())
-        # augment with figs in user_ns (see pre_execute for the logic)
-        for v in self.shell.user_ns.values():
-            if isinstance(v, mpl.figure.Figure):
-                current_mpl_figs.add(v)
+        current_mpl_figs = set(fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
+        
+        # for k,v in self.shell.user_ns.items():
+        #     if isinstance(v, mpl.figure.Figure):
+        #         current_mpl_figs.add(v)
+                # this will avoid returned figs NOT bound ot use-def'ed symbol
+                # if not k.startswith("_"): # avoid hidden vars
+                #     current_mpl_figs.add(v)
+                
+        # print(f"\npost_execute current figs {current_mpl_figs}")
                 
         deleted_mpl_figs = self.cached_mpl_figs - current_mpl_figs
+        # print(f"\npost_execute deleted_mpl_figs = {deleted_mpl_figs}")
         
         for f in deleted_mpl_figs:
-            f_names = list(k for k,v in self.shell.user_ns.values() if v == f and not k.startswith("_"))
+            f_names = list(k for k,v in self.shell.user_ns.items() if v == f and not k.startswith("_"))
             if len(f_names):
                 for n in f_names:
                     self.shell.user_ns.pop(n, None)
                     
         new_mpl_figs = current_mpl_figs - self.cached_mpl_figs
+        for k,v in self.shell.user_ns.items():
+            if isinstance(v, mpl.figure.Figure):
+                if v not in self.cached_mpl_figs:
+                    new_mpl_figs.add(v)
+        # print(f"\npost_execute new_mpl_figs = {new_mpl_figs}")
         
         for fig in new_mpl_figs:
             fig_var_name = "Figure"
+            if getattr(fig.canvas, "manager", None) is None:
+                fig = self.parent()._adopt_mpl_figure(fig)#, integrate_in_pyplot=False)
             
-            if fig.canvas.manager is not None:
-                num = getattr(fig.canvas.manager, "number", None)
-                if num is not None:
-                    fig_var_name = f"Figure{num}"
-                    
-            fig_var_name = validate_varname(fig_var_name, ws = self.shell.user_ns)
+            if fig.canvas.manager is not None and getattr(fig.canvas.manager, "num", None) is not None:
+                fig_var_name = f"Figure{fig.canvas.manager.num}"
+                
+            elif getattr(fig, "number", None) is not None:
+                fig_var_name = f"Figure{fig.number}"
+            
+            if fig_var_name in self.shell.user_ns:
+                fig_var_name = validate_varname(fig_var_name, ws = self.shell.user_ns)
+                
+            # if fig not in self.shell.user_ns.values():
+            if fig not in self.cached_vars.values():
+                # print(f"\n adding fig_var_name {fig_var_name}")
+                self.shell.user_ns[fig_var_name] = fig
+                self.observed_vars[fig_var_name] = fig
             
             if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
                 self.parent().registerWindow(fig)
@@ -713,8 +741,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 if self.mpl_figure_enter_callback:
                     fig.canvas.mpl_connect("figure_enter_event", self.mpl_figure_enter_callback)
                 
-            self.shell.user_ns[fig_var_name] = fig
-            self.observed_vars[fig_var_name] = fig
 #             
 #         for f in mpl_figs_nums_in_cache:
 #             if f not in current_plt_figs: # figure has been deleted via pylab manager
