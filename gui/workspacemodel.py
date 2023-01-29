@@ -621,9 +621,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # first, capture those registered in pyplot/pylab
         # REMEMBER Gcf holds references to instances of FigureManager concrete subclasses
         self.cached_mpl_figs = set(fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
-        # then augment the snapshot by capturing those in user_ns but NOT in Gcf
-        # we avoid cached_vars because we also want the figures created in code
-        # without binding to a user-specific symbol
+        
+        # NOTE: 2023-01-29 23:30:32 
+        # all figures created outside pyplot are now adopted for management under
+        # pyplot (see mainwindow.WindowManager._adopt_mpl_figure() method, called
+        # by code inside post_execute, below)
         for v in self.cached_vars.values():
             if isinstance(v, mpl.figure.Figure):
                 self.cached_mpl_figs.add(v) # self.cached_mpl_figs is a set so duplicates won't be added
@@ -681,19 +683,16 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         # print(f"\npost_execute Gcf figs {Gcf.figs}")
         
+        # NOTE: 2023-01-29 23:32:44
         # capture the figures referenced in Gcf
+        # these should be ALL mpl figures Scipyen knows about, see NOTE: 2023-01-29 23:30:32 
+        #
         current_mpl_figs = set(fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
         
-        # for k,v in self.shell.user_ns.items():
-        #     if isinstance(v, mpl.figure.Figure):
-        #         current_mpl_figs.add(v)
-                # this will avoid returned figs NOT bound ot use-def'ed symbol
-                # if not k.startswith("_"): # avoid hidden vars
-                #     current_mpl_figs.add(v)
-                
         # print(f"\npost_execute current figs {current_mpl_figs}")
                 
         deleted_mpl_figs = self.cached_mpl_figs - current_mpl_figs
+
         # print(f"\npost_execute deleted_mpl_figs = {deleted_mpl_figs}")
         
         for f in deleted_mpl_figs:
@@ -703,14 +702,20 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     self.shell.user_ns.pop(n, None)
                     
         new_mpl_figs = current_mpl_figs - self.cached_mpl_figs
+        
         for k,v in self.shell.user_ns.items():
             if isinstance(v, mpl.figure.Figure):
                 if v not in self.cached_mpl_figs:
                     new_mpl_figs.add(v)
+                    
         # print(f"\npost_execute new_mpl_figs = {new_mpl_figs}")
         
         for fig in new_mpl_figs:
             fig_var_name = "Figure"
+            # NOTE: 2023-01-29 23:34:00
+            # make sure all new figures are managed by pyplot (see NOTE: 2023-01-29 23:30:32)
+            # We need to call this early because we need a fig.number to avoid
+            # complicatons in fig variable name management!
             if getattr(fig.canvas, "manager", None) is None:
                 fig = self.parent()._adopt_mpl_figure(fig)#, integrate_in_pyplot=False)
             
@@ -723,14 +728,13 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             if fig_var_name in self.shell.user_ns:
                 fig_var_name = validate_varname(fig_var_name, ws = self.shell.user_ns)
                 
-            # if fig not in self.shell.user_ns.values():
             if fig not in self.cached_vars.values():
                 # print(f"\n adding fig_var_name {fig_var_name}")
                 self.shell.user_ns[fig_var_name] = fig
                 self.observed_vars[fig_var_name] = fig
             
             if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
-                self.parent().registerWindow(fig)
+                self.parent().registerWindow(fig) # shouldn't be necessary anymore
             else:
                 if self.mpl_figure_close_callback:
                     fig.canvas.mpl_connect("close_event", self.mpl_figure_close_callback)
@@ -740,17 +744,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     
                 if self.mpl_figure_enter_callback:
                     fig.canvas.mpl_connect("figure_enter_event", self.mpl_figure_enter_callback)
-                
-#             
-#         for f in mpl_figs_nums_in_cache:
-#             if f not in current_plt_figs: # figure has been deleted via pylab manager
-#                 fig_var_name = f"Figure{f[0]}"
-#                 if fig_var_name in self.shell.user_ns:
-#                     self.shell.user_ns.pop(fig_var_name, None)
-#                 if fig_var_name in self.observed_vars:
-#                     self.observed_vars.pop(fig_var_name, None)
-#                 if fig_var_name in self.cached_vars:
-#                     self.cached_vars.pop(fig_var_name, None)
                 
         if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
             cached_viewers = [(wname, win) for (wname, win) in self.cached_vars.items() if isinstance(win, QtWidgets.QMainWindow)]
@@ -762,8 +755,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     if type(w_name_obj[1]) in self.parent().viewers.keys():
                         if w_name_obj[1] not in self.parent().viewers[type(w_name_obj[1])]:
                             self.parent().registerWindow(w_name_obj[1])
-                    
-        
         
         # just update the model directly
         self.update()
