@@ -100,7 +100,7 @@ def nsfa(x, parameters):
     """
         y = x * i - x²/N + b
     
-    Parameters: i, N, b
+    Parameters: i, N, b (unitary current, number of channels, background noise)
     """
     if isinstance(x, pq.Quantity):
         x = x.magnitude
