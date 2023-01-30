@@ -702,6 +702,9 @@ class WindowManager(__QMainWindow__):
         winClass = type(win)
         
         if winClass is mpl.figure.Figure:
+            if win.canvas.manager is None:
+                win = self._adopt_mpl_figure(win)#, integrate_in_pyplot=True)
+                
             win.canvas.mpl_connect("button_press_event", self.handle_mpl_figure_click)
             win.canvas.mpl_connect("figure_enter_event", self.handle_mpl_figure_enter)
             
@@ -718,8 +721,6 @@ class WindowManager(__QMainWindow__):
             # We assume matplotlib Qt5Agg backend is used throughout Scipyen; 
             # there may be figures created via the constructor, that will not 
             # have a manager
-            if win.canvas.manager is None:
-                win = self._adopt_mpl_figure(win)#, integrate_in_pyplot=True)
             win.canvas.manager.window.installEventFilter(evtFilter)
             # else:
                 

@@ -696,7 +696,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # print(f"\npost_execute deleted_mpl_figs = {deleted_mpl_figs}")
         
         for f in deleted_mpl_figs:
-            f_names = list(k for k,v in self.shell.user_ns.items() if v == f and not k.startswith("_"))
+            f_names = list(k for k,v in self.shell.user_ns.items() if isinstance(v, mpl.figure.Figure) and v == f and not k.startswith("_"))
             if len(f_names):
                 for n in f_names:
                     self.shell.user_ns.pop(n, None)
@@ -728,22 +728,24 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             if fig_var_name in self.shell.user_ns:
                 fig_var_name = validate_varname(fig_var_name, ws = self.shell.user_ns)
                 
-            if fig not in self.cached_vars.values():
+            # cached_figs = [v for v in self.cached_vars.values() if isinstance(v, mpl.figure.Figure)]
+            cached_figs = [v for v in self.shell.user_ns.values() if isinstance(v, mpl.figure.Figure)]
+            if fig not in cached_figs:
                 # print(f"\n adding fig_var_name {fig_var_name}")
                 self.shell.user_ns[fig_var_name] = fig
                 self.observed_vars[fig_var_name] = fig
             
-            if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
-                self.parent().registerWindow(fig) # shouldn't be necessary anymore
-            else:
-                if self.mpl_figure_close_callback:
-                    fig.canvas.mpl_connect("close_event", self.mpl_figure_close_callback)
-                    
-                if self.mpl_figure_click_callback:
-                    fig.canvas.mpl_connect("button_press_event", self.mpl_figure_click_callback)
-                    
-                if self.mpl_figure_enter_callback:
-                    fig.canvas.mpl_connect("figure_enter_event", self.mpl_figure_enter_callback)
+#             if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
+#                 self.parent().registerWindow(fig) # shouldn't be necessary anymore
+#             else:
+#                 if self.mpl_figure_close_callback:
+#                     fig.canvas.mpl_connect("close_event", self.mpl_figure_close_callback)
+#                     
+#                 if self.mpl_figure_click_callback:
+#                     fig.canvas.mpl_connect("button_press_event", self.mpl_figure_click_callback)
+#                     
+#                 if self.mpl_figure_enter_callback:
+#                     fig.canvas.mpl_connect("figure_enter_event", self.mpl_figure_enter_callback)
                 
         if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
             cached_viewers = [(wname, win) for (wname, win) in self.cached_vars.items() if isinstance(win, QtWidgets.QMainWindow)]

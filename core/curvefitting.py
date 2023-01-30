@@ -865,6 +865,7 @@ def fit_nsfa(data, p0, **kwargs):
     tr_options  = kwargs.pop("tr_options",  {})
     jac_sparsity= kwargs.pop("jac_sparsity",None)
     verbose     = kwargs.pop("verbose",     0)
+    x           = kwargs.pop("x",           None)
     
     def __cost_fun__(x, t, y, *args, **kwargs):  # returns residuals
         yf = models.nsfa(t, x)
@@ -877,17 +878,28 @@ def fit_nsfa(data, p0, **kwargs):
    
     realDataNdx = ~np.isnan(data)
     
-    ydata = data.magnitude[realDataNdx]
+    if isinstance(data, neo.core.basesignal.BaseSignal):
+        ydata = data.magnitude[realDataNdx]
     
-    realDataNdx = np.squeeze(realDataNdx)
+        realDataNdx = np.squeeze(realDataNdx)
     
-    if isinstance(data, neo.AnalogSignal):
-        domaindata = data.times.magnitude
+        if isinstance(data, neo.AnalogSignal):
+            domaindata = data.times.magnitude
+            
+        else:
+            domaindata = data.domain.magnitude
+        
+        xdata  = domaindata[realDataNdx]
         
     else:
-        domaindata = data.domain.magnitude
-    
-    xdata  = domaindata[realDataNdx]
+        if not isinstance(x, np.ndarray): 
+            raise TypeError(f"When data id a numpy array, x must be given as a numpy array")
+        
+        if x.shape != data.shape:
+            raise ValueError(f"x shape {x.shape} is no identical to data shape {data.shape}")
+        
+        ydata = data[realDataNdx]
+        xdata = x[realDataNdx]
     
     x0 = p0
     lo = list()
