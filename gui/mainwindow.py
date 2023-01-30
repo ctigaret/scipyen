@@ -732,10 +732,14 @@ class WindowManager(__QMainWindow__):
                 winEvtFilter = WindowEventFilter(win, parent=self)
                 win.installEventFilter(winEvtFilter)
                 
+            if getattr(win, "appWindow", None) is not self:
+                win.setParent(self)
+                
         if winClass not in self.viewers:
             self.viewers[winClass] = list()
-            
-        self.viewers[winClass].append(win)
+        
+        if win not in self.viewers[winClass]:
+            self.viewers[winClass].append(win)
         self.currentViewers[winClass] = win
         
     @safeWrapper
@@ -7149,7 +7153,7 @@ class WindowEventFilter(QtCore.QObject):
             self.scipyenWindow = None
         
     def eventFilter(self, obj:QtCore.QObject, evt:QtCore.QEvent):
-        if evt.type() in (QtCore.QEvent.FocusIn, QtCore.QEvent.WindowActivate):
+        if evt.type() in (QtCore.QEvent.FocusIn, QtCore.QEvent.WindowActivate, QtCore.QEvent.Show):
             if self.scipyenWindow is not None:
                 if isinstance(self.fig, (mpl.figure.Figure, QtWidgets.QMainWindow)):
                     self.scipyenWindow.raiseWindow(self.fig)

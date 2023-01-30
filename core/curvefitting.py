@@ -896,7 +896,7 @@ def fit_nsfa(data, p0, **kwargs):
             raise TypeError(f"When data id a numpy array, x must be given as a numpy array")
         
         if x.shape != data.shape:
-            raise ValueError(f"x shape {x.shape} is no identical to data shape {data.shape}")
+            raise ValueError(f"x shape {x.shape} is different to to data shape {data.shape}")
         
         ydata = data[realDataNdx]
         xdata = x[realDataNdx]

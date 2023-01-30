@@ -52,6 +52,7 @@ import core.models as models
 import core.datatypes as dt
 import plots.plots as plots
 import core.datasignal as datasignal
+
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.quantities import units_convertible
 import core.neoutils as neoutils
@@ -7591,8 +7592,131 @@ def fit_Event(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opt
     
     return x
     
+def nsfa(data, /, start:int=0, stop:typing.Optional[int]=None, i=0, N=1, b=0, **kwargs):
+    """Skeleton function to run non-stationary fluctuation analysis.
+    In progress.
     
+    Parameters:
+    ===========
+    data: A collection (i.e., tuple, list) of 1D analog signals (either as special
+            neo-based objects: neo.AnalogSignal, DataSignal) or as numpy arrays,
+          or a 2D numpy array with one signal per column.
     
+        When a collection of signals, all elements must have the same Python type
+        (i.e. mixing of neo.AnalogSignal and DataSignal is NOT allowed).
+    
+        Furthermore, the shapes and domains of the signals must be identical.
+    
+        These signals should contain events (i.e., synaptic events) aligned on
+        their rising phase (i.e. on the point of the fastest rise) or or their 
+        onset.
+    
+    start: int, start >= 0 index of the first signal sample to be included in
+        the nsfa; optional, default is 0
+    
+    stop: int, index of the last signal sample for the nsfa
+        optional default is None
+    
+        When given, stop should be less than the number of samples in each signal.
+    
+        For the nsfa to make sense, start - stop must be >= 5.
+
+    
+    i, N, b: numeric scalars, the initial value of the parameters for nsfa fit
+            (unitary current, number of channels, background variance)
+    
+    The nsfa will be performed across signal segments from start index to 
+    stop index (sample at stop index is excluded).
+
+    When stop is None, the nsfa will be performed on the signal samples 
+    from start to the end of the signal.
+    
+    Var-keyword parameters (**kwargs):
+    ==================================
+    These are passed directly to curvefitting.fit_nsfa (and onwards to the 
+    scipy.optimise.least_squares() function, see the Scipy manual).
+    
+    The ones you are most likely to want to change are:
+    
+    • bounds: a tuple (lo, up) of scalars or vectors each with three elements
+    
+    Returns:
+    =======
+    tuple with fit_result, xdata, ydata, data, scaled_means and fluctuations
+        
+    """
+    
+    if isinstance(data, np.ndarray):
+        if data.ndim == 2:
+            if data.shape[1] <= 1:
+                raise ValueError(f"data must contain at least two signals; got {data.shape[1]} instead")
+            
+        else:
+            raise ValueError(f"data array must have two dimensions")
+            
+    elif isinstance(data, (tuple, list)):
+        if len(data) <= 1:
+            raise ValueError(f"data must contain at least two signals; got {len(data)} instead")
+        
+        if not all(isinstance(v, (neo.AnalogSignal, DataSignal, np.ndarray)) for v in data):
+            raise TypeError(f"The collection must contain only analog signal objects")
+        
+        types = set(type(v) for v in data)
+        if len(types) > 1:
+            raise TypeError(f"All signals in a collection must have the same type")
+        
+        if not all(v.shape == data[0].shape for v in data):
+            raise ValueError(f"All signals must have the same shape")
+        
+        if all(isinstance(v, neo.core.baseneo.BaseNeo) for v in data):
+            if not all(np.all(data[0].times == v.times) for v in data):
+                raise ValueError(f"All signals must have the same domain")
+            
+            data = np.concatenate([v.magnitude for v in data], axis=1)
+            
+        else:
+            if not all(dt.is_vector(v) for v in data):
+                raise ValueError(f"All elements in the data collection must be vectors")
+            data = np.concatenate(data, axis=1)
+            
+    else:
+        raise TypeError(f"Expecting a 2D array with column-wise signals or a collection (tuple, list) of neo signals or numpy vectors")
+            
+    # print(f"data shape = {data.shape}")
+    if start < 0:
+        raise ValueError(f"Expecting start >= 0; got {start} instead")
+    
+    if isinstance(stop, int):
+        if stop <= start:
+            raise ValueError(f"Expecting stop >= {start}; got {stop} instead ")
+        
+        if stop >= data.shape[1]:
+            raise ValueError(f"Invalid stop {stop} for signals with {data.shape[1]} samples")
+        
+        if stop - start < 5:
+            raise ValueError(f"Expecting at least five samples per signal for nsfa")
+        
+    elif stop is None:
+        stop = data.shape[1]
+        
+        
+    mean_data = np.nanmean(data, axis=1)
+    
+    scale_res = [crvf.scale_fit_wave(data[:,k], mean_data) for k in range(data.shape[1])]
+    scaled_means = [mean_data * float(s.x[0]) for s in scale_res]
+    fluct_waves = [(data[:,k]-scaled_means[k])[:, np.newaxis] for k in range(data.shape[1])]
+    # print(f"{len(fluct_waves)} fluct_waves")
+    all_fluct = np.concatenate(fluct_waves, axis=1)
+    flucts_var = np.var(all_fluct, axis=1)
+    
+    xdata = mean_data[start:stop]
+    ydata = flucts_var[start:stop]
+    
+    kwargs["x"] = xdata
+    
+    nsfa_fit = crvf.fit_nsfa(ydata, [i, N, b], **kwargs)
+    
+    return nsfa_fit, ydata, xdata, data, scaled_means, all_fluct
     
     
     

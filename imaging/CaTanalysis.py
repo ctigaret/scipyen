@@ -12304,7 +12304,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         if self.isTopLevel:
             if any([v is self for v in self.appWindow.workspace.values()]):
-                self.appWindow.deRegisterViewer(self) # this will also save settings and close the viewer window
+                self.appWindow.deRegisterWindow(self) # this will also save settings and close the viewer window
                 self.appWindow.removeFromWorkspace(self, by_name=False)
                 #self.appWindow.removeFromWorkspace(self, from_console=False, by_name=False)
                 self.appWindow.slot_updateWorkspaceModel()

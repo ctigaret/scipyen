@@ -735,28 +735,19 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 self.shell.user_ns[fig_var_name] = fig
                 self.observed_vars[fig_var_name] = fig
             
-#             if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
-#                 self.parent().registerWindow(fig) # shouldn't be necessary anymore
-#             else:
-#                 if self.mpl_figure_close_callback:
-#                     fig.canvas.mpl_connect("close_event", self.mpl_figure_close_callback)
-#                     
-#                 if self.mpl_figure_click_callback:
-#                     fig.canvas.mpl_connect("button_press_event", self.mpl_figure_click_callback)
-#                     
-#                 if self.mpl_figure_enter_callback:
-#                     fig.canvas.mpl_connect("figure_enter_event", self.mpl_figure_enter_callback)
-                
         if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
-            cached_viewers = [(wname, win) for (wname, win) in self.cached_vars.items() if isinstance(win, QtWidgets.QMainWindow)]
+            cached_viewers = [(wname, win) for (wname, win) in self.cached_vars.items() if isinstance(win, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(win)) ]
+            user_ns_viewers = [v for v in self.shell.user_ns.values() if isinstance(v, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(v))]
             for w_name_obj in cached_viewers:
-                if w_name_obj[1] not in list(self.shell.user_ns.values()):
+                if w_name_obj[1] not in user_ns_viewers:
                     self.cached_vars.pop(w_name_obj[0], None)
                     
                 else:
-                    if type(w_name_obj[1]) in self.parent().viewers.keys():
-                        if w_name_obj[1] not in self.parent().viewers[type(w_name_obj[1])]:
-                            self.parent().registerWindow(w_name_obj[1])
+                    # print(f"win: {w_name_obj[1]}")
+                    self.parent().registerWindow(w_name_obj[1])
+                    # if type(w_name_obj[1]) in self.parent().viewers.keys():
+                    #     if w_name_obj[1] not in self.parent().viewers[type(w_name_obj[1])]:
+                    #         self.parent().registerWindow(w_name_obj[1])
         
         # just update the model directly
         self.update()
