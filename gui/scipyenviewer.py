@@ -480,6 +480,13 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # call super().setData(...) from within their own setData()
         #
         
+        uiParamsPrompt = kwargs.pop("uiParamsPrompt", False)
+        
+        if uiParamsPrompt:
+            # TODO 2023-01-18 08:48:13
+            pass
+            # print(f"{self.__class__.__name__}.setData uiParamsPrompt")
+            
         if len(args):
             if "DataViewer" not in self.__class__.__name__:
                 if len(self.viewer_for_types) and not any([self._check_supports_parameter_type_(a) for a in args]):

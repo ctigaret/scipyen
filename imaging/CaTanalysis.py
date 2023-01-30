@@ -12195,8 +12195,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #self.protocolTableWidget.itemChanged[QtWidgets.QTableWidgetItem].connect(self.slot_protocolTableEdited, type = QtCore.Qt.QueuedConnection)
         
     @safeWrapper
-    def setData(self, newdata = None, doc_title=None):
+    def setData(self, newdata = None, doc_title=None, **kwargs):
         """When newdata is None this resets everything to their defaults"""
+        uiParamsPrompt = kwargs.pop("uiParamsPrompt", False)
+        
+        if uiParamsPrompt:
+            # TODO 2023-01-18 08:48:13
+            pass
+            # print(f"{self.__class__.__name__}.setData uiParamsPrompt")
+            
         # NOTE: 2021-07-08 13:40:23
         # called by ScyipenViewer superclass
         self._clear_contents_()

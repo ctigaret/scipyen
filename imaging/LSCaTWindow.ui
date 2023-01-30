@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>757</width>
-    <height>776</height>
+    <width>834</width>
+    <height>800</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -476,7 +476,8 @@
                     <string/>
                    </property>
                    <property name="icon">
-                    <iconset theme="document-import"/>
+                    <iconset theme="document-import">
+                     <normaloff>.</normaloff>.</iconset>
                    </property>
                   </widget>
                  </item>
@@ -510,7 +511,8 @@
                     <string/>
                    </property>
                    <property name="icon">
-                    <iconset theme="document-export"/>
+                    <iconset theme="document-export">
+                     <normaloff>.</normaloff>.</iconset>
                    </property>
                   </widget>
                  </item>
@@ -544,7 +546,8 @@
                     <string/>
                    </property>
                    <property name="icon">
-                    <iconset theme="remove"/>
+                    <iconset theme="remove">
+                     <normaloff>.</normaloff>.</iconset>
                    </property>
                   </widget>
                  </item>
@@ -578,7 +581,8 @@
                     <string/>
                    </property>
                    <property name="icon">
-                    <iconset theme="edit-delete"/>
+                    <iconset theme="edit-delete">
+                     <normaloff>.</normaloff>.</iconset>
                    </property>
                   </widget>
                  </item>
@@ -3179,20 +3183,20 @@ Integral values are in the interval [0,5]
    </layout>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <widget class="QMenuBar" name="menuBar">
+  <widget class="QMenuBar" name="mainMenuBar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>757</width>
-     <height>29</height>
+     <width>834</width>
+     <height>30</height>
     </rect>
    </property>
-   <widget class="QMenu" name="menuLoad">
+   <widget class="QMenu" name="fileMenu">
     <property name="title">
      <string>Fi&amp;le</string>
     </property>
-    <widget class="QMenu" name="menuImport">
+    <widget class="QMenu" name="importMenu">
      <property name="toolTip">
       <string>Import data acquired by third party software</string>
      </property>
@@ -3209,7 +3213,7 @@ Integral values are in the interval [0,5]
     </widget>
     <addaction name="actionOpen"/>
     <addaction name="actionSave"/>
-    <addaction name="menuImport"/>
+    <addaction name="importMenu"/>
     <addaction name="separator"/>
     <addaction name="actionQuit"/>
    </widget>
@@ -3219,7 +3223,7 @@ Integral values are in the interval [0,5]
     </property>
     <addaction name="whatsThisAction"/>
    </widget>
-   <widget class="QMenu" name="menuData">
+   <widget class="QMenu" name="dataMenu">
     <property name="title">
      <string>&amp;Data</string>
     </property>
@@ -3256,7 +3260,7 @@ Integral values are in the interval [0,5]
     <addaction name="separator"/>
     <addaction name="menu_Add_replace_Electrophysiology"/>
    </widget>
-   <widget class="QMenu" name="menuView">
+   <widget class="QMenu" name="viewMenu">
     <property name="title">
      <string>V&amp;iew</string>
     </property>
@@ -3264,11 +3268,11 @@ Integral values are in the interval [0,5]
     <addaction name="actionRefresh"/>
     <addaction name="actionOpaque_cursor_labels"/>
    </widget>
-   <widget class="QMenu" name="menuAnalysis">
+   <widget class="QMenu" name="analysisMenu">
     <property name="title">
      <string>A&amp;nalysis</string>
     </property>
-    <widget class="QMenu" name="menuOptions">
+    <widget class="QMenu" name="analysisOptionsMenu">
      <property name="toolTip">
       <string>Manage analysis options</string>
      </property>
@@ -3285,7 +3289,7 @@ Integral values are in the interval [0,5]
      <addaction name="actionExport_analysis_options_to_file"/>
      <addaction name="actionLoad_options_file"/>
     </widget>
-    <widget class="QMenu" name="menuUnits">
+    <widget class="QMenu" name="unitsMenu">
      <property name="toolTip">
       <string>Manage analysis units</string>
      </property>
@@ -3300,7 +3304,7 @@ Integral values are in the interval [0,5]
      </property>
      <addaction name="actionAdopt_units"/>
     </widget>
-    <widget class="QMenu" name="menuReporting">
+    <widget class="QMenu" name="reportingMenu">
      <property name="toolTip">
       <string>Manage analysis report</string>
      </property>
@@ -3317,12 +3321,12 @@ Integral values are in the interval [0,5]
      <addaction name="actionBatch_extract_and_write"/>
      <addaction name="actionCollate_reports"/>
     </widget>
-    <addaction name="menuOptions"/>
-    <addaction name="menuUnits"/>
-    <addaction name="menuReporting"/>
+    <addaction name="analysisOptionsMenu"/>
+    <addaction name="unitsMenu"/>
+    <addaction name="reportingMenu"/>
     <addaction name="actionImport_Data_wide_Descriptors"/>
    </widget>
-   <widget class="QMenu" name="menuProtocols">
+   <widget class="QMenu" name="protocolsMenu">
     <property name="toolTip">
      <string>Manage stimulation protocols (triggers)</string>
     </property>
@@ -3339,7 +3343,7 @@ Integral values are in the interval [0,5]
     <addaction name="actionAdopt_protocols"/>
     <addaction name="actionRemove_all_protocols"/>
    </widget>
-   <widget class="QMenu" name="menuOptions_2">
+   <widget class="QMenu" name="optionsMenu">
     <property name="title">
      <string>Options</string>
     </property>
@@ -3348,12 +3352,12 @@ Integral values are in the interval [0,5]
     <addaction name="actionDisplay_colorbars"/>
     <addaction name="actionDisplay_scale_bars"/>
    </widget>
-   <addaction name="menuLoad"/>
-   <addaction name="menuData"/>
-   <addaction name="menuProtocols"/>
-   <addaction name="menuAnalysis"/>
-   <addaction name="menuView"/>
-   <addaction name="menuOptions_2"/>
+   <addaction name="fileMenu"/>
+   <addaction name="dataMenu"/>
+   <addaction name="protocolsMenu"/>
+   <addaction name="analysisMenu"/>
+   <addaction name="viewMenu"/>
+   <addaction name="optionsMenu"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QToolBar" name="unitsToolbar">
@@ -3790,7 +3794,8 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionImportUnits">
    <property name="icon">
-    <iconset theme="document-import"/>
+    <iconset theme="document-import">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Import Units</string>
@@ -3801,7 +3806,8 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionAdd_unit">
    <property name="icon">
-    <iconset theme="cursor-cross"/>
+    <iconset theme="cursor-cross">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Add unit</string>
@@ -3812,7 +3818,8 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionRemove_unit">
    <property name="icon">
-    <iconset theme="remove"/>
+    <iconset theme="remove">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Remove unit</string>
@@ -3832,7 +3839,8 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionDeleteAllAnalysisUnits">
    <property name="icon">
-    <iconset theme="edit-delete"/>
+    <iconset theme="edit-delete">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>DeleteAllAnalysisUnits</string>
@@ -3843,7 +3851,8 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionRemoveSpecifiedUnits">
    <property name="icon">
-    <iconset theme="edit-delete-remove"/>
+    <iconset theme="edit-delete-remove">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>RemoveSpecifiedUnits</string>
@@ -3854,7 +3863,8 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionSetup_Vertical_Cursors_In_Frame">
    <property name="icon">
-    <iconset theme="tools-wizard"/>
+    <iconset theme="tools-wizard">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Setup</string>
@@ -3865,7 +3875,8 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionSetup_Vertical_Cursors_in_All_Frames">
    <property name="icon">
-    <iconset theme="tools-wizard"/>
+    <iconset theme="tools-wizard">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Setup In Specific Frames</string>
@@ -3876,7 +3887,8 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionToolbarOpenFile">
    <property name="icon">
-    <iconset theme="document-open"/>
+    <iconset theme="document-open">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Open</string>
@@ -3887,7 +3899,8 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionToolbarDataLoad">
    <property name="icon">
-    <iconset theme="document-import"/>
+    <iconset theme="document-import">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Load</string>
@@ -3898,7 +3911,8 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionToolbarSaveData">
    <property name="icon">
-    <iconset theme="document-save-as"/>
+    <iconset theme="document-save-as">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Save</string>
@@ -3909,7 +3923,8 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionToolbarCopyToWorkspace">
    <property name="icon">
-    <iconset theme="document-export"/>
+    <iconset theme="document-export">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Copy to workspace</string>
