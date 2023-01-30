@@ -850,6 +850,42 @@ def scale_fit_wave2(x, y, p0 = (1,0)):
     return res
     
 def fit_nsfa(data, p0, **kwargs):
+    """Fit the parabola y = x * i - x²/N + b throgh the observed variable data.
+    Parameters:
+    ===========
+    data: the observed variable
+    p0: tuple with the model parameters i, N, b
+    
+    Var-keyword parameters:
+    =======================
+    x: the independent variable
+    
+    The following are passed directly to scipy.optimize.least_squares:
+    bounds, jac, method, ftol, xtol, gtol, x_scale, loss, f_scale, max_nfev,
+    diff_step, tr_solver, tr_optoins, jac_sparsity, verbose
+    
+    (see scipy manual for details)
+    
+    Defaults are:
+    
+    jac          = "2-point"
+    bounds       = -np.inf, np.inf)
+    method       = "trf"
+    ftol         = 1e-8
+    xtol         = 1e-8
+    gtol         = 1e-8
+    x_scale      = 1.0
+    loss         = "linear"
+    f_scale      = 1.0
+    max_nfev     = None
+    diff_step    = None
+    tr_solver    = None
+    tr_options   = {}
+    jac_sparsity = None
+    verbose      = 0
+    
+    
+    """
     jac         = kwargs.pop("jac",         "2-point")
     bounds      = kwargs.pop("bounds",      (-np.inf, np.inf))
     method      = kwargs.pop("method",      "trf")

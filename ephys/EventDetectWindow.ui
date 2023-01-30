@@ -748,6 +748,7 @@
      <addaction name="actionExport_results"/>
      <addaction name="actionExport_event_trains"/>
      <addaction name="actionExport_event_waveforms"/>
+     <addaction name="actionExport_aligned_waveforms"/>
     </widget>
     <addaction name="menuCurrent_Sweep"/>
     <addaction name="menuEntire_Data"/>
@@ -1528,7 +1529,8 @@
   </action>
   <action name="actionSave_detection_prefs">
    <property name="icon">
-    <iconset theme="document-save"/>
+    <iconset theme="document-save">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Save detection prefernces</string>
@@ -1536,10 +1538,19 @@
   </action>
   <action name="actionLoad_detection_prefs">
    <property name="icon">
-    <iconset theme="document-open"/>
+    <iconset theme="document-open">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Load detection preferences</string>
+   </property>
+  </action>
+  <action name="actionExport_aligned_waveforms">
+   <property name="icon">
+    <iconset theme="document-export"/>
+   </property>
+   <property name="text">
+    <string>Export aligned waveforms</string>
    </property>
   </action>
  </widget>

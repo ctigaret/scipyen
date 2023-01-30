@@ -618,6 +618,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self.actionExport_event_trains.triggered.connect(self._slot_exportEventTrains)
         self.actionSave_event_waveforms.triggered.connect(self._slot_saveEventWaves)
         self.actionExport_event_waveforms.triggered.connect(self._slot_exportEventWaves)
+        self.actionExport_aligned_waveforms.triggered.connect(self._slot_exportAlignedWaves)
         self.actionClear_results.triggered.connect(self._slot_clearResults)
         self.actionUse_default_location_for_persistent_event_template.triggered.connect(self._slot_useDefaultTemplateLocation)
         self.actionChoose_persistent_event_template_file.triggered.connect(self._slot_choosePersistentTemplateFile)
@@ -3240,6 +3241,14 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         varName = f"{self._data_.name}_event_waves"
         
         self.exportDataToWorkspace(resultsWaves, var_name=varName, title="Export mPSC waves to workspace")
+        
+    @pyqtSlot()
+    def _slot_exportAlignedWaves(self):
+        if not isinstance(self._aligned_waves_, (tuple, list)) or len(self._aligned_waves_) == 0:
+            self.criticalMessage("Export aligned waveforms", "Must align the detected waves first!")
+            return
+        varName = f"{self._data_.name}_aligned_waves"
+        self.exportDataToWorkspace(self._aligned_waves_, var_name=varName, title="Export aligned waveforms")
         
     @pyqtSlot()
     def slot_showReportWindow(self):

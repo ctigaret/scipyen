@@ -7591,13 +7591,12 @@ def fit_Event(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opt
         
     
     return x
-    
-def nsfa(data, /, start:int=0, stop:typing.Optional[int]=None, i=0, N=1, b=0, **kwargs):
-    """Skeleton function to run non-stationary fluctuation analysis.
-    In progress.
-    
+
+def prep_for_nsfa(data):
+    """Helper for the nsfa function
+    Prepares an average event waveform and the variance of fluctuations.
     Parameters:
-    ===========
+    ==========
     data: A collection (i.e., tuple, list) of 1D analog signals (either as special
             neo-based objects: neo.AnalogSignal, DataSignal) or as numpy arrays,
           or a 2D numpy array with one signal per column.
@@ -7611,41 +7610,21 @@ def nsfa(data, /, start:int=0, stop:typing.Optional[int]=None, i=0, N=1, b=0, **
         their rising phase (i.e. on the point of the fastest rise) or or their 
         onset.
     
-    start: int, start >= 0 index of the first signal sample to be included in
-        the nsfa; optional, default is 0
-    
-    stop: int, index of the last signal sample for the nsfa
-        optional default is None
-    
-        When given, stop should be less than the number of samples in each signal.
-    
-        For the nsfa to make sense, start - stop must be >= 5.
-
-    
-    i, N, b: numeric scalars, the initial value of the parameters for nsfa fit
-            (unitary current, number of channels, background variance)
-    
-    The nsfa will be performed across signal segments from start index to 
-    stop index (sample at stop index is excluded).
-
-    When stop is None, the nsfa will be performed on the signal samples 
-    from start to the end of the signal.
-    
-    Var-keyword parameters (**kwargs):
-    ==================================
-    These are passed directly to curvefitting.fit_nsfa (and onwards to the 
-    scipy.optimise.least_squares() function, see the Scipy manual).
-    
-    The ones you are most likely to want to change are:
-    
-    • bounds: a tuple (lo, up) of scalars or vectors each with three elements
-    
     Returns:
     =======
-    tuple with fit_result, xdata, ydata, data, scaled_means and fluctuations
-        
-    """
+    A tuple (mean_data, flucts_var, scaled_means, flucts) were:
+        • `mean_data` (1D numpy array) is the averaged event waveform
     
+        • `flucts_var` (1D numpy array) is the variance of differences between 
+            each signal in `data` and its corresponding peak-scaled mean
+    
+        • `scaled_means` (2D numpy array) contains the peak-scaled average
+            waveforms for each signal in `data`, as column vectors
+    
+        • `flucts` (2D numpy array) contains the difference between each signal
+            in `data` and its corresponding peak-scaled average waveforms in 
+            `scaled_means`, as column vectors
+    """
     if isinstance(data, np.ndarray):
         if data.ndim == 2:
             if data.shape[1] <= 1:
@@ -7682,41 +7661,102 @@ def nsfa(data, /, start:int=0, stop:typing.Optional[int]=None, i=0, N=1, b=0, **
     else:
         raise TypeError(f"Expecting a 2D array with column-wise signals or a collection (tuple, list) of neo signals or numpy vectors")
             
-    # print(f"data shape = {data.shape}")
-    if start < 0:
-        raise ValueError(f"Expecting start >= 0; got {start} instead")
     
-    if isinstance(stop, int):
-        if stop <= start:
-            raise ValueError(f"Expecting stop >= {start}; got {stop} instead ")
-        
-        if stop >= data.shape[1]:
-            raise ValueError(f"Invalid stop {stop} for signals with {data.shape[1]} samples")
-        
-        if stop - start < 5:
-            raise ValueError(f"Expecting at least five samples per signal for nsfa")
-        
-    elif stop is None:
-        stop = data.shape[1]
-        
-        
     mean_data = np.nanmean(data, axis=1)
     
     scale_res = [crvf.scale_fit_wave(data[:,k], mean_data) for k in range(data.shape[1])]
-    scaled_means = [mean_data * float(s.x[0]) for s in scale_res]
-    fluct_waves = [(data[:,k]-scaled_means[k])[:, np.newaxis] for k in range(data.shape[1])]
+    scaled_means = np.concatenate([mean_data[:,np.newaxis] * float(s.x[0]) for s in scale_res], axis=1)
+    flucts = np.concatenate([(data[:,k]-scaled_means[:,k])[:, np.newaxis] for k in range(data.shape[1])], axis=1)
     # print(f"{len(fluct_waves)} fluct_waves")
-    all_fluct = np.concatenate(fluct_waves, axis=1)
-    flucts_var = np.var(all_fluct, axis=1)
+    # all_fluct = np.concatenate(fluct_waves, axis=1)
+    flucts_var = np.var(flucts, axis=1)
     
-    xdata = mean_data[start:stop]
-    ydata = flucts_var[start:stop]
+    return mean_data, flucts_var, scaled_means, flucts
+    
+    
+# def nsfa(data, /, start:int=0, stop:typing.Optional[int]=None, i=0, N=1, b=0, **kwargs):
+def nsfa(xdata:np.ndarray, ydata:np.ndarray, /, i=0, N=1, b=0, **kwargs):
+    """Non-stationary fluctuation analysis.
+    
+    The function estimated the number of channels and their unitary currents 
+    likely to have contributed to 
+    
+    Uses the average event waveform and the variance (at each data point) of the 
+    differences between each event and its peak-scaled waveform. These can be 
+    generated from a collection of events or a 2D numpy array using the function
+    prep_for_nsfa() defined in this module.
+    
+    Typically, nsfa is run on a subset of the waveform data, correspnding to the
+    decay phase of the events. This can be achieved by passing a subarray of the 
+    xdata and ydata.
+    
+    
+    
+    For details, theoretical background and implementations see:
+    Robinson H.P.C., Sahara Y., Kawai N. (1991) Biophys. J., 59:295-304
+    Traynelis, S.F., Silver, R. A., Cull-Candy S.G. (1993) Neuron, 11:279-289
+    Benke, T.A., et al, (1998) Nature 393:793-797
+    Benke T.A., et al, (2001) J. Physiol. 537.2:407-420 
+    
+    Parameters:
+    ===========
+    xdata: The averaged event waveform 
+    ydata: The variance of event fluctuations (differences between the average
+            event waveform and the peak-scaled average waveform)
+    
+        NOTE: xdata and ydata should be generated with prep_for_nsfa() function 
+        in this module
+    
+    i, N, b: numeric scalars, the initial value of the parameters for nsfa fit
+            (unitary current, number of channels, background variance)
+    
+    Var-keyword parameters (**kwargs):
+    ==================================
+    These are passed directly to curvefitting.fit_nsfa (and onwards to the 
+    scipy.optimise.least_squares() function, see the Scipy manual).
+    
+    The ones you are most likely to want to change are:
+    
+    • bounds: a tuple (lo, up) of scalars or vectors each with three elements
+    
+    Returns:
+    =======
+    A collections.OrderedDict with:
+    • Fit ↦ the result of nonlinear least squares fit of the parabolic function
+    
+        y = x * i - x²/N + b
+    
+        Where 
+        ∘ y = fitted variance of signal deviations from peak-scaled sample average
+        ∘ x = sample average
+        ∘ i = unitary (single-channel) current
+        ∘ N = number of channels
+        ∘ b = background variance
+    
+    NOTE: `x` and `i` represent membrane current (typically, in pA)
+    
+    If the holding membrane voltage (Vₘ) is known one can calculate the esimated
+    unitary conductance γ of the channels as:
+    
+        γ = i/Vₘ
+    
+    Using the Python quantities package allows a quick calculation of γ in pS:
+    
+    import quantities as pq
+    
+    Vₘ = -70 * pq.mV
+    
+    γ = (i * pq.pA/Vₘ).rescale(pq.pS)
+    
+        
+        
+    """
     
     kwargs["x"] = xdata
     
     nsfa_fit = crvf.fit_nsfa(ydata, [i, N, b], **kwargs)
     
-    return nsfa_fit, ydata, xdata, data, scaled_means, all_fluct
+    return nsfa_fit
     
     
     
