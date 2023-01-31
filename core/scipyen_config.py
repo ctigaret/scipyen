@@ -82,7 +82,7 @@ are configuration settings for various Scipyen functionalities:
 
 """
 #import base64
-import os, inspect, typing, types, math, numbers, ast, json, traceback
+import os, inspect, typing, types, math, numbers, json, traceback, warnings
 import yaml
 import dataclasses
 from copy import (copy, deepcopy,)
@@ -894,16 +894,7 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
             
             default = val
             
-            # if win.__class__.__name__ == "EventAnalysis":
-            #     print(f" key {confname}, val {val}, {type(val)}, default {default}, {type(default)}")
-            
             newval = loadQSettingsKey(qsettings, gname, key_prefix, confname, default)
-            
-#             if settername == "autoRemoveViewers":
-#                 print(f"syncQtSettings: settername = {settername}, default = {default}, newval = {newval}")
-#             
-            # if win.__class__.__name__ == "EventAnalysis":
-            #     print(f" key {confname}, val {val}, {type(val)}, default {default}, {type(default)}, newval {newval}, {type(newval)}")
             
             if isinstance(setter, property):
                 config_setter = getattr(setter.fset, "configurable_setter")
