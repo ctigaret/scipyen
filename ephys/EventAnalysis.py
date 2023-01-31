@@ -1719,6 +1719,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             else:
                 doctitle = self.metaDataWidget.dataVarName
                 
+            for ax in self._ephysViewer_.axes:
+                self._ephysViewer_.removeTargetsOverlay(ax)
+                
             self._ephysViewer_.view(self._data_, doc_title=doctitle)
             
             self._ephysViewer_.currentFrame = self.currentFrame
@@ -1952,7 +1955,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         if not isinstance(frameResult, neo.core.spiketrainlist.SpikeTrainList) or len(frameResult) == 0:
             if isinstance(self._detected_Events_Viewer_, sv.SignalViewer):
-                self._detected_Events_Viewer_.clear()
+                self._detected_Events_Viewer_.clearAxes()
                 
             
             return

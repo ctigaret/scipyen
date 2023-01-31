@@ -8863,6 +8863,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._signal_axes_.clear()
         self._events_axis_ = None 
         self._spiketrains_axis_ = None
+        
+    def clearAxes(self):
+        self._clear_lris_()
+        for ax in self.axes:
+            self.removeTargetsOverlay(ax)
+            ax.clear()
+            ax.setVisible(False)
+            
 
     def setTitlePrefix(self, value):
         """Sets the window-specific prefix of the window title
