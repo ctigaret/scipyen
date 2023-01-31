@@ -1533,7 +1533,7 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Save detection prefernces</string>
+    <string>Save detection preferences</string>
    </property>
   </action>
   <action name="actionLoad_detection_prefs">
@@ -1547,7 +1547,8 @@
   </action>
   <action name="actionExport_aligned_waveforms">
    <property name="icon">
-    <iconset theme="document-export"/>
+    <iconset theme="document-export">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Export aligned waveforms</string>

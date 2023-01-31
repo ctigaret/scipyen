@@ -7757,6 +7757,45 @@ def nsfa(xdata:np.ndarray, ydata:np.ndarray, /, i=0, N=1, b=0, **kwargs):
     nsfa_fit = crvf.fit_nsfa(ydata, [i, N, b], **kwargs)
     
     return nsfa_fit
+
+
+def get_nsfa_var(x, params):
+    """
+    Calculate nsfa variance from membrane currents in `x` using nsfa parabola.
+    
+    Useful to plot a fitted nsfa curve (current variance function of current
+    value. 
+    
+    e.g.
+    
+    x = np.linspace(-20, 0, 100)
+    
+    i = -2
+    N = 11
+    b =  6
+    
+    y = get_nsfa_var(x, [i, N, b])
+    
+    plt.plot(x,y)
+    
+    Assuming `res` is a nsfa fit result returned by the nsfa() function:
+    
+    y1 = get_nsfa_var(x, res[1]["Coefficients"])
+    
+    assert np.all(y1==y) # → True
+    
+    Parameters:
+    ==========
+    x: 1D numpy array with membrane currents
+    params: array-like with three elements (i, N, b) - see documentation for 
+            the nsfa function in this module
+    """
+    
+    from core import models
+    
+    return models.nsfa(x, params)
+
+    
     
     
     

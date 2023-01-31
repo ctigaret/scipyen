@@ -715,6 +715,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         self.actionRefit_wave.triggered.connect(self._slot_refit_Event_Waveform)
         
+        # NOTE: 2023-01-31 08:37:50
+        # the two slots below are inherited from WorkspaceGuiMixin
         self.actionSave_detection_prefs.triggered.connect(self.saveOptionsToUserFile)
         self.actionLoad_detection_prefs.triggered.connect(self.loadOptionsFromUserFile)
         
