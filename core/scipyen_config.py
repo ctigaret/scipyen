@@ -916,7 +916,7 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
                         newval = value_type(newval)
                     
                 except:
-                    warnings.warn(f"Cannot cast {type(newval).__name__} to {value_type.__name__}; reverting to default", category="RuntimeWarning")
+                    warnings.warn(f"Cannot cast {type(newval).__name__} to {value_type.__name__}; reverting to default", category=RuntimeWarning)
                     newval = default
                 
                 # if settername == "autoRemoveViewers":
