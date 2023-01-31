@@ -2819,7 +2819,12 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             
         elif hasattr(obj, "__iter__"):
             if hasattr(obj, "__len__"):
-                sz = len(obj)
+                try:
+                    # NOTE: 2023-01-31 17:36:53
+                    # to avoid NEURON error: TypeError Most HocObject have no len()
+                    sz = len(obj)
+                except:
+                    sz = ""
             else:
                 sz = ""
             sizetip = "length:"
