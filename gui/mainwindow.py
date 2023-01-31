@@ -6121,7 +6121,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def _slot_set_Application_style(self):
-        from gui.pictgui import ItemsListDialog
+        from .itemslistdialog import ItemsListDialog
         d = ItemsListDialog(self, itemsList = ["Default"] + self._available_Qt_style_names_,
                             title="Choose Application GUI Style",
                             preSelected = self._current_GUI_style_name)
