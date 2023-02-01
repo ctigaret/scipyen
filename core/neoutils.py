@@ -5443,29 +5443,6 @@ def average_blocks(*args, **kwargs):
             
     block_names = [b.name for b in blocks]
             
-        
-    #print(args)
-    #try:
-        #cframe = inspect.getouterframes(inspect.currentframe())[1][0]
-        #bname = ""
-        #for b in args:
-            #if b.name is None or len(b.name) == 0:
-                #if b.file_origin is None or len(b.file_origin) == 0:
-                    #for (k,v) in cframe.f_globals.items():
-                        #if isinstance(v, neo.Block) and v == b:
-                            #bname = k
-                #else:
-                    #bname = b.file_origin
-            #else:
-                #bname = b.name
-                
-            #block_names.append(bname)
-                    
-        
-    #finally:
-        #del(cframe)
-        
-    
     n = None
     m = None
     segment_index = None
@@ -5513,6 +5490,13 @@ def average_blocks(*args, **kwargs):
         if "file_datetime" in kwargs.keys():
             ret.file_datetime = kwargs["file_datetime"]
             
+    if analog_index is not None:
+        signal_str = str(analog_index)
+    elif isinstance(analog_index, (tuple, list)):
+        signal_str = f"{analog_index}"
+    else:
+        signal_str = "all"
+        
     if segment_index is None:
         segments = [[__applyRecDateTime(sgm, b) for sgm in b.segments] for b in blocks]
         segment_str = "all"
@@ -5521,19 +5505,25 @@ def average_blocks(*args, **kwargs):
         segments = [__applyRecDateTime(b.segments[segment_index], b) for b in blocks if segment_index < len(b.segments)]
         segment_str = str(segment_index)
         
-    else:
-        raise TypeError("Unexpected segment index type (%s) -- expected an int" % segment_index)
-    
-    #print(len(segments))
-    
-    if analog_index is not None:
-        signal_str = str(analog_index)
-    else:
-        signal_str = "all"
+#     elif isinstance(segment_index, (tuple, list)) and all(isinstance(ndx, int) for ndx in segment_index):
+#         seg_avg = list()
+#         for k, ndx in enumerate(segment_index):
+#             if any(ndx not in range(len(b.segments)) for b in blocks):
+#                 raise ValueError(f"segment index {ndx} out of range for ")
+#             segments = [[__applyRecDateTime(b.segments[ndx], b) if ndx in range(len(b.segments))] for b in blocks ]
+#             if k == 0:
+#                 seg_avg = average_segments(segments, count=n, every=m, analog_index = analog_index)
+#             else:
+#                 avg_segs = average_segments(segments, count=n, every=m, analog_index = analog_index)
+#                 
+#                 
+#             
+#         segments = [[__applyRecDateTime(b.segments[ndx], b) for ndx in segment_index if ndx in range(len(b.segments))] for b in blocks ]
+#         segment_str = f"{segment_index}"
         
-    block_names= list()
-    
-    #print(args)
+    else:
+        # raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or sequence of int, or None")
+        raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or None")
     
     ret.segments = average_segments(segments, count=n, every=m, analog_index=analog_index)
     
