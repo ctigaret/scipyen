@@ -314,6 +314,14 @@ import ephys.EventAnalysis as EventAnalysis
     
 #### END scipyen imaging modules
 
+has_qdarkstyle_for_win = False
+if sys.platform == "win32":
+    try:
+        import qdarkstyle
+        has_qdarkstyle_for_win = True
+    except:
+        has_qdarkstyle_for_win = False
+
 from core import scipyen_plugin_loader
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -1567,7 +1575,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: QMainWindow python3 way
         
-        # NOTE: 2023-01-08 16:14:26
+        # NOTE: 2023-01-08 16:14:26 - set this early !
         # this below is the same as:
         # • app.instance()
         # • QtWidgets.qApp.instance()
@@ -1807,6 +1815,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         if val =="Default":
             self.app.setStyle(QtWidgets.QApplication.style())
+        elif val == "Dark Style" and has_qdarkstyle_for_win:
+            self.app.setStyleSheet(qdarkstyle.load_stylesheet())
         else:
             self.app.setStyle(val)
             
@@ -3881,6 +3891,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         # list of available syle names
         self._available_Qt_style_names_ = QtWidgets.QStyleFactory.keys()
+        if sys.platform == "win32" and has_qdarkstyle_for_win:
+            self._available_Qt_style_names_.append("Dark Style")
+            
         self.actionGUI_Style.triggered.connect(self._slot_set_Application_style)
         self.actionAuto_launch_Script_Manager.toggled.connect(self._slot_set_scriptManagerAutoLaunch)
         # NOTE: 2016-05-02 14:26:58

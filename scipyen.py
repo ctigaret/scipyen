@@ -18,6 +18,9 @@ if sys.platform == "win32" and sys.version_info.minor >= 9:
     path_to_vigraimpex = win32api.GetModuleFileName(win32api.LoadLibrary(vigraimpex_mod))
     os.add_dll_directory(os.path.dirname(path_to_vigraimpex))
     lib_environ = os.environ.get("LIB", "")
+    
+    os.environ["QT_API"] = "pyqt5"
+    
     if len(lib_environ.strip()):
         libdirs = lib_environ.split(os.pathsep)
         for d in libdirs:
