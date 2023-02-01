@@ -2813,12 +2813,7 @@ def setupLTPCursors(viewer, LTPOptions, pathway, axis=None):
     
     viewer.setupCursors("v", LTPOptions["Cursors"]["Pathway%d"%pathway])
         
-def extract_sample_EPSPs(data, \
-                         test_base_segments_ndx, \
-                         test_chase_segments_ndx, \
-                         control_base_segments_ndx,\ 
-                         control_chase_segments_ndx,\
-                         t0, t1):
+def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx, control_base_segments_ndx, control_chase_segments_ndx, t0, t1):
     """
     data: dict; an LTP data dict
     
