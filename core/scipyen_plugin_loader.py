@@ -249,7 +249,7 @@ def find_plugins(path):
             if ext in importlib.machinery.SOURCE_SUFFIXES:
                 module_name = inspect.getmodulename(file_name)
                 if module_name is not None:
-                    with open(file_name, "rt") as module_file:
+                    with open(file_name, "rt", encoding="utf-8") as module_file:
                         for line in module_file:
                             if line.startswith('__scipyen_plugin__') or line.startswith("def init_scipyen_plugin"):
                                 # print(f"found plugin file {file_name}")
