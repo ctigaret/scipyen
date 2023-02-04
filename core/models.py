@@ -526,15 +526,15 @@ def Talbot_Sayer(x, a, b, c, x0, **kwargs):# t = 33 * pq.degC, o = 2.5 * pq.mM):
     
     #k = 0.0379
     
-    # see Kay & Wong (1987) J. Physiol, 392:603-616
-    boltzman = 1 / (1 + np.exp(-a * k.magnitude * (x-x0)))**2
+    # see Kay & Wong (1987) J. Physiol, 392:603-616 ↦ Boltzmann eqn squared
+    boltzmann = 1 / (1 + np.exp(-a * k.magnitude * (x-x0)))**2
     
     ghkexp = np.exp(-2 * x * k.magnitude)
     
     # Goldman-Hogkin-Katz
     ghk = x * b * (c - o.magnitude * ghkexp) / (1-ghkexp)
 
-    return boltzman * ghk
+    return boltzmann * ghk
 
 def gaussianSum1D(x, *args, **kwargs):
     """ Sum of shifted Gaussians in 1D.
@@ -657,4 +657,65 @@ def Frank_Fuortes2(x, irh, tau, x0):
     #return (1-np.exp(-x/tau)) / irh
 
     
+def Boltzmann(x, p, pos:bool=True):
+    """ Realises y = 1/(1+exp(±(x₀ - x)/κ))
+    
+    Boltzmann's equation is used to describe the voltage-dependent activation
+    of voltage-gated ion channels:
+    
+        Iₘ = 1/(1+exp((V½ - Vₘ)/κ))                                 (1)
 
+    where:
+    
+    Iₘ is the recorded membrane current at a range of Vₘ values.
+        When all other channels are blocked, Iₘ is the current carried by the
+        channels under study.
+    
+    Vₘ is the membrane voltage
+    
+    V½ is the "half-maximum" voltage - the voltage where ensemble channel 
+    current is half the maximum, or where half of the channels are active
+    
+    κ is a "slope" factor
+    
+    Similarly, it can be used to describe the voltage-dependent inactivation:
+    
+        Iₘ = 1/(1+exp(-(V½ - Vₘ)/κ))                                 (2)
+    
+    where: Iₘ, Vₘ, V½, and κ are as in equation 1
+    
+        NOTE the change in sign of the exponential argument!
+        NOTE V½ and κ are often different for the activation and inactivation
+    
+    Let ξ = (V½ - Vₘ)/κ
+    
+    Then:
+    
+    (Vₘ-V½)/κ = -ξ
+    
+    and:
+    
+    1/(1+exp(-ξ)) = 1/(1+1/exp(ξ)) = exp(ξ)/(1+exp(ξ)) = exp(ξ) × 1/(1+exp(ξ))
+    |___________|                                                 |__________|
+    inactivation                                                   activation
+    
+    When fitting experimental data, the fitted parameters are x₀ and κ.
+    
+    Function parameters:
+    ====================
+    x: scalar (e.g., membrane voltage)
+    p: array-like, with two elements: x₀ and κ (in THIS order)
+    pos: optional default is True ⇒ positive exponential argument (e.g. to fit
+        an activation curve)
+        When False, the argument is negaive (e.g., to fit an inactivation curve)
+    
+    Returns:
+    =======
+    A scalar (e.g., membrane current)
+    """
+    α = 1 if pos == True else -1
+    x0, κ = p
+    return 1/(1+np.exp(α * (x0 - x) / κ))
+
+
+    
