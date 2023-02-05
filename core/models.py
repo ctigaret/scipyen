@@ -667,11 +667,15 @@ def Boltzmann(x, p, pos:bool=True):
 
     where:
     
-    Iₘ is the recorded membrane current at a range of Vₘ values (normalized 
-        to the maximal value) or fractional open time (for recordings from
-        asmall number of channels, see e.g., Magee & Johnston, JPhysiol, 1995).
-        When all other channels are blocked, Iₘ is the current carried by the
-        channels under study.
+    Iₘ can be:
+        ∘ the recorded membrane current at a range of Vₘ values, normalized 
+            to the maximal value)
+        ∘ fractional open time (for recordings from a small number of channels, 
+            see e.g., Magee & Johnston, JPhysiol, 1995).
+        ∘ chord or slope conductance (normalized to maximal value, e.g., see
+            Magee & Johnston 1995)
+        When all other channels are blocked, Iₘ is specific to the studied
+        channels.
     
     Vₘ is the membrane voltage
     
