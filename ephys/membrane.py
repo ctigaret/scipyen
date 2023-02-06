@@ -54,6 +54,7 @@ import plots.plots as plots
 import core.datasignal as datasignal
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+from core import quantities as scq
 from core.quantities import units_convertible
 import core.neoutils as neoutils
 #import core.triggerprotocols
@@ -7598,8 +7599,8 @@ def prep_for_nsfa(data):
     Parameters:
     ==========
     data: A collection (i.e., tuple, list) of 1D analog signals (either as special
-            neo-based objects: neo.AnalogSignal, DataSignal) or as numpy arrays,
-          or a 2D numpy array with one signal per column.
+            neo-style signal objects: neo.AnalogSignal, DataSignal) or as numpy 
+            arrays, or a 2D numpy array with one signal per column.
     
         When a collection of signals, all elements must have the same Python type
         (i.e. mixing of neo.AnalogSignal and DataSignal is NOT allowed).
@@ -7678,8 +7679,9 @@ def prep_for_nsfa(data):
 def nsfa(xdata:np.ndarray, ydata:np.ndarray, /, i=0, N=1, b=0, **kwargs):
     """Non-stationary fluctuation analysis.
     
-    The function estimated the number of channels and their unitary currents 
-    likely to have contributed to 
+    The function estimates the number of channels and their unitary currents 
+    likely to have contributed to the events. When Vm and Erev are given (see 
+    below) the function also outputs the calculate unitary slope conductance.
     
     Uses the average event waveform and the variance (at each data point) of the 
     differences between each event and its peak-scaled waveform. These can be 
@@ -7712,7 +7714,23 @@ def nsfa(xdata:np.ndarray, ydata:np.ndarray, /, i=0, N=1, b=0, **kwargs):
     
     Var-keyword parameters (**kwargs):
     ==================================
-    These are passed directly to curvefitting.fit_nsfa (and onwards to the 
+    Vm: float scalar, the membrane voltage (in mV) where the events were measured;
+        optional, default is None.
+    
+        When given, the unitary conductance will be calculated as:
+    
+            γ = i/(Vm-Erev)         if Erev is also given
+    
+        or 
+    
+            γ = i/Vm                otherwise (assuming Erev == 0)
+    
+    Erev: float scalar, the reversal potential (in mV); optional default is None.
+        
+        When given, and Vm is also given, it is used to calculate the unitary 
+        channel conductance using the estimated unitary current (see above)
+    
+    The following are passed directly to curvefitting.fit_nsfa (and onwards to the 
     scipy.optimise.least_squares() function, see the Scipy manual).
     
     The ones you are most likely to want to change are:
@@ -7721,7 +7739,13 @@ def nsfa(xdata:np.ndarray, ydata:np.ndarray, /, i=0, N=1, b=0, **kwargs):
     
     Returns:
     =======
-    A collections.OrderedDict with:
+    A tuple with fitted curve and a collections.OrderedDict.
+    
+    The fitted curve is a realization of the parabola describing the variance
+    of the current as function of the mean current, generated using the fitted 
+    parameters values (see below).
+    
+    The OrderedDict contains the following key ↦ value mapping:
     • Fit ↦ the result of nonlinear least squares fit of the parabolic function
     
         y = x * i - x²/N + b
@@ -7733,12 +7757,26 @@ def nsfa(xdata:np.ndarray, ydata:np.ndarray, /, i=0, N=1, b=0, **kwargs):
         ∘ N = number of channels
         ∘ b = background variance
     
-    NOTE: `x` and `i` represent membrane current (typically, in pA)
+    • Coefficients ↦ a list of the fitted parameter values i, N and b, in THIS 
+        order
     
-    If the holding membrane voltage (Vₘ) is known one can calculate the esimated
-    unitary conductance γ of the channels as:
+    • Rsq ↦ a scalar, the R² correlation coefficient between `ydata` and the
+        fitted curve, given `xdata`.
     
-        γ = i/Vₘ
+    • UnitaryCurrent ↦ a scalar python Quantity (units: pA)
+    
+    • UnitaryConductance ↦ a scalar python Quantity (units: pS) if Vm was given, or None, otherwise
+    
+    • N ↦ an int, the estimated number of receptors (channels)
+    
+    NOTE: `x` and `i` represent membrane current in pA
+    
+    If the holding membrane voltage (Vₘ) is known one can calculate the unitary
+    conductance γ of the channels using the estimated unitary current as:
+    
+        γ = i/(Vₘ-Eᵣₑᵥ)
+    
+    where Eᵣₑᵥ is the reversal potential.
     
     Using the Python quantities package allows a quick calculation of γ in pS:
     
@@ -7747,14 +7785,67 @@ def nsfa(xdata:np.ndarray, ydata:np.ndarray, /, i=0, N=1, b=0, **kwargs):
     Vₘ = -70 * pq.mV
     
     γ = (i * pq.pA/Vₘ).rescale(pq.pS)
-    
-        
         
     """
     
+    Vm = kwargs.pop("Vm", None)
+    
+    Erev = kwargs.pop("Erev", None)
+    
+    
     kwargs["x"] = xdata
     
+    
     nsfa_fit = crvf.fit_nsfa(ydata, [i, N, b], **kwargs)
+    
+    i, N, b = nsfa_fit[1]["Coefficients"]
+    
+    i *= pq.pA
+    
+    b *= pq.pA**2
+    
+    N = math.ceil(N)
+    
+    # print(f"Vm = {Vm}")
+    
+    if isinstance(Vm, numbers.Number):
+        Vm *= pq.mV
+        
+    elif isinstance(Vm, pq.Quantity):
+        uname = scq.name_from_unit(Vm)
+        if uname != "Potential":
+            raise TypeError("Vm expected to be a Potential; got {uname} instead")
+        Vm  = Vm.rescale(pq.mV)
+        
+    elif Vm is not None:
+        raise TypeError(f"Vm expected to be a scalar float or quantity")
+    
+    if isinstance(Erev, numbers.Number):
+        Erev *= pq.mV
+        
+    elif isinstance(Erev, pq.Quantity):
+        uname = scq.name_from_unit(Erev)
+        if uname != "Potential":
+            raise TypeError("Erev expected to be a Potential; got {uname} instead")
+        Erev  = Erev.rescale(pq.mV)
+        
+    elif Erev is not None:
+        raise TypeError(f"Erev expected to be a scalar float or quantity")
+    
+    else:
+        Erev = 0*pq.mV # assume 0 reversal potential
+    
+    if Vm is not None:
+        gamma = (i/(Vm-Erev)).rescale(pq.pS)
+        
+    else:
+        gamma = np.nan*pq.pS
+        
+    nsfa_fit[1]["UnitaryCurrent"] = i
+    nsfa_fit[1]["UnitaryConductance"] = gamma
+    nsfa_fit[1]["N"] = N
+    nsfa_fit[1]["b"] = b
+    
     
     return nsfa_fit
 

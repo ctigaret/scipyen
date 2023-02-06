@@ -1879,7 +1879,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
 
             self._detected_Events_Viewer_.frameChanged.connect(self._slot_eventsViewer_frame_changed)
         
-        result = self.result(True)
+        result = self.result(self.allWavesToResult)
         
         self._targets_cache_.clear()
         

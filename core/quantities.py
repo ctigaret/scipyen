@@ -143,7 +143,7 @@ for cq in custom_quantities:
 del(custom_quantities, cq, _pqpfx)
 
 def get_units():
-    """REturns all units definitions in the Python Quantities package, augmented.
+    """Returns all units definitions in the Python Quantities package, augmented.
     
     """
     ret = dict()
