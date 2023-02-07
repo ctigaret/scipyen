@@ -1193,7 +1193,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 fw = membrane.fit_Event(w, init_params, lo=lo, up=up)
             except Exception as e:
                 traceback.print_exc()
-                excstr = traceback.format_exception(exc)
+                excstr = traceback.format_exception(e)
                 msg = f"Event {kw} in sweep {segment}:\n{excstr[-1]}"
                 self.criticalMessage("Fitting event",
                                         "\n".join(excstr))
@@ -1387,7 +1387,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                             using_template = train.annotations.get("using_template", False))
             except Exception as e:
                 traceback.print_exc()
-                excstr = traceback.format_exception(exc)
+                excstr = traceback.format_exception(e)
                 msg = f"Event {kw} in sweep {segment}:\n{excstr[-1]}"
                 self.criticalMessage("Extract waves",
                                         "\n".join(excstr))
@@ -2994,7 +2994,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     fitted_minis = self._fit_waves_(st, prefix = signal.name)
                     if isinstance(fitted_minis, Exception):
                         traceback.print_exc()
-                        excstr = traceback.format_exception(exc)
+                        excstr = traceback.format_exception(fitted_minis)
                         msg = f"Event {kw} in sweep {segment}:\n{excstr[-1]}"
                         self.criticalMessage("Fitting event",
                                                 "\n".join(excstr))
