@@ -828,7 +828,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.viewerWidgetContainer.layout().setSpacing(0)
         self.viewerWidgetContainer.layout().setContentsMargins(0,0,0,0)
         
-        self.actionSVG.triggered.connect(self.slot_export_svg)
+        
+        # NOTE: 2023-02-10 09:45:26
+        # export to SVG is broken; use the pyqtgraph's own export menu (right-click
+        # on the graph)
+        # self.actionSVG.triggered.connect(self.slot_export_svg)
         self.actionTIFF.triggered.connect(self.slot_export_tiff)
         self.actionPNG.triggered.connect(self.slot_export_png)
         
@@ -3673,12 +3677,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if len(fileName) == 0:
             return
         
+        itemsrect = self.fig.scene().itemsBoundingRect()
+        w = int(np.ceil(itemsrect.width()))
+        h = int(np.ceil(itemsrect.height()))
+
         if file_format.strip().lower() == "svg":
             generator = QtSvg.QSvgGenerator()
             generator.setFileName(fileName)
-            
-            generator.setSize(QtCore.QSize(int(self.fig.scene().width()), int(self.fig.scene().height())))
-            generator.setViewBox(QtCore.QRect(0, 0, int(self.fig.scene().width()), int(self.fig.scene().height())))
+            generator.setSize(QtCore.QSize(w,h))
+            generator.setViewBox(itemsrect)
             generator.setResolution(300)
             
             font = QtGui.QGuiApplication.font()
@@ -3686,16 +3693,18 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             painter = QtGui.QPainter()
             painter.begin(generator)
             painter.setFont(font)
-            self.fig.scene().render(painter)
+            self.fig.scene().render(painter, itemsrect, itemsrect)
             painter.end()
         
         else:
-            out = QtGui.QImage(int(self.fig.scene().width()), int(self.fig.scene().height()))
+            imgformat = QtGui.QImage.Format_ARGB32
+
+            out = QtGui.QImage(w,h,imgformat)
             
-            out.fill(QtGui.QColor(pg.getConfigOption("background")))
+            out.fill(pg.mkColor(pg.getConfigOption("background")))
             
             painter = QtGui.QPainter(out)
-            self.fig.scene().render(painter)
+            self.fig.scene().render(painter, itemsrect, itemsrect)
             painter.end()
             
             out.save(fileName, file_format.strip().lower(), 100)

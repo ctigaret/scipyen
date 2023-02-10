@@ -189,8 +189,8 @@ class ShadeWidget(QtWidgets.QWidget):
                 c = QtGui.QColor(stop[1])
                 self._alphaGradient.setColorAt(stop[0], QtGui.QColor(c.red(), c.green(), c.blue()))
             
-            self._shade = QtGui.QImage() # make this image null - why? another bug which created a color gradient
-            # in the alpha shade; we don' need to show the color there!
+            self._shade = QtGui.QImage() # make this image null - why? another bug which creates a color gradient
+            # in the alpha shade; we don't need to show the color there!
             self._generateShade()
             self.update()
             
