@@ -144,6 +144,7 @@
      <property name="title">
       <string>&amp;Export</string>
      </property>
+     <addaction name="actionSVG"/>
      <addaction name="actionTIFF"/>
      <addaction name="actionPNG"/>
      <addaction name="actionData_to_workspace"/>

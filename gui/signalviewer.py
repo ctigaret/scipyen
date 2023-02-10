@@ -832,7 +832,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # NOTE: 2023-02-10 09:45:26
         # export to SVG is broken; use the pyqtgraph's own export menu (right-click
         # on the graph)
-        # self.actionSVG.triggered.connect(self.slot_export_svg)
+        self.actionSVG.triggered.connect(self.slot_export_svg)
         self.actionTIFF.triggered.connect(self.slot_export_tiff)
         self.actionPNG.triggered.connect(self.slot_export_png)
         
@@ -3643,6 +3643,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
     @safeWrapper
     def _export_to_graphics_file_(self, file_format):
+        import pyqtgraph.exporters
+        
         if not isinstance(file_format, str) or file_format.strip().lower() not in ("svg", "tiff", "png"):
             raise ValueError("Unsupported export file format %s" % file_format)
         
@@ -3682,19 +3684,26 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         h = int(np.ceil(itemsrect.height()))
 
         if file_format.strip().lower() == "svg":
-            generator = QtSvg.QSvgGenerator()
-            generator.setFileName(fileName)
-            generator.setSize(QtCore.QSize(w,h))
-            generator.setViewBox(itemsrect)
-            generator.setResolution(300)
+            exporter = pyqtgraph.exporters.SVGExporter(self.fig.scene())
+            exporter.parameters()["width"] = w
+            exporter.parameters()["height"] = h
+            exporter.parameters()["background"] = pg.mkColor(pg.getConfigOption("background"))
+            exporter.parameters()["scaling stroke"] = True
+            exporter.export(fileName)
             
-            font = QtGui.QGuiApplication.font()
-            
-            painter = QtGui.QPainter()
-            painter.begin(generator)
-            painter.setFont(font)
-            self.fig.scene().render(painter, itemsrect, itemsrect)
-            painter.end()
+#             generator = QtSvg.QSvgGenerator()
+#             generator.setFileName(fileName)
+#             generator.setSize(QtCore.QSize(w,h))
+#             generator.setViewBox(itemsrect)
+#             generator.setResolution(300)
+#             
+#             font = QtGui.QGuiApplication.font()
+#             
+#             painter = QtGui.QPainter()
+#             painter.begin(generator)
+#             painter.setFont(font)
+#             self.fig.scene().render(painter, itemsrect, itemsrect)
+#             painter.end()
         
         else:
             imgformat = QtGui.QImage.Format_ARGB32
