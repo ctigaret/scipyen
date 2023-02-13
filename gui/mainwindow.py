@@ -4585,9 +4585,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot(str)
     @safeWrapper
     def slot_findCommand(self, val):
-        """Finds command in history tree based on glob search.
-        
-        Works across sessions.
+        """Finds command in the history tree based on glob search.
         
         TODO option to search in a selected session only
         

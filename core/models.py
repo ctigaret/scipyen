@@ -100,7 +100,7 @@ def nsfa(x, parameters):
     """
         y = x * i - x²/N + b
     
-    Parameters: i, N, b (unitary current, number of channels, background noise)
+    Parameters: i, N, b: unitary current (pA), number of channels, background current variance (pA²))
     """
     if isinstance(x, pq.Quantity):
         x = x.magnitude
@@ -660,20 +660,30 @@ def Frank_Fuortes2(x, irh, tau, x0):
 def Boltzmann(x, p, pos:bool=True):
     """ Realises y = 1/(1+exp(±(x₀ - x)/κ))
     
-    Boltzmann's equation is used to describe the voltage-dependent activation
+    Boltzmann's equation is commonly used to describe the voltage-dependent gating
     of voltage-gated ion channels:
+    
+        Activation:
     
         Iₘ = 1/(1+exp((V½ - Vₘ)/κ))                                 (1)
 
+        Inactivation:
+    
+        Iₘ = 1/(1+exp(-(V½ - Vₘ)/κ))                                 (2)
+    
     where:
     
     Iₘ can be:
-        ∘ the recorded membrane current at a range of Vₘ values, normalized 
-            to the maximal value)
+        ∘ the recorded membrane current at a range of Vₘ values, normalized to 
+            the maximal recorded current value)
+    
         ∘ fractional open time (for recordings from a small number of channels, 
-            see e.g., Magee & Johnston, JPhysiol, 1995).
-        ∘ chord or slope conductance (normalized to maximal value, e.g., see
-            Magee & Johnston 1995)
+            see e.g., Magee & Johnston, JPhysiol, 1995) - by definition 
+            normalized.
+    
+        ∘ chord or slope conductance normalized to maximal value, e.g., see
+            Magee & Johnston 1995
+    
         When all other channels are blocked, Iₘ is specific to the studied
         channels.
     
@@ -683,12 +693,6 @@ def Boltzmann(x, p, pos:bool=True):
     current is half the maximum, or where half of the channels are active
     
     κ is a "slope" factor
-    
-    Similarly, it can be used to describe the voltage-dependent inactivation:
-    
-        Iₘ = 1/(1+exp(-(V½ - Vₘ)/κ))                                 (2)
-    
-    where: Iₘ, Vₘ, V½, and κ are as in equation 1
     
         NOTE the change in sign of the exponential argument!
         NOTE V½ and κ are often different for the activation and inactivation
@@ -707,6 +711,9 @@ def Boltzmann(x, p, pos:bool=True):
     
     When fitting experimental data, the fitted parameters are x₀ and κ.
     
+    The equation is also an empyrical model of the "gating" mechanism for 
+    voltage dependent channels Naᵥ and Kᵥ in the Hodgkin-Huxley formalism.
+     
     Function parameters:
     ====================
     x: scalar (e.g., membrane voltage)
