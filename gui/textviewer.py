@@ -27,6 +27,7 @@ import iolib.pictio as pio
 # needed for the new plugins framework
 __scipyen_plugin__ = None
 
+
 # TODO: 2019-11-10 13:12:40
 # configure text syntax highlighting
 class TextViewer(ScipyenViewer):
@@ -59,6 +60,7 @@ class TextViewer(ScipyenViewer):
         self.fileMenu = self.menuBar().addMenu("&File")
         self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-open"), "&Open...", self.openFile, "Ctrl+Shift+O")
         self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-save-as"), "&Save As...", self.saveAsFile, "Ctrl+Shift+S")
+        self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-export"), "Export to workspace...", self._slot_exportDataToWorkspace, "Ctrl+Shift+E")
         self.editMenu = self.menuBar().addMenu("&Edit")
         self.editMenu.addAction(QtGui.QIcon.fromTheme("edit-undo"), "&Undo", self.undo, "Ctrl+z")
         self.editMenu.addAction(QtGui.QIcon.fromTheme("edit-redo"), "&Redo", self.undo, "Ctrl+Shift+z")
@@ -216,6 +218,45 @@ class TextViewer(ScipyenViewer):
                 
             return writer.write(self._docViewer_.document())
                 # print("Document saved to ", filePath)
-                        
+                
+    def lines(self):
+        doc = self._docViewer_.document()
+        ret = list()
+        if not doc.isEmpty():
+            tb = doc.begin()
+            while tb.isValid():
+                ret.append(tb.text())
+                tb = tb.next()
+                
+                # NOTE: 2023-02-25 09:46:17
+                # do not delete -> stub for more atomic code
+    #             try:
+    #                 layout = tb.layout()
+    #                 for i in range(layout.lineCount()):
+    #                     line = layout.lineAt(i)
+    #                     lines.append(line)
+    #                     
+    #                 tb = tb.next()
+    #             except:
+    #                 continue
+                
+        return ret
             
+    @pyqtSlot()
+    def _slot_exportDataToWorkspace(self):
+        if self._docViewer_.document().isEmpty():
+            return
+        
+        lines = self.lines()
+        
+        if len(lines):
+            textData = "\n".join(lines)
             
+            self.exportDataToWorkspace(textData, "textdata")
+        
+        # doc = self._docViewer_.document()
+        # lines = list()
+            
+        
+        
+        
