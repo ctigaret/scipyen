@@ -30,7 +30,7 @@ software.
 This means the software can be uninstalled re-built, etc, without worrying about
 the local account or system-wide interference.
 
-Disk space requirements: ~ 5 GiB (including sources and build binary dependencies
+Disk space requirements: ~ 5 GiB (including sources and built binary dependencies
 in the virtual python environment)
 
 Dependencies
@@ -75,17 +75,23 @@ Dependencies
 5) Software libraries to be built from sources, and installed inside the virtual
 environment:
     
-PyQt5 (including PyQt5.sip, sip5.5 if building PyQt5 from sources)
-    NOTE: on Windows, it is suffiient to install re-build PyQt5 via pip, inside
-        the virtual environment
+PyQt5 (including PyQt5.sip, sip5.5 if building PyQt5 from sources) -- on Linux,
+this allows for a better intergation with the desktop (in terms of widgets style
+etc), because the pre-built PyQt5 does not seem to pick these up:
     
-    While pre-built PyQt5 can also be used on Linux, it has the disadvantage that
-    the PyQt5 binaries supplied via pip are oblivious to the system-wide Qt5 
-    plugins that are installed on the machine. This is manifest, e.g., in the 
-    inconvenience that PyQt5 widgets are unable to use the global appearance of 
-    other Qt5 aplications installed on the machine. For this reason, and for
-    insulating Scipyen from sysem-wide PyQt5 library upgrades, it is convenient
-    to build PyQt5 from sources inside the virtual environment.
+While pre-built PyQt5 can also be used on Linux, the binaries supplied via pip 
+seem to be oblivious to the system-wide Qt5 plugins and user's settings on the 
+target machine. This is manifest, e.g., in the appearance of PyQt5 widgets 
+which does not integrate with the entire desktop look and feel.
+
+If such integration is not sought, then simply installing the pre-built binary 
+PyQt5 package using pip is sufficient.
+
+On Windows, building PyQt5 is more involved and needs building locally the Qt 
+toolkit (latest open-source version with major number 5) and its dependencies, 
+quite a complex process. For most uses, on Windows, installing a binary PyQt5 
+package via pip, inside the virtual environment, is sufficient.
+    
 
 vigra 
     NOTE: this needs:
@@ -103,7 +109,9 @@ NEURON
     I haven't yet tested the feasibility of using pre-build binaries (via pip).
     
 6) Build chain toolkit - to build the software above
-    On Linux: gnu compiler collection, make, ld, qmake (for PyQt5)
+    On Linux: gnu compiler collection, make, ld, qmake (for PyQt5); developer
+    packages for Qt, TIFF, PNG, HDF5, OpenEXR, zlib, fftw3, boost (including
+    threads, chrono, python3)
         
     See also the file 'c_cpp_requirements_unix.txt'
     
@@ -114,7 +122,7 @@ NEURON
      command line utility, and/or GitDesktop on Windows only)
     
 NOTE: On windows, these dependencies can be built OUTSIDE the virtual environment
-(see INSTALL for Windows.txt)
+(see INSTALL for Windows.txt), although this is not recommended.
 
 Which Python?
 -------------
