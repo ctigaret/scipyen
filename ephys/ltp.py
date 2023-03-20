@@ -66,7 +66,7 @@ Stimulus        0                   1                   2   etc...
 
 Time (s)        0         5         10        15        20  NOTE: __ = 1s = one "sweep"
 
-Path 0          |___________________|___________________|_  NOTE: |_ = test stimulus
+Path 0          |___________________|___________________|_  NOTE: |_ = test stimulus; this can be a paired pulse stimultion (e.g. two sitmuli 25 ms apart, etc)
 
 Path 1          __________|___________________|___________
 
@@ -1449,7 +1449,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         return record_data
     
             
-def generate_synaptic_plasticity_options(**kwargs) -> dict:
+def generate_synaptic_plasticity_options(**kwargs):
     """Constructs a dict with options for synaptic plasticity experiments.
     
     The options specify synaptic pathways, analysis cursors and optional 
@@ -1604,7 +1604,7 @@ def generate_synaptic_plasticity_options(**kwargs) -> dict:
     average = kwargs.pop("average", 6)
     average_every = kwargs.pop("every", 6)
     
-    reference = keargs.pop("reference", 5)
+    reference = kwargs.pop("reference", 5)
     
     measure = kwargs.pop("measure", "amplitude")
     
@@ -1790,6 +1790,9 @@ def load_synaptic_plasticity_options(LTPOptionsFile:[str, type(None)]=None, **kw
     
     """
     
+    if len(kwargs) == 0 and (LTPOptionsFile is None or len(LTPOptionsFile.strip()) == 0):
+        LTPOptionsFile = os.path.join(os.path.dirname(__file__), "options", "LTPOptions.pkl")
+    
     if LTPOptionsFile is None or not os.path.isfile(LTPOptionsFile):
         
         LTPopts = generate_synaptic_plasticity_options(**kwargs)
@@ -1841,11 +1844,11 @@ def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptio
     #print(len(chase_blocks))
     
     if LTPOptions["Average"] is None:
-        baseline = [ephys.concatenate_blocks(baseline_blocks,
+        baseline = [neoutils.concatenate_blocks(baseline_blocks,
                                                 segment = LTPOptions["Pathway0"],
                                                 analog = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path0_baseline"),
-                    ephys.concatenate_blocks(baseline_blocks,
+                    neoutils.concatenate_blocks(baseline_blocks,
                                                 segment = LTPOptions["Pathway1"],
                                                 analog = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path1_baseline")]
@@ -1868,11 +1871,11 @@ def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptio
     
     
     if LTPOptions["Average"] is None:
-        chase   = [ephys.concatenate_blocks(chase_blocks,
+        chase   = [neoutils.concatenate_blocks(chase_blocks,
                                                 segment = LTPOptions["Pathway0"],
                                                 analog = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path0_chase"),
-                   ephys.concatenate_blocks(chase_blocks,
+                   neoutils.concatenate_blocks(chase_blocks,
                                                 segment = LTPOptions["Pathway1"],
                                                 analog = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path1_chase")]
@@ -1951,7 +1954,7 @@ def calculate_fEPSP(block:neo.Block,\
         pass
     
 def calculate_LTP_measures_in_block(block: neo.Block, \
-                                    signal_index_Im, \
+                                    signal_index_Im, /, \
                                     signal_index_Vm = None, \
                                     trigger_signal_index = None,\
                                     testVm = None, \
@@ -2504,6 +2507,7 @@ def analyse_LTP_in_pathway(baseline_block: neo.Block, \
                            chase_block: neo.Block, \
                            signal_index_Im: typing.Union[int, str], \
                            path_index: int,\
+                           /, \
                            baseline_range=range(-5,-1),\
                            signal_index_Vm: typing.Union[int, str]=None, \
                            trigger_signal_index: typing.Union[int, str, None]=None,\
@@ -2533,7 +2537,11 @@ def analyse_LTP_in_pathway(baseline_block: neo.Block, \
     Vm              = False
     basename        = None
 
-    The baseline and chase blocks are expected to contain segments from the same pathway
+    The baseline and chase blocks are expected to contain segments from the same 
+    synaptic pathway. That is, they were obtained by calling 
+    neoutils.concatenate_blocks passing the index of the segments for the desired
+    as the 'segments' parameter (see neoutils.concatenate_blocks for details)
+    
     """
     # TODO 2020-10-26 09:18:18
     # analysis of fEPSPs
@@ -2544,8 +2552,7 @@ def analyse_LTP_in_pathway(baseline_block: neo.Block, \
         
     #else:
 
-    baseline_result     = calculate_LTP_measures_in_block(baseline_block, 
-                                                          signal_index_Im = signal_index_Im, 
+    baseline_result     = calculate_LTP_measures_in_block(baseline_block, signal_index_Im, 
                                                           signal_index_Vm = signal_index_Vm, 
                                                           trigger_signal_index = trigger_signal_index,
                                                           testVm = testVm, 
@@ -2553,8 +2560,7 @@ def analyse_LTP_in_pathway(baseline_block: neo.Block, \
                                                           stim = stim,
                                                           isi = isi)
     
-    chase_result        = calculate_LTP_measures_in_block(chase_block,    
-                                                            signal_index_Im = signal_index_Im, 
+    chase_result        = calculate_LTP_measures_in_block(chase_block, signal_index_Im, 
                                                             signal_index_Vm = signal_index_Vm, 
                                                             trigger_signal_index = trigger_signal_index,
                                                             testVm = testVm, 
@@ -2811,7 +2817,9 @@ def setupLTPCursors(viewer, LTPOptions, pathway, axis=None):
             raise ValueError("When specified, axis must be an integer between 0 and %d" % len(viewer.axesWithLayoutPositions))
         
     
-    viewer.setupCursors("v", LTPOptions["Cursors"]["Pathway%d"%pathway])
+    viewer.setupCursors("v", LTPOptions["Cursors"]["Pathway%d"%pathway], 
+                        xwindow = LTPOptions["Cursors"]["Windows"],
+                        labels = LTPOptions["Cursors"]["Labels"])
         
 def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx, control_base_segments_ndx, control_chase_segments_ndx, t0, t1):
     """

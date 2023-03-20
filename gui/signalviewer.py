@@ -2377,132 +2377,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 is currently selected, or axis 0 is no axis is selected.
         
         """
-        # print(f"{self.__class__.__name__}.addCursors args = {args}, kwargs = {kwargs}")
-        def _addCursors_parse_coords_(coords):
-            if isinstance(coords, (tuple, list)) and all([isinstance(v, numbers.Number) for v in coords]):
-                if len(coords) == 1:
-                    if cursorType in ("v", "vertical", "Vertical", 
-                                      "c", "crosshair", "Crosshair", 
-                                      SignalCursorTypes.vertical,
-                                      SignalCursorTypes.crosshair):
-                        x = coords[0]
-                        y = None
-                        
-                    elif cursorType in ("h", "horizontal", "Horizontal", 
-                                        SignalCursorTypes.horizontal):
-                        y = coords[0]
-                        x = None
-                        
-                elif len(coords) == 2:
-                    x,y = coords # distribute coordinates to individual values
-                
-                else:
-                    raise ValueError(f"Invalid coordinates specified: {coords}")
-                
-            elif isinstance(coords, (pq.Quantity, np.ndarray)):
-                if coords.size == 1:
-                    if cursorType in ("v", "vertical", "Vertical", 
-                                      "c", "crosshair", "Crosshair", 
-                                      SignalCursorTypes.vertical,
-                                      SignalCursorTypes.crosshair):
-                        if len(coords.shape)==0: # scalar
-                            x = coords
-                            
-                        else:
-                            x = coords[0] # array with 1 element
-                            
-                        y = None
-                        
-                    elif cursorType in ("h", "horizontal", "Horizontal", 
-                                        SignalCursorTypes.horizontal):
-                        if len(coords.shape) == 0: # scalar
-                            y = coords
-                            
-                        else:
-                            y = coords[0] # 1-element array
-                            
-                        x = None
-                        
-                elif coords.size == 2:
-                    x,y = coords # distribute to individual values
-                    
-                else:
-                    raise ValueError(f"Invalid coordinates specified: {coords}")
-                        
-            elif isinstance(coords, numbers.Number):
-                if cursorType in ("v", "vertical", "Vertical", 
-                                  "c", "crosshair", "Crosshair", 
-                                  SignalCursorTypes.vertical,
-                                  SignalCursorTypes.crosshair):
-
-                    x = coords
-                    y = None
-                    
-                elif cursorType in ("h", "horizontal", "Horizontal", 
-                                    SignalCursorTypes.horizontal):
-
-                    x = None
-                    y = coords
-                        
-            else:
-                raise ValueError(f"Invalid coordinates specification: {coords}")
-            
-            return x,y
-        
-        def _use_coords_sequence_(seq, xw, yw, lbls, ax):
-            """Adds cursors based on a sequence of cursor coordinates
-            """
-            # print(f"_use_coords_sequence_ seq = {seq}, xw = {xw}, yw = {yw}, lbls = {lbls}, ax = {ax}")
-            for (k, coords) in enumerate(seq):
-                x, y = _addCursors_parse_coords_(coords)
-            
-                if isinstance(xw, (tuple, list, np.ndarray)):
-                    if len(xw) != len(seq):
-                        raise ValueError("number of elements mismatch between xwindow and coordinates")
-                    wx = xw[k]
-                    
-                elif isinstance(xw, numbers.Number):
-                    wx = xw
-                        
-                if isinstance(yw, (tuple, list, np.ndarray)):
-                    if len(xw) != len(seq):
-                        raise ValueError("number of elements mismatch between ywindow and coordinates")
-                    wy = yw[k]
-                    
-                elif isinstance(yw, numbers.Number):
-                    wy = yw
-                    
-                if isinstance(lbls, (tuple, list)) and all([isinstance(v, str) for v in lbls]):
-                    if len(lbls) != len(seq):
-                        raise ValueError("number of elements mismatch between labels and coordinates")
-                    
-                    lbl = lbls[k]
-                    
-                elif isinstance(lbls, np.ndarray) and "str" in labels.dtype.name:
-                    if len(lbls) != len(seq):
-                        raise ValueError("number of elements mismatch between labels and coordinates")
-                    lbl = lbls[k]
-                    
-                elif isinstance(lbls, str):
-                    lbl = lbls
-                    
-                else:
-                    n_existing_cursors = self.getDataCursors(cursorType)
-                    lbl = f"{cursorType.name[0]}{len(n_existing_cursors)}"
-                    
-                if isinstance(ax, (int, pg.PlotItem, str)):
-                    self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
-                                label=lbl, show_value = self.setCursorsShowValue.isChecked(),
-                                axis=ax)
-                    
-                elif isinstance(ax, (tuple, list)) and all(isinstance(a, (int, pg.PlotItem)) for a in ax):
-                    if len(ax) != len(seq):
-                        raise ValueError(f"number of axes ({len(ax)}) should be the same as the number of cursors ({len(seq)})")
-                    
-                    self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
-                                label=lbl, show_value = self.setCursorsShowValue.isChecked(),
-                                axis=ax[k])
-
         xwindow = kwargs.pop("xwindow", self.defaultCursorWindowSizeX)
         ywindow = kwargs.pop("ywindow", self.defaultCursorWindowSizeY)
         labels  = kwargs.pop("labels",  None)
@@ -2582,13 +2456,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         elif len(args) == 1: # a single object passed - figure it out
             if isinstance(args[0], np.ndarray):
-                _use_coords_sequence_(args[0], xwindow, ywindow, labels, axis)
+                self._use_coords_sequence_(args[0], xwindow, ywindow, labels, axis, cursorType)
                 return
                 
-            x, y = _addCursors_parse_coords_(args[0])
+            x, y = self._addCursors_parse_coords_(args[0], cursorType)
             
         elif isinstance(args, (tuple, list, np.ndarray)):
-            _use_coords_sequence_(args, xwindow, ywindow, labels, axis)
+            self._use_coords_sequence_(args, xwindow, ywindow, labels, axis, cursorType)
             return
 
         self.addCursor(cursorType=cursorType, x=x, y=y, 
@@ -2703,7 +2577,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         allowed_keywords = ["xwindow", "ywindow", "labels"]
         
         if len(kwargs) > 0:
-            
             for key in kwargs.keys():
                 if key not in allowed_keywords:
                     raise ValueError("Illegal keyword argument %s" % key)
@@ -2717,15 +2590,18 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if "labels" in kwargs.keys():
                 labels = kwargs["labels"]
                 
-        
                 
         if len(where) == 1:
             where = where[0]
             
+#         print(f"cursorType = {cursorType}")
+#         
+#         print(f"where = {where}")
+            
         self.slot_removeCursors()
         self.displayFrame()
         #self._plotOverlayFrame_()
-        self.addCursors(cursorType, where, xwindow = xwindow, ywindow = ywindow, labels = labels)
+        self.addCursors(*where, cursorType=cursorType, xwindow = xwindow, ywindow = ywindow, labels = labels)
         
     @safeWrapper
     def reportCursors(self):
@@ -8725,6 +8601,149 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
         else:
             self._update_coordinates_viewer_()
+            
+    def _addCursors_parse_coords_(self, coords, cursorType):
+        # print(f"{self.__class__.__name__}._addCursors_parse_coords_ coords {coords}")
+        if isinstance(coords, (tuple, list)) and all([isinstance(v, numbers.Number) for v in coords]):
+            if len(coords) == 1:
+                if cursorType in ("v", "vertical", "Vertical", 
+                                    "c", "crosshair", "Crosshair", 
+                                    SignalCursorTypes.vertical,
+                                    SignalCursorTypes.crosshair):
+                    x = coords[0]
+                    y = None
+                    
+                elif cursorType in ("h", "horizontal", "Horizontal", 
+                                    SignalCursorTypes.horizontal):
+                    y = coords[0]
+                    x = None
+                    
+            elif len(coords) == 2:
+                x,y = coords # distribute coordinates to individual values
+                
+#                 elif len(coords)> 2:
+#                     if cursorType in ("v", "vertical", "Vertical",
+#                                       SignalCursorTypes.vertical):
+#                         x = coords
+#                         y = None
+#                         
+#                     elif cursorType in ("h", "horizontal", "Horizontal",
+#                                         SignalCursorTypes.horizontal):
+#                         y = coords,
+#                         x = None
+#                         
+#                     else:
+#                         raise ValueError(f"Expecting cursorType verticl or horizontal when more than two coordinates are passed; instead, got {cursorType}")
+
+            else:
+                raise ValueError(f"Invalid coordinates specified - expecting at most two; instead, got  {coords}")
+                    
+            
+        elif isinstance(coords, (pq.Quantity, np.ndarray)):
+            if coords.size == 1:
+                if cursorType in ("v", "vertical", "Vertical", 
+                                    "c", "crosshair", "Crosshair", 
+                                    SignalCursorTypes.vertical,
+                                    SignalCursorTypes.crosshair):
+                    if len(coords.shape)==0: # scalar
+                        x = coords
+                        
+                    else:
+                        x = coords[0] # array with 1 element
+                        
+                    y = None
+                    
+                elif cursorType in ("h", "horizontal", "Horizontal", 
+                                    SignalCursorTypes.horizontal):
+                    if len(coords.shape) == 0: # scalar
+                        y = coords
+                        
+                    else:
+                        y = coords[0] # 1-element array
+                        
+                    x = None
+                    
+            elif coords.size == 2:
+                x,y = coords # distribute to individual values
+                
+            else:
+                raise ValueError(f"Invalid coordinates specified: {coords}")
+                    
+        elif isinstance(coords, numbers.Number):
+            if cursorType in ("v", "vertical", "Vertical", 
+                                "c", "crosshair", "Crosshair", 
+                                SignalCursorTypes.vertical,
+                                SignalCursorTypes.crosshair):
+
+                x = coords
+                y = None
+                
+            elif cursorType in ("h", "horizontal", "Horizontal", 
+                                SignalCursorTypes.horizontal):
+
+                x = None
+                y = coords
+                    
+        else:
+            raise ValueError(f"Invalid coordinates specification: {coords}")
+        
+        return x,y
+            
+    def _use_coords_sequence_(self, seq, xw, yw, lbls, ax, cursorType):
+        """Adds cursors based on a sequence of cursor coordinates
+        """
+        # print(f"_use_coords_sequence_ seq = {seq}, xw = {xw}, yw = {yw}, lbls = {lbls}, ax = {ax}")
+        for (k, coords) in enumerate(seq):
+            x, y = self._addCursors_parse_coords_(coords, cursorType)
+        
+            if isinstance(xw, (tuple, list, np.ndarray)):
+                if len(xw) != len(seq):
+                    raise ValueError("number of elements mismatch between xwindow and coordinates")
+                wx = xw[k]
+                
+            elif isinstance(xw, numbers.Number):
+                wx = xw
+                    
+            if isinstance(yw, (tuple, list, np.ndarray)):
+                if len(xw) != len(seq):
+                    raise ValueError("number of elements mismatch between ywindow and coordinates")
+                wy = yw[k]
+                
+            elif isinstance(yw, numbers.Number):
+                wy = yw
+                
+            if isinstance(lbls, (tuple, list)) and all([isinstance(v, str) for v in lbls]):
+                if len(lbls) != len(seq):
+                    raise ValueError("number of elements mismatch between labels and coordinates")
+                
+                lbl = lbls[k]
+                
+            elif isinstance(lbls, np.ndarray) and "str" in labels.dtype.name:
+                if len(lbls) != len(seq):
+                    raise ValueError("number of elements mismatch between labels and coordinates")
+                lbl = lbls[k]
+                
+            elif isinstance(lbls, str):
+                lbl = lbls
+                
+            else:
+                n_existing_cursors = self.getDataCursors(cursorType)
+                lbl = f"{cursorType.name[0]}{len(n_existing_cursors)}"
+                
+            if isinstance(ax, (int, pg.PlotItem, str)):
+                self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
+                            label=lbl, show_value = self.setCursorsShowValue.isChecked(),
+                            axis=ax)
+                
+            elif isinstance(ax, (tuple, list)) and all(isinstance(a, (int, pg.PlotItem)) for a in ax):
+                if len(ax) != len(seq):
+                    raise ValueError(f"number of axes ({len(ax)}) should be the same as the number of cursors ({len(seq)})")
+                
+                self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
+                            label=lbl, show_value = self.setCursorsShowValue.isChecked(),
+                            axis=ax[k])
+
+
             
     @safeWrapper
     def _reportMouseCoordinatesInAxis_(self, pos, plotitem):

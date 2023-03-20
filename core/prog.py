@@ -730,7 +730,7 @@ def makeSignature(dct:Bunch) -> Signature:
     ## FIXME/TODO 2021-12-22 23:38:58
     #return
 
-def signature2Str(f:typing.Union[types.FunctionType, inspect.Signature, Bunch], 
+def signature2Str(f:typing.Union[types.FunctionType, inspect.Signature, Bunch], \
                         as_constructor:bool=False):
     """Turns a signature dict into an executable str.
     
@@ -774,9 +774,9 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
 def deprecation(msg):
     warnings.warn(msg, DeprecationWarning, stacklevel=2)
     
-def iter_attribute(iterable:typing.Iterable, 
-                   attribute:str, 
-                   silentfail:bool=True)-> typing.Generator:
+def iter_attribute(iterable:typing.Iterable, \
+                   attribute:str, \
+                   silentfail:bool=True):
     """Iterator accessing the specified attribute of the elements in 'iterable'.
     Elements lacking the specified attribute yield None, unless 'silentfail' is 
     False.
@@ -801,7 +801,7 @@ def iter_attribute(iterable:typing.Iterable,
     else:
         return (getattr(item, attribute) for item in iterable)
     
-def filter_type(iterable:typing.Iterable, klass:typing.Type) -> typing.Iterator:
+def filter_type(iterable:typing.Iterable, klass:typing.Type):
     """Iterates elements of 'iterable' that are of type specified by 'klass'
     
     Parameters:
@@ -811,7 +811,7 @@ def filter_type(iterable:typing.Iterable, klass:typing.Type) -> typing.Iterator:
     """
     return filter(lambda x: isinstance(x, klass), iterable)
 
-def filterfalse_type(iterable:typing.Iterable, klass:typing.Type) -> typing.Iterator:
+def filterfalse_type(iterable:typing.Iterable, klass:typing.Type):
     """The negated version of filter_type.
     Iterates elements that are NOT of type specified in 'klass'
 
@@ -822,12 +822,12 @@ def filterfalse_type(iterable:typing.Iterable, klass:typing.Type) -> typing.Iter
     """
     return filter(lambda x: not isinstance(x, klass), iterable)
 
-def filter_attr(iterable:typing.Iterable, 
-                op:typing.Callable[[typing.Any, typing.Any], bool] = operator.and_, 
-                indices:bool = False, 
-                indices_only:bool = False, 
-                exclude:bool = False,
-                **kwargs)-> typing.Iterator:
+def filter_attr(iterable:typing.Iterable, \
+                op:typing.Callable[[typing.Any, typing.Any], bool] = operator.and_, \
+                indices:bool = False, \
+                indices_only:bool = False, \
+                exclude:bool = False,\
+                **kwargs):
     """Filter an iterable using predicates applied to attributes of its elements.
     
     This is an enhanced version of filter_attribute. Furthermore, it fails
@@ -1021,7 +1021,7 @@ def filter_attr(iterable:typing.Iterable,
         else:
             yield from filter(lambda x: functools.reduce(op, (_tf_(x, k, f) for k,f in kwargs.items())), iterable)
     
-def filterfalse_attr(iterable:typing.Iterable, **kwargs)-> typing.Iterator:
+def filterfalse_attr(iterable:typing.Iterable, **kwargs):
     """'Negative' form of filter_attr.
     
     Calls filter_attr with 'exclude' set to True.
@@ -1035,9 +1035,9 @@ def filterfalse_attr(iterable:typing.Iterable, **kwargs)-> typing.Iterator:
                                                  #iterable) for n,f in kwargs.items()))
 
     
-def filter_attribute(iterable:typing.Iterable,attribute:str, value:typing.Any, 
-                     predicate:typing.Callable[...,bool]=lambda x,y: x==y,
-                     silentfail:bool=True) -> typing.Iterator:
+def filter_attribute(iterable:typing.Iterable,attribute:str, value:typing.Any, \
+                     predicate:typing.Callable[...,bool]=lambda x,y: x==y, \
+                     silentfail:bool=True):
     """Iterates elements in 'iterable' for which 'attribute' satisfies 'predicate'.
     DEPRECATED
     
@@ -1080,9 +1080,9 @@ def filter_attribute(iterable:typing.Iterable,attribute:str, value:typing.Any,
                                       value),
                   iterable)
     
-def filterfalse_attribute(iterable:typing.Iterable, attribute:str, value:typing.Any, 
-                     predicate:typing.Callable[...,bool]=lambda x,y: x==y,
-                     silentfail:bool=True) -> typing.Iterator:
+def filterfalse_attribute(iterable:typing.Iterable, attribute:str, value:typing.Any, \
+                     predicate:typing.Callable[...,bool]=lambda x,y: x==y,\
+                     silentfail:bool=True):
     """The negated version of filter_attribute.
     DEPRECATED
     Iterates elements in 'iterable' for which 'attribute' does NOT satisfy 'predicate'.

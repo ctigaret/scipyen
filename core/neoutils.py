@@ -1789,7 +1789,7 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
             data = src
         
         if isinstance(names, str):
-            ret = [k for k in filter_attr(getattr(j,signal_collection), name = names)]
+            # ret = [k for k in filter_attr(getattr(j,signal_collection), name = names) for j in data]
             if silent:
                 return [utilities.silentindex([i.name for i in getattr(j, signal_collection)], names, multiple=False) for j in data]
             
