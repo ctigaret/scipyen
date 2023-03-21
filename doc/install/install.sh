@@ -131,7 +131,7 @@ function dopyqt5 ()
     
     #sip-build --qmake=`which qmake-qt5` --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --no-dbus-python --pep484-pyi --no-make --verbose --target-dir $VIRTUAL_ENV
     #sip-build --qmake=`which qmake-qt5` --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --no-dbus-python --no-designer-plugin --no-qml-plugin --pep484-pyi --no-make --verbose --target-dir $VIRTUAL_ENV
-    sip-build --qmake="$qmake_binary" --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --no-dbus-python --pep484-pyi --no-make --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages
+    sip-build --qmake="$qmake_binary" --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --no-dbus-python --pep484-pyi --no-make --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages
 
     if [[ $? -ne 0 ]] ; then
         echo -e "sip-build Cannot configure PyQt5 source. Bailing out. Goodbye!\n"
