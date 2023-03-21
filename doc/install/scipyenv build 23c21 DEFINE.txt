@@ -20,6 +20,8 @@
 # ---------------------------------------------------------------------------
 # (*) these MAY be installed in the virtual environment using pip, see below
 # {**} these MAY have already been installed by default on your system but check
+#
+# ---------------------------------------------------------------------
 # NOTE: ask for location of the virtual environment (default: $HOME) => $scipyenv_parent_dir
 # NOTE: ask for the name of the viertual environment (default: scipyenv) => $scipyenv_dir; as a result, $scipyenv is $scipyenv_parent_dir/$scipyenv_dir e.g. ~/scipyenv
 # NOTE: ask for location of scipyen  (default $HOME) => $scipyen_top_dir; by default this is $HOME; as a result, $scipyen_dir is $scipyen_top_dir/scipyen

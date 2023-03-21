@@ -1,3 +1,0 @@
-pip install --user --upgrade virtualenv
-virtualenv scipyenv_23c19
-source scipyenv_23c19/bin/activate
