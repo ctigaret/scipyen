@@ -26,6 +26,7 @@
 # packages already listed above
 #wheel
 
+distlib
 Babel
 GitPython
 Jinja2

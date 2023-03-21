@@ -122,7 +122,16 @@ function dopyqt5 ()
         exit 1
     fi
     
-    wget $pyqt5_repo/$pyqt5_src && tar xzf $pyqt5_src && mkdir -p PyQt5-build
+    pyqt5_src_url=`python $installscriptdir/locate_pyqt5_src.py`
+    pyqt5_src=`basename $pyqt5_src_url`
+    
+    # NOTE TODO/FIXME: 2023-03-21 23:28:41 does not work
+    # install distlib and use a python script along the lines of
+    # from distlib.locators import locate
+    # pyqt5_locator = locate("PyQt5")
+    # pyqt5_url = pyqt5_locator.download_url
+    wget $pyqt5_src_url && tar xzf $pyqt5_src && mkdir -p PyQt5-build
+#     wget $pyqt5_repo/$pyqt5_src && tar xzf $pyqt5_src && mkdir -p PyQt5-build
     
     if [[ $? -ne 0 ]] ; then
         echo -e "Cannot obtain the PyQt5 source. Bailing out. Goodbye!\n"
@@ -228,12 +237,19 @@ function make_scipyenrc ()
 #       python executable
 # test if python complains about platform dependent libs
 
-    if [[ -z "$VIRTUAL_ENV" ]] ; then
-        echo -e "Not in an active environment! Goodbye!\n"
-        exit 1
-    fi
+if [[ -z "$VIRTUAL_ENV" ]] ; then
+    echo -e "Not in an active environment! Goodbye!\n"
+    exit 1
+fi
 
 # scipyenvdir=${VIRTUAL_ENV} # not really needed, right?
+dt=`date '+%Y-%m-%d_%H-%M-%s'`
+if [ -r ${HOME}/.scipyenrc ] ; then
+# make a backup copy of .scipyenrc
+shopt -s lastpipe
+echo "Copying ${HOME}/.scipyenrc to ${HOME}/.scipyenrc.$dt"
+cp ${HOME}/.scipyenrc ${HOME}/.scipyenrc.$dt
+fi
 cat<<END > ${HOME}/.scipyenrc
 scipyact () {
 source ${VIRTUAL_ENV}/bin/activate
@@ -244,6 +260,7 @@ END
 
 function update_bashrc () 
 {
+dt=`date '+%Y-%m-%d_%H-%M-%s'`
 if [ ! -r ${HOME}/.bashrc ]; then
 cat<<END > ${HOME}/.bashrc
 source ${HOME}/.scipyenrc
@@ -259,8 +276,7 @@ cat ${HOME}/.bashrc | grep "source ${HOME}/.scipyenrc" | read source_set
 if [ -z "${source_set}" ]; then
 # .scipyenrc not sourced from .bashrc => backup .bashrc then append a line to
 # source .scipyenrc in there
-dt=`date '+%Y-%m-%d_%H-%M-%s'`
-echo "Copying ${HOME}/.bashrc to ${HOME}/dot.bashrc.$dt"
+echo "Copying ${HOME}/.bashrc to ${HOME}/.bashrc.$dt"
 cp ${HOME}/.bashrc ${HOME}/.bashrc.$dt
 echo "source ${HOME}/.scipyenrc" >> ${HOME}/.bashrc
 echo ".bashrc has been modified in ${HOME}"
@@ -287,9 +303,9 @@ use_preexisting="Y"
 virtual_env="testenv"
 virtual_env="scipyenv.$pyver"
 ve_path=$HOME
-pyqt5_version=5.15.9
-pyqt5_repo=https://files.pythonhosted.org/packages/source/P/PyQt5/
-pyqt5_src=PyQt5-$pyqt5_version.tar.gz
+# pyqt5_version=5.15.9
+# pyqt5_repo=https://files.pythonhosted.org/packages/source/P/PyQt5/
+# pyqt5_src=PyQt5-$pyqt5_version.tar.gz
 # NOTE: figure out is /where is dbus-python.h
 # pcgconf (pkg-config) must be installed
 # pkgconf --liat-all  | grep dbus => list of dbus-* packages including dbus-python
