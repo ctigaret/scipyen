@@ -38,29 +38,29 @@ function upgrade_virtualenv ()
 
 function makevirtenv ()
 {
-    read -e -p "Location of virtual environment ['$HOME']: " ve_path
-    if [[ $? -ne 0 ]] ; then
-        echo -e "Goodbye!\n"
-        exit 1
-    fi
-    
-    if [ -z "$ve_path" ] ; then
-        ve_path=$HOME
-    fi
-    
-    if [ -d "$ve_path" ] ; then
-        cd $ve_path
-    else
-        echo -e "Specified path $ve_path doe not exist. Goodbye!\n"
-        exit 1
-    fi
-    
-    read -e -p "Name of virtual environment [$virtual_env]: " virtual_env
-    if [[ $? -ne 0 ]] ; then
-        echo -e "Goodbye!\n"
-        exit 1
-    fi
-    
+#     read -e -p "Location of virtual environment ['$HOME']: " ve_path
+#     if [[ $? -ne 0 ]] ; then
+#         echo -e "Goodbye!\n"
+#         exit 1
+#     fi
+#     
+#     if [ -z "$ve_path" ] ; then
+#         ve_path=$HOME
+#     fi
+#     
+#     if [ -d "$ve_path" ] ; then
+#         cd $ve_path
+#     else
+#         echo -e "Specified path $ve_path doe not exist. Goodbye!\n"
+#         exit 1
+#     fi
+#     
+#     read -e -p "Name of virtual environment [$virtual_env]: " virtual_env
+#     if [[ $? -ne 0 ]] ; then
+#         echo -e "Goodbye!\n"
+#         exit 1
+#     fi
+#     
     if [ -d $ve_path/$virtual_env ] ; then
         # NOTE: best thing is to avoid re-using virtual environments => force 
         # creation of a new environment
@@ -69,15 +69,20 @@ function makevirtenv ()
         if [ -a $ve_path/$virtual_env/pyvenv.cfg ] ; then
             aa=`cat $ve_path/$virtual_env/pyvenv.cfg | grep "virtualenv"`
             if [ -n "$aa" ] ; then
-                echo -e "Looks like $ve_path/$virtual_env is a virtual environment"
-                read -e -p "Do you want to use this environment ? [n/$use_preexisting]: " use_prexisting
-                if [[ ($use_prexisting == "y") || ($use_prexisting == "Y") || ($use_prexisting == "Yes") || ($use_prexisting == "YES") ]] ; then
-                    source $ve_path/$virtual_env/bin/activate
-                else
-                echo -e "Create a a new environment directory by running this script again. Goodbye!\n"
+                source $ve_path/$virtual_env/bin/activate
+#                 echo -e "Looks like $ve_path/$virtual_env is a virtual environment"
+#                 read -e -p "Do you want to use this environment ? [n/$use_preexisting]: " use_prexisting
+#                 if [[ ($use_prexisting == "y") || ($use_prexisting == "Y") || ($use_prexisting == "Yes") || ($use_prexisting == "YES") ]] ; then
+#                     source $ve_path/$virtual_env/bin/activate
+#                 else
+#                 echo -e "Create a a new environment directory by running this script again. Goodbye!\n"
+#                 exit 1
+#                 fi
+            else
+                echo -e "$ve_path/$virtual_env/ does not look like a virtual env directory. Goodbye!\n"
                 exit 1
-                fi
             fi 
+            
         fi
     else
         python3 -m virtualenv $virtual_env && source $ve_path/$virtual_env/bin/activate
@@ -107,7 +112,6 @@ function installpipreqs ()
 
 function dopyqt5 ()
 {
-    
     if [[ -z "$VIRTUAL_ENV" ]] ; then
         echo -e "Not in an active environment! Goodbye!\n"
         exit 1
@@ -125,7 +129,13 @@ function dopyqt5 ()
     pyqt5_src_url=`python $installscriptdir/locate_pyqt5_src.py`
     pyqt5_src=`basename $pyqt5_src_url`
     
-    pyqt5_src_dir="${ptqt5_src%.tar.gz}"
+    pyqt5_src_dir=${pyqt5_src%.tar.gz}
+    
+    echo "PyQt5 source is in "$pyqt5_src_dir
+    
+    pyqt5_build_dir="PyQt5-build"
+    
+    
     
     # NOTE TODO/FIXME: 2023-03-21 23:28:41 does not work
     # install distlib and use a python script along the lines of
@@ -142,16 +152,26 @@ function dopyqt5 ()
     
     fi
     
-    mkdir -p PyQt5-build
+    mkdir -p ${pyqt5_build_dir}
 #     wget $pyqt5_repo/$pyqt5_src && tar xzf $pyqt5_src && mkdir -p PyQt5-build
     
     cd ${pyqt5_src_dir}
     
-    #sip-build --qmake=`which qmake-qt5` --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --n`o-dbus-python --pep484-pyi --no-make --verbose --target-dir $VIRTUAL_ENV
+    echo "Working in "$(pwd)
+    
+    # NOTE: may have to source the activator again!
+    
     #sip-build --qmake=`which qmake-qt5` --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --no-dbus-python --no-designer-plugin --no-qml-plugin --pep484-pyi --no-make --verbose --target-dir $VIRTUAL_ENV
 #     sip-build --qmake=${qmake_binary} --verbose --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --no-dbus-python --pep484-pyi --no-compile --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages
-    sip-build --no-make --no-compile --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi 
 
+#     echo `which sip-build`
+#     ${VIRTUAL_ENV}/bin/sip-build --qmake=${qmake_binary} --no-make --no-compile --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi 
+#     shopt -s lastpipe
+#     sip-build --qmake=${qmake_binary} --confirm-license --jobs 8 --qt-shared --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+    sip-install --qmake=${qmake_binary} --confirm-license --jobs 8 --qt-shared --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+#     sip-install --qmake=${qmake_binary} --jobs 8 --confirm-license --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+
+#     echo `pwd`
     if [[ $? -ne 0 ]] ; then
         echo -e "sip-build Cannot configure PyQt5 source. Bailing out. Goodbye!\n"
         exit 1
@@ -323,6 +343,7 @@ source ${VIRTUAL_ENV}/bin/activate
 }
 export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
 END
+shopt -u lastpipe
 }
 
 function update_bashrc () 
@@ -367,7 +388,7 @@ get_pyver
 upgrade_virtualenv="N"
 use_preexisting="Y"
 # TODO: switch to a relevant name e.g. scipyenv
-#virtual_env="testenv"
+# virtual_env="testenv"
 virtual_env="scipyenv.$pyver"
 ve_path=$HOME
 # pyqt5_version=5.15.9
@@ -389,30 +410,30 @@ scipyendir=`dirname "$docdir"`
 # findqmake
 # echo $qmake
 # exit
-#### END testing - comment out
 
-read -e -p "Upgrade virtualenv locally? [y/$upgrade_virtualenv]: " upgrade_virtualenv # no timeout
-
-# NOTE: this is already set to "N"
-# if [ -z $upgrade_virtualenv ] ; then
-#     upgrade_virtualenv="N"
+# read -e -p "Upgrade virtualenv locally? [y/$upgrade_virtualenv]: " upgrade_virtualenv # no timeout
+# 
+# # NOTE: this is already set to "N"
+# # if [ -z $upgrade_virtualenv ] ; then
+# #     upgrade_virtualenv="N"
+# # fi
+# 
+# if [[ $? -ne 0 ]] ; then
+#     echo -e "Goodbye!\n"
+#     exit 1
 # fi
-
-if [[ $? -ne 0 ]] ; then
-    echo -e "Goodbye!\n"
-    exit 1
-fi
-
-
-if [[ ($upgrade_virtualenv == "y") || ($upgrade_virtualenv == "Y") || ($upgrade_virtualenv == "Yes") || ($upgrade_virtualenv == "YES") || ($upgrade_virtualenv == "yes")]] ; then
-# echo $upgrade_virtualenv
-    upgrade_virtualenv
-
-    if [[ $? -ne 0 ]] ; then
-        echo -e "\nError upgrading pip. Goodbye!\n"
-        exit 1
-    fi
-fi
+# 
+# 
+# if [[ ($upgrade_virtualenv == "y") || ($upgrade_virtualenv == "Y") || ($upgrade_virtualenv == "Yes") || ($upgrade_virtualenv == "YES") || ($upgrade_virtualenv == "yes")]] ; then
+# # echo $upgrade_virtualenv
+#     upgrade_virtualenv
+# 
+#     if [[ $? -ne 0 ]] ; then
+#         echo -e "\nError upgrading pip. Goodbye!\n"
+#         exit 1
+#     fi
+# fi
+#### END testing - comment out
 
 # makes a virtual environment and activates it
 makevirtenv
