@@ -113,6 +113,73 @@ function dopyqt5 ()
         exit 1
     fi
     
+    mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
+    
+    findqmake
+    
+    if [ `pwd` != "$VIRTUAL_ENV"/src ]; then
+        echo -e "Not inside $VIRTUAL_ENV/src - goodbye\n"
+        exit 1
+    fi
+    
+    pyqt5_src_url=`python $installscriptdir/locate_pyqt5_src.py`
+    pyqt5_src=`basename $pyqt5_src_url`
+    
+    pyqt5_src_dir="${ptqt5_src%.tar.gz}"
+    
+    # NOTE TODO/FIXME: 2023-03-21 23:28:41 does not work
+    # install distlib and use a python script along the lines of
+    # from distlib.locators import locate
+    # pyqt5_locator = locate("PyQt5")
+    # pyqt5_url = pyqt5_locator.download_url
+    if [ ! -r ${pyqt5_src} ] ; then
+        wget $pyqt5_src_url && tar xzf $pyqt5_src 
+
+        if [[ $? -ne 0 ]] ; then
+           echo -e "Cannot obtain the PyQt5 source. Bailing out. Goodbye!\n"
+           exit 1
+        fi
+    
+    fi
+    
+    mkdir -p PyQt5-build
+#     wget $pyqt5_repo/$pyqt5_src && tar xzf $pyqt5_src && mkdir -p PyQt5-build
+    
+    cd ${pyqt5_src_dir}
+    
+    #sip-build --qmake=`which qmake-qt5` --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --n`o-dbus-python --pep484-pyi --no-make --verbose --target-dir $VIRTUAL_ENV
+    #sip-build --qmake=`which qmake-qt5` --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --no-dbus-python --no-designer-plugin --no-qml-plugin --pep484-pyi --no-make --verbose --target-dir $VIRTUAL_ENV
+#     sip-build --qmake=${qmake_binary} --verbose --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --no-dbus-python --pep484-pyi --no-compile --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages
+    sip-build --no-make --no-compile --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi 
+
+    if [[ $? -ne 0 ]] ; then
+        echo -e "sip-build Cannot configure PyQt5 source. Bailing out. Goodbye!\n"
+        exit 1
+    fi
+    
+    cd "$VIRTUAL_ENV"/src/PyQt5-build
+    
+    make && make install
+    
+    if [[ $? -ne 0 ]] ; then
+        echo -e "Cannot build and/or install PyQt5; check console output. Goodbye!\n"
+        exit 1
+    else
+        echo -e "\n\n=====================\n# Pyqt5 installed!\n=====================\n\n"
+    fi
+    
+}
+
+
+
+function dopyqt5_1 ()
+{
+    
+    if [[ -z "$VIRTUAL_ENV" ]] ; then
+        echo -e "Not in an active environment! Goodbye!\n"
+        exit 1
+    fi
+    
     cd $VIRTUAL_ENV/src
     
     findqmake
