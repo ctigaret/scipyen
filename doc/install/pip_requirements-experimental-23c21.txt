@@ -27,6 +27,7 @@
 #wheel
 
 distlib
+scikit-learn # NOTE: install this early so that other packages don't have to pull down obsolete sklearn
 Babel
 GitPython
 Jinja2
@@ -172,7 +173,6 @@ regex
 requests-toolbelt
 researchpy
 scikit-image
-scikit-learn
 scipy
 seaborn
 slytherin

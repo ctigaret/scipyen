@@ -92,19 +92,25 @@ function makevirtenv ()
 
 function installpipreqs ()
 {
+    # installs pip packaged listed in pip_requirements
     # assumes (and therefore REQUIRES that the virtual environment is active)
     if [[ -z "$VIRTUAL_ENV" ]] ; then
         echo -e "Not in an active environment! Goodbye!\n"
         exit 1
     fi
     
-    pip install -r "$installscriptdir"/pip_requirements-experimental-23c21.txt
-    
-    if [[ $? -ne 0 ]] ; then
-        echo -e "Cannot install required packages from PyPI. Bailing out. Goodbye!\n"
-        exit 1
-    else
-        echo -e "\n\n=====================\n# PyPI packages installed.\n=====================\n\n"
+    if [ ! -r ${VIRTUAL_ENV}/.pipdone ] ; then
+        export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True
+        pip install -r "$installscriptdir"/pip_requirements-experimental-23c21.txt
+        
+        if [[ $? -ne 0 ]] ; then
+            echo -e "Cannot install required packages from PyPI. Bailing out. Goodbye!\n"
+            exit 1
+        else
+            echo "pip packages installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pipdone
+            echo -e "\n\n=====================\n# PyPI packages installed.\n=====================\n\n"
+        fi
+        
     fi
     
     
@@ -117,74 +123,79 @@ function dopyqt5 ()
         exit 1
     fi
     
-    mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
-    
-    findqmake
-    
-    if [ `pwd` != "$VIRTUAL_ENV"/src ]; then
-        echo -e "Not inside $VIRTUAL_ENV/src - goodbye\n"
-        exit 1
-    fi
-    
-    pyqt5_src_url=`python $installscriptdir/locate_pyqt5_src.py`
-    pyqt5_src=`basename $pyqt5_src_url`
-    
-    pyqt5_src_dir=${pyqt5_src%.tar.gz}
-    
-    echo "PyQt5 source is in "$pyqt5_src_dir
-    
-    pyqt5_build_dir="PyQt5-build"
-    
-    
-    
-    # NOTE TODO/FIXME: 2023-03-21 23:28:41 does not work
-    # install distlib and use a python script along the lines of
-    # from distlib.locators import locate
-    # pyqt5_locator = locate("PyQt5")
-    # pyqt5_url = pyqt5_locator.download_url
-    if [ ! -r ${pyqt5_src} ] ; then
-        wget $pyqt5_src_url && tar xzf $pyqt5_src 
-
-        if [[ $? -ne 0 ]] ; then
-           echo -e "Cannot obtain the PyQt5 source. Bailing out. Goodbye!\n"
-           exit 1
+    if [ ! -r ${VIRTUAL_ENV}/.pyqt5done ] ; then
+        mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
+        
+        findqmake
+        
+        if [ `pwd` != "$VIRTUAL_ENV"/src ]; then
+            echo -e "Not inside $VIRTUAL_ENV/src - goodbye\n"
+            exit 1
         fi
-    
+        
+        pyqt5_src_url=`python $installscriptdir/locate_pyqt5_src.py`
+        pyqt5_src=`basename $pyqt5_src_url`
+        
+        pyqt5_src_dir=${pyqt5_src%.tar.gz}
+        
+        echo "PyQt5 source is in "$pyqt5_src_dir
+        
+        pyqt5_build_dir="PyQt5-build"
+        
+        
+        
+        # NOTE TODO/FIXME: 2023-03-21 23:28:41 does not work
+        # install distlib and use a python script along the lines of
+        # from distlib.locators import locate
+        # pyqt5_locator = locate("PyQt5")
+        # pyqt5_url = pyqt5_locator.download_url
+        if [ ! -r ${pyqt5_src} ] ; then
+            wget $pyqt5_src_url && tar xzf $pyqt5_src 
+
+            if [[ $? -ne 0 ]] ; then
+            echo -e "Cannot obtain the PyQt5 source. Bailing out. Goodbye!\n"
+            exit 1
+            fi
+        
+        fi
+        
+        mkdir -p ${pyqt5_build_dir}
+    #     wget $pyqt5_repo/$pyqt5_src && tar xzf $pyqt5_src && mkdir -p PyQt5-build
+        
+        cd ${pyqt5_src_dir}
+        
+        echo "Working in "$(pwd)
+        
+        # NOTE: may have to source the activator again!
+        
+        #sip-build --qmake=`which qmake-qt5` --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --no-dbus-python --no-designer-plugin --no-qml-plugin --pep484-pyi --no-make --verbose --target-dir $VIRTUAL_ENV
+    #     sip-build --qmake=${qmake_binary} --verbose --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --no-dbus-python --pep484-pyi --no-compile --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages
+
+    #     echo `which sip-build`
+    #     ${VIRTUAL_ENV}/bin/sip-build --qmake=${qmake_binary} --no-make --no-compile --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi 
+    #     shopt -s lastpipe
+    #     sip-build --qmake=${qmake_binary} --confirm-license --jobs 8 --qt-shared --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+#         sip-install --qmake=${qmake_binary} --confirm-license --jobs 8 --qt-shared --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+        sip-wheel --qmake=${qmake_binary} --confirm-license --jobs 8 --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+    #     sip-install --qmake=${qmake_binary} --jobs 8 --confirm-license --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+
+    #     echo `pwd`
+    #     if [[ $? -ne 0 ]] ; then
+    #         echo -e "sip-build Cannot configure PyQt5 source. Bailing out. Goodbye!\n"
+    #         exit 1
+    #     fi
+        
+    #     cd "$VIRTUAL_ENV"/src/PyQt5-build
+    #     
+    #     make && make install
     fi
     
-    mkdir -p ${pyqt5_build_dir}
-#     wget $pyqt5_repo/$pyqt5_src && tar xzf $pyqt5_src && mkdir -p PyQt5-build
-    
-    cd ${pyqt5_src_dir}
-    
-    echo "Working in "$(pwd)
-    
-    # NOTE: may have to source the activator again!
-    
-    #sip-build --qmake=`which qmake-qt5` --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --no-dbus-python --no-designer-plugin --no-qml-plugin --pep484-pyi --no-make --verbose --target-dir $VIRTUAL_ENV
-#     sip-build --qmake=${qmake_binary} --verbose --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --no-dbus-python --pep484-pyi --no-compile --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages
-
-#     echo `which sip-build`
-#     ${VIRTUAL_ENV}/bin/sip-build --qmake=${qmake_binary} --no-make --no-compile --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi 
-#     shopt -s lastpipe
-#     sip-build --qmake=${qmake_binary} --confirm-license --jobs 8 --qt-shared --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
-    sip-install --qmake=${qmake_binary} --confirm-license --jobs 8 --qt-shared --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
-#     sip-install --qmake=${qmake_binary} --jobs 8 --confirm-license --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
-
-#     echo `pwd`
-    if [[ $? -ne 0 ]] ; then
-        echo -e "sip-build Cannot configure PyQt5 source. Bailing out. Goodbye!\n"
-        exit 1
-    fi
-    
-    cd "$VIRTUAL_ENV"/src/PyQt5-build
-    
-    make && make install
     
     if [[ $? -ne 0 ]] ; then
         echo -e "Cannot build and/or install PyQt5; check console output. Goodbye!\n"
         exit 1
     else
+        echo "PyQt5 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt5done
         echo -e "\n\n=====================\n# Pyqt5 installed!\n=====================\n\n"
     fi
     
@@ -192,60 +203,60 @@ function dopyqt5 ()
 
 
 
-function dopyqt5_1 ()
-{
-    
-    if [[ -z "$VIRTUAL_ENV" ]] ; then
-        echo -e "Not in an active environment! Goodbye!\n"
-        exit 1
-    fi
-    
-    cd $VIRTUAL_ENV/src
-    
-    findqmake
-    
-    if [ `pwd` != "$VIRTUAL_ENV"/src ]; then
-        echo -e "Not inside $VIRTUAL_ENV/src - goodbye\n"
-        exit 1
-    fi
-    
-    pyqt5_src_url=`python $installscriptdir/locate_pyqt5_src.py`
-    pyqt5_src=`basename $pyqt5_src_url`
-    
-    # NOTE TODO/FIXME: 2023-03-21 23:28:41 does not work
-    # install distlib and use a python script along the lines of
-    # from distlib.locators import locate
-    # pyqt5_locator = locate("PyQt5")
-    # pyqt5_url = pyqt5_locator.download_url
-    wget $pyqt5_src_url && tar xzf $pyqt5_src && mkdir -p PyQt5-build
-#     wget $pyqt5_repo/$pyqt5_src && tar xzf $pyqt5_src && mkdir -p PyQt5-build
-    
-    if [[ $? -ne 0 ]] ; then
-        echo -e "Cannot obtain the PyQt5 source. Bailing out. Goodbye!\n"
-        exit 1
-    fi
-    
-    #sip-build --qmake=`which qmake-qt5` --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --no-dbus-python --pep484-pyi --no-make --verbose --target-dir $VIRTUAL_ENV
-    #sip-build --qmake=`which qmake-qt5` --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --no-dbus-python --no-designer-plugin --no-qml-plugin --pep484-pyi --no-make --verbose --target-dir $VIRTUAL_ENV
-    sip-build --qmake="$qmake_binary" --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --no-dbus-python --pep484-pyi --no-make --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages
-
-    if [[ $? -ne 0 ]] ; then
-        echo -e "sip-build Cannot configure PyQt5 source. Bailing out. Goodbye!\n"
-        exit 1
-    fi
-    
-    cd "$VIRTUAL_ENV"/src/PyQt5-build
-    
-    make && make install
-    
-    if [[ $? -ne 0 ]] ; then
-        echo -e "Cannot build and/or install PyQt5; check console output. Goodbye!\n"
-        exit 1
-    else
-        echo -e "\n\n=====================\n# Pyqt5 installed!\n=====================\n\n"
-    fi
-    
-}
+# function dopyqt5_1 ()
+# {
+#     
+#     if [[ -z "$VIRTUAL_ENV" ]] ; then
+#         echo -e "Not in an active environment! Goodbye!\n"
+#         exit 1
+#     fi
+#     
+#     cd $VIRTUAL_ENV/src
+#     
+#     findqmake
+#     
+#     if [ `pwd` != "$VIRTUAL_ENV"/src ]; then
+#         echo -e "Not inside $VIRTUAL_ENV/src - goodbye\n"
+#         exit 1
+#     fi
+#     
+#     pyqt5_src_url=`python $installscriptdir/locate_pyqt5_src.py`
+#     pyqt5_src=`basename $pyqt5_src_url`
+#     
+#     # NOTE TODO/FIXME: 2023-03-21 23:28:41 does not work
+#     # install distlib and use a python script along the lines of
+#     # from distlib.locators import locate
+#     # pyqt5_locator = locate("PyQt5")
+#     # pyqt5_url = pyqt5_locator.download_url
+#     wget $pyqt5_src_url && tar xzf $pyqt5_src && mkdir -p PyQt5-build
+# #     wget $pyqt5_repo/$pyqt5_src && tar xzf $pyqt5_src && mkdir -p PyQt5-build
+#     
+#     if [[ $? -ne 0 ]] ; then
+#         echo -e "Cannot obtain the PyQt5 source. Bailing out. Goodbye!\n"
+#         exit 1
+#     fi
+#     
+#     #sip-build --qmake=`which qmake-qt5` --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --no-dbus-python --pep484-pyi --no-make --verbose --target-dir $VIRTUAL_ENV
+#     #sip-build --qmake=`which qmake-qt5` --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --no-dbus-python --no-designer-plugin --no-qml-plugin --pep484-pyi --no-make --verbose --target-dir $VIRTUAL_ENV
+#     sip-build --qmake="$qmake_binary" --confirm-license --build-dir ../PyQt5-build --qt-shared --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --no-dbus-python --pep484-pyi --no-make --verbose --target-dir $VIRTUAL_ENV/lib64/python3.10/site-packages
+# 
+#     if [[ $? -ne 0 ]] ; then
+#         echo -e "sip-build Cannot configure PyQt5 source. Bailing out. Goodbye!\n"
+#         exit 1
+#     fi
+#     
+#     cd "$VIRTUAL_ENV"/src/PyQt5-build
+#     
+#     make && make install
+#     
+#     if [[ $? -ne 0 ]] ; then
+#         echo -e "Cannot build and/or install PyQt5; check console output. Goodbye!\n"
+#         exit 1
+#     else
+#         echo -e "\n\n=====================\n# Pyqt5 installed!\n=====================\n\n"
+#     fi
+#     
+# }
 
 function dovigra ()
 {
@@ -254,22 +265,26 @@ function dovigra ()
         exit 1
     fi
     
-    cd $VIRTUAL_ENV/src
-    
-    findcmake
-    
-    git clone https://github.com/ukoethe/vigra.git && mkdir -p vigra-build && cd vigra-build
-    
-    $cmake_binary -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
-    
-    make && make install
-    
-    if [[ $? -ne 0 ]] ; then
-        echo -e "Cannot build vigra; check console output. Bailing out. Goodbye!\n"
-        exit 1
-    else
-        echo -e "\n\n=====================\n# Building vigra DONE!\n=====================\n\n"
+    if [ ! -r ${VIRTUAL_ENV}/.vigradone ] ; then
+        cd $VIRTUAL_ENV/src
+        
+        findcmake
+        
+        git clone https://github.com/ukoethe/vigra.git && mkdir -p vigra-build && cd vigra-build
+        
+        $cmake_binary -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
+        
+        make && make install
+        
+        if [[ $? -ne 0 ]] ; then
+            echo -e "Cannot build vigra; check console output. Bailing out. Goodbye!\n"
+            exit 1
+        else
+            echo "VIGRA installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.vigradone
+            echo -e "\n\n=====================\n# Building vigra DONE!\n=====================\n\n"
+        fi
     fi
+    
     
 }
 
@@ -280,21 +295,25 @@ function doneuron ()
         exit 1
     fi
     
-    cd $VIRTUAL_ENV/src
-    
-    findcmake
-    
-    git clone https://github.com/neuronsimulator/nrn && mkdir -p nrn-build && cd nrn-build
-    
-    $cmake_binary -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_INSTALL_LIBEXECDIR=libexec -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DIV_ENABLE_SHARED=1 -DNRN_AVOID_ABSOLUTE_PATHS=1 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_CORENEURON=1 -DNRN_ENABLE_INTERVIEWS=1 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_PYTHON_DYNAMIC=1 -DNRN_ENABLE_REL_PATH=1 -DNRN_ENABLE_RX3D=1 -DNRN_ENABL_SHARED=1 -DNRN_ENABLE_THREADS=1 -DNRN_ENABLE_MECH_DLL_STYLE=1 -DLIB_INSTALL_DIR=$VIRTUAL_ENV/lib64 -DLIB_SUFFIX=64 -DMOD2C_ENABLE_LEGACY_UNITS=0 ../nrn
-    $cmake_binary --build . --parallel 8 --target install
-    
-    
-    if [[ $? -ne 0 ]] ; then
-        echo -e "Cannot build NEURON; check console output. Bailing out. Goodbye!\n"
-        exit 1
-    else
-        echo -e "\n\n=====================\n# Building NEURON DONE!\n=====================\n\n"
+    if [ ! -r ${VIRTUAL_ENV}/.nrndone ] ; then
+        cd $VIRTUAL_ENV/src
+        
+        findcmake
+        
+        git clone https://github.com/neuronsimulator/nrn && mkdir -p nrn-build && cd nrn-build
+        
+        $cmake_binary -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_INSTALL_LIBEXECDIR=libexec -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DIV_ENABLE_SHARED=1 -DNRN_AVOID_ABSOLUTE_PATHS=1 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_CORENEURON=1 -DNRN_ENABLE_INTERVIEWS=1 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_PYTHON_DYNAMIC=1 -DNRN_ENABLE_REL_PATH=1 -DNRN_ENABLE_RX3D=1 -DNRN_ENABL_SHARED=1 -DNRN_ENABLE_THREADS=1 -DNRN_ENABLE_MECH_DLL_STYLE=1 -DLIB_INSTALL_DIR=$VIRTUAL_ENV/lib64 -DLIB_SUFFIX=64 -DMOD2C_ENABLE_LEGACY_UNITS=0 ../nrn
+        $cmake_binary --build . --parallel 8 --target install
+        
+        
+        if [[ $? -ne 0 ]] ; then
+            echo -e "Cannot build NEURON; check console output. Bailing out. Goodbye!\n"
+            exit 1
+        else
+            echo "NEURON installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.nrndone 
+            echo -e "\n\n=====================\n# Building NEURON DONE!\n=====================\n\n"
+        fi
+        
     fi
     
 }
@@ -381,6 +400,16 @@ function get_pyver ()
     pyver=${ver_array[1]}
 }
 
+function linkscripts () 
+{
+    mkdir -p ${HOME}/bin
+    if [ -r ${HOME}/bin/scipyen ] ; then
+        dt=`date '+%Y-%m-%d_%H-%M-%s'`
+        cp ${HOME}/bin/scipyen ${HOME}/bin/scipyen.$dt
+    fi
+    ln -s ${scipyendir}/scipyen ${HOME}/bin/scipyen
+}
+
 #### Execution starts here ###
 
 get_pyver
@@ -464,6 +493,8 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     # build Pyqt5
     dopyqt5
     
+    exit
+    
     # build vigra
     dovigra
     
@@ -474,7 +505,8 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     get_scipyen
     
     # make scripts
-    makescripts
+    make_scipyenrc && update_bashrc && linkscripts
+    
 fi
 
 
