@@ -6,127 +6,16 @@
 #
 # Distributed under GNU GPL License v.2
 #
-# NOTE: If you read this, this means you already have a local clone of the 
-# Scipyen repository.
-#
-# Scipyen requires Python >= 3.9 and is meant to run inside a virtual python 
-# environment. The `virtualenv` facility is recommended.
-#
-# This script will create the virtual environment and install any required third
-# party software INSIDE the virtual environment. 
-#
-# Assuming Scipyen is cloned inside $HOME/scipyen then launch the script like this:
-#
-# sh ${HOME}/scipyen/doc/install/install_test.sh
-#
-# NOTE: The script itself requires a few other command line tools - these are 
-# supplied by the Linux distribution and usually are installed by default, but 
-# it is worth checking they are available beforehand:
-#
-#   • usually are installed by default:
-#       ∘ date
-#
-#   • development tools: cmake, make, C++ compiler
-#
-# Some of the required third party software is available as Python packages on
-# on PyPI - hence installable via `pip`. The required packages are listed in
-# the file `pip_requirements.txt` in this directory.
-#
-# ATTENTION: The actual `pip` tool to be used is `pip3` (i.e. for python v 3 and 
-# later) or, better, 'python3 -m pip <... pip commands & options ...>' .
-#
-# Other third party software may not be available on PyPI, or needs to be built
-# locally (inside the virtual environment), provided that dependencies are 
-# installed on the host computer:
-#
-# • PyQt5 - Python bindings for Qt5 widget toolkit (framework) - necessary for Scipyen GUI
-#   ∘ web sites: 
-#       ⋆ https://pypi.org/project/PyQt5/ 
-#       ⋆ https://www.riverbankcomputing.com/software/pyqt/
-#   ∘ can be installed via `pip` directly from PyPI: python3 -m pip install PyQt5
-#   ∘ NOTE: On some distribution, installation via pip may fail; in this case a
-#       locall (custom) build is necessary - see below
-#   ∘ to customize the installation on Linux, the following dependencies are needed
-#       ⋆ build toolchain (e.g. make, GNU c++ compiler etc)
-#       ⋆ development packages for Qt5 - including qmake (!)
-#       ⋆ Python >= 3.10, cython
-#       ⋆ see also the web sites above, in particular:
-#           https://www.riverbankcomputing.com/static/Docs/PyQt5/installation.html
-#
-# • VIGRA - C++ library for computer vision - used by image analysis and processing code in Scipyen
-#   ∘ NOTE: VIGRA provides its own python bindings, which are actually used by Scipyen.
-#       However, there is no `pip` package available as of this time (2023-03-23 09:49:41)
-#       Therefore, VIGRA library and its python bindings MUST be built locally.
-#   ∘ web sites: 
-#       ⋆ http://ukoethe.github.io/vigra/
-#       ⋆ https://github.com/ukoethe/vigra
-#   ∘ dependencies: please see the VIGRA Homepage http://ukoethe.github.io/vigra/
-#       and here: http://ukoethe.github.io/vigra/doc-release/vigra/Installation.html
-#       Notably, these include (alogside with their development packages):
-#       ⋆ boost C++ libraries
-#       ⋆ ctyhon, sphinx, doxygen
-#       ⋆ fftw3
-#       ⋆ tiff, png, jpeg, zlib, hdf5
-#       ⋆ an appropriate software building toolchain (depends on platform, see
-#           the link above for details) - on Linux this includes `cmake`
-#
-# • NEURON - this is OPTIONAL; NEURON can be launched and interoperate(*) with Scipyen
-#   ∘ web sites: 
-#       ⋆ https://neuron.yale.edu/neuron/
-#       ⋆ https://github.com/neuronsimulator/nrn
-#   ∘ can be installed via `pip` directly from PyPI: python3 -m pip install neuron
-#   ∘ for a custom build of NEURON, please see:
-#     https://github.com/neuronsimulator/nrn/blob/master/docs/install/install_instructions.md
-#
-#   ∘ NOTE: (*) interoperability with Scipyen is experimental, and at an incipient stage
-#
-# If you want to add or remove packages manually, you can do so using `pip`; if 
-# you think these changes are worth propagating to the main scipyen repository
-# then please inform the main author (Cezar Tigaret). 
-#
-# WARNING: Please be advised that all calls to `pip` for package installation 
-# or removal should be done with the python virtual environment activated. The 
-# authors cannot advise on possible troubleshooting when packages are installed
-# outside the virtual environment.
-# 
-# NOTE: The script performs the following steps:
-#
-# 1. create virtual environment
-# 2. activate virtual environment
-# 3. install python packages from PyPI according to pip_requirements.txt
-# 4. download the latest PyQt5 sdist, build a wheel locally and install it
-# 5. clone vigra git repository, build and install it
-# 6. clone neuron git repository, build and install it
-#
-#
-# NOTE: The steps 3 - 6 also generate a local "flag" (saved as hidden files 
-# in the top directory of the environment) such that should something go wrong
-# in a particular step, the steps sucessfully executed prior to the fault will 
-# be skipped on a subsequent run.
-#
-# These flags are:
-# .pipdone
-# .pyqtdone
-# .vigradone
-# .nrndone
-#
-# Should you want to re-run a (previously sucessful) step, juts remove the 
-# corresponding flag from the environment directory.
-#
-# TODO: customize:
-# 1. which branch of scipyen git repo should be used?
-#   • buy default this should be the master branch, but currently we use the dev
-#       branch; as new contributors join us, they might want to work on their
-#       own branch
-# 2. the location (i.e. the containing directory) of the virtual environment
-# 3. the name of the virtual environment
-# 4. let the user choose to custommize these or just run unattended
-# 5. let the user choose if nrn should be built and installed
-# 6. various options for building:
-#   • PyQt5 (e.g. modules to leave out) vigra
-#   • vigra (e.g. do we want openEXR); NOTE: HDF5, vigranumpy are mandatory
-#   • nrn (e.g. do we want coreneuron or a plain nrn stack?)
 
+function showinstalldoc () 
+{
+    glowexec=`which glow`
+    if [ -n $glowexec ] ; then
+        glow -p $installscriptdir/Install.md
+    else
+        cat $installscriptdir/Install.md
+    fi
+}
 function show_help ()
 {
     echo -e "\n***                                                         ***"
@@ -153,6 +42,11 @@ function show_help ()
     echo -e "\t\t\tFor details about coreneuron see:"
     echo -e "\t\t\thttps://github.com/BlueBrain/CoreNeuron\n"
     echo -e "\t\t\tNOTE: Only used when '--build_neuron' is passed .\n"
+    echo -e "--jobs=N\t\t\t => enables parallel tasks during building;"
+    echo -e "\t\t\t used when building PyQt5 and NEURON; default is 4"
+    echo -e "--reinstall=NAME\t\t\t forces re-installation/re-building of NAME"
+    echo -e "\t\t\tNAME can be pips, pyqt5, vigra, or neuron; can be passed more than once."
+    echo -e "--about\t\t\t Displays Install.md at the console (requires the program 'glow')"
     echo -e "-h | -? | --help \t => show this help message and quit\n"
     
 }
@@ -187,10 +81,10 @@ function upgrade_virtualenv ()
 {
     havevenv=`python3 -m virtualenv --version`
     if [ -z $havenev ] ; then
-        echo "Installing virtualenv locally...\n"
+        echo -e "Installing virtualenv locally...\n"
         pip install --user virtualenv
     else
-        echo "Upgrading virtualenv locally...\n"
+        echo -e "Upgrading virtualenv locally...\n"
         pip install --user --upgrade virtualenv
     fi
 }
@@ -239,7 +133,7 @@ function installpipreqs ()
         exit 1
     fi
     
-    if [ ! -r ${VIRTUAL_ENV}/.pipdone ] ; then
+    if [ ! -r ${VIRTUAL_ENV}/.pipdone ] || [[ $reinstall_pips -gt 0 ]] ; then
         # NOTE: since around Jan 2023 sklearn has been deprecated in favour of 
         # scikit-learn, suchn that an error message is issues whenever pip tries
         # to install sklearn.
@@ -268,7 +162,7 @@ function dopyqt5 ()
         exit 1
     fi
     
-    if [ ! -r ${VIRTUAL_ENV}/.pyqt5done ] ; then
+    if [ ! -r ${VIRTUAL_ENV}/.pyqt5done ] || [[ $reinstall_pyqt5 -gt 0 ]]; then
         mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
         
         findqmake
@@ -286,18 +180,22 @@ function dopyqt5 ()
         
         pyqt5_src_dir=${pyqt5_src%.tar.gz}
         
-        echo "PyQt5 source is in "$pyqt5_src_dir
+        echo "PyQt5 source is in "${pyqt5_src_dir}
         
         # NOTE: the sdist might have been downloaded alreay - so check this first
         # before actually downloading
         if [ ! -r ${pyqt5_src} ] ; then
-            wget $pyqt5_src_url && tar xzf $pyqt5_src 
+            wget ${pyqt5_src_url} && tar xzf ${pyqt5_src} 
 
             if [[ $? -ne 0 ]] ; then
             echo -e "Cannot obtain the PyQt5 source. Bailing out. Goodbye!\n"
             exit 1
             fi
-        
+        else
+            if [ -d ${pyqt5_src_dir} ] ; then
+                rm -fr ${pyqt5_src_dir}
+            fi
+            tar xzf ${pyqt5_src}
         fi
         
         # NOTE: good practice is to create an out-of-source build tree, » ...
@@ -310,7 +208,16 @@ function dopyqt5 ()
         
         echo "Generating PyQt5 wheel in "$(pwd)"..."
         
-        sip-wheel --qmake=${qmake_binary} --confirm-license --jobs 8 --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+        # NOTE: 2023-03-23 14:03:48 - enable parallel jobs - to change, either:
+        # • change the value of the --jobs option (e.g. half the number of 
+        # cores in your system seems to be  good choice), or
+        # • remove the --jobs option altogether
+        if [[ $njobs -gt 0 ]] ; then
+            sip-wheel --qmake=${qmake_binary} --confirm-license --jobs $njobs --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+        else
+            sip-wheel --qmake=${qmake_binary} --confirm-license --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+        fi
+#         sip-wheel --qmake=${qmake_binary} --confirm-license --jobs 8 --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
 
         if [[ $? -ne 0 ]] ; then
             echo -e "sip Cannot build a PyQt5 wheel. Bailing out. Goodbye!\n"
@@ -345,7 +252,7 @@ function dovigra ()
         exit 1
     fi
     
-    if [ ! -r ${VIRTUAL_ENV}/.vigradone ] ; then
+    if [ ! -r ${VIRTUAL_ENV}/.vigradone ] || [[ $reinstall_vigra -gt 0 ]]; then
         cd $VIRTUAL_ENV/src
         
         findcmake
@@ -375,7 +282,7 @@ function doneuron ()
         exit 1
     fi
     
-    if [ ! -r ${VIRTUAL_ENV}/.nrndone ] ; then
+    if [ ! -r ${VIRTUAL_ENV}/.nrndone ] || [[ $reinstall_neuron -gt 0 ]]; then
         if [ $use_pypi_neuron -ne 0 ] ; then
             python3 -m pip install neuron
             if [[ $? -ne 0 ]] ; then
@@ -398,7 +305,11 @@ function doneuron ()
                 $cmake_binary -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_INSTALL_LIBEXECDIR=libexec -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DIV_ENABLE_SHARED=1 -DNRN_AVOID_ABSOLUTE_PATHS=1 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_INTERVIEWS=1 -DNRN_ENABLE_PYTHON_DYNAMIC=1 -DNRN_ENABLE_REL_PATH=1 -DNRN_ENABLE_RX3D=1 -DNRN_ENABL_SHARED=1 -DNRN_ENABLE_THREADS=1 -DNRN_ENABLE_MECH_DLL_STYLE=1 -DLIB_INSTALL_DIR=$VIRTUAL_ENV/lib64 -DLIB_SUFFIX=64 -DMOD2C_ENABLE_LEGACY_UNITS=0 ../nrn
             fi
             
-            $cmake_binary --build . --parallel 8 --target install
+            if [[ $njobs -gt 0 ]] ; then
+                $cmake_binary --build . --parallel $njobs --target install
+            else
+                $cmake_binary --build . --target install
+            fi
             
             
             if [[ $? -ne 0 ]] ; then
@@ -539,6 +450,11 @@ scipyendir=`dirname "$docdir"`
 install_neuron=0
 use_pypi_neuron=1
 use_core_neuron=0
+njobs=4
+reinstall_pyqt5=0
+reinstall_vigra=0
+reinstall_neuron=0
+reinstall_pips=0
 
 for i in "$@" ; do
     case $i in
@@ -560,8 +476,37 @@ for i in "$@" ; do
         ve_path="${i#*=}"
         shift
         ;;
+        --jobs=*)
+        njobs="${i#*=}"
+        shift
+        ;;
         --environment=*)
         virtual_env="${i#*=}"
+        shift
+        ;;
+        --reinstall=*)
+        reinstall="${i#*=}"
+        shift
+        case $reinstall in
+            pyqt5)
+            reinstall_pyqt5=1
+            ;;
+            vigra)
+            reinstall_vigra=1
+            ;;
+            neuron)
+            reinstall_neuron=1
+            ;;    
+            pips)
+            reinstall_pips=1
+            ;;
+            *)
+            ;;
+        esac
+        ;;
+        --about)
+        showinstalldoc
+        exit 0
         shift
         ;;
         -h|-?|--help)
@@ -573,7 +518,7 @@ for i in "$@" ; do
         echo -e "Unknown option $i"
         show_help
         shift
-        exit 1
+        exit 0
         ;;
         *)
         ;;
@@ -595,7 +540,7 @@ if [[ -z "$VIRTUAL_ENV" ]] ; then
 fi
 
 if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
-    echo -e "Creating 'src' directory inside $VIRTUAL_ENV ...\n"
+#     echo -e "Creating 'src' directory inside $VIRTUAL_ENV ...\n"
     mkdir -p "$VIRTUAL_ENV/src" && cd "$VIRTUAL_ENV/src"
     
     # install pip requirements

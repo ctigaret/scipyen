@@ -26,14 +26,19 @@
 # packages already listed above
 #wheel
 
+distlib
 Babel
 GitPython
 Jinja2
 MarkupSafe
 Pillow
 PyLEMS
-PyQt5; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
-qdarkstyle; sys_platform == 'win32'
+# required to build PyQt5 locally using the host's Qt stack
+PyQt-builder ; sys_platform == 'linux'
+# required to build PyQt5 locally using the host's Qt stack
+Pyqt5-sip ; sys_platform == 'linux'
+PyQt5 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
+qdarkstyle ; sys_platform == 'win32'
 PyWavelets
 QtPy
 SecretStorage
