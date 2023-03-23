@@ -335,7 +335,7 @@ function doneuron ()
             # try to see if neuron is in lib/site-packages/python3.10
             if [ ! -d ${lib_sites}/neuron ] ; then
                 # not found => try to see if it is in lib64_sites
-                if [! -d{lib64_sites}/neuron ] ; then
+                if [ ! -d{lib64_sites}/neuron ] ; then
                     # not found there either;
                     # try to see if it is in lib/python
                     if [ -d ${VIRTUAL_ENV}/lib/python/neuron ] ; then
