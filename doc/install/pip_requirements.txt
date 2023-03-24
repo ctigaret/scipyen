@@ -129,7 +129,7 @@ nbsphinx
 neo
 nest-asyncio
 networkx
-neuron; sys_platform == "win32" # NOTE: on linux, see install.sh for the option to build locally
+# neuron; sys_platform == "win32" # NOTE: does NOT work on windows; on linux, see install.sh for the option to build locally
 neuromllite
 nibabel
 nixio
