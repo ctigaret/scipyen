@@ -3193,7 +3193,7 @@ def concatenate_blocks(*args, **kwargs):
         # NOTE: 2021-11-24 09:55:15
         # this branch deals with a sequence of Blocks and/or Segments
         # make a new Block, append segments
-        # when Blocks, we need ot take into account the existence of Groups and
+        # when Blocks, we need to take into account the existence of Groups and
         # ChannelViews
         ret = neo.core.Block(name=name, description=description, file_origin=file_origin,
                             file_datetime=file_datetime, rec_datetime=rec_datetime, 
@@ -3202,7 +3202,6 @@ def concatenate_blocks(*args, **kwargs):
         
         for (k,arg) in enumerate(args):
             if isinstance(arg, neo.Block):
-                
                 new_block = copy_with_data_subset(arg, **kwargs)
                 
                 ret.segments.extend(new_block.segments)
