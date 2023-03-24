@@ -129,6 +129,7 @@ nbsphinx
 neo
 nest-asyncio
 networkx
+neuron; sys_platform == "win32" # NOTE: on linux, see install.sh for the option to build locally
 neuromllite
 nibabel
 nixio
@@ -156,7 +157,7 @@ pylmeasure      # optional
 pymongo
 pyneuroml       # optional
 pyparsing
-pyqt5-tools ; sys_platform == 'win32'
+#pyqt5-tools ; sys_platform == 'win32'
 pyqtgraph
 pytest
 python-magic
