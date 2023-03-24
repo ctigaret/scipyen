@@ -1,4 +1,4 @@
-# Installation script for scipyen 23c19
+# About install.sh - Scipyen installation script for Linux
 
 Author: Cezar M. Tigaret <cezar.tigaret@gmail.com>
 
@@ -127,7 +127,8 @@ which include [`cmake`](https://cmake.org/), [`boost C++`](https://www.boost.org
 [`sphinx`](https://www.sphinx-doc.org/en/master/) (*NOTE* that this is installed as per `pip_requirements.txt` file),
 [`fftw3`](https://www.fftw.org/), [`libtiff`](http://simplesystems.org/libtiff/),
 [`libpng`](http://www.libpng.org/pub/png/libpng.html) (also available [here](https://libpng.sourceforge.io/index.html)),
-[`libjpeg`](https://libjpeg.sourceforge.net/), and the *recommended* [`HDF5`](https://www.hdfgroup.org/solutions/hdf5/).
+[`libjpeg`](https://libjpeg.sourceforge.net/), and the *recommended* [`HDF5`](https://www.hdfgroup.org/solutions/hdf5/),
+[`doxygen`](https://www.doxygen.nl/).
 
 
 The script clones the latest [`vigra github`](http://ukoethe.github.io/vigra/) 
@@ -144,8 +145,8 @@ script.
 * The `--with-neuron` option simply installs the currently available `NEURON python` 
 package from its [PyPI repository](https://pypi.org/project/NEURON/).
 * The `--build-neuron` option builds `NEURON` locally from its [GitHub repository](https://github.com/neuronsimulator/nrn)
-    - To customize the build, see [here](https://github.com/neuronsimulator/nrn/blob/master/docs/install/install_instructions.md)
-    - When built locally, `NEURON` can be confiugured to use [The BLueBrain Project's](https://github.com/BlueBrain) [`coreneuron`](https://github.com/BlueBrain/CoreNeuron).
+    - For dependencies and options to customize the build, see [here](https://github.com/neuronsimulator/nrn/blob/master/docs/install/install_instructions.md)
+    - When built locally, `NEURON` can be configured to use [The BlueBrain Project's](https://github.com/BlueBrain) [`coreneuron`](https://github.com/BlueBrain/CoreNeuron).
     
 
 ## Environment customization

@@ -25,29 +25,19 @@ function show_help ()
     echo -e "<cezar tigaret at gmail com> , <tigaretc at cardiff ac uk>"
     echo -e "\nInstructions:"
     echo -e "============\n"
-    echo -e "Run 'instal.sh' without options for a fully automated installation"
-    echo -e "using built-in defaults.\n"
+    echo -e "Run 'sh instal.sh' without options for a fully automated installation, using built-in defaults.\n"
     echo -e "Options:"
-    echo -e "=======\n"
-    echo -e "--install_dir=DIR\t => specifies a directory where the virtual "
-    echo -e "\t\t\tenvironment will be created (default is ${HOME})\n"
-    echo -e "--environment=<name>\t => specifies a custom name for the virtual environment"
-    echo -e "\t\t\t(default is ${virtual_env})\n"
-    echo -e "--with_neuron\t\t => when passed, will install neuron python"
-    echo -e "\t\t\tfrom PyPI. See also:\n"
-    echo -e "\t\t\thttps://neuron.yale.edu/neuron/\n\t\t\thttps://github.com/neuronsimulator/nrn\n\t\t\thttps://pypi.org/project/NEURON/\n"
-    echo -e "--build_neuron\t\t => when passed, will build neuron python locally.\n"
-    echo -e "--with_coreneuron\t => when passed, local neuron build will use coreneuron."
-    echo -e "\t\t\t(by default coreneuron is not used).\n"
-    echo -e "\t\t\tFor details about coreneuron see:"
-    echo -e "\t\t\thttps://github.com/BlueBrain/CoreNeuron\n"
-    echo -e "\t\t\tNOTE: Only used when '--build_neuron' is passed .\n"
-    echo -e "--jobs=N\t\t\t => enables parallel tasks during building;"
-    echo -e "\t\t\t used when building PyQt5 and NEURON; default is 4"
-    echo -e "--reinstall=NAME\t\t\t forces re-installation/re-building of NAME"
-    echo -e "\t\t\tNAME can be pips, pyqt5, vigra, or neuron; can be passed more than once."
-    echo -e "--about\t\t\t Displays Install.md at the console (requires the program 'glow')"
-    echo -e "-h | -? | --help \t => show this help message and quit\n"
+    echo -e "========\n"
+    echo -e "--install_dir=DIR\tSpecify where the virtual environment will be created (default is ${HOME})\n"
+    echo -e "--environment=NAME\tCustom name for the virtual environment (default is ${virtual_env})\n"
+    echo -e "--with_neuron\t\tInstall binary neuron python distribution from PyPI\n"
+    echo -e "--build_neuron\t\tBuild neuron python locally\n"
+    echo -e "--with_coreneuron\tWhen '--build_neuron' is passed, build local neuron with coreneuron; by default coreneuron is not used.\n"
+    echo -e "--jobs=N\t\tNumber of parallel tasks during building PyQt5 and neuron; default is 4; set to 0 to disable parallel build\n"
+    echo -e "--reinstall=NAME\t\t\tRe-install/re-building NAME, where NAME is one of pips, pyqt5, vigra, or neuron; can be passed more than once\n"
+    echo -e "--about\t\t\tDisplay Install.md at the console (requires the program 'glow')\n"
+    echo -e "-h | -? | --help \tShow this help message and quit\n"
+    echo -e "\nFor details, execute install.sh --about\n"
     
 }
 function findqmake ()
@@ -143,7 +133,7 @@ function installpipreqs ()
         # by setting up the environment variable below
         # For details please see https://pypi.org/project/sklearn/
         export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
-        pip install -r "$installscriptdir"/pip_requirements-experimental-23c21.txt
+        pip install -r "$installscriptdir"/pip_requirements.txt
         
         if [[ $? -ne 0 ]] ; then
             echo -e "Cannot install required packages from PyPI. Bailing out. Goodbye!\n"
@@ -281,9 +271,25 @@ function doneuron ()
         echo -e "Not in an active environment! Goodbye!\n"
         exit 1
     fi
-    echo "Reinstall neuron: $reinstall_neuron"
-    echo "Using PyPI: $use_pypi_neuron"
-    echo "Using coreneuron: $use_core_neuron"
+#     echo "Reinstall neuron: $reinstall_neuron"
+#     echo "Using PyPI: $use_pypi_neuron"
+#     echo "Using coreneuron: $use_core_neuron"
+# NOTE: 2023-03-24 00:30:50 pip install neuron =>
+#     /home/cezar/scipyenv.3.10.10/bin/idraw
+#     /home/cezar/scipyenv.3.10.10/bin/mkthreadsafe
+#     /home/cezar/scipyenv.3.10.10/bin/modlunit
+#     /home/cezar/scipyenv.3.10.10/bin/neurondemo
+#     /home/cezar/scipyenv.3.10.10/bin/nrngui
+#     /home/cezar/scipyenv.3.10.10/bin/nrniv
+#     /home/cezar/scipyenv.3.10.10/bin/nrniv-core
+#     /home/cezar/scipyenv.3.10.10/bin/nrnivmodl
+#     /home/cezar/scipyenv.3.10.10/bin/nrnivmodl-core
+#     /home/cezar/scipyenv.3.10.10/bin/nrnpyenv.sh
+#     /home/cezar/scipyenv.3.10.10/bin/sortspike
+#     /home/cezar/scipyenv.3.10.10/lib64/python3.10/site-packages/NEURON-8.2.2.dist-info/*
+#     /home/cezar/scipyenv.3.10.10/lib64/python3.10/site-packages/NEURON.libs/libcoreneuron-f6d04d2a.so
+#     /home/cezar/scipyenv.3.10.10/lib64/python3.10/site-packages/NEURON.libs/libnrniv-e0a0fc78.so
+#     /home/cezar/scipyenv.3.10.10/lib64/python3.10/site-packages/neuron/*
     if [ ! -r ${VIRTUAL_ENV}/.nrndone ] || [[ $reinstall_neuron -gt 0 ]]; then
         if [ $use_pypi_neuron -ne 0 ] ; then
             python3 -m pip install neuron
@@ -308,10 +314,10 @@ function doneuron ()
             
             if [ $use_core_neuron -ne 0 ] ; then
                 echo -e "Configuring local neuron build with coreneuron ..."
-                $cmake_binary -DPYTHON_EXECUTABLE=$(which python3) -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_INSTALL_LIBEXECDIR=libexec -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DIV_ENABLE_SHARED=1 -DNRN_AVOID_ABSOLUTE_PATHS=1 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_CORENEURON=1 -DNRN_ENABLE_INTERVIEWS=1 -DNRN_ENABLE_PYTHON_DYNAMIC=1 -DNRN_ENABLE_REL_PATH=1 -DNRN_ENABLE_RX3D=1 -DNRN_ENABL_SHARED=1 -DNRN_ENABLE_THREADS=1 -DNRN_ENABLE_MECH_DLL_STYLE=1 -DLIB_INSTALL_DIR=$VIRTUAL_ENV/lib64 -DLIB_SUFFIX=64 -DMOD2C_ENABLE_LEGACY_UNITS=0 -DNRN_ENABLE_DOCS=ON ../nrn
+                $cmake_binary -DPYTHON_EXECUTABLE=$(which python3) -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_INSTALL_LIBEXECDIR=libexec -DCMAKE_SKIP_INSTALL_RPATH=0 -DCMAKE_SKIP_RPATH=0 -DIV_ENABLE_SHARED=1 -DNRN_AVOID_ABSOLUTE_PATHS=0 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_CORENEURON=1 -DNRN_ENABLE_INTERVIEWS=1 -DNRN_ENABLE_PYTHON_DYNAMIC=1 -DNRN_ENABLE_RX3D=1 -DNRN_ENABLE_SHARED=1 -DNRN_ENABLE_THREADS=1 -DNRN_ENABLE_MECH_DLL_STYLE=1 -DLIB_INSTALL_DIR=$VIRTUAL_ENV/lib64 -DLIB_SUFFIX=64 -DMOD2C_ENABLE_LEGACY_UNITS=0 -DNRN_ENABLE_DOCS=ON ../nrn
             else
                 echo -e "Configuring local neuron build ..."
-                $cmake_binary -DPYTHON_EXECUTABLE=$(which python3) -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_INSTALL_LIBEXECDIR=libexec -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DIV_ENABLE_SHARED=1 -DNRN_AVOID_ABSOLUTE_PATHS=1 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_INTERVIEWS=1 -DNRN_ENABLE_PYTHON_DYNAMIC=1 -DNRN_ENABLE_REL_PATH=1 -DNRN_ENABLE_RX3D=1 -DNRN_ENABL_SHARED=1 -DNRN_ENABLE_THREADS=1 -DNRN_ENABLE_MECH_DLL_STYLE=1 -DLIB_INSTALL_DIR=$VIRTUAL_ENV/lib64 -DLIB_SUFFIX=64 -DMOD2C_ENABLE_LEGACY_UNITS=0 -DNRN_ENABLE_DOCS=ON ../nrn
+                $cmake_binary -DPYTHON_EXECUTABLE=$(which python3) -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_INSTALL_LIBEXECDIR=libexec -DCMAKE_SKIP_INSTALL_RPATH=0 -DCMAKE_SKIP_RPATH=0 -DIV_ENABLE_SHARED=1 -DNRN_AVOID_ABSOLUTE_PATHS=0 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_INTERVIEWS=1 -DNRN_ENABLE_PYTHON_DYNAMIC=1 -DNRN_ENABLE_RX3D=1 -DNRN_ENABLE_SHARED=1 -DNRN_ENABLE_THREADS=1 -DNRN_ENABLE_MECH_DLL_STYLE=1 -DLIB_INSTALL_DIR=$VIRTUAL_ENV/lib64 -DLIB_SUFFIX=64 -DMOD2C_ENABLE_LEGACY_UNITS=0 -DNRN_ENABLE_DOCS=ON ../nrn
             fi
             
             echo -e "Building neuron locally and installing ..."
@@ -335,7 +341,7 @@ function doneuron ()
             # try to see if neuron is in lib/site-packages/python3.10
             if [ ! -d ${lib_sites}/neuron ] ; then
                 # not found => try to see if it is in lib64_sites
-                if [ ! -d{lib64_sites}/neuron ] ; then
+                if [ ! -d ${lib64_sites}/neuron ] ; then
                     # not found there either;
                     # try to see if it is in lib/python
                     if [ -d ${VIRTUAL_ENV}/lib/python/neuron ] ; then
@@ -379,16 +385,6 @@ function make_scipyenrc ()
 # also sourced from ${HOME}/.bashrc in order for the function 'scipyact' to be
 # readily available to the user, at the console.
 #
-# Parameters::
-# $1 = absolute path to the virtual environment directory
-# $2 = absolute path to the custom built python installation (e.g. /usr/local)
-#       default: /usr/local
-#
-#       NOTE: ONLY USED IF PYTHON IS IN CUSTOM-BUILT
-#       
-# $3 = x.y, where x and y are, respectively, the major and minor verison of the
-#       python executable
-# test if python complains about platform dependent libs
 
 if [[ -z "$VIRTUAL_ENV" ]] ; then
     echo -e "Not in an active environment! Goodbye!\n"
@@ -437,6 +433,7 @@ echo ".bashrc has been modified in ${HOME}"
 echo "Sourcing ${HOME}/.bashrc"
 source ${HOME}/.bashrc
 fi
+shopt -u lastpipe
 fi
 }
 
@@ -452,7 +449,7 @@ function linkscripts ()
     mkdir -p ${HOME}/bin
     if [ -r ${HOME}/bin/scipyen ] ; then
         dt=`date '+%Y-%m-%d_%H-%M-%s'`
-        cp ${HOME}/bin/scipyen ${HOME}/bin/scipyen.$dt
+        mv ${HOME}/bin/scipyen ${HOME}/bin/scipyen.$dt
     fi
     ln -s ${scipyendir}/scipyen ${HOME}/bin/scipyen
 }
@@ -598,7 +595,7 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     fi
     
     # make scripts
-    #make_scipyenrc && update_bashrc && linkscripts
+    make_scipyenrc && update_bashrc && linkscripts
     
 fi
 
@@ -608,9 +605,12 @@ fi
 t=$SECONDS
 
 days=$(( t/86400 ))
-hours=$(( t/3600 - 24*days ))
-minutes=$(( t/60 - 1440*days ))
-seconds=$(( t - 85400*days))
+t=$(( t%(24*3600) ))
+hours=$(( t/3600 ))
+t=$(( t%3600 ))
+minutes=$(( t/60 ))
+t=$(( t % 60))
+seconds=$(( t ))
 
 echo "Execution time was $days days, $hours hours, $minutes minutes and $seconds seconds"
 
