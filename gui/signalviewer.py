@@ -2569,12 +2569,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     ywindow   = as above, for crosshair and horizontal cursors
                     labels         = 1D sequence of str for cursor IDs; must have as many
                         elements as supplied through the *where argument
+                    axis = index of the axis where the cursors are to be shown (default is 0)
         """
         xwindow = self.defaultCursorWindowSizeX
         ywindow = self.defaultCursorWindowSizeY
         labels  = None
         
-        allowed_keywords = ["xwindow", "ywindow", "labels"]
+        allowed_keywords = ["xwindow", "ywindow", "labels", "axis"]
         
         if len(kwargs) > 0:
             for key in kwargs.keys():
@@ -2590,6 +2591,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if "labels" in kwargs.keys():
                 labels = kwargs["labels"]
                 
+            axis = kwargs.get("axis", 0)
+                
                 
         if len(where) == 1:
             where = where[0]
@@ -2601,7 +2604,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.slot_removeCursors()
         self.displayFrame()
         #self._plotOverlayFrame_()
-        self.addCursors(*where, cursorType=cursorType, xwindow = xwindow, ywindow = ywindow, labels = labels)
+        self.addCursors(*where, cursorType=cursorType, xwindow = xwindow, ywindow = ywindow, labels = labels, axis=axis)
         
     @safeWrapper
     def reportCursors(self):
