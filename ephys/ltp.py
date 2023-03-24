@@ -1714,7 +1714,7 @@ def generate_LTP_options(cursors, signal_names, path0, path1, baseline_minutes, 
     however, be recorded in Signal5 by routing from the amplifier into another analog input
     in the CED board (if available!) and recording it by apropriately configuring the Signal5.
     
-    Failing that, one can use Vm=True in fruther analyses and supply the value of the test Vm pulse in 
+    Failing that, one can use Vm=True in further analyses and supply the value of the test Vm pulse in 
     signal_index_Vm in LTP functions.
     
     The CED issue is not of immediate importance as this kind of analysis is easily done in Signal5
@@ -2413,8 +2413,8 @@ def segment_synplast_params_v_clamp(s: neo.Segment, \
 
     #print("testVm", testVm)
     
-    Rs     = (testVm / (Irs - Idc)).rescale(dt.Mohm)
-    Rin    = (testVm / (Irin - Idc)).rescale(dt.Mohm)
+    Rs     = (testVm / (Irs - Idc)).rescale(pq.Mohm)
+    Rin    = (testVm / (Irin - Idc)).rescale(pq.Mohm)
         
     #print("dIRs", (Irs-Idc), "dIRin", (Irin-Idc), "Rs", Rs, "Rin", Rin)
         
@@ -2474,7 +2474,7 @@ def segment_synplast_params_v_clamp(s: neo.Segment, \
             event = stim
             
         elif len(s.events): # check for presyn stim event embedded in segment
-            ltp_events = [e for e in s.events if (e.event_type == TriggerEventType.presynaptic and isinstance(e.name, str) and e.name.strip().lower() == "ltp")]
+            ltp_events = [e for e in s.events if (isinstance(e, TriggerEvent) and e.event_type == TriggerEventType.presynaptic and isinstance(e.name, str) and e.name.strip().lower() == "ltp")]
             
             if len(ltp_events):
                 if len(ltp_events)>1:
@@ -2569,7 +2569,7 @@ def analyse_LTP_in_pathway(baseline_block: neo.Block, \
                                                             isi = isi)
 
     result = pd.concat([baseline_result, chase_result],
-                       ignore_index = True, axis=0, sort=True)
+                       ignore_index = True, axis=0)#, sort=True)
     
     # time index (minutes) relative to the first post-conditioning stimulus (set 
     # to minute zero); this is stored as the index of the data frame

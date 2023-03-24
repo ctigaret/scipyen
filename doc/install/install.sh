@@ -72,10 +72,10 @@ function upgrade_virtualenv ()
     havevenv=`python3 -m virtualenv --version`
     if [ -z $havenev ] ; then
         echo -e "Installing virtualenv locally...\n"
-        pip install --user virtualenv
+        python3 -m pip install --user virtualenv
     else
         echo -e "Upgrading virtualenv locally...\n"
-        pip install --user --upgrade virtualenv
+        pytyhon3 -m pip install --user --upgrade virtualenv
     fi
 }
 
@@ -133,7 +133,7 @@ function installpipreqs ()
         # by setting up the environment variable below
         # For details please see https://pypi.org/project/sklearn/
         export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
-        pip install -r "$installscriptdir"/pip_requirements.txt
+        python3 -m pip install -r "$installscriptdir"/pip_requirements.txt
         
         if [[ $? -ne 0 ]] ; then
             echo -e "Cannot install required packages from PyPI. Bailing out. Goodbye!\n"

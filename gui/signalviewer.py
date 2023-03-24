@@ -3323,6 +3323,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             crsId = "%s%s" % (crsPrefix, str(nCursors))
             
         else:
+            currentCursorLabels = cursorDict.keys()
+            
             crsId = label
             
         if precision is None:

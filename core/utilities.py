@@ -361,7 +361,19 @@ def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarra
 
 @isclose.register(str)
 def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
-    return x.lower() == y.lower()
+    # TODO/FIXME: 2023-03-24 15:51:03
+    # use difflib.SequenceMatcher
+    from difflib import SequenceMatcher
+    ret = SequenceMatcher(None, x, y).ratio()
+    
+    if isinstance(rtol, Number):
+        return ret >= 1.0-abs(rtol)
+    elif isinstance(atol, Number):
+        return ret >= 1.0-abs(atol)
+    else:
+        return ret == 1.0
+    
+    # return x.lower() == y.lower()
 
 @isclose.register(np.ndarray)
 def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
@@ -856,6 +868,10 @@ def total_size(o, handlers={}, verbose=False):
 @safeWrapper
 def hash_identity_test(x,y):
     return gethash(x) == gethash(y)
+
+def similar_strings(a:str, b:str):
+    from difflib import SequenceMatcher
+    return SequenceMatcher(None, a, b).ratio()
 
 @safeWrapper
 def safe_identity_test2(x, y):

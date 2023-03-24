@@ -199,7 +199,7 @@ from . import workspacefunctions
 from . import signalprocessing as sigp
 from . import utilities
 from core.utilities import (normalized_index, name_lookup,
-                            elements_types, index_of, isclose)
+                            elements_types, index_of, isclose, similar_strings)
 
 
 #from .patchneo import neo
@@ -2920,6 +2920,16 @@ def _(obj, **kwargs):
     rec_datetime = kwargs.pop("rec_datetime", datetime.datetime.now())
     annotations = kwargs.pop("annotations", dict())
     
+    # for kwarg in kwargs.keys():
+    #     if kwarg not in obj._child_containers:
+    #         similars = [s for s in obj._child_containers if s.lower() in kwarg.lower() or kwarg.lower() in s.lower()]
+    #         if len(similars):
+    #             raise KeyError(f"Unexpected keyword {kwarg}; did you mean one of {similars}?")
+    #         else:
+    #             raise KeyError(f"Unexpected keyword {kwarg}")
+    
+    
+    
     indexing = dict((s, kwargs.pop(s, None)) for s in obj._child_containers)
     ret = make_neo_object(obj)
     
@@ -3011,6 +3021,7 @@ def _(obj, **kwargs):
 @copy_with_data_subset.register(neo.Segment)
 def _(obj, **kwargs):
     from neo.core.spiketrainlist import SpikeTrainList
+    import difflib
     
     name = kwargs.pop("name", obj.name)
     description = kwargs.pop("description", obj.description)
@@ -3018,6 +3029,20 @@ def _(obj, **kwargs):
     file_datetime = kwargs.pop("file_datetime", None)
     rec_datetime = kwargs.pop("rec_datetime", datetime.datetime.now())
     annotations = kwargs.pop("annotations", dict())
+    
+    data_child_object_names = [_container_name(s) for s in obj._data_child_objects]
+    
+    for kw in kwargs:
+        if kw not in data_child_object_names:
+            similar = [s for s in data_child_object_names if similar_strings(kw,s)>0.5]
+            if len(similar):
+                if len(similar)> 1:
+                    raise KeyError(f"Unexpected keyword '{kw}'; did you mean one of {similar}?")
+                else:
+                    raise KeyError(f"Unexpected keyword '{kw}'; did you mean '{similar[0]}'?")
+                
+            else:
+                raise KeyError(f"Unexpected keyword '{kw}'")
     
     indexing = dict((_container_name(s), kwargs.pop(_container_name(s), None)) for s in obj._data_child_objects)
         
