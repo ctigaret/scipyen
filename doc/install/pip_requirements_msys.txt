@@ -189,7 +189,7 @@ srsly
 stack-data
 statsmodels
 sympy
-tables ; python_version >= '3.9.7'
+#tables ; python_version >= '3.9.7'
 tabulate
 tenacity
 terminado

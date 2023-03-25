@@ -145,6 +145,11 @@ from here https://sourceforge.net/projects/vcxsrv/files/latest/download
     - python-scikit-image => python-scipy, python-imageio, python-networkx, python-tiffile & others
     - python-scikit-learn => python-threadpoolctl, python-joblib
     - python-scikit-build => python-wheel, python-distro
+    - python-statsmodels  => python-patsy, python-scipy
+    - python-nose
+    - python-sympy         => python-mpmath, python-gmpy
+    - python-cx-freeze
+    - python-
       
     
     ```bash
