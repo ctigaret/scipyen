@@ -160,7 +160,7 @@ pyparsing
 #pyqt5-tools ; sys_platform == 'win32'
 pyqtgraph
 pytest
-python-magic
+#python-magic
 pytz
 pywin32 ; sys_platform == 'win32'
 pyxdg
