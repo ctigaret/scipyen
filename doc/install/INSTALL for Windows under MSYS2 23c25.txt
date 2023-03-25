@@ -19,7 +19,7 @@
 ✓    openexr 
 ✓    hdf5 
 ✓    fftw 
-    zlib
+✓    zlib
     ffmpeg
 ✓    boost & boost-numpy, boost-threads, boost-graph 
 ✓    qt5 
