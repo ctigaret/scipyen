@@ -195,7 +195,7 @@ tenacity
 terminado
 testpath
 #thinc
-tiffile
+#tiffile
 #tokenizers
 torch
 #tqdm
