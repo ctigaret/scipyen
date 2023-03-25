@@ -171,7 +171,7 @@ from here https://sourceforge.net/projects/vcxsrv/files/latest/download
       virtualenv   20.21.0
     
     ```
-  * clone git repositories for `editdistance`, `murmurhash`, `cymem`, `preshed`, `spacy`
+  * clone git repositories for `editdistance`, `murmurhash`, `cymem`, `preshed`
   and build locally:
     ```bash
     mkdir src && cd src
@@ -190,11 +190,6 @@ from here https://sourceforge.net/projects/vcxsrv/files/latest/download
     python3 setup.py install
     git clone https://github.com/explosion/preshed.git
     cd preshed
-    python3 setup.py build
-    python3 setup.py install
-    cd ..
-    git clone https://github.com/explosion/spaCy.git
-    cd spaCy
     python3 setup.py build
     python3 setup.py install
     cd ..

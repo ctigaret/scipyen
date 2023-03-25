@@ -194,7 +194,7 @@ tabulate
 tenacity
 terminado
 testpath
-thinc
+#thinc
 tiffile
 tokenizers
 torch
