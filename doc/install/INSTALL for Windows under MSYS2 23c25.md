@@ -1,0 +1,121 @@
+# Using Scipyen in Windows
+
+We will use a virtual UN*X-like environment provided by [MSYS2](https://www.msys2.org/)
+
+## Step 1. Install [msys2](https://www.msys2.org/)
+
+NOTE: `msys2` installer will create a separate directory tree wherever it is installed.
+
+### MSYS2 installation directory
+By default, `msys2` is installed in `c:\msys64` but you can choose a drive (partition)
+with more space e.g. `e:\`. You can also give whatever name you want to where
+`msys2` wil be installed, but **do avoid spaces, accented characters or any non-ascii
+characters in the directory name**.
+
+Below, we assume `msys2` was installed on the `E:\` drive, in the `E:\msys64`
+directory. We refer to this directory as the **msys2 installation directory**.
+
+### MSYS2 Environment ≠ Python virtual environment!
+`E:\msys64` contains several directories named after the virtual UN\*X - like 
+[*environments*](https://www.msys2.org/docs/environments/) that `msys2` provides.
+
+Of these, we use `ucrt64` environment. The windows executable giving you a shell
+into it is launched with the `MSYS2 UCRT64` icon created by the `msys2` installer.
+
+One can also use the all new and shiny "Windows Terminal", see the [msys2](https://www.msys2.org/)
+web site for how to set this up.
+
+Alongside the `msys2`'s UN\*X environment-specific directories there are several
+other directories used in common by the environments: `dev`, `etc`, **`home`**, `opt`,
+`tmp`, `usr`, `var`.
+
+Your $HOME directory (from the point of view of the UN\*X environment you are 
+running) is located in `E:\msys64\home\<user name>` (shown in **`boldface`** above) 
+and corresponds to the `/home/<user name>` directory inside the UN*X shell.
+
+The Scipyen git repository and the *virtual python environment* needed to run 
+Scipyen will be located in your UN\*X home directory!
+
+## Step 2 Install msys2 packages.
+
+Launch `msys2 ucrt64` terminal, then install the packages listed in the table 
+below.
+
+**NOTE:**
+
+* search a package with 
+```bash
+pacman -Ss
+```
+* to limit searching to packages suitable for the ucrt64 environment, call:
+```bash
+  pacman -Ss <name> | grep ucrt64
+```
+* install packages specifically for the MSYS2 environment (in this case, `ucrt64`) using [`pacboy`](https://www.msys2.org/docs/package-naming/)[^pacboy] 
+```bash
+pacboy -S<name of package>:u
+```
+examples from history:
+```bash
+    2  pacman -S mingw-w64-ucrt-x86_64-gcc
+    4  pacman -Ss fftw
+    5  pacman -S mingw-w64-ucrt-x86_64-fftw
+    6  pacman -S pactoys
+    7  pacboy help
+    8  pacman -Ss libtiff
+    9  pacboy -S libtiff:u
+```
+[^pacboy]: This is installed with `pactoys`. When using `pacboy` the name of the 
+package does not need to befully-qualified; you can just give the name of the 
+software you want and `pacboy` will resolve the package name based on what is 
+available and the environment (the `:u` switch at the end). See [here]()
+for details.
+
+   | Packages                                                          |   Hermes |  Bruker
+   | :-----------------------------------------------------------------| :--------| :------
+   | pactoys (for pacboy)                                              |   ✓      |  ✓
+   | base-devel                                                        |   ✓      | 
+   | gcc                                                               |   ✓      |  ✓
+   | toolchain (includes gcc, make, binutils, etc)                     |   ✓      |  ✓
+   | autptools (pacman -S autotools)                                   |   ✓      | 
+   | cmake (ucrt64 version; see msys2.org site for details)            |   ✓      |  ✓
+   | bison                                                             |   ✓      |  ✓
+   | bisonc++ [^bisonc]                                                |   ✓      |  ✓
+   | flex                                                              |   ✓      |  ✓
+   | flex c++ [^flexc]                                                 |   ✓      |  ✓
+   | git # NOTE: use pacman -S git                                     |   ✓      |  ✓
+   | doxygen [^docygen]                                                |   ✓      |  ✓
+   | mpi (openmpi)                                                     |          | 
+   | X11 ?                                                             |          | 
+   | ncurses                                                           |   ✓      |  ✓
+   | xcomposite ?                                                      |          | 
+   | python                                                            |   ✓      |  ✓
+   | libtiff                                                           |   ✓      |  ✓
+   | libpng                                                            |   ✓      |  ✓
+   | libjpeg                                                           |   ✓      |  ✓
+   | zlib                                                              |   ✓      |  ✓
+   | openexr                                                           |   ✓      |  ✓
+   | hdf5                                                              |   ✓      |  ✓
+   | fftw                                                              |   ✓      |  ✓
+   | ffmpeg                                                            |   ✓      |  ✓
+   | boost & boost-numpy, boost-threads, boost-graph                   |   ✓      |  ✓ 
+   | qt5                                                               |   ✓      |  ✓
+   | python-pyqt5                                                      |   ✓      | 
+   | pyqt5-sip                                                         |   ✓      | 
+   | vigra (installs python-numpy)                                     |   ✓      | 
+   | python-pip                                                        |   ✓      | 
+   | ### experimenting                                                 |          | 
+   | cmakerc                                                           |   ✓      | 
+   | gnuplot                                                           |   ✓      | 
+   | ### useful                                                        |          | 
+   | man                                                               |   ✓      |
+   | info (∈)                                                          |   ✓      |  ✓
+
+
+4. install VcXsrv Windows X server
+    from here https://sourceforge.net/projects/vcxsrv/files/latest/download
+    
+    
+[^bisonc]: use `pacman -S bison pacman -S bisonc++`
+[^flexc]: use `pacman -S flex pacman -S flex++`
+[^doxygen]: use `pacman -S doxygen then pacboy -S doxygen:u`

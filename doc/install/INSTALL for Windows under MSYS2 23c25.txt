@@ -1,37 +1,13 @@
 1. install msys2
 2. launch msys2 ucrt64 terminal, then INSIDE the ucrt64 terminal →
 3. install:
-✓    gcc 
-✓    toolchain (includes gcc, make, binutils, etc) 
-✓    cmake 
-✓    bison bisonc++ # NOTE: use pacman -S bison pacman -S bisonc++ 
-✓    flex flex c++ # NOTE: use pacman -S flex pacman -S flex++ 
-✓    git # NOTE: use pacman -S git
-✓    doxygen # NOTE: use pacman -S doxygen the pacboy -S doxygen:u
-✓    python
-    mpi (openmpi)
-    X11
-    ncurses
-    xcomposite
-✓    libtiff 
-✓    libpng 
-✓    libjpeg 
-✓    openexr 
-✓    hdf5 
-✓    fftw 
-✓    zlib
-✓    ffmpeg
-✓    boost & boost-numpy, boost-threads, boost-graph 
-✓    qt5 
-    
-    
-    
-    
-4. (examples from history:)
 # install pactoys then
 # search package with pacman -Ss
-# install specificcally for the MSYS2 environment 
+# to limit results to the ucrt64 environment, call:
+#   pacman -Ss <name> | grep ucrt64
+# install specifically for the MSYS2 environment 
 #   ( in this case, ucrt64) using pacboy -S<name of package(*)>:u
+# (examples from history:)
     2  pacman -S mingw-w64-ucrt-x86_64-gcc
     4  pacman -Ss fftw
     5  pacman -S mingw-w64-ucrt-x86_64-fftw
@@ -39,7 +15,51 @@
     7  pacboy help
     8  pacman -Ss libtiff
     9  pacboy -S libtiff:u
-(*) when using pacby the name of the package need not be fully-qualified;
+(*) when using pacboy the name of the package need not be fully-qualified;
 you can just give the namem of the softyware you want; pacboy will resolve
 the package name based on what is available and the environment (the :u switch
 at the end)
+packages                                                            Hermes  Bruker
+----------------------------------------------------------------------------------
+pactoys (for pacboy)                                                ✓       ✓
+base-devel                                                          ✓
+gcc                                                                 ✓       ✓
+toolchain (includes gcc, make, binutils, etc)                       ✓       ✓
+autptools (pacman -S autotools)                                     ✓
+cmake (ucrt64 version; see msys2.org site for details)              ✓       ✓
+bison                                                               ✓       ✓
+bisonc++ # NOTE: use pacman -S bison pacman -S bisonc++             ✓       ✓
+flex                                                                ✓       ✓
+flex c++ # NOTE: use pacman -S flex pacman -S flex++                ✓       ✓
+git # NOTE: use pacman -S git                                       ✓       ✓
+doxygen # NOTE: use pacman -S doxygen then pacboy -S doxygen:u      ✓       ✓
+mpi (openmpi)
+X11 ?
+ncurses                                                             ✓       ✓
+xcomposite ?
+python                                                              ✓       ✓
+libtiff                                                             ✓       ✓
+libpng                                                              ✓       ✓
+libjpeg                                                             ✓       ✓
+zlib                                                                ✓       ✓
+openexr                                                             ✓       ✓
+hdf5                                                                ✓       ✓
+fftw                                                                ✓       ✓
+ffmpeg                                                              ✓       ✓
+boost & boost-numpy, boost-threads, boost-graph                     ✓       ✓         
+qt5                                                                 ✓       ✓
+python-pyqt5                                                        ✓
+pyqt5-sip                                                           ✓
+vigra (installs python-numpy)                                       ✓
+python-pip                                                          ✓ 
+### experimenting
+cmakerc                                                             ✓
+gnuplot                                                             ✓
+### useful
+man                                                                 ✓       
+info (∈)                                                            ✓       ✓
+
+4. install VcXsrv Windows X server
+    from here https://sourceforge.net/projects/vcxsrv/files/latest/download
+    
+    
