@@ -126,18 +126,24 @@ from here https://sourceforge.net/projects/vcxsrv/files/latest/download
 ## Step 4 Run the scipyen install script
 
 **Update 2023-03-25 18:03:56**
-  * Before running the scipyen install.sh script, install directly in msys2:
-    - via pacman:
-      - python-cython
-      - python-numpy
-      - python-pywavelets
-      - python-matplotlib
-      - python-matplotlib-inline
-      - python-seaborn
-      - python-pandas
-      - python-numexpr
-      - python-pywin32
-      - python-pywin32-ctypes
+  * Before running the scipyen install.sh script, install directly in msys2, via `pacman -S`
+  (or `pacboy -S <name>:u`)
+    - python-cython
+    - python-numpy
+    - python-pywavelets
+    - python-matplotlib
+    - python-matplotlib-inline
+    - python-seaborn
+    - python-pandas
+    - python-numexpr
+    - python-pywin32
+    - python-pywin32-ctypes
+    - python-pyqt5
+    - python-pyqt5-3d
+    - python-scikit-image => python-scipy, python-imageio, python-networkx, python-tiffile & others
+    - python-scikit-learn => python-threadpoolctl, python-joblib
+    - python-scikit-build => python-wheel, python-distro
+      
     
     ```bash
       $ python3 -m pip list
