@@ -156,14 +156,29 @@ from here https://sourceforge.net/projects/vcxsrv/files/latest/download
       virtualenv   20.21.0
     
     ```
-  * clone `editdistance` git repository:
+  * clone packages from Explosion: `editdistance`, `murmurhash`, `cymem`, `preshed` git repository:
     ```bash
     mkdir src && cd src
     git clone https://github.com/roy-ht/editdistance
     cd editdistance
-    python setup.py build
-    python setup.py install
-    ```
+    python3 setup.py build
+    python3 setup.py install
+    git clone https://github.com/explosion/murmurhash.git
+    cd murmurhash
+    python3 setup.py build
+    python3 setup.py install
+    cd ..
+    git clone https://github.com/explosion/cymem.git
+    cd cymem
+    python3 setup.py build
+    python3 setup.py install
+    git clone https://github.com/explosion/preshed.git
+    cd preshed
+    python3 setup.py build
+    python3 setup.py install
+    cd ..
+  ```
+  
   * finally, call (pip packages already installed in the steps above will be skipped):
 ```bash
 python3 -m pip install -r scipyen/doc/install/pip_requirements.txt
