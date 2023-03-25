@@ -1,28 +1,28 @@
 1. install msys2
 2. launch msys2 ucrt64 terminal, then INSIDE the ucrt64 terminal →
 3. install:
-    gcc ✓
-    toolchain (includes gcc, make, binutils, etc) ✓
-    cmake ✓
-    cmake-gui
-    bison 
-    flex
-    doxygen
-    python
+✓    gcc 
+✓    toolchain (includes gcc, make, binutils, etc) 
+✓    cmake 
+✓    bison bisonc++ # NOTE: use pacman -S bison pacman -S bisonc++ 
+✓    flex flex c++ # NOTE: use pacman -S flex pacman -S flex++ 
+✓    git # NOTE: use pacman -S git
+✓    doxygen # NOTE: use pacman -S doxygen the pacboy -S doxygen:u
+✓    python
     mpi (openmpi)
     X11
     ncurses
     xcomposite
-    libtiff ✓
-    libpng ✓
-    libjpeg ✓
-    openexr ✓
-    hdf5 ✓
-    fftw ✓
+✓    libtiff 
+✓    libpng 
+✓    libjpeg 
+✓    openexr 
+✓    hdf5 
+✓    fftw 
     zlib
     ffmpeg
-    boost & boost-numpy, boost-threads, boost-graph ✓
-    qt5 ✓
+✓    boost & boost-numpy, boost-threads, boost-graph 
+✓    qt5 
     
     
     
