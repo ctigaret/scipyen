@@ -3,9 +3,11 @@
 3. install:
     gcc ✓
     toolchain (includes gcc, make, binutils, etc) ✓
-    cmake
-    bison
+    cmake ✓
+    cmake-gui
+    bison 
     flex
+    doxygen
     python
     mpi (openmpi)
     X11
@@ -17,10 +19,10 @@
     openexr ✓
     hdf5 ✓
     fftw ✓
+    zlib
+    ffmpeg
     boost & boost-numpy, boost-threads, boost-graph ✓
     qt5 ✓
-    ffmpeg
-    doxygen
     
     
     
