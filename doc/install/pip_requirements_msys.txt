@@ -113,7 +113,7 @@ language_tool_python
 lazy_loader
 lesscpy
 libNeuroML
-linguistics
+#linguistics
 lxml
 matlab_kernel
 matplotlib
