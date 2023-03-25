@@ -196,9 +196,9 @@ terminado
 testpath
 #thinc
 tiffile
-tokenizers
+#tokenizers
 torch
-tqdm
+#tqdm
 traitlets
 transformers
 twine
