@@ -180,9 +180,9 @@ slytherin
 smart-open
 smmap
 sniffio
-spacy
-spacy-legacy
-spacy-loggers
+#spacy
+#spacy-legacy
+#spacy-loggers
 sphinx          
 sphinx_rtd_theme
 srsly

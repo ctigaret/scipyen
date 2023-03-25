@@ -140,6 +140,8 @@ from here https://sourceforge.net/projects/vcxsrv/files/latest/download
     - python-pywin32-ctypes
     - python-pyqt5
     - python-pyqt5-3d
+    - python-qtpy
+    - python-pyqtgraph
     - python-scikit-image => python-scipy, python-imageio, python-networkx, python-tiffile & others
     - python-scikit-learn => python-threadpoolctl, python-joblib
     - python-scikit-build => python-wheel, python-distro
@@ -164,7 +166,8 @@ from here https://sourceforge.net/projects/vcxsrv/files/latest/download
       virtualenv   20.21.0
     
     ```
-  * clone packages from Explosion: `editdistance`, `murmurhash`, `cymem`, `preshed` git repository:
+  * clone git repositories for `editdistance`, `murmurhash`, `cymem`, `preshed`, `spacy`
+  and build locally:
     ```bash
     mkdir src && cd src
     git clone https://github.com/roy-ht/editdistance
@@ -185,13 +188,18 @@ from here https://sourceforge.net/projects/vcxsrv/files/latest/download
     python3 setup.py build
     python3 setup.py install
     cd ..
+    git clone https://github.com/explosion/spaCy.git
+    cd spaCy
+    python3 setup.py build
+    python3 setup.py install
+    cd ..
+    
   ```
   
   * finally, call (pip packages already installed in the steps above will be skipped):
-```bash
-python3 -m pip install -r scipyen/doc/install/pip_requirements.txt
-```
-then 
+  ```bash
+    sh scipyen/doc/install/install.sh
+  ```
 
 **NOTES:** 
 
