@@ -136,6 +136,8 @@ from here https://sourceforge.net/projects/vcxsrv/files/latest/download
       - python-seaborn
       - python-pandas
       - python-numexpr
+      - python-pywin32
+      - python-pywin32-ctypes
     
     ```bash
       $ python3 -m pip list

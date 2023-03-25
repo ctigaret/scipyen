@@ -492,6 +492,10 @@ reinstall_neuron=0
 reinstall_pips=0
 for_msys=0
 
+if [ -n $MSYSTEM_PREFIX ] ; then
+    for_msys=1
+fi
+
 for i in "$@" ; do
     case $i in
         --with_neuron)
