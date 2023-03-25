@@ -133,7 +133,11 @@ function installpipreqs ()
         # by setting up the environment variable below
         # For details please see https://pypi.org/project/sklearn/
         export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
-        python3 -m pip install -r "$installscriptdir"/pip_requirements.txt
+        if [[ $for_msys -eq 1 ]] ; then
+            python3 -m pip install -r "$installscriptdir"/pip_requirements_msys.txt
+        else
+            python3 -m pip install -r "$installscriptdir"/pip_requirements.txt
+        fi
         
         if [[ $? -ne 0 ]] ; then
             echo -e "Cannot install required packages from PyPI. Bailing out. Goodbye!\n"
@@ -486,6 +490,7 @@ reinstall_pyqt5=0
 reinstall_vigra=0
 reinstall_neuron=0
 reinstall_pips=0
+for_msys=0
 
 for i in "$@" ; do
     case $i in
@@ -534,6 +539,10 @@ for i in "$@" ; do
             *)
             ;;
         esac
+        ;;
+        --msys)
+        for_msys=1
+        shift
         ;;
         --about)
         showinstalldoc
