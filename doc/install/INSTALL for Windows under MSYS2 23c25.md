@@ -51,7 +51,8 @@ pacman -Ss
 ```bash
   pacman -Ss <name> | grep ucrt64
 ```
-* install packages specifically for the MSYS2 environment (in this case, `ucrt64`) using [`pacboy`](https://www.msys2.org/docs/package-naming/)[^pacboy] 
+* install packages specifically for the MSYS2 environment in use (in this case, 
+`ucrt64`) using [`pacboy`](https://www.msys2.org/docs/package-naming/)[^pacboy] :
 ```bash
 pacboy -S<name of package>:u
 ```
@@ -68,7 +69,7 @@ examples from history:
 [^pacboy]: This is installed with `pactoys`. When using `pacboy` the name of the 
 package does not need to befully-qualified; you can just give the name of the 
 software you want and `pacboy` will resolve the package name based on what is 
-available and the environment (the `:u` switch at the end). See [here]()
+available and the environment (the `:u` switch at the end). See [here](https://www.msys2.org/docs/package-naming/)
 for details.
 
    | Packages                                                          |   Hermes |  Bruker
@@ -83,6 +84,7 @@ for details.
    | bisonc++ [^bisonc]                                                |   ✓      |  ✓
    | flex                                                              |   ✓      |  ✓
    | flex c++ [^flexc]                                                 |   ✓      |  ✓
+   | llvm (needed to build python-blis), lld, clang, compiler-rt       |
    | git # NOTE: use pacman -S git                                     |   ✓      |  ✓
    | doxygen [^docygen]                                                |   ✓      |  ✓
    | mpi (openmpi)                                                     |          | 
@@ -90,6 +92,7 @@ for details.
    | ncurses                                                           |   ✓      |  ✓
    | xcomposite ?                                                      |          | 
    | python                                                            |   ✓      |  ✓
+   | cython                                                            |   ✓      |  ✓
    | libtiff                                                           |   ✓      |  ✓
    | libpng                                                            |   ✓      |  ✓
    | libjpeg                                                           |   ✓      |  ✓
@@ -104,18 +107,32 @@ for details.
    | pyqt5-sip                                                         |   ✓      | 
    | vigra (installs python-numpy)                                     |   ✓      | 
    | python-pip                                                        |   ✓      | 
-   | ### experimenting                                                 |          | 
+   | ** experimenting **                                               |          | 
    | cmakerc                                                           |   ✓      | 
    | gnuplot                                                           |   ✓      | 
-   | ### useful                                                        |          | 
+   | ** useful stuff **                                                |          | 
    | man                                                               |   ✓      |
    | info (∈)                                                          |   ✓      |  ✓
 
 
-4. install VcXsrv Windows X server
-    from here https://sourceforge.net/projects/vcxsrv/files/latest/download
+## Step 3 install VcXsrv Windows X server
+from here https://sourceforge.net/projects/vcxsrv/files/latest/download
     
     
 [^bisonc]: use `pacman -S bison pacman -S bisonc++`
 [^flexc]: use `pacman -S flex pacman -S flex++`
 [^doxygen]: use `pacman -S doxygen then pacboy -S doxygen:u`
+
+## Step 4 Run the scipyen install script
+
+**NOTES:** 
+
+1. Some of the `PyPI` packages listed in `scipyen/doc/install/pip_requirements.txt`
+are not available as binary packages; therefore, `pip` will download their `sdist` 
+versions and try to compile locally. Depending on what msys environment provides, 
+some packages may fail to compile (see below). These packages can be installed
+directly in msys2 using `pacman` and therefore will be skipped by install.sh:
+  * `pywavelets` → `pacboy -S python-pywavelets:u`
+  * 
+  
+2. The "platform" reported by python executable will still be `win32` !!!

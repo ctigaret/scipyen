@@ -48,7 +48,7 @@ asttokens
 attrs
 base32hex
 bleach
-blis
+blis ; sys_platform == 'linux'
 bokeh
 cachetools
 catalogue
