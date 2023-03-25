@@ -69,7 +69,7 @@ cython
 debugpy
 descartes
 dill
-editdistance
+#editdistance
 exceptiongroup
 executing
 filelock
@@ -148,7 +148,7 @@ pkginfo
 platformdirs
 plotly
 plotnine
-preshed; sys-platform == "linux"
+preshed
 prometheus-client
 prompt-toolkit
 psutil

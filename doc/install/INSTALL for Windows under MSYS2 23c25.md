@@ -125,6 +125,51 @@ from here https://sourceforge.net/projects/vcxsrv/files/latest/download
 
 ## Step 4 Run the scipyen install script
 
+**Update 2023-03-25 18:03:56**
+  * Before running the scipyen install.sh script, install directly in msys2:
+    - via pacman:
+      - python-cython
+      - python-numpy
+      - python-pywavelets
+      - python-matplotlib
+      - python-matplotlib-inline
+      - python-seaborn
+      - python-pandas
+      - python-numexpr
+    
+    ```bash
+      $ python3 -m pip list
+      Package      Version
+      ------------ -------
+      asciidoc     10.2.0
+      Cython       0.29.33
+      distlib      0.3.6
+      editdistance 0.6.2
+      filelock     3.10.4
+      numpy        1.24.2
+      pip          23.0.1
+      platformdirs 3.1.1
+      PyQt5        5.15.9
+      PyQt5-sip    12.11.1
+      PyWavelets   1.4.1
+      setuptools   67.6.0
+      virtualenv   20.21.0
+    
+    ```
+  * clone `editdistance` git repository:
+    ```bash
+    mkdir src && cd src
+    git clone https://github.com/roy-ht/editdistance
+    cd editdistance
+    python setup.py build
+    python setup.py install
+    ```
+  * finally, call (pip packages already installed in the steps above will be skipped):
+```bash
+python3 -m pip install -r scipyen/doc/install/pip_requirements.txt
+```
+then 
+
 **NOTES:** 
 
 1. Some of the `PyPI` packages listed in `scipyen/doc/install/pip_requirements.txt`
@@ -136,3 +181,7 @@ directly in msys2 using `pacman` and therefore will be skipped by install.sh:
   * 
   
 2. The "platform" reported by python executable will still be `win32` !!!
+
+3. The following packages can be installed in your `msys2` `(ucrt64)` environment
+and therefore will be skipped by the `install.sh` script:
+  * cython
