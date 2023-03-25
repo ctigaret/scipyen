@@ -1,0 +1,43 @@
+1. install msys2
+2. launch msys2 ucrt64 terminal, then INSIDE the ucrt64 terminal →
+3. install:
+    gcc ✓
+    toolchain (includes gcc, make, binutils, etc) ✓
+    cmake
+    bison
+    flex
+    python
+    mpi (openmpi)
+    X11
+    ncurses
+    xcomposite
+    libtiff ✓
+    libpng ✓
+    libjpeg ✓
+    openexr ✓
+    hdf5 ✓
+    fftw ✓
+    boost & boost-numpy, boost-threads, boost-graph ✓
+    qt5 ✓
+    ffmpeg
+    doxygen
+    
+    
+    
+    
+4. (examples from history:)
+# install pactoys then
+# search package with pacman -Ss
+# install specificcally for the MSYS2 environment 
+#   ( in this case, ucrt64) using pacboy -S<name of package(*)>:u
+    2  pacman -S mingw-w64-ucrt-x86_64-gcc
+    4  pacman -Ss fftw
+    5  pacman -S mingw-w64-ucrt-x86_64-fftw
+    6  pacman -S pactoys
+    7  pacboy help
+    8  pacman -Ss libtiff
+    9  pacboy -S libtiff:u
+(*) when using pacby the name of the package need not be fully-qualified;
+you can just give the namem of the softyware you want; pacboy will resolve
+the package name based on what is available and the environment (the :u switch
+at the end)
