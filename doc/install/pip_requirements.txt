@@ -148,7 +148,7 @@ pkginfo
 platformdirs
 plotly
 plotnine
-preshed; sys-platform == "linux"
+preshed; sys_platform == "linux"
 prometheus-client
 prompt-toolkit
 psutil
