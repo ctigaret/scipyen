@@ -197,7 +197,7 @@ testpath
 #thinc
 #tiffile
 #tokenizers
-torch
+#torch
 #tqdm
 traitlets
 transformers
