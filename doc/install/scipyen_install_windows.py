@@ -190,11 +190,7 @@ def make_scipyact_vs64(pyvenv):
 
     pyvenvactivation = os.path.join(pyvenv, "Scripts", "activate.bat")
 
-    vcvarsall = os.path.join("C:\\", "Program Files (x86)", "Microsoft Visual Studio",
-                             "2019", "Community", "VC", "Auxiliary", "Build","vcvarsall.bat")
-
-    if not os.path.isfile(vcvarsall):
-        raise OSError("Please install VisualStudio 2019 and try again")
+    vcvarsall = check_visualstudio()
 
     if os.path.isfile(script):
         name, ext = os.path.splitext(script)
@@ -217,11 +213,7 @@ def make_vs64_bat():
 
     vs64script = os.path.join(userscripts, "vs64.bat")
 
-    vcvarsall = os.path.join("C:\\", "Program Files (x86)", "Microsoft Visual Studio",
-                             "2019", "Community", "VC", "Auxiliary", "Build","vcvarsall.bat")
-
-    if not os.path.isfile(vcvarsall):
-        raise OSError("Please install VisualStudio 2019 and try again")
+    vcvarsall = check_visualstudio()
 
     if os.path.isfile(vs64script):
         name, ext = os.path.splitext(vs64script)
@@ -276,27 +268,133 @@ def make_launch_script(pyvenv, scipydir):
         batch_file.write(f"call {pyvenvactivation}\n")
         batch_file.write(f"cmd /C 'python {scipystartup}' \n")
 
+def check_visualstudio():
+    vcvarsall = os.path.join("C:\\", "Program Files (x86)", "Microsoft Visual Studio",
+                             "2019", "Community", "VC", "Auxiliary", "Build","vcvarsall.bat")
+
+    if not os.path.isfile(vcvarsall):
+        raise OSError("Please install VisualStudio 2019 and try again")
+
+    return vcvarsall
+
+def check_wget():
+    wget = os.path.join("C:\\", "Program Files (x86)", "GnuWin32", "bin", "wget.exe")
+    if not os.path.isfile(wget):
+        raise OSError("Please install GNU wget from https://sourceforge.net/projects/gnuwin32/ and try again")
+
+    return wget
+
+def pre_install():
+    vcvarsall = check_visualstudio()
+    wget = check_wget()
+
+    virtual_env_name = f"{get_env_name()}.{get_pyver()}"
+
+    ve_home = get_env_home()
+
+    realscript = __file__
+
+    print(f"realscript={realscript}")
+
+    virtual_env_path = makevirtenv(ve_home, virtual_env_name)
+
+    if len(virtual_env_path.strip()):
+        make_scipyact(virtual_env_path)
+        make_scipyact_vs64(virtual_env_path)
+        make_vs64_bat()
+
+    reqsfile=os.path.join(os.path.dirname(realscript), "pip_requirements.txt")
+
+    installpipreqs(virtual_env_path, reqsfile)
+
+    userhome = os.getenv("USERPROFILE")
+    userpath = os.getenv("PATH")
+
+    userscripts = os.path.join(userhome, "Scripts")
+
+    if not os.path.isdir(userscripts):
+        os.mkdir(userscripts)
+
+    if userscripts not in userpath:
+        newpath=";".join([userpath, "Scripts"])
+        subprocess.run(f"setx PATH {newpath}", shell=True, check=True)
+        os.environ["PATH"]=newpath
+
+    print("Now, restart console, call scipyact_vs64, then run this script again")
 
 
-virtual_env_name = f"{get_env_name()}.{get_pyver()}"
+def make_sdk_src():
 
-ve_home = get_env_home()
+    virtual_env, venv_drive = get_venv()
 
-realscript = __file__
+    sdk_src = os.path.join(virtual_env, "src")
 
-print(f"realscript={realscript}")
+    if not os.path.isdir(sdk_src):
+        venv_drive = os.path.splitdrive(virtual_env)[0]
+        subprocess.run(f"{venv_drive} && cd {virtual_env} && mkdir src",
+                       shell=True, check=True)
 
-virtual_env_path = makevirtenv(ve_home, virtual_env_name)
+def get_venv():
+    if "VIRTUAL_ENV" not in os.environ:
+        raise OSError("You must run this after activating the python environment")
+    virtual_env = os.environ["VIRTUAL_ENV"]
+    venv_drive = os.path.splitdrive(virtual_env)[0]
 
-if len(virtual_env_path.strip()):
-    make_scipyact(virtual_env_path)
-    make_scipyact_vs64(virtual_env_path)
-    make_vs64_bat()
+    return virtual_env, venv_drive
 
-reqsfile=os.path.join(os.path.dirname(realscript), "pip_requirements.txt")
+def wget_fftw():
+    make_sdk_src()
+    venv, vdrive = get_venv()
+    wget = check_wget()
+    #print(f"wget: {wget}")
+    new_path = ";".join([os.environ["PATH"], os.path.dirname(wget)])
+    os.environ["PATH"] = new_path
+    fftw_src = os.path.join(venv, "src", "fftw")
+    #print(f"fftw_src: {fftw_src}")
+    if not os.path.isdir(fftw_src):
+        src = os.path.join(venv, "src")
+        #print(f"src: {src}")
+        subprocess.run(f"{vdrive} && cd {src} && mkdir fftw",
+                       shell=True, check=True)
 
-installpipreqs(virtual_env_path, reqsfile)
+    os.chdir(fftw_src)
+    if not os.path.isfile(os.path.join(fftw_src, "fftw-3.3.5-dll64.zip")):
+    #print(os.environ["PATH"])
+        subprocess.run(f"wget --no-check-certificate https://fftw.org/pub/fftw/fftw-3.3.5-dll64.zip",
+                    shell=True, check=True)
+
+    subprocess.run(f"tar -xf fftw-3.3.5-dll64.zip")
+
+    for f in ["libfftw3-3.def", "libfftw3f-3.def", "libfftw3l-3.def"]:
+        subprocess.run(f"lib /machine:x64 /def:{f}",
+                       shell=True, check=True)
+
+    dist = dict()
+    dist["*.exe"] = os.path.join(venv, "bin")
+    dist["*.dll"] = os.path.join(venv, "bin")
+    dist["*.lib"] = os.path.join(venv, "Lib")
+    dist["*.def"] = os.path.join(venv, "Lib")
+    dist["*.exp"] = os.path.join(venv, "Lib")
+    dist["*.h"] = os.path.join(venv, "include")
+
+
+    for k,v in dist.items():
+        subprocess.run(f"copy {k} {v}",
+                       shell=True, check=True)
+
+    #pass
 
 
 
+#print(f"name={__name__}")
+
+if __name__ == "__main__":
+    if "VIRTUAL_ENV" in os.environ:
+        # we're in a virtual environment already - start building the sdk'
+        print("inside virtualenv")
+        make_sdk_src()
+        wget_fftw()
+
+    else:
+        pre_install()
 

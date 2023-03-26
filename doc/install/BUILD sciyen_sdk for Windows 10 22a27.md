@@ -329,7 +329,7 @@ then copy:
 Then copy COPYING, COPYRIGHT, NEWS, README* to %SDK%\share\doc\fftw3\
 
 ### tiff - requires jpeg;
-Will be buit wothout support for OpenGL and deflate.
+Will be buit without support for OpenGL and deflate.
 
 In e:\scipyen_sdk_src run:
 
