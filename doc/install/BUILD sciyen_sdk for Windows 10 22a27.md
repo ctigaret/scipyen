@@ -156,7 +156,7 @@ scipyen.bat - launches Scipyen
 scipyen_desktop.bat - combines scipyact with scipyen - useful to make it
 a shortcut (e.g. on Desktop, StartMenu, or Windows TaskBar)
 
-NOTE: A shortcut (Sciipyen.lnk) is already provided. Use it but make sure
+NOTE: A shortcut (Scipyen.lnk) is already provided. Use it but make sure
 you set the correct paths (right-click -> Properties)
 
 If possible, you may want to change the icon to use the one supplied here
