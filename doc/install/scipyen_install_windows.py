@@ -557,7 +557,7 @@ def build_boost():
     os.chdir(os.path.join(venv, "src"))
     wget = check_wget()
     sevenzip = check_7z()
-    new_path = ";".join([os.environ["PATH"], os.path.dirname(wget), os.dirname(sevenzip)])
+    new_path = ";".join([os.environ["PATH"], os.path.dirname(wget), os.path.dirname(sevenzip)])
     os.environ["PATH"] = new_path
     
     boost_archive = os.path.join(venv, "src", "boost_1_81_0.7z")
