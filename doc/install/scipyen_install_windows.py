@@ -582,8 +582,8 @@ def build_boost():
     #     subprocess.run(f"wget https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.7z",
     #                    shell=True, check=True)
         
-    if not os.path.isdir(boost_src):
-        os.mkdir(boost_src)
+    # if not os.path.isdir(boost_src):
+    #     os.mkdir(boost_src)
         
     # if not os.path.isdir(boost_build):
     #     os.mkdir(boost_build)
