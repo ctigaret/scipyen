@@ -345,7 +345,7 @@ def pre_install(re_create_scripts=False, reinstallpips=False):
         os.environ["PATH"]=newpath
 
 
-    print("\n\Now, restart console, call scipyact_vs64, then run this script again")
+    print("\n\nNow, restart console, call scipyact_vs64, then run this script again")
 
 
 def make_sdk_src():
