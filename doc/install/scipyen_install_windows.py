@@ -295,9 +295,16 @@ def check_visualstudio():
 def check_wget():
     wget = os.path.join("C:\\", "Program Files (x86)", "GnuWin32", "bin", "wget.exe")
     if not os.path.isfile(wget):
-        raise OSError("Please install GNU wget from https://sourceforge.net/projects/gnuwin32/ and try again")
+        raise OSError("Please install GNU wget from https://sourceforge.net/projects/gnuwin32/ in the default location and try again")
 
     return wget
+
+def check_7z():
+    sevenzip=os.path.join("C:\\", "Program Files", "7-Zip", "7z.exe")
+    if not os.path.isfile(sevenzip):
+        raise OSError("Please install 7-zip from https://www.7-zip.org/download.html in its default location and try again")
+    
+    return sevenzip
 
 def check_cmake():
     """Not used: cmake MUST be in PATH nsince its installation"""
@@ -385,7 +392,6 @@ def wget_fftw():
 
     os.chdir(fftw_src)
     if not os.path.isfile(os.path.join(fftw_src, "fftw-3.3.5-dll64.zip")):
-    #print(os.environ["PATH"])
         subprocess.run(f"wget --no-check-certificate https://fftw.org/pub/fftw/fftw-3.3.5-dll64.zip",
                     shell=True, check=True)
 
@@ -546,6 +552,26 @@ def build_tiff():
     subprocess.run(f"cmake --build . --target ALL_BUILD --config Release", shell=True, check=True)
     subprocess.run(f"cmake --install . --prefix {venv} --config Release", shell=True, check=True)
     
+def build_boost():
+    venv, vdrive=get_venv()
+    os.chdir(os.path.join(venv, "src"))
+    wget = check_wget()
+    sevenzip = check_7z()
+    new_path = ";".join([os.environ["PATH"], os.path.dirname(wget), os.dirname(sevenzip)])
+    os.environ["PATH"] = new_path
+    
+    boost_archive = os.path.join(venv, "src", "boost_1_81_0.7z")
+    boost_src = os.path.join(venv, "src", "boost_src")
+    if not os.path.isfile(boost_archive):
+        subprocess.run(f"wget --no-check-certificate https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.7z",
+                       shell=True, check=True)
+        
+    if not os.path.isdir(boost_src):
+        os.mkdir(boost_src)
+        
+    subprocess.run(f"7z -x {boost_archive} -o{boost_src} ",
+                   shell=True, check=True)
+    
 
 #print(f"name={__name__}")
 
@@ -572,6 +598,8 @@ if __name__ == "__main__":
         if not check_flag_file(".tiffdone", venv):
             build_tiff()
             make_flag_file(".tiffdone", venv, f"png installed on {datetime.datetime.now}")
+            
+        build_boost()
             
     else:
         pre_install()
