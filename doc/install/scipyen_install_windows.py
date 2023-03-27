@@ -616,10 +616,14 @@ def build_boost():
     
     include=";".join([os.environ["INCLUDE"], pysys, pyinclude, venv_include])
     os.environ["INCLUDE"] = include 
+    print(f"INCLUDE = {include}")
     libpath=";".join([os.environ["LIBPATH"], pysys, pylibs, venv_libdir])
     os.environ["LIBPATH"] = libpath
+    print(f"LIBPATH = {libpath}")
     libs = ";".join([os.environ["LIB"], pysys, pylibs, venv_libdir])
     os.environ["LIB"] = libs
+    
+    os.environ["CPLUS_INCLUDE_PATH"]=";".join([pyinclude, venv_include])
     
     # os this, then pass include= below
     # include=";".join([os.environ["INCLUDE"], pyinclude, venv_include])
