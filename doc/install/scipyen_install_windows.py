@@ -420,11 +420,11 @@ def build_zlib():
         # NOTE: cmake SHOULD automatically identify a default generator
         # as of 2023-03-27 13:31:25,
         # on this machine this is Visual Studio 16 2019
-        bindir = os.path.join(vnv, "bin")
-        incdir = os.path.join(vnv, "include")
-        libdir = os.path.join(vnv, "Lib")
-        mandir = os.path.join(vnv, "share", "man")
-        pkgconfdir = os.path.join(vnv, "share", "pkgconfig")
+        bindir = os.path.join(venv, "bin")
+        incdir = os.path.join(venv, "include")
+        libdir = os.path.join(venv, "Lib")
+        mandir = os.path.join(venv, "share", "man")
+        pkgconfdir = os.path.join(venv, "share", "pkgconfig")
         cmake_args = " ".join([f"-DCMAKE_INSTALL_PREFIX={venv}",
                                 f"-DINSTALL_BIN_DIR={bindir}",
                                 f"-DINSTALL_LIB_DIR={libdir}",
