@@ -437,13 +437,12 @@ def build_zlib():
                            f"-DINSTALL_LIB_DIR={libdir}",
                            f"-DINSTALL_MAN_DIR={mandir}",
                            f"-DINSTALL_PKGCONFIG_DIR={pkgconfdir}",
-                           f"--config Release",
                            f"-S {zlib_src}",
                            f"-B {zlib_build}",
                            ])
         
     subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
-    subprocess.run(f"cmake --build . --config Release", shell=True, check=True)
+    subprocess.run(f"cmake --build . --target ALL_BUILD --config Release", shell=True, check=True)
     subprocess.run(f"cmake --install . --prefix {venv} --config Release", shell=True, check=True)
 
 
