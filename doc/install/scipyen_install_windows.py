@@ -608,7 +608,9 @@ if __name__ == "__main__":
             build_tiff()
             make_flag_file(".tiffdone", venv, f"png installed on {datetime.datetime.now}")
             
-        build_boost()
+        if not check_flag_file(".boostdone", venv):
+            build_boost()
+            
             
     else:
         pre_install()
