@@ -431,17 +431,20 @@ def build_zlib():
     libdir = os.path.join(venv, "Lib")
     mandir = os.path.join(venv, "share", "man")
     pkgconfdir = os.path.join(venv, "share", "pkgconfig")
-    cmake_args = " ".join([f"-S {zlib_src}",
-                           f"-B {zlib_build}",
+    cmake_args = " ".join([
                            f"-DCMAKE_INSTALL_PREFIX={venv}",
                            f"-DINSTALL_BIN_DIR={bindir}",
                            f"-DINSTALL_LIB_DIR={libdir}",
                            f"-DINSTALL_MAN_DIR={mandir}",
-                           f"-DINSTALL_PKGCONFIG_DIR={pkgconfdir}"])
+                           f"-DINSTALL_PKGCONFIG_DIR={pkgconfdir}",
+                           f"--config Release",
+                           f"-S {zlib_src}",
+                           f"-B {zlib_build}",
+                           ])
         
     subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
-    subprocess.run(f"cmake --build .", shell=True, check=True)
-    subprocess.run(f"cmake --install . --prefix {venv}", shell=True, check=True)
+    subprocess.run(f"cmake --build . --config Release", shell=True, check=True)
+    subprocess.run(f"cmake --install . --prefix {venv} --config Release", shell=True, check=True)
 
 
 #print(f"name={__name__}")
