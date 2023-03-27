@@ -411,17 +411,17 @@ def wget_fftw():
 def build_zlib():
     venv, vdrive=get_venv()
     # cmake=check_cmake()# NOTE: cmake MUST be in the PATH since its installation!
-    zlib_src = os.path.join(venv, "src", "zlib")
-    zlib_build = os.path.join(venv, "src", "zlib-build")
-    if not os.path.isdir(zlib_src):
+    src_dir = os.path.join(venv, "src", "zlib")
+    build_dir = os.path.join(venv, "src", "zlib-build")
+    if not os.path.isdir(src_dir):
         os.chdir(os.path.join(venv, "src"))
         subprocess.run("git clone https://github.com/madler/zlib.git",
                        shell=True, check=True)
         
-    if not os.path.isdir(zlib_build):
-        os.mkdir(zlib_build)
+    if not os.path.isdir(build_dir):
+        os.mkdir(build_dir)
         
-    os.chdir(zlib_build)
+    os.chdir(build_dir)
     
     # NOTE: cmake SHOULD automatically identify a default generator
     # as of 2023-03-27 13:31:25,
@@ -437,14 +437,48 @@ def build_zlib():
                            f"-DINSTALL_LIB_DIR={libdir}",
                            f"-DINSTALL_MAN_DIR={mandir}",
                            f"-DINSTALL_PKGCONFIG_DIR={pkgconfdir}",
-                           f"-S {zlib_src}",
-                           f"-B {zlib_build}",
+                           f"-S {src_dir}",
+                           f"-B {build_dir}",
                            ])
         
     subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
     subprocess.run(f"cmake --build . --target ALL_BUILD --config Release", shell=True, check=True)
     subprocess.run(f"cmake --install . --prefix {venv} --config Release", shell=True, check=True)
 
+def build_jpeg():
+    venv, vdrive=get_venv()
+    src_dir = os.path.join(venv, "src", "libjpeg")
+    build_dir = os.path.join(venv, "src", "libjpeg-build")
+    bindir = os.path.join(venv, "bin")
+    incdir = os.path.join(venv, "include")
+    libdir = os.path.join(venv, "Lib")
+    mandir = os.path.join(venv, "share", "man")
+    pkgconfdir = os.path.join(venv, "share", "pkgconfig")
+    if not os.path.isdir(src_dir):
+        os.chdir(os.path.join(venv, "src"))
+        subprocess.run("git clone https://github.com/winlibs/libjpeg.git",
+                       shell=True, check=True)
+        
+    if not os.path.isdir(build_dir):
+        os.mkdir(build_dir)
+        
+    os.chdir(build_dir)
+    cmake_args = " ".join([
+                           f"-DCMAKE_INSTALL_PREFIX={venv}",
+                           f"-DDEPENDENCY_SEARCH_PREFIX={venv}",
+                           f"-DINSTALL_BIN_DIR={bindir}",
+                           f"-DINSTALL_LIB_DIR={libdir}",
+                           f"-DINSTALL_MAN_DIR={mandir}",
+                           f"-DINSTALL_PKGCONFIG_DIR={pkgconfdir}",
+                           f"-DWITH_JPEG7=ON",
+                           f"-DWITH_JPEG8=ON",
+                           f"-S {src_dir}",
+                           f"-B {build_dir}",
+                           ])
+    
+    subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
+    subprocess.run(f"cmake --build . --target ALL_BUILD --config Release", shell=True, check=True)
+    subprocess.run(f"cmake --install . --prefix {venv} --config Release", shell=True, check=True)
 
 #print(f"name={__name__}")
 
@@ -459,6 +493,9 @@ if __name__ == "__main__":
         if not check_flag_file(".zlibdone", venv):
             build_zlib()
             make_flag_file(".zlibdone", venv, f"zlib installed on {datetime.datetime.now}")
+        if not check_flag_file(".jpegdone", venv):
+            build_jpeg()
+            make_flag_file(".jpegdone", venv, f"jpeg installed on {datetime.datetime.now}")
     else:
         pre_install()
 
