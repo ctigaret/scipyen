@@ -411,29 +411,34 @@ def build_zlib():
     venv, vdrive=get_venv()
     cmake=check_cmake()
     zlib_src = os.path.join(venv, "src", "zlib")
+    zlib_build = os.path.join(venv, "src", "zlib_build")
     if not os.path.isdir(zlib_src):
         os.chdir(os.path.join(venv, "src"))
         subprocess.run("git clone https://github.com/madler/zlib.git",
                        shell=True, check=True)
-        os.mkdir("zlib-build")
-        os.chdir("zlib-build")
-        # NOTE: cmake SHOULD automatically identify a default generator
-        # as of 2023-03-27 13:31:25,
-        # on this machine this is Visual Studio 16 2019
-        bindir = os.path.join(venv, "bin")
-        incdir = os.path.join(venv, "include")
-        libdir = os.path.join(venv, "Lib")
-        mandir = os.path.join(venv, "share", "man")
-        pkgconfdir = os.path.join(venv, "share", "pkgconfig")
-        cmake_args = " ".join([f"-DCMAKE_INSTALL_PREFIX={venv}",
-                                f"-DINSTALL_BIN_DIR={bindir}",
-                                f"-DINSTALL_LIB_DIR={libdir}",
-                                f"-DINSTALL_MAN_DIR={mandir}",
-                                f"-DINSTALL_PKGCONFIG_DIR={pkgconfdir}",
-                                f"-DEXECUTABLE_OUTPUT_PATH={bindir}",
-                                f"-DLIBRARY_OUTPUT_PATH={libdir}"])
         
-        subprocess.run(f"{cmake} {cmake_args}",
+    if not os.path.isdir(zlib_build):
+        os.mkdir("zlib-build")
+        
+    os.chdir("zlib-build")
+    
+    # NOTE: cmake SHOULD automatically identify a default generator
+    # as of 2023-03-27 13:31:25,
+    # on this machine this is Visual Studio 16 2019
+    bindir = os.path.join(venv, "bin")
+    incdir = os.path.join(venv, "include")
+    libdir = os.path.join(venv, "Lib")
+    mandir = os.path.join(venv, "share", "man")
+    pkgconfdir = os.path.join(venv, "share", "pkgconfig")
+    cmake_args = " ".join([f"-DCMAKE_INSTALL_PREFIX={venv}",
+                            f"-DINSTALL_BIN_DIR={bindir}",
+                            f"-DINSTALL_LIB_DIR={libdir}",
+                            f"-DINSTALL_MAN_DIR={mandir}",
+                            f"-DINSTALL_PKGCONFIG_DIR={pkgconfdir}",
+                            f"-DEXECUTABLE_OUTPUT_PATH={bindir}",
+                            f"-DLIBRARY_OUTPUT_PATH={libdir}"])
+        
+        subprocess.run(f"{cmake} {cmake_args} ..\\zlib",
                        shell=True, check=True)
 
 
