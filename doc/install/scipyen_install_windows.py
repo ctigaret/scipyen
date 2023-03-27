@@ -440,7 +440,7 @@ def build_zlib():
                             f"-DLIBRARY_OUTPUT_PATH={libdir}"])
         
     subprocess.run(f"cmake {cmake_args} ..\\zlib", shell=True, check=True)
-    subprocess.run(f"")
+    subprocess.run(f"cmake --install")
 
 
 #print(f"name={__name__}")
