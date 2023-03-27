@@ -345,7 +345,7 @@ def pre_install(re_create_scripts=False, reinstallpips=False):
         os.environ["PATH"]=newpath
 
 
-    print("\n\now, restart console, call scipyact_vs64, then run this script again")
+    print("\n\Now, restart console, call scipyact_vs64, then run this script again")
 
 
 def make_sdk_src():
@@ -441,14 +441,15 @@ def build_zlib():
 #print(f"name={__name__}")
 
 if __name__ == "__main__":
-    venv, vdrive = get_venv()
-    make_sdk_src()
-    if not check_flag_file(".fftwdone", venv):
-        wget_fftw()
-        make_flag_file(".fftwdone", venv, f"fftw3 libraries installed on {datetime.datetime.now}")
+    if "VIRTUAL_ENV" in os.environ:
+        venv, vdrive = get_venv()
+        make_sdk_src()
+        if not check_flag_file(".fftwdone", venv):
+            wget_fftw()
+            make_flag_file(".fftwdone", venv, f"fftw3 libraries installed on {datetime.datetime.now}")
 
-    if not check_flag_file(".zlibdone", venv):
-        build_zlib()
+        if not check_flag_file(".zlibdone", venv):
+            build_zlib()
     else:
         pre_install()
 
