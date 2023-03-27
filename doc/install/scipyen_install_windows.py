@@ -130,21 +130,19 @@ def get_pyver():
     return ".".join([str(sys.version_info.major), str(sys.version_info.minor), str(sys.version_info.micro)])
 
 def get_pyinclude():
-    ver = "".join(["Python",str(sys.version_info.major), str(sys.version_info.minor)])
-    syspath = os.environ["PATH"].split(";")
-    pypaths = [s for s in syspath if ver in s and os.path.split(s)[0].endswith(ver)]
-    pypath = pypaths[0]
+    pypath = get_pysys()
     return os.path.join(pypath, "include")
 
 
 def get_pylibs():
+    pypath = get_pysys()
+    return os.path.join(pypath, "libs")
+
+def get_pysys()
     ver = "".join(["Python",str(sys.version_info.major), str(sys.version_info.minor)])
     syspath = os.environ["PATH"].split(";")
     pypaths = [s for s in syspath if ver in s and os.path.split(s)[0].endswith(ver)]
-    pypath = pypaths[0]
-    return os.path.join(pypath, "libs")
-
-
+    return pypaths[0]
 
     
     
@@ -606,8 +604,13 @@ def build_boost():
     if not os.path.isdir(boost_src):
         subprocess.run(f"7z x {boost_archive} -o{venv_src} ",
                         shell=True, check=True)
+    
+    pysys = get_pysys()
+    print(f"pysys = {pysys}")
     pyinclude = get_pyinclude()
+    print(f"pyinclude = {pyinclude}")
     pylibs = get_pylibs()
+    print(f"pylibs = {pylibs}")
     venv_include = os.path.join(venv, "include")
     venv_libdir=os.path.join(venv, "Lib")
     
