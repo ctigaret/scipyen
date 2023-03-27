@@ -300,6 +300,7 @@ def check_wget():
     return wget
 
 def check_cmake():
+    """Not used: cmake MUST be in PATH nsince its installation"""
     cmake=os.path.join("C:\\", "Program Files", "CMake", "bin", "cmake.exe")
     if not os.path.isfile(cmake):
         raise OSError("Please install CMake then try again")
@@ -409,18 +410,18 @@ def wget_fftw():
 
 def build_zlib():
     venv, vdrive=get_venv()
-    cmake=check_cmake()
+    # cmake=check_cmake()# NOTE: cmake MUST be in the PATH since its installation!
     zlib_src = os.path.join(venv, "src", "zlib")
-    zlib_build = os.path.join(venv, "src", "zlib_build")
+    zlib_build = os.path.join(venv, "src", "zlib-build")
     if not os.path.isdir(zlib_src):
         os.chdir(os.path.join(venv, "src"))
         subprocess.run("git clone https://github.com/madler/zlib.git",
                        shell=True, check=True)
         
     if not os.path.isdir(zlib_build):
-        os.mkdir("zlib-build")
+        os.mkdir(zlib_build)
         
-    os.chdir("zlib-build")
+    os.chdir(zlib_build)
     
     # NOTE: cmake SHOULD automatically identify a default generator
     # as of 2023-03-27 13:31:25,
@@ -438,7 +439,8 @@ def build_zlib():
                             f"-DEXECUTABLE_OUTPUT_PATH={bindir}",
                             f"-DLIBRARY_OUTPUT_PATH={libdir}"])
         
-    subprocess.run(f"{cmake} {cmake_args} ..\\zlib", shell=True, check=True)
+    subprocess.run(f"cmake {cmake_args} ..\\zlib", shell=True, check=True)
+    subprocess.run(f"")
 
 
 #print(f"name={__name__}")
