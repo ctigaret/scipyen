@@ -611,24 +611,23 @@ def build_boost():
     venv_include = os.path.join(venv, "include")
     venv_libdir=os.path.join(venv, "Lib")
     
-    # either this
     include=";".join([os.environ["INCLUDE"], pyinclude, venv_include])
     os.environ["INCLUDE"] = include 
-    # os this, then pass include= below
-    include=";".join([os.environ["INCLUDE"], pyinclude, venv_include])
-    
-    
     libpath=";".join([os.environ["LIBPATH"], pylibs, venv_libdir])
     os.environ["LIBPATH"] = libpath
     libs = ";".join([os.environ["LIB"], pylibs, venv_libdir])
     os.environ["LIB"] = libs
+    
+    # os this, then pass include= below
+    # include=";".join([os.environ["INCLUDE"], pyinclude, venv_include])
+    
     
     
     b2_args = " ".join([f"toolset=msvc",
                         f"threading=multi",
                         f"address-model=64",
                         f"variant=release",
-                        f"include='{include}'",
+                        # f"include='{include}'",
                         # f"linkflags=-L{libpath}",
                         f"link=shared",
                         f"--prefix={venv}",
