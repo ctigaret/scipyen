@@ -426,7 +426,7 @@ def build_zlib():
                                 f"-DINSTALL_MAN_DIR={mandir}",
                                 f"-DINSTALL_PKGCONFIG_DIR={pkgconfdir}",
                                 f"-DEXECUTABLE_OUTPUT_PATH={bindir}",
-                                f"-DLIBRARY_OUTPUT_PATH"={libdir}])
+                                f"-DLIBRARY_OUTPUT_PATH={libdir}"])
         
         subprocess.run(f"{cmake} -DCMAKE_INSTALL_PREFIX={venv} {cmake_args}",
                        shell=True, check=True)
