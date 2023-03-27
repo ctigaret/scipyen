@@ -594,7 +594,7 @@ def build_boost():
                         "msvc",
                         "install",
                         ])
-    subprocess.run(f".\\b2 {b2-args}" shell=True, check=True)
+    subprocess.run(f".\\b2 {b2-args}", shell=True, check=True)
     # subprocess.run()
     
 
