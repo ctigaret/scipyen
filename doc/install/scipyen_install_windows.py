@@ -582,7 +582,10 @@ def build_boost():
     os.environ["PATH"] = new_path
     
     default_boost_archive = os.path.join(venv, "src", "boost_1_81_0.7z")
-    boost_archive = input(f"Enter for fully qualified path and file name for the DOWNLOADED boost source archive (default is {default_boost_archive}): ")
+    if os.path.isfile(default_boost_archive):
+        boost_archive=default_boost_archive
+    else:
+        boost_archive = input(f"Enter for fully qualified path and file name for the DOWNLOADED boost source archive (the {default_boost_archive} was not found): ")
     
     if len(boost_archive.strip()) == 0:
         boost_archive=default_boost_archive
