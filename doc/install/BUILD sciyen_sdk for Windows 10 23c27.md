@@ -7,7 +7,7 @@
 * Use only ASCII characters for file and directory names, avoid spaces and punctuation marks other than '.' (dot),  '_' (underscore) or '-' (dash)
 
 ## Required software
-These requirements are to be downloaded and installed manually
+These requirements are to be downloaded and installed manually (with their default installation locations shown):
 
 * [Python](https://www.python.org/downloads/) (>= 3.10)
     - launch the installer, install for *everybody* and 
@@ -18,25 +18,27 @@ These requirements are to be downloaded and installed manually
     - VisualStudio Community Edition 2019 is used at of the time of writing.
 * [wget](https://gnuwin32.sourceforge.net/packages/wget.htm)
     - needed to automate downloading of libraries
+    - installs under `C:\Program Files (x86)\GnuWin32\bin\` as `wget.exe`
 * [cmake](https://cmake.org/download/)
     - needed to build VIGRA and its python bindings
-    - in the installer, select add CMake to the system PATH for all users
-
-* [7zip](https://www.7-zip.org/download.html)
+    - pull the `msi` installer, and run it
+    - in the installer, select `add CMake to the system PATH for all users`
+    - installs in `C:\Program Files\CMake\bin\` as `cmake.exe`, `cmake-gui.exe`
+* [7-zip](https://www.7-zip.org/download.html)
     - needed to unpack `boost` libraries
-
-* [nasm](https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/nasm-2.15.05-installer-x64.exe)
+    - installs in `C:\Program Files\7-Zip\` as `7z.exe`
+* [Netwide assembler (nasm)](https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/nasm-2.15.05-installer-x64.exe)
     - needed to build `jpeg` libraries
-    - run the installer 
-    - *manually add* `c:\Programs Files\NASM` to the `PATH` environment variable.
-        
+    - run the installer (allow the installer to run)
+    - installs in `C:\Programs Files\NASM\` as `nasm.exe`
+    - *manually add*  to the `PATH` environment variable.
 * [git](https://git-scm.com/download/win)
     - needed to make a local clone of the `scipyen` git repository.
 
 * [Doxygen](https://www.doxygen.nl/download.html)
     - Needed to build VIGRA documentation.
-    - run the installer, override the safety warning
-    - by default installs in `C:\Program Files\doxygen\bin\` and the executable is `doxygen.exe`
+    - run the installer (allow the installer to run)
+    - installs in `C:\Program Files\doxygen\bin\` as `doxygen.exe`
 
 
 
@@ -94,45 +96,21 @@ python e:\scipyen\doc\install\scipyen_install_windows.py
 ```
 **Note:** This will create a virtual environment directory; by default this is `e:\scipyenv.X.Y.Z` where `X`, `Y`, and `Z` are the major, minor and micro versions of the python executable. 
 
-You will be asked to provide:
+The script will ask you to provide:
 
 * an evironment name prefix (default is `scipyenv`)
 * a location of the new environment (default is drive `E:`)
 
-The script will also install a bunch of Python packages (listed in
-`scipyen\doc\install\pip_requirements.txt` and create the following scripts in `%USERPROFILE%\Scripts (which will also be added to your %PATH%, permanently):
+then proceeds to install Python packages (dependencies of `Scipyen`, listed in `scipyen\doc\install\pip_requirements.txt`) and create the a `Scripts` directory in your home (user) directory i.e.`%USERPROFILE%\Scripts`. This directory will also be added to your `%PATH%` permanently, and contains:
 
-* `scipyact.bat` - needed to activate the `scipyenv.X.Y.Z` environment
-* `scipyen.bat` - needed to launch `Scipyen`
-* `vs64.bat` - needed to activate the VisualStudio development environment
-* `scipyenv_vs64.bat` - needed to activate the `scipyenv.X.Y.Z` environment *inside* the VisualStudio development environment.
+* `scipyen.bat` - launches `Scipyen` (and also activates the `scipyenv.X.Y.Z` environment)
+* `scipyact.bat` - activates the `scipyenv.X.Y.Z` environment
+* `vs64.bat` - activates the VisualStudio development environment
+* `scipyenv_vs64.bat` - activates the `scipyenv.X.Y.Z` environment *inside* the VisualStudio development environment.
 
 * * *
 # Tools for building scipyen dependencies.
 * * *
-These must be installed system-wide (make sure there is enough space on C:\drive)
-(for convenience, installer are provided in the "DownloadsForScipyen" bundle;
- below I give the details of the version used, but you <b>may</b> use a more
- recent version)
-
-
-## doxygen
-
-## cmake
-Download Windows installer from [here](https://cmake.org/download/).
-Current sdk uses CMake-3.22.1, you may choose a more recent version
-* Run the installer, select options:
-    * add CMake to the system PATH for all users
-    * create CMake desktop icon
-
-## Visual Studio Community Edition 2019
-Make sure it is all uptodate and it includes:
-* Desktop development with C++
-
-
-## 7zip for windows 10
-Get it from [here](https://www.7-zip.org/download.html)
-I used 7z2107-x64.exe
 
 ## MPICH
 Download from [here](https://www.microsoft.com/en-us/download/confirmation.aspx?id=57467):
@@ -145,11 +123,6 @@ Download from [here](https://www.microsoft.com/en-us/download/confirmation.aspx?
     C:\Program Files (x86)\Microsoft SDKs\MPI\Include to %INCLUDE%
     C:\Program Files (x86)\Microsoft SDKs\MPI\Lib to %LIB% and %LIBPATH%
     C:\Program Files\Microsoft MPI\Bin to %PATH%
-
-## nasm: (for building jpeg)
-Get nasm-2.15.05-installer-x64.exe from [here](https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/nasm-2.15.05-installer-x64.exe)
-* Run installer as administrator;
-* Manually add c:\Programs Files\NASM to %PATH%
 
 ## Ruby
 Download installer + devkit from [here](https://rubyinstaller.org/downloads/)
