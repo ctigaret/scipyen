@@ -433,7 +433,7 @@ def build_zlib():
                                 f"-DEXECUTABLE_OUTPUT_PATH={bindir}",
                                 f"-DLIBRARY_OUTPUT_PATH={libdir}"])
         
-        subprocess.run(f"{cmake} -DCMAKE_INSTALL_PREFIX={venv} {cmake_args}",
+        subprocess.run(f"{cmake} {cmake_args}",
                        shell=True, check=True)
 
 
