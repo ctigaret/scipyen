@@ -592,7 +592,7 @@ def build_boost():
         subprocess.run(f"7z x {boost_archive} -o{venv_src} ",
                         shell=True, check=True)
         
-    os.chdir(boost_src)) 
+    os.chdir(boost_src)
     subprocess.run("bootstrap", shell=True, check=True)
     b2_args = " ".join([f"toolset=msvc",
                         f"threading=multi",
