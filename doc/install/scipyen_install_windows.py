@@ -129,6 +129,26 @@ def check_VS():
 def get_pyver():
     return ".".join([str(sys.version_info.major), str(sys.version_info.minor), str(sys.version_info.micro)])
 
+def get_pyinclude():
+    ver = "".join(["Python",str(sys.version_info.major), str(sys.version_info.minor)])
+    syspath = os.environ["PATH"].split(";")
+    pypaths = [s for s in syspath if ver in s and os.path.split(s)[0].endswith(ver)]
+    pypath = pypaths[0]
+    return os.path.join(pypath, "include")
+
+
+def get_pylibs():
+    ver = "".join(["Python",str(sys.version_info.major), str(sys.version_info.minor)])
+    syspath = os.environ["PATH"].split(";")
+    pypaths = [s for s in syspath if ver in s and os.path.split(s)[0].endswith(ver)]
+    pypath = pypaths[0]
+    return os.path.join(pypath, "libs")
+
+
+
+    
+    
+    
 def get_env_name():
     default = "scipyenv"
     ret = input(f"Enter environment name prefix (default is {default}): ")
@@ -575,37 +595,62 @@ def build_boost():
     ba_name = os.path.basename(boost_archive)
     pfx, ext = os.path.splitext(ba_name)
     
-    boost_src = os.path.join(venv, "src", pfx)
-    # boost_build = os.path.join(venv, "src", "boost-build")
-    
+    boost_src = os.path.join(venv_src, pfx)
+        
+    # NOTE: 2023-03-27 21:30:33 doesn't seem to work TODO/FIXME
     # if not os.path.isfile(boost_archive):
     #     subprocess.run(f"wget https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.7z",
     #                    shell=True, check=True)
         
-    # if not os.path.isdir(boost_src):
-    #     os.mkdir(boost_src)
-        
-    # if not os.path.isdir(boost_build):
-    #     os.mkdir(boost_build)
         
     if not os.path.isdir(boost_src):
         subprocess.run(f"7z x {boost_archive} -o{venv_src} ",
                         shell=True, check=True)
-        
-    os.chdir(boost_src)
-    subprocess.run("bootstrap", shell=True, check=True)
+    pyinclude = get_pyinclude()
+    pylibs = get_pylibs()
+    venv_include = os.path.join(venv, "include")
+    venv_libdir=os.path.join(venv, "Lib")
+    
+    # either this
+    include=";".join([os.environ["INCLUDE"], pyinclude, venv_include])
+    os.environ["INCLUDE"] = include 
+    # os this, then pass include= below
+    include=";".join([os.environ["INCLUDE"], pyinclude, venv_include])
+    
+    
+    libdir=";".join([os.environ["LIBDIR"], venv_include])
+    os.environ["LIBDIR"] = libdir
+    
     b2_args = " ".join([f"toolset=msvc",
                         f"threading=multi",
                         f"address-model=64",
                         f"variant=release",
+                        f"include={include}",
+                        f"linkflags=-L{libdir}",
                         f"link=shared",
                         f"--prefix={venv}",
                         f"--build-type=complete",
                         "msvc",
                         "install",
                         ])
+    os.chdir(boost_src)
+    
+    # NOTE: 2023-03-27 21:37:29 tried this, 
+    # → fatal error C1083: Cannot open include file: 'pyconfig.h': No such file or directory
+    subprocess.run("bootstrap", shell=True, check=True)
     subprocess.run(f".\\b2 {b2_args} > scipyenv_build.log", shell=True, check=True)
     # subprocess.run()
+    
+    boost_tool_build = os.path.join(boost_src, "tools", "build")
+    BoostBuild_dir = os.path.join(venv_src, "Boost.Build")
+    os.chdir(boost_tool_build)
+    subprocess.run("bootstrapt", shell=True, check=True)
+    # subprocess.run (f"b2 install --prefix={BoostBuild_dir}", shell=True, check=True)
+    subprocess.run (f".\\b2 --prefix={BoostBuild_dir} toolset=msvc install", shell=True, check=True)
+    new_path=";".join([os.environ["PATH"], os.path.join(BoostBuild_dir, "bin"])
+    os.environ["PATH"] = new_path
+    os.chdir(boost_src)
+    subprocess.run(f"b2 {b2_args} ", shell=True, check=True)
     
 
 #print(f"name={__name__}")
