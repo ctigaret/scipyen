@@ -629,7 +629,7 @@ def build_boost():
                         f"address-model=64",
                         f"variant=release",
                         f"include={include}",
-                        f"linkflags=-L{libpath}",
+                        # f"linkflags=-L{libpath}",
                         f"link=shared",
                         f"--prefix={venv}",
                         f"--build-type=complete",
