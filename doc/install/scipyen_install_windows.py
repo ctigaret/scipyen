@@ -563,7 +563,7 @@ def build_boost():
     boost_archive = os.path.join(venv, "src", "boost_1_81_0.7z")
     boost_src = os.path.join(venv, "src", "boost_src")
     if not os.path.isfile(boost_archive):
-        subprocess.run(f"wget --no-check-certificate https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.7z",
+        subprocess.run(f"wget https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.7z",
                        shell=True, check=True)
         
     if not os.path.isdir(boost_src):
