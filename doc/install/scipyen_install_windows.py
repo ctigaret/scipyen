@@ -138,7 +138,7 @@ def get_pylibs():
     pypath = get_pysys()
     return os.path.join(pypath, "libs")
 
-def get_pysys()
+def get_pysys():
     ver = "".join(["Python",str(sys.version_info.major), str(sys.version_info.minor)])
     syspath = os.environ["PATH"].split(";")
     pypaths = [s for s in syspath if ver in s and os.path.split(s)[0].endswith(ver)]
