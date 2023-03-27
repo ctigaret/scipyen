@@ -566,7 +566,7 @@ def build_boost():
     if not os.path.isfile(boost_archive):
         raise OSError(f"Boost archive {boost_archive} not found; bailing out. Goodbye!")
     
-    ba_name = os.basename(boost_archive)
+    ba_name = os.path.basename(boost_archive)
     pfx, ext = os.path.splitext(ba_name)
     
     boost_src = os.path.join(venv, "src", "boost_src")
