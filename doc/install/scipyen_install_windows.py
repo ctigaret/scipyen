@@ -578,8 +578,24 @@ def build_boost():
     if not os.path.isdir(boost_src):
         os.mkdir(boost_src)
         
-    subprocess.run(f"7z x {boost_archive} -o{boost_src} ",
-                   shell=True, check=True)
+    if not os.path.isdir(os.path.join(boost_src, pfx)):
+        subprocess.run(f"7z x {boost_archive} -o{boost_src} ",
+                        shell=True, check=True)
+        
+    os.chdir(boost_src) 
+    subprocess.run("bootstrap", shell=True, check=True)
+    b2_args = " ".join([f"toolset=msvc",
+                        f"threading=multi",
+                        f"address-model=64",
+                        f"variant=release",
+                        f"link=shared",
+                        f"--prefix={venv}",
+                        f"--build-type=complete",
+                        "msvc",
+                        "install",
+                        ])
+    subprocess.run(f".\\b2 {b2-args}" shell=True, check=True)
+    # subprocess.run()
     
 
 #print(f"name={__name__}")
