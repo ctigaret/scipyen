@@ -352,8 +352,10 @@ def pre_install(re_create_scripts=False, reinstallpips=False):
         subprocess.run(f"setx PATH {newpath}", shell=True, check=True)
         os.environ["PATH"]=newpath
 
-
-    print("\n\nNow, restart console, call scipyact_vs64, then run this script again")
+    venv_src = os.path.join(virtual_env_name, "src")
+    print("\n\nNext steps:\n")
+    print(f"1. Download boost from https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.7z into {venv_src}")
+    print(f"2. In a new comand prompt window call scipyact_vs64, then run this script again")
 
 
 def make_sdk_src():
@@ -554,7 +556,8 @@ def build_tiff():
     
 def build_boost():
     venv, vdrive=get_venv()
-    os.chdir(os.path.join(venv, "src"))
+    venv_src = os.path.join(venv, "src")
+    os.chdir(venv_src)
     wget = check_wget()
     sevenzip = check_7z()
     new_path = ";".join([os.environ["PATH"], os.path.dirname(wget), os.path.dirname(sevenzip)])
@@ -562,15 +565,18 @@ def build_boost():
     
     default_boost_archive = os.path.join(venv, "src", "boost_1_81_0.7z")
     boost_archive = input(f"Enter for fully qualified path and file name for the DOWNLOADED boost source archive (default is {default_boost_archive}): ")
+    
     if len(boost_archive.strip()) == 0:
         boost_archive=default_boost_archive
+        
     if not os.path.isfile(boost_archive):
         raise OSError(f"Boost archive {boost_archive} not found; bailing out. Goodbye!")
     
     ba_name = os.path.basename(boost_archive)
     pfx, ext = os.path.splitext(ba_name)
     
-    boost_src = os.path.join(venv, "src", "boost_src")
+    boost_src = os.path.join(venv, "src", pfx)
+    # boost_build = os.path.join(venv, "src", "boost-build")
     
     # if not os.path.isfile(boost_archive):
     #     subprocess.run(f"wget https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.7z",
@@ -579,11 +585,14 @@ def build_boost():
     if not os.path.isdir(boost_src):
         os.mkdir(boost_src)
         
-    if not os.path.isdir(os.path.join(boost_src, pfx)):
-        subprocess.run(f"7z x {boost_archive} -o{boost_src} ",
+    # if not os.path.isdir(boost_build):
+    #     os.mkdir(boost_build)
+        
+    if not os.path.isdir(os.path.join(boost_src)):
+        subprocess.run(f"7z x {boost_archive} -o{venv_src} ",
                         shell=True, check=True)
         
-    os.chdir(os.path.join(boost_src, pfx)) 
+    os.chdir(boost_src)) 
     subprocess.run("bootstrap", shell=True, check=True)
     b2_args = " ".join([f"toolset=msvc",
                         f"threading=multi",
@@ -595,7 +604,7 @@ def build_boost():
                         "msvc",
                         "install",
                         ])
-    subprocess.run(f".\\b2 {b2_args}", shell=True, check=True)
+    subprocess.run(f".\\b2 {b2_args} > build.log 2&>1", shell=True, check=True)
     # subprocess.run()
     
 
