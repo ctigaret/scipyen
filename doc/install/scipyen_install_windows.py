@@ -188,7 +188,7 @@ def make_scipyact(pyvenv):
         binpath=os.path.join(pyvenv, "bin")
         oldpath=os.environ["PATH"]
         newpath = ";".join([oldpath, binpath])
-        batch_file.write(f"setx PATH {newpath}", shell=True, check=True)
+        batch_file.write(f"set PATH {newpath}")
         os.environ["PATH"]=newpath
         batch_file.write(f"call {pyvenvactivation}\n")
         batch_file.write("echo on\n")
