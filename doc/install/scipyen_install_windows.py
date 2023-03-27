@@ -578,7 +578,7 @@ def build_boost():
     if not os.path.isdir(boost_src):
         os.mkdir(boost_src)
         
-    subprocess.run(f"7z -x {boost_archive} -o{boost_src} ",
+    subprocess.run(f"7z x {boost_archive} -o{boost_src} ",
                    shell=True, check=True)
     
 
