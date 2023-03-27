@@ -433,7 +433,6 @@ def build_zlib():
     pkgconfdir = os.path.join(venv, "share", "pkgconfig")
     cmake_args = " ".join([f"-S {zlib_src}",
                            f"-B {zlib_build}",
-                           f"--preset=Release",
                            f"-DCMAKE_INSTALL_PREFIX={venv}",
                            f"-DINSTALL_BIN_DIR={bindir}",
                            f"-DINSTALL_LIB_DIR={libdir}",
