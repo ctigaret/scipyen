@@ -570,7 +570,7 @@ if __name__ == "__main__":
             make_flag_file(".pngdone", venv, f"png installed on {datetime.datetime.now}")
             
         if not check_flag_file(".tiffdone", venv):
-            build_png()
+            build_tiff()
             make_flag_file(".tiffdone", venv, f"png installed on {datetime.datetime.now}")
             
     else:
