@@ -618,15 +618,18 @@ def build_boost():
     include=";".join([os.environ["INCLUDE"], pyinclude, venv_include])
     
     
-    libdir=";".join([os.environ["LIBDIR"], venv_include])
-    os.environ["LIBDIR"] = libdir
+    libpath=";".join([os.environ["LIBPATH"], pylibs, venv_libdir])
+    os.environ["LIBPATH"] = libpath
+    libs = ";",join([os.environ["LIB"], pylibs, venv_libdir])
+    os.environ["LIB"] = libs
+    
     
     b2_args = " ".join([f"toolset=msvc",
                         f"threading=multi",
                         f"address-model=64",
                         f"variant=release",
                         f"include={include}",
-                        f"linkflags=-L{libdir}",
+                        f"linkflags=-L{libpath}",
                         f"link=shared",
                         f"--prefix={venv}",
                         f"--build-type=complete",
