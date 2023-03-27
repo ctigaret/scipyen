@@ -102,6 +102,16 @@ def _(key):
 
     return values_dict
 
+def check_flag_file(flagname, pyvenv):
+    flagfile = os.path.join(pyvenv, flagname)
+    return os.path.isfile(flagfile)
+
+def make_flag_file(flagname, pyvenv, msg):
+    flagfilename=os.path.join(pyvenv, flagname)
+    with open(flagfilename, "w") as flagfile:
+        flagfile.write(msg)
+
+
 #def find_reg_subkey(parent, name, cache=list()):
     #if isinstance(parent, str) and parent.startswith("HKEY") and parent in winreg.__dict__.keys():
         #subkeys = get_subkeys(parent)
@@ -121,7 +131,7 @@ def get_pyver():
 
 def get_env_name():
     default = "scipyenv"
-    ret = input(f"Enter environment name (default is {default}): ")
+    ret = input(f"Enter environment name prefix (default is {default}): ")
     if len(ret.strip()) == 0:
         ret = default
 
@@ -135,18 +145,18 @@ def get_env_home():
 
     return ret
 
-def installpipreqs(pyvenv, reqs, force=False):
+def installpipreqs(pyvenv, reqs): #, force=False):
     activate_script = os.path.join(pyvenv, "Scripts", "activate.bat")
-    flagfile=os.path.join(pyvenv, ".pipdone")
     if not os.path.isfile(activate_script):
         raise OSError(f"File {activate_script} not found !")
-    if not os.path.isfile(flagfile) or force == True:
-        print("Installing Python packages from PyPI")
-        subprocess.run(f"{activate_script} & set SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True & python -m pip install -r {reqs}",
-                       shell=True, check=True)
+    print("Installing Python packages from PyPI")
+    subprocess.run(f"{activate_script} & set SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True & python -m pip install -r {reqs}",
+                    shell=True, check=True)
+    #flagfile=os.path.join(pyvenv, ".pipdone")
+    #if not os.path.isfile(flagfile) or force == True:
 
-        with open(flagfile, "w") as flag:
-            flag.write(f"Python packages from PyPI installed on {datetime.datetime.now}")
+        #with open(flagfile, "w") as flag:
+            #flag.write(f"Python packages from PyPI installed on {datetime.datetime.now}")
 
         #os.system(f"{activate_script} & set SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True & python -m pip install -r {reqs}")
 
@@ -284,7 +294,7 @@ def check_wget():
 
     return wget
 
-def pre_install():
+def pre_install(re_create_scripts=False, reinstallpips=False):
     vcvarsall = check_visualstudio()
     wget = check_wget()
 
@@ -294,23 +304,25 @@ def pre_install():
 
     realscript = __file__
 
-    print(f"realscript={realscript}")
+    #print(f"realscript={realscript}")
+    userhome = os.getenv("USERPROFILE")
+    userpath = os.getenv("PATH")
+    userscripts = os.path.join(userhome, "Scripts")
 
     virtual_env_path = makevirtenv(ve_home, virtual_env_name)
 
     if len(virtual_env_path.strip()):
-        make_scipyact(virtual_env_path)
-        make_scipyact_vs64(virtual_env_path)
-        make_vs64_bat()
+        if not check_flag_file(".batchscriptsdone", virtual_env_path) or re_create_scripts:
+            make_scipyact(virtual_env_path)
+            make_scipyact_vs64(virtual_env_path)
+            make_vs64_bat()
+            make_flag_file(".batchscriptsdone", virtual_env_path, f"Batch scripts created on {datetime.datetime.now}")
 
     reqsfile=os.path.join(os.path.dirname(realscript), "pip_requirements.txt")
 
-    installpipreqs(virtual_env_path, reqsfile)
-
-    userhome = os.getenv("USERPROFILE")
-    userpath = os.getenv("PATH")
-
-    userscripts = os.path.join(userhome, "Scripts")
+    if not check_flag_file(".pipdone", virtual_env_path) or reinstallpips:
+        installpipreqs(virtual_env_path, reqsfile)
+        make_flag_file(".pipdone", virtual_env_path, f"Python packages from PyPI installed on {datetime.datetime.now}")
 
     if not os.path.isdir(userscripts):
         os.mkdir(userscripts)
@@ -320,7 +332,8 @@ def pre_install():
         subprocess.run(f"setx PATH {newpath}", shell=True, check=True)
         os.environ["PATH"]=newpath
 
-    print("Now, restart console, call scipyact_vs64, then run this script again")
+
+    print("\n\nNow, restart console, call scipyact_vs64, then run this script again")
 
 
 def make_sdk_src():

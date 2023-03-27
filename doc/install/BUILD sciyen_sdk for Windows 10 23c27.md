@@ -1,13 +1,111 @@
 * * *
-# Build scipyen_sdk on Windows.
-## 2022-01-26 10:37:43
-AVOID building on networked drive - on a virtual machine, create a 2nd VDI image
-for a 2nd partition (~100 GiB)
+# Building a virtual Python environment for running scipyen on Windows.
+2023-03-2
 
-Building on network drive will:
-1. slow down the process
-2. interfere with building processes (e.g. HDF5 and VIGRA)
+## General recommendations
+* AVOID building on networked drive
+* Use only ASCII characters for file and directory names, avoid spaces and punctuation marks other than '.' (dot),  '_' (underscore) or '-' (dash)
 
+## Required software
+These requirements are to be downloaded and installed manually
+
+* [Python](https://www.python.org/downloads/) (>= 3.10)
+    - launch the installer, install for *everybody* and 
+    - *allow* add Python to the system PATH
+    - *associate* `*.py` files with `%USERPROFILE%\AppData\Local\Programs\Python\Python311\python.exe`
+* [VisualStudio](https://visualstudio.microsoft.com/free-developer-offers/) 
+    - needed to build VIGRA and its python bindings. 
+    - VisualStudio Community Edition 2019 is used at of the time of writing.
+* [wget](https://gnuwin32.sourceforge.net/packages/wget.htm)
+    - needed to automate downloading of libraries
+* [cmake](https://cmake.org/download/)
+    - needed to build VIGRA and its python bindings
+    - in the installer, select add CMake to the system PATH for all users
+
+* [7zip](https://www.7-zip.org/download.html)
+    - needed to unpack `boost` libraries
+
+* [nasm](https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/nasm-2.15.05-installer-x64.exe)
+    - needed to build `jpeg` libraries
+    - run the installer 
+    - *manually add* `c:\Programs Files\NASM` to the `PATH` environment variable.
+        
+* [git](https://git-scm.com/download/win)
+    - needed to make a local clone of the `scipyen` git repository.
+
+* [Doxygen](https://www.doxygen.nl/download.html)
+    - Needed to build VIGRA documentation.
+    - run the installer, override the safety warning
+    - by default installs in `C:\Program Files\doxygen\bin\` and the executable is `doxygen.exe`
+
+
+
+## Additional useful software
+The following utilities should be downloaded and installed manually
+
+* [ReText](https://pypi.org/project/ReText/) editor for [Markdown](https://daringfireball.net/projects/markdown/) and [ReStructuredText](https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html) files
+    - to install:
+    
+        ```cmd
+            python -m pip install retext
+        ```
+
+    - to run:
+        
+        ```cmd
+            python -m ReText
+        ```
+
+* [Kate](https://kate-editor.org/) text editor; get the installer from [here](https://kate-editor.org/get-it/).
+
+* * *
+
+## Clone the Scipyen git repository and create a virtual Python environment using `virtualenv`.
+
+The virtual Python environment and the Scipyen repository **should be** in distinct directories. 
+
+* These can both be on the same partition (`drive`) or on different partitions, as long as they are both *local* to your machine).
+* Neither need to be on the partition's root. It should be possible to place them anywhere ina directory tree, as long as the path name does *not* contain spaces or punctuation characters ('.', '_' and '-' *are* allowed).
+
+### Preparations
+
+1.Clone the ``scipyen`` git repository. Choose a directory where to install it - this can be the root of a partition, or anywhere else locally. 
+
+* Open a `Command Prompt` window and navigate to where you want to clone the repository locally then checkout the `dev` branch. 
+* The following `cmd` snippet this will create the directory `e:\scipyen` containing the local repository clone (**note:** in all the examples below we use the `E:` drive)
+
+``` 
+e:
+git clone https://github.com/ctigaret/scipyen.git
+git checkout dev
+git pull
+```
+        
+2.Install or upgrade [`virtualenv`](https://pypi.org/project/virtualenv/)
+
+```cmd
+    python -m pip install virtualenv
+```
+
+3.Run:
+
+```cmd
+python e:\scipyen\doc\install\scipyen_install_windows.py
+```
+**Note:** This will create a virtual environment directory; by default this is `e:\scipyenv.X.Y.Z` where `X`, `Y`, and `Z` are the major, minor and micro versions of the python executable. 
+
+You will be asked to provide:
+
+* an evironment name prefix (default is `scipyenv`)
+* a location of the new environment (default is drive `E:`)
+
+The script will also install a bunch of Python packages (listed in
+`scipyen\doc\install\pip_requirements.txt` and create the following scripts in `%USERPROFILE%\Scripts (which will also be added to your %PATH%, permanently):
+
+* `scipyact.bat` - needed to activate the `scipyenv.X.Y.Z` environment
+* `scipyen.bat` - needed to launch `Scipyen`
+* `vs64.bat` - needed to activate the VisualStudio development environment
+* `scipyenv_vs64.bat` - needed to activate the `scipyenv.X.Y.Z` environment *inside* the VisualStudio development environment.
 
 * * *
 # Tools for building scipyen dependencies.
@@ -17,21 +115,8 @@ These must be installed system-wide (make sure there is enough space on C:\drive
  below I give the details of the version used, but you <b>may</b> use a more
  recent version)
 
-## python-3.9.7 or newer -- install with options:
-* for everyone
-* raise the limit on PATH
-
-## git
-Download from [here](https://git-scm.com/download/win)
-The version used here is Git-2.33.0.2-64-bit.exe but you may
-
-## kate
-Useful and powerful text editor - if you do not like VisualStudio Code, etc.
-Download app from Microsoft Store.
 
 ## doxygen
-Needed to build VIGRA.
-Get it from [here](https://www.doxygen.nl/download.html)
 
 ## cmake
 Download Windows installer from [here](https://cmake.org/download/).
@@ -78,7 +163,7 @@ Download from [here](https://sourceforge.net/projects/winflexbison/)
 I use the win_flex_bison-latest.zip
 Extract win_bison.exe and win_flex.exe to %USERPROFILE%\Scripts
 
-## msys2-64bit - required for readline & termcap, see below
+## msys2-64bit - required for radline & termcap, see below
 Download installer from [here](https://www.msys2.org/)
 Run the installer, follow the instruction [here](https://www.msys2.org/)
 * make sure you run it after first installation ("Run MSYS2 Now")
