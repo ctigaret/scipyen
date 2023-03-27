@@ -628,7 +628,7 @@ def build_boost():
                         f"threading=multi",
                         f"address-model=64",
                         f"variant=release",
-                        f"include={include}",
+                        f"include='{include}'",
                         # f"linkflags=-L{libpath}",
                         f"link=shared",
                         f"--prefix={venv}",
