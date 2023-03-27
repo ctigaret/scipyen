@@ -438,9 +438,7 @@ def build_zlib():
                             f"-DEXECUTABLE_OUTPUT_PATH={bindir}",
                             f"-DLIBRARY_OUTPUT_PATH={libdir}"])
         
-        subprocess.run(f"{cmake} {cmake_args} ..\\zlib",
-                       shell=True, check=True)
-
+    subprocess.run(f"{cmake} {cmake_args} ..\\zlib", shell=True, check=True)
 
 
 #print(f"name={__name__}")
@@ -455,6 +453,7 @@ if __name__ == "__main__":
 
         if not check_flag_file(".zlibdone", venv):
             build_zlib()
+            make_flag_file(".zlibdone", venv)
     else:
         pre_install()
 
