@@ -604,7 +604,7 @@ def build_boost():
                         "msvc",
                         "install",
                         ])
-    subprocess.run(f".\\b2 {b2_args} > build.log 2&>1", shell=True, check=True)
+    subprocess.run(f".\\b2 {b2_args} > scipyenv_build.log", shell=True, check=True)
     # subprocess.run()
     
 
