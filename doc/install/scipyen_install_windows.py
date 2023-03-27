@@ -294,6 +294,13 @@ def check_wget():
 
     return wget
 
+def check_cmake():
+    cmake=os.path.join("C:\\", "Program Files", "CMake", "bin", "cmake.exe")
+    if not os.path.isfile(cmake):
+        raise OSError("Please install CMake then try again")
+
+    return cmake
+
 def pre_install(re_create_scripts=False, reinstallpips=False):
     vcvarsall = check_visualstudio()
     wget = check_wget()
@@ -333,7 +340,7 @@ def pre_install(re_create_scripts=False, reinstallpips=False):
         os.environ["PATH"]=newpath
 
 
-    print("\n\nNow, restart console, call scipyact_vs64, then run this script again")
+    print("\n\now, restart console, call scipyact_vs64, then run this script again")
 
 
 def make_sdk_src():
@@ -349,7 +356,7 @@ def make_sdk_src():
 
 def get_venv():
     if "VIRTUAL_ENV" not in os.environ:
-        raise OSError("You must run this after activating the python environment")
+        raise OSError("\n\nATTENTION:\n\nYou must run this after activating the python environment. Have you called 'scipyact_vs64' ?")
     virtual_env = os.environ["VIRTUAL_ENV"]
     venv_drive = os.path.splitdrive(virtual_env)[0]
 
@@ -395,19 +402,33 @@ def wget_fftw():
         subprocess.run(f"copy {k} {v}",
                        shell=True, check=True)
 
-    #pass
+def build_zlib():
+    venv, vdrive=get_venv()
+    cmake=check_cmake()
+    zlib_src = os.path.join(venv, "src", "zlib")
+    if not os.path.isdir(zlib_src):
+        os.chdir(os.path.join(venv, "src"))
+        subprocess.run("git clone https://github.com/madler/zlib.git",
+                       shell=True, check=True)
+        os.mkdir("zlib-build")
+        os.chdir("zlib-build")
+        # NOTE: cmake SHOULD automatically identify a default generator
+        # as of 2023-03-27 13:31:25,
+        # on this machine this is Visual Studio 16 2019
 
 
 
 #print(f"name={__name__}")
 
 if __name__ == "__main__":
-    if "VIRTUAL_ENV" in os.environ:
-        # we're in a virtual environment already - start building the sdk'
-        print("inside virtualenv")
-        make_sdk_src()
+    venv, vdrive = get_venv()
+    make_sdk_src()
+    if not check_flag_file(".fftwdone", venv):
         wget_fftw()
+        make_flag_file(".fftwdone", venv, f"fftw3 libraries installed on {datetime.datetime.now}")
 
+    if not check_flag_file(".zlibdone", venv):
+        build_zlib()
     else:
         pre_install()
 
