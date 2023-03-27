@@ -174,7 +174,7 @@ def make_scipyact(pyvenv):
         os.mkdir(userscripts)
 
     if userscripts not in userpath:
-        newpath=";".join([userpath, "Scripts"])
+        newpath=";".join([userpath, userscripts])
         subprocess.run(f"setx PATH {newpath}", shell=True, check=True)
         os.environ["PATH"]=newpath
 
@@ -185,6 +185,11 @@ def make_scipyact(pyvenv):
 
     with open(activation_script, "w") as batch_file:
         batch_file.write("@echo off\n")
+        binpath=os.path.join(venv, "bin")
+        oldpath=os.environ["PATH"]
+        newpath = ";".join([oldpath, binpath])
+        batch_file.write(f"setx PATH {newpath}", shell=True, check=True)
+        os.environ["PATH"]=newpath
         batch_file.write(f"call {pyvenvactivation}\n")
         batch_file.write("echo on\n")
 
