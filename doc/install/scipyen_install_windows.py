@@ -480,6 +480,39 @@ def build_jpeg():
     subprocess.run(f"cmake --build . --target ALL_BUILD --config Release", shell=True, check=True)
     subprocess.run(f"cmake --install . --prefix {venv} --config Release", shell=True, check=True)
 
+def build_png():
+    venv, vdrive=get_venv()
+    src_dir = os.path.join(venv, "src", "libpng")
+    build_dir = os.path.join(venv, "src", "libpng-build")
+    bindir = os.path.join(venv, "bin")
+    incdir = os.path.join(venv, "include")
+    libdir = os.path.join(venv, "Lib")
+    mandir = os.path.join(venv, "share", "man")
+    pkgconfdir = os.path.join(venv, "share", "pkgconfig")
+    if not os.path.isdir(src_dir):
+        os.chdir(os.path.join(venv, "src"))
+        subprocess.run("git clone https://github.com/winlibs/libpng.git",
+                       shell=True, check=True)
+        
+    if not os.path.isdir(build_dir):
+        os.mkdir(build_dir)
+        
+    os.chdir(build_dir)
+    cmake_args = " ".join([
+                           f"-DCMAKE_INSTALL_PREFIX={venv}",
+                           f"-DDEPENDENCY_SEARCH_PREFIX={venv}",
+                           f"-DINSTALL_BIN_DIR={bindir}",
+                           f"-DINSTALL_LIB_DIR={libdir}",
+                           f"-DINSTALL_MAN_DIR={mandir}",
+                           f"-DINSTALL_PKGCONFIG_DIR={pkgconfdir}",
+                           f"-S {src_dir}",
+                           f"-B {build_dir}",
+                           ])
+    
+    subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
+    subprocess.run(f"cmake --build . --target ALL_BUILD --config Release", shell=True, check=True)
+    subprocess.run(f"cmake --install . --prefix {venv} --config Release", shell=True, check=True)
+
 #print(f"name={__name__}")
 
 if __name__ == "__main__":
@@ -493,9 +526,14 @@ if __name__ == "__main__":
         if not check_flag_file(".zlibdone", venv):
             build_zlib()
             make_flag_file(".zlibdone", venv, f"zlib installed on {datetime.datetime.now}")
+            
         if not check_flag_file(".jpegdone", venv):
             build_jpeg()
             make_flag_file(".jpegdone", venv, f"jpeg installed on {datetime.datetime.now}")
+            
+        if not check_flag_file(".pngdone", venv):
+            build_png()
+            make_flag_file(".pngdone", venv, f"png installed on {datetime.datetime.now}")
     else:
         pre_install()
 
