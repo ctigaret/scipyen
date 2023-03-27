@@ -439,8 +439,9 @@ def build_zlib():
                             f"-DEXECUTABLE_OUTPUT_PATH={bindir}",
                             f"-DLIBRARY_OUTPUT_PATH={libdir}"])
         
-    subprocess.run(f"cmake {cmake_args} ..\\zlib", shell=True, check=True)
-    subprocess.run(f"cmake --install . --prefix {venv}")
+    subprocess.run(f"cmake {cmake_args} -S {zlib_src} -B {zlib_build}", shell=True, check=True)
+    subprocess.run(f"cmake --build .", shell=True, check=True)
+    subprocess.run(f"cmake --install . --prefix {venv}", shell=True, check=True)
 
 
 #print(f"name={__name__}")
