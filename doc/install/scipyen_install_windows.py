@@ -641,16 +641,17 @@ def build_boost():
     subprocess.run(f".\\b2 {b2_args} > scipyenv_build.log", shell=True, check=True)
     # subprocess.run()
     
-    boost_tool_build = os.path.join(boost_src, "tools", "build")
-    BoostBuild_dir = os.path.join(venv_src, "Boost.Build")
-    os.chdir(boost_tool_build)
-    subprocess.run("bootstrapt", shell=True, check=True)
-    # subprocess.run (f"b2 install --prefix={BoostBuild_dir}", shell=True, check=True)
-    subprocess.run (f".\\b2 --prefix={BoostBuild_dir} toolset=msvc install", shell=True, check=True)
-    new_path=";".join([os.environ["PATH"], os.path.join(BoostBuild_dir, "bin"])
-    os.environ["PATH"] = new_path
-    os.chdir(boost_src)
-    subprocess.run(f"b2 {b2_args} ", shell=True, check=True)
+    # NOTE: don't remove yet !!!
+    # boost_tool_build = os.path.join(boost_src, "tools", "build")
+    # BoostBuild_dir = os.path.join(venv_src, "Boost.Build")
+    # os.chdir(boost_tool_build)
+    # subprocess.run("bootstrapt", shell=True, check=True)
+    # # subprocess.run (f"b2 install --prefix={BoostBuild_dir}", shell=True, check=True)
+    # subprocess.run (f".\\b2 --prefix={BoostBuild_dir} toolset=msvc install", shell=True, check=True)
+    # new_path=";".join([os.environ["PATH"], os.path.join(BoostBuild_dir, "bin"])
+    # os.environ["PATH"] = new_path
+    # os.chdir(boost_src)
+    # subprocess.run(f"b2 {b2_args} ", shell=True, check=True)
     
 
 #print(f"name={__name__}")
