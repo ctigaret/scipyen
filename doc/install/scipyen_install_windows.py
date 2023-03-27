@@ -620,7 +620,7 @@ def build_boost():
     
     libpath=";".join([os.environ["LIBPATH"], pylibs, venv_libdir])
     os.environ["LIBPATH"] = libpath
-    libs = ";",join([os.environ["LIB"], pylibs, venv_libdir])
+    libs = ";".join([os.environ["LIB"], pylibs, venv_libdir])
     os.environ["LIB"] = libs
     
     
