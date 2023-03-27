@@ -7,7 +7,7 @@
 * Use only ASCII characters for file and directory names, avoid spaces and punctuation marks other than '.' (dot),  '_' (underscore) or '-' (dash)
 
 ## Required software
-These requirements are to be downloaded and installed manually (with their default installation locations shown):
+These requirements are to be downloaded and *installed in their default installation locations* (shown below).  This is needed for the installation script to locate these tools.
 
 * [Python](https://www.python.org/downloads/) (>= 3.10)
     - launch the installer, install for *everybody* and 
@@ -40,7 +40,9 @@ These requirements are to be downloaded and installed manually (with their defau
     - run the installer (allow the installer to run)
     - installs in `C:\Program Files\doxygen\bin\` as `doxygen.exe`
 
-
+* [Boost C++ libraries](https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.7z)
+    - needed to build VIGRA Python bindings
+    - download manually somewhere in your file system, then remember this location; the installation script will ask for it
 
 ## Additional useful software
 The following utilities should be downloaded and installed manually
@@ -286,7 +288,7 @@ make out-of-source build tree for cmake:
     cd zlib-build
     cmake-gui ..\zlib
 
-1st time configure => select VS2019, x64, native compilers
+1st time configure => select Visual Studio 16 2019, x64, native compilers
     then check destinations to go under e:\scipyen_sdk
     configure -> generate -> open project (VS2019)
     select Release + x64

@@ -560,11 +560,20 @@ def build_boost():
     new_path = ";".join([os.environ["PATH"], os.path.dirname(wget), os.path.dirname(sevenzip)])
     os.environ["PATH"] = new_path
     
-    boost_archive = os.path.join(venv, "src", "boost_1_81_0.7z")
-    boost_src = os.path.join(venv, "src", "boost_src")
+    default_boost_archive = os.path.join(venv, "src", "boost_1_81_0.7z")
+    boost_archive = input(f"Enter for fully qualified path and file name for the DOWNLOADED boost source archive (default is {default_boost_archive}): ")
+    
     if not os.path.isfile(boost_archive):
-        subprocess.run(f"wget https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.7z",
-                       shell=True, check=True)
+        raise OSError(f"Boost archive {boost_archive} not found; bailing out. Goodbye!")
+    
+    ba_name = os.basename(boost_archive)
+    pfx, ext = os.path.splitext(ba_name)
+    
+    boost_src = os.path.join(venv, "src", "boost_src")
+    
+    # if not os.path.isfile(boost_archive):
+    #     subprocess.run(f"wget https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.7z",
+    #                    shell=True, check=True)
         
     if not os.path.isdir(boost_src):
         os.mkdir(boost_src)
