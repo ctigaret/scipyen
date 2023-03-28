@@ -842,7 +842,7 @@ def build_vigra():
                            f"-DPython_ROOT_DIR={venv}",
                            "-DPython_FIND_VIRTUALENV=ONLY",
                            "-DBUILD_SHARED_LIBS=ON",
-                           f"-DBoost_DIR={boost_dir_path}",
+                           f"-DBoost_DIR={boost_dir}",
                            f"-DBoost_INCLUDE_DIR={boost_include_dir}",
                            f"-DBoost_PYTHON_LIBRARY={boost_python_libfile}",
                            f"-DHDF5_SZ_LIBRARY={hdf5_sz_libfile}",
