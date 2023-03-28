@@ -839,11 +839,10 @@ def build_vigra():
                             f"-DBoost_PYTHON_LIBRARY={boost_python_libfile}",
                             f"-DHDF5_SZ_LIBRARY={hdf5_sz_libfile}",
                             f"-DCMAKE_BUILD_TYPE=Release",
-                            "--target install",
                             f"{vigra_src}"])
     
     subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
-    subprocess.run(f"cmake build {vigra_build} ")
+    # subprocess.run(f"cmake build {vigra_build} ")
 
 if __name__ == "__main__":
     if sys.platform != "win32":
@@ -882,9 +881,9 @@ if __name__ == "__main__":
             
         if not check_flag_file(".vigradone", venv):
             build_vigra()
-            make_flag_file(".vigradone", venv, f"vigra installed on {datetime.datetime.now()}")
+            # make_flag_file(".vigradone", venv, f"vigra installed on {datetime.datetime.now()}")
             
-        print(f"\n\nScipyen virtual environment build complete at {datetime.datetime.now()}")
+        # print(f"\n\nScipyen virtual environment build complete at {datetime.datetime.now()}")
     else:
         pre_install()
 
