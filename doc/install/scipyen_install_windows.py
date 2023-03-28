@@ -632,20 +632,22 @@ def build_boost():
     
     pysys = get_pysys()
     pyver_for_boost = ".".join(["Python",str(sys.version_info.major), str(sys.version_info.minor)])
-    print(f"pysys = {pysys}")
+    # print(f"pysys = {pysys}")
     pyinclude = get_pyinclude()
-    print(f"pyinclude = {pyinclude}")
+    # print(f"pyinclude = {pyinclude}")
     pylibs = get_pylibs()
-    print(f"pylibs = {pylibs}")
+    # print(f"pylibs = {pylibs}")
     venv_include = os.path.join(venv, "include")
     venv_libdir=os.path.join(venv, "Lib")
     
     include=";".join([os.environ["INCLUDE"], pysys, pyinclude, venv_include])
     os.environ["INCLUDE"] = include 
-    print(f"INCLUDE = {include}")
+    # print(f"INCLUDE = {include}")
+    
     libpath=";".join([os.environ["LIBPATH"], pysys, pylibs, venv_libdir])
     os.environ["LIBPATH"] = libpath
-    print(f"LIBPATH = {libpath}")
+    # print(f"LIBPATH = {libpath}")
+    
     libs = ";".join([os.environ["LIB"], pysys, pylibs, venv_libdir])
     os.environ["LIB"] = libs
     
@@ -745,7 +747,58 @@ def build_hdf5():
         subprocess.run(f"tar xf {hdf5_src_archive}", shell=True, check=True)
         
     os.chdir(hdf5_src)
+    # NOTE: 2023-03-28 11:09:37
+    # optionally, ONLY if no suitable batch script is found in hdf5_src
+    # subprocess.run(f"echo ctest -S HDF5config.cmake,BUILD_GENERATOR=VS201964,INSTALLDIR=e:\scipyen_sdk -C Release -V -O hdf5.log > build.bat",
+    #                shell=True, check=True)
+    # subprocess.run(f"build.bat")
     subprocess.run(f"build-VS2019-64.bat")
+    
+def build_vigra():
+    venv, vdrive=get_venv()
+    venv_src = os.path.join(venv, "src")
+    pysys = get_pysys()
+    pyinclude = get_pyinclude()
+    pylibs = get_pylibs()
+    venv_include = os.path.join(venv, "include")
+    venv_libdir=os.path.join(venv, "Lib")
+    
+    include=";".join([os.environ["INCLUDE"], pysys, pyinclude, venv_include])
+    os.environ["INCLUDE"] = include 
+
+    libpath=";".join([os.environ["LIBPATH"], pysys, pylibs, venv_libdir])
+    os.environ["LIBPATH"] = libpath
+
+    os.chdir(venv_src)
+    
+    libs = ";".join([os.environ["LIB"], pysys, pylibs, venv_libdir])
+    os.environ["LIB"] = libs
+    
+    os.environ["CPLUS_INCLUDE_PATH"]=";".join([pyinclude, venv_include])
+    
+    vigra_src = os.path.join(venv_src, "vigra")
+    vigra_build = os.path.join(venv_src, "vigra-build")
+    
+    if not os.path.isdir(vigra_src):
+        suubprocess.run(f"git clone https://github.com/ukoethe/vigra.git")
+        
+    if not os.path.isdir(vigra_build):
+        os.mkdir(vigra_build)
+        
+    os.chdir(vigra_build)
+    
+    cmake_args = " ".join([f"DCMAKE_INSTALL_PREFIX={venv}",
+                            "-DCMAKE_SKIP_RPATH=1" ,
+                            "-DWITH_BOOST_GRAPH=0" ,
+                            "-DWITH_BOOST_THREAD=1" ,
+                            "-DWITH_HDF5=1" ,
+                            "-DWITH_OPENEXR=0" ,
+                            "-DWITH_VIGRANUMPY=1" ,
+                            "-DLIB_SUFFIX=64" ,
+                            f"{vigra_src}"])
+    
+    subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
+    subprocess.run(f"cmake --build {vigra_build} --target install")
 
 if __name__ == "__main__":
     if "VIRTUAL_ENV" in os.environ:
@@ -777,8 +830,13 @@ if __name__ == "__main__":
             
         if not check_flag_file(".hdf5done", venv):
             build_hdf5()
-            make_flag_file(f".hdf5done", venv, f"hdf5 installed on {datetime.datetime.now()}")
+            make_flag_file(".hdf5done", venv, f"hdf5 installed on {datetime.datetime.now()}")
             
+        if not check_flag_file(".vigradone", venv):
+            build_vigra()
+            make_flag_file(".vigradone", venv, f"vigra installed on {datetime.datetime.now()}")
+            
+        print(f"\n\nScipyen virtual environment build complete at {datetime.datetime.now()}")
     else:
         pre_install()
 
