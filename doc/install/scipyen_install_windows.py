@@ -839,7 +839,10 @@ def build_vigra():
                             "-DLIB_SUFFIX=64" ,
                             f"-DBoost_PYTHON_LIBRARY={boost_python_libfile}",
                             f"-DHDF5_SZ_LIBRARY={hdf5_sz_libfile}",
-                            f"-DCMAKE_BUILD_TYPE=Release",
+                            "-DCMAKE_BUILD_TYPE=Release",
+                            "-DAUTOEXEC_TESTS=0",
+                            "-DBUILD_DOCS=0",
+                            "-DBUILD_TESTS=0",
                             f"{vigra_src}"])
     
     subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
