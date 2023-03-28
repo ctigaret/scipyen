@@ -841,11 +841,10 @@ def build_vigra():
                             f"-DCMAKE_BUILD_TYPE=Release",
                             "--target install",
                             "--config Release",
-                            "--build .",
                             f"{vigra_src}"])
     
     subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
-    # subprocess.run(f"cmake --build {vigra_build} ")
+    subprocess.run(f"cmake build {vigra_build} ")
 
 if __name__ == "__main__":
     if sys.platform != "win32":
