@@ -575,6 +575,7 @@ def build_tiff():
 def build_boost():
     venv, vdrive=get_venv()
     venv_src = os.path.join(venv, "src")
+    boost_build_log=os.path.join(venv_src, "boost_build.log")
     os.chdir(venv_src)
     wget = check_wget()
     sevenzip = check_7z()
@@ -585,11 +586,36 @@ def build_boost():
     if os.path.isfile(default_boost_archive):
         boost_archive=default_boost_archive
     else:
-        boost_archive = input(f"Enter for fully qualified path and file name for the DOWNLOADED boost source archive (the {default_boost_archive} was not found): ")
+        boost_archive = input(f"Input the fully qualified path and file name for the DOWNLOADED boost source archive (the {default_boost_archive} was not found): ")
     
     if len(boost_archive.strip()) == 0:
         boost_archive=default_boost_archive
         
+#     # NOTE: 2023-03-27 21:30:33 doesn't seem to work TODO/FIXME
+#     # NOTE: 2023-03-28 09:13:40 test the new curl download strategy; 
+#     # for now use manually dl-ed 7z archive
+#     if not os.path.isfile(boost_archive):
+#         dlcmd = " ".join(['curl "https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.7z"',
+#                 '-H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"',
+#                 '-H "Accept-Language: en-GB,en;q=0.9,en-US;q=0.8,ro;q=0.7,fr;q=0.6,cy;q=0.5"',
+#                 '-H "Connection: keep-alive"',
+#                 '-H "Cookie: ab.storage.deviceId.a9882122-ac6c-486a-bc3b-fab39ef624c5=^%^7B^%^22g^%^22^%^3A^%^22ff8b1c5c-8f01-e657-a1aa-73a2c6a6d5d0^%^22^%^2C^%^22c^%^22^%^3A1679990528908^%^2C^%^22l^%^22^%^3A1679990528908^%^7D"',
+#                 '-H "Referer: https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/"',
+#                 '-H "Sec-Fetch-Dest: document"',
+#                 '-H "Sec-Fetch-Mode: navigate"',
+#                 '-H "Sec-Fetch-Site: same-origin"',
+#                 '-H "Sec-Fetch-User: ?1"',
+#                 '-H "Upgrade-Insecure-Requests: 1"',
+#                 '-H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"',
+#                 '-H "sec-ch-ua: ^\^"Google Chrome^\^";v=^\^"111^\^", ^\^"Not(A:Brand^\^";v=^\^"8^\^", ^\^"Chromium^\^";v=^\^"111^\^""',
+#                 '-H "sec-ch-ua-mobile: ?0"',
+#                 '-H "sec-ch-ua-platform: ^\^"Windows^\^""',
+#                 '-L',
+#                 '--compressed',
+#                 '-o {boost_archive}',
+#                 ])
+#         subprocess.run(f"{dlcmd}", shell=True, check=True)
+#         
     if not os.path.isfile(boost_archive):
         raise OSError(f"Boost archive {boost_archive} not found; bailing out. Goodbye!")
     
@@ -600,14 +626,6 @@ def build_boost():
         
     boost_tool_build = os.path.join(boost_src, "tools", "build")
     
-    
-    
-    # NOTE: 2023-03-27 21:30:33 doesn't seem to work TODO/FIXME
-    # if not os.path.isfile(boost_archive):
-    #     subprocess.run(f"wget https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.7z",
-    #                    shell=True, check=True)
-        
-        
     if not os.path.isdir(boost_src):
         subprocess.run(f"7z x {boost_archive} -o{venv_src} ",
                         shell=True, check=True)
@@ -633,11 +651,6 @@ def build_boost():
     
     os.environ["CPLUS_INCLUDE_PATH"]=";".join([pyinclude, venv_include])
     
-    # os this, then pass include= below
-    # include=";".join([os.environ["INCLUDE"], pyinclude, venv_include])
-    
-    
-    
     b2_args = " ".join([f"toolset=msvc",
                         f"threading=multi",
                         f"address-model=64",
@@ -655,20 +668,28 @@ def build_boost():
     
     os.chdir(boost_src)
     
+    # NOTE: 2023-03-28 09:15:26
+    # the code below compiles w/o issues (was failing to locate pyconfig.h 
+    # previously, see NOTE: 2023-03-27 21:37:29 below )
     with open("user-config.jam", "w") as boost_user_config_jamfile:
         boost_user_config_jamfile.write(f"using python : {pyver_for_boost} : {pysys} : {pyinclude} : {pylibs}")
     
     # NOTE: 2023-03-27 21:37:29 tried this, 
     # → fatal error C1083: Cannot open include file: 'pyconfig.h': No such file or directory
+    # NOTE: 2023-03-28 09:17:05
+    # apparently fixed with setting up user-config.jam , see NOTE: 2023-03-28 09:15:26
+    # and with additional options to bootstrap
     subprocess.run(f"bootstrap --with-python={pysys} --with-python-version={pyver_for_boost} --with-python-root={pylibs}", shell=True, check=True)
-    subprocess.run(f".\\b2 {b2_args} > scipyenv_build.log", shell=True, check=True)
+    subprocess.run(f".\\b2 {b2_args} > {boost_build_log}", shell=True, check=True)
     # subprocess.run()
     
     # NOTE: don't remove yet !!!
+    # NOTE: 2023-03-28 09:19:18 possibly not needed, see NOTE: 2023-03-28 09:15:26 and NOTE: 2023-03-28 09:17:05
+    #
     # boost_tool_build = os.path.join(boost_src, "tools", "build")
     # BoostBuild_dir = os.path.join(venv_src, "Boost.Build")
     # os.chdir(boost_tool_build)
-    # subprocess.run("bootstrapt", shell=True, check=True)
+    # subprocess.run("bootstrap", shell=True, check=True)
     # # subprocess.run (f"b2 install --prefix={BoostBuild_dir}", shell=True, check=True)
     # subprocess.run (f".\\b2 --prefix={BoostBuild_dir} toolset=msvc install", shell=True, check=True)
     # new_path=";".join([os.environ["PATH"], os.path.join(BoostBuild_dir, "bin"])
@@ -676,8 +697,55 @@ def build_boost():
     # os.chdir(boost_src)
     # subprocess.run(f"b2 {b2_args} ", shell=True, check=True)
     
+def build_hdf5():
+    venv, vdrive=get_venv()
+    venv_src = os.path.join(venv, "src")
+    os.chdir(venv_src)
+    hdf5_src_archive_name = "CMake-hdf5-1.14.0.zip"
+    default_hdf5_archive=os.path.join(venv, "src", {hdf5_src_archive_name})
+    if os.path.isfile(default_hdf5_archive):
+        hdf5_src_archive=default_hdf5_archive
+    else:
+        hdf5_src_archive=input(f"Input the fully qualified path and file name of the CMake HDF5 source archive (the {default_hdf5_archive} was not found): ")
+        
+    if len(hdf5_src_archive.strip()) == 0:
+        hdf5_src_archive = default_hdf5_archive
+        
+    if not os.path.isfile(hdf5_src_archive):
+        raise OSError(f"HDF5 CMake sourcre archive {hdf5_src_archive} not found; bailing out. Goodbye!")
+    # TODO
+#         dlcmd = " ".join([
+#             f'curl "https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.14/hdf5-1.14.0/src/{hdf5_src_archive_name}"',
+#             '-H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"',
+#             '-H "Accept-Language: en-GB,en;q=0.9,en-US;q=0.8"',
+#             '-H "Connection: keep-alive"',
+#             '-H "Cookie: _ga=GA1.2.943308084.1631701310; _gid=GA1.2.1811147552.1679993942"',
+#             '-H "Referer: https://confluence.hdfgroup.org/"' ,
+#             '-H "Sec-Fetch-Dest: document"' ,
+#             '-H "Sec-Fetch-Mode: navigate"' ,
+#             '-H "Sec-Fetch-Site: same-site"' ,
+#             '-H "Sec-Fetch-User: ?1"' ,
+#             '-H "Upgrade-Insecure-Requests: 1"' ,
+#             '-H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.54"',
+#             '-H "sec-ch-ua: ^\^"Microsoft Edge^\^";v=^\^"111^\^", ^\^"Not(A:Brand^\^";v=^\^"8^\^", ^\^"Chromium^\^";v=^\^"111^\^"",'
+#             '-H "sec-ch-ua-mobile: ?0"' ,
+#             '-H "sec-ch-ua-platform: ^\^"Windows^\^""',
+#             '--compressed',
+#             '-L',
+#             f'-o {hdf5_src_archive}'])
+#         
+#             subprocess.run(f"{dlcmd}", shell=True, check=True)
 
-#print(f"name={__name__}")
+    a_name = os.path.basename(hdf5_src_archive)
+    pfx, ext = os.path.splitext(a_name)
+    
+    hdf5_src = os.path.join(venv_src, pfx)
+    # hdf5_build = os.path.join(venv_src, f"{pfx}-build")
+    if not os.path.isdir(hdf5_src):
+        subprocess.run(f"tar xf {hdf5_src_archive}", shell=True, check=True)
+        
+    os.chdir(hdf5_src)
+    subprocess.run(f"build-VS2019-64.bat")
 
 if __name__ == "__main__":
     if "VIRTUAL_ENV" in os.environ:
@@ -685,27 +753,31 @@ if __name__ == "__main__":
         make_sdk_src()
         if not check_flag_file(".fftwdone", venv):
             wget_fftw()
-            make_flag_file(".fftwdone", venv, f"fftw3 libraries installed on {datetime.datetime.now}")
+            make_flag_file(".fftwdone", venv, f"fftw3 libraries installed on {datetime.datetime.now()}")
 
         if not check_flag_file(".zlibdone", venv):
             build_zlib()
-            make_flag_file(".zlibdone", venv, f"zlib installed on {datetime.datetime.now}")
+            make_flag_file(".zlibdone", venv, f"zlib installed on {datetime.datetime.now()}")
             
         if not check_flag_file(".jpegdone", venv):
             build_jpeg()
-            make_flag_file(".jpegdone", venv, f"jpeg installed on {datetime.datetime.now}")
+            make_flag_file(".jpegdone", venv, f"jpeg installed on {datetime.datetime.now()}")
             
         if not check_flag_file(".pngdone", venv):
             build_png()
-            make_flag_file(".pngdone", venv, f"png installed on {datetime.datetime.now}")
+            make_flag_file(".pngdone", venv, f"png installed on {datetime.datetime.now()}")
             
         if not check_flag_file(".tiffdone", venv):
             build_tiff()
-            make_flag_file(".tiffdone", venv, f"png installed on {datetime.datetime.now}")
+            make_flag_file(".tiffdone", venv, f"png installed on {datetime.datetime.now()}")
             
         if not check_flag_file(".boostdone", venv):
             build_boost()
+            make_flag_file(".boostdone", venv, f"boost installed on {datetime.datetime.now()}")
             
+        if not check_flag_file(".hdf5done", venv):
+            build_hdf5()
+            make_flag_file(f".hdf5done", venv, f"hdf5 installed on {datetime.datetime.now()}")
             
     else:
         pre_install()

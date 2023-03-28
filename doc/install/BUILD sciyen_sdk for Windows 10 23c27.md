@@ -71,8 +71,8 @@ The virtual Python environment and the Scipyen repository **should be** in disti
 * These can both be on the same partition (`drive`) or on different partitions, as long as they are both *local* to your machine).
 * Neither need to be on the partition's root. It should be possible to place them anywhere ina directory tree, as long as the path name does *not* contain spaces or punctuation characters ('.', '_' and '-' *are* allowed).
 
-### Preparations
-
+### Stages and steps
+#### Stage I - generate the python virtual environment and activation scripts
 1.Clone the ``scipyen`` git repository. Choose a directory where to install it - this can be the root of a partition, or anywhere else locally. 
 
 * Open a `Command Prompt` window and navigate to where you want to clone the repository locally then checkout the `dev` branch. 
@@ -91,27 +91,63 @@ git pull
     python -m pip install virtualenv
 ```
 
-3.Run:
+3.Run
 
 ```cmd
 python e:\scipyen\doc\install\scipyen_install_windows.py
 ```
 **Note:** This will create a virtual environment directory; by default this is `e:\scipyenv.X.Y.Z` where `X`, `Y`, and `Z` are the major, minor and micro versions of the python executable. 
 
-The script will ask you to provide:
+Unpon a first run, the script will:
 
-* an evironment name prefix (default is `scipyenv`)
-* a location of the new environment (default is drive `E:`)
+* ask you to provide:
+    - an evironment name prefix (default is `scipyenv`)
+    - a location of the new environment (default is drive `E:`)
 
-then proceeds to install Python packages (dependencies of `Scipyen`, listed in `scipyen\doc\install\pip_requirements.txt`) and create the a `Scripts` directory in your home (user) directory i.e.`%USERPROFILE%\Scripts`. This directory will also be added to your `%PATH%` permanently, and contains:
+* install Python package dependencies of `Scipyen` (listed in `scipyen\doc\install\pip_requirements.txt`)
+* create a `Scripts` directory in your home (user) directory i.e.`%USERPROFILE%\Scripts` which will be added to your `%PATH%` permanently, and containing:
+    - `scipyen.bat` - launches `Scipyen` (and also activates the `scipyenv.X.Y.Z` environment)
+    - `scipyact.bat` - activates the `scipyenv.X.Y.Z` environment
+    - `vs64.bat` - activates the VisualStudio development environment
+    - `scipyenv_vs64.bat` - activates the `scipyenv.X.Y.Z` environment *inside* the VisualStudio development environment.
 
-* `scipyen.bat` - launches `Scipyen` (and also activates the `scipyenv.X.Y.Z` environment)
-* `scipyact.bat` - activates the `scipyenv.X.Y.Z` environment
-* `vs64.bat` - activates the VisualStudio development environment
-* `scipyenv_vs64.bat` - activates the `scipyenv.X.Y.Z` environment *inside* the VisualStudio development environment.
+#### Stage II - building the binary libraries inside the virtual environment
+4.For the moment, the following must be *downloaded manually* and placed in `e:\scipyenv.X.Y.Z\src\`
 
-* * *
-# Tools for building scipyen dependencies.
+* the boost library archive ([`boost_1_81_0.7z`](https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.7z))
+* the HDF5 source archive for CMake ([`CMake-hdf5-1.14.0.zip`](https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.14/hdf5-1.14.0/src/CMake-hdf5-1.14.0.zip))
+
+5.Activate BOTH the VisualStudio AND Scipyen environments then run the `scipyen_install_windows.py` script again to perform subsequent build steps:
+
+```cmd
+scipyenv_vs64
+python e:\scipyen\doc\install\scipyen_install_windows.py
+```
+Each step of **Stage II** builds a set of libraries:
+
+* fftw
+* zlib
+* libjpeg
+* libpng
+* libtiff
+* boost_1_81_0
+* hdf5
+* vigra
+
+and creates one or two directories for each, inside `e:\scipyenv.X.Y.Z\src\`
+
+For example, *except for `fftw` and `boost` libraries*, the steps will associate two directories: `<libname>` (the *source tree*) and `<libname_build>` (the *build tree*), where `libname` is the name of the library being built (e.g., `zlib`, `tifflib`, etc).
+
+Each *successful* step will also generate a *dotfile* inside the root
+directory of the environment (i.e., `e:\scipyenv.X.Y.Z`) named after `libname`: `.<libname>done`, e.g. `.fftwdone`, `.tiffdone`, etc.
+
+**NOTE:** If something goes wrong in a step, check the console output or, in the case of `boost` libraries, check the `e:\scipyenv.X.Y.Z\src\boost_build.log` file. After making the necessary corrections, the script can be run again with BOTH environments activated as above. 
+
+**NOTE:** To force the re-execution of a particular step on a subsequent run of the script, remove either the *source tree*, the *build tree*, or the *dotfile* for the offending library, and run the script again with BOTH environments activated as above. 
+
+**NOTE:** The libraries are being built in the order shown above, because of the way they depend on each other. When a build step fails, the script will stop.
+
+# Obsolete instructions - please disregard
 * * *
 
 ## MPICH
