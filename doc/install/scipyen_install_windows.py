@@ -800,8 +800,6 @@ def build_vigra():
     else:
         boost_python_libfile = boost_python_library[0]
         
-    python_exec=sys.e
-    
     hdf5_sz_libfile = os.path.join(venv, "Lib", "libszaec.lib")
     
     if not os.path.isfile(hdf5_sz_libfile):
