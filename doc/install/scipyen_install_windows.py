@@ -598,6 +598,10 @@ def build_boost():
     
     boost_src = os.path.join(venv_src, pfx)
         
+    boost_tool_build = os.path.join(boost_src, "tools", "build")
+    
+    
+    
     # NOTE: 2023-03-27 21:30:33 doesn't seem to work TODO/FIXME
     # if not os.path.isfile(boost_archive):
     #     subprocess.run(f"wget https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.7z",
@@ -609,6 +613,7 @@ def build_boost():
                         shell=True, check=True)
     
     pysys = get_pysys()
+    pyver_for_boost = ".".join(["Python",str(sys.version_info.major), str(sys.version_info.minor)])
     print(f"pysys = {pysys}")
     pyinclude = get_pyinclude()
     print(f"pyinclude = {pyinclude}")
@@ -645,11 +650,17 @@ def build_boost():
                         "msvc",
                         "install",
                         ])
+    
+    
+    
     os.chdir(boost_src)
+    
+    with open("user-config.jam", "w") as boost_user_config_jamfile:
+        boost_user_config_jamfile.write(f"using python : {pyver_for_boost} : {pysys} : {pyinclude} : {pylibs}")
     
     # NOTE: 2023-03-27 21:37:29 tried this, 
     # → fatal error C1083: Cannot open include file: 'pyconfig.h': No such file or directory
-    subprocess.run("bootstrap", shell=True, check=True)
+    subprocess.run(f"bootstrap --with-python={pysys} --with-python-version={pyver_for_boost} --with-python-root={pylibs}", shell=True, check=True)
     subprocess.run(f".\\b2 {b2_args} > scipyenv_build.log", shell=True, check=True)
     # subprocess.run()
     
