@@ -800,7 +800,7 @@ def build_vigra():
     else:
         boost_python_libfile = boost_python_library[0]
         
-    python_exec=os.path.join(venv, "bin", "python.exe")
+    python_exec=sys.e
     
     hdf5_sz_libfile = os.path.join(venv, "Lib", "libszaec.lib")
     
@@ -841,7 +841,7 @@ def build_vigra():
                            # "-DCMAKE_BUILD_TYPE=Release",
                            f"-DPython_ROOT_DIR={venv}",
                            # "-DPython_FIND_VIRTUALENV=ONLY",
-                           # f"-DPython_EXECUTBALE={python_exec}",
+                           f"-DPython_EXECUTBALE={sys.executable}",
                            # f"-DPython_LIBRARIES="
                            "-DBUILD_SHARED_LIBS=ON",
                            f"-DBoost_DIR={boost_dir}",
