@@ -828,7 +828,7 @@ def build_vigra():
         
     os.chdir(vigra_build)
     
-    cmake_args = " ".join([f"DCMAKE_INSTALL_PREFIX={venv}",
+    cmake_args = " ".join([f"-DCMAKE_INSTALL_PREFIX={venv}",
                             "-DCMAKE_SKIP_RPATH=1" ,
                             "-DWITH_BOOST_GRAPH=0" ,
                             "-DWITH_BOOST_THREAD=1" ,
