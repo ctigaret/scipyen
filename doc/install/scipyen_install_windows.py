@@ -502,7 +502,7 @@ def build_jpeg():
                            f"-B {build_dir}",
                            ])
     
-    subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
+    subprocess.run(f"cmake {cmake_args}", check=True)
     subprocess.run(f"cmake --build . --target ALL_BUILD --config Release", shell=True, check=True)
     subprocess.run(f"cmake --install . --prefix {venv} --config Release", shell=True, check=True)
 
