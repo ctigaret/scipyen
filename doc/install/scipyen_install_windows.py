@@ -862,7 +862,8 @@ def build_vigra():
                            "-DAUTOBUILD_TESTS=OFF",
                            f"{vigra_src}"])
     vigra_build_log=os.path.join(venv_src, "vigra_build.log")
-    subprocess.run(f"cmake {cmake_args} > {vigra_build_log}", shell=True, check=True)
+    subprocess.run("cmake-gui ..\\vigra")
+    # subprocess.run(f"cmake {cmake_args} > {vigra_build_log}", shell=True, check=True)
     # subprocess.run(f"cmake build {vigra_build} ")
 
 if __name__ == "__main__":
