@@ -790,11 +790,25 @@ def build_vigra():
     venv_include = os.path.join(venv, "include")
     venv_libdir=os.path.join(venv, "Lib")
     
+    boost_python_library=[s for s in os.listdir(os.path.join(venv, "Lib")) if s.startswith("boost_python") and s.endswith("lib")]
+    
+    if len(boost_python_library) == 0:
+        raise OSError("Boost Python library not found. Goodbye!")
+    
+    else:
+        boost_python_libfile = boost_python_library[0]
+        
+    hdf5_sz_libfile = os.path.join(venv, "Lib", "libszaec.lib")
+    
+    if not os.path.isfile(hdf5_sz_libfile):
+        raise OSError("HDF5 sz library file not found. Goodbye!")
+    
     include=";".join([os.environ["INCLUDE"], pysys, pyinclude, venv_include])
     os.environ["INCLUDE"] = include 
 
     libpath=";".join([os.environ["LIBPATH"], pysys, pylibs, venv_libdir])
     os.environ["LIBPATH"] = libpath
+    
 
     os.chdir(venv_src)
     
@@ -822,6 +836,8 @@ def build_vigra():
                             "-DWITH_OPENEXR=0" ,
                             "-DWITH_VIGRANUMPY=1" ,
                             "-DLIB_SUFFIX=64" ,
+                            f"-DBoost_PYTHON_LIBRARY={boost_python_libfile}",
+                            f"-DHDF5_SZ_LIBRARY={hdf5_sz_libfile}",
                             f"{vigra_src}"])
     
     subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
