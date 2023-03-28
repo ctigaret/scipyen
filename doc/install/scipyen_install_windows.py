@@ -859,7 +859,7 @@ def build_vigra():
                            "-DAUTOEXEC_TESTS=OFF",
                            "-DBUILD_DOCS=ON",
                            "-DBUILD_TESTS=OFF",
-                           "-DAUTOBUILD_TESTS=OFF",
+                           "-DAUTOBUILD_TESTS=ON",
                            f"{vigra_src}"])
     
     subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
