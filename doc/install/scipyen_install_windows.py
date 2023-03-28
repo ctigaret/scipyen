@@ -861,8 +861,8 @@ def build_vigra():
                            "-DBUILD_TESTS=ON",
                            "-DAUTOBUILD_TESTS=OFF",
                            f"{vigra_src}"])
-    
-    subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
+    vigra_build_log=os.path.join(venv_src, "vigra_build.log")
+    subprocess.run(f"cmake {cmake_args} > {vigra_build_log}", shell=True, check=True)
     # subprocess.run(f"cmake build {vigra_build} ")
 
 if __name__ == "__main__":
