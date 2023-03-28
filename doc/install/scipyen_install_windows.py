@@ -715,6 +715,12 @@ def build_hdf5():
         
     if not os.path.isfile(hdf5_src_archive):
         raise OSError(f"HDF5 CMake sourcre archive {hdf5_src_archive} not found; bailing out. Goodbye!")
+    
+    a_name = os.path.basename(hdf5_src_archive)
+    pfx, ext = os.path.splitext(a_name)
+    hdf5_src = os.path.join(venv_src, pfx)
+    hdf5_binary = pfx.replace("CMake-", "")
+    hdf5_binary_archive = os.path.join(hdf5_src, f"{hdf5_binary}-win64.zip")
     # TODO
 #         dlcmd = " ".join([
 #             f'curl "https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.14/hdf5-1.14.0/src/{hdf5_src_archive_name}"',
@@ -738,12 +744,7 @@ def build_hdf5():
 #         
 #             subprocess.run(f"{dlcmd}", shell=True, check=True)
 
-    a_name = os.path.basename(hdf5_src_archive)
-    pfx, ext = os.path.splitext(a_name)
-    hdf5_binary = pfx.replace("CMake-", "")
-    hdf5_binary_archive = os.path.join(hdf5_src, f"{hdf5_binary}-win64.zip")
     
-    hdf5_src = os.path.join(venv_src, pfx)
     # hdf5_build = os.path.join(venv_src, f"{pfx}-build")
     if not os.path.isdir(hdf5_src):
         subprocess.run(f"tar xf {hdf5_src_archive}", shell=True, check=True)
