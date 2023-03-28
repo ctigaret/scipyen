@@ -827,7 +827,7 @@ def build_vigra():
     subprocess.run(f"cmake --build {vigra_build} --target install --config Release")
 
 if __name__ == "__main__":
-    if sys.platform == "win32":
+    if sys.platform != "win32":
         raise OSError("This script must be run on a Windows platform")
     
     if "VIRTUAL_ENV" in os.environ:
