@@ -847,9 +847,9 @@ def build_vigra():
                            # "-DLIBDIR_SUFFIX=64",
                            "-DCMAKE_SKIP_INSTALL_RPATH=1",
                            "-DCMAKE_SKIP_RPATH=1",
-                           "-DAUTOEXEC_TESTS=0",
-                           "-DBUILD_DOCS=0",
-                           "-DBUILD_TESTS=0",
+                           "-DAUTOEXEC_TESTS=OFF",
+                           "-DBUILD_DOCS=OFF",
+                           "-DBUILD_TESTS=ON",
                            f"{vigra_src}"])
     
     subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
