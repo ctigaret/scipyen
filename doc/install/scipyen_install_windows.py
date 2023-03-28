@@ -840,7 +840,6 @@ def build_vigra():
                             f"-DHDF5_SZ_LIBRARY={hdf5_sz_libfile}",
                             f"-DCMAKE_BUILD_TYPE=Release",
                             "--target install",
-                            "--config Release",
                             f"{vigra_src}"])
     
     subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
