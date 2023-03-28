@@ -838,6 +838,7 @@ def build_vigra():
                             "-DWITH_HDF5=1" ,
                             "-DWITH_OPENEXR=0" ,
                             "-DLIB_SUFFIX=64" ,
+                            # "-DLIBDIR_SUFFIX=64",
                             # "-DCMAKE_BUILD_TYPE=Release",
                             "-DCMAKE_SKIP_INSTALL_RPATH=1",
                             "-DCMAKE_SKIP_RPATH=1",
