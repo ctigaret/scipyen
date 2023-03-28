@@ -838,10 +838,14 @@ def build_vigra():
                             "-DLIB_SUFFIX=64" ,
                             f"-DBoost_PYTHON_LIBRARY={boost_python_libfile}",
                             f"-DHDF5_SZ_LIBRARY={hdf5_sz_libfile}",
+                            f"-DCMAKE_BUILD_TYPE=Release",
+                            "--target install",
+                            "--config Release",
+                            "--build .",
                             f"{vigra_src}"])
     
     subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
-    subprocess.run(f"cmake --build {vigra_build} --target install --config Release")
+    # subprocess.run(f"cmake --build {vigra_build} ")
 
 if __name__ == "__main__":
     if sys.platform != "win32":
