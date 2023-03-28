@@ -807,7 +807,7 @@ def build_vigra():
     vigra_build = os.path.join(venv_src, "vigra-build")
     
     if not os.path.isdir(vigra_src):
-        suubprocess.run(f"git clone https://github.com/ukoethe/vigra.git")
+        subprocess.run(f"git clone https://github.com/ukoethe/vigra.git")
         
     if not os.path.isdir(vigra_build):
         os.mkdir(vigra_build)
