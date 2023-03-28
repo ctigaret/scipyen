@@ -830,22 +830,27 @@ def build_vigra():
     os.chdir(vigra_build)
     
     cmake_args = " ".join([f"-DCMAKE_INSTALL_PREFIX={venv}",
-                            f"-DBoost_PYTHON_LIBRARY={boost_python_libfile}",
-                            f"-DHDF5_SZ_LIBRARY={hdf5_sz_libfile}",
-                            "-DWITH_VIGRANUMPY=1" ,
-                            "-DWITH_BOOST_THREAD=1" ,
-                            "-DWITH_BOOST_GRAPH=0" ,
-                            "-DWITH_HDF5=1" ,
-                            "-DWITH_OPENEXR=0" ,
-                            "-DLIB_SUFFIX=64" ,
-                            # "-DLIBDIR_SUFFIX=64",
-                            # "-DCMAKE_BUILD_TYPE=Release",
-                            "-DCMAKE_SKIP_INSTALL_RPATH=1",
-                            "-DCMAKE_SKIP_RPATH=1",
-                            "-DAUTOEXEC_TESTS=0",
-                            "-DBUILD_DOCS=0",
-                            "-DBUILD_TESTS=0",
-                            f"{vigra_src}"])
+                           f"-DCMAKE_PREFIX_PATH={venv}",
+                           "-DCMAKE_BUILD_TYPE=Release",
+                           f"-DPython_ROOT_DIR={venv}",
+                           "-DPython_FIND_VIRTUALENV=ONLY",
+                           "-DBUILD_SHARED_LIBS=ON",
+                           f"-DBoost_PYTHON_LIBRARY={boost_python_libfile}",
+                           f"-DHDF5_SZ_LIBRARY={hdf5_sz_libfile}",
+                           "-DWITH_VIGRANUMPY=ON" ,
+                           "-DWITH_BOOST_THREAD=ON" ,
+                           "-DWITH_BOOST_GRAPH=OFF" ,
+                           "-DWITH_HDF5=ON" ,
+                           "-DWITH_OPENEXR=OFF" ,
+                           "-DWITH_LEMON=OFF" ,
+                           "-DLIB_SUFFIX=64" ,
+                           # "-DLIBDIR_SUFFIX=64",
+                           "-DCMAKE_SKIP_INSTALL_RPATH=1",
+                           "-DCMAKE_SKIP_RPATH=1",
+                           "-DAUTOEXEC_TESTS=0",
+                           "-DBUILD_DOCS=0",
+                           "-DBUILD_TESTS=0",
+                           f"{vigra_src}"])
     
     subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
     # subprocess.run(f"cmake build {vigra_build} ")
