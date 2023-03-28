@@ -820,9 +820,9 @@ def build_vigra():
     vigra_src = os.path.join(venv_src, "vigra")
     vigra_build = os.path.join(venv_src, "vigra-build")
     
-    subprocess.run(f"git clone https://github.com/ukoethe/vigra.git")
-    # if not os.path.isdir(vigra_src):
-    #     subprocess.run(f"git clone https://github.com/ukoethe/vigra.git")
+    # subprocess.run(f"git clone https://github.com/ukoethe/vigra.git")
+    if not os.path.isdir(vigra_src):
+        subprocess.run(f"git clone https://github.com/ukoethe/vigra.git")
         
     if not os.path.isdir(vigra_build):
         os.mkdir(vigra_build)
