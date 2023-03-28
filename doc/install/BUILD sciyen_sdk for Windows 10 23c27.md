@@ -13,6 +13,7 @@ These requirements are to be downloaded and *installed in their default installa
     - launch the installer, install for *everybody* and 
     - *allow* add Python to the system PATH
     - *associate* `*.py` files with `%USERPROFILE%\AppData\Local\Programs\Python\Python311\python.exe`
+    - **NOTE:** If (re)installing a newer version of Python **make sure you uninstall the old version first!**
 * [VisualStudio](https://visualstudio.microsoft.com/free-developer-offers/) 
     - needed to build VIGRA and its python bindings. 
     - VisualStudio Community Edition 2019 is used at of the time of writing.
