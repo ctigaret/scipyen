@@ -1,4 +1,4 @@
-import sys, os, subprocess, io, datetime, winreg
+import sys, os, subprocess, io, datetime, winreg, shutil
 from contextlib import contextmanager
 from functools import singledispatch
 #from collections import deque
@@ -740,6 +740,8 @@ def build_hdf5():
 
     a_name = os.path.basename(hdf5_src_archive)
     pfx, ext = os.path.splitext(a_name)
+    hdf5_binary = pfx.replace("CMake-", "")
+    hdf5_binary_archive = os.path.join(hdf5_src, f"{hdf5_binary}-win64.zip")
     
     hdf5_src = os.path.join(venv_src, pfx)
     # hdf5_build = os.path.join(venv_src, f"{pfx}-build")
@@ -752,7 +754,31 @@ def build_hdf5():
     # subprocess.run(f"echo ctest -S HDF5config.cmake,BUILD_GENERATOR=VS201964,INSTALLDIR=e:\scipyen_sdk -C Release -V -O hdf5.log > build.bat",
     #                shell=True, check=True)
     # subprocess.run(f"build.bat")
-    subprocess.run(f"build-VS2019-64.bat")
+    hdf5_build_dir = os.path.join(hdf5_src, "build")
+    
+    # NOTE: don;t rebuild if build dir is found unless --rebuild-hdf5 is passed in sys.argv
+    if not os.path.isfile(hdf5_binary_archive):
+        subprocess.run(f"build-VS2019-64.bat")
+    
+    hdf5_binary_dir = os.path.join(venv_src,os.path.basename(os.path.splitext(hdf5_binary_archive)[0]))
+    
+    if not os.path.isfile(hdf5_binary_archive):
+        raise OSError(f"Building the HDF5 binary archive failed; please see the {hdf5_src}\hdf5.log for details")
+
+    os.chdir(venv_src)
+    subprocess.run(f"tar xf {hdf5_binary_archive} -C .", shell=True, check=True)
+    
+    if not os.path.isdir(hdf5_binary_dir):
+        raise OSError(f"Archive {hdf5_binary_archive} coud not be expanded. Goodbye!")
+    
+    subdirs = [s for s in os.listdir(hdf5_binary_dir) if os.path.isdir(os.path.join(hdf5_binary_dir, s))]
+    
+    src_subdirs = [os.path.join(hdf5_binary_dir, s) for s in subdirs]
+    dest_dirs = [os.path.join(venv, s) for s in subdirs]
+    
+    for s_dir, d_dir in zip(src_subdirs, dest_dirs):
+        shutil.copytree(s_dir, d_dir, dirs_exist_ok=True)
+        
     
 def build_vigra():
     venv, vdrive=get_venv()
@@ -798,9 +824,12 @@ def build_vigra():
                             f"{vigra_src}"])
     
     subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
-    subprocess.run(f"cmake --build {vigra_build} --target install")
+    subprocess.run(f"cmake --build {vigra_build} --target install --config Release")
 
 if __name__ == "__main__":
+    if sys.platform == "win32":
+        raise OSError("This script must be run on a Windows platform")
+    
     if "VIRTUAL_ENV" in os.environ:
         venv, vdrive = get_venv()
         make_sdk_src()
