@@ -790,6 +790,8 @@ def build_vigra():
     venv_include = os.path.join(venv, "include")
     venv_libdir=os.path.join(venv, "Lib")
     
+    boost_dir=os.path.join(venv, "Lib", "cmake")    
+    boost_include_dir = os.path.join(venv, "include", "boost-1_81")
     boost_python_library=[s for s in os.listdir(os.path.join(venv, "Lib")) if s.startswith("boost_python") and s.endswith("lib")]
     
     if len(boost_python_library) == 0:
@@ -798,6 +800,8 @@ def build_vigra():
     else:
         boost_python_libfile = boost_python_library[0]
         
+    
+    
     hdf5_sz_libfile = os.path.join(venv, "Lib", "libszaec.lib")
     
     if not os.path.isfile(hdf5_sz_libfile):
@@ -831,12 +835,15 @@ def build_vigra():
         
     os.chdir(vigra_build)
     
+    
     cmake_args = " ".join([f"-DCMAKE_INSTALL_PREFIX={venv}",
                            f"-DCMAKE_PREFIX_PATH={venv}",
-                           "-DCMAKE_BUILD_TYPE=Release",
+                           # "-DCMAKE_BUILD_TYPE=Release",
                            f"-DPython_ROOT_DIR={venv}",
                            "-DPython_FIND_VIRTUALENV=ONLY",
                            "-DBUILD_SHARED_LIBS=ON",
+                           f"-DBoost_DIR={boost_dir_path}",
+                           f"-DBoost_INCLUDE_DIR={boost_include_dir}",
                            f"-DBoost_PYTHON_LIBRARY={boost_python_libfile}",
                            f"-DHDF5_SZ_LIBRARY={hdf5_sz_libfile}",
                            "-DWITH_VIGRANUMPY=ON" ,
@@ -850,8 +857,9 @@ def build_vigra():
                            "-DCMAKE_SKIP_INSTALL_RPATH=1",
                            "-DCMAKE_SKIP_RPATH=1",
                            "-DAUTOEXEC_TESTS=OFF",
-                           "-DBUILD_DOCS=OFF",
-                           "-DBUILD_TESTS=ON",
+                           "-DBUILD_DOCS=ON",
+                           "-DBUILD_TESTS=OFF",
+                           "-DAUTOBUILD_TESTS=OFF",
                            f"{vigra_src}"])
     
     subprocess.run(f"cmake {cmake_args}", shell=True, check=True)
