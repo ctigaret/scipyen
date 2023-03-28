@@ -702,7 +702,7 @@ def build_hdf5():
     venv_src = os.path.join(venv, "src")
     os.chdir(venv_src)
     hdf5_src_archive_name = "CMake-hdf5-1.14.0.zip"
-    default_hdf5_archive=os.path.join(venv, "src", {hdf5_src_archive_name})
+    default_hdf5_archive=os.path.join(venv, "src", hdf5_src_archive_name)
     if os.path.isfile(default_hdf5_archive):
         hdf5_src_archive=default_hdf5_archive
     else:
