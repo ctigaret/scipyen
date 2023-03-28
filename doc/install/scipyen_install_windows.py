@@ -809,6 +809,8 @@ def build_vigra():
     libpath=";".join([os.environ["LIBPATH"], pysys, pylibs, venv_libdir])
     os.environ["LIBPATH"] = libpath
     
+    new_path = ";".join([os.environ["PATH"], os.path.join("C:", "Program Files", "doxygen", "bin")])
+    os.environ["PATH"] = new_path
 
     os.chdir(venv_src)
     
