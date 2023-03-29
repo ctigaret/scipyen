@@ -3890,7 +3890,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # allow user to choose app style interactively -- 
         
         # list of available syle names
-        self._available_Qt_style_names_ = QtWidgets.QStyleFactory.keys()
+        # NOTE: 2023-03-29 14:08:58 CT - selecting bb10 bright & dark styles crashes the GUI - not sure why
+        self._available_Qt_style_names_ = [s for s in QtWidgets.QStyleFactory.keys() if not s.startswith("bb10")]
         if sys.platform == "win32" and has_qdarkstyle_for_win:
             self._available_Qt_style_names_.append("Dark Style")
             
