@@ -858,7 +858,7 @@ def build_vigra():
                            "-DCMAKE_SKIP_RPATH=0",
                            "-DAUTOEXEC_TESTS=OFF",
                            "-DBUILD_DOCS=ON",
-                           "-DBUILD_TESTS=ON",
+                           "-DBUILD_TESTS=OFF",
                            "-DAUTOBUILD_TESTS=OFF",
                            f"-S {vigra_src}",
                            f"-B {vigra_build}"])
