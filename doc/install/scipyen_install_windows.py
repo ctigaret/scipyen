@@ -103,11 +103,11 @@ def _(key):
     return values_dict
 
 def check_flag_file(flagname, pyvenv):
-    flagfile = os.path.join(pyvenv, flagname)
+    flagfile = os.path.join(pyvenv, "src", flagname)
     return os.path.isfile(flagfile)
 
 def make_flag_file(flagname, pyvenv, msg):
-    flagfilename=os.path.join(pyvenv, flagname)
+    flagfilename=os.path.join(pyvenv, "src", flagname)
     with open(flagfilename, "w") as flagfile:
         flagfile.write(msg)
 
@@ -860,10 +860,11 @@ def build_vigra():
                            "-DBUILD_DOCS=ON",
                            "-DBUILD_TESTS=ON",
                            "-DAUTOBUILD_TESTS=OFF",
-                           f"{vigra_src}"])
+                           f"-S {vigra_src}",
+                           f"-B {vigra_build}"])
     vigra_build_log=os.path.join(venv_src, "vigra_build.log")
-    subprocess.run("cmake-gui ..\\vigra")
-    # subprocess.run(f"cmake {cmake_args} > {vigra_build_log}", shell=True, check=True)
+    # subprocess.run("cmake-gui ..\\vigra")
+    subprocess.run(f"cmake {cmake_args} > {vigra_build_log}", shell=True, check=True)
     # subprocess.run(f"cmake build {vigra_build} ")
 
 if __name__ == "__main__":
