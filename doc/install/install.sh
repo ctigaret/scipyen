@@ -492,11 +492,11 @@ reinstall_pyqt5=0
 reinstall_vigra=0
 reinstall_neuron=0
 reinstall_pips=0
-for_msys=0
+# for_msys=0
 
-if [ -n $MSYSTEM_PREFIX ] ; then
-    for_msys=1
-fi
+# if [ -n $MSYSTEM_PREFIX ] ; then
+#     for_msys=1
+# fi
 
 for i in "$@" ; do
     case $i in
@@ -546,10 +546,10 @@ for i in "$@" ; do
             ;;
         esac
         ;;
-        --msys)
-        for_msys=1
-        shift
-        ;;
+#         --msys)
+#         for_msys=1
+#         shift
+#         ;;
         --about)
         showinstalldoc
         exit 0
