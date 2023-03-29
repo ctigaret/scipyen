@@ -82,8 +82,7 @@ are configuration settings for various Scipyen functionalities:
 
 """
 #import base64
-import os
-import inspect, typing, types, math, numbers
+import os, inspect, typing, types, math, numbers, json, traceback, warnings
 import yaml
 import dataclasses
 from copy import (copy, deepcopy,)
@@ -102,11 +101,13 @@ from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 from PyQt5.QtWidgets import (QWidget, QMainWindow)
 from PyQt5.QtCore import (QSettings, QVariant)
 
+from IPython.lib.pretty import pprint
+
 import traitlets
 from traitlets.utils.bunch import Bunch
 import traitlets.config
 from .traitcontainers import DataBag
-from core import traitutils
+from core import (traitutils, strutils)
 from core.prog import safeWrapper
 from core.workspacefunctions import user_workspace
 from core.quantities import(quantity2str, str2quantity)
@@ -169,6 +170,7 @@ confuse.yaml_util.Loader.add_constructor("tag:pq.Quantity", quantity_constructor
 application_name = "Scipyen"
 organization_name = "Scipyen"
 
+global scipyen_config
 scipyen_config = confuse.LazyConfig(application_name, "scipyen_defaults")
 
 if not scipyen_config._materialized:# make sure this is done only once
@@ -177,39 +179,6 @@ if not scipyen_config._materialized:# make sure this is done only once
 #print(f"scipyen_config module: global qsettings {qsettings.fileName()}")
 scipyen_user_config_source = [s for s in scipyen_config.sources if not s.default][0]
 
-def _cfg_exec_body_(ns, supplement={}):
-    print("_cfg_exec_body_ supplement")
-    ns.update(supplement)
-    
-    if not isinstance(ns.get("_scipyen_settings_", None), confuse.Configuration):
-        ns["_scipyen_settings_"] = scipyen_config
-        
-    if not isinstance(ns.get("_user_settings_src_", None), confuse.ConfigSource):
-        ns["_user_settings_src_"] = scipyen_user_config_source
-        
-    if not isinstance(ns.get("qsettings", None), QtCore.QSettings):
-        ns["qsettings"] = QtCore.QSettings("Scipyen", "Scipyen") # user scope, application-level
-        
-    if not isinstance(ns.get("configurables", None), property):
-        ns["configurables"] = property(fget = _configurables, doc = "All configurables")
-        
-    if not isinstance(ns.get("qtconfigurables", None), property):
-        ns["qtconfigurables"] = property(fget = _qtconfigurables, doc = "QSettings configurables")
-        
-    if not isinstance(ns.get("clsconfigurables", None), property):
-        ns["clsconfigurables"] = property(fget = _clsconfigurables, doc = "Class configurables")
-        
-    if not inspect.isfunction(ns.get("_observe_configurables_", None)):
-        ns["_observe_configurables_"] = _observe_configurables_
-        
-    if not isinstance (ns.get("configurable_traits", None), DataBag):
-        ns["configurable_traits"] = DataBag()
-        
-    ns["configurable_traits"].observe(ns["_observe_configurables_"])
-    
-    if not inspect.isfunction(ns.get("loadSettings", None)):
-        ns["loadSettings"] = _loadSettings_
-                
 def configsrc2bunch(src:typing.Union[confuse.ConfigSource, Bunch]):
     """Creates a nested Bunch from this confuse.ConfigSource
     
@@ -225,7 +194,7 @@ def configsrc2bunch(src:typing.Union[confuse.ConfigSource, Bunch]):
     """
     return Bunch(((k, configsrc2bunch(v)) if isinstance(v, (confuse.ConfigSource, Bunch)) else (k,v) for k,v in src.items()))
 
-def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:typing.Optional[typing.Any]=None, trait_notifier:typing.Optional[typing.Union[bool, DataBag]] = None):
+def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:typing.Optional[typing.Any]=None, trait_notifier:typing.Optional[typing.Union[bool, DataBag]] = None, value_type=None):
     """Decorator for instance methods & properties.
     
     Decorates instance properties and methods that access instance attributes 
@@ -291,7 +260,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
         (a) and (b) options, or the option (c), below:
         
         a) override the 'configurable_traits' DataBag attribute in the :class:
-        b) override the '_observe_configurables_' method in the :class:
+        b) reimplement the '_observe_configurables_' method in the :class:
         c) outside the :class:, define a DataBag trait notifier and a handler, 
             register the handler with the notifier (notifier.observe(...)) then
             pass the notifier as parameter to this decorator.
@@ -315,6 +284,11 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
         
         CAUTION: Always make sure the getter returns the same type of data as 
         that expected by the setter!
+    
+    value_type: optional default None
+        When specified, it must be a type, useful to force cast a config value to
+        a desired type. This seems to be necessary for qsettings which converts 
+        numbers to strings.
         
     Returns:
     =======
@@ -428,8 +402,8 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
             # applies only to read-write properties
             # hence only decorate xxx.setter if defined
             if all((inspect.isfunction(func) for func in (f.fget, f.fset))):
-                setattr(f.fget, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.fget.__name__, "default": default}))
-                setattr(f.fset, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.fset.__name__, "default": default}))
+                setattr(f.fget, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.fget.__name__, "default": default, "value_type": value_type}))
+                setattr(f.fset, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.fset.__name__, "default": default, "value_type": value_type}))
                 
                 if conftype != "qt": #and isinstance(trait_notifier, DataBag):
                     # NOTE: 2021-09-08 09:14:16
@@ -470,7 +444,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
                 
         elif inspect.isfunction(f):
             if setter is True:
-                setattr(f, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default}))
+                setattr(f, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default, "value_type": value_type}))
                 
                 if conftype != "qt":# and isinstance(trait_notifier, DataBag):
                     # see NOTE: 2021-09-08 09:14:16
@@ -500,7 +474,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
                     return parset 
         
             else:
-                setattr(f, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.__name__, "default": default}))
+                setattr(f, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.__name__, "default": default, "value_type": value_type}))
                 
         elif inspect.isbuiltin(f): # FIXME 2021-09-09 14:09:04
             # NOTE: 2021-09-08 10:10:07
@@ -509,7 +483,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
             # we must wrap on the fly
             #print("trait_notifier", trait_notifier)
             if setter is True:
-                conf_setter = Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default})
+                conf_setter = Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default, "value_type": value_type})
 
                 def newf(instance,  trn, *args, **kwargs):
                     """Calls the owner's setter method & updates the trait notifier.
@@ -535,7 +509,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
                 return parset
                 
             else:
-                configurable_getter = Bunch({"type": conftype, "name": confname, "getter":f.__name__, "default": default})
+                configurable_getter = Bunch({"type": conftype, "name": confname, "getter":f.__name__, "default": default, "value_type": value_type})
                 
                 def newf(instance, *args, **kwargs):
                     return f(instance, *args, **kwargs)
@@ -635,7 +609,7 @@ def saveQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, val:typin
     if len(gname.strip()) == 0:
         gname = "General"
     key_name = "%s%s" % (pfx, key)
-    #print("saveQSettingsKey group %s key %s, value %s (%s)" % (gname, key_name, val, type(val)))
+    # print(f"saveQSettingsKey group: {gname}, key: {key}, value: {val} ({type(val).__name__})")
     qsettings.beginGroup(gname)
     qsettings.setValue(key_name, val)
     qsettings.endGroup()
@@ -645,10 +619,11 @@ def loadQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, default:t
     if len(gname.strip()) == 0:
         gname = "General"
     key_name = "%s%s" % (pfx, key)
-    #print("loadQSettingsKey group %s key %s, default %s (%s)" % (gname, key_name, type(default).__name__, default))
+    
     qsettings.beginGroup(gname)
     ret = qsettings.value(key_name, default)
     qsettings.endGroup()
+    # print(f"loadQSettingsKey group: {gname}, key: {key}, value: {ret} ({type(ret).__name__})")
     return ret
 
 def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, Figure], group_name:typing.Optional[str]=None, prefix:typing.Optional[str]=None, save:bool=True):
@@ -845,6 +820,7 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
     
     if hasattr(win, "qtconfigurables"):
         qtcfg = win.qtconfigurables
+        # print(f"\tsyncQtSettings {win.__class__.__name__}, {win.windowTitle()}:")
         
     elif issubclass(win, (mpl.backend_bases.FigureCanvasBase, win, QtWidgets.QWidget)):
         # executed when a :class: inherits from matplotlib.Figure AND ScipyenConfigurable
@@ -860,8 +836,8 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
         
         if issubclass(canvas, (mpl.backend_bases.FigureCanvasBase, win, QtWidgets.QWidget)):
             qtcfg = Bunch({"WindowSize":       Bunch({"getter":"size",        "setter":"resize"}),
-                        "WindowPosition":   Bunch({"getter":"pos",         "setter":"move"}),
-                        "WindowGeometry":   Bunch({"getter":"geometry",    "setter":"setGeometry"}),
+                           "WindowPosition":   Bunch({"getter":"pos",         "setter":"move"}),
+                           "WindowGeometry":   Bunch({"getter":"geometry",    "setter":"setGeometry"}),
                         })
             
             win = canvas
@@ -871,7 +847,7 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
         qtcfg.update(getattr(win, "_qtcfg", Bunch()))
         qtcfg.update(getattr(win, "_ownqtcfg", Bunch()))
     
-    #print("\tqtcfg for %s: %s" % (win.__class__.__name__, qtcfg))
+    # print(f"\tsyncQtSettings {win.__class__.__name__}, {win.windowTitle()}:\n\t{qtcfg}")
 
     for confname, getset in qtcfg.items():
         # NOTE: 2021-08-28 21:59:43
@@ -921,6 +897,30 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
             newval = loadQSettingsKey(qsettings, gname, key_prefix, confname, default)
             
             if isinstance(setter, property):
+                config_setter = getattr(setter.fset, "configurable_setter")
+                value_type = config_setter.get("value_type", None)
+                if not isinstance(value_type, type):
+                    value_type = type(default)
+                    
+                # if settername == "autoRemoveViewers":
+                #     print(f"value_type {value_type}")
+                    
+                try:
+                    if value_type is bool:
+                        if isinstance(newval, str):
+                            newval = newval.lower()=="true"
+                        elif not isinstance(newval, bool):
+                            newval = False
+                            
+                    elif value_type is not None:
+                        newval = value_type(newval)
+                    
+                except:
+                    # warnings.warn(f"Cannot cast {type(newval).__name__} to {value_type.__name__}; reverting to default", category=RuntimeWarning)
+                    newval = default
+                
+                # if settername == "autoRemoveViewers":
+                #     print(f"{win.__class__.__name__} syncQtSettings: settername = {settername},  newval = {newval}")
                 #print("\t\tsetter win.%s = %s" % (settername, newval))
                 setattr(win, settername, newval)
                 
@@ -948,7 +948,6 @@ def collect_configurables(cls):
     """
     if not inspect.isclass(cls):
         cls = cls.__class__
-    #cls = instance.__class__ # this is normally the derived type
     
     ret = Bunch({"qt": Bunch(), "conf": Bunch()})
     
@@ -959,15 +958,10 @@ def collect_configurables(cls):
         if isinstance(fn, property):
             if inspect.isfunction(fn.fget) or isinstance(fn.fget, partial):
                 confdict.update(getattr(fn.fget, "configurable_getter", Bunch()))
+
             if inspect.isfunction(fn.fset) or isinstance(fn.fset, partial):
                 confdict.update(getattr(fn.fset, "configurable_setter", Bunch()))
                 
-            #if inspect.isfunction(fn.fget) and hasattr(fn.fget, "configurable_getter"):
-                #getterdict = fn.fget.configurable_getter
-                
-            #if inspect.isfunction(fn.fset) and hasattr(fn.fset, "configurable_setter"):
-                #setterdict = fn.fset.configurable_setter
-                    
         elif inspect.isfunction(fn) or isinstance(fn, partial):
             confdict.update(getattr(fn, "configurable_getter", Bunch()))
             confdict.update(getattr(fn, "configurable_setter", Bunch()))
@@ -976,9 +970,6 @@ def collect_configurables(cls):
             continue # skip members that are not methods or properties
         
         if len(confdict):
-            #print("scipyen_config.collect_configurables %s confdict:" % cls.__name__)
-            #pprint(confdict)
-            #print("%s confdict" % cls.__name__, confdict)
             target = ret.qt if confdict.type.lower() == "qt" else ret.conf
 
             cfgget = confdict.get("getter", None)
@@ -1003,7 +994,7 @@ def collect_configurables(cls):
             else:
                 target[confdict.name].update(cfgdict)
                 
-            
+    # adapt for "old" API
     ret.qt.update(getattr(cls, "_qtcfg", dict()))
     ret.qt.update(getattr(cls, "_ownqtcfg", dict()))
     ret.conf.update(getattr(cls, "_cfg", dict()))
@@ -1016,6 +1007,10 @@ class ScipyenConfigurable(object):
     
     Implements functionality to deal with non-Qt settings made persistent across
     Scipyen sessions.
+    
+    Provides common functionality for Scipyen's QWindow-based GUI classes (as
+    long as they inherit from ScipyenConfigurable as well, either directly, or
+    indirectly via WorkspaceGuiMixin)
     
     Qt-based GUI settings (where appropriate) are dealt with separately, by either
     inheriting from gui.workspacegui.WorkspaceGuiMixin, or directly by using
@@ -1035,7 +1030,50 @@ class ScipyenConfigurable(object):
         • gui.scipyenviewer.ScipyenFrameViewer ← gui.scipyenviewer.ScipyenViewer
         • all viewer classes in gui subpackage, indirectly via either 
         gui.scipyenviewer.ScipyenViewer or gui.scipyenviewer.ScipyenFrameViewer.
-            
+    
+    NOTE: For developers:
+    1) If the derived class defines a UI component, is better to call`loadSettings`
+        called AFTER the initialization of its widgets. 
+    
+        This is MANDATORY whenever the derived class uses the `loadSettings` 
+        method to assign default values (read from the config file) to various 
+        widgets.
+    
+        When exactly `loadSettings` should be called depends on what UI widgets 
+        it affects, and when are these defined and initialized.
+    
+        For example, SignalViewer and ImageViewer have a special function
+        `_configureUI_` (inherited from ScipyenViewer) which calls `setupUi`,
+        the adds a few more actions & widgets (I agree, this is bad practice).
+    
+        For this reason, `loadSettings` is called AFTER `_configureUI_`; since
+        this approach is used in common by SignalViewer and ImageViewer, it 
+        was factored out in ScipyenViewer and therefore it will be used by any
+        class that inherits from ScipyenViewer (either directly, or indirectly
+        via ScipyenFrameViewer).
+    
+        The consequence that an UI class inheriting from ScipyenConfigurable may
+        need to reimplement the `loadSettings` method.
+    
+        The `loadSettings` method defined here only reads the values for
+        configurables from the config file(s). Therefore, it should be called 
+        from within the `loadSettings` of the derived class; for example:
+    
+        `super().loadSettings()` 
+    
+        or
+    
+        `super(WorkspaceGuiMixin, self).loadSettings()`
+    
+        If the derived class does not store default values for its UI widgets
+        in the config file then it does not need to reimplement this method. 
+        This is what SignalViewer does, because it stores in the config file only
+        data that is associated with objects that are NOT initialized during
+        __init__ (such as the colours of various cursor types).
+    
+    2) must call saveSettings() inside the closeEvent() handler in the derived
+        class
+    
     """
     # NOTE: 2021-09-23 11:39:57
     # added self._tag and tag property getter/setter
@@ -1063,34 +1101,42 @@ class ScipyenConfigurable(object):
         return parent
 
     def _observe_configurables_(self, change):
-        #### BEGIN debug - comment out when done
-        # if self.__class__.__name__ == "MPSCAnalysis":
-        #     print(f"ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_():")
-        #     print(f"\tchange.name = {change.name}")
-        #     print(f"\tchange.type = {change.type}")
-        #     print(f"\tchange.old = {change.old} ({type(change.old).__name__})")
-        #     print(f"\tchange.new = {change.new} ({type(change.new).__name__})")
-        #     print("\ttraits observer state:") 
-        #     for k, v in self.configurable_traits.__observer__.__getstate__().items():
-        #         if isinstance(v, dict):
-        #             print(f"\t\t{k}:")
-        #             for kk, vv in v.items():
-        #                 print(f"\t\t\t{kk} = {vv}")
-        #         else:
-        #             print(f"\t\t{k} = {v}")
-        #     print("\tobserver class traits:")
-        #     for k, v in self.configurable_traits.__observer__.class_traits().items():
-        #         print(f"\t\t{k} = {v}")
-        #     print("\tobserver class own traits")
-        #     for k, v in self.configurable_traits.__observer__.class_own_traits().items():
-        #         print(f"\t\t{k} = {v}")
-        #### END debug - comment out when done
-                
         isTop = hasattr(self, "isTopLevel") and self.isTopLevel
         parent = self._get_parent_()
         tag = self.configTag
         
         cfg = self._make_confuse_config_data_(change, isTop, parent, tag)
+        #### BEGIN debug - comment out when done
+#         if self.__class__.__name__ == "EventAnalysis":
+#             print(f"ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_():")
+#             stack = inspect.stack()
+#             for s in stack:
+#                 print(f"\t\tcaller {s.function}")
+#             # currentexecframe = inspect.currentframe()
+#             # outerframes = inspect.getouterframes(currentexecframe, 2)
+#             # print(f"\tcaller {callframe[1][3]}")
+#             print(f"\tchange.name = {change.name}")
+#             print(f"\tchange.type = {change.type}")
+#             print(f"\tchange.old = {change.old} ({type(change.old).__name__})")
+#             print(f"\tchange.new = {change.new} ({type(change.new).__name__})")
+#             print(f"\tconfig = {cfg}")
+#         
+#             print("\ttraits observer state:") 
+#             for k, v in self.configurable_traits.__observer__.__getstate__().items():
+#                 if isinstance(v, dict):
+#                     print(f"\t\t{k}:")
+#                     for kk, vv in v.items():
+#                         print(f"\t\t\t{kk} = {vv}")
+#                 else:
+#                     print(f"\t\t{k} = {v}")
+#             print("\tobserver class traits:")
+#             for k, v in self.configurable_traits.__observer__.class_traits().items():
+#                 print(f"\t\t{k} = {v}")
+#             print("\tobserver class own traits")
+#             for k, v in self.configurable_traits.__observer__.class_own_traits().items():
+#                 print(f"\t\t{k} = {v}")
+        #### END debug - comment out when done
+                
         
         if isinstance(cfg, Bunch):
             for k,v in cfg.items():
@@ -1102,14 +1148,14 @@ class ScipyenConfigurable(object):
                     scipyen_config[k][kk].set(vv)
                     
         #### BEGIN debug - comment out when done
-#         if self.__class__.__name__ == "MPSCAnalysis":
+#         if self.__class__.__name__ == "EventAnalysis":
 #             print(f"\twriting configuration file")
         #### END debug - comment out when done
             
         write_config(scipyen_config)
         
         #### BEGIN debug - comment out when done
-        # if self.__class__.__name__ == "MPSCAnalysis":
+        # if self.__class__.__name__ == "EventAnalysis":
         #     print(f"DONE ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_()\n\n")
         #### END debug - comment out when done
             
@@ -1151,16 +1197,34 @@ class ScipyenConfigurable(object):
         return Bunch({self.__class__.__name__:Bunch({change.name:v})})
         
     def _get_config_view_(self, isTop=True, parent=None, tag=None):
-        if isTop:
-            return scipyen_config[self.__class__.__name__].get(None)
+        """
+        If isTop, returns the confuse config section for the class of this instance:
+                scipyen_config → this class name
+        Else:
+            If parent is not None:
+                If tag is not None (or an empty str)
+                    return the sub-subsection: scipyen_config → parent class name → this class name → tag
+                Else
+                    return the sub-subsection: scipyen_config → parent class name → this class name
+        
+            Else:
+                return the same thing as if isTop were True ('cause there's no parent, let alone a tag)
+                    
+        """
+        # if self.__class__.__name__ == "EventAnalysis":
+        #     print(f"scipyen_config {id(scipyen_config)} {scipyen_config}")
+            
+        if isTop: 
+            return scipyen_config[self.__class__.__name__]#.get()
+            # return scipyen_config[self.__class__.__name__].get(None)
             
         if parent is not None:
             if isinstance(tag, str) and len(tag.strip()):
-                return scipyen_config[parent.__class__.__name__][self.__class__.__name__][tag].get(None)
+                return scipyen_config[parent.__class__.__name__][self.__class__.__name__][tag]#.get(None)
             
-            return scipyen_config[parent.__class__.__name__][self.__class__.__name__].get(None)
+            return scipyen_config[parent.__class__.__name__][self.__class__.__name__]#.get(None)
         
-        return scipyen_config[self.__class__.__name__].get(None)
+        return scipyen_config[self.__class__.__name__]#.get(None) 
             
     @property
     def configTag(self) -> str:
@@ -1174,7 +1238,7 @@ class ScipyenConfigurable(object):
             warnings.warn(f"The attempt to set configTag to {val} failed")
         
     @property
-    def configurables(self) -> Bunch:
+    def configurables(self):
         """All configurables
         
         Collects all configurables for this ::class:: in a mapping.
@@ -1203,8 +1267,9 @@ class ScipyenConfigurable(object):
         return self.configurables.get("conf", Bunch())
     
     def loadWindowSettings(self):
-        """Laods window settings
+        """Reads window and Qt GUI settings from the QSettings file
         """
+        # print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadWindowSettings")
         if isinstance(self, Figure): # this presupposes self is an instance that also inherits from matplotlib Figure
             if issubclass(self.canvas, (mpl.backend_bases.FigureCanvasBase, QtWidgets.QWidget)):
                 loadWindowSettings(ScipyenConfigurable.qsettings, self.canvas, group_name = self.canvas.__class__.__name__, prefix="")
@@ -1215,8 +1280,9 @@ class ScipyenConfigurable(object):
         loadWindowSettings(self.qsettings, self, group_name = group_name, prefix=prefix)
     
     def saveWindowSettings(self):
+        """Writes windows and Qt GUI settins to the QSettings file
         """
-        """
+        # print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveWindowSettings")
         if isinstance(self, Figure):# this presupposes self is an instance that also inherits from matplotlib Figure
             if issubclass(self.canvas, (mpl.backend_bases.FigureCanvasBase, win, QtWidgets.QWidget)):
                 saveWindowSettings(ScipyenConfigurable.qsettings, self.canvas, group_name = self.canvas.__class__.__name__, prefix="")
@@ -1225,18 +1291,36 @@ class ScipyenConfigurable(object):
         group_name, prefix = qSettingsGroupPfx(self)
         saveWindowSettings(self.qsettings, self, group_name=group_name, prefix=prefix)
     
-    def __load_config_key_val__(self, settername, val):
+    def _assign_trait_from_config_(self, settername, val):
         #### BEGIN debug - comment out when done
-        # if self.__class__.__name__ == "MPSCAnalysis":
-        #     print(f"ScipyenConfigurable<{self.__class__.__name__}>. __load_config_key_val__ settername {settername}, val {val}")
-            #print("ScipyenConfigurable.__load_config_key_val__")
-            #print("\tsettername: %s, val: %s" % (settername, val))
+        # if self.__class__.__name__ == "EventAnalysis":
+        #     print(f"ScipyenConfigurable<{self.__class__.__name__}>._assign_trait_from_config_ settername {settername}, val {val}")
         #### END debug - comment out when done
         setter = inspect.getattr_static(self, settername, None)
         
-        if isinstance(val, str) and any(c in val for c in ("()")):
-            # this is a string rep of a basic Pyton sequence
-            val = tuple(v_.strip() for v_ in val.strip("()").split(","))
+        if isinstance(val, str):
+            # NOTE: 2022-11-27 12:46:17 POSSIBLE NEW BUG
+            # The json library will help identify string representation of 
+            # sequences but fail in any other case. 
+            # HOWEVER:
+            # What if we WANT to store a str representation of a sequence, 
+            # and retrieve it as such, instead of retrieving the original
+            # sequence represented here?
+            #
+            # The answer to that is to enclose the whole string in double or
+            # single quotes at writing time; then, here, let the caller deal
+            # with the result...
+            try:
+                val = json.loads(val)
+            except:
+                val = strutils.str2sequence(val)
+        
+        # FIXME BUG 2022-11-27 12:33:35
+        # this messes up string that may contain parantheses inside (such as a
+        # file filter specification !!!!)
+        # if isinstance(val, str) and any(c in val for c in ("()")):
+        #     # this is a string rep of a basic Pyton sequence such as a tuple or list
+        #     val = tuple(v_.strip() for v_ in val.strip("()").split(","))
         
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             with self.configurable_traits.observer.hold_trait_notifications():
@@ -1265,29 +1349,35 @@ class ScipyenConfigurable(object):
             isTop = hasattr(self, "isTopLevel") and self.isTopLevel
             parent = self._get_parent_()
             tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
-            
             user_conf = self._get_config_view_(isTop, parent, tag)
             
-            #### BEGIN debug - comment out when done
-            # if self.__class__.__name__ == "MPSCAnalysis":
-            #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings() user_conf {user_conf}")
+            # #### BEGIN debug - comment out when done
+            # if self.__class__.__name__ == "EventAnalysis":
+            #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings() to load user_conf:")
+            #     pprint(user_conf)
             #### END debug - comment out when done
 
-            if isinstance(user_conf, dict):
+            if isinstance(user_conf, confuse.Subview):
                 for k, v in user_conf.items():
-                    getset = cfg.get(k, {})
-                    settername = getset.get("setter", None)
-                    
-                    if not isinstance(settername, str) or len(settername.strip())==0:
-                        continue
-                    
-                    self.__load_config_key_val__(settername, v)
+                    if k in cfg:
+                        try:
+                            self.set_configurable_attribute(k, v.get(), cfg)
+                        except Exception as e:
+                            traceback.print_exc()
+                            continue
+#                         getset = cfg.get(k, {})
+#                         settername = getset.get("setter", None)
+#                         
+#                         if not isinstance(settername, str) or len(settername.strip()) == 0:
+#                             continue
+#                         
+#                         self._assign_trait_from_config_(settername, v.get())
                     
         if issubclass(self.__class__, QtWidgets.QWidget):
             self.loadWindowSettings() 
             
     def saveSettings(self):
-        """ Must be called with super() if overridden in subclasses
+        """ Must be called with super() if reimplemented in subclasses
         
         NOTE: 2022-11-01 22:13:57 Does not support mapping collections as
         configuration settings. In other words, an individual setting cannot be
@@ -1296,6 +1386,7 @@ class ScipyenConfigurable(object):
         On the other hand, individual settings can be organized hierarchically
         by collecting them in a dict (or dict-like) object.
         """
+        # print(f"ScipyenConfigurable<{self.__class__.__name__}.saveSettings()")
         # NOTE: 2021-05-04 21:53:04
         # This saveSettings has access to all the subclass attributes (with the
         # subclass being  fully initialized by the time this is called).
@@ -1309,39 +1400,45 @@ class ScipyenConfigurable(object):
         
         if len(cfg):
             isTop = hasattr(self, "isTopLevel") and self.isTopLevel
+                
             parent = self._get_parent_()
             tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
-            
             user_conf = self._get_config_view_(isTop, parent, tag)
             
             #### BEGIN debug - comment out when done
-            # if self.__class__.__name__ == "MPSCAnalysis":
-            #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf {user_conf}")
+            # if self.__class__.__name__ == "EventAnalysis":
+            #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf:")
+            #     pprint(user_conf)
             #### END debug - comment out when done
             
             changed = False
             
             if isinstance(user_conf, dict):
                 for k, v in user_conf.items():
-                    getset = cfg.get(k, {})
-                    gettername = getset.get("getter", None)
-                    
-                    if not isinstance(gettername, str) or len(gettername.strip())==0:
+                    try:
+                        val = self.get_configurable_attribute(k, cfg)
+                    except Exception as e:
+                        traceback.print_exc()
                         continue
-                    
-                    getter = inspect.getattr_static(self, gettername, None)
-                    
-                    if isinstance(getter, property):
-                        val = getattr(self, gettername)
-                        
-                    elif getter is not None:
-                        getter = getattr(self, gettername)
-                        val  = getter()
+#                     getset = cfg.get(k, {})
+#                     gettername = getset.get("getter", None)
+#                     
+#                     if not isinstance(gettername, str) or len(gettername.strip())==0:
+#                         continue
+#                     
+#                     getter = inspect.getattr_static(self, gettername, None)
+#                     
+#                     if isinstance(getter, property):
+#                         val = getattr(self, gettername)
+#                         
+#                     elif getter is not None:
+#                         getter = getattr(self, gettername)
+#                         val  = getter()
 
-                #### BEGIN debug - comment out when done
-                # if self.__class__.__name__ == "MPSCAnalysis":
-                #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() user_conf {user_conf}, val {val} ({type(val).__name__}), v {v} ({type(v).__name__})")
-                #### END debug - comment out when done
+                    #### BEGIN debug - comment out when done
+                    # if self.__class__.__name__ == "EventAnalysis":
+                    #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings(), getter={gettername} → {k}={val} ({type(val).__name__}), v {v} ({type(v).__name__})")
+                    #### END debug - comment out when done
                     
                     if val != v:
                         # NOTE: 2022-11-01 21:54:34
@@ -1359,18 +1456,49 @@ class ScipyenConfigurable(object):
                         
             if changed:
                 #### BEGIN debug - comment out when done
-                # if self.__class__.__name__ == "MPSCAnalysis":
+                # if self.__class__.__name__ == "EventAnalysis":
                 #     print(f"\twriting configuration file")
                 #### END debug - comment out when done
-                #self._update_config_view(user_conf, isTop, parent, tag)
                 write_config(scipyen_config)
                 #### BEGIN debug - comment out when done
-                # if self.__class__.__name__ == "MPSCAnalysis":
+                # if self.__class__.__name__ == "EventAnalysis":
                 #     print(f"DONE ScipyenConfigurable<{self.__class__.__name__}>.saveSettings()\n\n")
                 #### END debug - comment out when done
                 
         if issubclass(self.__class__, (QtWidgets.QWidget, Figure)):
             self.saveWindowSettings()
+            
+    def get_configurable_attribute(self, name, config_dict):
+        """Helper to get the actual attribute value given a config entry"""
+        getset = config_dict.get(name, {})
+        gettername = getset.get("getter", None)
+        if not isinstance(gettername, str) or len(gettername.strip()) == 0:
+            raise RuntimeError(f"{name} is not a configurable")
+        
+        getter = inspect.getattr_static(self, gettername, None)
+        
+        if isinstance(getter, property):
+            return getattr(self, gettername)
+            
+        elif getter is not None:
+            getter = getattr(self, gettername)
+            return getter()
+            
+        else:
+            raise RuntimeError(f"{gettername} is not a `get` property")
+        
+    def set_configurable_attribute(self, name, val, config_dict):
+        """Helper function to assign a value to a configurable attribute
+        """
+        getset = config_dict.get(name, {})
+        settername = getset.get("setter", None)
+        if not isinstance(settername, str) or len(settername.strip()) == 0:
+            raise RuntimeError(f"{name} is not a configurable")
+        
+        self._assign_trait_from_config_(settername, val)
+        
+        
+        
         
 class ScipyenConfiguration(DataBag):
     """Superclass of all non-gui configurations
@@ -1706,7 +1834,7 @@ def saveWindowSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QM
     group_name:str, optional, default is None. The qsettings group name under 
         which the settings will be saved.
         
-        When specified, this will override the automatically determined group 
+        When specified, this will reimplement the automatically determined group 
         name (see below).
     
         When group_name is None, the group name is determined from win's type 
@@ -1757,7 +1885,7 @@ def saveWindowSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QM
     NOTE: Delegates to core.scipyen_config.syncQtSettings
     
     """
-    #print("saveWindowSettings %s" % win.__class__.__name__)
+    # print("saveWindowSettings %s" % win.__class__.__name__)
     return syncQtSettings(qsettings, win, group_name, prefix, True)
     
 def loadWindowSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QMainWindow, Figure], group_name:typing.Optional[str]=None, prefix:typing.Optional[str]=None):
@@ -1856,12 +1984,13 @@ def loadWindowSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QM
     return syncQtSettings(qsettings, win, group_name, prefix, False)
 
 
-# def data2confuse(x):
-#     """Filter to convert some special data to str for yaml representation.
-#     Uses iolib.jonsio to enable storage of more specialized /complex data types
-#     with the confuse framework.
-#     """
-#     return object2JSON(x)
+def data2confuse(x):
+    """Filter to convert some special data to str for yaml representation.
+    Uses iolib.jonsio to enable storage of more specialized /complex data types
+    with the confuse framework.
+    A bit expensive, though... Therefore not sure I will use it...
+    """
+    return object2JSON(x)
 
 # Some yaml representers and constructors for special object types
 

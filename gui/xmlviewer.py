@@ -43,6 +43,10 @@ from . import resources_rc
 #### END pict.gui modules
 
 
+# NOTE: 2022-12-25 23:08:51
+# needed for the new plugins framework
+__scipyen_plugin__ = None
+
 # 2016-08-16 23:55:53
 class DomItem(object):
     '''Wraps a QDomNode 
@@ -389,8 +393,12 @@ class XMLViewer(ScipyenViewer):
     '''
     sig_activated = pyqtSignal(int)
     closeMe  = pyqtSignal(int)
-    supported_types = (xmlutils.xml.dom.minidom.Document, xmlutils.xml.etree.ElementTree.Element, QtXml.QDomNode, QtXml.QDomDocument, str)
-    view_action_name = "XML Object"
+    viewer_for_types = {xmlutils.xml.dom.minidom.Document: 99, 
+                        xmlutils.xml.etree.ElementTree.Element: 99, 
+                        QtXml.QDomNode: 99, 
+                        QtXml.QDomDocument: 99, 
+                        str: 0}
+    # view_action_name = "XML Object"
         
     def __init__(self, data: (xml.etree.ElementTree.Element, xml.dom.minidom.Document, QtXml.QDomNode, QtXml.QDomDocument, str, type(None)) = None, 
                  parent: (QtWidgets.QMainWindow, type(None)) = None, 

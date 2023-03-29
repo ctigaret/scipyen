@@ -259,15 +259,6 @@ class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
             self._data_ = value
             self.endResetModel()
             
-            #topLeft = self.createIndex(0,0)
-            #if len(self._data_):
-                #bottomRight = self.createIndex(len(self._data_)-1, len(self.model_columns)-1)
-                
-            #else:
-                #bottomRight = topLeft
-                
-            #self.dataChanged.emit(topLeft, bottomRight, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
-            
 class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
     """Gateway of GUI actions to triggers protocols management.
     The dialog uses Qt signal/slot communication to redirect GUI requests for

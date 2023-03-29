@@ -2,7 +2,7 @@
 """Processing of electrophysiology signal data.
 """
 #### BEGIN core python modules
-import sys, traceback, inspect, numbers, typing
+import sys, traceback, inspect, numbers, typing, datetime
 import warnings
 import os, pickle
 import collections
@@ -22,21 +22,19 @@ import matplotlib.pyplot as plt
 import scipy
 from scipy import optimize, cluster
 
-# TODO/FIXME 2019-07-29 13:08:29
-# -- move to pict.gui package
-#
-# NOTE: 2019-05-02 22:38:20
-# progress display in QtConsole seems broken
-try:
-    # NOTE: progressbar does not work on QtConsole
-    #from progressbar import ProgressBar, Percentage, Bar, ETA
-    
-    # and neither does this as it should !
-    from pyprog import ProgressBar
-    
-    
-except Exception as e:
-    ProgressBar = None
+# NOTE: 2019-05-02 22:38:20 
+# progress display in QtConsole seems broken - that is because QtConsole is NOT
+# a terminal like your usual shell console
+# try:
+#     # NOTE: progressbar does not work on QtConsole
+#     #from progressbar import ProgressBar, Percentage, Bar, ETA
+#     
+#     # and neither does this as it should !
+#     from pyprog import ProgressBar
+#     
+#     
+# except Exception as e:
+#     ProgressBar = None
 
 # NOTE: 2019-07-29 13:09:02 do I really need these 2 lines?
 from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
@@ -54,12 +52,14 @@ import core.models as models
 import core.datatypes as dt
 import plots.plots as plots
 import core.datasignal as datasignal
+
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+from core import quantities as scq
 from core.quantities import units_convertible
 import core.neoutils as neoutils
 #import core.triggerprotocols
 from core.triggerevent import (TriggerEvent, TriggerEventType)
-from core.triggerprotocols import (TriggerProtocol)
+from core.triggerprotocols import (TriggerProtocol, auto_define_trigger_events, auto_detect_trigger_protocols)
 #import imaging.scandata
 from imaging.scandata import ScanData
 
@@ -180,7 +180,7 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
         rm_epoch = regions
         
     elif isinstance(regions, (tuple, list)) and len(regions) == 3:
-        if all([isinstance(r, SignalCursor) and (r.cursorType is SignalCursor.SignalCursorTypes.vertical or r.cursorType is SignalCursor.SignalCursorTypes.crosshair) for r in regions]):
+        if all([isinstance(r, SignalCursor) and (r.cursorType is SignalCursorTypes.vertical or r.cursorType is SignalCursorTypes.crosshair) for r in regions]):
             cIDs = [c.ID for c in regions]
             
             if any([n not in cIDs for n in ["baseline", "Rs", "Rin"]]):
@@ -231,7 +231,7 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
         raise RuntimeError("Cannot determine signal interval boundaries")
         
     if isinstance(Im, str):
-        Im = ephys.get_index_of_named_signal(segment, Im)
+        Im = neoutils.get_index_of_named_signal(segment, Im)
         
     elif not isinstance(Im, int):
         raise TypeError("Im expected to be a str or int; got %s instead" % type(Im).__name__)
@@ -257,7 +257,7 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
         # get the vm signal and measure vstep based on the specified regions:
         # use Irin region and Ibase region to determine the amplitude of vstep.
         if isinstance(Vm, str):
-            Vm = ephys.get_index_of_named_signal(segment, Vm)
+            Vm = neoutils.get_index_of_named_signal(segment, Vm)
         
         elif not isinstance(Vm, int):
             raise TypeError("Vm expected to be a str or int; got %s instead" % type(Vm).__name__)
@@ -1188,7 +1188,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
     data = neoutils.set_relative_time_start(data)
     
     if t_start is not None and t_stop is not None:
-        data = ephys.get_time_slice(data, t0=t_start, t1=t_stop)
+        data = neoutils.get_time_slice(data, t0=t_start, t1=t_stop)
         
     if isinstance(data, neo.Block):
         segments = data.segments
@@ -1203,7 +1203,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
         raise TypeError("'data' expected to be a neo.Block, neo.Segment, or a sequence of neo.Segment; got %s instead" % type(data).__name__)
     
     if isinstance(VmSignal, str):
-        vmsignalindex = utilities.unique(ephys.get_index_of_named_signal(data, VmSignal))[0]
+        vmsignalindex = utilities.unique(neoutils.get_index_of_named_signal(data, VmSignal))[0]
         
     elif isinstance(VmSignal, int):
         vmsignalindex = VmSignal
@@ -1212,7 +1212,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
         raise TypeError("'VmSignal' expected to be a str or an int; got %s instead" % type(VmSignal).__name__)
     
     if isinstance(ImSignal, str):
-        imsignalindex = utilities.unique(ephys.get_index_of_named_signal(data, ImSignal))[0]
+        imsignalindex = utilities.unique(neoutils.get_index_of_named_signal(data, ImSignal))[0]
         
     elif isinstance(ImSignal, int):
         imsignalindex = ImSignal
@@ -1330,7 +1330,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None, steadyStateDuratio
         #
         #   the high state is the actual pulse
         #
-        centroids, cnt, edg = sigp.state_levels(im, levels = 0.5)
+        centroids, cnt, edg, rng = sigp.state_levels(im, levels = 0.5)
         centroids = np.array(centroids).T[:,np.newaxis]
         
         #[low, high]
@@ -1577,7 +1577,7 @@ def PassiveMembranePropertiesAnalysis(block:neo.Block, Vm_index:(int,str) = "Vm_
     else:
         if isinstance(Im_index, str):
             try:
-                Im_index = ephys.get_index_of_named_signal(block.segments[0], Im_index)
+                Im_index = neoutils.get_index_of_named_signal(block.segments[0], Im_index)
             except Exception as e:
                 raise RuntimeError("%s signal not found" % Im_index)
             
@@ -1586,7 +1586,7 @@ def PassiveMembranePropertiesAnalysis(block:neo.Block, Vm_index:(int,str) = "Vm_
         
     if isinstance(Vm_index, str):
         try:
-            Vm_index = ephys.get_index_of_named_signal(block.segments[0], Vm_index)
+            Vm_index = neoutils.get_index_of_named_signal(block.segments[0], Vm_index)
         except Exception as e:
             raise RuntimeError("%s signal not found" % Vm_index)
         
@@ -1784,7 +1784,7 @@ def ap_waveform_roots(w, value, interpolate=False):
             
     return float(rise_x), float(rise_y), float(rise_cslope), float(decay_x), float(decay_y), float(decay_cslope)
 
-def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=None, tail=None,thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, dataname=None, cell="NA", genotype="NA", source="NA", gender="NA",age=np.nan, record=None, protocol_name=None,ref_vm = None, ref_vm_relative_onset=False,output_prefix=None):
+def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=None, tail=None,thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, dataname=None, cell="NA", genotype="NA", source="NA", sex="NA",age=np.nan, record=None, protocol_name=None,ref_vm = None, ref_vm_relative_onset=False,output_prefix=None):
     """Batch analysis for pulse-triggered APs in current-clamp.
     
     Loops through neo.Segments in data, calling analyse_AP_pulse_train for each
@@ -1854,7 +1854,7 @@ def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=No
         genotype = data.genotype
         source = data.sourceID
         age = data.age
-        gender = data.gender
+        sex = data.sex if hasattr(data, "sex") else getattr(data, "gender", "NA")
         data = data.electrophysiology
         
     if not isinstance(segment_index, (int, tuple, list, range, slice, type(None))):
@@ -1939,7 +1939,7 @@ def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=No
                                                             resample_with_period=resample_with_period,
                                                             t0=t0,t1=t1, 
                                                             cell=cell, genotype=genotype, 
-                                                            source=source, gender=gender,
+                                                            source=source, sex=sex,
                                                             age=age, dataname=dataname, 
                                                             record=recname, 
                                                             protocol_name=protocol_name,
@@ -1981,9 +1981,9 @@ def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=No
                                                      AP = grouped_report.index)
         grouped_report.Genotype = grouped_report.Genotype.astype("category")
         
-        grouped_report = grouped_report.assign(Gender = [gender] * len(grouped_report),
+        grouped_report = grouped_report.assign(Sex = [sex] * len(grouped_report),
                                                      AP = grouped_report.index)
-        grouped_report.Gender = grouped_report.Gender.astype("category")
+        grouped_report.Sex = grouped_report.Sex.astype("category")
         
         sdict = dict()
         
@@ -2006,9 +2006,9 @@ def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=No
                                                      AP = aggregated_report.index)
         aggregated_report.Genotype = aggregated_report.Genotype.astype("category")
         
-        aggregated_report = aggregated_report.assign(Gender = [gender] * len(aggregated_report),
+        aggregated_report = aggregated_report.assign(Sex = [sex] * len(aggregated_report),
                                                      AP = aggregated_report.index)
-        aggregated_report.Gender = aggregated_report.Gender.astype("category")
+        aggregated_report.Sex = aggregated_report.Sex.astype("category")
         
         
         
@@ -2031,7 +2031,7 @@ def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=No
     else:
         return report, aggregated_report, grouped_report, segments_ap_results, segments_ap_waves, segments_ap_dvdt, segments_ap_d2vdt2
         
-def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, record=None, dataname=None,cell="NA", genotype="NA", source="NA", gender="NA",age=np.nan, protocol_name="NA", ref_vm = None, ref_vm_relative_onset=False):
+def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, record=None, dataname=None,cell="NA", genotype="NA", source="NA", sex="NA",age=np.nan, protocol_name="NA", ref_vm = None, ref_vm_relative_onset=False):
     
     """
     Analyses AP waveforms triggered by a train of current injection pulses.
@@ -2097,7 +2097,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr
     
     tail, thr, atol, smooth_window, resample_with_period, t0, t1,
     
-    record, dataname, cell, genotype, source, gender, age,
+    record, dataname, cell, genotype, source, sex, age,
     
     protocol_name, ref_vm
     
@@ -2119,7 +2119,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr
         if len(signal_index.strip()) == 0:
             raise ValueError("signal_index is an empty string!")
         
-        signal_index = ephys.get_index_of_named_signal(segment, signal_index, silent=True)
+        signal_index = neoutils.get_index_of_named_signal(segment, signal_index, silent=True)
         
         if isinstance(signal_index, (tuple, list)):
             if len(signal_index) and isinstance(signal_index[0], int):
@@ -2217,7 +2217,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr
                                                    resample_with_period=resample_with_period,
                                                    t0=t0, t1=t1, record=recordname, 
                                                    cell=cell, genotype=genotype, 
-                                                   source=source, gender=gender,
+                                                   source=source, sex=sex,
                                                    age=age, dataname=dataname, protocol_name=protocol_name,
                                                    ref_vm = ref_vm,
                                                    ref_vm_relative_onset = ref_vm_relative_onset)
@@ -2227,7 +2227,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr
     return ap_result, ap_report, ap_waves, ap_dvdt, ap_d2vdt2
     
 
-def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, record=None, cell="NA", genotype="NA", source="NA", gender="NA",age=np.nan, dataname=None, protocol_name="NA", ref_vm = None, ref_vm_relative_onset=False):
+def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, record=None, cell="NA", genotype="NA", source="NA", sex="NA",age=np.nan, dataname=None, protocol_name="NA", ref_vm = None, ref_vm_relative_onset=False):
     """Waveform analysis for action potentials elicited individually by brief 
     pulses of current injection.
     
@@ -2272,7 +2272,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
     source: str, unique identifier of the recording source (e.g. animal ID, 
         culture ID, etc.); default is "NA"
         
-    gender: str, the genetic sex or gender or "NA" (default) when not available
+    sex: str, the genetic sex or sex or "NA" (default) when not available
     
     age: scalar float, default is np.nan
     
@@ -2323,7 +2323,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
         raise TypeError("'signal' expected to be a neo.AnalogSignal; got %s instead" % type(signal).__name__)
         
     if resample_with_period is not None:
-        signal = ephys.resample_pchip(signal, resample_with_period)
+        signal = sigp.resample_pchip(signal, resample_with_period)
             
     if isinstance(t0, numbers.Real):
         t0 *= signal.times.units
@@ -2361,7 +2361,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
     if t0 is not None and t1 is not None:
         signal = signal.time_slice(t0, t1)
             
-    dsdt = ephys.ediff1d(signal).rescale(pq.V/pq.s)
+    dsdt = sigp.ediff1d(signal).rescale(pq.V/pq.s)
     
     if isinstance(thr, numbers.Real):
         thr *= pq.V/pq.s
@@ -2373,12 +2373,12 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
         thr = thr.rescale(pq.V/pq.s)
 
     if smooth_window is not None:
-        dsdt = ephys.convolve(dsdt, boxcar(smooth_window)/smooth_window)
+        dsdt = sigp.convolve(dsdt, boxcar(smooth_window)/smooth_window)
         
-    d2sdt2 = ephys.ediff1d(dsdt).rescale(dsdt.units/dsdt.times.units)
+    d2sdt2 = sigp.ediff1d(dsdt).rescale(dsdt.units/dsdt.times.units)
     
     if smooth_window is not None:
-        d2sdt2 = ephys.convolve(d2sdt2, boxcar(smooth_window)/smooth_window)
+        d2sdt2 = sigp.convolve(d2sdt2, boxcar(smooth_window)/smooth_window)
     
     ap_waves = extract_pulse_triggered_APs(signal, times, tail=tail)
     ap_dvdt = extract_pulse_triggered_APs(dsdt, times, tail=tail)
@@ -2407,7 +2407,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
         
         res_dict["Genotype"] = pd.Series([genotype] * len(ap_results), name="Genotype").astype("category")
         
-        res_dict["Gender"] = pd.Series([gender] * len(ap_results), name="Gender").astype("category")
+        res_dict["Sex"] = pd.Series([sex] * len(ap_results), name="Sex").astype("category")
         
         res_dict["Age"] = pd.Series([age] * len(ap_results), name="Age")
         
@@ -3024,11 +3024,11 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
         current injection.
         
         See also the functions:
-        ephys.parse_step_waveform_signal
+        signalprocessing.parse_step_waveform_signal
     
     adcres, adcrange, adcscale: float scalars
         See also the functions:
-        ephys.parse_step_waveform_signal and signalprocessing.state_levels.
+        signalprocessing.parse_step_waveform_signal and signalprocessing.state_levels.
     
         Used only when method is "state_levels"
         
@@ -3079,10 +3079,10 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             raise TypeError("new sampling rate expected to be a scalar float, Quantity, or None; got %s instead" % type(resample_with_rate).__name__)
         
         if resample_with_rate is not None and resample_with_period is None:
-            resample_with_period = ephys.sampling_rate_or_period(resample_with_rate, resample_with_period)
+            resample_with_period = neoutils.sampling_rate_or_period(resample_with_rate, resample_with_period)
             
         elif resample_with_rate is not None and resample_with_period is not None:
-            if not ephys.sampling_rate_or_period(resample_with_rate, resample_with_period):
+            if not neoutils.sampling_rate_or_period(resample_with_rate, resample_with_period):
                 raise ValueError("resample_with_rate (%s) and resample_with_period (%s) are incompatible" % (resample_with_rate, resample_with_period))
     
 
@@ -3093,7 +3093,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             # up   = time point of the down-up transition
             # inj  = injected current (difference between centroids )
             # label = int array "mask" with 0 for down and 1 for up; same shape as im
-            d, u, inj, c, l = ephys.parse_step_waveform_signal(im,
+            d, u, inj, c, l = sigp.parse_step_waveform_signal(im,
                                                                 method=method,
                                                                 box_size=box_size, 
                                                                 adcres=adcres,
@@ -3105,19 +3105,16 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
                 d = d[0]
             if u.ndim > 0:
                 u = u[0]
+                
+            start, stop = (min(d,u), max(d,u))
             
-            if d > u:
-                vstep = vm.time_slice(u, d + tail)
-                istep = im.time_slice(u, d + tail)
-                
-            elif d < u:
-                vstep = vm.time_slice(d, u + tail)
-                istep = im.time_slice(d, u + tail)
+            if d < u:
                 inj *= -1.0
-                
-            else:
-                vstep = vm.time_slice(d, d + tail)
-                istep = im.time_slice(d, d + tail)
+            
+            vstep = vm.time_slice(start, stop + tail)
+            istep = im.time_slice(start, stop + tail)
+            
+            # print(f"extract_AP_train: start = {start}, stop = {stop}")
                 
             Ihold = istep.mean()
             
@@ -3182,7 +3179,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
         if resample_with_period > vstep.sampling_period:
             warnings.warn("A sampling period larger than the signal's sampling period (%s) was requested (%s); the signal will be DOWNSAMPLED" % (vstep.sampling_period, resample_with_period), RuntimeWarning)
 
-        vstep = ephys.resample_pchip(vstep, resample_with_period)
+        vstep = sigp.resample_pchip(vstep, resample_with_period)
         
         if vstep.size == 0:
             raise RuntimeError("Check resampling; new period requested was %s and the resampled signal has vanished" % resample_with_period)
@@ -3246,10 +3243,10 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5, min_ap_isi= 6e-3*pq.s
                              units = pq.V, t_start = sig.t_start, time_units = pq.s, name=sig.name)
     vmsig.annotate(**sig.annotations)
     
-    dv_dt = ephys.ediff1d(vmsig).rescale(pq.V/pq.s)  # 1st derivative of the Vm signal
+    dv_dt = sigp.ediff1d(vmsig).rescale(pq.V/pq.s)  # 1st derivative of the Vm signal
     
     if w is not None:
-        dv_dt_smooth = ephys.convolve(dv_dt, w)        # and its smoothed version
+        dv_dt_smooth = sigp.convolve(dv_dt, w)        # and its smoothed version
         dv_dt_smooth.name = "%s_1st_derivative" % sig.name
         
     else:
@@ -3268,10 +3265,10 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5, min_ap_isi= 6e-3*pq.s
     
     dvmsig.annotate(**dv_dt_smooth.annotations)
     
-    d2v_dt2 = ephys.ediff1d(dvmsig).rescale(pq.V/(pq.s**2)) # 2nd derivative of the Vm signal
+    d2v_dt2 = sigp.ediff1d(dvmsig).rescale(pq.V/(pq.s**2)) # 2nd derivative of the Vm signal
     
     if w is not None:
-        d2v_dt2_smooth = ephys.convolve(d2v_dt2, w)                   # and its smoothed version 
+        d2v_dt2_smooth = sigp.convolve(d2v_dt2, w)                   # and its smoothed version 
         d2v_dt2_smooth.name = "%s_2nd_derivative" % sig.name
         
     else:
@@ -3313,7 +3310,7 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5, min_ap_isi= 6e-3*pq.s
     return ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_fast_rise_durations, ap_peak_times, dv_dt, d2v_dt2
     
     
-def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = None, min_fast_rise_duration = None, min_ap_isi = 6e-3*pq.s, rtol = 1e-5, atol = 1e-8, use_min_detected_isi=True,smooth_window = 5,interpolate_roots = False,decay_intercept_approx = "linear",decay_ref = "hm",get_duration_at_Vm=None,return_all = False, vm_thr=0):
+def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = None, min_fast_rise_duration = None, min_ap_isi = 6e-3*pq.s, rtol = 1e-5, atol = 1e-8, use_min_detected_isi=True,smooth_window = 5,interpolate_roots = False,decay_intercept_approx = "linear",decay_ref = "hm",get_duration_at_Vm=None,return_all = False, vm_thr=0, **kwargs):
     """Detects action potentials in a Vm signal.
     For use with experiments using "steps" of depolarizing current injections.
     
@@ -3455,6 +3452,12 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
     
         When True, the function will also return a dictionary with various
         internal variables used or calculated during the AP waveform detection.
+    
+    t_start, t_stop: start, stop time of the spiketrain - relevant when detection
+        takes place on a slice of the original signal; these values should reflect 
+        the entire extend of the original signal
+        
+        Optional; default values are taken from `sig`.
         
     Returns:
     --------
@@ -3673,6 +3676,10 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
     else:
         raise TypeError("get_duration_at_Vm expected to be a scalar real, Quantity or None; got %s instead" % type(get_duration_at_Vm).__name__)
     
+    t_start = kwargs.pop("t_start", sig.t_start)
+    t_stop = kwargs.pop("t_stop", sig.t_stop)
+    
+    # print(f"detect_AP_waveforms_in_train kwargs t_start {t_start} t_stop {t_stop}")
     # ### END parse parameters
     
     #### BEGIN Detect APs by thresholding on the 1st derivative of the Vm signal
@@ -3709,8 +3716,8 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
     train_annotations["AP_dV_dt_waveforms"]      = None
     train_annotations["AP_d2V_dt2_waveforms"]    = None
     
-    
-    ap_train = neo.SpikeTrain([], t_stop = 0*pq.s, units = pq.s)
+    # print(f"detect_AP_waveforms_in_train t_start {t_start} t_stop {t_stop}")
+    ap_train = neo.SpikeTrain([], t_start=t_start, t_stop = t_stop, units = pq.s)
     
     if ap_fast_rise_start_times is None:
         ap_train.annotations.update(train_annotations)
@@ -3931,7 +3938,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
                 # (b) determine a "pseudo-baseline" and use that as the onset Vm on the 
                 # decay side
                 else:
-                    [lo, hi] = sigp.state_levels(w)
+                    [lo, hi], _,_,_ = sigp.state_levels(w)
                     _,_,_,decay_onset_Vm_x,decay_onset_Vm_y,decay_onset_slope = ap_waveform_roots(w, lo)
                 
                 #print("estimated decay_onset_Vm_x", decay_onset_Vm_x)
@@ -4141,8 +4148,8 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
     #
     if len(ap_fast_rise_start_times):
         ap_train = neo.SpikeTrain(ap_fast_rise_start_times,
-                                t_start = sig.t_start,
-                                t_stop = sig.t_stop,
+                                t_start = t_start,
+                                t_stop = t_stop,
                                 left_sweep = ap_fast_rise_start_times - sig.t_start,
                                 sampling_rate = sig.sampling_rate,
                                 name="%s_AP_train" % (sig.name),
@@ -4169,6 +4176,8 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
         train_annotations["AP_d2V_dt2_waveforms"]    = ap_d2vdt2_waveform_signals
     
     ap_train.annotations.update(train_annotations)
+    
+    # print(f"detect_AP_waveforms_in_train ap_train t_start {ap_train.t_start} t_stop {ap_train.t_stop}")
     
     return ap_train, ap_waveform_signals
         
@@ -4250,7 +4259,7 @@ def ap_duration_at_Vm(ap, value, **kwargs): #decay_ref, decay_intercept_approx="
             decay_time = (value - ref_decay_value)/ref_decay_slope + ref_decay_time
             
         else:
-            [lo, hi] = sigp.state_levels(ap)
+            [lo, hi], _, _, _ = sigp.state_levels(ap)
             _,_,_, decay_time, decay_value, decay_slope = ap_waveform_roots(ap, lo, interpolate=interpolate)
             
     ret = dt.DataBag()
@@ -4285,10 +4294,10 @@ def ap_phase_plot_data(vm, dvdt=None, smooth_window=None):
         h = None
         
     if dvdt is None:
-        dvdt = ephys.ediff1d(vm).rescale(pq.V/pq.s)
+        dvdt = sigp.ediff1d(vm).rescale(pq.V/pq.s)
         
         if h is not None:
-            dvdt = ephys.convolve(dvdt, h)
+            dvdt = sigp.convolve(dvdt, h)
             
     ret = IrregularlySampledDataSignal(vm.magnitude * vm.units, 
                                           dvdt.magnitude * dvdt.units, 
@@ -4340,10 +4349,10 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relati
         h = None
         
     if dvdt is None:
-        dvdt = ephys.ediff1d(vm).rescale(pq.V/pq.s)
+        dvdt = sigp.ediff1d(vm).rescale(pq.V/pq.s)
         
         if h is not None:
-            dvdt = ephys.convolve(dvdt, h)
+            dvdt = sigp.convolve(dvdt, h)
             
     if isinstance(dvdt_thr, numbers.Real):
         dvdt_thr *= dvdt.units
@@ -4355,10 +4364,10 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relati
         dvdt_thr = dvdt_thr.rescale(dvdt.units)
 
     if d2vdt2 is None:
-        d2vdt2 = ephys.ediff1d(dvdt).rescale(pq.V/(pq.s**2))
+        d2vdt2 = sigp.ediff1d(dvdt).rescale(pq.V/(pq.s**2))
         
         if h is not None:
-            d2vdt2 = ephys.convolve(d2vdt2, h)
+            d2vdt2 = sigp.convolve(d2vdt2, h)
     
     dvdt_ge_thr = dvdt >= dvdt_thr
     
@@ -4534,10 +4543,10 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
         raise ValueError("There are no segments in the block")
     
     if isinstance(VmSignal, str):
-        VmSignal = ephys.get_index_of_named_signal(block.segments[0], VmSignal)
+        VmSignal = neoutils.get_index_of_named_signal(block.segments[0], VmSignal)
         
     if isinstance(ImSignal, str):
-        ImSignal = ephys.get_index_of_named_signal(block.segments[0], ImSignal)
+        ImSignal = neoutils.get_index_of_named_signal(block.segments[0], ImSignal)
         
         
     #times = None
@@ -4603,7 +4612,7 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
         im = segment.analogsignals[ImSignal]
         vm = segment.analogsignals[VmSignal]
         if isinstance(im, neo.AnalogSignal):
-            d,u,_,_,_ = ephys.parse_step_waveform_signal(im)
+            d,u,_,_,_ = sigp.parse_step_waveform_signal(im)
             
             start_stop = list((d,u))
 
@@ -4740,17 +4749,17 @@ def analyse_AP_step_injection_series(data, **kwargs):
         
     Iinj_0: python quantity (pA), float scalar, or None: amplitude of the first 
         current injection in the series; optional default is None.
-        
+    
         NOTE: When None, the value of the first will be determined from the Im 
         signal of the segment
     
     delta_I: python quantity (pA), float scalar, or None; current injection 
-        increment.
+        increment. ΔI
         When None (defaut) the value will be determined from the Im signal
         
     Istart, Istop: time quantities for current step injection, or None
         When given, all segments in the block must start at the same time
-        
+    
     Itimes_relative:bool, default is True; 
         When True, then Istart and Istop are considered RELATIVE to the sweep's 
         t0, in every sweep (this is the default, because usually Istart and Istop
@@ -4831,11 +4840,11 @@ def analyse_AP_step_injection_series(data, **kwargs):
         
         default is 0 (no boxcar filtering)
         
-    method: str, one of "state_levels" (default) or "kmeans": methiod for detection
+    method: str, one of "state_levels" (default) or "kmeans": method for detection
         "up" vs "down" states of the step current injection waveform
     
     adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
-        called from ephys.parse_step_waveform_signal() 
+        called from signalprocessing.parse_step_waveform_signal() 
         
         Used only when method is "state_levels"
         
@@ -5314,15 +5323,17 @@ def analyse_AP_step_injection_series(data, **kwargs):
             if isinstance(seg_res["AP_analysis"]["AP_train"], neo.SpikeTrain) and len(seg_res["AP_analysis"]["AP_train"]):
                 val = seg_res["AP_analysis"]["AP_train"].annotations["AP_onset_Vm"]
                 if val is None:
-                    apThr.append(np.nan * vstep.units)
+                    apThr.append(np.nan)
                 else:
-                    apThr.append(val[0])
+                    apThr.append(float(val[0]))
                     
                 apLatency.append(seg_res["AP_analysis"]["AP_train"][0] - seg_res["AP_analysis"]["AP_train"].t_start)
                 
             else:
-                apThr.append(np.nan * vstep.units)
+                apThr.append(np.nan)
                 apLatency.append(np.nan * vstep.times.units)
+                
+        apThr = (np.array(apThr))[:,np.newaxis] * vstep.units
         
         #apThr = [seg_res["AP_analysis"]["AP_train"].annotations["AP_onset_Vm"][0] for seg_res in ret["Depolarising_steps"]]
         
@@ -5334,6 +5345,8 @@ def analyse_AP_step_injection_series(data, **kwargs):
         
         nAPs = [seg_res["AP_analysis"]["Number_of_APs"] for seg_res in ret["Depolarising_steps"]]
         
+        # print(f"Iinj = {Iinj}")
+        # print(f"apThr = {apThr}")
         ret["First_AP_threshold"]   = IrregularlySampledDataSignal(domain = Iinj,
                                                                    signal = apThr,
                                                                    units = vstep.units,
@@ -5784,7 +5797,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     method: str, one of "state_levels" (default) or "kmeans"
     
     adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
-        called from ephys.parse_step_waveform_signal() 
+        called from signalprocessing.parse_step_waveform_signal() 
         
         Used only when method is "state_levels"
         
@@ -5934,12 +5947,12 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     # 
     
     if isinstance(VmSignal, str):
-        VmSignal = ephys.get_index_of_named_signal(segment, VmSignal)
+        VmSignal = neoutils.get_index_of_named_signal(segment, VmSignal)
     
     vm = segment.analogsignals[VmSignal].copy()
         
     if isinstance(ImSignal, str):
-        im = segment.analogsignals[ephys.get_index_of_named_signal(segment, ImSignal)].copy()
+        im = segment.analogsignals[neoutils.get_index_of_named_signal(segment, ImSignal)].copy()
         
     elif isinstance(ImSignal, int):
         im = segment.analogsignals[ImSignal].copy()
@@ -5963,6 +5976,9 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
                                     Itimes_relative = Itimes_relative,
                                     Itimes_samples = Itimes_samples)
     
+    
+    # print(f"analyse_AP_step_injection_sweep: istep = {istep}")
+    
     # adjust the smooth window for the new sampling_period
     if smooth_window > 0:
         upsampling = (vm.sampling_period.rescale(pq.s) / vstep.sampling_period.rescale(pq.s)).magnitude.flatten()[0]
@@ -5985,18 +6001,27 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     
     # NOTE: 2019-08-16 13:30:43
     # ap_train is always a SpikeTrain, even if empty
+    kwargs["t_start"] = vm.t_start
+    kwargs["t_stop"] = vm.t_stop
+    # print(f"analyse_AP_step_injection_sweep kwargs t_start {kwargs['t_start']}, t_stop {kwargs['t_stop']}")
     ap_train, ap_waveform_signals = detect_AP_waveforms_in_train(vstep, istep, **kwargs)
+    # print(f"analyse_AP_step_injection_sweep ap_train t_start = {ap_train.t_start}, t_stop = {ap_train.t_stop}")
     
     result = collections.OrderedDict() #dict()
     
     #if isinstance(ap_train, neo.SpikeTrain) and len(ap_train):
     if len(segment.spiketrains) > 0: 
         # check to see if there already is a spike train of APs; don't just append
-        for k, st in enumerate(segment.spiketrains):
-            if is_AP_spiketrain(st):
-                #segment.spiketrains[k] = ap_train
-                # NOTE: in neo >= 0.10.0 segment.spiketrains is a neo.SpikeTrainList
-                list(segment.spiketrains)[k] = ap_train
+        ndx = list(filter(lambda x: is_AP_spiketrain(x[1]), ((k,s) for k,s in enumerate(segment.spiketrains))))
+        
+        if len(ndx):
+            segment = neoutils.remove_spiketrain(segment, ndx)
+                   
+        # for k, st in enumerate(segment.spiketrains):
+        #     if is_AP_spiketrain(st):
+        #         #segment.spiketrains[k] = ap_train
+        #         # NOTE: in neo >= 0.10.0 segment.spiketrains is a neo.SpikeTrainList
+        #         list(segment.spiketrains)[k] = ap_train
                 
     else:
         segment.spiketrains.append(ap_train)
@@ -6069,12 +6094,12 @@ def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
         Iinj: Quantity = the actual value of injected current calculated from the command signal
     
     """
-    averaged_block = ephys.average_blocks(*data_blocks, step_index = step_index, signal_index = [Vm_index, Iinj_index], name=name_prefix)
+    averaged_block = neoutils.average_blocks(*data_blocks, step_index = step_index, signal_index = [Vm_index, Iinj_index], name=name_prefix)
     
     neoutils.set_relative_time_start(averaged_block)
     
-    ephys.auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = True, label = "Ion", append=False)
-    ephys.auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
+    auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = True, label = "Ion", append=False)
+    auto_define_trigger_events(averaged_block, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
     
     Ion = averaged_block.segments[0].events[0].times
     
@@ -6115,12 +6140,11 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
     
     for b in data_blocks:
         bb = deepcopy(b)
-        #bb = ephys.neo_copy(b)
         
         neoutils.set_relative_time_start(bb)
         
-        ephys.auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = True, label="Ion", append=False)
-        ephys.auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
+        auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = True, label="Ion", append=False)
+        auto_define_trigger_events(bb, Iinj_index, "user", use_lo_hi = False, label = "Ioff", append=True)
         
         Ion.append(bb.segments[0].events[0].times)
         
@@ -6151,7 +6175,7 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
         
     ret = neo.Block()
     
-    ret.segments[:] = ephys.average_segments(*segments, signal_index = [Vm_index, Iinj_index],
+    ret.segments[:] = neoutils.average_segments(*segments, signal_index = [Vm_index, Iinj_index],
                                                 name = name_prefix)
     
     AHP = ret.segments[0].analogsignals[Vm_index].time_slice(Ioff[-1], ret.segments[0].analogsignals[Vm_index].t_stop)
@@ -6258,7 +6282,7 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     x = np.linspace(t_start, t_start + duration, num=int(sampling_rate * duration))
     
     if all(isinstance(p, pq.Quantity) for p in model_parameters):
-        model_parameters = tuple(p.magnitude for p in model_parameters)
+        model_parameters = tuple(float(p.magnitude) for p in model_parameters)
     
     y = models.Clements_Bekkers_97(x.magnitude, model_parameters)
     
@@ -6280,17 +6304,20 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     
     
     return ret
-    
-def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02)):
-    """Detect miniature or spontaneous PSCs by cross-correlation with a waveform.
+
+def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal], threshold:float=4., channels:typing.Optional[typing.Union[int, typing.Sequence[int]]]=None, outputDetection:bool=False, raw_signal=None):
+    """Detect miniature or spontaneous PSCs with optimally scaled template.
+    Implements the "sliding template" algorithm in Clements & Bekkers 1997, Biophys.J.
     
     Parameters:
     ==========
     
-    x: neo.AnalogSignal containing the recorded membrane current that 
-        will be scanned for mEPSCs. Typically this is single-channel, meaning it
-        is a 2D array with a singleton 2nd axis (e.g., x.shape = (n,1) where `n`
-        is the number of samples in `x`)
+    x: neo.AnalogSignal or DataSignal containing the recorded membrane current
+        that will be scanned for mEPSCs. Typically this is single-channel, 
+        meaning it is a 2D array with a singleton 2nd axis (e.g., x.shape = (n,1)
+        where `n` is the number of samples in `x`)
+    
+        NOTE: 2022-12-12 08:56:23 as of now, more than one channel is supported
     
     waveform: neo.AnalogSignal or 1D numpy array (vector, i.e., 
         waveform.shape = (m,) where `m` is the number of samples in `waveform`).
@@ -6322,17 +6349,625 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
         NOTE: When specified in this way the waveform will be generated ad-hoc
         using the sampling rate of the signal `x`.
     
-    For example, if creating the waveform as a plain numpy array:
+        For example, if creating the waveform as a plain numpy array:
+        
+        t_start     = 0     # [s]
+        duration    = 0.2   # [s]
+        sr          = 1e4   # [Hz]
+        
+        t = np.linspace(0, duration, num = sr * duration)
+        model = models.Clements_Bekkers_97(x, parameters)
+        
+        As a convenience, you can use PSCwaveform(...) function in this module to
+        generate a synthetic  waveform as a neo.AnalogSignal.
+        
+    threshold: float; optional, default None.
+        This value is the threshold for the detection criterion used in the 
+        Clements & Bekkers 1997 Biophys J paper
     
-    t_start     = 0     # [s]
-    duration    = 0.2   # [s]
-    sr          = 1e4   # [Hz]
+        When threshold is None, the threshold of detection is the calculated 
+        root-mean-square of the detection criterion signal output by the sliding
+        template detection method.
     
-    t = np.linspace(0, duration, num = sr * duration)
-    model = models.Clements_Bekkers_97(x, parameters)
+        This parameter is only used when useCBsliding is True.
+        
+    outputDetection:bool, default is False
+        When True, the function also returns the detection criterion (here, as 
+        defined in Clements & Bekkers 1997 paper)
     
-    As a convenience, you can use PSCwaveform(...) function in this module to
-    generate a synthetic  waveform as a neo.AnalogSignal.
+    raw_signal: analog signal with the same shape and domain as the signal where
+        the detection took place, default is None
+        When given, the waveforms will be extracted from THIS signal using the 
+        time stamps in the spike train.
+        This is useful when detection was performed on a pre-processed (e.g., 
+        smoothed) signal but the "raw" waveforms are required.
+    
+        
+    Returns:
+    ========
+    a neo SpikeTrainList with SpikeTrain objects containing time stamps of the 
+    detected mPSCs, peak times, and associated waveforms
+    
+    ATTENTION: When detection has failed, returns None
+    
+    """
+    if not isinstance(x, (neo.AnalogSignal, DataSignal)):
+        raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal; got a {type(x).__name__} instead")
+
+    if isinstance(waveform, (np.ndarray,neo.core.basesignal.BaseSignal)):
+        if not dt.is_vector(waveform):
+            raise TypeError("waveform expected to be a vector")
+    
+    elif isinstance(waveform, (tuple, list)):
+        if len(waveform) == 6:
+            waveduration = waveform[5] * x.times.units
+            
+            waveform = PSCwaveform(waveform[0:-1], units = x.units,
+                                     t_start = 0*x.times.units,
+                                     duration = waveduration,
+                                     sampling_rate = x.sampling_rate)
+            
+    else:
+        raise ValueError("Incorrect waveform specification")
+    
+    if isinstance(waveform, neo.core.basesignal.BaseSignal):
+        mini_duration = waveform.duration
+    else:
+        # NOTE: 2022-10-25 18:16:26
+        # make sure the waveform, if a plain numpy array, has the same
+        # "sampling rate" as the signal
+        mini_duration = len(waveform) / x.sampling_rate
+    
+    if sigp.is_positive_waveform(waveform):
+        peakfunc = np.argmax
+    else:
+        peakfunc = np.argmin
+        
+    h = waveform.magnitude[:,0]
+    
+    N = h.shape[0]
+    
+    M = x.shape[0]
+    
+    sum_h = np.sum(h)           # Σ TEMPLATE
+    sum_h_N = sum_h/N
+    sum_h2 = sum_h*sum_h        # Σ TEMPLATE * Σ TEMPLATE = (Σ TEMPLATE)²
+    sum_h2_N = sum_h2/N         # (Σ TEMPLATE)² / N
+    
+    h_dot = np.dot(h, h)        # Σ TEMPLATE²
+    
+    beta_denom = h_dot - sum_h2_N #  Σ TEMPLATE² - Σ TEMPLATE * Σ TEMPLATE/N
+    
+    data_cache = (N, M, sum_h, sum_h_N, sum_h2, sum_h2_N, h_dot, beta_denom)
+    
+    thetas = [slide_detect(x.magnitude[:,k], h, data_cache=data_cache) for k in range(x.shape[1])]
+    
+    ch_id = x.array_annotations.get("channel_ids", [0])[0]
+    ch_name = x.array_annotations.get("channel_names", [""])[0]
+    
+    ret = list()
+    theta_sigs = list()
+    
+    for kt,t in enumerate(thetas):
+        θ = type(x)(t.θ, units = pq.dimensionless, t_start = x.t_start, 
+                    sampling_rate = x.sampling_rate,
+                    name = f"{x.name}_θ",
+                    description="Sliding template detection criterion")
+        θ.array_annotate(channel_names=[f"{ch_name}_θ"])
+        θ.array_annotate(channel_ids=[ch_id])
+        theta_sigs.append(θ)
+        
+        if isinstance(raw_signal, type(x)) and raw_signal.shape == x.shape and \
+            raw_signal.sampling_rate == x.sampling_rate and raw_signal.times.units == x.times.units and \
+                raw_signal.t_start == x.t_start and raw_signal.units == x.units:
+            ret_ = extract_event_waveforms(raw_signal[:,kt], mini_duration, t.θ, threshold, peakfunc)
+        else:
+            ret_ = extract_event_waveforms(x[:,kt], mini_duration, t.θ, threshold, peakfunc)
+        
+        
+        # ret_ = extract_event_waveforms(x[:,kt], mini_duration, t.θ, threshold, peakfunc)
+        
+        if isinstance(ret_, neo.SpikeTrain):
+            ret_.annotate(waveform = waveform, θ = θ, channel_id = x.array_annotations.get("channel_ids", [0])[0])
+            # NOTE: 2022-12-12 15:34:06
+            # this is wrong: for spike trains, array annotations seem to need as many
+            # elements as there are time stamps !
+            # ret_.array_annotate(channel_names = [θ.array_annotations.get("channel_names", [""])[0]])
+            # ret_.array_annotate(channel_id = [θ.array_annotations.get("channel_ids", [0])[0]])
+            ret_.segment = x.segment
+            
+            ret.append(ret_)
+            
+    if len(ret):
+        result = neo.core.spiketrainlist.SpikeTrainList(items = ret, segment=x.segment)
+        for st in result:
+            st.segment = x.segment
+            
+        if outputDetection:
+            return result, theta_sigs
+        else:
+            return result
+    else:
+        if outputDetection:
+            return None, theta_sigs
+        else:
+            return
+    
+def calculate_template_scale_offset(x, h):
+    if any(v.ndim != 1 for v in (x,h)):
+        raise TypeError("Expecting two 1D vectors")
+    
+    if x.shape[0] != h.shape[0]:
+        raise ValueError("Both vectors must have the same length")
+    
+    N = h.shape[0]
+    
+    sum_h = np.sum(h)           # Σ TEMPLATE
+    sum_h_N = sum_h/N
+    sum_h2 = sum_h*sum_h        # Σ TEMPLATE * Σ TEMPLATE = (Σ TEMPLATE)²
+    sum_h2_N = sum_h2/N         # (Σ TEMPLATE)² / N
+    
+    h_dot = np.dot(h, h)        # Σ TEMPLATE²
+    
+    beta_denom = h_dot - sum_h2_N #  Σ TEMPLATE² - Σ TEMPLATE * Σ TEMPLATE/N
+    
+    sum_y = np.sum(x) # Σ data
+    sum_y_N = sum_y / N
+    y_dot = np.dot(x,x)       # Σ(data²)
+    
+    hy_dot = np.dot(h, x)   # Σ(TEMPLATE * DATA)
+    
+    β  = (hy_dot - sum_h * sum_y_N) / beta_denom
+    
+    α = sum_y_N - β*sum_h_N
+    
+    h_ = h*β + α
+    y_h = x - h_ # the error
+    ε = np.dot(y_h, y_h) # explicit
+    
+    σ = np.sqrt(ε/(N-1))
+    θ = β/σ
+    
+    # print(f" sum_h = {sum_h}")
+    # print(f" sum_h_N = {sum_h_N}")
+    # print(f" sum_y = {sum_y}")
+    # print(f" sum_y_N = {sum_y_N}")
+    # print(f" h_dot = {h_dot}")
+    # print(f" y_dot = {y_dot}")
+    # print(f" hy_dot = {hy_dot}")
+    # print(f" sum_h * sum_y_N = {sum_h * sum_y_N }")
+    # print(f" β_denom = {beta_denom}")
+    # print(f" α = {α}")
+    # print(f" β = {β}")
+    # print(f" ε = {ε}")
+    # print(f" σ = {σ}")
+    # print(f" θ = {θ}")
+    
+    return  h_
+
+def test_sliding(x, y, h, viewer, step_size=100):
+    N = h.shape[0]
+    M = y.shape[0]
+    
+    test_y = np.full((M,), fill_value = np.nan)
+    test_h = np.full((M,), fill_value = np.nan)
+    test_scaled_h = np.full((M,), fill_value = np.nan)
+    
+    test_sig = np.concatenate([y[:,np.newaxis],
+                               test_y[:,np.newaxis],
+                               test_h[:,np.newaxis], 
+                               test_scaled_h[:,np.newaxis]],
+                              axis=1)
+    
+    for k in range(0, M-N, 100):
+        # print(f"k = {k}")
+        y_ = y[k:(N+k)]
+        scaled_h = calculate_template_scale_offset(y_, h)
+        if k > 0:
+            test_sig[:,1] = np.nan
+            test_sig[:,2] = np.nan
+            test_sig[:,3] = np.nan
+            
+        test_sig[k:(N+k), 1] = y_[:]
+        test_sig[k:(N+k), 2] = h[:]
+        test_sig[k:(N+k), 3] = scaled_h[:]
+        # t_sig = np.concatenate([x_[:,np.newaxis], h[:,np.newaxis], scaled_h[:,np.newaxis]], axis=1)
+        viewer.plot(x, test_sig)
+        a = input("Press Enter to continue, any key followed by Enter to stop: ")
+        if len(a):
+            break
+    
+def slide_detect(x:np.ndarray, h:np.ndarray, padding:bool=True, data_cache = None, **kwargs):
+    """
+    WARNING: Expects plain numpy arrays, NOT quantity arrays!
+    x: signal
+    h: template
+    padding: True/False
+    data_cache: None, or 8-tuple with N, M, sum_h, sum_h_N, sum_h2, sum_h2_N, h_dot, beta_denom
+    """
+    if any(v.ndim > 1 for v in (x,h)):
+        raise TypeError("Expecting two 1D signals")
+    
+    units = kwargs.pop("units", None)
+    t_start = kwargs.pop("t_start", None)
+    
+    if isinstance(data_cache, tuple) and len(data_cache) == 8:
+        N, M, sum_h, sum_h_N, sum_h2, sum_h2_N, h_dot, beta_denom = data_cache
+    else:
+        N = h.shape[0]
+        M = x.shape[0]
+        sum_h = np.sum(h)           # Σ TEMPLATE
+        sum_h_N = sum_h/N
+        sum_h2 = sum_h*sum_h        # Σ TEMPLATE * Σ TEMPLATE = (Σ TEMPLATE)²
+        sum_h2_N = sum_h2/N         # (Σ TEMPLATE)² / N
+        
+        h_dot = np.dot(h, h)        # Σ TEMPLATE²
+        
+        beta_denom = h_dot - sum_h2_N #  Σ TEMPLATE² - Σ TEMPLATE * Σ TEMPLATE/N
+    
+    if padding:
+        # pad xx with a vector of size h, by duplicating last size(h) elements
+        pad = x[M-N:]
+        
+        time_range = range(M)
+        
+        xx = np.concatenate([x, pad], axis=0)
+        
+        α  = np.full_like(x, fill_value = np.nan) # offset
+        β  = np.full_like(x, fill_value = np.nan) # scale
+        ε  = np.full_like(x, fill_value = np.nan) # sse
+    else:
+        xx = x
+        time_range = range(M-N)
+        α  = np.full((M-N, ), fill_value = np.nan) # offset
+        β  = np.full((M-N,), fill_value = np.nan) # scale
+        ε  = np.full((M-N,), fill_value = np.nan) # sse
+        
+        
+    
+    for k in time_range:
+        y = xx[k:k+N]
+        sum_y = np.sum(y) # Σ data
+        sum_y_N = sum_y / N
+        y_dot = np.dot(y, y)       # Σ(data²)
+        
+        # l = k + N - 1
+        # if l >= M:
+        #     l = M-1
+#         if k > 1:
+#             sum_y = sum_y + y[-1] - xx[k-1]       # Σ DATA
+#             sum_y_N = sum_y / N
+#             
+#             y_dot = y_dot + y[-1]**2 - xx[k-1]**2 # Σ DATA²
+            
+            # sum_y = sum_y + xx[l] - xx[k-1]       # Σ DATA
+            # y_dot = y_dot + xx[l]**2 - xx[k-1]**2 # Σ DATA²
+            
+            
+        hy_dot = np.dot(h, y)   # Σ(TEMPLATE * DATA)
+        
+        # SCALE = [Σ(TEMPLATE * DATA) - Σ TEMPLATE * Σ DATA /N] / (Σ TEMPLATE² - Σ TEMPLATE * Σ TEMPLATE / N)
+        
+        β[k]  = (hy_dot - sum_h * sum_y_N) / beta_denom
+        
+        # α[k] = (sum_y - β[k]*sum_h)/N
+        α[k] = sum_y_N - β[k]*sum_h_N
+        
+        
+        # Calculate the SSE
+        # the scaled (fitted) template:
+        h_ = h*β[k] + α[k]
+        y_h = y - h_ # the error
+        ε[k] = np.dot(y_h, y_h) # explicit
+        
+        # ε[k] = y_dot + β[k]*β[k] * h_dot + N*α[k]*α[k] - 2 * (β[k]*hy_dot + α[k]*sum_y - α[k]*β[k]*sum_h)
+        # ε[k] = y_dot + β[k]**2 * h_dot + N*α[k]**2 - 2 * (β[k]*hy_dot + α[k]*sum_y - α[k]*β[k]*sum_h)
+        
+        # the standard error
+        # σ[k] = np.sqrt(ε[k]/(N-1))
+        
+        # the detection criterion: scale / standard error
+        # θ[k] = β[k] / σ[k]
+        
+    σ = np.sqrt(ε/(N-1))
+    θ = β/σ
+    
+    Result = collections.namedtuple("Result", ["θ", "α", "β", "ε", "σ"])
+    ret = Result(θ , α, β, ε, σ)
+    # Result = collections.namedtuple("Result", ["θ", "α", "β", "ε", "σ", "xx", "x"])
+    # ret = Result(θ , α, β, ε, σ, xx, x)
+    
+    return ret
+        
+    # return θ , α, β, ε, σ, xx
+    
+def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, threshold, peakfunc):
+    """
+    Extracts detected mPSC waveforms.
+    
+    Waveforms are detected by comparing the θ signal (containing a detection
+    signal) to the scalar `threshold`, to determine the start & end time stamps
+    of each waveform in the parent signal `x`.
+    
+    The start time stamps are stored in a SpikeTrain, and the peak time
+    stamps are embedded as a quantity array in the SpikeTrain's annotations. The
+    waveforms are also embedded in the spike train's `waveforms` attribute, and 
+    also returned as a collection of analog signals 
+    
+    Parameters:
+    ==========-
+    x: single-channel signal
+    duration: duration of the mPSC template 
+    θ: single-channel signal with detection criterion (can be cross-correlation
+        of the result of sliding deteciton algorithm)
+    threshold: scalar detection threshold; samples in the θ that are >= threshold 
+        are considered to correspond to samples in the detected mPSCs
+    peakfunc: function to extract the sample index of the extremum in the 
+        mPSC waveform (i.e., either argmax, for upward event waveform, or argmin
+        for downward event waveform)
+    
+    Returns:
+    ========
+    A spike train, a sequence of neo signals with fitted copies of the waveforms
+    and a sequence of neo signals containing aligned copies of the waveforms.
+    
+    CAUTION: 2022-12-18 23:11:33
+    This extracts single-channel waveforms, which will carry the array annotations
+    of the single-channel signal where the waveforms have been sliced from. 
+    
+    The waveforms are then concatenated into a 3D array stored as the `waveforms`
+    attribute of the resulting spike train, losing their array annotations.
+    
+    When these waveforms are individually fitted, they will be converted again
+    to individual analog signals waveforms which will be passed to the fitting
+    function. As a result, they will gain a second channel 
+    (channel 0 ↦ recorded waveform; channel 1 ↦ fitted waveform).
+
+    There is no point using array annotations with the individual waveforms for 
+    the following reasons:
+    1. the waveform analgsignals will lose their metainformation (array annotations
+    AND annotations) when embedded in the spike train
+    2. after fitting, the original array annotations of the waveform signals (if
+    present) will be incompatible with the shape of the new signals (which will
+    contain both the original data and the fit curve, as explained above)
+    
+    Here, the array_annotations of the SINGLE-CHANNEL waveforms are merged as 
+    array annotations in the spike train (where the keys are mapped to an 
+    array of scalars with as many elements as spikes). These
+    spike train array annotations are then used to carry the relevant metadata
+    per spike, further into the analysis function(s).
+    
+    """
+    if not isinstance(x, (neo.AnalogSignal, DataSignal)):
+        raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal; got {type(x).__name__} instead")
+    if x.shape[1] > 1:
+        raise TypeError(f"Expecting a vector; instead, the signal has {x.shape[1]} channels")
+    flags =  θ >= threshold
+    flag_bounds = np.ediff1d(flags.astype(np.dtype(float)))
+    peak_begins = np.where(flag_bounds > 0)[0] # sample indices
+    peak_ends   = np.where(flag_bounds < 0)[0] # sample indices
+    
+    # print(len(peak_begins), len(peak_ends))
+    
+    if len(peak_begins) == 0 or len(peak_ends) == 0:
+        return # nothing detected ?!?
+    
+    if len(peak_begins) > len(peak_ends):
+        if peak_begins[-1] > peak_ends[-1]:
+            peak_begins = peak_begins[0:-1]
+        elif peak_begins[-1] < peak_ends[-1]:
+            peak_begins = peak_begins[1:]
+            
+    elif len(peak_begins) < len(peak_ends):
+        if peak_begins[0] > peak_ends[0]:
+            peak_ends = peak_ends[1:]
+            
+        elif peak_begins[-1] > peak_ends[-1]:
+            peak_ends = peak_ends[0:-1]
+            
+    # print(f"peak begin, end: {[v for v in zip(peak_begins, peak_ends)]}")
+        
+    θmaxima = [np.argmax(θ[v[0]:v[1]]) + v[0] for v in zip(peak_begins, peak_ends) if len(θ[v[0]:v[1]]) > 0]
+    
+    # print(f"θmaxima {θmaxima}")
+    mini_starts = x.times[θmaxima]
+    
+    mini_ends = mini_starts + duration
+    
+    # remove past-the-end intervals
+    intervals = [(t0,t1) for (t0,t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
+    
+    # generate new starts after removal of past-the-end
+    starts = np.array([interval[0] for interval in intervals])
+    # ends = starts + duration
+    
+    # for ke, me in enumerate(mini_ends):
+    #     if me > x.t_stop:
+    #         me = x.t_stop
+    # print(mini_starts)
+
+    minis = [x.time_slice(*interval) for interval in intervals]
+    # minis = [x.time_slice(t0,t1) if t1 < x.t_stop else x.time_slice(t0,x.t_stop) for (t0, t1) in zip(mini_starts, mini_ends)]
+    # minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop ]
+    if len(minis) == 0:
+        return
+    
+    mini_peaks = np.array([w.times[peakfunc(w[:,0])] for w in minis])*x.times.units
+
+    chname = x.array_annotations.get("channel_names", [""])[0]
+
+    if len(chname.strip())==0:
+        chname = "mPSC"
+    chname +="_"
+        
+    for km, m in enumerate(minis):
+        m.annotations["Accept"] = np.array([True])
+        m.name = f"{chname}{km}"
+        m.array_annotate(**x.array_annotations)
+    
+    # NOTE: 2022-12-17 22:08:57 array_annotating a SpikeTrain:
+    # Normally, neo.DataObject take array annotations with as many elements per
+    # key as the sie on the last axis (highest dimension).
+    # For AnalogSignal and such, this is also the number of channels (2nd dimension
+    # of the underlying data array, where one channel is a column vector).
+    #
+    # Therefore, the API dealing with array_annotations checks for the annotation
+    # length against the size of the DataObject's data array on its last axis
+    # (i.e., shape[-1]).
+    #
+    # However, for a SpikeTrain, things are different: the "data" array in a 
+    # SpikeTrain is, BY DEFINITION, a 1D array (with shape (N,)). This means 
+    # that for a SpikeTrain array.shape[-1] is the same as array.shape[0] !!!
+    # If this is what the neo authors have intended (this is not explicit in 
+    # the documentation) then the justification seems to be that the array
+    # annotations of a SpikeTrain are intended to provide data related to
+    # each individual spike in the SpikeTrain. This is perfectly justifiable
+    # given that the spike waveform data is only stored as a plain numpy array, 
+    # and not as a signal, in the SpikeTrain (so that any of the array annotations
+    # associated with the original signal from where the spikes were taken are 
+    # lost). 
+    # This is unlike the array annotations for, say, an AnalogSignal, where they 
+    # provide information related to each individual channel, and NOT to individual
+    # data points (the latter being practically penalizing in terms of resources
+    # and not very useful anyway).
+    ret = neo.SpikeTrain(starts, t_start = x.t_start, units = x.times.units,
+                         t_stop = x.times[-1], sampling_rate = x.sampling_rate,
+                         name="mPSCs")
+    
+    # NOTE: 2022-12-17 22:22:41 
+    # Although it would have been easier (and perhaps faster) to call directly
+    # np.concatenate on the wave's magnitude, as in the next line,
+    # mPSCtrain_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
+    # we would be losing the array annotations (see NOTE: 2022-12-17 22:08:57);
+    # therefore it would be better to merge signals one by one.
+    #
+    # However, this aproach has two shortcomings:
+    # 1) in order to merge them, minis must have the same t_start (which, of
+    # of course, they have not). We could set their time starts to 0, being
+    # mindful that the TRUE start time is stored in the SpikeTrain, and their
+    # peak time has already been collected above
+    #
+    # 2) The merged signal would efectively be a 2D array, whereas the 
+    # the waveforms of the SpikeTrain need to be a 3D array. Taking the magnitude 
+    # of the merged minis and adding add a new axis would NOT solve this because
+    # the new axis would be a singleton (i.e., all minis in the merged object
+    # would be treated as channels of a same signal, and NOT as separate waveform
+    # signals).
+    #
+    # Therefore the best approach is to np.concatenate as above, but to also
+    # merge their array annotations separately
+    #
+    mPSCtrain_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
+    minis_arr_ann = minis[0].array_annotations
+    for mw in minis[1:]:
+        minis_arr_ann = neoutils.merge_array_annotations(minis_arr_ann, mw.array_annotations)
+    ret.waveforms = mPSCtrain_waves.T
+    # print(f"membrane.extract_event_waveforms: waves shape {mPSCtrain_waves.shape}, waveforms shape {ret.waveforms.shape}")
+    ret.segment = x.segment
+    
+    # print(f"extract_event_waveforms x.name {x.name}")
+    ret.annotate(
+                 peak_time = mini_peaks, 
+                 wave_name = [w.name for w in minis],
+                 event_fit = [w.annotations.get("event_fit", None) for w in minis],
+                 Accept = np.concatenate([w.annotations["Accept"] for w in minis]),
+                 source="Event_detection",
+                 signal_units = x.units, 
+                 signal_origin = x.name,
+                 datetime=datetime.datetime.now(),
+                 Aligned = False,
+                 )
+    
+    ret.array_annotate(**minis_arr_ann)
+    ret.array_annotate(peak_time = mini_peaks)
+    ret.array_annotate(wave_name = [w.name for w in minis])
+    ret.array_annotate(accept = ret.annotations["Accept"])
+    # ret.array_annotate(accept = np.concatenate([w.annotations["Accept"] for w in minis]))
+    
+    return ret
+
+def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typing.Optional[float]=None, outputDetection:bool=False, raw_signal=None):
+    """Detect spontaneous events in a signal.
+
+    Uses cross-correlation with a waveform, or the sliding detection algorithm
+    by Clements & Bekkers, 1997, (Biophys J.).
+    
+    Parameters:
+    ==========
+    
+    x: neo.AnalogSignal containing the recorded membrane current that 
+        will be scanned for events. Typically this is single-channel, meaning it
+        is a 2D array with a singleton 2nd axis (e.g., x.shape = (n,1) where `n`
+        is the number of samples in `x`)
+    
+    waveform: neo.AnalogSignal or 1D numpy array (vector, i.e., 
+        waveform.shape = (m,) where `m` is the number of samples in `waveform`).
+    
+        Contains an event model (ie. a "synthetic" waveform) or a "template" 
+        waveform extracted from a signal.
+    
+        ATTENTION: Make sure this model waveform has the SAME SAMPLING RATE as 
+        the signal!!!
+    
+        ALTERNATIVELY, the waveform can be specified by a sequence of six scalars, 
+        where the first five are the Clements & Bekkers 1997 model parameters:
+        α, β, x₀, τ₁ and τ₂ (see models.Clements_Bekkers_97 for details)
+        and the 6ᵗʰ element is the duration of the model waveform (which will
+        be generated ad-hoc); this last element is assumed to be in the units of
+        the domain of x.
+    
+        By default, waveform is (0., -1., 0.01, 0.001, 0.01, 0.05) which means,
+        for a membrane current signal `x` in pA:
+    
+        α  =  0.0 pA (ie. no offset)
+        β  = -1.0 (i.e. downward deflection)
+        x₀ =  0.01 (i.e. 10 ms from the start of the waveform)
+        τ₁ =  0.001 (i.e., rising time constant of 1 ms)
+        τ₂ =  0.01  (i.e., decay time constant of 10 ms)
+        
+        and 50 ms duration of the model waveform
+    
+        NOTE: When specified in this way the waveform will be generated ad-hoc
+        using the sampling rate of the signal `x`.
+    
+        For example, if creating the waveform as a plain numpy array:
+        
+        t_start     = 0     # [s]
+        duration    = 0.2   # [s]
+        sr          = 1e4   # [Hz]
+        
+        t = np.linspace(0, duration, num = sr * duration)
+        model = models.Clements_Bekkers_97(x, parameters)
+        
+        As a convenience, you can use PSCwaveform(...) function in this module 
+        to generate a synthetic  waveform as a neo.AnalogSignal.
+        
+    useCBsliding:bool, default is False
+        When True (the default), uses the Clements & Bekkers optimally scaled 
+        template sliding detection, with the waveform as a template.
+    
+        When False, uses cross-correlation between the signal and the waveform 
+    
+    threshold: float; optional, default None.
+        This value is the threshold for the detection criterion used in the 
+        Clements & Bekkers 1997 Biophys J paper
+    
+        When threshold is None, the threshold of detection is the calculated 
+        root-mean-square of the detection criterion signal output by the sliding
+        template detection method.
+    
+        This parameter is only used when useCBsliding is True.
+    
+    outputDetection:bool, default is False
+        When True, the function also returns the detection criterion (here, the 
+        cross-correlation signal)
+    
+    raw_signal: analog signal with the same shape and domain as the signal where
+        the detection took place, default is None
+        When given, the waveforms will be extracted from THIS signal using the 
+        time stamps in the spike train.
+        This is useful when detection was performed on a pre-processed (e.g., 
+        smoothed) signal but the "raw" waveforms are required.
     
     Returns:
     ========
@@ -6356,8 +6991,13 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
     ATTENTION: When detection has failed, returns None
     
     """
-    if isinstance(waveform, np.ndarray) and not dt.is_vector(waveform):
-        raise TypeError("waveform expected to be a vector")
+    # print(f"membrane.detect_Events: waveform is a {type(waveform).__name__}")
+    if not isinstance(x, (neo.AnalogSignal, DataSignal)):
+        raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal; got a {type(x).__name__} instead")
+
+    if isinstance(waveform, (np.ndarray,neo.core.basesignal.BaseSignal)):
+        if not dt.is_vector(waveform):
+            raise TypeError("waveform expected to be a vector")
     
     elif isinstance(waveform, (tuple, list)):
         if len(waveform) == 6:
@@ -6367,74 +7007,9 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
                                      t_start = 0*x.times.units,
                                      duration = waveduration,
                                      sampling_rate = x.sampling_rate)
+            
     else:
         raise ValueError("Incorrect waveform specification")
-    
-    # 1) normalize the model waveform
-    mdl = sigp.normalise_waveform(waveform)
-    
-    mdl = np.atleast_2d(mdl)
-    
-    if mdl.shape[1] > 1:
-        mdl = mdl.T
-        
-    # 2) cross-correlate the signal with the normalized model waveform
-    
-    xc = scipy.signal.correlate(x, mdl, mode="valid")
-    
-    # 3) de-trend the cross-correlation signal (so that noise is almost about 0)
-    dxc = scipy.signal.detrend(xc, type="constant", axis=0)
-    
-    # 4) find out where cross-correlation is largers than its noise (root-mean-square)
-    flags = dxc > sigp.rms(dxc)
-    
-    # 5) find out starts and stops of those regions
-    # NOTE: 2022-10-25 16:44:58
-    # Putative peak regions start where flag_bounds are > 0 and end where 
-    # flag_bounds < 0 (we'd expect each +1 bound ie. a BEGIN to be FOLLOWED by 
-    # a -1 bound ie. and END).
-    #
-    flag_bounds = np.ediff1d(flags.astype(np.dtype(float)))
-    
-    # NOTE: 2022-10-25 16:46:10
-    # The only exception to NOTE: 2022-10-25 16:44:58 is when the cross-correlation
-    # signal ends with an upwards deflection (unlikely, but we can still check)
-    peak_begins = np.where(flag_bounds > 0)[0] # sample indices
-    peak_ends   = np.where(flag_bounds < 0)[0] # sample indices
-    
-    if len(peak_begins) == 0 or len(peak_ends) == 0:
-        return # nothing detected ?!?
-    
-    if len(peak_begins) > len(peak_ends):
-        if peak_begins[-1] > peak_ends[-1]:
-            peak_begins = peak_begins[0:-1]
-        elif peak_begins[-1] < peak_ends[-1]:
-            peak_begins = peak_begins[1:]
-            
-    elif len(peak_begins) < len(peak_ends):
-        if peak_begins[0] > peak_ends[0]:
-            peak_ends = peak_ends[1:]
-            
-        elif peak_begins[-1] > peak_ends[-1]:
-            peak_ends = peak_ends[0:-1]
-            
-        
-    # 6) find the location of the local maxima in the cross-correlation signal 
-    # location is given in sample indices
-    # ATTENTION: these maxima correspond to samples where the model or template 
-    # fits best with the signal data; theo DO NOT correspond to the "peak" (or
-    # trough) of the actual mini EPSC!!!
-    xcmaxima = [np.argmax(xc[v[0]:v[1]]) + v[0] for v in zip(peak_begins, peak_ends) if len(xc[v[0]:v[1]]) > 0]
-    
-    # 7) locate the actual peaks (for positive waveform) or troughs (negative waveforms)
-    if sigp.is_positive_waveform(waveform):
-        peakfunc = np.argmax
-    else:
-        peakfunc = np.argmin
-    
-    peaks = [peakfunc(x.magnitude[v[0]:v[1]]) + v[0] for v in zip(peak_begins, peak_ends) if len(x.magnitude[v[0]:v[1]]) > 0]
-
-    # 8) get the start & end of the signal's regions where putative minis were found
     
     if isinstance(waveform, neo.core.basesignal.BaseSignal):
         mini_duration = waveform.duration
@@ -6444,49 +7019,105 @@ def detect_mPSC(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Un
         # same "sampling rate" as the signal
         mini_duration = len(waveform) / x.sampling_rate
     
-    mini_starts = x.times[xcmaxima]
-    
-    mini_ends = mini_starts + mini_duration
-    
-    mini_peaks = x.times[peaks]
-    
-    # minis = neoutils.set_relative_time_start([x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop])
-    minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
-    
-    
-    for m in minis:
-        m.annotations["Accept"] = True
-    
-    # NOTE: 2022-10-26 22:22:37
-    # reconstruct this in the caller so that we can use several epochs on the
-    # same signal/segment
-    # FIXME/TODO: 2022-10-25 18:25:48
-    # a neo.SpikeTrain is defined in the time domain only !!!
-    # MUST create a SpikeTrain-like signal object type for anything else
-    
-#     dstring = f"mEPSC detected in {x.name}"
-#     
-#     if isinstance(waveform, neo.core.basesignal.BaseSignal) and len(waveform.description.strip()):
-#         dstring += f" using {waveform.description}"
+    if sigp.is_positive_waveform(waveform):
+        peakfunc = np.argmax
+    else:
+        peakfunc = np.argmin
         
-#     waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
-#     
-#     ret = neo.SpikeTrain(mini_starts, t_stop = x.t_stop, units = x.times.units,
-#                          t_start = x.t_start, sampling_rate = x.sampling_rate,
-#                          name=f"{x.name}_mEPSCs", description=dstring)
-#     
-#     ret.waveforms = waves
-#     ret.annotations["peak_times"] = mini_peaks
-#     ret.annotations["mEPSC_parameters"] = waveform.annotations["parameters"]
-    
-    # return ret, mini_peaks, minis
-    return {"mini_starts":mini_starts, "mini_peaks":mini_peaks, "minis":minis,
-            "waveform":waveform}
+    if useCBsliding:
+        return detect_Events_CBsliding(x, waveform, threshold, outputDetection=outputDetection, raw_signal=raw_signal)
+            
+    else:
+        # 1) normalize the model waveform - only for the cross-correlation method
+        # if not useCBsliding:
+        mdl = sigp.normalise_waveform(waveform)
+        
+        mdl = np.atleast_2d(waveform)
+        
+        if mdl.shape[1] > 1:
+            mdl = mdl.T
+            
+        N = mdl.shape[0]
+        M = x.shape[0]
 
-def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), Im:typing.Union[int, str] = "IN0", epoch=None, clear_spiketrains:bool=True, fit_waves:bool=False):
-    """Batch m(E/I)PSC analysis.
-    Detects and analyses mPSCs in a neo.Block, neo.Segment, or a sequence of 
+        # a list of cross-correrlation signals, one per signal channel (i.e. each
+        # data on 2nd axis)
+        xc = [scipy.signal.correlate(x[:,k], mdl, mode="valid") for k in range(x.shape[1])]
+        
+        ret = list()
+        
+        # waves = list()
+        
+        # for each cross-correlation:
+        # • detrend it
+        # • scale it to 10/max so that thresholding is done in this range (0..10)
+        #   ∘ detrended & unscaled is stored in annotations as θ
+        #   ∘ detrended & scaled is stored in annotations as θ_norm
+        # • thresholding is always performed on θ_norm
+        thetas = list()
+        
+        for k, c in enumerate(xc):
+            dxc = scipy.signal.detrend(c, type="constant",axis=0)
+            if threshold is None:
+                thr = sigp.rms(dxc) * 10 / dxc.max()
+            else:
+                thr = threshold
+            
+            dxc_n = np.copy(dxc) # because next is mod-ing in place
+            dxc_n = sigp.scale_waveform(dxc_n, 10, np.max(dxc[~np.isnan(dxc)]))
+
+            θ = type(x)(dxc, units = pq.dimensionless, t_start = x.t_start,
+                        sampling_rate = x.sampling_rate,
+                        name = f"{x.name}_θ",
+                        description = "Template cross-correlation")
+            
+            θ_norm = type(x)(dxc_n, units = pq.dimensionless, t_start = x.t_start,
+                        sampling_rate = x.sampling_rate,
+                        name = f"{x.name}_θ_norm",
+                        description = "Template cross-correlation (normalized)")
+            
+            thetas.append(θ_norm)
+            
+            if isinstance(raw_signal, type(x)) and raw_signal.shape == x.shape and \
+                raw_signal.sampling_rate == x.sampling_rate and raw_signal.times.units == x.times.units and \
+                    raw_signal.t_start == x.t_start and raw_signal.units == x.units:
+                ret_ = extract_event_waveforms(raw_signal[:,k], mini_duration, dxc_n, thr, peakfunc)
+            else:
+                ret_ = extract_event_waveforms(x[:,k], mini_duration, dxc_n, thr, peakfunc)
+            
+            if isinstance(ret_, neo.SpikeTrain):
+                ret_.annotate(waveform = waveform, θ = θ, θ_norm=θ_norm,
+                              channel_id = x.array_annotations.get("channel_ids", [0])[0])
+                ret_.segment = x.segment
+                ret.append(ret_)
+                # waves.append(waves_)
+                
+        if len(ret) == 0:
+            if outputDetection:
+                return None, thetas
+            else:
+                return
+        
+        result = neo.core.spiketrainlist.SpikeTrainList(items = ret, segment=x.segment)
+        for st in result:
+            st.segment = x.segment
+        
+        if outputDetection:
+            return result, thetas
+        else:
+            return result
+
+def batch_EventDetection(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), Im:typing.Union[int, str] = "IN0", epoch=None, clear_spiketrains:bool=True, fit_waves:bool=False):
+    """Batch event detection - e.g., mini EPSC, IPSC, etc.
+    
+    Detects and analyses events (e.g. mini ePSCs) in a neo.Block, neo.Segment, or a sequence of 
     neo.Segment objects.
+    
+    Calls detect_Events for each segment in `x`, and generates a spiketrain with
+    the the stamps of the detected mPSCs. The spiketrain's annotation contain 
+    the mandatory key "source" mapped to the string "Event_detection", in order
+    to identify this spike train among other (possible) spike trains held in the
+    segment.
     
     NOTE: a neo.Block already contains a collection of segments, see 
     neo API reference:
@@ -6515,11 +7146,11 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
     x: neo.Block or a sequence (tuple, list) of neo.Segments, where each segment
         contains:
 
-        • an analog signal identified by the `Im` parameter below, which 
+        • a neo.AnalogSignal identified by the `Im` parameter below, which 
         represents the recorded membrane current with putative miniature or 
         spontaneous post-synaptic currents (mEPSCs or mIPSCs) 
     
-        • an Epoch named "mPSC" or any name specified in the `epoh_name` parameter
+        • a neo.Epoch with the name specified in the `epoch_name` parameter
     
     waveform: numpy array (1D), or a sequence of six float scalars
         
@@ -6532,7 +7163,7 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
         • when a sequence of floats, it contains the five parameters for the
             Clements & Bekkers 1997 waveform model, AND the duration of the
             synthetic waveform whcih will be generated ad hoc (see also the 
-            `detect_mPSC` function in this module).
+            `detect_Events` function in this module).
     
     Im: str or int. The identifier of the membrane current signal contained in
         the segments of `x`.
@@ -6614,6 +7245,7 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
     
     
     """
+    raise NotImplementedError("Must adapt to new data layout")
     
     if clear_spiketrains:
         neoutils.clear_spiketrains(x)
@@ -6623,12 +7255,15 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
     if isinstance(x, neo.Block):
         segments = x.segments
         data_name = x.name
+        
     elif isinstance(x, neo.Segment):
         segments = [x]
         data_name = x.name
+        
     elif isinstance(x, (tuple, list)) and all(isinstance(s, neo.Segment) for s in x):
         segments = x
         data_name = "Segments"
+        
     else:
         raise TypeError(f"Expecting a neo.Block, a neo.Segment, or a sequence of neo.Segments; got {type(x).__name__} instead")
     
@@ -6641,7 +7276,7 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
         
         try:
             if isinstance(Im, str):
-                im = s.analogsignals[ephys.get_index_of_named_signal(s, Im)].copy()
+                im = s.analogsignals[neoutils.get_index_of_named_signal(s, Im)].copy()
                 
             elif isinstance(Im, int):
                 im = s.analogsignals[Im].copy()
@@ -6649,6 +7284,7 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
             else:
                 result.append(None)
                 continue
+            
         except:
             warnings.warn(f"No membrane current signal with index or name {Im} is found in segment {k}")
             result.append(None)
@@ -6667,9 +7303,9 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
         
         if epoch is None:
             if template is None:
-                detection = detect_mPSC(im, waveform)
+                detection = detect_Events(im, waveform)
             else:
-                detection = detect_mPSC(im, template)
+                detection = detect_Events(im, template)
             
             if detection is None:
                 result.append(None)
@@ -6735,10 +7371,10 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
             for detect_epoch in mPSCdetectepochs:
                 sig = im.time_slice(detect_epoch.times[0], detect_epoch.times[0] + detect_epoch.durations[0])
                 if template is None:
-                    detection = detect_mPSC(sig, waveform) # only generate template ONCE
+                    detection = detect_Events(sig, waveform) # only generate template ONCE
                 else:
-                    detection = detect_mPSC(sig, template) 
-                    # starts, peaks, epoch_minis, template = detect_mPSC(sig, template) 
+                    detection = detect_Events(sig, template) 
+                    # starts, peaks, epoch_minis, template = detect_Events(sig, template) 
                 if detection is None:
                     continue
                 
@@ -6762,11 +7398,11 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
             
             # # waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
             # train.waveforms = waves
-            train.annotations["peak_times"] = peak_times
-            train.annotations["source"] = "mPSC_detection"
+            train.annotations["peak_time"] = peak_times
+            train.annotations["source"] = "Event_detection"
             
             if isinstance(template, neo.core.basesignal.BaseSignal):
-                train.annotations["mPSC_parameters"] = template.annotations["parameters"]
+                train.annotations["PSC_parameters"] = template.annotations["parameters"]
             # elif isinstance(waveform, neo.core.basesignal.BaseSignal):
             #     train.annotations["mPSC_parameters"] = waveform.annotations["parameters"]
             # elif isinstance(waveform, (tuple, list)) and len(waveform)==6:
@@ -6777,7 +7413,7 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
             # fit mPSC waves if asked
             if fit_waves:
                 for k,w in enumerate(mini_waves):
-                    fw = fit_mPSC(w, template.annotations["parameters"])
+                    fw = fit_Event(w, template.annotations["parameters"])
                     
                     mini_waves[k] = fw
                 
@@ -6785,7 +7421,7 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
             train_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in mini_waves], axis=2)
             
             # a SpikeTrain expects (spike, channel, time) hence train_waves.T
-            train.waveforms = train_waves.T # 
+            train.waveforms = train_waves.T 
             
             s.spiketrains.append(train)
             
@@ -6796,12 +7432,15 @@ def batch_mPSC(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segmen
     return result, template
         
     
-def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Optional[typing.Sequence]=None):
-    """Convenience wrapper to curvefitting.fit_mPSC_model with suitable lower & upper bounds
+def fit_Event(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Optional[typing.Sequence]=None):
+    """Convenience wrapper to curvefitting.fit_Event_model with suitable lower & upper bounds
+    
+    Modifies signal `x` in-place.
     
     Parameters:
     ===========
-    x: neo.AnalogSignal or DataSignal) with a miniEPSC (i.e. fragment of a signal)
+    x: neo.AnalogSignal or DataSignal) with an event such as a mmini ePSC   
+        (i.e. fragment of a signal)
     
     params: sequence of float scalars; these are the initial parameter values for
             the Clements & Bekkers '97 model:
@@ -6816,6 +7455,11 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
             x₀ = delay ("onset") [ms];
         
             τ₁, τ₂ = the "rise" and "decay" time constants, respectively, in [ms]
+    
+        ATTENTION: Alternatively, the `params` may be an analog signal (a "template")
+            In this case, the `lo` and `up` parameters (see below) are ignored,
+            and only a R² value will be calculated between the experimental data
+            and the template.
     
     lo, up: None, or a sequence of floats of the same length as params, with the
             the lower and upper bounds, respectively, for the model parameters.
@@ -6832,9 +7476,31 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
                 lo  = ( 0.,        0,        0.,     1.0e-4,   1.0e-4)
                 hi  = ( np.inf,    np.inf,   np.inf, 0.01,     0.01)
     
-    ATTENTION: the structure of the params lo and up sequences is NOT checked.  
+    WARNING: the structure of the params lo and up sequences is NOT checked.  
         If you feed garbage the function will either throw an exception, or will
         fail to give you what you want.
+    
+    Returns:
+    =======
+    An analog signal (neo.AnalogSignal) with two channels:
+    • the experimental data (the original waveform to which the fitting was performed)
+    • the fitted curve (optional; this IS NOT present when `params` is a template)
+    
+    Its `annotations` attribute (a dict) contains the following mapping:
+    • "event_fit" → the fit result, an OrderedDict with the results of the 
+        fitting function, in this case: curvefitting.fit_Event_model, mapping:
+        ∘ "Fit"             → the result of scipy.optimize.least_squares
+        ∘ "Coefficients"    → the fitted parameters
+        ∘ "Rsq"             → The R² value of the fit (a.k.a goodness of fit)
+        ∘ "template"        → True when `params` is a template; False, otherwise
+    
+        NOTE: When `params` is a template waveform, only the "Rsq" mapping is present
+    
+    • "amplitude" → the amplitude of the original data (waveform)
+    • "fit_amplitude" → the amplitude of the fitted curve (typically, smaller 
+                    than the amplitude of the experimental waveform data, due to
+                    the noise in the latter)
+    
     """
     
     if not isinstance(x, (neo.AnalogSignal, DataSignal)):
@@ -6846,72 +7512,380 @@ def fit_mPSC(x, params, lo:typing.Optional[typing.Sequence]=None, up:typing.Opti
     # but cache the original t_start to restore afterwards
     t_start = x.t_start
     if x.t_start.magnitude != 0:
-        x = neoutils.set_relative_time_start(x)
-    
-    l, c, e = sigp.state_levels(x[:,0])
-    
-    # NOTE: 2022-10-27 22:53:50
-    # FYI these are:
-    # α, β, x₀, τ₁ and τ₂
-    # same structure for lower & upper bounds (respectively, lo & up)
-    params = list(params)
-    params[0] = l[1] # adapt the offset to the DC components in the waveform
-    
-    if lo is None:
-        if params[1] < 0:   # downward mPSC
-            lo = (0., -np.inf, 0., 1e-4, 1e-4)
-        else:               # upward mPSC
-            lo = (0., 0, 0., 1e-4, 1e-4)
-            
-    if up is None:
-        if params[1] < 0:   # downward mPSC
-            up = (np.inf, 0., np.inf, 0.01, 0.01) # fix upper bounds for the time constants to 0.1.
-        else:
-            up = (np.inf, np.inf, np.inf, 0.01, 0.01) # fix upper bounds for the time constants to 0.1.
-            
-    
-    # NOTE: 2022-10-27 22:45:23
-    # Normally, the waveform has just one channel: the mPSC "cropped" out from 
-    # the signal it was detected in
-    #
-    # However, if the waveform was fitted before, the fitted curve is in the 2nd
-    # channel. To avoid appending further curves upon re-fitting, we use the 1st
-    # channel as data to fit, and overwrite the 2nd channel with the fitted curve
-    # if a 2nd channel exists, else we just append the newly fit curve as 2nd 
-    # channel
-    
-    xx = x[:,0] # this always works even if there is only one channel, 
-                # and returns an AnalogSignal
-                
-    fitresult = crvf.fit_mPSC_model(xx, params, bounds = [lo, up])
-    
-    fitted_x = type(x)(fitresult[0], units = x.units, t_start = x.t_start, sampling_rate = x.sampling_rate, name="mPSCfit")
-    
-    if x.shape[1] > 1:
-        x[:,1] = fitted_x # modifies x in-place
+        x_ = neoutils.set_relative_time_start(x)
     else:
-        for annkey in x.array_annotations:
-            if annkey == "channel_names":
-                fitted_x.array_annotations[annkey] = ["mPSCfit"]
-            elif annkey == "channel_ids":
-                fitted_x.array_annotations[annkey] = x.array_annotations[annkey][0] + "_fit"
+        x_ = x
+    
+    l, c, e, _ = sigp.state_levels(x_[:,0], axis=0)
+    
+    if isinstance(params, neo.AnalogSignal): # template waveform given
+        if params.t_start.magnitude != 0:
+            params = neoutils.set_relative_time_start(params)
+            
+        Rsq = crvf.fit_Event_wave(x_, params)
+        x.annotations["event_fit"] = {"Rsq": Rsq, "template": True, "amplitude":sigp.waveform_amplitude(params)}
+        x.annotations["amplitude"] = sigp.waveform_amplitude(x)
+        
+    else:
+    
+        # NOTE: 2022-10-27 22:53:50
+        # FYI these are:
+        # α, β, x₀, τ₁ and τ₂
+        # same structure for lower & upper bounds (respectively, lo & up)
+        params = list(params)
+        params[0] = l[1] # adapt the offset to the DC components in the waveform
+        
+        if lo is None:
+            if params[1] < 0:   # downward mPSC
+                lo = (0., -np.inf, 0., 1e-4, 1e-4)
+            else:               # upward mPSC
+                lo = (0., 0, 0., 1e-4, 1e-4)
+                
+        if up is None:
+            if params[1] < 0:   # downward mPSC
+                up = (np.inf, 0., np.inf, 0.01, 0.01) # fix upper bounds for the time constants to 0.1.
             else:
-                fitted_x.array_annotations[annkey] = x.array_annotations[annkey]
+                up = (np.inf, np.inf, np.inf, 0.01, 0.01) # fix upper bounds for the time constants to 0.1.
                 
         
-        x = x.merge(fitted_x) # returns a new x
-    
-    # NOTE: 2022-10-27 22:44:50
-    # Restore the domain start of the waveform (see NOTE: 2022-10-27 22:44:40)
-    x.t_start = t_start
-    
-    x.annotations["mPSC_fit"] = fitresult[1]
-    x.annotations["amplitude"] = sigp.waveform_amplitude(x[:,0])
-    x.annotations["fit_amplitude"] = sigp.waveform_amplitude(x[:,1])
+        # NOTE: 2022-10-27 22:45:23
+        # Normally, the waveform has just one channel: the mPSC "cropped" out from 
+        # the signal it was detected in
+        #
+        # However, if the waveform was fitted before, the fitted curve is in the 2nd
+        # channel. To avoid appending further curves upon re-fitting, we use the 1st
+        # channel as data to fit, and overwrite the 2nd channel with the fitted curve
+        # if a 2nd channel exists, else we just append the newly fit curve as 2nd 
+        # channel
+        
+        xx = x_[:,0] # this always works even if there is only one channel, 
+                    # and returns an AnalogSignal
+                    
+        fitresult = crvf.fit_Event_model(xx, params, bounds = [lo, up])
+        
+        fitted_x = type(x)(fitresult[0], units = x.units, t_start = x.t_start, sampling_rate = x.sampling_rate, name="EventModelFit")
+        fitted_x.segment = x.segment
+        
+        if x.shape[1] > 1:
+            x[:,1] = fitted_x # modifies x in-place
+        else:
+            for annkey in x.array_annotations:
+                if annkey == "channel_names":
+                    fitted_x.array_annotations[annkey] = [f"{annkey[0]}_fit"]
+                elif annkey == "channel_ids":
+                    fitted_x.array_annotations[annkey] = x.array_annotations[annkey][0] + "_fit"
+                else:
+                    fitted_x.array_annotations[annkey] = x.array_annotations[annkey]
+                    
+            name = f"{x.name}_{fitted_x.name}"
+            x = x.merge(fitted_x) # returns a new x
+            x.name = name
+        
+        # NOTE: 2022-10-27 22:44:50
+        # Restore the domain start of the waveform (see NOTE: 2022-10-27 22:44:40)
+        x.t_start = t_start
+        x.annotate(event_fit = fitresult[1],
+                   amplitude = sigp.waveform_amplitude(x[:,0]))
+        
+        x.annotations["event_fit"]["template"] = False
+        x.annotations["event_fit"]["amplitude"] = sigp.waveform_amplitude(x[:,1])
+        
     
     return x
+
+def prep_for_nsfa(data):
+    """Helper for the nsfa function
+    Prepares an average event waveform and the variance of fluctuations.
+    Parameters:
+    ==========
+    data: A collection (i.e., tuple, list) of 1D analog signals (either as special
+            neo-style signal objects: neo.AnalogSignal, DataSignal) or as numpy 
+            arrays, or a 2D numpy array with one signal per column.
+    
+        When a collection of signals, all elements must have the same Python type
+        (i.e. mixing of neo.AnalogSignal and DataSignal is NOT allowed).
+    
+        Furthermore, the shapes and domains of the signals must be identical.
+    
+        These signals should contain events (i.e., synaptic events) aligned on
+        their rising phase (i.e. on the point of the fastest rise) or or their 
+        onset.
+    
+    Returns:
+    =======
+    A tuple (mean_data, flucts_var, scaled_means, flucts) were:
+        • `mean_data` (1D numpy array) is the averaged event waveform
+    
+        • `flucts_var` (1D numpy array) is the variance of differences between 
+            each signal in `data` and its corresponding peak-scaled mean
+    
+        • `scaled_means` (2D numpy array) contains the peak-scaled average
+            waveforms for each signal in `data`, as column vectors
+    
+        • `flucts` (2D numpy array) contains the difference between each signal
+            in `data` and its corresponding peak-scaled average waveforms in 
+            `scaled_means`, as column vectors
+    """
+    if isinstance(data, np.ndarray):
+        if data.ndim == 2:
+            if data.shape[1] <= 1:
+                raise ValueError(f"data must contain at least two signals; got {data.shape[1]} instead")
+            
+        else:
+            raise ValueError(f"data array must have two dimensions")
+            
+    elif isinstance(data, (tuple, list)):
+        if len(data) <= 1:
+            raise ValueError(f"data must contain at least two signals; got {len(data)} instead")
+        
+        if not all(isinstance(v, (neo.AnalogSignal, DataSignal, np.ndarray)) for v in data):
+            raise TypeError(f"The collection must contain only analog signal objects")
+        
+        types = set(type(v) for v in data)
+        if len(types) > 1:
+            raise TypeError(f"All signals in a collection must have the same type")
+        
+        if not all(v.shape == data[0].shape for v in data):
+            raise ValueError(f"All signals must have the same shape")
+        
+        if all(isinstance(v, neo.core.baseneo.BaseNeo) for v in data):
+            if not all(np.all(data[0].times == v.times) for v in data):
+                raise ValueError(f"All signals must have the same domain")
+            
+            data = np.concatenate([v.magnitude for v in data], axis=1)
+            
+        else:
+            if not all(dt.is_vector(v) for v in data):
+                raise ValueError(f"All elements in the data collection must be vectors")
+            data = np.concatenate(data, axis=1)
+            
+    else:
+        raise TypeError(f"Expecting a 2D array with column-wise signals or a collection (tuple, list) of neo signals or numpy vectors")
+            
+    
+    mean_data = np.nanmean(data, axis=1)
+    
+    scale_res = [crvf.scale_fit_wave(data[:,k], mean_data) for k in range(data.shape[1])]
+    scaled_means = np.concatenate([mean_data[:,np.newaxis] * float(s.x[0]) for s in scale_res], axis=1)
+    flucts = np.concatenate([(data[:,k]-scaled_means[:,k])[:, np.newaxis] for k in range(data.shape[1])], axis=1)
+    # print(f"{len(fluct_waves)} fluct_waves")
+    # all_fluct = np.concatenate(fluct_waves, axis=1)
+    flucts_var = np.var(flucts, axis=1)
+    
+    return mean_data, flucts_var, scaled_means, flucts
     
     
+# def nsfa(data, /, start:int=0, stop:typing.Optional[int]=None, i=0, N=1, b=0, **kwargs):
+def nsfa(xdata:np.ndarray, ydata:np.ndarray, /, i=0, N=1, b=0, **kwargs):
+    """Non-stationary fluctuation analysis.
+    
+    The function estimates the number of channels and their unitary currents 
+    likely to have contributed to the events. When Vm and Erev are given (see 
+    below) the function also outputs the calculate unitary slope conductance.
+    
+    Uses the average event waveform and the variance (at each data point) of the 
+    differences between each event and its peak-scaled waveform. These can be 
+    generated from a collection of events or a 2D numpy array using the function
+    prep_for_nsfa() defined in this module.
+    
+    Typically, nsfa is run on a subset of the waveform data, correspnding to the
+    decay phase of the events. This can be achieved by passing a subarray of the 
+    xdata and ydata.
+    
+    
+    
+    For details, theoretical background and implementations see:
+    Robinson H.P.C., Sahara Y., Kawai N. (1991) Biophys. J., 59:295-304
+    Traynelis, S.F., Silver, R. A., Cull-Candy S.G. (1993) Neuron, 11:279-289
+    Benke, T.A., et al, (1998) Nature 393:793-797
+    Benke T.A., et al, (2001) J. Physiol. 537.2:407-420 
+    
+    Parameters:
+    ===========
+    xdata: The averaged event waveform 
+    ydata: The variance of event fluctuations (differences between the average
+            event waveform and the peak-scaled average waveform)
+    
+        NOTE: xdata and ydata should be generated with prep_for_nsfa() function 
+        in this module
+    
+    i, N, b: numeric scalars, the initial value of the parameters for nsfa fit
+            (unitary current, number of channels, background variance)
+    
+    Var-keyword parameters (**kwargs):
+    ==================================
+    Vm: float scalar, the membrane voltage (in mV) where the events were measured;
+        optional, default is None.
+    
+        When given, the unitary conductance will be calculated as:
+    
+            γ = i/(Vm-Erev)         if Erev is also given
+    
+        or 
+    
+            γ = i/Vm                otherwise (assuming Erev == 0)
+    
+    Erev: float scalar, the reversal potential (in mV); optional default is None.
+        
+        When given, and Vm is also given, it is used to calculate the unitary 
+        channel conductance using the estimated unitary current (see above)
+    
+    The following are passed directly to curvefitting.fit_nsfa (and onwards to the 
+    scipy.optimise.least_squares() function, see the Scipy manual).
+    
+    The ones you are most likely to want to change are:
+    
+    • bounds: a tuple (lo, up) of scalars or vectors each with three elements
+    
+    Returns:
+    =======
+    A tuple with fitted curve and a collections.OrderedDict.
+    
+    The fitted curve is a realization of the parabola describing the variance
+    of the current as function of the mean current, generated using the fitted 
+    parameters values (see below).
+    
+    The OrderedDict contains the following key ↦ value mapping:
+    • Fit ↦ the result of nonlinear least squares fit of the parabolic function
+    
+        y = x * i - x²/N + b
+    
+        Where 
+        ∘ y = fitted variance of signal deviations from peak-scaled sample average
+        ∘ x = sample average
+        ∘ i = unitary (single-channel) current
+        ∘ N = number of channels
+        ∘ b = background variance
+    
+    • Coefficients ↦ a list of the fitted parameter values i, N and b, in THIS 
+        order
+    
+    • Rsq ↦ a scalar, the R² correlation coefficient between `ydata` and the
+        fitted curve, given `xdata`.
+    
+    • UnitaryCurrent ↦ a scalar python Quantity (units: pA)
+    
+    • UnitaryConductance ↦ a scalar python Quantity (units: pS) if Vm was given, or None, otherwise
+    
+    • N ↦ an int, the estimated number of receptors (channels)
+    
+    NOTE: `x` and `i` represent membrane current in pA
+    
+    If the holding membrane voltage (Vₘ) is known one can calculate the unitary
+    conductance γ of the channels using the estimated unitary current as:
+    
+        γ = i/(Vₘ-Eᵣₑᵥ)
+    
+    where Eᵣₑᵥ is the reversal potential.
+    
+    Using the Python quantities package allows a quick calculation of γ in pS:
+    
+    import quantities as pq
+    
+    Vₘ = -70 * pq.mV
+    
+    γ = (i * pq.pA/Vₘ).rescale(pq.pS)
+        
+    """
+    
+    Vm = kwargs.pop("Vm", None)
+    
+    Erev = kwargs.pop("Erev", None)
+    
+    
+    kwargs["x"] = xdata
+    
+    
+    nsfa_fit = crvf.fit_nsfa(ydata, [i, N, b], **kwargs)
+    
+    i, N, b = nsfa_fit[1]["Coefficients"]
+    
+    i *= pq.pA
+    
+    b *= pq.pA**2
+    
+    N = math.ceil(N)
+    
+    # print(f"Vm = {Vm}")
+    
+    if isinstance(Vm, numbers.Number):
+        Vm *= pq.mV
+        
+    elif isinstance(Vm, pq.Quantity):
+        uname = scq.name_from_unit(Vm)
+        if uname != "Potential":
+            raise TypeError("Vm expected to be a Potential; got {uname} instead")
+        Vm  = Vm.rescale(pq.mV)
+        
+    elif Vm is not None:
+        raise TypeError(f"Vm expected to be a scalar float or quantity")
+    
+    if isinstance(Erev, numbers.Number):
+        Erev *= pq.mV
+        
+    elif isinstance(Erev, pq.Quantity):
+        uname = scq.name_from_unit(Erev)
+        if uname != "Potential":
+            raise TypeError("Erev expected to be a Potential; got {uname} instead")
+        Erev  = Erev.rescale(pq.mV)
+        
+    elif Erev is not None:
+        raise TypeError(f"Erev expected to be a scalar float or quantity")
+    
+    else:
+        Erev = 0*pq.mV # assume 0 reversal potential
+    
+    if Vm is not None:
+        gamma = (i/(Vm-Erev)).rescale(pq.pS)
+        
+    else:
+        gamma = np.nan*pq.pS
+        
+    nsfa_fit[1]["UnitaryCurrent"] = i
+    nsfa_fit[1]["UnitaryConductance"] = gamma
+    nsfa_fit[1]["N"] = N
+    nsfa_fit[1]["b"] = b
+    
+    
+    return nsfa_fit
+
+
+def get_nsfa_var(x, params):
+    """
+    Calculate nsfa variance from membrane currents in `x` using nsfa parabola.
+    
+    Useful to plot a fitted nsfa curve (current variance function of current
+    value. 
+    
+    e.g.
+    
+    x = np.linspace(-20, 0, 100)
+    
+    i = -2
+    N = 11
+    b =  6
+    
+    y = get_nsfa_var(x, [i, N, b])
+    
+    plt.plot(x,y)
+    
+    Assuming `res` is a nsfa fit result returned by the nsfa() function:
+    
+    y1 = get_nsfa_var(x, res[1]["Coefficients"])
+    
+    assert np.all(y1==y) # → True
+    
+    Parameters:
+    ==========
+    x: 1D numpy array with membrane currents
+    params: array-like with three elements (i, N, b) - see documentation for 
+            the nsfa function in this module
+    """
+    
+    from core import models
+    
+    return models.nsfa(x, params)
+
     
     
     

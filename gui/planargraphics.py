@@ -147,7 +147,6 @@ from copy import copy
 
 #### BEGIN 3rd party modules
 #import vigra.pyqt.quickdialog as quickdialog
-#import pyqtgraph as pg
 import numpy as np
 from traitlets import Bunch
 from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
@@ -801,8 +800,7 @@ class PlanarGraphics():
         
     # ### END static methods
     
-    def __init_from_descriptors__(self, *args, frameindex:typing.Optional[typing.Iterable]=[],
-                                  currentframe:int=0) -> None:
+    def __init_from_descriptors__(self, *args, frameindex:typing.Optional[typing.Iterable]=[], currentframe:int=0) -> None:
         """This can (and should) be overloaded in subclasses
         """
         
@@ -819,8 +817,7 @@ class PlanarGraphics():
         
         self.checkStates()
         
-    def __init_from_state__(self, state:dict, frameindex:typing.Optional[typing.Iterable]=[], 
-                            currentframe:int=0) -> None:
+    def __init_from_state__(self, state:dict, frameindex:typing.Optional[typing.Iterable]=[], currentframe:int=0):
         # this also checks for descriptor consistency including z_frame
         self._states_ = [self.__class__.copyConvertState(state)]
         
@@ -831,8 +828,7 @@ class PlanarGraphics():
         
         self.checkStates()
         
-    def __init_from_states__(self, *states, frameindex:typing.Optional[typing.Iterable]=[], 
-                            currentframe:int=0) -> None:
+    def __init_from_states__(self, *states, frameindex:typing.Optional[typing.Iterable]=[], currentframe:int=0):
         if all([isinstance(s, dict) for s in states]):
             # CAUTION these states may bring their own z_frame values
              # this also checks for descriptor consistency including z_frame
@@ -851,10 +847,7 @@ class PlanarGraphics():
         else:
             raise TypeError("Expecting a sequence of state dict-like objects; got %s instead" % states)
         
-    def __init__(self, *args, graphicstype=None, closed:bool=False, 
-                 name:typing.Optional[str]=None, 
-                 frameindex:typing.Optional[typing.Iterable]=[], 
-                 currentframe:int=0, linked_objects:dict=dict()) -> None:
+    def __init__(self, *args, graphicstype=None, closed:bool=False, name:typing.Optional[str]=None, frameindex:typing.Optional[typing.Iterable]=[], currentframe:int=0, linked_objects:dict=dict()):
         """Constructor.
         
         Var-positional parameters:
@@ -1237,9 +1230,7 @@ class PlanarGraphics():
     def __repr__(self):
         return " ".join([self.__class__.__name__, ", type:", getattr(self._planar_graphics_type_, "name", "None"), ", name:", self._ID_])
 
-    def __call__(self, path:typing.Optional[QtGui.QPainterPath]=None, 
-                frame:typing.Optional[int]=None, closed:typing.Optional[bool]=None,
-                connected:typing.Optional[bool]=False) -> QtGui.QPainterPath:
+    def __call__(self, path:typing.Optional[QtGui.QPainterPath]=None, frame:typing.Optional[int]=None, closed:typing.Optional[bool]=None, connected:typing.Optional[bool]=False):
         """Returns a QtGui.QPainterPath object. 
         
         QPainterPath composition methods used here depend on the subclass of

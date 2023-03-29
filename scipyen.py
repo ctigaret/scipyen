@@ -6,7 +6,7 @@
 
 import sys, os
 
-import atexit, re, inspect, gc, io, traceback
+import atexit, re, inspect, gc, io, traceback, platform
 import faulthandler
 #import cProfile
 
@@ -18,6 +18,9 @@ if sys.platform == "win32" and sys.version_info.minor >= 9:
     path_to_vigraimpex = win32api.GetModuleFileName(win32api.LoadLibrary(vigraimpex_mod))
     os.add_dll_directory(os.path.dirname(path_to_vigraimpex))
     lib_environ = os.environ.get("LIB", "")
+    
+    os.environ["QT_API"] = "pyqt5"
+    
     if len(lib_environ.strip()):
         libdirs = lib_environ.split(os.pathsep)
         for d in libdirs:
@@ -38,6 +41,7 @@ if sys.platform == "win32" and sys.version_info.minor >= 9:
 #### BEGIN 3rd party modules
 
 from PyQt5 import (QtCore, QtWidgets, QtGui, )
+import sip
 #### END 3rd party modules
 
 #### BEGIN Scipyen modules
@@ -91,7 +95,7 @@ def main():
     faulthandler.enable()
 
     # NOTE: 2021-08-17 10:02:20
-    # thsi did not improve / prevent crashes when exiting NEURON - leave here so
+    # this does not prevent crashes when exiting NEURON - leave here so
     # that we know we tried and didn't work
     #if sys.platform == "linux":
         #import subprocess
@@ -100,14 +104,19 @@ def main():
     #sip.setdestroyonexit(True)
 
     try:
-        #sip.setdestroyonexit(False) # better leave to default
+        sip.setdestroyonexit(True) # better leave to default
         
         # NOTE: 2021-08-17 10:07:11 is this needed?
         QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
         
+        
         # BEGIN 
         # 1. create the pyqt5 app
         app = QtWidgets.QApplication(sys.argv)
+        
+        # NOTE: 2023-01-08 00:48:47
+        # avoid global menus - must be called AFTER we have an instance of app!
+        # QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_DontUseNativeMenuBar)
         
         if has_breeze_resources_for_win32:
             file = QtCore.QFile(":/dark/stylesheet.qss")

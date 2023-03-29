@@ -16,7 +16,7 @@ from core.quantities import (units_convertible, name_from_unit)
 from core.strutils import is_path #, is_pathname_valid
 
 
-def _new_DataSignal(cls, signal, units=None, domain_units=None, dtype=None, copy=True,t_start=0*pq.dimensionless, sampling_period=None,sampling_rate=None, name=None, file_origin=None,description=None, array_annotations=None, annotations=None,segment=None):
+def _new_DataSignal(cls, signal, units=None, domain_units=None, dtype=None, domain_dtype=None, copy=True,t_start=0*pq.dimensionless, sampling_period=None,sampling_rate=None, name=None, domain_name=None, file_origin=None,description=None, array_annotations=None, annotations=None,segment=None):
     if not isinstance(array_annotations, ArrayDict):
         array_annotations = ArrayDict(signal.shape[-1])
         
@@ -29,9 +29,9 @@ def _new_DataSignal(cls, signal, units=None, domain_units=None, dtype=None, copy
             except:
                 annotations = dict() # just so that we aren't left hanging out
                 
-    obj = cls(signal=signal, units=units, time_units=domain_units, dtype=dtype, copy=copy,
+    obj = cls(signal=signal, units=units, domain_units=domain_units, dtype=dtype, copy=copy,
               t_start=t_start, sampling_period=sampling_period, sampling_rate=sampling_rate,
-              name=name, file_origin=file_origin, description=description,
+              name=name, domain_name=domain_name,file_origin=file_origin, description=description,
               array_annotations=array_annotations,
               **annotations)
     
@@ -40,7 +40,7 @@ def _new_DataSignal(cls, signal, units=None, domain_units=None, dtype=None, copy
     
     return obj
 
-def _new_IrregularlySampledDataSignal(cls, domain, signal, units=None, domain_units=None, dtype=None, domain_dtype=None, copy=True, name=None,file_origin=None,description=None,annotations=None,array_annotations=None,segment=None):
+def _new_IrregularlySampledDataSignal(cls, domain, signal, units=None, domain_units=None, dtype=None, domain_dtype=None, copy=True, name=None,domain_name=None,file_origin=None,description=None,array_annotations=None,annotations=None,segment=None):
     if not isinstance(array_annotations, ArrayDict):
         array_annotations = ArrayDict(signal.shape[-1])
         
@@ -54,7 +54,7 @@ def _new_IrregularlySampledDataSignal(cls, domain, signal, units=None, domain_un
                 annotations = dict() # just so that we aren't left hanging out
                 
     obj = cls(domain=domain,signal=signal,units=units,domain_units=domain_units,
-              dtype=dtype,copy=copy,name=name,file_origin=file_origin,
+              dtype=dtype,copy=copy,name=name,domain_name=domain_name,file_origin=file_origin,
               description=description, array_annotations=array_annotations,**annotations)
     
     obj.segment=segment
@@ -98,7 +98,7 @@ class DataSignal(BaseSignal):
     
     _parent_objects = ('Segment',)
     _parent_attrs = ('segment',)
-    _quantity_attr = 'signal'
+    _quantity_attr = 'signal' # ?!? FIXME/TODO 
 
     _necessary_attrs = (('signal', pq.Quantity, 2),
                         ('sampling_period', pq.Quantity, 0),
@@ -106,42 +106,52 @@ class DataSignal(BaseSignal):
     
     _recommended_attrs = neo.baseneo.BaseNeo._recommended_attrs
 
-    def __new__(cls, signal, units=None,  time_units=None,dtype=np.dtype("float64"), copy=True, t_start=0*pq.dimensionless, sampling_period=None, sampling_rate=None, name=None, file_origin=None, description=None, array_annotations=None, **annotations):
-        
-        # NOTE: try & sort out the mess from pickles saved with prev APIs
-        # WARNING: 2021-12-09 21:45:08 This is NOT guaranteed to succeed
+    def __new__(cls, signal, units=None, domain_units=None, time_units = None, dtype=np.dtype("float64"), copy=True, t_start=0*pq.dimensionless, sampling_period=None, sampling_rate=None, name=None, domain_name=None, file_origin=None, description=None, array_annotations=None, **annotations):
+        # NOTE: 2021-12-09 21:45:08 try & sort out the mess from pickles saved with prev APIs
+        # WARNING: This is NOT guaranteed to succeed
         # if trying to load an old pickle fails, you're better off going to the
-        # original data !
+        # original data and re-analyse!
+        #
+        # What we need to set up here are the following:
+        # • the data itself (as a Quantity) - needs `units`, `dtype`, `copy`
+        # • attribute `segment`
+        #
+        # Hence we pick only the relevant named params here (all others are 
+        # passed by Python to __init__ anyway)
         
-        #strings  = {"name":None,"file_origin":None, "description": None}
+        quants = {"units": None}
         
-        quants = {"units": None, "time_units": None}
+        dtypes = {"dtype":None}
         
-        #domainargs = {"t_start": None, "sampling_period":None, "sampling_rate":None}
+        bools = {"copy": True}
         
-        #annots    = {"array_annotations":None, "annotations": None}
+        call_arg_names = ("units", "dtype")
         
-        dtypes   = {"dtype":None}
+        segment = None
         
-        bools = {"copy": None}
+        # take attributes from signal, if possible, then overwrite them with
+        # passed arguments if not None
+        if isinstance(signal, (neo.AnalogSignal, DataSignal)):
+            call_args = dict((name, getattr(signal, name, None)) for name in call_arg_names)
+            call_args["copy"] = copy
+            segment = signal.segment
+        else:    
+            call_args = dict()
         
-        
-        call_args = {"units": units,
-                    "time_units": time_units,
-                    "dtype": dtype,
-                    "copy": copy,
-                    "t_start": t_start,
-                    "sampling_period": sampling_period,
-                    "sampling_rate": sampling_rate,
-                    "name": name,
-                    "file_origin": file_origin,
-                    "description": description,
-                    "array_annotations": array_annotations,
-                    "annotations": annotations,
-            }
-        
+        # NOTE: 2022-11-24 11:57:08
+        # see NOTE: 2022-11-24 11:59:04 and NOTE: 2022-11-24 11:22:34 for the logic
+        for v in call_arg_names + ("copy",):
+            val = eval(v)
+            if v in call_args:
+                if call_args[v] is None and val is not None:
+                    call_args[v] = val
+            else:
+                call_args[v] = val
+            
+        # print(f"call_args {call_args}")
+        # distribute call args 
         for k,v in call_args.items():
-            if isinstance(v, bool): # there is onyl one bool arg expected
+            if isinstance(v, bool): # there is only one bool arg expected
                 bools["copy"] = v
                 
             elif isinstance(v, np.dtype): # there is only one dtype arg expected
@@ -149,72 +159,113 @@ class DataSignal(BaseSignal):
 
             elif isinstance(v, pq.Quantity):
                 if v.size == 1: # a scalar ; note signal is treated from the outset
-                    # precedence: units, time_units, t_start, sampling_period, sampling_rate
-                    if quants["units"] is None:
-                        if isinstance(signal, pq.Quantity):
-                            quants["units"] = signal.units
+                    quants["units"] = v
+                    
+        if quants["units"] is None:
+            quants["units"] = pq.dimensionless
+            
+        if isinstance(signal, pq.Quantity):
+            if quants["units"].units != signal.units:
+                signal = signal.rescale(quants["units"].units)
                             
-                        else:
-                            quants["units"] = v.units
-                            
-        obj = pq.Quantity(signal, units=quants["units"], dtype=dtypes["dtype"], copy=bools["copy"]).view(cls)
+        obj = pq.Quantity(signal, 
+                          units=quants["units"].units, 
+                          dtype=dtypes["dtype"], 
+                          copy=bools["copy"]).view(cls)
         
         if obj.ndim == 1:
             obj.shape = (-1,1)
-        obj.segment=None
-        obj.channel_index=None
+            
+        obj.segment = segment
+        
+        # NOTE: 2022-11-24 12:13:04
+        # obj.channel_index=None 
 
         return obj
     
-    def __init__(self, signal, units=None, time_units = None, dtype=None, copy=True, t_start=0*pq.dimensionless, sampling_rate=None, sampling_period=None,name=None, file_origin=None, description=None, array_annotations=None, **annotations):
+    def __init__(self, signal, units=None, domain_units = None, time_units = None, dtype=None, copy=True, t_start=0*pq.dimensionless, sampling_rate=None, sampling_period=None, name=None, domain_name = None, file_origin=None, description=None, array_annotations=None, **annotations):
         
         """DataSignal constructor.
         """
+        # ATTENTION: __init__ is called AFTER __new__ so `self` is already 
+        # partly initialized here !!!
+        # In particular, it SHOULD already contain:
+        # • the data itself (as a Quantity)
+        # • attribute `segment`
+        # 
+        # we need to deal with thing again because __class__(...) jumps right
+        # to init (see e.g., rescale)
         
-        strings  = {"name":None,"file_origin":None, "description": None}
+        strings  = {"name":None, "domain_name":None, "file_origin":None, "description": None}
         
-        quants = {"units": None, "time_units": None}
+        quants = {"units": None, "domain_units": None, "time_units": None}
         
         domainargs = {"t_start": None, "sampling_period":None, "sampling_rate":None}
         
         annots    = {"array_annotations":None, "annotations": None}
         
-        dtypes   = {"dtype":None}
+        dtypes   = {"dtype":None} # dealt with in __new__
         
-        bools = {"copy": None}
+        bools = {"copy": None} # dealt with in __new__
+        
+        call_arg_names = ("units", "domain_units", "time_units", "dtype", "t_start",
+                          "sampling_period", "sampling_rate", "name", 
+                          "file_origin", "description", "array_annotations",
+                          "annotations")
         
         
-        call_args = {"units": units,
-                    "time_units": time_units,
-                    "dtype": dtype,
-                    "copy": copy,
-                    "t_start": t_start,
-                    "sampling_period": sampling_period,
-                    "sampling_rate": sampling_rate,
-                    "name": name,
-                    "file_origin": file_origin,
-                    "description": description,
-                    "array_annotations": array_annotations,
-                    "annotations": annotations,
-            }
+        # take attributes from signal, if possible, then overwrite them with
+        # passed arguments if not None
+        if isinstance(signal, (neo.AnalogSignal, DataSignal)):
+            call_args = dict((name, getattr(signal, name, None)) for name in call_arg_names)
+            call_args["copy"] = True 
+            call_args["domain_units"] = getattr(signal, "t_start", 0.*pq.s).units
+        else:    
+            call_args = dict()
         
+        # NOTE: 2022-11-24 11:59:04
+        # check if a value is assigned to a call arg (i.e. is not None)
+        # • call arg is in the dict AND is mapped to None then:
+        #   ∘ if the corresponding named param supplies a value, use that value
+        #       — NOTE that if the call arg has a value taken from corresponding
+        #           attribute of signal, this will be overwritten ONLY if
+        #           the corresponding named param is not None
+        # • otherwise, use whatever value the corresponding named param has
+        #
+        # NOTE: 2022-11-24 11:22:34 IN OTHER WORDS:
+        # check if param already in call_args, probably taken from signal
+        # • if not there, then assign the value passed as named parameter for the call
+        # • if there, only replace if the value from signal is not None AND the 
+        #   named param supplied to the call is not None
+        #   → this is so that we don't overwrite the value taken from signal
+        for v in call_arg_names:
+            val = eval(v) # evals locally, so available only if given as named param 
+            # print(f"\t{v} = {val}")
+            if v in call_args: 
+                if call_args[v] is None and val is not None:
+                    # only replace with named param if value in call_args is None
+                    # and val is not None; else, leave it as None anyway
+                    call_args[v] = val
+            else: # param not there hence add it
+                call_args[v] = val
+            
+        # NOTE: 2022-11-24 12:10:17
+        # distribute call args in categories
         for k,v in call_args.items():
-            #print(f"before: {k}, {v}, {type(v).__name__}")
-            if isinstance(v, bool): # there is onyl one bool arg expected
+            if isinstance(v, bool): # there is only one bool arg expected
                 bools["copy"] = v
                 
             elif isinstance(v, np.dtype): # there is only one dtype arg expected
-                dtypes["dtype"] = v
+                if k in ("dtype", "domain_dtype"):
+                    dtypes[k] = v
 
             elif isinstance(v, str):
-                # there are 3 str args expected: name, file_origin and description; brrrr...
-                if is_path(v):
+                if k == "file_origin" and is_path(v):
                     # likely a file path name
                     strings["file_origin"] = v
-                elif strings["name"] is None: # give precedence to name
-                    strings["name"] = v
-                else:
-                    strings["description"] = v
+                    
+                elif k in ("name", "domain_name", "description"):
+                    strings[k] = v
                     
             elif isinstance(v, dict):
                 if isinstance(v, ArrayDict): # only array_annotations are ArrayDict
@@ -235,40 +286,29 @@ class DataSignal(BaseSignal):
                         
             elif isinstance(v, pq.Quantity):
                 if v.size == 1: # a scalar ; note signal is treated from the outset
-                    # precedence: units, time_units, t_start, sampling_period, sampling_rate
-                    if quants["time_units"] is None:
-                        quants["time_units"] = v.units
+                    # precedence: units, domain_units, t_start, sampling_period, sampling_rate
+                    if k in ("units", "domain_units", "time_units"):
+                        quants[k] = v.units # not needed -- supplied at __new__
+                    elif k in ("t_start", "sampling_period", "sampling_rate"):
+                        domainargs[k] = v
                         
-                    elif domainargs["t_start"] is None:
-                        domainargs["t_start"] = v
-                        
-                    elif domainargs["sampling_period"] is None:
-                        domainargs["sampling_period"] = v
-                        
-                    elif domainargs["sampling_rate"] is None:
-                        domainargs["sampling_rate"] = v
-                        
-        #print("strings", strings)
-        #print("quants", quants)
-        #print("domainargs", domainargs)
-        #print("annots", annots)
-        #print("call_args", call_args)
-        
-        # let's checkout domainargs and units
-        # get sampling period & rate out of the way first
-        #s_rate = None
-        #s_per = None
-        #t_units = None
-        
+        # harmonize time_units with domain_units
+        if quants["domain_units"] is None:
+            quants["domain_units"] = quants["time_units"]
+        # print(f"{self.__class__.__name__}.__init__ call_args {call_args}\n")
+        # print(f"{self.__class__.__name__}.__init__ strings {strings}\n")
+        # print(f"{self.__class__.__name__}.__init__ quants {quants}\n")
+        # print(f"{self.__class__.__name__}.__init__ domainargs {domainargs}\n")
+        # print(f"{self.__class__.__name__}.__init__ annots {annots}\n")
         
         if isinstance(domainargs["sampling_period"], pq.Quantity):
             #print("sampling_period", domainargs["sampling_period"])
-            if units_convertible(1/domainargs["sampling_period"], quants["time_units"]):
+            if units_convertible(1/domainargs["sampling_period"], quants["domain_units"]):
                 domainargs["sampling_rate"] = domainargs["sampling_period"]
                 domainargs["sampling_period"] = 1/domainargs["sampling_period"]
                 
         if isinstance(domainargs["sampling_rate"], pq.Quantity):
-            if units_convertible(domainargs["sampling_rate"], quants["time_units"]):
+            if units_convertible(domainargs["sampling_rate"], quants["domain_units"]):
                 domainargs["sampling_period"] = 1/domainargs["sampling_rate"]
                 
         if all(isinstance(d, pq.Quantity) for d in (domainargs["t_start"], domainargs["sampling_period"])) :
@@ -276,27 +316,27 @@ class DataSignal(BaseSignal):
                 sr = domainargs["sampling_period"]
                 domainargs["sampling_period"] = domainargs["t_start"]
                 domainargs["sampling_rate"] = sr
-                domainargs["t_start"] = 0 * quants["time_units"]
+                domainargs["t_start"] = 0 * quants["domain_units"]
             
         elif all(isinstance(d, pq.Quantity) for d in (domainargs["t_start"], domainargs["sampling_rate"])) :
             if domainargs["t_start"] == 1/domainargs["sampling_rate"]:
                 domainargs["sampling_period"] = domainargs["t_start"]
-                domainargs["t_start"] = 0 * quants["time_units"]
+                domainargs["t_start"] = 0 * quants["domain_units"]
 
-        DataObject.__init__(self, name=strings["name"], file_origin=strings["file_origin"], 
-                         description=strings["description"], 
-                         array_annotations=annots["array_annotations"], 
-                         **annots["annotations"])
+        DataObject.__init__(self, name=strings["name"], 
+                            file_origin=strings["file_origin"], 
+                            description=strings["description"], 
+                            array_annotations=annots["array_annotations"], 
+                            **annots["annotations"])
         
+        self._domain_name_ = strings["domain_name"]
         self._origin = domainargs["t_start"]
         self._sampling_period = domainargs["sampling_period"]
+
+        if not isinstance(self._domain_name_, str) or len(self._domain_name_.strip()) == 0:
+            self._domain_name_ = name_from_unit(self._origin)
         
-        self.__domain_name__ = name_from_unit(self.domain)
-        
-        if isinstance(name, str):
-            self._name_ = name
-            
-        else:
+        if not isinstance(self._name_, str) or len(self._name_.strip()) == 0:
             self._name_ = name_from_unit(self.units)
     
     def __array_finalize__(self, obj):
@@ -310,10 +350,13 @@ class DataSignal(BaseSignal):
         self.name               = getattr(obj, "name",          None)
         self.file_origin        = getattr(obj, "file_origin",   None)
         self.description        = getattr(obj, "description",   None)
+        
+        # NOTE: this attribute was removed from neo API
         #self.channel_index      = getattr(obj, "channel_index", None)
+        
         self.segment            = getattr(obj, "segment",       None)
         self.array_annotations  = getattr(obj, "array_annotations", None)
-        self.__domain_name__    = name_from_unit(self._origin)
+        self._domain_name_    = name_from_unit(self._origin)
     
     def __reduce__(self):
         return _new_DataSignal, (self.__class__, 
@@ -321,16 +364,17 @@ class DataSignal(BaseSignal):
                                  self.units, 
                                  self.domain.units,
                                  self.dtype, 
+                                 self.domain.dtype,
                                  True,
                                  self.origin, 
                                  self.sampling_period, 
                                  self.sampling_rate,
                                  self.name, 
+                                 self.domain_name,
                                  self.file_origin, 
                                  self.description,
-                                 self.annotations,
                                  self.array_annotations,
-                                 #self.channel_index,
+                                 self.annotations,
                                  self.segment)
     
     def __deepcopy__(self, memo):
@@ -343,6 +387,7 @@ class DataSignal(BaseSignal):
                      origin=self._origin, 
                      sampling_period=self._sampling_period,
                      name=self.name,
+                     domain_name=self.domain_name,
                      file_origin=self.file_origin, 
                      description=self.description)
         
@@ -606,16 +651,16 @@ class DataSignal(BaseSignal):
     def domain_name(self):
         """A brief description of the domain name
         """
-        if self.__domain_name__ is None:
-            self.__domain_name__ = name_from_unit(self.domain)
+        if self._domain_name_ is None:
+            self._domain_name_ = name_from_unit(self.domain)
             
-        return self.__domain_name__
+        return self._domain_name_
     
     
     @domain_name.setter
     def domain_name(self, value):
         if isinstance(value, str) and len(value.strip()):
-            self.__domain_name__ = value
+            self._domain_name_ = value
             
     @property
     def extent(self):
@@ -665,6 +710,16 @@ class DataSignal(BaseSignal):
         new_signal = f(other, *args)
         new_signal._copy_data_complement(self)
         return new_signal
+    
+    def time_index(self, t):
+        """Copied from neo.AnalogSignal"""
+        i = (t - self.t_start) * self.sampling_rate
+        i  = np/rint(i.simplified.magitude).astype(np.int64)
+        
+        return i
+    
+    def domain_index(self, x):
+        return self.time_index(x)
 
     def as_array(self, units=None):
         """
@@ -689,9 +744,11 @@ class DataSignal(BaseSignal):
         """
         to_dims = pq.quantity.validate_dimensionality(units)
         
+        domain_units = self.times.units
+        
         if self.dimensionality == to_dims:
             to_u = self.units
-            signal = np.array(self)
+            signal_data = np.array(self)
             
         else:
             to_u = pq.Quantity(1.0, to_dims)
@@ -704,14 +761,20 @@ class DataSignal(BaseSignal):
                 raise ValueError('Unable to convert between units of "%s" \
                                  and "%s"' % (from_u._dimensionality,
                                               to_u._dimensionality))
-            signal = cf * self.magnitude
+            signal_data = cf * self.magnitude
             
-        obj = self.__class__(signal=signal, units=to_u,
+        obj = self.__class__(signal=signal_data, units=to_u,
+                             domain_units = self.domain_units,
+                             name = self.name,
+                             domain_name = self.domain_name,
+                             array_annotations = self.array_annotations,
+                             description = self.description,
+                             file_origin = self.file_origin,
                              sampling_rate=self.sampling_rate)
         
-        obj._copy_data_complement(self)
+        # obj._copy_data_complement(self)
         #obj.channel_index = self.channel_index #
-        #obj.segment = self.segment             # FIXME TODO parent container functionality
+        obj.segment = self.segment             # FIXME TODO parent container functionality
         obj.annotations.update(self.annotations)
 
         return obj
@@ -1134,57 +1197,211 @@ class IrregularlySampledDataSignal(BaseSignal):
     """
     _parent_objects = ('Segment',)
     _parent_attrs = ('segment',)
-    _quantity_attr = 'signal'
-    _necessary_attrs = (('domain', pq.Quantity, 1), ('signal', pq.Quantity, 2))
+    _quantity_attr = 'signal' # ?!? FIXME/TODO 
+    _necessary_attrs = (('domain', pq.Quantity, 1), 
+                        ('signal', pq.Quantity, 2))
 
     _recommended_attrs = neo.baseneo.BaseNeo._recommended_attrs
 
-    def __new__(cls, domain, signal, units=None, domain_units=None, time_units=None,
-                dtype=np.dtype("float64"), domain_dtype = np.dtype("float64"),
-                copy=True, name=None, file_origin=None, 
-                description=None, array_annotations=None, **annotations):
+    def __new__(cls, domain, signal, units=None, domain_units=None, time_units=None, dtype=np.dtype("float64"), domain_dtype = np.dtype("float64"), domain_name = None, copy=True, name=None, file_origin=None, description=None, array_annotations=None, **annotations):
+        # NOTE: 2022-11-24 15:49:27
+        # see NOTE: 2021-12-09 21:45:08
+        #
+        # What we need to set up here are the following:
+        # • the data itself (as a Quantity) - here, needs `units`, `dtype`, `copy`
+        # • attribute `segment`
+        # • attribute `domain` as a Quantity - here, needs domain_units, domain_dtype
+        quants = {"units": None, "domain_units": None}
         
-        if units is None:
-            if not hasattr(signal, "units"):
-                units = pq.dimensionless
+        dtypes = {"dtype":None, "domain_dtype": None}
+        
+        bools = {"copy": True}
+        
+        call_arg_names = ("units", "dtype", "domain_units", "time_units", "domain_dtype")
+        
+        segment = None
+        
+        call_args = dict()
+        
+        if isinstance(signal, (neo.AnalogSignal, DataSignal)):
+            call_args = dict((name, getattr(signal, name, None)) for name in call_arg_names)
+            call_args["copy"] = copy
+            segment = signal.segment
+            
+        if isinstance(domain, (pq.Quantity)):
+            call_args["domain"] = domain
+        
+        # NOTE: 2022-11-24 11:57:08
+        # see NOTE: 2022-11-24 11:59:04 and NOTE: 2022-11-24 11:22:34 for the logic
+        for v in call_arg_names + ("copy",):
+            val = eval(v)
+            if v in call_args:
+                if call_args[v] is None and val is not None:
+                    call_args[v] = val
+            else:
+                call_args[v] = val
+            
+        for k,v in call_args.items():
+            if isinstance(v, bool): # there is only one bool arg expected
+                bools["copy"] = v
                 
-        elif isinstance(signal, pq.Quantity):
-            if units != signal.units:
-                signal = signal.rescale(units)
+            elif isinstance(v, np.dtype): # there is only one dtype arg expected
+                if k in ("dtype", "domain_dtype"):
+                    dtypes[k] = v
+
+            elif isinstance(v, pq.Quantity):
+                if v.size == 1: # a scalar ; note signal is treated from the outset
+                    if k in ("units", "domain_units", "time_units"):
+                        quants[k] = v
+                    
+        if quants["units"] is None:
+            quants["units"] = pq.dimensionless
+            
+        if quants["domain_units"] is None:
+            if quants["time_units"] is None:
+                quants["domain_units"] = pq.dimensionless
+            else:
+                quants["domain_units"] = quants["time_units"]
+            
+        if isinstance(signal, pq.Quantity):
+            if signal.units != quants["units"]:
+                signal = signal.rescale(quants["units"])
                 
-        obj = pq.Quantity(signal, units=units, dtype=dtype, copy=copy).view(cls)
+        if isinstance(domain, pq.Quantity):
+            if domain.units != quants["domain_units"]:
+                domain = domain.rescale(quants["domain_units"])
+                            
+#         if units is None:
+#             if not hasattr(signal, "units"):
+#                 units = pq.dimensionless
+#                 
+#         elif isinstance(signal, pq.Quantity):
+#             if units != signal.units:
+#                 signal = signal.rescale(units)
+                
+        obj = pq.Quantity(signal, 
+                          units=quants["units"], 
+                          dtype=dtypes["dtype"], 
+                          copy=bools["copy"]).view(cls)
 
         if obj.ndim == 1:
             obj.shape = (-1,1)
 
-        if domain_units is None:
-            if isinstance(time_units, pq.Quantity):
-                domain_units = time_units
-
-            elif hasattr(domain, "units"):
-                domain_units = domain.units
-                
-            else:
-                raise TypeError("Domain units must be specified")
-            
-        elif isinstance(domain, pq.Quantity):
-            if domain_units != domain.units:
-                domain = domain.rescale(domain_units)
-                
-        obj._domain = pq.Quantity(domain, units = domain_units,
-                                  dtype=float, copy=copy)
+        obj._domain = pq.Quantity(domain, 
+                                  units = quants["domain_units"],
+                                  dtype = dtypes["domain_dtype"], 
+                                  copy=bools["copy"])
                 
         obj.segment=None
 
         return obj
                 
-    def __init__(self, domain, signal, units=None, domain_units=None, time_units=None, dtype=None, domain_dtype=None, copy=True, name=None, file_origin=None, description=None,array_annotations=None, **annotations):
-        DataObject.__init__(self, name=name, file_origin=file_origin,
-                            description=description, 
-                            array_annotations=array_annotations,
-                            **annotations)
+    def __init__(self, domain, signal, units=None, domain_units=None, time_units=None, dtype=None, domain_dtype=None, domain_name=None, copy=True, name=None, file_origin=None, description=None,array_annotations=None, **annotations):
+        """IrregularlySampledDataSignal constructor
+        Similar to the neo.IrregularlySampledSignal but not restricted to the 
+        time domain.
+    
+        NOTE: the first positional parameter (`domain`) corresponds to the first
+        positional parameter `time` in neo.IrregularlySampledSignal
+    
+        """
+        # ATTENTION: __init__ is called AFTER __new__ so `self` is already 
+        # partly initialized here !!!
+        # In particular, it SHOULD already contain:
+        # • the data itself (as a Quantity)
+        # • attribute `_domain` (as a Quantity)
+        # • attribute `segment`
+        # • attribute `channel_index`
 
-        self.__domain_name__ = name_from_unit(self._domain)
+        strings  = {"name":None,"file_origin":None, "description": None,"domain_name":None}
+        
+        quants = {"units": None, "domain_units": None}
+        
+        annots    = {"array_annotations":None, "annotations": None}
+        
+        dtypes   = {"dtype":None, "domain_dtype": None}
+        
+        bools = {"copy": None}
+        
+        call_arg_names = ("units", "domain_units", "dtype", "domain_dtype",
+                          "name", "domain_name",
+                          "file_origin", "description", "array_annotations",
+                          "annotations")
+        
+        call_args = dict()
+        
+        if isinstance(signal, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
+            call_args = dict((name, getattr(signal, name, None)) for name in call_arg_names)
+            call_args["copy"] = True
+            call_args["domain_units"] = getattr(signal, "times", 0.*pq.s).units
+        elif isinstance(signal, (tuple, list)):
+            signal = np.array(signal)
+            
+        elif isinstance(signal, np.ndarray):
+            if isinstance(signal, pq.Quantity):
+                call_args["units"] = signal.units
+                
+        else:    
+            raise TypeError(f"Unexpected type ({type(signal).__name__}) for signal's data")
+        
+        # print(f"signal.shape")
+        siglen = signal.shape[0]
+        channels = 1 if signal.ndim == 1 else signal.shape[1]
+        
+        for v in call_arg_names:
+            val = eval(v) # evals locally, so available only if given as named param 
+            if v in call_args: 
+                if call_args[v] is None and val is not None:
+                    call_args[v] = val
+            else: # param not there hence add it
+                call_args[v] = val
+            
+        for k,v in call_args.items():
+            if isinstance(v, bool): # there is only one bool arg expected
+                bools["copy"] = v
+                
+            elif isinstance(v, np.dtype): # 
+                if k == "dtype":
+                    dtypes[k] = v
+
+            elif isinstance(v, str):
+                # there are 4 str args expected: name, file_origin and description;
+                if k == "file_origin" and is_path(v):
+                    # likely a file path name
+                    strings["file_origin"] = v
+                elif k in ("name", "domain_name", "description"):
+                    strings[k] = v
+                    
+            elif isinstance(v, dict):
+                if isinstance(v, ArrayDict): # only array_annotations are ArrayDict
+                    annots["array_annotations"] = v
+                    
+                elif isinstance(v, dict): # can be array_annotations or anotations; brrr...
+                    # if len(v) == signal.shape[1]: # likely array annotations, too
+                    if len(v) == channels: # likely array annotations, too
+                        if annots["array_annotations"] is None:
+                            arr_ann = ArrayDict(signal.shape[1])
+                            for ka,va in v.items():
+                                arr_ann[ka] = va
+                            annots["array_annotations"] = arr_ann
+                        else:
+                            annots["annotations"] = v
+                            
+                    else:
+                        annots["annotations"] = v
+                        
+            elif isinstance(v, pq.Quantity):
+                if v.size == 1: # a scalar ; note signal is treated from the outset
+                    quants[k] = v.units
+                        
+        DataObject.__init__(self, name = strings["name"], 
+                            file_origin=strings["file_origin"],
+                            description=strings["description"], 
+                            array_annotations=annots["array_annotations"],
+                            **annots["annotations"])
+
+        
+        self._domain_name_ = name_from_unit(self._domain)
         
         if isinstance(name, str):
             self._name_ = name
@@ -1201,11 +1418,11 @@ class IrregularlySampledDataSignal(BaseSignal):
                                                    self.domain.dtype,
                                                    True,
                                                    self.name,
+                                                   self.domain_name,
                                                    self.file_origin,
                                                    self.description,
-                                                   self.annotations,
                                                    self.array_annotations,
-                                                   #self.channel_index,
+                                                   self.annotations,
                                                    self.segment,
                                                    )
     
@@ -1220,16 +1437,17 @@ class IrregularlySampledDataSignal(BaseSignal):
         #self.channel_index      = getattr(obj, "channel_index", None)
         self.array_annotations  = getattr(obj, "array_annotations", None)
         if isinstance(self._domain, pq.Quantity):
-            self.__domain_name__    = name_from_unit(self._domain)
+            self._domain_name_    = name_from_unit(self._domain)
         else:
-            self.__domain_name__    = "Dimensionless"
+            self._domain_name_    = "Dimensionless"
         
     def __deepcopy__(self, memo):
         cls = self.__class__
         new_signal = cls(self.domain, np.array(self), units=self.units,
                          domain_units=self.domain.units, dtype=self.dtype,
                          domain_dtype=self.domain.dtype,
-                         name=self.name, file_origin=self.file_origin, 
+                         name=self.name, doman_name=self.domain_name,
+                         file_origin=self.file_origin, 
                          description=self.description,
                          array_annotations=self.array_annotations,
                          annotations = self.annotations)
@@ -1577,15 +1795,15 @@ class IrregularlySampledDataSignal(BaseSignal):
     def domain_name(self):
         """A brief description of the domain name
         """
-        if self.__domain_name__ is None:
-            self.__domain_name__ = name_from_unit(self.domain) if isinstance(self.domain, pq.Quantity) else "Dimensionless"
+        if self._domain_name_ is None:
+            self._domain_name_ = name_from_unit(self.domain) if isinstance(self.domain, pq.Quantity) else "Dimensionless"
             
-        return self.__domain_name__
+        return self._domain_name_
     
     @domain_name.setter
     def domain_name(self, value):
         if isinstance(value, str) and len(value.strip()):
-            self.__domain_name__ = value
+            self._domain_name_ = value
     
     @property
     def domain(self):
@@ -1676,7 +1894,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         
         if self.dimensionality == to_dims:
             to_u = self.units
-            signal = np.array(self)
+            signal_data = np.array(self)
             
         else:
             to_u = pq.Quantity(1.0, to_dims)
@@ -1689,13 +1907,19 @@ class IrregularlySampledDataSignal(BaseSignal):
                 raise ValueError('Unable to convert between units of "%s" \
                                  and "%s"' % (from_u._dimensionality,
                                               to_u._dimensionality))
-            signal = cf * self.magnitude
+            signal_data = cf * self.magnitude
             
-        obj = self.__class__(domain=self.domain, signal=signal, units=to_u)
+        obj = self.__class__(domain=self.domain, signal=signal_data, 
+                             units=to_u,
+                             domain_units = self.domain_units,
+                             domain_name = self.domain_name,
+                             array_annotations = self.array_annotations,
+                             description = self.description,
+                             file_origin = self.file_origin)
         
-        obj._copy_data_complement(self)
+        # obj._copy_data_complement(self)
         #obj.channel_index = self.channel_index 
-        #obj.segment = self.segment             # FIXME TODO parent container functionality
+        obj.segment = self.segment             # FIXME TODO parent container functionality
         obj.annotations.update(self.annotations)
 
         return obj

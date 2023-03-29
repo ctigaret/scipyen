@@ -1,5 +1,7 @@
+# -*- coding: utf-8 -*-
 """quickdialog module adapted from vigranumpy.pyqt.quickdialog
 Useful to have even when vigranumpy is not installed.
+
 """
 #######################################################################
 #                                                                      
@@ -45,6 +47,8 @@ import PyQt5.QtCore as QtCore
 import PyQt5.QtGui as QtGui
 import PyQt5.QtWidgets as QtWidgets
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
+
+from gui.guiutils import(InftyDoubleValidator, ComplexValidator, UnitsStringValidator)
 
 def alignLabels(*args):
     m = 0
@@ -190,25 +194,20 @@ class IntegerInput(OptionalIntegerInput):
     def value(self):
         return int(self.text())
     
-class InftyDoubleValidator(QtGui.QDoubleValidator):
-    def __init__(self, bottom:float=-math.inf, top:float=math.inf, decimals:int=4, parent=None):
-        QtGui.QDoubleValidator.__init__(self,parent)
-        self.setBottom(bottom)
-        self.setTop(top)
-        self.setDecimals(decimals)
+    
+class ComplexInput(_OptionalValueInput):
+    _QValidator = ComplexValidator
+    _text2Value = complex
+    _mustContain = "a complex value"
+    
+    def setValue(self, x:typing.Union[complex, str]):
+        if isinstance(x, complex):
+            super().setValue(str(x))
+        else:
+            super().setValue(x)
         
-    def validate(self, s:str, pos:int):
-        valid = super().validate(s, pos)
-        # print(f"InftyDoubleValidator.validate s: {s}, pos: {pos}, valid {valid}, type: {type(valid).__name__}")
-        if valid[0] not in (QtGui.QValidator.Intermediate, QtGui.QValidator.Acceptable):
-            if s.lower() in ("-i", "i", "-in", "in"):
-                return (QtGui.QValidator.Intermediate, s, pos)
-            elif s.lower() in ("-inf", "inf"):
-                return (QtGui.QValidator.Acceptable, s, pos)
-            else:
-                return (QtGui.QValidator.Invalid, s, pos)
-            
-        return valid
+    def value(self):
+        return complex(self.text())
 
 class OptionalFloatInput(_OptionalValueInput):
     # _QValidator = QtGui.QDoubleValidator
@@ -217,6 +216,12 @@ class OptionalFloatInput(_OptionalValueInput):
     _mustContain = "a float"
 
 class FloatInput(OptionalFloatInput):
+    def setValue(self, x:typing.Union[float, str]):
+        if isinstance(x, float):
+            super().setValue(str(x))
+        else:
+            super().setValue(x)
+        
     def value(self):
         return float(self.text())
 
@@ -236,6 +241,9 @@ class OptionalStringInput(QtWidgets.QFrame):
                     
     def setFocus(self):
         self.variable.setFocus()
+        
+    def setValue(self, text):
+        self.variable.setText(text)
             
     def setText(self, text):
         self.variable.setText(text)
@@ -401,6 +409,9 @@ class QuickDialogComboBox(QtWidgets.QFrame):
         for text in textList:
             self.variable.addItem(text)
             
+    def setCurrentIndex(self, value:int):
+        self.setValue(value)
+            
     def setValue(self, index):
         if isinstance(index, int) and index >= -1 and index < self.variable.model().rowCount():
             self.variable.setCurrentIndex(index)
@@ -466,16 +477,16 @@ class VariableNameStringInput(StringInput):
             
         def validate(self, s, pos):
             if not s.isidentifier() or keyword.iskeyword(s):
-                ret = QtGui.QValidator.Invalid
+                ret = (QtGui.QValidator.Invalid, s, pos)
                 #if s[0:pos].isidentifier() and not keyword.iskeyword(s[0:pos]):
                     #ret = QtGui.QValidator.Intermediate
                 #else:
                     #ret = QtGui.QValidator.Invalid
             else:
-                ret = QtGui.QValidator.Acceptable
+                ret = (QtGui.QValidator.Acceptable, s, pos)
                 
             #print("validate returns: ", ret)
-            return ret
+            return ret 
         
         
         def fixup(self, s):
@@ -555,6 +566,7 @@ class QuickDialog(QtWidgets.QDialog):
         if isinstance(addSpacing, bool):
             if addSpacing:
                 self.layout.addSpacing(20)
+                
         elif isinstance(addSpacing, int):
             self.layout.addSpacing(addSpacing)
         

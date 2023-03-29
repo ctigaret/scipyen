@@ -3,7 +3,7 @@
 Various utilities
 '''
 import traceback, re, itertools, functools, time, typing, warnings, operator, inspect
-import random, math
+import random, math, pprint
 from numbers import Number
 from sys import getsizeof, stderr
 from copy import (copy, deepcopy,)
@@ -361,7 +361,19 @@ def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarra
 
 @isclose.register(str)
 def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
-    return x.lower() == y.lower()
+    # TODO/FIXME: 2023-03-24 15:51:03
+    # use difflib.SequenceMatcher
+    from difflib import SequenceMatcher
+    ret = SequenceMatcher(None, x, y).ratio()
+    
+    if isinstance(rtol, Number):
+        return ret >= 1.0-abs(rtol)
+    elif isinstance(atol, Number):
+        return ret >= 1.0-abs(atol)
+    else:
+        return ret == 1.0
+    
+    # return x.lower() == y.lower()
 
 @isclose.register(np.ndarray)
 def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
@@ -429,7 +441,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     
     return reduce(operator.and_, (f_isclose(x_, y_) for x_, y_ in ((getattr(x, name), getattr(y, name)) for name in ("real", "imag"))))
 
-def all_or_not_all(*args):
+def all_or_all_not(*args):
     """Returns True when elements in args are either all True or all False.
     """
     return all(args) or all(not(arg) for arg in args)
@@ -857,6 +869,10 @@ def total_size(o, handlers={}, verbose=False):
 def hash_identity_test(x,y):
     return gethash(x) == gethash(y)
 
+def similar_strings(a:str, b:str):
+    from difflib import SequenceMatcher
+    return SequenceMatcher(None, a, b).ratio()
+
 @safeWrapper
 def safe_identity_test2(x, y):
     return SafeComparator(comp=eq)(x, y)
@@ -864,6 +880,9 @@ def safe_identity_test2(x, y):
 @safeWrapper
 def safe_identity_test(x, y, idcheck=False):
     ret = True
+    
+    if all(isinstance(v, type) for v in (x,y)):
+        return x==y
     
     if idcheck:
         ret &= id(x) == id(y)
@@ -894,7 +913,12 @@ def safe_identity_test(x, y, idcheck=False):
         if not ret:
             return ret
         
-        ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
+        if all(isinstance(v, dict) for v in (x,y)):
+            ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x.items(), y.items())))
+            if not ret:
+                return ret
+        else:
+            ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
         
         if not ret:
             return ret
@@ -925,7 +949,7 @@ def safe_identity_test(x, y, idcheck=False):
     
         if not ret:
             return ret
-    
+        
     ret &= eq(x,y)
     
     return ret ## good fallback, though potentially expensive
@@ -2552,7 +2576,12 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
     objtype = type(obj)
     typename = objtype.__name__
-    ttip = typename
+    typemodulename = objtype.__module__
+    objcls = obj.__class__
+    clsname = objcls.__name__
+    
+    fqual = ".".join([objcls.__module__, clsname])
+    ttip = ".".join([typemodulename, typename])
     
     wspace_name = "Namespace: %s" % namespace
     
@@ -2573,13 +2602,11 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
     tt = abbreviated_type_names.get(typename, typename)
     
+    
     if tt in signal_types and hasattr(obj, "dimensionality"):
         tt += " (%s)" % obj.dimensionality
     
     if tt == "instance":
-        objcls = obj.__class__
-        clsname = objcls.__name__
-        
         tt = abbreviated_type_names.get(clsname, clsname)
 
     if objtype is type:
@@ -2630,6 +2657,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     if ismemberdescriptor(obj):
         ttip += " (member descriptor)"
             
+    ttip += f"\n({fqual})"
     result["Type"] = {"display": tt, "tooltip": "type: %s" % ttip}
     
     # these get assigned values below
@@ -2653,7 +2681,9 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     memsztip = ""
 
     try:
-        if isinstance(obj, sequence_types):
+        if isinstance(obj, type):
+            pass
+        elif isinstance(obj, sequence_types):
             if len(obj) and all([isinstance(v, Number) for v in obj]):
                 datamin = str(min(obj))
                 mintip = "min: "
@@ -2690,7 +2720,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsztip = "memory size: "
             
         elif isinstance(obj, NeoContainer):
-            sz = str(obj.size)
+            sz = pprint.pformat(obj.size)
             sizetip = "size: "
                 
             memsz = str(getsizeof(obj))
@@ -2803,6 +2833,19 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
                 arrayorder    = str(obj.order)
                 ordertip = "array order: "
             
+        elif hasattr(obj, "__iter__"):
+            if hasattr(obj, "__len__"):
+                try:
+                    # NOTE: 2023-01-31 17:36:53
+                    # to avoid NEURON error: TypeError Most HocObject have no len()
+                    sz = len(obj)
+                except:
+                    sz = ""
+            else:
+                sz = ""
+            sizetip = "length:"
+            memsz    = str(getsizeof(obj))
+            memsztip = "memory size: "
             
         else:
             #vmemsize = QtGui.QStandardItem(str(getsizeof(obj)))
@@ -2973,7 +3016,8 @@ def elements_types(s):
     return gen_unique(map(lambda x: type(x).__name__, s))
 
 
-def counter_suffix(x, strings, sep="_"):
+# def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, bracketed:bool = False, ret:bool=False):
+def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, ret:bool=False):
     """Appends a counter suffix to x if x is found in the list of strings
     
     Parameters:
@@ -2983,9 +3027,9 @@ def counter_suffix(x, strings, sep="_"):
     
     strings = sequence of str to check for existence of x
     
-    underscore_sfx: bool default is True: and underscore separated the numeric
-     suffi from the root of the string
-     When False, the separator is space
+    sep: str, default is "_"; suffix separator
+    
+    start: 
     
     """
     # TODO:
@@ -3009,62 +3053,82 @@ def counter_suffix(x, strings, sep="_"):
     if not isinstance(sep, str):
         raise TypeError("Separator must be a str; got %s instead" % type(sep).__name__)
     
-    if len(sep) == 0:
-        raise ValueError("Separator cannot be an empty string")
+    # if len(sep.strip()) == 0:
+    #     raise ValueError("Separator cannot be an empty string")
     
+    if not isinstance(start, int):
+        raise TypeError(f"'start' expected to be an int; got {type(start).__name__} instead")
+    
+    if start < 0:
+        raise ValueError(f"'start' expected to be a positive int (>= 0); instead, got {start}")
+    
+    # print(f"counter_suffix: x = {x}, strings = {strings}, start = {start}")
+    # print(f"counter_suffix: x = {x}, start = {start}, ret = {ret}")
     
     if len(strings):
-        base, cc = get_int_sfx(x, sep=sep)
+        base, cc = get_int_sfx(x, sep=sep)#, bracketed=bracketed)
+        
+        # print(f"counter_suffix: base = {base}, cc = {cc}")
         
         #p = re.compile(base)
+        # if bracketed:
+        #     p = re.compile("^%s%s{0,1}\(\d*\)$" % (base, sep))
+        # else:
+        #     p = re.compile("^%s%s{0,1}\d*$" % (base, sep))
         p = re.compile("^%s%s{0,1}\d*$" % (base, sep))
         
-        items = list(filter(lambda x: p.match(x), strings))
+        items = sorted(list(filter(lambda x: p.match(x), strings)))
         
+        # print(f"counter_suffix items = {items}")
+        newsfx = None
         if len(items):
-            fullndx = range(1, len(items))
-            full = set(fullndx)
-            currentsfx = sorted(list(filter(lambda x: x, map(lambda x: get_int_sfx(x, sep=sep)[1], items))))
-            current = set(currentsfx)
+            full_ndx = list(range(start, len(items)))
+            currentsfx = list(x[1] for x in sorted(list(filter(lambda x: isinstance(x[1], int), (map(lambda x: get_int_sfx(x, sep=sep), items)))), key=lambda x: x[1]))
+            # currentsfx = list(x[1] for x in sorted(list(filter(lambda x: isinstance(x[1], int), (map(lambda x: get_int_sfx(x, sep=sep, bracketed=bracketed), items)))), key=lambda x: x[1]))
             if len(currentsfx):
-                if min(currentsfx) > 1:
-                    # first slot (base_1) is missing - fill it 
-                    newsfx = 1
-                    
+                min_current = min(currentsfx)
+                max_current = max(currentsfx)
+                if  len(full_ndx) == 0:
+                    newsfx = 0
                 else:
-                    if current == full:
-                        # full range if indices is taken;
-                        # but the 0th slot may be missing (base)
-                        if base not in items:
-                            # 0th slot (base) is missing:
-                            return base
-                        # => get the next one up (base_x, x = len(items)
-                        newsfx = len(items)
-                        
-                    else: # set cardinality may be different, or just their elements are different
-                        if len(current) == len(full):
-                            # same cardinality => different elements =>
-                            # neither is a subset of the other
-                            # check what elements from full are NOT in currentsfx
-                            # while SOME currentsfx are in full
-                            missing = full - current
-                            if len (missing):
-                                # get the minimal slot from missing
-                                newsfx = min(missing)
+                    if min_current > min(full_ndx):
+                        newsfx = min(full_ndx)
+                    else:
+                        # find out missing indices
+                        if len(currentsfx) > 1:
+                            dsfx = np.ediff1d(currentsfx)
+                            locs = np.where(dsfx > 1)[0]
+                            if len(locs):
+                                newsfx = locs[0] + 1
                             else:
-                                # full and currentsfx are disjoint
-                                newsfx = min(full)
+                                newsfx = currentsfx[-1] + 1
                         else:
-                            return base # FIXME/TODO good default ?!?
+                            newsfx = currentsfx[-1] + 1
+                        
+                    # newsfx = full_ndx[-1]
+                    
             else:
-                # base not found: return the next available slot (base_1)
-                newsfx = 1
+                newsfx = start   
                 
-            return sep.join([base, "%d" % newsfx])
+            # if bracketed:
+            #     result = sep.join([base, "(%d)" % newsfx])
+            # else:
+            #     result = sep.join([base, "%d" % newsfx])
+            result = sep.join([base, "%d" % newsfx])
             
+            if ret:
+                return result, newsfx
+            
+            return result
+        
         else:
+            result = x
+            if ret:
+                return x, None
             return x
-                
+        
+    if ret:
+        return x, None
     return x
                 
 def get_nested_value(src, path):
@@ -3194,11 +3258,11 @@ def sort_with_none(iterable, none_last = True):
     return sorted(iterable, key=lambda x: x if x is not None else noneph)
 
 def unique(seq, key=None):
-    """Returns a sequence of unique elements in sequence 'seq'.
-    Function vrsion of gen_unique
+    """Returns a sequence of unique elements in the iterable 'seq'.
+    Functional version of gen_unique
     Parameters:
     -----------
-    seq: an iterable sequence (tuple, list, range)
+    seq: an iterable (tuple, list, range, map)
     
     key: predicate for uniqueness (optional, default is None)
         Typically, this is an object returned by a lambda function
@@ -3209,35 +3273,26 @@ def unique(seq, key=None):
     
     Returns:
     =======
-    A sequence containing unique elements in 'seq'.
+    A tuple containing unique elements in 'seq'.
     
     NOTE: Does not guarantee the order of the unique elements is the same as 
             their order in 'seq'
             
-    WARNING: Only works with sequences of hashable types.
-    
     See also gen_unique for a generator version.
     
     """
-    if not isinstance(seq, collections.abc.Sequence):
-        raise TypeError(f"Expecting a Sequence; got {type(seq).__name__} instead")
+    # if not isinstance(seq, collections.abc.Sequence):
+    if not hasattr(seq, "__iter__"):
+        raise TypeError(f"Expecting an iterable; got {type(seq).__name__} instead")
+    
+    return tuple(item for item in gen_unique(seq, key=key))
 
-    if isinstance(seq, tuple):
-        return tuple((item for item in gen_unique(seq, key=key)))
-    
-    else:
-        return [item for item in gen_unique(seq, key=key)]
+#     if isinstance(seq, tuple):
+#         return tuple((item for item in gen_unique(seq, key=key)))
+#     
+#     else:
+#         return [item for item in gen_unique(seq, key=key)]
             
-    #if not isinstance(seq, (tuple, list, range)):
-        #raise TypeError("expecting an iterable sequence (i.e., a tuple, a list, or a range); got %sinstead" % type(seq).__name__)
-    
-    #seen = set()
-    
-    #if key is None:
-        #return [x for x in seq if x not in seen and not seen.add(x)]
-    
-    #else:
-        #return [x for x in seq if key not in seen and not seen.add(key)]
 
 def gen_unique(seq, key=None):
     """Iterates through unique elements in seq
@@ -3276,8 +3331,9 @@ def gen_unique(seq, key=None):
     unique for a function version
     
     """
-    if not isinstance(seq, (tuple, list, range, deque, str)):
-        raise TypeError("expecting an iterable sequence (i.e., a tuple, a list, or a range); got %s instead" % type(seq).__name__)
+    # if not isinstance(seq, (tuple, list, range, deque, str)):
+    if not hasattr(seq, "__iter__"):
+        raise TypeError("expecting an iterable; got %s instead" % type(seq).__name__)
     
     seen = set()
     

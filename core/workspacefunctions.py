@@ -16,13 +16,13 @@ from operator import attrgetter, itemgetter, methodcaller
 
 from collections import OrderedDict, deque
 
-
 try:
     from reprlib import repr
+    
 except ImportError:
     pass
 
-def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None) -> bool:
+def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None):
     """Sets or gets the state of scipyen debugging.
     
     The state is a boolean variable SCIPYEN_DEBUG in the user namespace.
@@ -66,9 +66,7 @@ def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None) -> bool:
     elif not isinstance(arg, bool):
         raise TypeError("Expecting a str ('on' or 'off'), a bool, or None; got %s instead" % arg)
         
-def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, 
-            var_type:typing.Optional[typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]]=None,
-            sort:bool=False, sortkey:object=None, reverse:bool=False):
+def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_type:typing.Optional[typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]]=None, sort:bool=False, sortkey:object=None, reverse:bool=False):
     """List names of variables in a namespace, according to a selection criterion.
     
     Returns a (possibly sorted) list of variable names if found, or an empty list.
@@ -186,7 +184,6 @@ def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None,
     
     return ret
     
-    
 def getvarsbytype(vartype, ws=None):
     """Get variables by type, from a namespace or a dict
     """
@@ -201,7 +198,7 @@ def getvarsbytype(vartype, ws=None):
             raise TypeError("Sequence in the first argument must contain only types")
         
         if isinstance(vartype, list):
-            vatrtype = tuple(vartype)
+            vartype = tuple(vartype)
         
     if ws is None:
         ws = user_workspace()
@@ -213,9 +210,7 @@ def getvarsbytype(vartype, ws=None):
     
     #return dict(lst)
         
-def getvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, 
-            var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None,
-            as_dict:bool=False, sort:bool= False, sortkey:object=None, reverse:bool = False) -> object:
+def getvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None, as_dict:bool=False, sort:bool= False, sortkey:object=None, reverse:bool = False):
     """Collects a subset of variabes from a workspace or a dictionary.
 
     Returns a (possibly sorted) list of the variables if found, or an empty list.
@@ -375,7 +370,6 @@ def getvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None,
         
     return ret
 
-    
 def assignin(variable, varname, ws=None):
     """Assign variable as varname in workspace ws"""
     
@@ -397,7 +391,7 @@ def assignin(variable, varname, ws=None):
     
 assign = assignin # syntactic sugar
 
-def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None) -> list:
+def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None):
     """Returns a list of symbols to which 'x' is bound in the namespace 'ws'
     
     The  list is empty when the variable 'x' does not exist in ws (e.g when it is
@@ -419,7 +413,7 @@ def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None) -> li
         
     return [k for k in ws if ws[k] is x and not k.startswith("_")]
 
-def user_workspace() -> dict:
+def user_workspace():
     """Returns a reference to the user workspace (a.k.a user namespace)
     """
     frame_records = inspect.getouterframes(inspect.currentframe())
@@ -427,7 +421,7 @@ def user_workspace() -> dict:
         if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within Scipyen's IPython console
             return f[0].f_globals["mainWindow"].workspace
         
-def scipyentopdir() -> str:
+def scipyentopdir():
     user_ns = user_workspace()
     return user_ns["mainWindow"]._scipyendir_
 
@@ -558,30 +552,50 @@ def delvars(*args, glob=True, ws=None):
                 for t in targets:
                     ws.pop(t[0], None)
                         
-                    
-def validate_varname(arg, ws=None):
-    """Converts a putative variable name "arg" into a valid one.
+def validate_varname(arg, ws=None, start_counter=0, sep = "_", return_counter:bool=False):
+    """Returns a valid symbol based on an intended variable name.
     
-    arg: a string
+    arg: a string (symbol to be bound to a variable in the namespace `ws`)
+    
     ws: a namespace (dict), default None => will search for the topmost workspace
     
-    1)  Non-valid characters are replaced with underscores.
+    start_counter: int (default is 0) the start value of the counter used in the
+            suffix to the variable name is an identical symbol already exists in 
+            ws.
     
-    2)  If "arg" begins with a digit or is a standard python language keyword, 
-        it will be prefixed with "variable_".
-    3)  If "arg" already exists in the "ws" dictionary (e.g. a workspace/namespace)
-        then it will be suffixed with "_counter" where counter starts at 1 and 
-        carries on; 
-        
-        3.a) if there is already a variable with this suffix, it will be incremented
-            as necessary
+    sep: str, default is "_"; the separator between the symbol base string and 
+        its suffix (counter)
+    
+    return_counter:bool, default is False;
+            When True, returns the valid symbol _AND_ the integer counter for 
+            the suffix.
     
     Returns:
     
-    a modified variable name
+    • When return_counter is False (default), returns a modified verions of `arg`
+        where:
+    
+        1)  Non-valid characters are replaced with underscores.
+        
+        2)  If arg begins with a digit or is a standard python language keyword, 
+            it will be prefixed with "data_".
+    
+        3)  If arg already exists in the "ws" namespace it will be sufixes with
+            `_<counter>`, where <counter> is a string representation of an int
+            starting at `start_counter`; the actual value written to the suffix
+            reflects the number of symbols with same base as `arg`
+            
+            3.a) If a counter suffix already exists, it will be incremented as
+                necessary.
+    
+    • When return_counter is True, returns a two-elements tuple containing the
+        modified `arg` as above, AND the counter suffix as an int or None (when
+        a suffix was not appended to the modified `arg`)
+        
     
     """
     from core.utilities import counter_suffix
+    from core.strutils import str2symbol
     
     if ws is None:
         frame_records = inspect.getouterframes(inspect.currentframe())
@@ -589,31 +603,44 @@ def validate_varname(arg, ws=None):
             if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within the IPython console
                 ws = f[0].f_globals["mainWindow"].workspace
                 break
+            
     if not isinstance(arg, str) or len(arg.strip()) == 0:
         arg = "data"
-    # check if arg is a valid python variable identifier; replace non-valid characters with 
-    # "_" (underscore) and prepend "data_" if it starts with a digit
-    if not arg.isidentifier():
-        arg = _re.sub("^(?=\d)","data_", _re.sub("\W", "_", arg))
         
-    # avoid arg being a valid python language keyword
     if keyword.iskeyword(arg):
         arg = "data_" + arg
         
-    arg = counter_suffix(arg, ws.keys())
+    # check if arg is a valid python variable identifier; adjust accordingly:
+    # replace non-valid characters with 
+    # "_" (underscore) and prepend "data_" if it starts with a digit
+    if not arg.isidentifier():
+        arg = str2symbol(arg)
+        # arg = _re.sub("^(?=\d)","data_", _re.sub("\W", "_", arg))
         
-    #if arg in ws.keys():
-        #while arg in ws.keys():
-            #m = _re.search("_(\d+)$", arg)
-            #if m:
-                #count = int(m.group(0).split("_")[1]) + 1
-                #arg = _re.sub("_(\d+)$", "_%d" % count, arg)
-                
-            #else:
-                #arg += "_01"
+    # NOTE: 2022-12-26 14:35:33
+    # no need to add suffix if arg is not already in the workspace symbols
+    # HOWEVER, IF arg is already there THEN:
+    # • if arg is a symbol bound to a class or a type, then start the counter at
+    #   0 (as in <variable of given type>_0, etc)
+    # • otherwise, start the counter at 1 ('cause an instance with same name 
+    # already exists)
+    if arg not in ws.keys():
+        # not need to append suffix since arg symbol is not in the ws
+        if return_counter:
+            return arg, None
         
-            ##print("validate_varname: new name: %s", arg)
-                
+        return arg
+    else:
+        # print(f"validate_varname arg {arg} exists")
+        if inspect.isclass(ws[arg]) or isinstance(ws[arg], type):
+            start_counter = 0 # 
+        else:
+            start_counter = 1
             
+        # print(f"validate_varname start_counter = {start_counter}")
+        
+    arg = counter_suffix(arg, list(ws.keys()), sep=sep, start=start_counter, ret=return_counter)
+    # print(f"validate_varname return {arg}")
+        
     return arg
     

@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>EpochEditorDialog</class>
+ <widget class="QDialog" name="EpochEditorDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>673</width>
+    <height>389</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Epochs Editor</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout_3">
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_4">
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <widget class="QLabel" name="label">
+         <property name="text">
+          <string>Epochs:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QListView" name="epochsListView"/>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_3">
+         <item>
+          <widget class="QToolButton" name="addEpochToolButton">
+           <property name="toolTip">
+            <string>Add epoch</string>
+           </property>
+           <property name="statusTip">
+            <string>Add epoch</string>
+           </property>
+           <property name="whatsThis">
+            <string>Add epoch</string>
+           </property>
+           <property name="text">
+            <string>Add epoch</string>
+           </property>
+           <property name="icon">
+            <iconset theme="list-add">
+             <normaloff>.</normaloff>.</iconset>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="removeEpochToolButton">
+           <property name="toolTip">
+            <string>Remove selected epoch</string>
+           </property>
+           <property name="statusTip">
+            <string>Remove selected epoch</string>
+           </property>
+           <property name="whatsThis">
+            <string>Remove selected epoch</string>
+           </property>
+           <property name="text">
+            <string>Remove selected epoch</string>
+           </property>
+           <property name="icon">
+            <iconset theme="list-remove">
+             <normaloff>.</normaloff>.</iconset>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="plotEpochToolButton">
+           <property name="toolTip">
+            <string>Plot epoch</string>
+           </property>
+           <property name="statusTip">
+            <string>Plot epoch</string>
+           </property>
+           <property name="whatsThis">
+            <string>Plot epoch</string>
+           </property>
+           <property name="text">
+            <string>Plot selected epoch</string>
+           </property>
+           <property name="icon">
+            <iconset theme="quickview"/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="clearProtocolsToolButton">
+           <property name="toolTip">
+            <string>Remove all epochs</string>
+           </property>
+           <property name="statusTip">
+            <string>Remove all epochs</string>
+           </property>
+           <property name="whatsThis">
+            <string>Remove all epochs</string>
+           </property>
+           <property name="text">
+            <string>Clear</string>
+           </property>
+           <property name="icon">
+            <iconset theme="edit-clear-all">
+             <normaloff>.</normaloff>.</iconset>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer_2">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout">
+         <item>
+          <widget class="QToolButton" name="epochsFileChooserToolButton">
+           <property name="toolTip">
+            <string>Open file with epochs collection</string>
+           </property>
+           <property name="statusTip">
+            <string>Open file with epochs collection</string>
+           </property>
+           <property name="whatsThis">
+            <string>Open file with epochs collection</string>
+           </property>
+           <property name="text">
+            <string>Open file with epochs collection</string>
+           </property>
+           <property name="icon">
+            <iconset theme="project-open">
+             <normaloff>../systems</normaloff>../systems</iconset>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="openEpochFileToolButton">
+           <property name="toolTip">
+            <string>Open epoch file</string>
+           </property>
+           <property name="statusTip">
+            <string>Open epoch file</string>
+           </property>
+           <property name="whatsThis">
+            <string>Open epoch file</string>
+           </property>
+           <property name="text">
+            <string>Open epoch file</string>
+           </property>
+           <property name="icon">
+            <iconset theme="document-open"/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="importEpochsToolButton">
+           <property name="toolTip">
+            <string>Import epochs collection from workspace</string>
+           </property>
+           <property name="statusTip">
+            <string>Import epochs collection from workspace</string>
+           </property>
+           <property name="whatsThis">
+            <string>Import epochs collection from workspace</string>
+           </property>
+           <property name="text">
+            <string>Import Epochs</string>
+           </property>
+           <property name="icon">
+            <iconset theme="download">
+             <normaloff>.</normaloff>.</iconset>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="toolButton">
+           <property name="toolTip">
+            <string>Import single epoch from workspace</string>
+           </property>
+           <property name="statusTip">
+            <string>Import single epoch from workspace</string>
+           </property>
+           <property name="whatsThis">
+            <string>Import single epoch from workspace</string>
+           </property>
+           <property name="text">
+            <string>Import Single Epoch</string>
+           </property>
+           <property name="icon">
+            <iconset theme="document-import"/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="saveEpochsCollection">
+           <property name="toolTip">
+            <string>Save epochs collection to file</string>
+           </property>
+           <property name="statusTip">
+            <string>Save epochs collection to file</string>
+           </property>
+           <property name="whatsThis">
+            <string>Save epochs collection to file</string>
+           </property>
+           <property name="text">
+            <string>Save epochs collection</string>
+           </property>
+           <property name="icon">
+            <iconset theme="document-save"/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="saveEpochToolButton">
+           <property name="toolTip">
+            <string>Save selected epochs to file</string>
+           </property>
+           <property name="statusTip">
+            <string>Save selected epochs to file</string>
+           </property>
+           <property name="whatsThis">
+            <string>Save selected epochs to file</string>
+           </property>
+           <property name="text">
+            <string>Save selected epochs</string>
+           </property>
+           <property name="icon">
+            <iconset theme="document-save-all"/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer_3">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <item>
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>Selected epoch:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QTableView" name="epochTableView"/>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_2">
+         <item>
+          <widget class="QToolButton" name="addEpochIntervalToolButton">
+           <property name="toolTip">
+            <string>Add interval</string>
+           </property>
+           <property name="statusTip">
+            <string>Add interval</string>
+           </property>
+           <property name="whatsThis">
+            <string>Add interval</string>
+           </property>
+           <property name="text">
+            <string>Add interval</string>
+           </property>
+           <property name="icon">
+            <iconset theme="list-add">
+             <normaloff>.</normaloff>.</iconset>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="removeEpochIntervalToolButton">
+           <property name="toolTip">
+            <string>Remove interval</string>
+           </property>
+           <property name="statusTip">
+            <string>Remove interval</string>
+           </property>
+           <property name="whatsThis">
+            <string>Remove interval</string>
+           </property>
+           <property name="text">
+            <string>Remove interval</string>
+           </property>
+           <property name="icon">
+            <iconset theme="list-remove">
+             <normaloff>.</normaloff>.</iconset>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>accepted()</signal>
+   <receiver>EpochEditorDialog</receiver>
+   <slot>accept()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>248</x>
+     <y>254</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>157</x>
+     <y>274</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>rejected()</signal>
+   <receiver>EpochEditorDialog</receiver>
+   <slot>reject()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>316</x>
+     <y>260</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>286</x>
+     <y>274</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>

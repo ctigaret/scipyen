@@ -134,6 +134,10 @@ from functools import partial
 from copy import deepcopy
 #### END core python modules
 
+from IPython.core.magic import (Magics, magics_class, line_magic,
+                                cell_magic, line_cell_magic,
+                                needs_local_scope)
+
 #### BEGIN traitlets
 #from traitlets import (HasTraits, Integer, Float, Complex, Unicode, Bytes,
                        #List, Set, Tuple, Dict, Bool, )
@@ -201,18 +205,19 @@ import gui.quickdialog as qd
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import (ScipyenViewer, ScipyenFrameViewer)
 from gui.workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
+from gui.itemslistdialog import ItemsListDialog
 #### END pict.gui modules
 
 #### BEGIN imaging modules
-from . import vigrautils as vu
+from imaging import vigrautils as vu
 from imaging.vigrautils import (imageIndexTuple, proposeLayout)
-from . import imageprocessing as imgp
-from .imageprocessing import *
-from . import scandata
-from .scandata import (ScanData, AnalysisUnit, check_apiversion, scanDataOptions)
-from . import axisutils
-from .axisutils import dimEnum
-from .axiscalibration import (AxesCalibration, 
+from imaging import imageprocessing as imgp
+from imaging.imageprocessing import *
+from imaging import scandata
+from imaging.scandata import (ScanData, AnalysisUnit, check_apiversion, scanDataOptions)
+from imaging import axisutils
+from imaging.axisutils import dimEnum
+from imaging.axiscalibration import (AxesCalibration, 
                               AxisCalibrationData, 
                               ChannelCalibrationData,
                               CalibrationData,  
@@ -1550,17 +1555,15 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
         
         return fitted_epscat #, src_base, src_peak
     
-def analyseFrame(lsdata, frame, unit=None, 
-                 indicator_channel_ndx=None, 
-                 reference_channel_ndx=None,
-                 detrend=False,
-                 gen_long_fits=False):
-    """Modifies ScanData in place !
+def analyseFrame(lsdata:ScanData, frame:int, unit=None, indicator_channel_ndx=None, reference_channel_ndx=None, detrend=False, gen_long_fits=False):
+    """Analyses a specific frame in a ScanData object.
+    See also the module-level function CaTanalysis.analyseFrame(...)
+    Modifies ScanData in place !
     Uses analysisOptions stored in lsdata.
     
     lsdata: a ScanData object
     
-    frame: index of the frame to be analysed
+    frame: int; index of the frame to be analysed
     
     unit: None, an AnalysisUnit, a vertical scan cursor used in an Analysis unit, or the name of such cursor
         
@@ -1807,9 +1810,7 @@ def analyseFrame(lsdata, frame, unit=None,
     lsdata.scansBlock.segments[frame].name = "%s" % protocol.name
         
 #@safeWrapper
-def computeLSCaT(roiRange, f0Range, ca_data, ref_data=None, detrend=False, 
-                 name=None, description=None, units=pq.dimensionless, #
-                 **annotations):
+def computeLSCaT(roiRange, f0Range, ca_data, ref_data=None, detrend=False, name=None, description=None, units=pq.dimensionless, **annotations):
     """
     Generates an EPSCaT trace by calculating df/a or df/f on a linescan time series.
     
@@ -1824,7 +1825,7 @@ def computeLSCaT(roiRange, f0Range, ca_data, ref_data=None, detrend=False,
     
     ref_data: 2D vigra.VigraArray with line scan series (reference dye channel e.g. alexa fluor)
     
-    detrend: boolean, defasult False; when True, tries to compensate for a sliding background
+    detrend: boolean, default False; when True, tries to compensate for a sliding background
     using scipy.signal.detrend ("linear" detrend type)
     
     discr_base: list of tuples (start, stop) in samples, or empty (default)
@@ -1991,8 +1992,6 @@ def computeLSCaT(roiRange, f0Range, ca_data, ref_data=None, detrend=False,
     
     return ret
 
-#"def" fitEPSCaT(data, p0, bounds, fitWindow = None, integration=None,
-             #amplitudeWindows = None, amplitudeMethod="direct"):
 #@safeWrapper
 def fitEPSCaT(data, p0, bounds, fitWindow = None, integration=None):
     """Fit EPSCaT model defined by p0 parameters through data.
@@ -2116,7 +2115,6 @@ def fitEPSCaT(data, p0, bounds, fitWindow = None, integration=None):
         y = models.compound_exp_rise_multi_decay(x, params)
         return y
     
-    #"def" _integrate_window_(x, window, params, name):
     def _integrate_window_(x, window, name, column = 1):
         # NOTE: 2018-02-03 21:46:38
         # column specifies which fitted curve we're integrating on
@@ -2423,8 +2421,8 @@ def collateReports(data):
         if "Source" not in data[0].columns:
             addSource(data[0])
             
-        if "Gender" not in data[0].columns:
-            addGender(data[0], "NA")
+        if "Sex" not in data[0].columns:
+            addSex(data[0], "NA")
             
         if "Age" not in data[0].columns:
             addAge(data[0], "NA")
@@ -2439,8 +2437,8 @@ def collateReports(data):
             if "Source" not in d.columns:
                 addSource(d)
             
-            if "Gender" not in d.columns:
-                addGender(d, "NA")
+            if "Sex" not in d.columns:
+                addSex(d, "NA")
                 
             if "Age" not in d.columns:
                 addAge(d, "NA")
@@ -2740,12 +2738,12 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
                         genotype = strutils.str2symbol(scandata.genotype)
                         #genotype = strutils.str2R(scandata.genotype)
                         
-                    gender = strutils.str2symbol(analysis_unit.gender)
-                    #gender = strutils.str2R(analysis_unit.gender)
+                    sex = strutils.str2symbol(analysis_unit.sex)
+                    #sex = strutils.str2R(analysis_unit.sex)
                     
-                    if "na" in gender.lower():
-                        gender = strutils.str2symbol(scandata.gender)
-                        #gender = strutils.str2R(scandata.gender)
+                    if "na" in sex.lower():
+                        sex = strutils.str2symbol(scandata.sex)
+                        #sex = strutils.str2R(scandata.sex)
                     
                     age = analysis_unit.age
                     
@@ -2757,7 +2755,7 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
                     #sig_result["Data"]      = strutils.str2R(scandata.name)
                     sig_result["Source"]    = strutils.str2symbol(analysis_unit.sourceID)
                     #sig_result["Source"]    = strutils.str2R(analysis_unit.sourceID)
-                    sig_result["Gender"]    = gender
+                    sig_result["Sex"]    = sex
                     sig_result["Age"]       = age
                     sig_result["Cell"]      = strutils.str2symbol(analysis_unit.cell)
                     sig_result["Field"]     = strutils.str2symbol(analysis_unit.field)
@@ -3398,7 +3396,7 @@ def removeMirrorCursor(data, vc):
     data.sceneCursors.pop(vc.name, None)
     
     
-class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
+class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     # NOTE: 2021-09-23 10:43:12
     # ScipyenFrameViewer <- ScipyenViewer <- WorkspaceGuiMixin
     # NOTE: 2021-07-08 10:04:42 About configuration/settings
@@ -3412,7 +3410,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
     #
     # On the other hand, the settings for LSCaT and its client viewers are ALL
     # SAVED when LSCaTWindow is closed (see self.slot_Quit() PyQt slot)
-    supported_types = (ScanData,)
+    viewer_for_types = (ScanData,)
     
     view_action_name = "Launch LSCaT"
     
@@ -3919,8 +3917,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 [self.sourceIDLineEdit.editingFinished,                 self.slot_gui_changed_source_ID,    QtCore.Qt.QueuedConnection],
                 [self.cellLineEdit.editingFinished,                     self.slot_gui_changed_cell_name,    QtCore.Qt.QueuedConnection],
                 [self.fieldLineEdit.editingFinished,                    self.slot_gui_changed_field_name,   QtCore.Qt.QueuedConnection],
-                [self.genotypeComboBox.currentIndexChanged[str],        self.slot_gui_changed_genotype,     QtCore.Qt.QueuedConnection],
-                [self.genderComboBox.currentIndexChanged[str],          self.slot_gui_changed_gender,       QtCore.Qt.QueuedConnection],
+                [self.genotypeComboBox.currentTextChanged[str],         self.slot_gui_changed_genotype,     QtCore.Qt.QueuedConnection],
+                [self.sexComboBox.currentIndexChanged[str],             self.slot_gui_changed_sex,       QtCore.Qt.QueuedConnection],
                 [self.ageLineEdit.editingFinished,                      self.slot_gui_age_changed,          QtCore.Qt.QueuedConnection]
             ]
         
@@ -3954,15 +3952,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             self.analysisUnitNameLineEdit, self.defineAnalysisUnitCheckBox, self.descriptorsEditorBtn, 
             self.extractCurrentUnitButton]
             
-        #self._analysis_unit_gui_widgets_ = [
-            #self.setupCursorsBtn, self.setupCursorsAllFrames, self.importCursorsBtn, 
-            #self.deleteAnalysisUnitsBtn, self.deleteAllAnalysisUnitsBtn, 
-            #self.selectCursorSpinBox, self.cursorXposDoubleSpinBox, self.cursorYposDoubleSpinBox,
-            #self.cursorXwindow, self.cursorYwindow, self.unitTypeComboBox, 
-            #self.analysisUnitNameLineEdit, self.defineAnalysisUnitCheckBox, self.descriptorsEditorBtn, 
-            #self.extractCurrentUnitButton, self.removeCursorButton, self.addVerticalCursorBtn]
-            
-        
         self._analysis_unit_gui_signal_slots_ = [
                 [self.selectCursorSpinBox.valueChanged[int],        self.slot_gui_spinbox_select_cursor_by_index],
                 [self.cursorXposDoubleSpinBox.valueChanged[float],  self.slot_gui_changed_cursor_x_pos],
@@ -3977,36 +3966,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 [self.extractUnitsButton.clicked,                   self.slot_exportAnalysisUnits,                      QtCore.Qt.QueuedConnection],
             ]
         
-        #self._analysis_unit_gui_signal_slots_ = [
-                #[self.setupCursorsBtn.clicked,                      self.slot_setupLinescanCursorsInCurrentFrame,       QtCore.Qt.QueuedConnection],
-                #[self.setupCursorsAllFrames.clicked,                self.slot_setupLinescanCursorsInSpecifiedFrames,    QtCore.Qt.QueuedConnection],
-                #[self.importCursorsBtn.clicked,                     self.slot_adoptAnalysisUnitsFromScanData,           QtCore.Qt.QueuedConnection],
-                #[self.deleteAnalysisUnitsBtn.clicked,               self.slot_deleteAnalysisUnits,                      QtCore.Qt.QueuedConnection],
-                #[self.deleteAllAnalysisUnitsBtn.clicked,            self.slot_deleteAllAnalysisUnits,                   QtCore.Qt.QueuedConnection],
-                #[self.selectCursorSpinBox.valueChanged[int],        self.slot_gui_spinbox_select_cursor_by_index,                      QtCore.Qt.QueuedConnection],
-                #[self.cursorXposDoubleSpinBox.valueChanged[float],  self.slot_gui_changed_cursor_x_pos,                 QtCore.Qt.QueuedConnection],
-                #[self.cursorYposDoubleSpinBox.valueChanged[float],  self.slot_gui_changed_cursor_y_pos,                 QtCore.Qt.QueuedConnection],
-                #[self.cursorXwindow.valueChanged[float],            self.slot_gui_changed_cursor_xwindow,               QtCore.Qt.QueuedConnection],
-                #[self.cursorYwindow.valueChanged[float],            self.slot_gui_changed_cursor_ywindow,               QtCore.Qt.QueuedConnection],
-                #[self.unitTypeComboBox.currentIndexChanged[str],    self.slot_gui_changed_unit_type_string,             QtCore.Qt.QueuedConnection],
-                #[self.analysisUnitNameLineEdit.editingFinished,           self.slot_gui_changed_analysis_unit_name,                  QtCore.Qt.QueuedConnection],
-                #[self.defineAnalysisUnitCheckBox.stateChanged[int], self.slot_change_analysis_unit_state,               QtCore.Qt.QueuedConnection],
-                #[self.descriptorsEditorBtn.clicked,                 self.slot_gui_edit_analysis_unit_descriptors,                     QtCore.Qt.QueuedConnection],
-                #[self.extractCurrentUnitButton.clicked,             self.slot_exportCurrentAnalysisUnit,                QtCore.Qt.QueuedConnection],
-                #[self.extractUnitsButton.clicked,                   self.slot_exportAnalysisUnits,                      QtCore.Qt.QueuedConnection],
-                #[self.removeCursorButton.clicked,                   self.slot_remove_analysis_cursor,                   QtCore.Qt.QueuedConnection],
-                #[self.addVerticalCursorBtn.clicked,                 self.slot_gui_add_vertical_cursor,                  QtCore.Qt.QueuedConnection]
-            #]
-        
-        
         self._protocol_gui_signal_slots_ = [
                 [self.protocolTableWidget.itemChanged[QtWidgets.QTableWidgetItem],  self.slot_protocolTableEdited, QtCore.Qt.QueuedConnection],
                 [self.addProtocolAction.triggered,                                  self.slot_addProtocol, QtCore.Qt.QueuedConnection],
                 [self.removeProtocolAction.triggered,                               self.slot_removeProtocol, QtCore.Qt.QueuedConnection]
             ]
-        
-        #self._filters_gui_signal_slots_ = [
-            #]
         
         self._epscat_channels_calibration_gui_signal_slots_ = [
                 [self.indicatorChannelComboBox.currentIndexChanged[int], self.slot_epscatIndicatorChannelChanged,   QtCore.Qt.QueuedConnection],
@@ -4063,11 +4027,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 [self.saveReportBtn.clicked,                self.slot_reportLSCaTResults, QtCore.Qt.QueuedConnection],
                 [self.viewReportBtn.clicked,                self.slot_showReportWindow, QtCore.Qt.QueuedConnection]
             ]
-        
-        #self.__output_gui_signal_slots__ = [
-                #[self.collectUnitsBtn.clicked,      self.slot_collectAnalysisUnits, QtCore.Qt.QueuedConnection],
-                #[self.reportResultsBtn.clicked,     self.slot_reportLSCaTResults]
-           #]
         
         # NOTE: 2018-05-21 15:25:31
         # this function only does additional set up for gui objects
@@ -4178,11 +4137,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         self.genotypeComboBox.addItems(genotypes)
         self.genotypeComboBox.setCurrentIndex(0)
         
-        gender = ["NA", "F", "M"]
+        sex = ["NA", "F", "M"]
         
-        self.genderComboBox.setEditable(False)
-        self.genderComboBox.addItems(gender)
-        self.genderComboBox.setCurrentIndex(0)
+        self.sexComboBox.setEditable(False)
+        self.sexComboBox.addItems(sex)
+        self.sexComboBox.setCurrentIndex(0)
         
         self.ageLineEdit.setText("NA")
         self.ageLineEdit.setClearButtonEnabled(True)
@@ -4493,9 +4452,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
     def filterData(self, scene=True, scans=True):#, frames = None):
         """ Filters data with functions selected in the "Filters" tab.
         
-        Wraps processData() function in a separate pictgui.ProgressWorker thread.
+        Wraps processData() function in separate pictgui.ProgressWorkerRunnable threads,
+        one for the scans and one for the scene ⟹ there will be two progressbars
+        showing.
         
-        data filtering function is associated with the individual ScanData object
+        Data filtering function is associated with the individual ScanData object
         because it allows the processing to be tractable to the particular
         ScanData instance (the processing function & parameters are included in 
         the "analysisOptions "property of the ScanData object)
@@ -4638,14 +4599,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             
             pdlg = QtWidgets.QProgressDialog("De-noising scene data...", "Abort", 0, self._data_.sceneFrames, self)
 
-            sceneWorker = pgui.ProgressWorker(self.processData, pdlg,
+            sceneWorker = pgui.ProgressWorkerRunnable(self.processData, pdlg,
                                       channel = [self._data_.analysisOptions["Channels"]["Reference"], 
                                                  self._data_.analysisOptions["Channels"]["Indicator"]],
                                       scene=True)
             
-            sceneWorker.signals.signal_finished.connect(pdlg.reset)
-            #sceneWorker.signals.signal_finished.connect(self.slot_sceneProcessingDone)
-            sceneWorker.signals.signal_result[object].connect(self.slot_sceneProcessingDone)
+            sceneWorker.signals.signal_Finished.connect(pdlg.reset)
+            #sceneWorker.signals.signal_Finished.connect(self.slot_sceneProcessingDone)
+            sceneWorker.signals.signal_Result[object].connect(self.slot_sceneProcessingDone)
                 
         else:
             self._scene_processing_idle_ = True
@@ -4656,14 +4617,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             
             pdlg = QtWidgets.QProgressDialog("De-noising scans data...", "Abort", 0, self._data_.scansFrames, self)
             
-            scansWorker = pgui.ProgressWorker(self.processData, pdlg,
+            scansWorker = pgui.ProgressWorkerRunnable(self.processData, pdlg,
                                       channel = [self._data_.analysisOptions["Channels"]["Reference"], 
                                                  self._data_.analysisOptions["Channels"]["Indicator"]],
                                       scene=False)
             
-            scansWorker.signals.signal_finished.connect(pdlg.reset)
-            #scansWorker.signals.signal_finished.connect(self.slot_scansProcessingDone)
-            scansWorker.signals.signal_result[object].connect(self.slot_scansProcessingDone)
+            scansWorker.signals.signal_Finished.connect(pdlg.reset)
+            #scansWorker.signals.signal_Finished.connect(self.slot_scansProcessingDone)
+            scansWorker.signals.signal_Result[object].connect(self.slot_scansProcessingDone)
             
         else:
             self._scans_processing_idle_ = True
@@ -4983,7 +4944,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         else:
             pre_selected = None
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, 
+        choiceDialog = ItemsListDialog(parent=self, 
                                             title="Import Data-wide Descriptors From:", 
                                             itemsList = name_list, 
                                             preSelected = pre_selected)
@@ -4994,7 +4955,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
 
             lsdata = scandata_name_vars[choiceDialog.selectedItemsText[0]]
             
-            for attribute in ("sourceID", "cell", "field", "age", "gender", "genotype"):
+            for attribute in ("sourceID", "cell", "field", "age", "sex", "genotype"):
                 if hasattr(lsdata, attribute):
                     # do this instead of prescribing a default value here, as we 
                     # don't want to override previus values
@@ -5027,15 +4988,26 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         pvimp.open()
         
     def _analyzeFrames_(self, frames, progressSignal=None, setMaxSignal=None, **kwargs):
+        """Calls to the module-level analyseFrame() for each frame in frames.
+        This is meant to be executed in a separate GUI thread, (i.e. it is called 
+        by a ProgressWorkerRunnable) emits progressSignal(int) pyqtSignal
+        
+        Parameters:
+        ==========
+        frames: a sequence of int: indices of the data frames to be analysed
+        progressSignal: a pyqtSignal with one int argument (the frame)
+            This signal is emitted after the processing of one frame.
+        
+        """
         if self._data_ is None:
             return
+        
+        frames = kwargs.pop(frames)
         
         #print("LSCaTWindow._analyzeFrames_ progressSignal", progressSignal, "**kwargs", kwargs)
         
         #detrend = self.detrendEPSCaTsCheckBox.isChecked()
-        
-        
-        
+#         
         for frame in frames:
             analyseFrame(self._data_, frame, **kwargs)
             #analyseFrame(self._data_, frame, detrend=detrend, 
@@ -5126,7 +5098,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
 
         name_list = sorted([name for name in scandata_name_vars.keys() if self._check_for_linescan_data_(scandata_name_vars[name])])
         
-        choiceDialog = pgui.ItemsListDialog(title="Append ScanData Object", 
+        choiceDialog = ItemsListDialog(title="Append ScanData Object", 
                                             parent=self, 
                                             itemsList = name_list)
         
@@ -5169,7 +5141,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
 
         name_list = sorted([name for name in scandata_name_vars.keys() if self._check_for_linescan_data_(scandata_name_vars[name])])
         
-        choiceDialog = pgui.ItemsListDialog(title="Concatenate ScanData Objects", 
+        choiceDialog = ItemsListDialog(title="Concatenate ScanData Objects", 
                                             parent=self, itemsList = name_list, 
                                             selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
         
@@ -5184,9 +5156,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         pd = QtWidgets.QProgressDialog("Concatenating LSCaT data (ScanData) objects in Workspace", "Abort", 0, len(selected_names), self)
         
-        worker = pgui.ProgressWorker(self.concatenateScanData,  pd, selected_names)
+        worker = pgui.ProgressWorkerRunnable(self.concatenateScanData,  pd, selected_names)
         
-        worker.signals.signal_finished.connect(pd.reset)
+        worker.signals.signal_Finished.connect(pd.reset)
         worker.signals.result[object].connect(self.slot_concatenateLSDataDone)
         
         self.threadpool.start(worker)
@@ -5212,7 +5184,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         else:
             pre_selected = None
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, 
+        choiceDialog = ItemsListDialog(parent=self, 
                                             itemsList = name_list, 
                                             preSelected = pre_selected)
         
@@ -5255,7 +5227,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             else:
                 pre_selected = None
             
-            choiceDialog = pgui.ItemsListDialog(parent=self, 
+            choiceDialog = ItemsListDialog(parent=self, 
                                                 itemsList = name_list, 
                                                 preSelected = pre_selected)
             
@@ -5306,7 +5278,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             else:
                 pre_selected = None
             
-            choiceDialog = pgui.ItemsListDialog(parent=self, 
+            choiceDialog = ItemsListDialog(parent=self, 
                                                 itemsList = name_list, 
                                                 preSelected = pre_selected)
             
@@ -5356,7 +5328,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             else:
                 pre_selected = None
             
-            choiceDialog = pgui.ItemsListDialog(parent=self, 
+            choiceDialog = ItemsListDialog(parent=self, 
                                                 itemsList = name_list, 
                                                 preSelected = pre_selected)
             
@@ -5407,7 +5379,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         name_list = sorted(name for name in neo_block_name_vars.keys())
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = name_list)
+        choiceDialog = ItemsListDialog(parent=self, itemsList = name_list)
         
         ans = choiceDialog.exec()
         
@@ -5840,13 +5812,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         pd = QtWidgets.QProgressDialog("EPSCaT Analysis...", "Abort", 0, self._data_.scansFrames, self)
         
-        worker = pgui.ProgressWorker(self._analyzeFrames_, pd,
+        worker = pgui.ProgressWorkerRunnable(self._analyzeFrames_, pd,
                              frames=range(self._data_.scansFrames),
                              detrend = self.detrendEPSCaTsCheckBox.isChecked(),
                              gen_long_fits=self.actionPlot_long_fits.isChecked())
         
-        worker.signals.signal_finished.connect(pd.reset)
-        worker.signals.signal_finished.connect(self.slot_analyseFramesDone)
+        worker.signals.signal_Finished.connect(pd.reset)
+        worker.signals.signal_Finished.connect(self.slot_analyseFramesDone)
         
         self.threadpool.start(worker)
         
@@ -5976,11 +5948,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         pd = QtWidgets.QProgressDialog("EPSCaT Analysis...", "Abort", 0, self._data_.scansFrames, self)
         
-        worker = pgui.ProgressWorker(self._analyzeUnitInFrames_, pd,
+        worker = pgui.ProgressWorkerRunnable(self._analyzeUnitInFrames_, pd,
                              frames=frames, unit=unit)
         
-        worker.signals.signal_finished.connect(pd.reset)
-        worker.signals.signal_finished.connect(self.slot_analyseFramesDone)
+        worker.signals.signal_Finished.connect(pd.reset)
+        worker.signals.signal_Finished.connect(self.slot_analyseFramesDone)
         
         self.threadpool.start(worker)
         
@@ -6860,7 +6832,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         unit_names = sorted([u.name for u in self._data_.analysisUnits])
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = unit_names,
+        choiceDialog = ItemsListDialog(parent=self, itemsList = unit_names,
                                             selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
         
         ans = choiceDialog.exec()
@@ -7223,7 +7195,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
 
         name_list = sorted([name for name in scandata_name_vars.keys() if self._check_for_linescan_data_(scandata_name_vars[name])])
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = name_list, 
+        choiceDialog = ItemsListDialog(parent=self, itemsList = name_list, 
                                             selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
         
         ans = choiceDialog.exec()
@@ -7301,7 +7273,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         try:
             # NOTE: 2018-12-14 16:46:03
             # offer these in a list dialog -- allow the user to pick & choose
-            choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = [item[0] for item in vars_list], 
+            choiceDialog = ItemsListDialog(parent=self, itemsList = [item[0] for item in vars_list], 
                                                 selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
             
             ans = choiceDialog.exec()
@@ -7496,7 +7468,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
 
         name_list = sorted([name for name in scandata_name_vars.keys() if self._check_for_linescan_data_(scandata_name_vars[name])])
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = name_list, 
+        choiceDialog = ItemsListDialog(parent=self, itemsList = name_list, 
                                             selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
         
         ans = choiceDialog.exec()
@@ -7511,10 +7483,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         pd = QtWidgets.QProgressDialog("Collecting Analysis Units from ScanData in Workspace", 
                                        "Abort", 0, len(selected_names), self)
         
-        worker = pgui.ProgressWorker(self.collectAnalysisUnits,  pd, selected_names)
+        worker = pgui.ProgressWorkerRunnable(self.collectAnalysisUnits,  pd, selected_names)
         
-        worker.signals.signal_finished.connect(pd.reset)
-        worker.signals.signal_result[object].connect(self.slot_collectAnalysisDone)
+        worker.signals.signal_Finished.connect(pd.reset)
+        worker.signals.signal_Result[object].connect(self.slot_collectAnalysisDone)
         
         self.threadpool.start(worker)
         
@@ -7803,17 +7775,17 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
     @pyqtSlot(str)
     @safeWrapper
-    def slot_gui_changed_gender(self, val):
+    def slot_gui_changed_sex(self, val):
         if self._data_ is None:
             return
         
         if self._selected_analysis_unit_ is not None:
-            self._selected_analysis_unit_.gender = val
+            self._selected_analysis_unit_.sex = val
             
         else:
-            self._data_.analysisUnit().gender = val
+            self._data_.analysisUnit().sex = val
             for unit in self._data_.analysisUnits:
-                unit.gender = val
+                unit.sex = val
             
         self._update_report_()
         
@@ -7868,7 +7840,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 self.cursorXposDoubleSpinBox, self.cursorYposDoubleSpinBox, \
                 self.cursorXwindow, self.cursorYwindow, \
                 self.unitTypeComboBox, self.genotypeComboBox, \
-                self.genderComboBox, self.ageLineEdit, self.defineAnalysisUnitCheckBox)]
+                self.sexComboBox, self.ageLineEdit, self.defineAnalysisUnitCheckBox)]
             
             if not self._data_.hasAnalysisUnit(self._selected_analysis_cursor_):
                 self._data_.defineAnalysisUnit(self._selected_analysis_cursor_)
@@ -9692,7 +9664,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
     @safeWrapper
     def _check_for_linescan_data_(self, data):
         try:
-            if not check_apiversion(data):
+            if not check_apiversion(data) and hasattr(data, "_upgrade_API_"):
                 data._upgrade_API_()
                 
             return data._scandatatype_ == ScanData.ScanDataType.linescan and data._analysismode_ == ScanData.ScanDataAnalysisMode.frame
@@ -9901,6 +9873,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         win.signal_graphicsObjectDeselected.connect(self.slot_graphics_objects_deselected, type = QtCore.Qt.QueuedConnection)
         
     def _signalviewer_setup_(self, win):
+        # TODO 2022-11-05 15:04:37 is this still required ?!?
         pass
             
     @safeWrapper
@@ -9920,8 +9893,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         # NOTE: 2022-01-17 16:57:06
         # to properly deal with frame indices from the ScanData.framesMap we 
-        # don't link viewers anymore; instead, we capture their frame number
-        # change via the separate slot _slot_frameChangedInChildViewer
+        # don't link viewers anymore; instead, we capture changes in each viewer's
+        # frame number throught the separate slot _slot_frameChangedInChildViewer
         #for viewer in allviewers:
             #viewer.linkToViewers(*allviewers, broadcast=False)
         
@@ -10749,7 +10722,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         # see NOTE: 2018-09-25 22:19:58
         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in self._analysis_unit_gui_widgets_]
-        signalBlockers += [QtCore.QSignalBlocker(self.genotypeComboBox), QtCore.QSignalBlocker(self.genderComboBox), QtCore.QSignalBlocker(self.ageLineEdit)]
+        signalBlockers += [QtCore.QSignalBlocker(self.genotypeComboBox), QtCore.QSignalBlocker(self.sexComboBox), QtCore.QSignalBlocker(self.ageLineEdit)]
         
         self.defineAnalysisUnitCheckBox.setTristate(False)
         
@@ -10842,15 +10815,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 else:
                     self.genotypeComboBox.setCurrentIndex(genotype_index)
                     
-                gender_index = self.genderComboBox.findText(self._data_.gender)
+                sex_index = self.sexComboBox.findText(self._data_.sex)
                 
-                if gender_index == -1:
-                    gender_index = 0
-                    self._data_.gender = "NA"
-                    self.genderComboBox.setCurrentIndex(0)
+                if sex_index == -1:
+                    sex_index = 0
+                    self._data_.sex = "NA"
+                    self.sexComboBox.setCurrentIndex(0)
                     
                 else:
-                    self.genderComboBox.setCurrentIndex(gender_index)
+                    self.sexComboBox.setCurrentIndex(sex_index)
                     
                 self.ageLineEdit.setText("%s" % self._data_.age)
                     
@@ -10888,15 +10861,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 else:
                     self.genotypeComboBox.setCurrentIndex(genotype_index)
                     
-                gender_index = self.genderComboBox.findText(self._data_.gender)
+                sex_index = self.sexComboBox.findText(self._data_.sex)
                 
-                if gender_index == -1:
-                    gender_index = 0
-                    self._data_.gender = "NA"
-                    self.genderComboBox.setCurrentIndex(0)
+                if sex_index == -1:
+                    sex_index = 0
+                    self._data_.sex = "NA"
+                    self.sexComboBox.setCurrentIndex(0)
                     
                 else:
-                    self.genderComboBox.setCurrentIndex(gender_index)
+                    self.sexComboBox.setCurrentIndex(sex_index)
                     
                 self.ageLineEdit.setText("%s" % self._data_.age)
                     
@@ -10936,7 +10909,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             # ###
             # BEGIN Data tab
             dataWidgetsSignalBockers = [QtCore.QSignalBlocker(widget) for widget in \
-                (self.scanDataNameLineEdit, self.cellLineEdit, self.fieldLineEdit, self.genotypeComboBox, self.unitTypeComboBox, self.genderComboBox, self.ageLineEdit)]
+                (self.scanDataNameLineEdit, self.cellLineEdit, self.fieldLineEdit, self.genotypeComboBox, self.unitTypeComboBox, self.sexComboBox, self.ageLineEdit)]
             
             self.sourceIDLineEdit.setText(self._data_.sourceID)
             
@@ -10960,14 +10933,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             else:
                 self.genotypeComboBox.setCurrentIndex(genotype_index)
             
-            gender_index = self.genderComboBox.findText(self._data_.gender)
+            sex_index = self.sexComboBox.findText(self._data_.sex)
             
-            if gender_index == -1:
+            if sex_index == -1:
                 self._data_.genotype = "NA"
                 self.genotypeComboBox.setCurrentIndex(0)
                 
             else:
-                self.genotypeComboBox.setCurrentIndex(gender_index)
+                self.genotypeComboBox.setCurrentIndex(sex_index)
                 
             self.ageLineEdit.setText("%s" % self._data_.age)
             
@@ -11921,10 +11894,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             warnings.warn("Data contains no scans!")
                 
     @safeWrapper
-    def processData(self, scene=True, channel = None, progressSignal = None, setMaxSignal=None):
+    def processData(self, progressSignal = None, setMaxSignal=None, **kwargs):#scene=True, channel = None, ):
         """Applies 2D filters frame-wise to raw scene or scans image data subsets.
         
-        The function is meant to be called by a ProgressWorker instance.
+        The function is meant to be called by a ProgressWorkerRunnable instance.
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
@@ -11953,7 +11926,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         ===========
         
         scene: boolean (default True).
-            When True (the default) the function processed the scene images;
+            When True (the default) the function processes the scene images;
             otherwise, it processed the scans images.
         
         channel: a str, an int, a sequence of str or a sequence of int, or None 
@@ -11965,39 +11938,27 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         if not isinstance(self._data_, ScanData):
             return
         
+        scene = kwargs.pop("scene", True)
+        channel = kwargs.pop("channel", None)
+        
         # choose what to process: data.scene or data.scans
         if scene:
             source = self._data_.scene
-            
             source_chnames = self._data_.sceneChannelNames
-            
             source_frames = self._data_.sceneFrames
-            
             source_frameaxis = self._data_.sceneFrameAxis
-            
             processing = self._scene_filters_
-            
             #target = self._data_.scene
-            
             #target_chnames = self._data_.sceneChannelNames
-            
-            calibrations = self._data_._scene_axis_calibrations_
             
         else:
             source = self._data_.scans
-            
             source_chnames = self._data_.scansChannelNames
-            
             source_frames = self._data_.scansFrames
-            
             source_frameaxis = self._data_.scansFrameAxis
-            
             processing = self._scans_filters_
-            
             #target = self._data_.scans
-            
             #target_chnames = self._data_.scansChannelNames
-            
             calibrations = self._data_._scans_axis_calibrations_
             
         if len(source) == 0:
@@ -12006,12 +11967,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         if len(processing) == 0:
             return
         
-        if channel is None:
+        # figure out the channels to process
+        if channel is None: 
+            # no specific channel to process ⟹ process all channels
             process_channel_names = source_chnames
             process_channel_ndx = [source_chnames.index(c) for c in process_channel_names]
             untouched_channels_ndx = list()
             
         elif isinstance(channel, int):
+            # channel specified by its index (int) ⟹ process indicated channel
             if channel < 0 or channel >= len(source_chnames):
                 raise ValueError("Invalid channel index specified (%d) in %s" % (channel, self._data_var_name_))
             
@@ -12020,6 +11984,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             untouched_channels_ndx = [[k for k in range(len(source_chnames)) if k != process_channel_ndx[0]]]
             
         elif isinstance(channel, str):
+            # channel specified by its name ⟹ process named channel
             if channel not in source_chnames:
                 raise ValueError("Channel %s not found in %s" % (channel, self._data_var_name_))
             
@@ -12028,7 +11993,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             untouched_channels_ndx = [k for k in range(len(source_chnames)) if k != process_channel_ndx[0]]
             
         elif isinstance(channel, (tuple, list)):
+            # specified a sequence of channel ⟹ process ONLY the channels specified
             if all([isinstance(c, str) for c in channel]):
+                # channels to process are specified by name
                 if any([c not in source_chnames for c in channel]):
                     raise ValueError("Not all specified channels (%s) were found in %s" % (channel, self._data_var_name_))
                 
@@ -12037,6 +12004,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 untouched_channels_ndx = [k for k in range(len(source_chnames)) if k not in process_channel_ndx]
                 
             elif all([isinstance(c, int) for c in channel]):
+                # channels to process are specified by int index
                 if any([c < 0 or c >= len(source_chnames) for c in channel]):
                     raise ValueError("Invalid channel indices specified (%s) in %s" % (channel, self._data_var_name_))
                 
@@ -12047,6 +12015,22 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         else:
             raise TypeError("Invalid channel specification: %s for %s" % (channel, self._data_var_name_))
         
+        # NOTE: 2022-11-18 22:05:54
+        # the specified channels names MUST be present in the processing dict, 
+        # as str keys, mapped to a dict with the following key/value pairs:
+        #
+        # "function" → the fully qualified name of the function (i.e. package.module.function_name)
+        #   the package/module MUST have been already imported in this module
+        #   FIXME/TODO: 2022-11-18 22:09:04 
+        #   when factorising this code do NOT expect the above to happen; implement
+        #   some dynamic module load/search rather than just going straight to eval
+        #
+        # "args" → a sequence (e.g. tuple, list) of positional (var-positional)
+        #   parameters to the function in "function" (see above)
+        #
+        # "kwargs" → a mapping (e.g. a dict) with the var-keyword parameters of
+        #   the function in "function" (see above)
+    
         if any([c not in processing for c in process_channel_names]):
             raise ValueError("Processing functions are not defined for all channels")
         
@@ -12211,8 +12195,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         #self.protocolTableWidget.itemChanged[QtWidgets.QTableWidgetItem].connect(self.slot_protocolTableEdited, type = QtCore.Qt.QueuedConnection)
         
     @safeWrapper
-    def setData(self, newdata = None, doc_title=None):
+    def setData(self, newdata = None, doc_title=None, **kwargs):
         """When newdata is None this resets everything to their defaults"""
+        uiParamsPrompt = kwargs.pop("uiParamsPrompt", False)
+        
+        if uiParamsPrompt:
+            # TODO 2023-01-18 08:48:13
+            pass
+            # print(f"{self.__class__.__name__}.setData uiParamsPrompt")
+            
         # NOTE: 2021-07-08 13:40:23
         # called by ScyipenViewer superclass
         self._clear_contents_()
@@ -12320,7 +12311,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         if self.isTopLevel:
             if any([v is self for v in self.appWindow.workspace.values()]):
-                self.appWindow.deRegisterViewer(self) # this will also save settings and close the viewer window
+                self.appWindow.deRegisterWindow(self) # this will also save settings and close the viewer window
                 self.appWindow.removeFromWorkspace(self, by_name=False)
                 #self.appWindow.removeFromWorkspace(self, from_console=False, by_name=False)
                 self.appWindow.slot_updateWorkspaceModel()
@@ -12347,7 +12338,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
              self.cursorXposDoubleSpinBox, self.cursorYposDoubleSpinBox, 
              self.cursorXwindow, self.cursorYwindow, 
              self.unitTypeComboBox, self.genotypeComboBox,
-             self.genderComboBox, self.defineAnalysisUnitCheckBox)]
+             self.sexComboBox, self.defineAnalysisUnitCheckBox)]
 
         #self.scanDataNameLineEdit.editingFinished.disconnect(self.slot_setDataName)
         #self.cellLineEdit.editingFinished.disconnect(self.slot_gui_changed_cell_name)
@@ -12409,7 +12400,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         self.selectCursorSpinBox.setValue(-1)
         self.unitTypeComboBox.setCurrentIndex(0)
         self.genotypeComboBox.setCurrentIndex(0)
-        self.genderComboBox.setCurrentIndex(0)
+        self.sexComboBox.setCurrentIndex(0)
         
         self.protocolTableWidget.clearContents()
         self.protocolTableWidget.setRowCount(0)
@@ -12543,14 +12534,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         else:
             raise TypeError("channels is expected to be a list of str or int, or None")
                 
-def addGender(data, value):
-    """Creates a 'Gender' column in the data.
+def addSex(data, value):
+    """Creates a 'Sex' column in the data.
     Parameters:
     ==========
     data: pandas.DataFrame with LSCaT results
     value = string, one of "m", "f", "na" (case-insensitive)
     
-    ATTENTION: Data should all have the same source, otherwise the gender will be 
+    ATTENTION: Data should all have the same source, otherwise the sex will be 
         coerced to "na"
         
     Modifies data in-place; the columns will be inserted after the source column,
@@ -12564,20 +12555,20 @@ def addGender(data, value):
         raise TypeError("value parameter expectd a str; got %s instead" % type(value).__name__)
     
     if value.lower().strip() not in ("f", "m", "na"):
-        raise ValueError("Gender expected to be one of 'f', 'm', or 'na' (case-insensitive); got %s instead" % value)
+        raise ValueError("Sex expected to be one of 'f', 'm', or 'na' (case-insensitive); got %s instead" % value)
     
     if "Source" in data.columns:
         if all([s == data.Source[0] for s in data.Source]):
-            gdr = pd.Series([value] * len(data.Source), name="Gender").astype("category")
+            gdr = pd.Series([value] * len(data.Source), name="Sex").astype("category")
             
         else:
-            warnings.warn("Not all data have the same source; coercing Gender to 'NA'")
-            gdr = pd.Series(["NA"] * len(data.Source), name="Gender").astype("category")
+            warnings.warn("Not all data have the same source; coercing Sex to 'NA'")
+            gdr = pd.Series(["NA"] * len(data.Source), name="Sex").astype("category")
             
         data.insert(1, gdr)
         
     else:
-        gdr = pd.Series([value] * len(data.Source), name="Gender").astype("category")
+        gdr = pd.Series([value] * len(data.Source), name="Sex").astype("category")
         index = data.columns.index("Source")
         data.insert(index, gdr)
         
@@ -12723,8 +12714,8 @@ def addAge(data, value):
         age_series = pd.Series([age] * len(data.index), name="Age")
         
         if "Source" in data.columns:
-            if "Gender" in data.columns:
-                index = data.columns.index("Gender")
+            if "Sex" in data.columns:
+                index = data.columns.index("Sex")
             
             else:
                 index = data.columns.index("Source")
@@ -13894,7 +13885,37 @@ def blankUncageArtifactInLineScans(data, time, width, bgstart, bgend, frame=0):
             #print("blanking index", imgIndex)
             img[imgIndex] = val
         
+@magics_class
+class LSCaTMagics(Magics):
+    @line_magic
+    @needs_local_scope
+    def LSCaT(self, line, local_ns):
+        if len(line.strip()):
+            lsdata = local_ns.get(line, None)
+        else:
+            lsdata = None
+            
+        mw = local_ns.get("mainWindow", None)
         
+        if mw.__class__.__name__ == "ScipyenWindow":
+            lscatWindow = mw.newViewer(LSCaTWindow, parent=mw, win_title="LSCaT")
+            if isinstance(lsdata,  ScanData):
+                lscatWindow.view(lsdata)
+            else:
+                lscatWindow.show()
+        
+def launch():
+    try:
+        win = mainWindow.newViewer(LSCaTWindow, parent = mainWindow, win_title="LSCaT")
+        win.show()
+    except:
+        traceback.print_exc()
+        
+        
+def init_scipyen_plugin():
+    return {"Applications|LSCaT":launch}
 
-    
+
+def load_ipython_extension(ipython):
+    ipython.register_magics(LSCaTMagics)
     

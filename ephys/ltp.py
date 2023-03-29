@@ -66,7 +66,7 @@ Stimulus        0                   1                   2   etc...
 
 Time (s)        0         5         10        15        20  NOTE: __ = 1s = one "sweep"
 
-Path 0          |___________________|___________________|_  NOTE: |_ = test stimulus
+Path 0          |___________________|___________________|_  NOTE: |_ = test stimulus; this can be a paired pulse stimultion (e.g. two sitmuli 25 ms apart, etc)
 
 Path 1          __________|___________________|___________
 
@@ -576,7 +576,7 @@ Waveform:
 
 TODO 2020-10-20 21:45:35
 
-1) finalize ephys.ElectrophysiologyDataParser, to "guess" the Clampex protocol
+1) finalize ephys.ElectrophysiologyProtocol, to "guess" the Clampex protocol
 configuration from the ABF files (this metadata is stored in the "annotations"
 attribute of the neo.Block objects)
 2) GUI for LTP experiments - with fields to modify these parameters
@@ -644,6 +644,7 @@ import gui.textviewer as tv
 import gui.tableeditor as te
 import gui.matrixviewer as matview
 import gui.pictgui as pgui
+from gui.itemslistdialog import ItemsListDialog
 import gui.quickdialog as quickdialog
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import ScipyenViewer, ScipyenFrameViewer
@@ -1088,7 +1089,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
         else:
             nameList = [b.name for b in self._baseline_source_data_]
-            choiceDialog = pgui.ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
+            choiceDialog = ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
             
             ans = choiceDialog.exec()
             
@@ -1118,7 +1119,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
         else:
             nameList = [b.name for b in self._chase_source_data_]
-            choiceDialog = pgui.ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
+            choiceDialog = ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
             
             ans = choiceDialog.exec()
             
@@ -1149,7 +1150,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
         else:
             nameList = [b.name for b in self._conditioning_source_data_]
-            choiceDialog = pgui.ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
+            choiceDialog = ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
             
             ans = choiceDialog.exec()
             
@@ -1179,7 +1180,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
         else:
             nameList = [b.name for b in self._path_xtalk_source_data_]
-            choiceDialog = pgui.ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
+            choiceDialog = ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
             
             ans = choiceDialog.exec()
             
@@ -1448,7 +1449,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         return record_data
     
             
-def generate_synaptic_plasticity_options(**kwargs) -> dict:
+def generate_synaptic_plasticity_options(**kwargs):
     """Constructs a dict with options for synaptic plasticity experiments.
     
     The options specify synaptic pathways, analysis cursors and optional 
@@ -1603,7 +1604,7 @@ def generate_synaptic_plasticity_options(**kwargs) -> dict:
     average = kwargs.pop("average", 6)
     average_every = kwargs.pop("every", 6)
     
-    reference = keargs.pop("reference", 5)
+    reference = kwargs.pop("reference", 5)
     
     measure = kwargs.pop("measure", "amplitude")
     
@@ -1713,7 +1714,7 @@ def generate_LTP_options(cursors, signal_names, path0, path1, baseline_minutes, 
     however, be recorded in Signal5 by routing from the amplifier into another analog input
     in the CED board (if available!) and recording it by apropriately configuring the Signal5.
     
-    Failing that, one can use Vm=True in fruther analyses and supply the value of the test Vm pulse in 
+    Failing that, one can use Vm=True in further analyses and supply the value of the test Vm pulse in 
     signal_index_Vm in LTP functions.
     
     The CED issue is not of immediate importance as this kind of analysis is easily done in Signal5
@@ -1789,6 +1790,9 @@ def load_synaptic_plasticity_options(LTPOptionsFile:[str, type(None)]=None, **kw
     
     """
     
+    if len(kwargs) == 0 and (LTPOptionsFile is None or len(LTPOptionsFile.strip()) == 0):
+        LTPOptionsFile = os.path.join(os.path.dirname(__file__), "options", "LTPOptions.pkl")
+    
     if LTPOptionsFile is None or not os.path.isfile(LTPOptionsFile):
         
         LTPopts = generate_synaptic_plasticity_options(**kwargs)
@@ -1818,8 +1822,6 @@ def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptio
             mapping onto the minute-by-minute average of the sweep data in the 
             respective pathway.
             
-    DEPRECATED
-    
     """
     from operator import attrgetter, itemgetter, methodcaller
     
@@ -1842,11 +1844,11 @@ def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptio
     #print(len(chase_blocks))
     
     if LTPOptions["Average"] is None:
-        baseline = [ephys.concatenate_blocks(baseline_blocks,
+        baseline = [neoutils.concatenate_blocks(baseline_blocks,
                                                 segment = LTPOptions["Pathway0"],
                                                 analog = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path0_baseline"),
-                    ephys.concatenate_blocks(baseline_blocks,
+                    neoutils.concatenate_blocks(baseline_blocks,
                                                 segment = LTPOptions["Pathway1"],
                                                 analog = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path1_baseline")]
@@ -1869,11 +1871,11 @@ def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptio
     
     
     if LTPOptions["Average"] is None:
-        chase   = [ephys.concatenate_blocks(chase_blocks,
+        chase   = [neoutils.concatenate_blocks(chase_blocks,
                                                 segment = LTPOptions["Pathway0"],
                                                 analog = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path0_chase"),
-                   ephys.concatenate_blocks(chase_blocks,
+                   neoutils.concatenate_blocks(chase_blocks,
                                                 segment = LTPOptions["Pathway1"],
                                                 analog = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path1_chase")]
@@ -1902,12 +1904,12 @@ def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptio
 
     return ret
 
-def calculate_fEPSP(block:neo.Block,
-                    signal_index:[int, str],
-                    epoch:[neo.Epoch, type(None)]=None,
-                    out_file:[str, type(None)]=None) -> dict:
+def calculate_fEPSP(block:neo.Block,\
+                    signal_index:[int, str],\
+                    epoch:[neo.Epoch, type(None)]=None,\
+                    out_file:[str, type(None)]=None):# -> dict:
     """
-    Calculates the slope of field EPSPs.
+    Calculates the slope of field EPSPs. TODO
     
     Parameters:
     ===========
@@ -1951,15 +1953,15 @@ def calculate_fEPSP(block:neo.Block,
     for k, seg in enumerate(block.segments):
         pass
     
-def calculate_LTP_measures_in_block(block: neo.Block, 
-                                    signal_index_Im, 
-                                    signal_index_Vm = None, 
-                                    trigger_signal_index = None,
-                                    testVm = None, 
-                                    epoch = None, 
-                                    stim = None,
-                                    isi = None,
-                                    out_file=None) -> pd.DataFrame:
+def calculate_LTP_measures_in_block(block: neo.Block, \
+                                    signal_index_Im, /, \
+                                    signal_index_Vm = None, \
+                                    trigger_signal_index = None,\
+                                    testVm = None, \
+                                    epoch = None, \
+                                    stim = None,\
+                                    isi = None,\
+                                    out_file=None):# -> pd.DataFrame:
     """
     Calculates membrane Rin, Rs, and EPSC amplitudes in whole-cell voltage clamp.
     
@@ -2079,9 +2081,9 @@ def calculate_LTP_measures_in_block(block: neo.Block,
     return result
 
 
-def segment_synplast_params_i_clamp(s: neo.Segment, 
-                                       signal_index: int, 
-                                       epoch: typing.Optional[neo.Epoch]=None) -> np.ndarray:
+def segment_synplast_params_i_clamp(s: neo.Segment, \
+                                       signal_index: int, \
+                                       epoch: typing.Optional[neo.Epoch]=None):# -> np.ndarray:
     if epoch is None:
         if len(s.epochs) == 0:
             raise ValueError("Segment has no epochs and no external epoch has been defined")
@@ -2109,14 +2111,14 @@ def segment_synplast_params_i_clamp(s: neo.Segment,
         return chord_slopes
         
         
-def segment_synplast_params_v_clamp(s: neo.Segment,
-                                       signal_index_Im: int,
-                                       signal_index_Vm: typing.Optional[int]=None,
-                                       trigger_signal_index: typing.Optional[int] = None,
-                                       testVm: typing.Union[float, pq.Quantity, None]=None,
-                                       epoch: typing.Optional[neo.Epoch]=None,
-                                       stim: typing.Optional[TriggerEvent]=None,
-                                       isi:typing.Union[float, pq.Quantity, None]=None) -> tuple:
+def segment_synplast_params_v_clamp(s: neo.Segment, \
+                                       signal_index_Im: int,\
+                                       signal_index_Vm: typing.Optional[int]=None,\
+                                       trigger_signal_index: typing.Optional[int] = None,\
+                                       testVm: typing.Union[float, pq.Quantity, None]=None,\
+                                       epoch: typing.Optional[neo.Epoch]=None,\
+                                       stim: typing.Optional[TriggerEvent]=None,\
+                                       isi:typing.Union[float, pq.Quantity, None]=None):# -> tuple:
     """
     Calculates several signal measures in a synaptic plasticity experiment.
     
@@ -2411,8 +2413,8 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
 
     #print("testVm", testVm)
     
-    Rs     = (testVm / (Irs - Idc)).rescale(dt.Mohm)
-    Rin    = (testVm / (Irin - Idc)).rescale(dt.Mohm)
+    Rs     = (testVm / (Irs - Idc)).rescale(pq.Mohm)
+    Rin    = (testVm / (Irin - Idc)).rescale(pq.Mohm)
         
     #print("dIRs", (Irs-Idc), "dIRin", (Irin-Idc), "Rs", Rs, "Rin", Rin)
         
@@ -2472,7 +2474,7 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
             event = stim
             
         elif len(s.events): # check for presyn stim event embedded in segment
-            ltp_events = [e for e in s.events if (e.event_type == TriggerEventType.presynaptic and isinstance(e.name, str) and e.name.strip().lower() == "ltp")]
+            ltp_events = [e for e in s.events if (isinstance(e, TriggerEvent) and e.event_type == TriggerEventType.presynaptic and isinstance(e.name, str) and e.name.strip().lower() == "ltp")]
             
             if len(ltp_events):
                 if len(ltp_events)>1:
@@ -2501,24 +2503,25 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
     return (Idc, Rs, Rin, EPSC0, EPSC1, PPR, ISI)
 
                  
-def analyse_LTP_in_pathway(baseline_block: neo.Block, 
-                           chase_block: neo.Block, 
-                           signal_index_Im: typing.Union[int, str], 
-                           path_index: int,
-                           baseline_range=range(-5,-1),
-                           signal_index_Vm: typing.Union[int, str]=None, 
-                           trigger_signal_index: typing.Union[int, str, None]=None,
-                           baseline_epoch:typing.Optional[neo.Epoch]=None, 
-                           chase_epoch:typing.Optional[neo.Epoch] = None,
-                           testVm:typing.Optional[typing.Union[float, pq.Quantity]] = None,
-                           stim:typing.Optional[TriggerEvent] = None,
-                           isi:typing.Optional[typing.Union[float, pq.Quantity]] = None,
-                           basename:str=None, 
-                           normalize:bool=False,
-                           field:bool=False,
-                           is_test:bool = False,
-                           v_clamp:bool = True,
-                           out_file:typing.Optional[str]=None) -> pd.DataFrame:
+def analyse_LTP_in_pathway(baseline_block: neo.Block, \
+                           chase_block: neo.Block, \
+                           signal_index_Im: typing.Union[int, str], \
+                           path_index: int,\
+                           /, \
+                           baseline_range=range(-5,-1),\
+                           signal_index_Vm: typing.Union[int, str]=None, \
+                           trigger_signal_index: typing.Union[int, str, None]=None,\
+                           baseline_epoch:typing.Optional[neo.Epoch]=None, \
+                           chase_epoch:typing.Optional[neo.Epoch] = None,\
+                           testVm:typing.Optional[typing.Union[float, pq.Quantity]] = None,\
+                           stim:typing.Optional[TriggerEvent] = None,\
+                           isi:typing.Optional[typing.Union[float, pq.Quantity]] = None,\
+                           basename:str=None, \
+                           normalize:bool=False,\
+                           field:bool=False,\
+                           is_test:bool = False,\
+                           v_clamp:bool = True,\
+                           out_file:typing.Optional[str]=None):# -> pd.DataFrame:
     """
     Parameters:
     -----------
@@ -2534,6 +2537,11 @@ def analyse_LTP_in_pathway(baseline_block: neo.Block,
     Vm              = False
     basename        = None
 
+    The baseline and chase blocks are expected to contain segments from the same 
+    synaptic pathway. That is, they were obtained by calling 
+    neoutils.concatenate_blocks passing the index of the segments for the desired
+    as the 'segments' parameter (see neoutils.concatenate_blocks for details)
+    
     """
     # TODO 2020-10-26 09:18:18
     # analysis of fEPSPs
@@ -2544,8 +2552,7 @@ def analyse_LTP_in_pathway(baseline_block: neo.Block,
         
     #else:
 
-    baseline_result     = calculate_LTP_measures_in_block(baseline_block, 
-                                                          signal_index_Im = signal_index_Im, 
+    baseline_result     = calculate_LTP_measures_in_block(baseline_block, signal_index_Im, 
                                                           signal_index_Vm = signal_index_Vm, 
                                                           trigger_signal_index = trigger_signal_index,
                                                           testVm = testVm, 
@@ -2553,8 +2560,7 @@ def analyse_LTP_in_pathway(baseline_block: neo.Block,
                                                           stim = stim,
                                                           isi = isi)
     
-    chase_result        = calculate_LTP_measures_in_block(chase_block,    
-                                                            signal_index_Im = signal_index_Im, 
+    chase_result        = calculate_LTP_measures_in_block(chase_block, signal_index_Im, 
                                                             signal_index_Vm = signal_index_Vm, 
                                                             trigger_signal_index = trigger_signal_index,
                                                             testVm = testVm, 
@@ -2563,7 +2569,7 @@ def analyse_LTP_in_pathway(baseline_block: neo.Block,
                                                             isi = isi)
 
     result = pd.concat([baseline_result, chase_result],
-                       ignore_index = True, axis=0, sort=True)
+                       ignore_index = True, axis=0)#, sort=True)
     
     # time index (minutes) relative to the first post-conditioning stimulus (set 
     # to minute zero); this is stored as the index of the data frame
@@ -2591,10 +2597,10 @@ def analyse_LTP_in_pathway(baseline_block: neo.Block,
     
     return result
 
-def LTP_analysis(path0_base:neo.Block, path0_chase:neo.Block, path0_options:dict,
-                 path1_base:typing.Optional[neo.Block]=None, 
-                 path1_chase:typing.Optional[neo.Block]=None, 
-                 path1_options:typing.Optional[dict]=None,
+def LTP_analysis_new(path0_base:neo.Block, path0_chase:neo.Block, path0_options:dict,\
+                 path1_base:typing.Optional[neo.Block]=None, \
+                 path1_chase:typing.Optional[neo.Block]=None, \
+                 path1_options:typing.Optional[dict]=None,\
                  basename:typing.Optional[str]=None):
     """
     path0_base: neo.Block with minute-averaged sweeps with synaptic responses
@@ -2623,9 +2629,9 @@ def LTP_analysis(path0_base:neo.Block, path0_chase:neo.Block, path0_options:dict
                 
     
     """
-
+    pass
     
-def LTP_analysis_v0(mean_average_dict, LTPOptions, results_basename=None, normalize=False):
+def LTP_analysis(mean_average_dict, LTPOptions, results_basename=None, normalize=False):
     """
     Arguments:
     ==========
@@ -2641,7 +2647,6 @@ def LTP_analysis_v0(mean_average_dict, LTPOptions, results_basename=None, normal
     NOTE 1: The segments in the blocks inside mean_average_dict must have already been assigned epochs from cursors!
     NOTE 2: The "Test" and "Control" dictionaries in mean_average_dict must contain a field "Path" with the actual path index
     
-    DEPRECATED
     """
     
     if results_basename is None:
@@ -2812,14 +2817,11 @@ def setupLTPCursors(viewer, LTPOptions, pathway, axis=None):
             raise ValueError("When specified, axis must be an integer between 0 and %d" % len(viewer.axesWithLayoutPositions))
         
     
-    viewer.setupCursors("v", LTPOptions["Cursors"]["Pathway%d"%pathway])
+    viewer.setupCursors("v", LTPOptions["Cursors"]["Pathway%d"%pathway], 
+                        xwindow = LTPOptions["Cursors"]["Windows"],
+                        labels = LTPOptions["Cursors"]["Labels"])
         
-def extract_sample_EPSPs(data, 
-                         test_base_segments_ndx, 
-                         test_chase_segments_ndx, 
-                         control_base_segments_ndx, 
-                         control_chase_segments_ndx,
-                         t0, t1):
+def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx, control_base_segments_ndx, control_chase_segments_ndx, t0, t1):
     """
     data: dict; an LTP data dict
     

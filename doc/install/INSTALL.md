@@ -1,0 +1,184 @@
+# About install.sh - Scipyen installation script for Linux
+
+Author: Cezar M. Tigaret <cezar.tigaret@gmail.com>
+
+Distributed under GNU GPL License v.2
+
+* * * 
+
+**NOTE:** If you read this, this means you already have a local clone of the 
+Scipyen repository.
+
+## Preamble
+
+Scipyen requires Python >= 3.9 and is meant to run inside a virtual python 
+environment. The `virtualenv` facility is recommended.
+
+This script will create the virtual environment and install any required third
+party software INSIDE the virtual environment. 
+
+**WARNING:** 
+Scipyen repository ***SHOULD NOT*** be stored inside the virtual environment directory!
+
+**NOTE:**
+The script itself requires a few other command line tools - these are 
+supplied by the Linux distribution and usually are installed by default, but 
+it is worth checking that they are available beforehand:
+
+  • `date` (usually are installed by default)
+  
+  • `virtualenv` python package
+  
+  • [`glow`](https://github.com/charmbracelet/glow) (to display [Markdown](https://daringfireball.net/projects/markdown/) documents on the console)
+
+  • development tools: `cmake`, `make`, C++ compiler suite, assembler, etc., see below.
+## Usage
+
+Assuming Scipyen is cloned inside `${HOME}/scipyen` launch the script like this:
+
+```bash
+sh ${HOME}/scipyen/doc/install/install_test.sh
+```
+### Script options
+* `--install_dir=DIR` - specifies a directory where the virtual environment will be created (default is `${HOME}`)
+* `--environment=NAME` - specifies a custom name for the virtual environment; (default is `scipyenv.x.y.z` where `x`, `y`, and `z` are the `python` interpreter version numbers"
+* `--with_neuron` - when present, will install neuron python from PyPI. See also:
+    - https://neuron.yale.edu/neuron/
+    - https://github.com/neuronsimulator/nrn/
+    - https://pypi.org/project/NEURON/
+* `--build_neuron` - when present, will build neuron python locally.
+* `--with_coreneuron` - when present, local `neuron` build will use `coreneuron` (by default, `coreneuron` is not used). 
+This option has effect only when `neuron` is built locally. For details about `coreneuron` see
+    https://github.com/BlueBrain/CoreNeuron
+* `--jobs=N` where `N` is an integer `>= 0`; enables parallel tasks during building 
+of `PyQt5` and `neuron` (default is `4`)
+* `--reinstall=N` whene `N` is one of `pyqt5`, `vigra` ,`neuron`; (re)installation or (re)building of any of these components;
+can be passed more than once.
+* `-h | -? | --help` shows a brief help message then quit
+* `--about` shows this document on the console (requires `glow`).
+    
+    
+## Description
+Scipyen requires third party software installed in a virtual `python` environment.
+
+### Needed Python packages
+Some of this is available as Python packages on [PyPI](https://pypi.org/) - hence installable via `pip`. 
+The required packages are listed in the file `pip_requirements.txt` in this directory.
+
+**ATTENTION:**
+The actual `pip` tool to be used is `pip3` (i.e. for `python` version 3 and later). 
+A better (as in more explicit) solution is to call (see [pip user guide](https://pip.pypa.io/en/latest/user_guide/) for details):
+    
+```bash
+python3 -m pip <... pip commands & options ...>
+```
+### Software that may have to be built locally
+Other third party software may not be available on [PyPI](https://pypi.org/), or needs to be built
+locally (inside the virtual environment), provided that dependencies are 
+installed on the host computer:
+
+#### [PyQt5](https://www.riverbankcomputing.com/software/pyqt/) - Python bindings for `Qt5` toolkit
+These are necessary for `Scipyen`'s GUI.
+
+* On Windows, this can be installed via `pip` directly from [the PyPI repository](https://pypi.org/project/PyQt5/) by calling
+      
+      ```sh
+      python3 -m pip install PyQt5
+      ```
+
+* **NOTE:** On some Linux distributions installation via `pip` may fail, in particular
+when the expected Qt project build tool `qmake` is available under a different 
+name (e.g., `qmake-qt5`); in this case a local build is necessary.
+
+Local `PyQt5` build is also useful for a custom selection of `Qt` components, and
+for a better integration of `Scipyen`'s GUI with the desktop look and feel
+when using `KDE/Plasma` desktop.
+    - To build `PyQt5` locally in Lnux the following dependencies are needed
+    - build toolchain (e.g. `make`, GNU c++ compiler etc)
+    - development packages for `Qt5` - including `qmake` (!)
+    - Python >= 3.10, `cython`
+    - Follow instructions given on the [PyQt5 home page](https://www.riverbankcomputing.com/static/Docs/PyQt5/installation.html).
+
+**WARNING:**
+By default, this script uses parallel compilation to build PyQt5 locally. 
+In some circumstances this may crash the build process with an error like the one below:
+
+```sh
+      {standard input}: Assembler messages: 
+      {standard input}: Warning: end of file not at end of a line; newline inserted 
+      {standard input}:1353: Error: unbalanced parenthesis in operand 1.
+```
+      
+The error is likely generated by a race condition (the assembler triying to process 
+a file that is incomplete at that particular stage in the build).
+
+If this happens, then pass `--jobs=N` option to this script with `N` a small number 
+(half the number of cores is a good guess) or even `0`.
+
+#### [VIGRA](http://ukoethe.github.io/vigra/) - C++ library for computer vision
+This library privides `python` bindings (`vigranumpy`) that are used by `Scipyen` code for image analysis and processing.
+
+However, there are no `vigranumpy` packages available as of this time 
+(2023-03-23) and Therefore, VIGRA library and its python bindings MUST be built
+locally.
+
+This requires a few dependencies listed [here](http://ukoethe.github.io/vigra/doc-release/vigra/Installation.html), 
+which include [`cmake`](https://cmake.org/), [`boost C++`](https://www.boost.org/), [`cython`](https://cython.org/),
+[`sphinx`](https://www.sphinx-doc.org/en/master/) (*NOTE* that this is installed as per `pip_requirements.txt` file),
+[`fftw3`](https://www.fftw.org/), [`libtiff`](http://simplesystems.org/libtiff/),
+[`libpng`](http://www.libpng.org/pub/png/libpng.html) (also available [here](https://libpng.sourceforge.io/index.html)),
+[`libjpeg`](https://libjpeg.sourceforge.net/), and the *recommended* [`HDF5`](https://www.hdfgroup.org/solutions/hdf5/),
+[`doxygen`](https://www.doxygen.nl/).
+
+
+The script clones the latest [`vigra github`](http://ukoethe.github.io/vigra/) 
+repository and builds it locally.
+
+#### [NEURON](https://neuron.yale.edu/neuron/) simulation environment.
+The `python` interface in recent versions of [NEURON](https://neuron.yale.edu/neuron/)
+enables Scipyen to launch and operate with `NEURON`. This interoperability 
+is still at an incipient stage, therefore `NEURON` is **NOT** installed by default.
+
+To enable `NEURON`, pass either `--with_neuron` or `--build-neuron` options to the install
+script.
+
+* The `--with-neuron` option simply installs the currently available `NEURON python` 
+package from its [PyPI repository](https://pypi.org/project/NEURON/).
+* The `--build-neuron` option builds `NEURON` locally from its [GitHub repository](https://github.com/neuronsimulator/nrn)
+    - For dependencies and options to customize the build, see [here](https://github.com/neuronsimulator/nrn/blob/master/docs/install/install_instructions.md)
+    - When built locally, `NEURON` can be configured to use [The BlueBrain Project's](https://github.com/BlueBrain) [`coreneuron`](https://github.com/BlueBrain/CoreNeuron).
+    
+
+## Environment customization
+If you want to add or remove packages manually, you can do so using `pip`; if 
+you think these changes are worth propagating to the main scipyen repository
+then please inform the main author ([Cezar Tigaret](tigaretc@cardiff.ac.uk)). 
+
+**WARNING:** Please be advised that all calls to `pip` for package installation 
+or removal should be done **with the python virtual environment activated**. The 
+author(s) cannot advise on possible troubleshooting when packages are installed
+outside the virtual environment.
+
+## What the script does
+The script performs the following steps:
+
+1. Creates a virtual environment if necessary, then activates it
+2. Installs python packages from the [Python Package Index](https://pypi.org/) according to the [`./pip_requirements.txt`](pip_requirements.txt) file in this directory
+3. Download the latest PyQt5 sdist, build a wheel locally and installs it
+4. Clones vigra git repository, build and install it
+5. Optionally, installs neuron from PyPI or clones the neuron git repository, builds and install it.
+
+
+**NOTE:** Steps 2 - 5 also generate a local "flag" (saved as hidden files 
+in the top directory of the environment) such that should something go wrong
+in a particular step, the steps sucessfully executed prior to the fault will 
+be skipped on a subsequent run.
+
+These flags are `.pipdone`, `.pyqtdone`, `.vigradone`, and `.nrndone`.
+
+Should you want to re-run a (previously sucessful) step, just remove the 
+corresponding flag from the environment directory and call this script again.
+
+
+2023-03-23
+

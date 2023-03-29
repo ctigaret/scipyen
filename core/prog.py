@@ -8,9 +8,10 @@ decorators, context managers, and descriptor validators.
 
 #print("{}: {}".format(__file__, __name__))
 
-from pprint import pprint
+import pprint
 
 from abc import ABC, abstractmethod
+from importlib import abc as importlib_abc
 import enum, io, os, re, itertools, sys, time, traceback, types, typing
 import collections
 import importlib, inspect, pathlib, warnings, operator, functools
@@ -81,7 +82,7 @@ class BaseDescriptorValidator(ABC):
         If the descriptor owner contains at least one of the dict attributes
         '_preset_hooks_' and '_postset_hooks_' mapping the descriptor's public
         name to an AttributeAdapter instance, then the adapter instance will be
-        called BEFORE (respectively, AFTER)  assignment of 'value' to descriptor.
+        called BEFORE (respectively, AFTER) assignment of 'value' to descriptor.
         
         """
         # NOTE: 2022-01-03 20:45:48
@@ -479,6 +480,21 @@ class Timer(object):
         # for use as context manager
         self.stop()
         
+# class SpecFinder(importlib.abc.MetaPathFinder):
+class SpecFinder(importlib_abc.MetaPathFinder):
+    """
+    See https://stackoverflow.com/questions/62052359/modulespec-not-found-during-reload-for-programmatically-imported-file-in-differe
+    """
+    def __init__(self, path_map:dict):
+        self.path_map = path_map
+        
+    def find_spec(self, fullname, path, target=None):
+        if fullname in self.path_map:
+            return importlib.util.spec_from_file_location(fullname, self.path_map[fullname])
+        
+    def find_module(self, fullname, path):
+        return
+        
 # ### BEGIN module functions
 
 def signature2Dict(sig, name:typing.Optional[str]=None, 
@@ -714,7 +730,7 @@ def makeSignature(dct:Bunch) -> Signature:
     ## FIXME/TODO 2021-12-22 23:38:58
     #return
 
-def signature2Str(f:typing.Union[types.FunctionType, inspect.Signature, Bunch], 
+def signature2Str(f:typing.Union[types.FunctionType, inspect.Signature, Bunch], \
                         as_constructor:bool=False):
     """Turns a signature dict into an executable str.
     
@@ -758,9 +774,9 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
 def deprecation(msg):
     warnings.warn(msg, DeprecationWarning, stacklevel=2)
     
-def iter_attribute(iterable:typing.Iterable, 
-                   attribute:str, 
-                   silentfail:bool=True)-> typing.Generator:
+def iter_attribute(iterable:typing.Iterable, \
+                   attribute:str, \
+                   silentfail:bool=True):
     """Iterator accessing the specified attribute of the elements in 'iterable'.
     Elements lacking the specified attribute yield None, unless 'silentfail' is 
     False.
@@ -785,7 +801,7 @@ def iter_attribute(iterable:typing.Iterable,
     else:
         return (getattr(item, attribute) for item in iterable)
     
-def filter_type(iterable:typing.Iterable, klass:typing.Type) -> typing.Iterator:
+def filter_type(iterable:typing.Iterable, klass:typing.Type):
     """Iterates elements of 'iterable' that are of type specified by 'klass'
     
     Parameters:
@@ -795,7 +811,7 @@ def filter_type(iterable:typing.Iterable, klass:typing.Type) -> typing.Iterator:
     """
     return filter(lambda x: isinstance(x, klass), iterable)
 
-def filterfalse_type(iterable:typing.Iterable, klass:typing.Type) -> typing.Iterator:
+def filterfalse_type(iterable:typing.Iterable, klass:typing.Type):
     """The negated version of filter_type.
     Iterates elements that are NOT of type specified in 'klass'
 
@@ -806,12 +822,12 @@ def filterfalse_type(iterable:typing.Iterable, klass:typing.Type) -> typing.Iter
     """
     return filter(lambda x: not isinstance(x, klass), iterable)
 
-def filter_attr(iterable:typing.Iterable, 
-                op:typing.Callable[[typing.Any, typing.Any], bool] = operator.and_, 
-                indices:bool = False, 
-                indices_only:bool = False, 
-                exclude:bool = False,
-                **kwargs)-> typing.Iterator:
+def filter_attr(iterable:typing.Iterable, \
+                op:typing.Callable[[typing.Any, typing.Any], bool] = operator.and_, \
+                indices:bool = False, \
+                indices_only:bool = False, \
+                exclude:bool = False,\
+                **kwargs):
     """Filter an iterable using predicates applied to attributes of its elements.
     
     This is an enhanced version of filter_attribute. Furthermore, it fails
@@ -1005,7 +1021,7 @@ def filter_attr(iterable:typing.Iterable,
         else:
             yield from filter(lambda x: functools.reduce(op, (_tf_(x, k, f) for k,f in kwargs.items())), iterable)
     
-def filterfalse_attr(iterable:typing.Iterable, **kwargs)-> typing.Iterator:
+def filterfalse_attr(iterable:typing.Iterable, **kwargs):
     """'Negative' form of filter_attr.
     
     Calls filter_attr with 'exclude' set to True.
@@ -1019,9 +1035,9 @@ def filterfalse_attr(iterable:typing.Iterable, **kwargs)-> typing.Iterator:
                                                  #iterable) for n,f in kwargs.items()))
 
     
-def filter_attribute(iterable:typing.Iterable,attribute:str, value:typing.Any, 
-                     predicate:typing.Callable[...,bool]=lambda x,y: x==y,
-                     silentfail:bool=True) -> typing.Iterator:
+def filter_attribute(iterable:typing.Iterable,attribute:str, value:typing.Any, \
+                     predicate:typing.Callable[...,bool]=lambda x,y: x==y, \
+                     silentfail:bool=True):
     """Iterates elements in 'iterable' for which 'attribute' satisfies 'predicate'.
     DEPRECATED
     
@@ -1064,9 +1080,9 @@ def filter_attribute(iterable:typing.Iterable,attribute:str, value:typing.Any,
                                       value),
                   iterable)
     
-def filterfalse_attribute(iterable:typing.Iterable, attribute:str, value:typing.Any, 
-                     predicate:typing.Callable[...,bool]=lambda x,y: x==y,
-                     silentfail:bool=True) -> typing.Iterator:
+def filterfalse_attribute(iterable:typing.Iterable, attribute:str, value:typing.Any, \
+                     predicate:typing.Callable[...,bool]=lambda x,y: x==y,\
+                     silentfail:bool=True):
     """The negated version of filter_attribute.
     DEPRECATED
     Iterates elements in 'iterable' for which 'attribute' does NOT satisfy 'predicate'.
@@ -1757,8 +1773,14 @@ class WithDescriptors(object):
     
     These descriptors DO NOT implement the trait observer design pattern as found
     in the 'traitlets' package (https://traitlets.readthedocs.io/en/stable/).
-    Therefore they are ARE NOT a replacement for, nor are they intended for use 
-    with, the 'HasDescriptors' classes in the 'traitlets' package.
+    They are not a replacement for, nor are they intended for use with, the
+    'HasDescriptors' classes in the 'traitlets' package.
+    
+    Therefore, this mechanism is not used for storing configurables for various
+    GUI components in Scipyen.
+    
+    Rather, it should be used to provide a consistent data attributes structure 
+    for special Scipyen data types
     
     
     """
@@ -2005,4 +2027,164 @@ def resolveObject(modName, objName):
         except ModuleNotFoundError:
             return MISSING
             
+            
+def is_module_loaded(m:types.ModuleType):
+    modname = m.__name__
+    if modname in sys.modules:
+        return True
+    
+    m_rev_path = list(reversed(modname.split('.')))
+    
+    for p in m_rev_path:
+        if p in sys.modules:
+            sysm = sys.modules[p]
+            return (inspect.ismodule(sysm) and sysm.__spec__.origin == m.__spec__.origin)
+        
+    return False
+
+
+@singledispatch
+def get_loaded_module(m):
+    raise NotImplementedError(f"This function is not implemented for {type(m).__name__} objects")
+
+@get_loaded_module.register(types.ModuleType)
+def _(m:types.ModuleType):
+    """Returns a reference to module `m` in sys.modules.
+
+    If `m` has not been loaded at all (even as an alias) returns None.
+    
+    Identity check is performed on the `origin` attribute of the module's 
+    __spec__ attribute. A module's __spec__ attribute is an instance of 
+    `importlib.machinery.ModuleSpec`.
+    
+    Two modules with the same `__spec__.origin` are considered identical even if
+    they are mapped to different symbols (keys) in the `sys.modules` dictionary.
+    """
+    # NOTE: 2022-12-25 00:11:46
+    # The following modules are example of modules where __spec__ is None, yet 
+    # they are present in sys.modules:
+    # • The REPL main module (__main__)
+    # • cython_runtime, valrious _cython* modules, pyexpat submodules
+    # • the __main__module excuted by python runtime from source file (e.g. the 
+    #   __main__ module generated by python upon running 'scipyen.py')
+    #
+    # In addition, all but the last in the above exampke DO NOT have a __file__
+    # attribute; this is useful to distinguish between "pure" runtime modules
+    # and runtime modules created from a python source file.
+    #
+    ModSpec = importlib.machinery.ModuleSpec        # saves me some typing
+    sysmodules = [v for v in sys.modules.values()]  # saves me some typing
+    modname = m.__name__
+    modspec = getattr(m, "__spec__", None)
+    modfile = getattr(m, "__file__", None)
+    
+    if not isinstance(modspec, ModSpec):
+        modules = list(filter(lambda x: x == m, [v for v in sysmodules]))
+        if len(modules):
+            return modules[0]
+        else:
+            return
+    
+    if modname in sys.modules:
+        module = sys.modules[modname]
+        if inspect.ismodule(module) and isinstance(getattr(module, "__spec__", None), ModSpec) and module.__spec__.origin == modspec.origin:
+            return m
+        
+    else:
+        modules = filter(lambda x: x == m, sysmodules)
+        if len(modules):
+            return modules[0]
+        
+        modules = filter(lambda x: inspect.ismodule(x) and isinstance(getattr(x, "__spec__", None), ModSpec) and getattr(x.__spec__, "origin", None) == modspec.origin,  sysmodules)
+        if len(modules):
+            return modules[0]
+    
+@get_loaded_module.register(importlib.machinery.ModuleSpec)
+def _(spec:importlib.machinery.ModuleSpec):
+    ModSpec = importlib.machinery.ModuleSpec        # saves me some typing
+    sysmodules = [v for v in sys.modules.values()]  # saves me some typing
+    modname = spec.name
+    modorigin = spec.origin
+    
+    # print(f"get_loaded_module(spec) modname {modname} spec {spec} origin {spec.origin}")
+    
+    if modname in sys.modules:
+        module = sys.modules[modname]
+        if inspect.ismodule(module) and isinstance(getattr(module, "__spec__", None), ModSpec) and module.__spec__.origin == modorigin:
+            return module
+        
+    modules = list(filter(lambda x: inspect.ismodule(x) and isinstance(x.__spec__, ModSpec) and x.__spec__.origin == modorigin, sysmodules))
+    
+    if len(modules):
+        return modules[0]
+    
+@get_loaded_module.register(str)
+def _(modname:str):
+    if not isinstance(modname, str) or len(modname.strip()) == 0:
+        return
+    
+    if modname in sys.modules:
+        return sys.modules[modname]
+    
+    m_rev_path = list(itertools.accumulate(reversed(modname.split('.')), lambda x,y: ".".join(y,x)))
+    
+    for p in m_rev_path:
+        if p in sys.modules:
+            sysm = sys.modules[p]
+            if inspect.ismodule(sysm):
+                return sysm
+        
+def is_class_defined_in_module(x:typing.Any, m:types.ModuleType):
+    """Checks if 'x' is a class or instance of a class defined in module 'm'.
+    """
+    
+    if not inspect.isclass(x):
+        x = type(x)
+        
+    if not inspect.ismodule(m):
+        warnings.warn(f"Expecting a module; got {type(m).__name__} instead")
+        return False
+    
+    x_module = get_loaded_module(x.__module__)
+    
+    if x_module is None:
+        return False
+    
+    module = get_loaded_module(m)
+    
+    if module is None:
+        return False
+    
+    # try to find x's module
+    if x.__module__ in sys.modules:
+        x_module = sys.modules[x.__module__]
+        
+    else:
+        x_rev_module_path = list(reversed(x.__module__.split('.')))
+        for p in x_rev_module_path:
+            if p in sys.modules:
+                x_module = sys.modules[p]
+                break
+            
+    if x_module is None:
+        # shouldn't happen; x being a class or instance implies its module has been 
+        # imported already, hence present in sys.modules, UNLESS x is something
+        # dynamically generated - in which case it would NOT have been found in
+        # any of th currently importd modules anyway
+        return False
+        
+    
+    return x_module.__spec__.origin == m.__spec__.origin
+
+    
+def show_caller_stack(stack):
+    for s in stack:
+        # print(f"\tcaller\t {s.function} at line {s.lineno} in context: {pprint.pformat(s.code_context)}")
+        print(f"\tcaller\t {s.function} at line {s.lineno} in {s.filename}")
+        # fcn = s.function
+        # if inspect.ismethod(fcn):
+        #     ftxt = f"{s.function.__self__.__class__.__name__}.{s.function} in {s.function.__module__} at line {s.lineno}"
+        # else:
+        #     ftxt = f"{s.function} in {s.function.__module__} at line {s.lineno}"
+        # print(f"\tcaller\t {ftxt}")
     

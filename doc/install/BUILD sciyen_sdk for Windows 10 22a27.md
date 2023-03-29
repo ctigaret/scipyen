@@ -17,13 +17,9 @@ These must be installed system-wide (make sure there is enough space on C:\drive
  below I give the details of the version used, but you <b>may</b> use a more
  recent version)
 
-## python-3.9.7 -- with options:
+## python-3.9.7 or newer -- install with options:
 * for everyone
 * raise the limit on PATH
-
-<b>NOTE</b>: scipyen is written with <b>Python3.9</b> in mind, and some of its dependencies
-(boost, vigra) were build against <b>this</b> version of Python.
-The code has not yet been tested against Python 3.10 or newer.
 
 ## git
 Download from [here](https://git-scm.com/download/win)
@@ -34,7 +30,7 @@ Useful and powerful text editor - if you do not like VisualStudio Code, etc.
 Download app from Microsoft Store.
 
 ## doxygen
-VIGRA dependency, required to build documentation.
+Needed to build VIGRA.
 Get it from [here](https://www.doxygen.nl/download.html)
 
 ## cmake
@@ -82,7 +78,7 @@ Download from [here](https://sourceforge.net/projects/winflexbison/)
 I use the win_flex_bison-latest.zip
 Extract win_bison.exe and win_flex.exe to %USERPROFILE%\Scripts
 
-## msys2-64bit - required for radline & termcap, see below
+## msys2-64bit - required for readline & termcap, see below
 Download installer from [here](https://www.msys2.org/)
 Run the installer, follow the instruction [here](https://www.msys2.org/)
 * make sure you run it after first installation ("Run MSYS2 Now")
@@ -156,7 +152,7 @@ scipyen.bat - launches Scipyen
 scipyen_desktop.bat - combines scipyact with scipyen - useful to make it
 a shortcut (e.g. on Desktop, StartMenu, or Windows TaskBar)
 
-NOTE: A shortcut (Sciipyen.lnk) is already provided. Use it but make sure
+NOTE: A shortcut (Scipyen.lnk) is already provided. Use it but make sure
 you set the correct paths (right-click -> Properties)
 
 If possible, you may want to change the icon to use the one supplied here
@@ -329,7 +325,7 @@ then copy:
 Then copy COPYING, COPYRIGHT, NEWS, README* to %SDK%\share\doc\fftw3\
 
 ### tiff - requires jpeg;
-Will be buit wothout support for OpenGL and deflate.
+Will be buit without support for OpenGL and deflate.
 
 In e:\scipyen_sdk_src run:
 

@@ -3,7 +3,8 @@
 Functions for plotting with matplotlib and seaborn
 """
 #### BEGIN core python modules
-import numbers
+import numbers, typing, warnings
+from functools import partial
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -27,6 +28,8 @@ plt.rcParams["ytick.direction"] = "in"
 plt.rcParams["svg.fonttype"]="none"
 
 import numpy as np
+import pandas as pd
+import neo
 from scipy import stats
 import quantities as pq
 import vigra
@@ -35,9 +38,11 @@ import vigra
 #### BEGIN pict.core modules
 from core import datatypes as dt
 from imaging import vigrautils as vu
+from gui import (scipyen_colormaps, guiutils)
 #### END pict.core modules
 
 # from . import sb_plots
+# import seaborn as sb
 
 # TODO 2019-09-06 13:08:18
 # set up a clever way to offer there plottign functions ans their arguments in 
@@ -425,12 +430,17 @@ def plotNeoSignal(data, fig=None, label=None, newPlot=False, title = None,
     
     else:
         ret = plt.plot(x,y, **kwargs)
-        
     
     ax = plt.gca()
     
     if despine:
-        sb.despine(ax = ax, offset = axes_offset)
+        ax.spines.left.set_position(("outward", axes_offset))
+        ax.spines.bottom.set_position(("outward", axes_offset))
+        ax.spines.top.set_visible(False)
+        ax.spines.right.set_visible(False)
+        ax.yaxis.set_ticks_position("left")
+        ax.xaxis.set_ticks_position("bottom")
+        # sb.despine(ax = ax, offset = axes_offset)
     
     ax.tick_params("y", direction=tick_direction, length=tick_length, color="black")
         
@@ -726,3 +736,431 @@ def generate_imshow_demo_grid(extents, xlim=None, ylim=None):
         ax.text(1., .5, text, transform=ax.transAxes, ha='right', va='center')
         ax.axis('off')
     return columns
+
+def plot_Gantt(data, **kwargs):
+    """
+    Renders a Gantt chart plot.
+    The data is organized in intervals (start, finish) with each interval being
+    represented by a horizontal bar along a time axis, and is encapsulated in 
+    either a neo.Epoch, or a pandas.DataFrame object
+    
+    Delegates to plot_Gantt_DF after converting the data to pandas DataFrame.
+    
+    Parameters:
+    ===========
+    data:neo Epoch, pandas DataFrame or sequence of such.
+        WARNING: 
+        When a sequence, all elements must ve of the same object type (i.e.
+        NOT a mixture of neo.Epoch and pandas.DataFrame objects)!
+    
+        The function will call plot_Gantt_Epochs or plot_Gantt_DF accordingly,
+    
+        See the documentation for these functions for details.
+    
+    Named and var-named parameters (kwargs):
+    ========================================
+    
+    fig: matplotib figure; optional, default is None
+    
+    height: int, float; height of the Gantt bars (optional, default is 20)
+    
+    y_interval: int, float: vertical spacing between bars (optional, default is 5)
+    
+    harmonize_ylims: bool; optional default is True;
+        When True, all y axes get the same limits
+    
+    barcolors: a matplotib color specification or a sequence of such
+    textcolor: a matplotib color specification or a sequence of such
+    
+    textpos: a str, one of "auto","top", "bottom", "above", "below", "inside"
+    
+    grid: bool, default is True
+    
+    staggered: bool; optional, default is True
+        When True all intervals are plotted at increasing heights.
+        When False, all intervalks are plotted at the same y coordinate.
+        
+        
+    """
+    # fig = kwargs.pop("fig", None)
+    # height = kwargs.pop("height", 20)
+    # y_interval = kwargs.pop("y_interval", 5)
+    # harmonize_ylims = kwargs.pop("harmonize_ylims", True)
+    # barcolors = kwargs.pop("barcolors", None)
+    # textcolor = kwargs.pop("textcolor",None)
+    # textpos = kwargs.pop("textpos", "auto")
+    # grid = kwargs.pop("grid", True)
+    # staggered = kwargs.pop("staggered", True)
+    
+    if isinstance(data, (tuple, list)):
+        if all(isinstance(d, neo.Epoch) for d in data):
+            func = plot_Gantt_Epochs
+        
+        elif all(isinstance(d, pd.DataFrame) for d in data):
+            func = plot_Gantt_DF
+        
+        else:
+            raise TypeError("Expecting a homogeneous sequence with all elements being either of neo.Epoch or pandas.DataFrame")
+        
+    elif isinstance(data, neo.Epoch):
+        func = plot_Gantt_Epochs
+    
+    elif isinstance(data, pd.DataFrame):
+        func = plot_Gantt_DF
+    
+    else:
+        raise TypeError(f"Expecting a neo.Epoch, a pandas.DataFrame, or a homogeneous sequence with all elements being either of neo.Epoch or pandas.DataFrame; instead, got {type(data).__name__}")
+
+    return func(data, **kwargs)
+
+def plot_Gantt_Epochs(data:typing.Union[tuple, list, neo.Epoch], **kwargs):
+    """
+    Renders a Gantt chart plot.
+    The data is organized in intervals (start, finish) with each interval being
+    represented by a horizontal bar along a time axis, encapsulated in a neo
+    Epoch.
+    
+    Delegates to plot_Gantt_DF after converting the data to pandas DataFrame.
+    
+    Parameters:
+    ===========
+    data:neo Epoch, or sequence of neo Epoch objects.
+        The intervals are defined as t + d where t is each element in the Epoch
+        'times' attribute, and d is an element in the Epoch's 'durations' attribute.
+    
+        The interval names are taken from the Epoch's 'labels' attribute.
+    
+        Each Epoch data is plotted is its own axis system, but all x axes are 
+        shared.
+    
+    Named and var-named parameters (kwargs):
+    ========================================
+    
+    fig: matplotib figure; optional, default is None
+    
+    height: int, float; height of the Gantt bars (optional, default is 20)
+    
+    y_interval: int, float: vertical spacing between bars (optional, default is 5)
+    
+    harmonize_ylims: bool; optional default is True;
+        When True, all y axes get the same limits
+    
+    barcolors: a matplotib color specification or a sequence of such
+    textcolor: a matplotib color specification or a sequence of such
+    
+    textpos: a str, one of "auto","top", "bottom", "above", "below", "inside"
+    
+    grid: bool, default is True
+    
+    staggered: bool; optional, default is True
+        When True all intervals are plotted at increasing heights.
+        When False, all intervalks are plotted at the same y coordinate.
+        
+        
+    """
+    from ephys import ephys
+    
+    # fig = kwargs.pop("fig", None)
+    # height = kwargs.pop("height", 20)
+    # y_interval = kwargs.pop("y_interval", 5)
+    # harmonize_ylims = kwargs.pop("harmonize_ylims", True)
+    # barcolors = kwargs.pop("barcolors", None)
+    # textcolor = kwargs.pop("textcolor",None)
+    # textpos = kwargs.pop("textpos", "auto")
+    # grid = kwargs.pop("grid", True)
+    # staggered = kwargs.pop("staggered", True)
+    
+    if isinstance(data, (tuple, list)):
+        if len(data) == 0:
+            warnings.warn("No data!")
+            return
+        
+        if not all(isinstance(v, neo.Epoch) for v in data):
+            raise TypeError("Expecting a sequence of neo.Epoch objects")
+        
+    elif isinstance(data, neo.Epoch):
+        data = [data]
+        
+    else:
+        raise TypeError(f"Expecting a neo.Epoch or a sequence (tuple, list of neo.Epoch objects; instead, got {type(data).__name__}")
+                        
+    kwargs["names"] = [epoch.name for epoch in data]
+    data = [pd.DataFrame([dict(Task=i[2], Start=i[0], Finish=i[0]+i[1], Name = i[2] if isinstance(i[2], str) and len(i[2].strip()) else f"Interval {k}" ) for i in neoutils.epoch2intervals(epoch)]) for k, epoch in enumerate(data) if len(epoch)]
+
+    if len(data):
+        return plot_Gantt_DF(data=data, **kwargs)
+    
+
+
+def plot_Gantt_DF(data:typing.Union[tuple, list, pd.DataFrame], **kwargs):
+    """
+    Renders a Gantt chart plot.
+    The data is organized in intervals (start, finish) with each interval being
+    represented by a horizontal bar along a time axis, encapsulated in a pandas
+    DataFrame
+    
+    Parameters:
+    ===========
+    data: pandas DataFrame, or sequence of DataFrame objects.
+        Each DataFrame must have the mandatory columns: "Start", "Finish", "Name"
+        and each row represents an individual interval (plotted as a horizontal bar)
+    
+        Each DataFrame is plotted is its own axis system, but all x axes are shared
+    
+    Named and var-named parameters (kwargs):
+    ========================================
+    
+    names: a str, sequence (tuple, or list) of str, or None;
+        optional, default is None
+    
+    fig: matplotib figure; optional, default is None
+    
+    height: int, float; height of the Gantt bars (optional, default is 20)
+    
+    y_interval: int, float: vertical spacing between bars (optional, default is 5)
+    
+    harmonize_ylims: bool; optional default is True;
+        When True, all y axes get the same limits
+    
+    barcolors: a matplotib color specification or a sequence of such
+    textcolor: a matplotib color specification or a sequence of such
+    
+    textpos: a str, one of "auto","top", "bottom", "above", "below", "inside"
+    
+    grid: bool, default is True
+    
+    staggered: bool; optional, default is True
+        When True all intervals are plotted at increasing heights.
+        When False, all intervalks are plotted at the same y coordinate.
+        
+    """
+    from matplotlib import transforms
+    from matplotlib.transforms import (Bbox, TransformedBbox)
+    names = kwargs.pop("names", None)
+    fig = kwargs.pop("fig", None)
+    height = kwargs.pop("height", 20)
+    y_interval = kwargs.pop("y_interval", 5)
+    harmonize_ylims = kwargs.pop("harmonize_ylims", True)
+    barcolors = kwargs.pop("barcolors", None)
+    textcolor = kwargs.pop("textcolor",None)
+    textpos = kwargs.pop("textpos", "inside")
+    grid = kwargs.pop("grid", True)
+    staggered = kwargs.pop("staggered", True)
+    
+    if isinstance(data, (tuple, list)):
+        if len(data) == 0:
+            warnings.warn("No data!")
+            return
+        if not all(isinstance(v, pd.DataFrame) for v in data):
+            raise TypeError("Expecting a sequence of pandas.DataFrame objects")
+        
+    elif isinstance(data, pd.DataFrame):
+        data = [data]
+        
+    else:
+        raise TypeError(f"Expecting a neo.Epoch or a sequence (tuple, list of pandas.DataFrame objects; instead, got {type(data).__name__}")
+
+    _mandatory_DF_columns_ = ("Start", "Finish", "Name")
+
+    if not all(all(s in d.columns for s in _mandatory_DF_columns_) for d in data):
+        raise ValueError(f"DataFrame objects MUST contain the columns {_mandatory_DF_columns_}")
+    
+    if isinstance(names, (tuple, list)):
+        if len(names) != len(data):
+            raise ValueError(f"names: Expecting one str or a sequence of str with as {len(data)}")
+        if not all(isinstance(v, str) for v in names):
+            raise TypeError("names: Expecting a sequence of strings")
+        
+    elif isinstance(names,str):
+        if len(names.strip()) == 0:
+            names = [f"Epoch {k}" for k in range(len(data))]
+        else:
+            names = [names] * len(data)
+            
+    elif names is None:
+        names = [f"Epoch {k}" for k in range(len(data))]
+        
+    else:
+        raise ValueError(f"names: Expecting one str or a sequence of str with as {len(data)}")
+    
+    if barcolors is not None:
+        barcolors = scipyen_colormaps.get_color4mpl(barcolors)
+        
+        if isinstance(barcolors, str):
+            barcolors = [barcolors]
+
+    if textcolor is not None:
+        textcolor = scipyen_colormaps.get_color4mpl(textcolor)
+        
+    if not isinstance(textpos, str):
+        textpos = "inside"
+        
+    elif textpos not in ("auto","top", "bottom", "above", "below", "inside"):
+        textpos = "inside"
+        
+    if fig is None:
+        fig = plt.figure()
+        
+    elif isinstance(fig, numbers.Integral):
+        fig = plt.figure(fig)
+        
+    elif isinstance(fig, mpl.figure.Figure):
+        fig = plt.figure(fig.number)
+
+    plt.clf()
+    
+    
+    for k in range(len(data)):
+        epoch_axis=fig.add_subplot(len(data), 1, k+1)
+        epoch_axis.grid(grid)
+        epoch_df = data[k]
+        nIntervals = epoch_df.shape[0]
+        
+        maxHeight = nIntervals * (height + y_interval)
+        
+        name = names[k]
+            
+        maxY = nIntervals * (height+y_interval)
+        
+        prevIntervalEnd = 0
+        
+        hasWarned = False
+        
+        for k, row in enumerate(epoch_df.index):
+            text = epoch_df.loc[row, "Name"]
+            bar_x = (epoch_df.loc[row, "Start"], epoch_df.loc[row, "Finish"])
+            
+            if k == 0:
+                prevIntervalEnd = bar_x[1]
+            
+            if staggered:
+                bar_y = (row*(height+y_interval), height)
+            else:
+                if bar_x[0] < prevIntervalEnd and not hasWarned:
+                    warnings.warn("Intervals are overlapping; `staggered` should be set to True")
+                    hasWarned = True
+                bar_y = (1, height)
+                
+            if barcolors is not None:
+                bh = epoch_axis.broken_barh([bar_x], bar_y, edgecolors= ("black",),
+                                            label = text,
+                                            facecolors=barcolors)
+            else:
+                bh = epoch_axis.broken_barh([bar_x], bar_y, edgecolors= ("black",),
+                                            label=text)
+                
+            axes_facecolor = epoch_axis.get_facecolor()
+            textonaxiscolor = scipyen_colormaps.auto_fg_color(axes_facecolor)
+            
+            if textcolor is None:
+                bh_colors = bh.get_facecolors()
+                if len(bh_colors):
+                    textcolor = scipyen_colormaps.auto_fg_color(bh_colors[0])
+                else:
+                    textcolor = scipyen_colormaps.auto_fg_color(axes_facecolor)
+            
+            
+            bh_paths = bh.get_paths()
+            nPaths = len(bh_paths)
+            
+            for kp, p in enumerate(bh_paths):
+                path_extents = p.get_extents()
+                x0,y0,x1,y1 = (path_extents.x0, path_extents.y0, path_extents.x1, path_extents.y1)
+                
+                text_x = 0.5 * (x0 + x1)
+                text_y = 0.5 * (y0 + y1)
+                horizontalalignment="center"
+                verticalalignment = "center"
+                transform = epoch_axis.transAxes
+                
+                if textpos == "bottom": # plot at bottom of axis
+                    text_y = 0
+                    verticalalignment="bottom"
+                    textcolor = textonaxiscolor
+                    
+                elif textpos == "above":
+                    text_y = y1
+                    verticalalignment="bottom"
+                    textcolor = textonaxiscolor
+                    
+                elif textpos == "below":
+                    text_y = y0
+                    verticalalignment="top"
+                    textcolor = textonaxiscolor
+                    
+                elif textpos == "top": # plot at top of axis
+                    text_y = (maxHeight + textheight)*1.1
+                    textcolor = textonaxiscolor
+                    
+                elif textpos == "auto":
+                    if textwidth >= barwidth: # plot above the bar
+                        text_y = y1
+                        verticalalignment="top"
+                        textcolor = textonaxiscolor
+                        
+                epoch_axis.text(text_x, text_y, text, color=textcolor,
+                                horizontalalignment = horizontalalignment,
+                                verticalalignment = verticalalignment)
+                
+            
+        epoch_axis.set_ylabel(name)
+        epoch_axis.set_ylim(0, maxY)
+        
+    if harmonize_ylims:
+        maxY = max(ax.get_ylim()[1] for ax in fig.get_axes())
+        for ax in fig.get_axes():
+            ax.set_ylim(0, maxY)
+            
+    minX = min(ax.get_xlim()[0] for ax in fig.get_axes())
+    maxX = max(ax.get_xlim()[1] for ax in fig.get_axes())
+    
+    for k, ax in enumerate(fig.get_axes()):
+        ax.set_frame_on(False)
+        ax.spines.left.set_visible(False)
+        ax.spines.top.set_visible(False)
+        ax.spines.right.set_visible(False)
+        ax.yaxis.set_ticklabels([])
+        
+        if ax != fig.get_axes()[-1]:
+            ax.xaxis.set_ticklabels([])
+            ax.sharex(fig.get_axes()[-1])
+        # ax.yaxis.set_ticks_position("none")
+        if k < (len(fig.get_axes()) - 1):
+            ax.spines.bottom.set_visible(False)
+        else:
+            ax.spines.bottom.set_visible(True)
+            ax.set_xlabel("Time")
+            ax.xaxis.set_ticks_position("bottom")
+        # hide ticks
+        ax.tick_params(color="none")
+        ax.set_xlim(minX, maxX)
+        if ax == fig.get_axes()[-1]:
+            ax.spines.bottom.set_visible(True)
+            ax.set_xlabel("Time")
+            ax.xaxis.set_ticks_position("bottom")
+            ax.xaxis.set_tick_params(color="black", labelcolor="black")
+            
+            
+    fig.set_layout_engine("tight")
+    return fig
+
+def adjust_spines(ax, spines):
+    # from matplotlib Spines examples
+    for loc, spine in ax.spines.items():
+        if loc in spines:
+            spine.set_position(('outward', 10))  # outward by 10 points
+        else:
+            spine.set_color('none')  # don't draw spine
+
+    # turn off ticks where there is no spine
+    if 'left' in spines:
+        ax.yaxis.set_ticks_position('left')
+    else:
+        # no yaxis ticks
+        ax.yaxis.set_ticks([])
+
+    if 'bottom' in spines:
+        ax.xaxis.set_ticks_position('bottom')
+    else:
+        # no xaxis ticks
+        ax.xaxis.set_ticks([])

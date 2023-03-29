@@ -45,7 +45,7 @@
 
 #### BEGIN core python modules
 # NOTE: use Python re instead of QRegExp
-import sys, os, re, numbers, itertools, warnings, traceback
+import sys, os, re, numbers, itertools, warnings, traceback, logging
 import typing
 import math
 from collections import (ChainMap, namedtuple, defaultdict, OrderedDict,)
@@ -60,7 +60,8 @@ from copy import copy
 
 #### BEGIN 3rd party modules
 #import vigra.pyqt.quickdialog as quickdialog
-import pyqtgraph as pg
+# import pyqtgraph as pg
+from gui.pyqtgraph_patch import pyqtgraph as pg
 import numpy as np
 
 from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
@@ -93,11 +94,11 @@ from .planargraphics import (Arc, ArcMove, Cubic, Cursor, Ellipse, Line, Move, P
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-#Ui_EditColorMapWidget, QWidget = __loadUiType__(os.path.join(__module_path__,"editcolormap2.ui"))
+#Ui_EditColorMapWidget, QWidget = __loadUiType__(os.path.join(__module_path__,"widgets","editcolormap2.ui"))
 
-Ui_ItemsListDialog, QDialog = __loadUiType__(os.path.join(__module_path__,"itemslistdialog.ui"))
+# Ui_ItemsListDialog, QDialog = __loadUiType__(os.path.join(__module_path__,"itemslistdialog.ui"))
 
-Ui_LinearRangeMappingWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "linearrangemappingwidget.ui"))
+# Ui_LinearRangeMappingWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "linearrangemappingwidget.ui"))
 
 def generateColorCycle():
     pass
@@ -127,9 +128,11 @@ def genColorTable(cmap, ncolors=256):
     return colortable
 
 class GuiWorkerSignals(QtCore.QObject):
-    signal_finished = pyqtSignal(name="signal_finished")
+    signal_Finished = pyqtSignal(name="signal_Finished")
     sig_error = pyqtSignal(tuple, name="sig_error")
-    signal_result = pyqtSignal(object, name="signal_result")
+    signal_Result = pyqtSignal(object, name="signal_Result")
+    
+
     
 class GuiWorker(QtCore.QRunnable):
     def __init__(self, fn, *args, **kwargs):
@@ -147,7 +150,7 @@ class GuiWorker(QtCore.QRunnable):
     def run(self):
         try:
             self.result = self.fn(*self.args, **self.kwargs)
-            self.signals.signal_result.emit(self.result)  # Return the result of the processing
+            self.signals.signal_Result.emit(self.result)  # Return the result of the processing
             
         except:
             traceback.print_exc()
@@ -157,11 +160,11 @@ class GuiWorker(QtCore.QRunnable):
             self.signals.sig_error.emit((exc_type, value, traceback.format_exc()))
             
         else:
-            #self.signals.signal_result.emit(self.result)  # Return the result of the processing
-            self.signals.signal_finished.emit()  # Done
+            #self.signals.signal_Result.emit(self.result)  # Return the result of the processing
+            self.signals.signal_Finished.emit()  # Done
             
         finally:
-            self.signals.signal_finished.emit()  # Done
+            self.signals.signal_Finished.emit()  # Done
 
 class ProgressWorkerSignals(QtCore.QObject):
     """See Martin Fitzpatrick's tutorial on Multithreading PyQt applications with QThreadPool 
@@ -171,29 +174,30 @@ class ProgressWorkerSignals(QtCore.QObject):
 
     Supported signals are:
 
-    signal_finished
+    signal_Finished
         No data
 
     sig_error
         `tuple` (exctype, value, traceback.format_exc() )
 
-    signal_result
+    signal_Result
         `object` data returned from processing, anything
 
-    signal_progress
+    signal_Progress
         `int` indicating % progress
 
     """
     
-    signal_finished = pyqtSignal()
+    signal_Finished = pyqtSignal()
     sig_error = pyqtSignal(tuple)
-    signal_result = pyqtSignal(object)
-    signal_progress = pyqtSignal(int)
+    signal_Result = pyqtSignal(object)
+    signal_Progress = pyqtSignal(int)
     signal_setMaximum = pyqtSignal(int)
+    signal_Canceled = pyqtSignal()
     
-class ProgressWorker(QtCore.QRunnable):
+class ProgressWorkerRunnable(QtCore.QRunnable):
     """
-    ProgressWorker thread
+    ProgressWorkerRunnable thread
 
     Inherits from QRunnable to handler worker thread setup, signals and wrap-up.
 
@@ -212,35 +216,46 @@ class ProgressWorker(QtCore.QRunnable):
     NOTE: the entire loop is executed in a separate thread and periodically
     signals its progress by emitting the progressSignal, connected to a 
     progressDialog in the main (GUI) thread.
+    
+    NOTE: because this inherits from a QRunnable, the operation cannot be aborted
 
     """
+    # canceled = pyqtSignal(name="canceled")
+    
     def __init__(self, fn, progressDialog, *args, **kwargs):
         """
         fn: callable
         progressDialog: QtWidgets.QProgressDialog
         *args, **kwargs are passed to fn
         """
-        super(ProgressWorker, self).__init__()
+        super(ProgressWorkerRunnable, self).__init__()
         # Store constructor arguments (re-used for processing)
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
         self.signals = ProgressWorkerSignals()
         self.pd = progressDialog
+        self.setAutoDelete(True)
         
         if isinstance(self.pd, QtWidgets.QProgressDialog):
             self.pd.setValue(0)
-            self.signals.signal_progress.connect(self.pd.setValue)
+            # self.pd.canceled.connect(self.slot_canceled)
+            self.signals.signal_Progress.connect(self.pd.setValue)
             self.signals.signal_setMaximum.connect(self.pd.setMaximum)
-            self.kwargs['progressSignal'] = self.signals.signal_progress
+            self.kwargs['progressSignal'] = self.signals.signal_Progress
             self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
+            self.kwargs["progressUI"] = self.pd
             
         #else:
             #self.pd = None
 
         # Add the callback to our kwargs
         
-        #print("ProgressWorker fn args", self.args)
+        #print("ProgressWorkerRunnable fn args", self.args)
+        
+    # @pyqtSlot()
+    # def slot_canceled(self):
+    #     self.signals.signal_Canceled(emit)
 
     @pyqtSlot()
     def run(self):
@@ -258,10 +273,10 @@ class ProgressWorker(QtCore.QRunnable):
             self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
             
         else:
-            self.signals.signal_result.emit(result)  # Return the result of the processing
+            self.signals.signal_Result.emit(result)  # Return the result of the processing
             
         finally:
-            self.signals.signal_finished.emit()  # Done
+            self.signals.signal_Finished.emit()  # Done
             
 def checkboxDialogPrompt(parent, title, slist):
     if not all([isinstance(s, str) for s in slist]):
@@ -316,169 +331,137 @@ class MouseEventSink(QtCore.QObject):
         self.itemSelected.emit(item.text())
         self.close()
 
-class ItemsListDialog(QDialog, Ui_ItemsListDialog):
-    itemSelected = QtCore.pyqtSignal(str)
-
-    def __init__(self, parent = None, itemsList=None, title=None, preSelected=None, modal=False, selectmode=QtWidgets.QAbstractItemView.SingleSelection):
-        super(ItemsListDialog, self).__init__(parent)
-        self.setupUi(self)
-        self.setModal(modal)
-        self.preSelected = list()
+class ProgressWorkerThreaded(QtCore.QObject):
+    """Calls a worker function in a separate QThread.
+        The worker function is typically executing a time-consuming loop (such
+        as an iteration through some data, where each cycle involves a time-
+        consuming operation).
         
-        self.searchLineEdit.undoAvailable=True
-        self.searchLineEdit.redoAvailable=True
-        self.searchLineEdit.setClearButtonEnabled(True)
+        The worker instance should be `moved` to a QThread instance, and the 
+        thread's `started` signal must be connected to this worker's `run` slot
+        which then calls the worker function.
         
-        self.searchLineEdit.textEdited.connect(self.slot_locateSelectName)
+        The worker function is called from within the run 
         
-        if isinstance(selectmode, str):
-            if selectmode.lower == "single":
-                selectmode = QtWidgets.QAbstractItemView.SingleSelection
-            elif selectmode.lower == "contiguous":
-                selectmode = QtWidgets.QAbstractItemView.ContiguousSelection
-            elif selectmode.lower == "extended":
-                selectmode = QtWidgets.QAbstractItemView.ExtendedSelection
-            elif selectmode.lower == "multi":
-                selectmode = QtWidgets.QAbstractItemView.MultiSelection
-            else:
-                warnings.warn(f"I don't know what '{selectmode}' selection means...")
-                selectmode = QtWidgets.QAbstractItemView.SingleSelection
-                
-            
-        if not isinstance(selectmode, QtWidgets.QAbstractItemView.SelectionMode):
-            selectmode = QtWidgets.QAbstractItemView.SingleSelection
-        
-        self.listWidget.setSelectionMode(selectmode)
-    
-        if title is not None:
-            self.setWindowTitle(title)
-    
-        self.listWidget.itemClicked.connect(self.selectItem)
-        self.listWidget.itemDoubleClicked.connect(self.selectAndGo)
-
-        self.selectionMode = selectmode
-        
-        if isinstance(itemsList, (tuple, list)) and \
-            all([isinstance(i, str) for i in itemsList]):
-            
-            if isinstance(preSelected, str) and preSelected in itemsList:
-                self.preSelected = [preSelected]
-                
-            elif isinstance(preSelected, (tuple, list)) and all([(isinstance(s, str) and len(s.strip()) and s in itemsList) for s in preSelected]):
-                self.preSelected = preSelected
-                
-            self.setItems(itemsList)
-            
-    @pyqtSlot(str)
-    def slot_locateSelectName(self, txt):
-        found_items = self.listWidget.findItems(txt, QtCore.Qt.MatchContains | QtCore.Qt.MatchCaseSensitive)
-        if len(found_items):
-            for row in range(self.listWidget.count()):
-                self.listWidget.item(row).setSelected(False)
-                
-            for k, item in enumerate(found_items):
-                item.setSelected(True)
-                self.itemSelected.emit(str(item.text()))
-                
-            sel_indexes = self.listWidget.selectedIndexes()
-            
-            if len(sel_indexes):
-                self.listWidget.scrollTo(sel_indexes[0])
-                if len(sel_indexes) == 1:
-                    self.itemSelected.emit(str(found_items[0].text()))
-                #self.itemSelected.emit()
-            
-    def validateItems(self, itemsList):
-        # 2016-08-10 11:51:07
-        # NOTE: in python3 all str are unicode
-        if itemsList is None or isinstance(itemsList, list) and (len(itemsList) == 0 or not all([isinstance(x,(str)) for x in itemsList])):
-            QtWidgets.QMessageBox.critical(None, "Error", "Argument must be a list of string or unicode items.")
-            return False
-        return True
-
-    @property
-    def selectedItemsText(self):
-        """A a list of str - text of selected items, which may be empty
+    """
+    # def __init__(self, fn, /, *args, **kwargs):
+    # def __init__(self, fn, /, progressDialog=None, refreshTime=200, *args, **kwargs):
+    def __init__(self, fn, /, progressDialog=None, loopControl=None, *args, **kwargs):
         """
-        return [str(i.text()) for i in self.listWidget.selectedItems()]
-        
-    @property
-    def selectionMode(self):
-        return self.listWidget.selectionMode()
-    
-    @selectionMode.setter
-    def selectionMode(self, selectmode):
-        if not isinstance(selectmode, (int, QtWidgets.QAbstractItemView.SelectionMode, str)):
-            raise TypeError("Expecting an int or a QtWidgets.QAbstractItemView.SelectionMode; got %s instead" % type(selectmode).__name__)
-        
-        if isinstance(selectmode, int):
-            if selectmode not in range(5):
-                raise ValueError("Invalid selection mode:  %d" % selectmode)
-            
-        elif isinstance(selectmode, str):
-            if selectmode.strip().lower() not in ("single", "multi"):
-                raise ValueError("Invalid selection mode %s", selectmode)
-            
-            if selectmode == single:
-                selectmode = QtWidgets.QAbstractItemView.SingleSelection
-                
-            else:
-                selectmode = QtWidgets.QAbstractItemView.MultiSelection
-            
-        self.listWidget.setSelectionMode(selectmode)
-                
-    def setItems(self, itemsList, preSelected=None):
-        """Populates the list dialog with a list of strings :-)
-        
-        itemsList: a python list of python strings :-)
+        fn: callable
+        progressDialog: QtWidgets.QProgressDialog - REMOVED !!!
+        *args, **kwargs are passed to fn
         """
-        if self.validateItems(itemsList):
-            self.listWidget.clear()
-            self.listWidget.addItems(itemsList)
-            
-            if isinstance(preSelected, (tuple, list)) and len(preSelected) and all([(isinstance(s, str) and len(s.strip()) and s in itemsList) for s in preSelected]):
-                self.preSelected=preSelected
-                
-            elif isinstance(preSelected, str) and len(preSelected.strip()) and preSelected in itemsList:
-                self.preSelected = [preSelected]
-            
-            longestItemNdx = np.argmax([len(i) for i in itemsList])
-            longestItem = itemsList[longestItemNdx]
-            
-            for k, s in enumerate(self.preSelected):
-                ndx = itemsList.index(s)
-                item = self.listWidget.item(ndx)
-                self.listWidget.setCurrentItem(item)
-                self.listWidget.scrollToItem(item)
-                
-            fm = QtGui.QFontMetrics(self.listWidget.font())
-            w = fm.width(longestItem) * 1.1
-            
-            if self.listWidget.verticalScrollBar():
-                w += self.listWidget.verticalScrollBar().sizeHint().width()
-                
-            self.listWidget.setMinimumWidth(int(w))
-
-    @pyqtSlot(QtWidgets.QListWidgetItem)
-    def selectItem(self, item):
-        self.itemSelected.emit(str(item.text())) # this is a QString !!!
+        super(ProgressWorkerThreaded, self).__init__()
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+        self.signals = ProgressWorkerSignals()
+        self.pd = None
+        self.loopControl = loopControl
+        self.kwargs['progressSignal'] = self.signals.signal_Progress
+        self.kwargs["finished"] = self.signals.signal_Finished
+        self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
+        self.kwargs["loopControl"] = self.loopControl
         
-    @pyqtSlot(QtWidgets.QListWidgetItem)
-    def selectAndGo(self, item):
-        self.itemSelected.emit(item.text())
-        self.accept()
+        # self.loopControl = {"break":False}
+        # self.poller = QtCore.QTimer(self)
+        # self.refreshTime = refreshTime
+        # self.poller.setInterval(200)
+        # self.poller.timeout.connect(self.progress_poll)
         
+        if isinstance(progressDialog, QtWidgets.QProgressDialog):
+            self.setProgressDialog(progressDialog)
+            
+        # print(f"{self.__class__.__name__}.__init__(fn = {fn}, progressDialog = {progressDialog})")
+            
+    def setProgressDialog(self, progressDialog:QtWidgets.QProgressDialog):
+        if isinstance(progressDialog, QtWidgets.QProgressDialog):
+            self.pd = progressDialog
+            self.pd.setValue(0)
+            self.signals.signal_Progress.connect(self.pd.setValue)
+            self.signals.signal_setMaximum.connect(self.pd.setMaximum)
+            self.signals.signal_Finished.connect(self.pd.reset)
+            # self.kwargs['progressSignal'] = self.signals.signal_Progress
+            # self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
+            # self.kwargs["finished"] = self.signals.signal_Finished
+            # self.kwargs["loopControl"] = self.loopControl
+            
+            # self.kwargs["progressUI"] = self.pd
+            # self.kwargs["canceled"] = self.signals.signal_Canceled
+            # self.kwargs["poller"] = self.poller
+            # slot_canceled emits signal_Canceled
+            # self.pd.canceled.connect(self.slot_canceled)
+        else:
+            self.pd is None
+            
     @property
-    def selectedItems(self):
-        return self.listWidget.selectedItems()
-        
-class SelectablePlotItem(pg.PlotItem):
-    itemClicked = pyqtSignal()
+    def progressDialog(self):
+        return self.pd
     
-    def __init__(self, **kwargs):
-        super(SelectablePlotItem, self).__init__(**kwargs)
+    # @pyqtSlot()
+    # def slot_canceled(self):
+    #     print(f"{self.__class__.__name__}.slot_canceled")
+    #     self.thread().quit()
+    #     self.loopControl["break"] = True
+    #     self.signals.signal_Canceled.emit()
         
-    def mousePressEvent(self, ev):
-        super(SelectablePlotItem, self).mousePressEvent(ev)
-        self.itemClicked.emit()
+    @pyqtSlot()
+    def run(self):
+        # print(f"{self.__class__.__name__}.run()")
+        # self.poller.start(self.refreshTime)
+        # result = self.fn(*self.args, **self.kwargs)
+        # self.signals.signal_Result.emit(result)  # Return the result of the processing
+        # self.signals.signal_Finished.emit()  # Done
+        try:
+            result = self.fn(*self.args, **self.kwargs)
+            
+        except:
+            traceback.print_exc()
+            exctype, value = sys.exc_info()[:2]
+            self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
+            
+        else:
+            self.signals.signal_Result.emit(result)  # Return the result of the processing
+            
+        finally:
+            self.signals.signal_Finished.emit()  # Done
+        
+class ProgressThreadController(QtCore.QObject):
+    sig_start = pyqtSignal(name="sig_start")
+    sig_ready = pyqtSignal(object, name="sig_ready")
+    
+    def __init__(self, fn, /, progressDialog=None, *args, **kwargs):
+        super().__init__()
+        print(f"{self.__class__.__name__}.__init__(fn={fn}, progressDialog = {progressDialog})")
+        self.workerThread = QtCore.QThread()
+        self.worker = ProgressWorkerThreaded(fn, progressDialog, *args, **kwargs)
+        self.worker.moveToThread(self.workerThread)
+        self.workerThread.finished.connect(self.worker.deleteLater)
+        self.sig_start.connect(self.worker.run)
+        self.worker.signals.signal_Result.connect(self.handleResult)
+        self.worker.signals.signal_Canceled.connect(self.abort)
+        self.workerThread.start()
+        
+    def __del__(self):
+        self.workerThread.quit()
+        self.workerThread.wait()
+        # super().__del__()
+        
+    def setProgressDialog(self, progressDialog):
+        if isinstance(progressDialog, QtWidgets.QProgressDialog):
+            self.worker.setProgressDialog(progressDialog)
+            
+    @pyqtSlot(object)
+    def handleResult(self, result:object):
+        if isinstance(self.worker.progressDialog, QtWidgets.QProgressDialog):
+            self.worker.progressDialog.setValue(self.worker.progressDialog.maximum())
+        self.sig_ready.emit(result)
+        
+    @pyqtSlot()
+    def abort(self):
+        print(f"{self.__class__.__name__}.abort")
+        self.sig_ready.emit(None)
+        
+        
         

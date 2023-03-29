@@ -18,72 +18,197 @@
 # (some are installed for experimentation, e.g. the extra jupyter kernel packages,
 # and others). 
 
-numpy           
-sphinx          
-nose            
-confuse
-dill
-PyQt5; sys_platform == 'win32'         # on Windows run 'pip install PyQt5';
-                                       # on Unix must build  - see INSTALL file
-pyqt5-tools ; sys_platform == 'win32'
-pywin32 ; sys_platform == 'win32'
-winshell ; sys_platform == 'win32'
-jupyter
-jupyter_qtconsole_colorschemes
-ipython
-matplotlib
-viscm
-scipy
-sympy
-pandas
-pyqtgraph
-nixio
-neo
-h5py
-qimage2ndarray
-imreg-dft
-seaborn
-statsmodels
-pyxdg
-python-magic
-cmocean
-cmasher
-nibabel
-twine
-jupyter_cms
-jupyterlab
-jupyterthemes
-nodejs
-pingouin
-researchpy
-scikit-learn
-scikit-image
-octave_kernel
-gnuplot_kernel
-matlab_kernel
-cython
-bokeh
-pytest
-pyneuroml       # optional
-pylmeasure      # optional
-jupyter_cms
-jupyterlab
-jupyterthemes
-nodejs
-pingouin
-researchpy
-scikit-learn
-scikit-image
-language_tool_python
-pyabf
-ipyparallel
-# also see nrn/docs/docs_requirements.txt, reproduced below after excluding 
-# packages already listed above
-sphinx_rtd_theme
-nbconvert
-recommonmark
-plotnine
-plotly
+
+
 # NOTE as of 2021-10-12 11:59:52 might have to compile from source if using Python >= 3.9.7
-tables ; python_version >= '3.9.7'
+# also see nrn/docs/docs_requirements.txt, reproduced below after excluding 
+# linguistics
+# packages already listed above
+#wheel
+
+distlib
+Babel
 GitPython
+Jinja2
+MarkupSafe
+Pillow
+PyLEMS
+# required to build PyQt5 locally using the host's Qt stack
+PyQt-builder ; sys_platform == 'linux'
+# required to build PyQt5 locally using the host's Qt stack
+Pyqt5-sip ; sys_platform == 'linux'
+PyQt5 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
+qdarkstyle ; sys_platform == 'win32'
+PyWavelets
+QtPy
+SecretStorage
+airspeed
+anyio
+asttokens
+attrs
+base32hex
+bleach
+blis ; sys_platform == 'linux'
+bokeh
+cachetools
+catalogue
+certifi
+cffi
+chardet
+chronometry
+click
+cmasher
+cmocean
+colorama
+colouration
+confection
+confuse
+cryptography
+cymem
+cython
+debugpy
+descartes
+dill
+editdistance
+exceptiongroup
+executing
+filelock
+fonttools
+func-timeout
+fuzzywuzzy
+geographiclib
+geopy
+gitdb
+gnuplot_kernel
+graphviz
+h5py
+huggingface-hub
+idna
+imageio
+imagesize
+importlib-metadata
+imreg-dft
+inflect
+ipyparallel
+ipython
+ipywidgets
+isodate
+jaraco.classes
+jeepney
+joblib
+#jsonlib
+jsonschema
+jupyter
+jupyter_cms
+jupyter_qtconsole_colorschemes
+jupyterlab
+jupyterlab-pygments
+jupyterlab-server
+jupyterlab-widgets
+jupyterthemes
+keyring
+kiwisolver
+langcodes
+language_tool_python
+lazy_loader
+lesscpy
+libNeuroML
+linguistics
+lxml
+matlab_kernel
+matplotlib
+matplotlib-inline
+metakernel
+modelspec
+more-itertools
+murmurhash
+nbclassic
+nbclient
+nbconvert
+nbsphinx
+neo
+nest-asyncio
+networkx
+# neuron; sys_platform == "win32" # NOTE: does NOT work on windows; on linux, see install.sh for the option to build locally
+neuromllite
+nibabel
+nixio
+nodejs
+nose            
+notebook
+notebook_shim
+numpy           
+octave_kernel
+pandas
+pandas-flavor
+pathy
+patsy
+pingouin
+pkginfo
+platformdirs
+plotly
+plotnine
+preshed; sys_platform == "linux"
+prometheus-client
+prompt-toolkit
+psutil
+pyabf
+pylmeasure      # optional
+pymongo
+pyneuroml       # optional
+pyparsing
+#pyqt5-tools ; sys_platform == 'win32'
+pyqtgraph
+pytest
+python-magic
+pytz
+pywin32 ; sys_platform == 'win32'
+pyxdg
+qimage2ndarray
+ravenclaw
+rdflib
+readme-renderer
+recommonmark
+regex
+requests-toolbelt
+researchpy
+scikit-image
+scikit-learn
+scipy
+seaborn
+slytherin
+smart-open
+smmap
+sniffio
+spacy
+spacy-legacy
+spacy-loggers
+sphinx          
+sphinx_rtd_theme
+srsly
+stack-data
+statsmodels
+sympy
+tables ; python_version >= '3.9.7'
+tabulate
+tenacity
+terminado
+testpath
+thinc
+tiffile
+tokenizers
+torch
+tqdm
+traitlets
+transformers
+twine
+txt
+typing_extensions
+viscm
+wasabi
+websocket-client
+widgetsnbextension
+winshell ; sys_platform == 'win32'
+xarray
+xyzservices
+zipp

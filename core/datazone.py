@@ -47,10 +47,9 @@ class DataZone(DataObject):
                         ('durations', pq.Quantity, 1),
                         ('labels', np.ndarray, 1, np.dtype('U')))
 
-    def __new__(cls, places=None, times=None, extents=None, durations=None,
-                labels=None, units=None, name=None, 
-                description=None, file_origin=None, segment=None,
-                array_annotations=None, **annotations):
+    def __new__(cls, places=None, times=None, extents=None, durations=None, labels=None, units=None, name=None, description=None, file_origin=None, segment=None,array_annotations=None, **annotations):
+        """
+        """
         if places is None:
             if times is None:
                 places = np.array([])
@@ -62,12 +61,11 @@ class DataZone(DataObject):
         elif instance(places, (tuple, list)):
             places = np.array(places)
             
-        elif not isinstance(places, pq.Quantity):
+        elif not isinstance(places, (pq.Quantity, np.ndarray)):
             places = np.array([])
             
         else:
             places = places.flatten()
-            
             
         if extents is None:
             if durations is None:
@@ -77,11 +75,11 @@ class DataZone(DataObject):
             elif isinstance(durations, pq.Quantity):
                 extents = durations
                 
-        elif isinstance(places, (tuple, list)):
-            places = np.array(places)
+        elif isinstance(extents, (tuple, list)):
+            extents = np.array(extents)
             
-        elif not isinstance(places, pq.Quantity):
-            places = np.array([])
+        elif not isinstance(extents, (pq.Quantity, np.ndarray)):
+            extents = np.array([])
             
         if extents.size != places.size:
             if extents.size == 1:
@@ -93,8 +91,9 @@ class DataZone(DataObject):
         if not isinstance(units, pq.Quantity):
             if isinstance(places, pq.Quantity):
                 units = places.units
-            else:
-                raise ValueError("Units must be specified")
+                
+            elif places is not None:
+                units = pq.dimensionless
         else:
             if not isinstance(places, pq.Quantity):
                 places = places * units
@@ -116,7 +115,7 @@ class DataZone(DataObject):
             if labels.size != places.size and labels.size:
                 raise ValueError("Labels array has different length to times")
             
-        obj = pq.Quantity.__new__(cls, places, units = places.dimensionality)
+        obj = pq.Quantity.__new__(cls, places, units = units.dimensionality)
         
         obj._labels = labels
         obj._extents = extents
@@ -130,7 +129,7 @@ class DataZone(DataObject):
                             description=description, 
                             array_annotations=array_annotations, **annotations)
                 
-        self.__domain_name__ = name_from_unit(self.places)
+        self.__domain_name__ = cq.name_from_unit(self.places)
             
             
     def __reduce__(self):
@@ -148,7 +147,7 @@ class DataZone(DataObject):
         self.file_origin = getattr(obj, "file_origin", None)
         self.description = getattr(obj, "description", None)
         self.segment = getattr(obj, "segment", None)
-        self.__domain_name__ = cq.name_from_unit(self.places)
+        self.__domain_name__ = cq.name_from_unit(self.units)
         
         if not hasattr(self, "array_annotations"):
             self.array_annotations = ArrayDict(self._get_arr_ann_length())

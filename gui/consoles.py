@@ -39,7 +39,7 @@ some of the lost variables across kill - restart cycles.
 import os
 import signal
 import json
-import sys, typing, traceback, itertools, subprocess
+import sys, typing, traceback, itertools, subprocess, asyncio
 # BEGIN NOTE: 2022-03-05 16:07:04 For execute_request
 import inspect, time
 from ipykernel.jsonutil import json_clean
@@ -205,6 +205,10 @@ class ScipyenInProcessKernel(InProcessKernel):
     
     def __init__(self, **traits):
         super().__init__(**traits)
+        
+    @asyncio.coroutine
+    def _abort_queues(self):
+        yield
     
     async def execute_request(self, stream, ident, parent):
         """handle an execute_request
@@ -3017,6 +3021,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
             indent = ''
         else:
             indent = ' ' * indent_spaces
+            
         return status != 'incomplete', indent
     
     def closeEvent(self, evt):
@@ -3151,8 +3156,67 @@ class ScipyenConsoleWidget(ConsoleWidget):
             
         elif isinstance(text, (tuple, list) and all([isinstance(s, str) for s in text])):
             self.__write_text_in_console_buffer__("\n".join(text))
-        
-        
+            
+    def _format_text_selection(self, text):
+        # code below from qtconsole.frontend_widget.FrontendWidget
+        if len(text.strip()):
+            first_line_selection, *remaining_lines = text.splitlines()
+
+            # Get preceding text
+            cursor = self._control.textCursor()
+            cursor.setPosition(cursor.selectionStart())
+            cursor.setPosition(cursor.block().position(),
+                                QtGui.QTextCursor.KeepAnchor)
+            preceding_text = cursor.selection().toPlainText()
+
+            def remove_prompts(line):
+                """Remove all prompts from line."""
+                line = self._highlighter.transform_classic_prompt(line)
+                return self._highlighter.transform_ipy_prompt(line)
+
+            # Get first line promp len
+            first_line = preceding_text + first_line_selection
+            len_with_prompt = len(first_line)
+            first_line = remove_prompts(first_line)
+            prompt_len = len_with_prompt - len(first_line)
+
+            # Remove not selected part
+            if prompt_len < len(preceding_text):
+                first_line = first_line[len(preceding_text) - prompt_len:]
+
+            # Remove partial prompt last line
+            if len(remaining_lines) > 0 and remaining_lines[-1]:
+                cursor = self._control.textCursor()
+                cursor.setPosition(cursor.selectionEnd())
+                block = cursor.block()
+                start_pos = block.position()
+                length = block.length()
+                cursor.setPosition(start_pos)
+                cursor.setPosition(start_pos + length - 1,
+                                    QtGui.QTextCursor.KeepAnchor)
+                last_line_full = cursor.selection().toPlainText()
+                prompt_len = (
+                    len(last_line_full)
+                    - len(remove_prompts(last_line_full)))
+                if len(remaining_lines[-1]) < prompt_len:
+                    # This is a partial prompt
+                    remaining_lines[-1] = ""
+
+            # Remove prompts for other lines.
+            remaining_lines = map(remove_prompts, remaining_lines)
+            text = '\n'.join([first_line, *remaining_lines])
+
+            # Needed to prevent errors when copying the prompt.
+            # See issue 264
+            try:
+                was_newline = text[-1] == '\n'
+            except IndexError:
+                was_newline = False
+            if was_newline:  # user doesn't need newline
+                text = text[:-1]
+                
+        return text
+
     def set_pygment(self, scheme:typing.Optional[str]="", colors:typing.Optional[str]=None):
         """Sets up style sheet for console colors and syntax highlighting style.
         
@@ -3322,8 +3386,38 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def _configureUI_(self):
         ctrl = "Meta" if sys.platform == 'darwin' else "Ctrl"
         menuBar = self.menuBar()
+        self.file_menu = menuBar.addMenu("File")
+        
+        self.saveToFile = self.file_menu.addAction(QtGui.QIcon.fromTheme("document-save"),
+                                                    "Save contents to file")
+        
+        self.saveToFile.triggered.connect(self._slot_saveToFile)
+        
+        self.saveRawToFile = self.file_menu.addAction(QtGui.QIcon.fromTheme("document-save"),
+                                                        "Save contents (raw) to file")
+        
+        self.saveRawToFile.triggered.connect(self._slot_saveRawToFile)
+        
+        self.saveFormattedToFile = self.file_menu.addAction(QtGui.QIcon.fromTheme("document-save-as"),
+                                                            "Save formatted contents to file")
+        
+        self.saveFormattedToFile.triggered.connect(self.consoleWidget.export_html) # slot inherited from qtconsole.ConsoleWidget
+        
+        self.saveSelectionToFile = self.file_menu.addAction(QtGui.QIcon.fromTheme("document-save"),
+                                                            "Save selection to file")
+        
+        self.saveSelectionToFile.triggered.connect(self._slot_saveSelectionToFile)
+        
+        self.saveRawSelectionToFile = self.file_menu.addAction(QtGui.QIcon.fromTheme("document-save"),
+                                                                "Save selection (raw) to file")
+        
+        self.saveRawSelectionToFile.triggered.connect(self._slot_saveRawSelectionToFile)
         
         self.settings_menu = menuBar.addMenu("Settings")
+        
+        self.listMagicsAction = self.file_menu.addAction(QtGui.QIcon.fromTheme("view-list-text"),"List magics")
+
+        self.listMagicsAction.triggered.connect(self._slot_listMagics)
         
         available_syntax_styles = get_available_syntax_styles() # defined in this module
         
@@ -3386,8 +3480,63 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #msg["connection_file"] = ""
         #self.sig_shell_msg_received.emit(msg)
         
-        
+    @pyqtSlot()
+    def _slot_listMagics(self):
+        self.ipkernel.shell.run_cell("%lsmagic")
             
+            
+    @pyqtSlot()
+    def _slot_saveToFile(self):
+        self.consoleWidget.select_all_smart() # inherited from qtconsole.ConsoleWidget
+        text = self.consoleWidget._format_text_selection(self.consoleWidget._control.textCursor().selection().toPlainText())
+        if len(text.strip()):
+            self._saveToFile(text, mode="python")
+        
+    @pyqtSlot()
+    def _slot_saveRawToFile(self):
+        self.consoleWidget.select_document() # inherited from qtconsole.ConsoleWidget
+        # text = self.layout().currentWidget().toPlainText()
+        # text = self.layout().currentWidget().toPlainText()
+        text = self.consoleWidget._control.toPlainText()
+        if len(text.strip()):
+            self._saveToFile(text, mode="raw")
+                
+    @pyqtSlot()
+    def _slot_saveRawSelectionToFile(self):
+        c = self.consoleWidget._get_cursor()
+        text = c.selectedText()
+        if len(test.strip()):
+            self._savetoFile(text, mode="raw")
+        
+        
+    @pyqtSlot()
+    def _slot_saveSelectionToFile(self):
+        c = self.consoleWidget._get_cursor()
+        text = self.consoleWidget._format_text_selection(c.selection().toPlainText())
+        if len(text.strip()):
+            self._saveToFile(text, mode="python")
+    
+    
+    def _saveToFile(self, text, mode="python"):
+        from iolib import pictio as pio
+        if not isinstance(mode, str) or len(mode.strip()) == 0:
+            mode = "python"
+            
+        if mode.lower() == "raw":
+            fileflt = ";;".join(["Text files (*.txt)", "All Files (*.*)"])
+        elif mode.lower() == "html/xml":
+            fileflt = ";;".join(["HTML file (*.htm*)", "XML file (*.xml)", "All Files (*.*)"])
+        else:
+            fileflt = ";;".join(["Python source file (*.py)", "All Files (*.*)"])
+        if len(text.strip()):
+            filename, filefilter = self.chooseFile("Save buffer to file",
+                                                   fileFilter = fileflt,
+                                                   single=True,
+                                                   save=True)
+            
+            if isinstance(filename, str) and len(filename.strip()):
+                pio.saveText(text, filename)
+        
     def loadSettings(self):
         self.consoleWidget.loadSettings() # inherited from ScipyenConfigurable
         super(WorkspaceGuiMixin, self).loadSettings()

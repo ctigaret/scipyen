@@ -248,7 +248,7 @@ def pandasDtype2HF5Dtype(dtype, col, categorical_info:dict=None):
                 categorical_info[col_name] = {"categories": np.array(categories, dtype=col_dtype),
                                               "ordered": 1 if dtype.ordered else 0, 
                                              }
-        elif "datetime" in str(dtype):
+        elif "datetime" in str(dtype): # FIXME: 2022-11-28 17:53:57 = done? in NOTE: 2022-11-28 17:54:36
             col_dtype = h5py.string_dtype() # remember to convert datetime data to str!!!
         else:
             col_dtype = dtype
@@ -557,8 +557,10 @@ def makeAttr(x:typing.Optional[typing.Union[str, list, tuple, dict, deque, np.nd
         
         return x
     
+    # NOTE: 2022-11-28 17:54:36
+    # store datetime.datetime in their isoformat string representation
     if isinstance(x, datetime.datetime):
-        return str(x)
+        return x.isoformat()
         
     if isinstance(x, (list, tuple, dict)): 
         # will raise exception if elements or values are not json-able
@@ -1169,7 +1171,7 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
                 else:
                     pymodule = sys.modules[module_name_comps[0]]
 
-                # NOTE: 2022-10-05 18:40:53
+                # NOTE: 2022-10-05 18:40:53 FIXME possible BUG
                 # this doesn't work if the module is imported under an alias
                 target_class = eval(".".join(python_class_comps[1:]), pymodule.__dict__)
                     
@@ -1197,11 +1199,26 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
             # no axes imply no Dataset dimscales either
             # most likely a scalar and therefore we attempt to instantiate
             # one as such
+            # print(f"target_class {target_class}")
             if target_class == bool:
                 obj = target_class(entity)
                 
             elif target_class == str:
                 obj = dataset2string(entity)
+                
+            elif target_class == datetime.timedelta:
+                days = int(attrs.get("days", 0))
+                microseconds = int(attrs.get("microseconds", 0))
+                seconds = int(attrs.get("seconds", 0))
+                obj = target_class(days=days, seconds=seconds, microseconds=microseconds)
+                
+            elif target_class in (datetime.date, datetime.time, datetime.datetime):
+                try:
+                    val = dataset2string(entity)
+                    # print(f"val {val} decoded {val.decode()}")
+                    obj = target_class.fromisoformat(val)
+                except Exception as e:
+                    traceback.print_exc()
                 
             elif any(k in inspect.getmro(target_class) for k in (int, float, complex)):
                 # NOTE: 2022-10-08 13:20:20
@@ -1233,6 +1250,14 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
             elif target_class in (vigra.filters.Kernel1D, vigra.filters.Kernel2D):
                 data = np.array(entity)
                 obj = vu.kernelfromarray(data)
+                
+            # elif target_class in (datetime.date, datetime.time, datetime.datetime):
+            #     try:
+            #         val = dataset2string(entity)
+            #         print(f"val {val} decoded {val.decode()}")
+            #         obj = target_class.fromisoformat(val.decode())
+            #     except Exception as e:
+            #         traceback.print_exc()
                 
             else:
                 obj = target_class # for now
@@ -1565,6 +1590,18 @@ def _(obj):
    return makeAttrDict(dtype = jsonio.dtype2JSON(obj.dtype), 
                        axistags = obj.axistags.toJSON())
 
+@makeDatasetAttrs.register(datetime.timedelta)
+def _(obj):
+    attrs = dict()
+    for attribute in ("days", "seconds", "microseconds"):
+        attrs[attribute] = int(getattr(obj, attribute))
+        
+    
+    # for attribute in ("days", "seconds", "microseconds"):
+    #     attrs[f"resolution_{attribute}"] = int(getattr(obj.resolution, attribute))
+
+    return attrs
+        
 @singledispatch
 def makeAxisDict(obj, axisindex:int):
     """Returns a dict with axis information for storage in HDF5 hierarchy.
@@ -1934,7 +1971,8 @@ def _(obj, axisindex):
     return ret
 
 @safeWrapper
-def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,axisdict:dict,compression:str="gzip",chunks:bool=None,track_order=True):
+# def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,axisdict:dict,compression:str="gzip",chunks:bool=None,track_order=True):
+def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,compression:str="gzip",chunks:bool=None,track_order=True):
     """
     Attaches a dimension scale for a specific dimension in a HDF5 Dataset.
     
@@ -1982,7 +2020,6 @@ def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,axi
     # in self.writeDataObject) 
     
     axis_dict  = makeAxisDict(obj, dimindex)
-    # axis_attrs = makeAttrDict(**axis_dict)
     
     axis_dset_name = f"axis_{dimindex}"
     
@@ -2028,16 +2065,19 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
     """
     Encodes Python objects into a HDF5 entity (Group or Dataset).
     
+    This is the "entry point" for encoding (writing) a Python object as a HDF5
+    data structure (file), in Scipyen.
+    
     Depending on the type of Python object, the object's data are stored as one
     or more HDF5 entities collected in a tree-like structure, in a parent HDF5
-    Group. The tree-like layout is characteristic to the Python's type.
+    Group. The tree-like layout is characteristic to the Python data type.
     
     As a rule of thumb, numeric scalars, arrays and other plain old data types
-    (str, bool, bytes, bytearray) are stored in Dataset "leaves".
+    (str, bool, bytes, bytearray) are stored as HDF5 Dataset "leaves".
     
-    Iterable objects, as well as more complex object types are stored as a Group
-    containing (sub)Group or Dataset children that correspond to specific attributes
-    of the Python object.
+    Iterable objects, as well as more complex object types are stored as HDF5
+    Group objects, containing children (HDF5 Group or Dataset) that correspond 
+    to specific attributes of the Python object.
     
     Information about the Python object's class and, where necessary, about any
     specific attributes of the Python's object, are stored in the 'attrs' property
@@ -2056,27 +2096,28 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
     group: h5py.Group The HDF5 parent group, where obj will be stored as a HDF5 
         entity 
         NOTE: this can be a h5py.File as well, opened for writing
-        name: str, optional default is None:
-            name of the entity which will contain obj data and will be created by
-            this function.
-            
-        oname: str, optional, default is None:
-            typically, the name (symbol) bound to the obj in the caller namespace,
-            OR obj's `name` property (if present)
-            
-        compression: str, chunks: bool - parameters passed on to code that 
-            creates HDF5 Dataset entities; both optional with default being None
-            
-        track_order:bool - flags passed on the code creating HDF5 Group entities
-            optional, default is True
-            
-        entity_cache: dict, optional default is None
-            When given it maps Python objects to the HDF5 entities that were 
-                created for these objects (technically, maps object id values to
-                entiti id values).
-                Useful to track 'stored' objects in the HDF5 hierarchy to avoid
-                storage duplication for data in 'obj', which otherwise has already
-                generated an HDF5 entity
+    
+    name: str, optional default is None:
+        name of the entity which will contain obj data and will be created by
+        this function.
+        
+    oname: str, optional, default is None:
+        typically, the name (symbol) bound to the obj in the caller namespace,
+        OR obj's `name` property (if present)
+        
+    compression: str, chunks: bool - parameters passed on to code that 
+        creates HDF5 Dataset entities; both optional with default being None
+        
+    track_order:bool - flags passed on the code creating HDF5 Group entities
+        optional, default is True
+        
+    entity_cache: dict, optional default is None
+        When given it maps Python objects to the HDF5 entities that were 
+            created for these objects (technically, maps object id values to
+            entiti id values).
+            Useful to track 'stored' objects in the HDF5 hierarchy to avoid
+            storage duplication for data in 'obj', which otherwise has already
+            generated an HDF5 entity
         
     Var-keyword parameters - used in special circumstances
     ------------------------------------------------------
@@ -2368,6 +2409,7 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
     
     elif isinstance(obj, enum.Enum):
         # → h5py.Dataset child of group,  with h5py.enum_dtype
+        cached_entity = getCachedEntity(entity_cache, obj)
         if isinstance(cached_entity, h5py.Dataset):
             group[target_name] = cached_entity
             return cached_entity
@@ -2449,11 +2491,21 @@ def makeDataset(obj, group:h5py.Group, attrs:dict, name:str, compression:typing.
         group[target_name] = cached_entity # make a hard link
         return cached_entity
     
-    if not isinstance(obj, (numbers.Number, tuple, list, deque)):
+    # NOTE: 2022-12-21 22:00:52
+    # in Python 3.10 bool is a numbers.Number
+    supported_types = (numbers.Number, tuple, list, deque)
+    
+    if not isinstance(obj, supported_types):
         warnings.warn(f"makeDataset: {type(obj).__name__} objects are not supported")
-        dset = group.create_dataset(name, data = h5py.Empty("f"))
+        dset = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
     else:
-        dset = group.create_dataset(name, data = obj)
+        # HDF5 prevents the use of compression and chunks with scalars!
+        if isinstance(obj, numbers.Number):
+            compression = None
+            chunks = None
+            
+        dset = group.create_dataset(name, data = obj, compression=compression,
+                                    chunks=chunks, track_order=track_order)
         
     dset.attrs.update(attrs)
     storeEntityInCache(entity_cache, obj, dset)
@@ -2466,7 +2518,7 @@ def _(obj, group, attrs:dict, name:str, compression, chunks, track_order, entity
         group[target_name] = cached_entity # make a hard link
         return cached_entity
     
-    dset =  group.create_dataset(name, data = h5py.Empty("f"))
+    dset =  group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
     dset.attrs.update(attrs)
     storeEntityInCache(entity_cache, obj, dset)
     return dset
@@ -2486,19 +2538,44 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
         data = np.array(obj)
     
     if data.size == 0:
-        dset = group.create_dataset(name, data = h5py.Empty(f))
+        dset = group.create_dataset(name, data = h5py.Empty(f), track_order=track_order)
     
     if data.size == 1:
-        dset = group.create_dataset(name, data = data)
+        dset = group.create_dataset(name, data = data, track_order=track_order)
+        
     else:
         dset = group.create_dataset(name, data = data, compression=compression,
-                                    chunks = chunks)
+                                    chunks = chunks, track_order=track_order)
         
     dset.attrs.update(attrs)
     storeEntityInCache(entity_cache, obj, dset)
     return dset
     
-            
+@makeDataset.register(datetime.date)
+@makeDataset.register(datetime.time)
+@makeDataset.register(datetime.datetime)
+def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
+    cached_entity = getCachedEntity(entity_cache, obj)
+    if isinstance(cached_entity, h5py.Dataset):
+        group[target_name] = cached_entity # make a hard link
+        return cached_entity
+    
+    return makeDataset(obj.isoformat(), group, attrs, name, compression, chunks, track_order, entity_cache)
+    
+@makeDataset.register(datetime.timedelta)
+def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
+    cached_entity = getCachedEntity(entity_cache, obj)
+    if isinstance(cached_entity, h5py.Dataset):
+        group[target_name] = cached_entity # make a hard link
+        return cached_entity
+    
+    dset = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
+    # print(f"attrs {attrs}")
+    dset.attrs.update(attrs)
+    storeEntityInCache(entity_cache, obj, dset)
+    
+    return dset
+    
 @makeDataset.register(str)
 def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     cached_entity = getCachedEntity(entity_cache, obj)
@@ -2506,18 +2583,18 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
         group[target_name] = cached_entity # make a hard link
         return cached_entity
     
-    if len(obj)==0:
-        dset = group.create_dataset(name, data = h5py.Empty("f"))
+    if len(obj) == 0: # empty string
+        dset = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
     else:
-        dset = group.create_dataset(name, data = np.array(obj, dtype = h5py.string_dtype()))
+        dset = group.create_dataset(name, data = np.array(obj, dtype = h5py.string_dtype()),
+                                    track_order=track_order)
         
     dset.attrs.update(attrs)
     storeEntityInCache(entity_cache, obj, dset)
     return dset
 
 @makeDataset.register(vigra.VigraArray)
-def _(obj, group:h5py.Group, attrs:dict, name:str, 
-      compression=None, chunks=None, track_order=True, entity_cache=None):
+def _(obj, group:h5py.Group, attrs:dict, name:str, compression=None, chunks=None, track_order=True, entity_cache=None):
     """Variant of vigra.impex.writeHDF5 returning the created h5py.Dataset object
     Also populates the dataset's dimension scales.
     
@@ -2532,19 +2609,21 @@ def _(obj, group:h5py.Group, attrs:dict, name:str,
     axgrp_name = "axes"
     
     if obj.size == 0:
-        dset = group.create_dataset(dset_name, data = h5py.Empty("f"))
+        dset = group.create_dataset(dset_name, data = h5py.Empty("f"), track_order=track_order)
     
     data = obj.transposeToNumpyOrder()
     
     if data.size == 1:
         dset = group.create_dataset(dset_name, data = data)
     else:
-        dset = group.create_dataset(dset_name, data = data, compression = compression, chunks=chunks)
+        dset = group.create_dataset(dset_name, data = data, track_order=track_order, 
+                                    compression = compression, chunks=chunks)
     
     axesgroup = group.create_group(axgrp_name, track_order = track_order)
     
     for axindex in range(obj.ndim):
-        makeAxisScale(obj, dset, axesgroup, axindex, compression, chunks)
+        makeAxisScale(obj, dset, axesgroup, axindex, compression=compression, 
+                      chunks=chunks, track_order=track_order)
         
     dset.attrs.update(attrs)
     storeEntityInCache(entity_cache, obj, dset)
@@ -2571,12 +2650,13 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     
     # 1. create a child data Dataset in group
     if obj.size == 0:
-        return group.create_dataset(dset_name, data = h5py.Empty("f"))
+        return group.create_dataset(dset_name, data = h5py.Empty("f"), track_order=track_order)
     
     if obj.size == 1:
-        dset = group.create_dataset(dset_name, data = obj.magnitude)
+        dset = group.create_dataset(dset_name, data = obj.magnitude, track_order=track_order)
     else:
-        dset = group.create_dataset(dset_name, data = obj.magnitude, compression = compression, chunks = chunks)
+        dset = group.create_dataset(dset_name, data = obj.magnitude, track_order=track_order,
+                                    compression = compression, chunks = chunks)
         
     # 2. create a child axes Group in group
     axgroup = group.create_group(axgrp_name, track_order=track_order)
@@ -2585,7 +2665,8 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     # scales attached to the data Dataset child created in 1. above
     
     for k in range(obj.ndim):
-        makeAxisScale(obj, dset, axgroup, k, compression, chunks)
+        makeAxisScale(obj, dset, axgroup, k, compression=compression,
+                      chunks=chunks, track_order=track_order)
         
     # 3. make a labels Dataset child of group
     # NOTE: 2022-10-11 11:52:59
@@ -2629,7 +2710,8 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
             waveforms_dset = makeHDF5Entity(waveforms, group, 
                                             name = "waveforms",
                                             compression = compression,
-                                            chunks = chunks)
+                                            chunks = chunks,
+                                            track_order = track_order)
             waveforms_dset.make_scale("waveforms")
             dset.dims[0].attach_scale(waveforms_dset)
         
@@ -2672,12 +2754,12 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     # NOTE: 2021-11-18 14:41:47
     # units & dtype taken care of by makeObjAttrs() via makeDatasetAttrs()
     if obj.size == 0:
-        dset = group.create_dataset(name, data = h5py.Empty("f"))
+        dset = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
     
     if obj.size == 1:
-        dset = group.create_dataset(name, data = obj.magnitude)
+        dset = group.create_dataset(name, data = obj.magnitude, track_order=track_order)
     else:
-        dset = group.create_dataset(name, data = obj.magnitude, 
+        dset = group.create_dataset(name, data = obj.magnitude, track_order=track_order, 
                                     compression = compression, chunks = chunks)
         
     dset.attrs.update(attrs)
@@ -2692,7 +2774,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
         return cached_entity
     
     if obj.size == 0:
-        dset = group.create_dataset(name, data = h5py.Empty("f"))
+        dset = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
     
     if obj.dtype.kind in NUMPY_STRING_KINDS:
         data = np.array(obj, dtype=h5py.string_dtype(), order="k")
@@ -2700,9 +2782,9 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
         data = obj
         
     if obj.size == 1:
-        dset = group.create_dataset(name, data = data, compression = compression)
+        dset = group.create_dataset(name, data = data, track_order=track_order, compression = compression)
     else:
-        dset = group.create_dataset(name, data = data, compression = compression, 
+        dset = group.create_dataset(name, data = data, track_order=track_order, compression = compression, 
                                     chunks = chunks)
     dset.attrs.update(attrs)
     storeEntityInCache(entity_cache, obj, dset)

@@ -471,7 +471,6 @@ class TriggerDetectDialog(qd.QuickDialog):
         
         self.triggerProtocols = list()
         
-        
         if not isinstance(ephysViewer, SignalViewer):
             self._ephysViewer_ = SignalViewer(win_title = "Trigger Events Detection")
             self._owns_viewer_ = True

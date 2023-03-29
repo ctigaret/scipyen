@@ -1,0 +1,54 @@
+2023-01-01 16:24:16
+
+neo.Block:
+    • each segment is a "frame"
+    
+    • for each segment:
+        ∘ the signals (analog and irregularly sampled) are plotted
+            in their own PlotItem
+            ★ to keep it simple, the separateChannelAxis flag is NOT used
+                (if you want to plot each channel of a multi-channel signal in 
+                 separate PlotItems, then pass the signal to the 
+                 SignalViewer.view() and set this flag to True)
+             
+        ∘ events are all plotted in the same PlotItem (NOTE: they can also be
+            overlaid in a signal PlotItem using the `overlayTargets` method)
+
+        ∘ spike trains (contained in the segment's `spiketrains` attribute, which
+            is a neo.core.spiketrainlist.SpikeTrainList) are plotted all in the
+            same PlotItem (NOTE: they can also be overlaid in a signal PlotItem 
+            using the `overlayTargets` method)
+            
+            
+neo.Segment:
+    • treated as a segment in the neo.Block
+    
+    • there is only one "frame"
+    
+sequence of neo.Segment:
+    • treated as a neo.Block
+    
+    • each segment is a "frame"
+    
+signal object: 
+    These are objects of one of the following types:
+        neo.AnalogSignal, 
+        neo.IrregularlySampledSignal, 
+        scipyen.core.datasignal.DataSignal
+        scipyen.core.datasignal.IrregularlySampledDataSignal.
+        
+    • plotted in a single PlotItem, UNLESS separateSignalChannels flag is True, in
+        which case each channel is plotted in its own PlotItem
+        
+    • there is only one frame, UNLESS:
+        ∘ separateSignalChannels is False, AND
+        ∘ frameAxis is 1 (i.e., frameAxis is the same as signalChannelAxis which
+            is orthgonal to the data axis)
+    
+    
+sequence (i.e. tuple, list) of signal objects:
+    • In the general case, these are considered to be disparate signals and it is
+        assumed that they do not have the same domain. This is unlike the signal
+        objects collected in a segment, where (at least theoretically) they 
+        should be defined in the same domain (t_start, duration and, for analog
+        signals, the same sampling rate) (really ?!?)

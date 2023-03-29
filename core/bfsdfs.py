@@ -448,7 +448,7 @@ def dict_depth(x):
     
     for kv in dkv:
         dp = dict_depth(kv[1])
-        print(kv[0], dp)
+        # print(kv[0], dp)
         depths.append(dp)
         
     if len(depths):
@@ -477,7 +477,7 @@ class Finder:
 
         self.level = 0
         
-        print(self.branches)
+        # print(self.branches)
         
     #def traverse_dict(self, x=None, branch=list()):
         #if x is None:
@@ -545,7 +545,7 @@ class Finder:
         #for k, kv in enumerate(dkv):
         for k, (key, val) in enumerate(dkv):
             current_branch = [k for k in filter(lambda i: i[0:self.level]==[key], self.branches)]
-            print("in branch %s" % branch, "key",key, "current", current_branch, "level", self.level)
+            # print("in branch %s" % branch, "key",key, "current", current_branch, "level", self.level)
             if len(branch) == 0:
                 branch.append(key)
             dp, br = self.dict_depth(val, current_branch)#, branch+[key])#, branches[k], branches)
@@ -553,7 +553,7 @@ class Finder:
             depths.append(dp)
             if dp > 0: # store in branch
                 current_branch+=br
-            print("in branch %s" % branch, "key", key, "updated current", current_branch, "level", self.level)
+            # print("in branch %s" % branch, "key", key, "updated current", current_branch, "level", self.level)
                 
         self.level -= 1
             

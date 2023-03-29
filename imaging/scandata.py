@@ -45,7 +45,7 @@ from core.triggerprotocols import (TriggerProtocol,
 
 from core.neoutils import (clear_events, get_index_of_named_signal, is_empty,)
 #from core.neoutils import (clear_events, get_index_of_named_signal, neo_copy, is_empty,)
-from ephys.ephys import (average_segments, )
+from core.neoutils import (average_segments, )
 
 from imaging.vigrautils import (proposeLayout, concatenateImages, croppedView, 
                                 imageIndexTuple, resampleImage, resampleImageAxis,
@@ -1332,7 +1332,8 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
                 self.obj.framesMap.map = newmap
 
 class ScanData(BaseScipyenData):
-    """An almost direct translation of matlab LSData data structure.
+    """Encapsulates data from laser scanning imaging and electrophysiology data.
+
     Work in progress.
     
     TODO/FIXME 2018-09-14 10:28:13 - place on back-burner...
@@ -1437,6 +1438,8 @@ class ScanData(BaseScipyenData):
         Where the did the 26 come from?
         
     """
+    #  An almost direct translation of my old matlab LSData data structure.
+    
     from gui import pictgui as pgui
     
     # NOTE: 2022-01-11 13:48:37
@@ -1503,7 +1506,7 @@ class ScanData(BaseScipyenData):
         ("type",                            ScanDataType.linescan),
         )
     
-    _descriptor_attributes_= _data_children_ + _derived_data_children_ + _result_data_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ + BaseScipyenData._descriptor_attributes_
+    _descriptor_attributes_ = _data_children_ + _derived_data_children_ + _result_data_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ + BaseScipyenData._descriptor_attributes_
     
     def _get_data_child_component_(self, component:str):
         """
@@ -2459,7 +2462,7 @@ class ScanData(BaseScipyenData):
                 
                 result.age      = unit.age
                 result.genotype = unit.genotype
-                result.gender   = unit.gender
+                result.sex   = unit.sex
                 result.sourceID = unit.sourceID
                 
                 result._analysis_units_.add(analysis_unit)
@@ -2473,7 +2476,7 @@ class ScanData(BaseScipyenData):
         result._analysis_unit_.field = self._analysis_unit_.field
         result._analysis_unit_.age = self._analysis_unit_.age
         result._analysis_unit_.genotype = self._analysis_unit_.genotype
-        result._analysis_unit_.gender= self._analysis_unit_.gender
+        result._analysis_unit_.sex= self._analysis_unit_.sex
         result._analysis_unit_.inScene= self._analysis_unit_.inScene
         result._analysis_unit_.sourceID = self._analysis_unit_.sourceID
         result._analysis_unit_.parent = self
@@ -3714,7 +3717,7 @@ class ScanData(BaseScipyenData):
                 unit.field = self.analysisUnit().field
                 unit.sourceID = self.analysisUnit().sourceID
                 unit.genotype = self.analysisUnit().genotype
-                unit.gender = self.analysisUnit().gender
+                unit.sex = self.analysisUnit().sex
                 unit.age = self.analysisUnit().age
                 
                 for d in self.analysisUnit().descriptors:
@@ -5474,7 +5477,7 @@ class ScanData(BaseScipyenData):
         ret_unit.age = self.analysisUnit().age
         ret_unit.sourceID = self.analysisUnit().sourceID
         ret_unit.genotype = self.analysisUnit().genotype
-        ret_unit.gender = self.analysisUnit().gender
+        ret_unit.sex = self.analysisUnit().sex
         
         # force ret_unit's name to be that of the landmark (if present)
         if analysis_unit.landmark is not None:

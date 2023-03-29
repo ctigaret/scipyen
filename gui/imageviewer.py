@@ -57,7 +57,8 @@ from dataclasses import MISSING
 from traitlets import Bunch
 import numpy as np
 import quantities as pq
-import pyqtgraph as pgraph
+# import pyqtgraph as pgraph
+from gui.pyqtgraph_patch import pyqtgraph as pgraph
 import neo
 import vigra
 from pandas import NA
@@ -112,7 +113,12 @@ from . import pictgui as pgui
 from . import scipyen_colormaps as colormaps 
 from . import quickdialog
 from . import painting_shared
+from gui.itemslistdialog import ItemsListDialog
 #### END scipyen gui modules
+
+# NOTE: 2022-12-25 23:08:51
+# needed for the new plugins framework
+__scipyen_plugin__ = None
 
 mpl.rcParams['backend']='Qt5Agg'
 
@@ -130,7 +136,7 @@ from qimage2ndarray import gray2qimage, array2qimage, alpha_view, rgb_view, byte
 
 # don't use this yet, until we fully understand how to deal with VigraQt colormap
 #mechanism from Python side
-Ui_EditColorMapWidget, QWidget = __loadUiType__(os.path.join(__module_path__,"editcolormap2.ui"))
+Ui_EditColorMapWidget, QWidget = __loadUiType__(os.path.join(__module_path__,"widgets","editcolormap2.ui"))
 
 #Ui_ItemsListDialog, QDialog = __loadUiType__(os.path.join(__module_path__,'itemslistdialog.ui'))
 
@@ -155,7 +161,7 @@ class ColorMapEditor(QWidget, Ui_EditColorMapWidget):
 
     
 class ComplexDisplay(Enum):
-    """
+    """TODO
     """
     real  = 1
     imag  = 2
@@ -810,7 +816,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         else:
             dlgTitle = "Remove %ss" % "cursor" if cursors else "ROI"
             
-            selectionDialog = pgui.ItemsListDialog(self, objNames,
+            selectionDialog = ItemsListDialog(self, objNames,
                                                 title = dlgTitle,
                                                 selectmode = QtWidgets.QAbstractItemView.MultiSelection)
             
@@ -845,7 +851,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             return
         
         if not isinstance(crsId, str) or len(crsId.strip()) == 0:
-            selectionDialog = pgui.ItemsListDialog(self, sorted([c.name for c in self.dataCursors]), "Select cursor")
+            selectionDialog = ItemsListDialog(self, sorted([c.name for c in self.dataCursors]), "Select cursor")
             
             a = selectionDialog.exec_()
             
@@ -2211,10 +2217,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     # TODO 2019-11-01 22:41:39
     # implement viewing of Kernel2D, numpy.ndarray with 2 <= ndim <= 3
     # list and tuple of 2D VigraArray 2D, Kernel2D, 2D numpy.ndarray, QImage, QPixmap
-    supported_types = (vigra.VigraArray, vigra.filters.Kernel2D, np.ndarray, 
-                       QtGui.QImage, QtGui.QPixmap, tuple, list) 
+    viewer_for_types = {vigra.VigraArray:99, 
+                        vigra.filters.Kernel2D:99, 
+                        np.ndarray:0, 
+                        QtGui.QImage:99, 
+                        QtGui.QPixmap:99, 
+                        tuple:0, 
+                        list:0}
     
-    view_action_name = "Image"
+    # view_action_name = "Image"
     
     # image = the image (2D or volume, or up to 5D (but with up to 3 spatial
     #           dimensions e.g., xyztc, etc))
@@ -2386,7 +2397,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         # specially (unlike in SignalViewer's case)
         #
         # in turn, super.setData() calls self._set_data_(...)
-        if isinstance(data, ImageViewer.supported_types) or any([t in type(data).mro() for t in ImageViewer.supported_types]):
+        if isinstance(data, tuple(ImageViewer.viewer_for_types.keys())) or any([t in type(data).mro() for t in tuple(ImageViewer.viewer_for_types.keys())]):
             self.setData(data, doc_title=self._docTitle_)
             
         
@@ -3361,7 +3372,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         name_list = sorted([name for name in img_vars.keys()])
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = name_list)
+        choiceDialog = ItemsListDialog(parent=self, itemsList = name_list)
         
         ans = choiceDialog.exec()
         
@@ -3496,7 +3507,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.widthAxis  = layout.horizontalAxis
             self.heightAxis = layout.verticalAxis
             
-            with self.observed_vars.hold_trait_notifications():
+            with self.observed_vars.observer.hold_trait_notifications():
                 self.observed_vars["data"] = self._data_
             
             return True
@@ -3762,6 +3773,19 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         #self.setWindowTitle("Image Viewer")
         
+        # NOTE: 2022-11-05 23:26:25
+        # adding a custom widget in a placeholder in the UI form; this is because
+        # widgets defined in Scipyen have no Qt 5 Designer equivalent
+        # the placeholder is a QWidget () in the UI form
+        # we set the placeholder's layout to a gridlayout with tight spacing &
+        # margins
+        # then we create an instance of the custom widgtet with this placeholder
+        # as parent
+        # finally, we add the custom Scipyen widget to the placeholder grid 
+        # layout at position 0,0
+        #
+        # The placeholder here is self.viewerWidgetContainer (defined in the 
+        # Designer UI form)
         if self.viewerWidgetContainer.layout() is None:
             self.viewerWidgetContainer.setLayout(QtWidgets.QGridLayout(self.viewerWidgetContainer))
             
@@ -3771,12 +3795,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.intensityCalibrationWidget = None
             
         self.viewerWidget = GraphicsImageViewerWidget(parent = self.viewerWidgetContainer, imageViewer=self)
+        
+        # NOTE: 2022-11-05 23:28:39
+        # presumably, these tweaks are redundant
         self.viewerWidgetContainer.layout().setHorizontalSpacing(0)
         self.viewerWidgetContainer.layout().setVerticalSpacing(0)
         self.viewerWidgetContainer.layout().contentsMargins().setLeft(0)
         self.viewerWidgetContainer.layout().contentsMargins().setRight(0)
         self.viewerWidgetContainer.layout().contentsMargins().setTop(0)
         self.viewerWidgetContainer.layout().contentsMargins().setBottom(0)
+        
         self.viewerWidgetContainer.layout().addWidget(self.viewerWidget, 0,0)
         
         # NOTE: 2017-12-18 09:37:07 this relates to mouse cursor position!!!
@@ -4044,12 +4072,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         colormapnames = sorted([n for n in mpl.colormaps.keys()])
         
         if isinstance(self._colorMap, colormaps.colors.Colormap):
-            d = pgui.ItemsListDialog(self, itemsList=colormapnames,
+            d = ItemsListDialog(self, itemsList=colormapnames,
                                      title="Select color map",
                                      preSelected=self._colorMap.name)
             
         else:
-            d = pgui.ItemsListDialog(self, itemsList=colormapnames, 
+            d = ItemsListDialog(self, itemsList=colormapnames, 
                                      title="Select color map", 
                                      preSelected="None")
             

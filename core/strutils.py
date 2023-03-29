@@ -3,13 +3,19 @@
 
 from __future__ import print_function
 import errno, os
+import locale
 import sys
 import typing
 import keyword
 import string
+import ast
+import re as _re
 from numbers import (Number, Real,)
 import numpy as np
 import quantities as pq
+
+import inflect
+InflectEngine = inflect.engine()
 
 from PyQt5 import QtCore, QtGui
 
@@ -18,7 +24,60 @@ __translation_table_to_identifier = str.maketrans(dict([(c_, "_") for c_ in stri
 __translation_table_to_R_identifier = str.maketrans(dict([(c_, ".") for c_ in string.punctuation + string.whitespace]))
 
 import errno, os
-
+def is_sequence(s:str):
+    possibleSequence = False
+    if s.startswith('(') and s.endswith(')'):
+        possibleSequence = True
+        seqStart = '('
+        seqEnd = ')'
+        
+    elif s.startswith('[') and s.endswith(']'):
+        possibleSequence = True
+        seqStart = '['
+        seqEnd = ']'
+        
+    if possibleSequence:
+        ss = s[1:-1].replace(" ", "")
+        if ',' in ss:
+            if len(ss.split('.')):
+                return True
+            
+    return False
+            
+        
+def str2sequence(s:str):
+    possibleSequence = False
+    
+    if s.startswith('(') and s.endswith(')'):
+        possibleSequence = True
+        seqStart = '('
+        seqEnd = ')'
+        
+    elif s.startswith('[') and s.endswith(']'):
+        possibleSequence = True
+        seqStart = '['
+        seqEnd = ']'
+        
+    if possibleSequence:
+        ss = s[1:-1].replace(" ", "")
+        delim = None
+        if ',' in ss:
+            delim = ','
+        elif ';' in ss:
+            delim = ';'
+        else:
+            return s
+        
+        if delim is not None:
+            if seqStart == '(' and seqEnd == ')':
+                return tuple(ss.split(delim))
+            else:
+                return ss.split # a list
+        else:
+            return s
+        
+    return s
+            
 def is_path(s:str):
     return any(c in s for c in (os.sep, os.pathsep, ";", "\\"))
     
@@ -28,7 +87,7 @@ def str2range(s):
         return range(*parts)
     else:
         return range(*parts[0:3])
-        
+    
 def is_pathname_valid(pathname: str):
     '''
     `True` if the passed pathname is a valid pathname for the current OS;
@@ -109,6 +168,7 @@ def is_pathname_valid(pathname: str):
     #
     # Did we mention this should be shipped with Python already?
 
+# def get_int_sfx(s, sep = "_", bracketed=False):
 def get_int_sfx(s, sep = "_"):
     """Parses an integral suffix from the string.
     
@@ -142,6 +202,10 @@ def get_int_sfx(s, sep = "_"):
     base = sep.join(parts[0:-1])
     
     try:
+        # if bracketed:
+        #     sfx = sfx[1:-1]
+            # sfx = sfx.lstrip("(").strip(")")
+        # print(f"sfx = {sfx}")
         sfx = int(sfx)
     except:
         sfx = None
@@ -173,13 +237,20 @@ def str2symbol(s):
     
     # replace any punctuation & white spaces with "_"
     #print("str2symbol: ", s)
+    s = _re.sub("^(?=\d)","data_", _re.sub("\W", "_", _re.sub("\s", "_", s)))
+    # s = s.translate(__translation_table_to_identifier)
     
-    s = s.translate(__translation_table_to_identifier)
+    # do some grooming
+    while ("__" in s):
+        s = s.replace("__", "_")
+        
+    if s.endswith("_"):
+        s = s[0:-1]
     
     # then check if all is digits
     
-    if len(s) and not s[0].isalpha():
-        s = "data_"+s
+    # if len(s) and not s[0].isalpha():
+    #     s = "data_"+s
         
     return s
 
@@ -192,7 +263,16 @@ def str2R(s):
     if not isinstance(s, str):
         raise TypeError("Expecting a str; got %s instead" % type(s).__name__)
     
-    s = s.translate(__translation_table_to_R_identifier)
+    if keyword.iskeyword(s):
+        s = "data."+s
+    
+    s = _re.sub("^(?=\d)","data.", _re.sub("\W", ".", _re.sub("\s", ".", arg)))
+    # s = s.translate(__translation_table_to_R_identifier)
+    while (".." in s):
+        s = s.replace("..", ".")
+        
+    if s.endswith("."):
+        s = s[0:-1]
 
     return s
     
@@ -280,23 +360,8 @@ def numbers2str(value:typing.Optional[typing.Union[Number, np.ndarray, tuple, li
     else:
         txt = ", ".join([fmt % i for i in val])
         
-    #if len(val) == 1:
-        #if show_units and isinstance(val, pq.Quantity):
-            #txt = quantity2str(val[0], precision=precision, format=format)
-        #else:
-            #txt = fmt % val[0]
-        
-    #elif len(val) > 1:
-        #if show_units and all([isinstance(v, pq.Quantity) for v in val]):
-            #txt = ", ".join([quantity2str(i, precision=precision, format=format) for i in val])
-        #else:
-            #txt = ", ".join([fmt % i for i in val])
-        
-    #else:
-        #txt = ""
-        
     return txt
-    
+
 def str2float(s):
     if not isinstance(s, str):
         return np.nan
@@ -308,4 +373,56 @@ def str2float(s):
         ret = np.nan
     
     return ret
+
+def isnumber(s):
+    """Returns True if string s can be evalated to a numbers.Number
+    
+    Strings of the form [-/+]x.y[e][-/+]z return True.
+    
+    """
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return False
+    
+    try:
+        v = eval(s)
+        if isinstance(v, Number):
+            return True
+        
+    except:
+        return False
+    
+    # ### BEGIN fool around, do NOT delete
+#     # split the string in parts separated by the current locale decimal point,
+#     # or by "e" (scientific notation)
+#     
+#     # in scientific notation a mantissa can have a decimal point
+#     
+#     ss = s.split("e")
+#     
+#     if len(ss) > 2:
+#         return False
+#     
+#     ss_ = ss[0].split(locale.localeconv()["decimal_point"])
+#     if len(ss_) > 2:
+#         return False
+#     
+#     print(f"ss_: {ss_}")
+#     ss_.extend(ss[1:])
+#     print(f"extended ss_: {ss_}")
+#     
+#     if ss_[0].startswith('-') or ss_[0].startswith('+'):
+#         ss_[0] = ss_[0][1:]
+#     
+#     if ss_[-1].startswith('-') or ss_[-1].startswith('+'):
+#         ss_[-1] = ss_[-1][1:]
+#         
+#     if ss_[-1].endswith('j'):
+#         ss_[-1] - ss_[-1][0:-1]
+#      
+#     print(f"ss_: {ss_} w/o signs")
+#     test = "".join(ss_)
+#     print(f"test: {test}")
+#     
+#     return test.isnumeric()
+    # ### END fool around, do NOT delete
 

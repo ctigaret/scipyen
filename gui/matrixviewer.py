@@ -20,6 +20,10 @@ from . import quickdialog
 from . import resources_rc
 #### END pict.gui modules
 
+# NOTE: 2022-12-25 23:08:51
+# needed for the new plugins framework
+__scipyen_plugin__ = None
+
 # TODO / FIXME: 2019-11-10 16:33:13 Merge with TableEditor
 class MatrixViewer(ScipyenViewer):
     """Simple table viewer for numpy arrays and vigra.filters.Kernel* objects.
@@ -29,17 +33,16 @@ class MatrixViewer(ScipyenViewer):
     On its way to deprecation -- use TableEditor (see below)
     
     See also:
-    * gui.dictviewer.ScipyenTableWidget
+    * gui.dictviewer.SimpleTableWidget
     * gui.tableeditor.TableEditorWidget for extended functionality
     
     """
-    supported_types = (
-                       np.ndarray, 
-                       vigra.VigraArray,
-                       vigra.filters.Kernel1D, 
-                       vigra.filters.Kernel2D,
-                       )
-    view_action_name = "Matrix"
+    viewer_for_types = {np.ndarray:0, 
+                        vigra.VigraArray:0,
+                        vigra.filters.Kernel1D:99, 
+                        vigra.filters.Kernel2D:99}
+                       
+    # view_action_name = "Matrix"
     
     #def __init__(self, data: (np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
                  #pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,

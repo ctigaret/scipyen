@@ -1,0 +1,106 @@
+# NOTE: REQUIREMENTS (binaries and development packages - installed system-wide, 
+# from your distributiom)
+# CMake, cmake-gui, cmake-modules, Qt5, python >= 3.10, X11
+# === VIGRA ===
+# libjpeg, libtiff, libpng, OpenEXR for reading and writing JPEG, TIFF, PNG, and EXR images respectively.
+# HDF5 for reading and writing HDF5 files (storage of MultiArray and RandomForest).
+# libfftw for fast Fourier transforms.
+# doxygen and Python to generate C++ documentation.
+# Python, boost_python, and numpy(*) to compile and run vigranumpy (the VIGRA Python bindings).
+# sphinx(*) to generate vigranumpy documentation.
+# nosetests(*) to execute the vigranumpy test suite.
+# === NEURON ===
+# C/C++ compiler suite supporting C++17
+# libXcomposite, bison, flex >= 2.6, CMake, 
+# cython, (python-Cyton3) (for RXD)
+# mpi (actually, openmpi & mpich), for parallel
+# ncurses
+# X11 (for GUI)
+# freetype, fontconfig,  (**)
+# ---------------------------------------------------------------------------
+# (*) these MAY be installed in the virtual environment using pip, see below
+# {**} these MAY have already been installed by default on your system but check
+#
+# ---------------------------------------------------------------------
+# NOTE: ask for location of the virtual environment (default: $HOME) => $scipyenv_parent_dir
+# NOTE: ask for the name of the viertual environment (default: scipyenv) => $scipyenv_dir; as a result, $scipyenv is $scipyenv_parent_dir/$scipyenv_dir e.g. ~/scipyenv
+# NOTE: ask for location of scipyen  (default $HOME) => $scipyen_top_dir; by default this is $HOME; as a result, $scipyen_dir is $scipyen_top_dir/scipyen
+# NOTE: navigate to $scipyen_top_dir (by default this is $HOME)
+# NOTE: clone the scipyen git repository - assumes you are in the $scipyen_top_dir directory, which by default is $HOME - see abvove; 
+git clone https://github.com/ctigaret/scipyen.git
+cd scipyen
+git checkout dev
+git pull
+
+# NOTE: get back to $scipyen_top_dir
+cd ..
+# NOTE: create virtual environment - to force the use of python 3.10 call
+# python3 -m virtualenv $scipyenv_dir
+virtualenv $scipyenv_dir
+# NOTE: activate the environment
+source $scipyenv_dir/bin/activate
+# NOTE: from now on, all code is executed with the scipyenv activated
+pip install -r $scipyen_dir/doc/install/pip_requirements.txt
+pip install --upgrade pip
+cd $scipyenv # (use absolute path name to avoid doubts)
+mkdir src
+cd src
+# TODO: offer a repo to pull these off locally
+# NOTE: build sip, PyQt5 and PyQt5-sip 
+# ATTENTION: these are old versions (unmaintained?)
+# TODO: Try to compile latest PyQt5 !!! and sip !!!
+
+# NOTE: 1 build sip
+tar xzv sip-5.5.1.dev2011271026.tar.gz
+cd sip-5.5.1.dev2011271026/
+python setup.py build
+python setup.py install
+
+cd ..
+# NOTE: 2 build PyQt5
+tar xzf PyQt5-5.15.3.dev2012141313.tar.gz
+cd PyQt5-5.15.3.dev2012141313/
+python configure.py --confirm-license --qmake=`which qmake-qt5` --designer-plugindir=$VIRTUAL_ENV/lib/qt5/plugins/designer --qml-plugindir=$VIRTUAL_ENV/lib/qt5/plugins/PyQt5 --qsci-api-destdir=$VIRTUAL_ENV/share/qt5 --no-python-dbus --sip=$VIRTUAL_ENV/bin/sip5 > config_output 2>&1
+# NOTE: check if configure has worked e.g. run it inside bash function then check $?
+make && make install
+
+cd ..
+# NOTE: 3 build PyQt5-sip
+tar xzf PyQt5_sip-12.8.1.tar.gz 
+cd PyQt5_sip-12.8.1/
+python setup.py build
+python setup.py install
+  
+cd ..
+# NOTE: build vigra
+git clone https://github.com/ukoethe/vigra.git
+
+mkdir vigra-build && cd vigra-build
+# NOTE: generate project build system
+# FIXME: NOT SURE --> export CMAKE_PREFIX_PATH=$VIRTUALENV
+cmake -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
+# NOTE: build the project
+# make && make install
+# NOTE: alternatively (but you must attend) run the line below, followed by make && make install
+# cmake-gui ../vigra # TODO add specific options & config variables in environment
+
+cd ..
+# NOTE: build NEURON
+git clone https://github.com/neuronsimulator/nrn
+mkdir nrn-build && cd nrn-build
+cmake -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_INSTALL_LIBEXECDIR=libexec -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DIV_ENABLE_SHARED=1 -DNRN_AVOID_ABSOLUTE_PATHS=1 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_CORENEURON=1 -DNRN_ENABLE_INTERVIEWS=1 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_PYTHON_DYNAMIC=1 -DNRN_ENABLE_REL_PATH=1 -DNRN_ENABLE_RX3D=1 -DNRN_ENABL_SHARED=1 -DNRN_ENABLE_THREADS=1 -DNRN_ENABLE_MECH_DLL_STYLE=1 -DLIB_INSTALL_DIR=$VIRTUAL_ENV/lib64 -DLIB_SUFFIX=64 -DMOD2C_ENABLE_LEGACY_UNITS=0
+cmake --build . --parallel 8 --target install
+# alternative ways to build
+# cmake-gui ../nrn => set the options as above in the GUI, press "Configure" until no more red highlight, then press "Generate"; finally, close cmake-gui and run:
+# make && make install
+cd ..
+# 
+# NOTE: generate launch scripts and .desktop launcher
+cd $scipyen_top_dir/scipyen/doc/install
+./make_script_links.sh
+mkdir $HOME/bin
+
+ln -s $scipyen_top_dir/scipyen/scipyen $HOME/bin/scipyen
+
+
+

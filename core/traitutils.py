@@ -20,9 +20,18 @@ import typing
 from collections import deque
 from functools import (partial, partialmethod)
 
-import six
-
+# import six
+# 
+# 
+# 
+# try:
+#     from traitlets import (class_of, repr_type, add_article,)
+# except:
+#     from traitlets.utils.descriptions import (class_of, repr_type, add_article,)
+    
 import traitlets
+
+from traitlets.utils.bunch import Bunch as Bunch
 
 from traitlets import (HasTraits, MetaHasTraits, TraitType, All, Any, Bool, CBool, Bytes, CBytes, 
     Dict, Enum, Set, Int, CInt, Long, CLong, Integer, Float, CFloat, 
@@ -34,14 +43,6 @@ from traitlets import (HasTraits, MetaHasTraits, TraitType, All, Any, Bool, CBoo
     )
 #, EventHandler,
     #)
-
-try:
-    from traitlets import (class_of, repr_type, add_article,)
-except:
-    from traitlets.utils.descriptions import (class_of, repr_type, add_article,)
-    
-
-from traitlets.utils.bunch import Bunch as Bunch
 
 import numpy as np
 import vigra
@@ -72,33 +73,6 @@ from core.prog import safeWrapper
 # e.g. not imported
 # in particular this is the case for traitcontainer.DataBag, TriggerEvent, etc
 
-TRAITSMAP = {           # use casting versions
-    None:       (Any,),
-    type(None): (Any,),
-    bool:       (CBool,),
-    int:        (CInt,),
-    float:      (CFloat,),
-    complex:    (CComplex,),
-    bytes:      (CBytes,),
-    str:        (Unicode,),
-    #str:        (CUnicode,),
-    list:       (List,),
-    #deque:      (List,),
-    set:        (Set,),
-    frozenset:  (Set,),
-    tuple:      (Tuple,),
-    dict:       (Dict,),
-    EnumMeta:   (Any,),
-    Enum:       (Any,), # IntEnum inherits from int and Enum
-    #EnumMeta:   (UseEnum,),
-    #Enum:       (UseEnum,), # IntEnum inherits from int and Enum
-    type:       (Any,),    # e.g., type(type(None))
-    #type:       (Instance,),    # e.g., type(type(None)) # Instance requires arguments to instantiate default value
-    property:   (Any,),
-    #property:   (DottedObjectName,),
-    #type:       (Type,),    # e.g., type(type(None))
-    #function:   (Any,)
-    }
 
 #@timefunc
 def enhanced_traitlet_set(instance, obj, value):
@@ -128,7 +102,7 @@ def enhanced_traitlet_set(instance, obj, value):
         new_hash = gethash(new_value)
         #print("\told %s (hash %s)\n\tnew %s (hash %s)" % (old_value, instance.hashed, new_value, new_hash))
         #print(instance.name, "old hashed", instance.hashed, "new_hash", new_hash)
-        silent = (new_hash == instance.hashed)
+        silent = bool(new_hash == instance.hashed)
         
         if not silent:
             instance.hashed = new_hash
@@ -339,7 +313,8 @@ def adapt_args_kw(x, args, kw, allow_none):
         kw["default_value"] = x
         
         kw["allow_none"] = allow_none
-        
+
+        # print(f"adapt_args_kw args = {args}, kw = {kw}")
 
     return args, kw
     
@@ -394,7 +369,9 @@ def dynamic_trait(x, *args, **kwargs):
     
     """
     from .traitcontainers import DataBag
-    from .scipyen_traitlets import (DataBagTrait, DequeTrait, QuantityTrait)
+    import core.scipyen_traitlets as sct
+    from .scipyen_traitlets import (DataBagTrait, DequeTrait, QuantityTrait,
+                                    NeoBlockTrait)
     allow_none = kwargs.pop("allow_none", False)
     force_trait = kwargs.pop("force_trait", None)
     set_function = kwargs.pop("set_function", None)
@@ -419,83 +396,98 @@ def dynamic_trait(x, *args, **kwargs):
     # if 'x' is of a type found in traitsmap keys then OK, else we fallback to
     # Instance
     
-    myclass = x.__class__
-    
-    #print("dynamic_trait: myclass", myclass)
-    
     arg = [x] + [a for a in args]
     
     args = tuple(arg)
     
     kw = kwargs
     
+    myclass = x.__class__
+    
     if issubclass(myclass, DataBag):
         traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=False if v is x else True)) for k,v in x.items())
-        return DataBagTrait(default_value=x, 
+        return sct.DataBagTrait(default_value=x, 
                             per_key_traits = traits, 
                             allow_none = allow_none, 
                             mutable_key_value_traits = use_mutable)
     
-    elif issubclass(myclass, deque):
-        return DequeTrait(default_value = x)
+    traitlet_class = None
     
-    elif issubclass(myclass, pq.Quantity):
-        return QuantityTrait(default_value = x)
-#     
-    elif issubclass(myclass, list):
-        return ListTrait(x)
+    traitlet_class_name = myclass.__name__
     
-    elif issubclass(myclass, tuple):
-        return Tuple(x)
-    
-    elif issubclass(myclass, dict):
-        return Dict(x)
-    
-    if isclass(force_trait) and issubclass(force_trait, traitlets.TraitType):
-        traitclass = (force_trait, )
+    if traitlet_class_name[0].islower():
+        traitlet_class_name = traitlet_class_name[0].upper() + traitlet_class_name[1:]
         
-    else:
-        # NOTE: 2021-08-20 12:22:12 For a finer granularity
-        # traitclass = TRAITSMAP.get(myclass, (Any, ))
-        traitclass = (Any,)
+    traitlet_class_name = f"{traitlet_class_name}Trait"
+    
+    traitlet_class = sct.__dict__.get(traitlet_class_name, None)
+    
+    if traitlet_class is None:
+        if any("neo" in c.__module__ for c in getmro(myclass)):
+            traitlet_class_name = f"Neo{myclass.__name__}Trait"
+            traitlet_class = sct.__dict__.get(traitlet_class_name, None)
+    
+    if traitlet_class is not None and (not isinstance(traitlet_class, type) and TraitType not in getmro(traitlet_class)):
+        traitlet_class = None
+    
+    if traitlet_class is None:
+        traitlet_classes = [None]
         
-    if traitclass[0] is None:
-        # NOTE: 2021-10-10 17:10:02
-        # when 'x' is a DataBag, the line below always returns 'dict'
-        highest_below_object = [s for s in reversed(getmro(myclass))][1] # all Python types inherit from object
-        traitclass = TRAITSMAP.get(highest_below_object, (Any,))
+        if issubclass(myclass, tuple):
+            return Tuple(x)
         
-    if not isfunction(set_function) or len(signature(set_function).parameters) != 3:
-        set_function = enhanced_traitlet_set
-        #set_function = standard_traitlet_set
-
-    exec_body_fn = partial(_dynatrtyp_exec_body_, setfn=set_function)
-    
-    new_klass = new_class("%s_Dyn" % traitclass[0].__name__, 
-                        bases = traitclass, 
-                        exec_body = exec_body_fn)
-    
-    new_args, new_kw = adapt_args_kw(x, args, kw, allow_none)
-    
-    if traitclass[0] is Instance:
-        return new_klass(klass = myclass, args = args, kw = kw, allow_none = allow_none)
-    
-    if issubclass(new_klass, Dict) and content_traits:
-        traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=False if v is x else True)) for k,v in x.items())
-        # NOTE: New API for traitlets >= 5.0: 'traits' is deprecated in favour of 'per_key_traits'
-        return new_klass(default_value = x, per_key_traits = traits, allow_none = allow_none)
-    
-    return new_klass(default_value = x, allow_none = allow_none)
-    
-class TraitSetMixin(object):
-    def __init__(self):
-        super().__init__
+        elif issubclass(myclass, dict):
+            return Dict(x)
+        
+        if isclass(force_trait) and issubclass(force_trait, traitlets.TraitType):
+            traitlet_classes = sct.TRAITSMAP.get(myclass, (force_trait, ))
             
-    def set(self, obj, value):
-        """Overrides List.set to check for special hash.
-        This is supposed to also detect changes in the order of elements.
-        """
-        enhanced_traitlet_set(self, obj, value)
+        else:
+            # NOTE: 2021-08-20 12:22:12 For a finer granularity
+            traitlet_classes = sct.TRAITSMAP.get(myclass, (Any, ))
+
+        if traitlet_classes[0] is None:
+            # NOTE: 2021-10-10 17:10:02
+            # when 'x' is a DataBag, the line below always returns 'dict'
+            highest_below_object = [s for s in reversed(getmro(myclass))][1] # all Python types inherit from object
+            traitlet_classes = sct.TRAITSMAP.get(highest_below_object, (Any,))
+            
+        if not isfunction(set_function) or len(signature(set_function).parameters) != 3:
+            set_function = enhanced_traitlet_set
+            #set_function = standard_traitlet_set
+
+        exec_body_fn = partial(_dynatrtyp_exec_body_, setfn=set_function)
+        
+        traitlet_class = traitlet_classes[0]
+        
+        new_klass = new_class("%s_Dyn" % traitlet_class.__name__, 
+                            bases = traitlet_classes, 
+                            exec_body = exec_body_fn)
+        
+        new_args, new_kw = adapt_args_kw(x, args, kw, allow_none)
+        
+        if traitlet_classes[0] is Instance:
+            return new_klass(klass = myclass, args = args, kw = kw, allow_none = allow_none)
+        
+        if issubclass(new_klass, Dict) and content_traits:
+            traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=False if v is x else True)) for k,v in x.items())
+            # NOTE: New API for traitlets >= 5.0: 'traits' is deprecated in favour of 'per_key_traits'
+            return new_klass(default_value = x, per_key_traits = traits, allow_none = allow_none)
+        
+        return new_klass(default_value = x, allow_none = allow_none)
+    
+    else:
+        return traitlet_class(default_value = x, allow_none = allow_none)
+    
+# class TraitSetMixin(object):
+#     def __init__(self):
+#         super().__init__
+#             
+#     def set(self, obj, value):
+#         """Overrides List.set to check for special hash.
+#         This is supposed to also detect changes in the order of elements.
+#         """
+#         enhanced_traitlet_set(self, obj, value)
         
 class TraitsObserver(HasTraits):
     """ CAUTION do not use yet
@@ -674,186 +666,204 @@ class transform_link(traitlets.link):
         self.target[0].unobserve(self._update_source, names=self.target[1])
         self.source, self.target = None, None
         
-class ListTrait(List): # inheritance chain: List <- Container <- Instance
-    """TraitType that ideally should notify:
-    a) when a list contents has changed (i.e., gained/lost members)
-    b) when an element in the list has changed (either a new value, or a new type)
-    c) when the order of the elements has changed
-    FIXME: 2022-01-29 15:22:27
-    This doesn't do what is promised above?
-    TODO: Revisit this.
-    See also FIXME/TODO:2022-01-29 13:29:19 in scipyen_traitlets module.
-    """
-    _trait = None
-    default_value = []
-    klass = list
-    _valid_defaults = (list,tuple)
-    # _cast_types = (list, tuple)
-    
-    info_text = "Trait for lists that is sensitive to changes in content"
-    
-    # def __init__(self, trait=None, traits=None, default_value=None, **kwargs):
-    # def __init__(self, trait=typing.Any, traits=None, default_value=None, **kwargs):
-    def __init__(self, trait=None, traits=None, default_value=Undefined, **kwargs):
-        """
-        trait: in the super() List traitype, `traits` restricts the type of elements
-                in the container to that TraitType -- i.e. all must be of the same type
-    
-                this is OK for homogeneous sequences
-    
-        traits: when specified, is a sequence of TypeTrais, so that the instance 
-                is valid when the list's elements are of these types - the intention
-                is to accomodate heterogeneous sequences
-    
-            FIXME/TODO: there are two options:
-                • we pass a list of traitlets with the same number of elements as the
-                instance of ListTrait - meaning that it will be valid if 
-                traitlet[k] validates the kth element in the ListTrait
-                 - a bit of overkill: for large lists we effectively pass a second
-                list as large as the list 
-    
-                • we pass a list of traitlets such that an element in the ListTrait
-                is valid IF it can be validated by at least one of the traitlets
-                in here - question is, how to do that?
-                WARNING this may introduce a BUG by casting a value to another
-                type, depending on thhe _cast_types of the particular trait used
-                to validate
-    
-        default_value: list, tuple, set 
-        """
-        self._traits = traits # a list of traits, one per element
-        self._length = 0
-        
-        self.hashed = 0
-        
-        allow_none = kwargs.pop("allow_none", True) # make this True by default
-        
-        
-        # initialize the List (<- Container <- Instance) NOW
-        # NOTE: 2022-11-02 22:45:46
-        # this will also set the super() defaults:
-        # self._minlen = tratielts.Int(0), 
-        # self._maxlen = traitlets.Int(sys.maxsize)
-        super(ListTrait, self).__init__(trait=trait, default_value=default_value, **kwargs)
-        
-        # NOTE: for our purposes we don't really need the validation logic!
-            
-    def instance_init(self, obj=None):
-        # print(f"ListTrait {self.__class__.__name__}")
-        if obj is None:
-            obj = self
-        if isinstance(self._trait, TraitType):
-            self._trait.instance_init(obj)
-        super(Container, self).instance_init(obj)
-        
-    def validate_elements(self, obj, value):
-        # NOTE: 2021-08-19 11:28:10 do the inherited validation first
-        value = super(ListTrait, self).validate_elements(obj, value)
-        # NOTE: 2021-08-19 11:18:25 then the customized one
-        # imitates see traitlets.Dict.validate_elements
-        use_list = bool(self._traits) # may be None
-        default_to = (self._trait or Any())
-        validated = []
-        
-        if not use_list and isinstance(default_to, Any):
-            return value
-        
-        for k,v in enumerate(value):
-            vv = list()
-            for t in self._traits:
-                # FIXME: 2022-11-02 23:18:08 potential BUG
-                try:
-                    v_ = self._traits[k]._validate(obj, v)
-                    vv.append(v_)
-                except TraitError:
-                    pass
-            if len(vv):
-                validated.append(vv[0])
-                    
-#             if k < len(self._traits):
+# class ListTrait(List): # inheritance chain: List <- Container <- Instance
+#     """TraitType that ideally should notify:
+#     a) when a list contents has changed (i.e., gained/lost members)
+#     b) when an element in the list has changed (either a new value, or a new type)
+#     c) when the order of the elements has changed
+#     FIXME: 2022-01-29 15:22:27
+#     This doesn't do what is promised above?
+#     TODO: Revisit this.
+#     See also FIXME/TODO:2022-01-29 13:29:19 in scipyen_traitlets module.
+#     """
+#     _trait = None
+#     default_value = []
+#     klass = list
+#     _valid_defaults = (list,tuple)
+#     
+#     info_text = "Trait for lists that is sensitive to changes in content"
+#     
+#     def __init__(self, trait=None, traits=None, default_value=Undefined, **kwargs):
+#         """
+#         trait: in the super() List traitype, `traits` restricts the type of elements
+#                 in the container to that TraitType -- i.e. all must be of the same type
+#     
+#                 this is OK for homogeneous sequences
+#     
+#         traits: when specified, is a sequence of TypeTrais, so that the instance 
+#                 is valid when the list's elements are of these types - the intention
+#                 is to accomodate heterogeneous sequences
+#     
+#             FIXME/TODO: there are two options:
+#                 • we pass a list of traitlets with the same number of elements as the
+#                 instance of ListTrait - meaning that it will be valid if 
+#                 traitlet[k] validates the kth element in the ListTrait
+#                  - a bit of overkill: for large lists we effectively pass a second
+#                 list as large as the list 
+#     
+#                 • we pass a list of traitlets such that an element in the ListTrait
+#                 is valid IF it can be validated by at least one of the traitlets
+#                 in here - question is, how to do that?
+#                 WARNING this may introduce a BUG by casting a value to another
+#                 type, depending on thhe _cast_types of the particular trait used
+#                 to validate
+#     
+#         default_value: list, tuple, set 
+#         """
+#         self._traits = traits # a list of traits, one per element
+#         self._length = 0
+#         
+#         self.hashed = 0
+#         
+#         allow_none = kwargs.pop("allow_none", True) # make this True by default
+#         
+#         
+#         # initialize the List (<- Container <- Instance) NOW
+#         # NOTE: 2022-11-02 22:45:46
+#         # this will also set the super() defaults:
+#         # self._minlen = tratielts.Int(0), 
+#         # self._maxlen = traitlets.Int(sys.maxsize)
+#         super(ListTrait, self).__init__(trait=trait, default_value=default_value, **kwargs)
+#         
+#         # NOTE: for our purposes we don't really need the validation logic!
+#             
+#     def instance_init(self, obj=None):
+#         # print(f"ListTrait {self.__class__.__name__}")
+#         if obj is None:
+#             obj = self
+#         if isinstance(self._trait, TraitType):
+#             self._trait.instance_init(obj)
+#         super(Container, self).instance_init(obj)
+#         
+#     def validate_elements(self, obj, value):
+#         # NOTE: 2021-08-19 11:28:10 do the inherited validation first
+#         value = super(ListTrait, self).validate_elements(obj, value)
+#         # NOTE: 2021-08-19 11:18:25 then the customized one
+#         # imitates see traitlets.Dict.validate_elements
+#         use_list = bool(self._traits) # may be None
+#         default_to = (self._trait or Any())
+#         validated = []
+#         
+#         if not use_list and isinstance(default_to, Any):
+#             return value
+#         
+#         for k,v in enumerate(value):
+#             vv = list()
+#             for t in self._traits:
+#                 # FIXME: 2022-11-02 23:18:08 potential BUG
 #                 try:
-#                     v = self._traits[k]._validate(obj, v)
+#                     v_ = self._traits[k]._validate(obj, v)
+#                     vv.append(v_)
 #                 except TraitError:
 #                     pass
-#                     self.element_error(obj, v, self._traits[k])
+#             if len(vv):
+#                 validated.append(vv[0])
+#                     
+# #             if k < len(self._traits):
+# #                 try:
+# #                     v = self._traits[k]._validate(obj, v)
+# #                 except TraitError:
+# #                     pass
+# #                     self.element_error(obj, v, self._traits[k])
+# #                 else:
+# #                     validated.append(v)
+# #                     
+# #             else:
+# #                 validated.append(v)
+# 
+#         return self.klass(validated)
+# 
+#     def set(self, obj, value):
+#         """Overrides List.set to check for special hash.
+#         This is supposed to also detect changes in the order of elements.
+#         """
+#         new_value = self._validate(obj, value)
+#         try:
+#             old_value = obj._trait_values[self.name]
+#         except KeyError:
+#             old_value = self.default_value
+# 
+#         obj._trait_values[self.name] = new_value
+#         
+#         try:
+#             silent = bool(old_value == new_value)
+#             
+#             # NOTE: 2021-08-19 16:17:23
+#             # check for change in contents
+#             if silent is not False:
+#                 new_hash = gethash(new_value)
+#                 silent = (new_hash == self.hashed)
+#                 if not silent:
+#                     self.hashed = new_hash
+#         except:
+#             # if there is an error in comparing, default to notify
+#             silent = False
+#             
+#         if silent is not True:
+#             # we explicitly compare silent to True just in case the equality
+#             # comparison above returns something other than True/False
+#             obj._notify_trait(self.name, old_value, new_value)
+#             
+# class StringTrait(CUnicode):
+#     def __init__(self, default_value=Undefined, allow_none=True, read_only=None,help=None,config=None, **kwargs):
+#         super(StringTrait, self).__init__(default_value=default_value,
+#                                           allow_none=allow_none,
+#                                           read_only=read_only,
+#                                           help=help,
+#                                           config=config,
+#                                           **kwargs)
+#         
+#     def set(self, obj, value):
+#         new_value = self._validate(obj, value)
+#         try:
+#             old_value = obj._trait_values[self.name]
+#         except KeyError:
+#             old_value = self.default_value
+# 
+#         obj._trait_values[self.name] = new_value
+#         
+#         if bool(old_value != new_value) is not True:
+#             obj._notify_trait(self.name, old_value, new_value)
+#         
+# class NdarrayTrait(Instance):
+#     info_text = "Trait for numpy arrays"
+#     default_value = np.array([])
+#     klass = np.ndarray
+#     
+#     def __init__(self, args=None, kw=None, **kwargs):
+#         # allow 1st argument to be the array instance
+#         default_value = kwargs.pop("default_value", None)
+#         self.allow_none = kwargs.pop("allow_none", False)
+#         
+#         if isinstance(args, np.ndarray):
+#             self.default_value = args
+#             
+#         elif isinstance(args, (tuple, list)):
+#             if len(args):
+#                 if isinstance(args[0], np.ndarray):
+#                     self.default_value = args[0]
+#                     
 #                 else:
-#                     validated.append(v)
+#                     self.default_value = np.array(*args, **kwargs)
 #                     
 #             else:
-#                 validated.append(v)
-
-        return self.klass(validated)
-
-    def set(self, obj, value):
-        """Overrides List.set to check for special hash.
-        This is supposed to also detect changes in the order of elements.
-        """
-        new_value = self._validate(obj, value)
-        try:
-            old_value = obj._trait_values[self.name]
-        except KeyError:
-            old_value = self.default_value
-
-        obj._trait_values[self.name] = new_value
-        
-        try:
-            silent = bool(old_value == new_value)
-            
-            # NOTE: 2021-08-19 16:17:23
-            # check for change in contents
-            if silent is not False:
-                new_hash = gethash(new_value)
-                silent = (new_hash == self.hashed)
-                if not silent:
-                    self.hashed = new_hash
-        except:
-            # if there is an error in comparing, default to notify
-            silent = False
-            
-        if silent is not True:
-            # we explicitly compare silent to True just in case the equality
-            # comparison above returns something other than True/False
-            obj._notify_trait(self.name, old_value, new_value)
-        
-class ArrayTrait(Instance):
-    info_text = "Trait for numpy arrays"
-    default_value = np.array([])
-    klass = np.ndarray
-    
-    def __init__(self, args=None, kw=None, **kwargs):
-        # allow 1st argument to be the array instance
-        default_value = kwargs.pop("default_value", None)
-        self.allow_none = kwargs.pop("allow_none", False)
-        
-        if isinstance(args, np.ndarray):
-            self.default_value = args
-            
-        elif isinstance(args, (tuple, list)):
-            if len(args):
-                if isinstance(args[0], np.ndarray):
-                    self.default_value = args[0]
-                    
-                else:
-                    self.default_value = np.array(*args, **kwargs)
-                    
-            else:
-                self.default_value = np.array([])
-                
-        else:
-            self.default_value = np.array([])
-                
-        args = None
-        super().__init__(klass = self.klass, args=args, kw=kw, 
-                         default_value=default_value, **kwargs)
-        
-    def validate(self, obj, value):
-        if isinstance(value, np.ndarray):
-            return value
-        
-        self.error(obj, value)
-        
-    def make_dynamic_default(self):
-        return np.array(self.default_value)
+#                 self.default_value = np.array([])
+#                 
+#         else:
+#             self.default_value = np.array([])
+#                 
+#         args = None
+#         super().__init__(klass = self.klass, args=args, kw=kw, 
+#                          default_value=default_value, **kwargs)
+#         
+#     def validate(self, obj, value):
+#         if isinstance(value, np.ndarray):
+#             return value
+#         
+#         self.error(obj, value)
+#         
+#     def make_dynamic_default(self):
+#         return np.array(self.default_value)
  
     
 def trait_from_type(x, *args, **kwargs):
@@ -958,10 +968,6 @@ def trait_from_type(x, *args, **kwargs):
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
         return Tuple(default_value = x, allow_none = allow_none)
-    
-    #elif "DataBag" in type(x).__name__:
-    #elif isinstance(x, DataBag):
-        #return DataBagTrait(default_value=x, allow_none=allow_none)
     
     elif isinstance(x, dict):
         # NOTE 2021-08-19 11:33:03
@@ -1112,7 +1118,7 @@ def trait_from_type(x, *args, **kwargs):
                 kw["default_value"] = x
                 kw["allow_none"] = allow_none
                 
-                return ArrayTrait(x, **kw)
+                return NdarrayTrait(x, **kw)
                     
             elif isinstance(x, pd.DataFrame):
                 if len(args) == 0:
@@ -1127,9 +1133,3 @@ def trait_from_type(x, *args, **kwargs):
             trait.default_value = x
             return trait
     
-class TestTrait(TraitSetMixin, List):
-    def __init__(self, *args, **kwargs):
-        List.__init__(self, **kwargs)
-        super().__init__()
-        #TraitSetMixin.__init__(self)
-        

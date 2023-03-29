@@ -66,13 +66,13 @@ def jupyterNotebookOrQtConsole():
         proclines = s.split("\n")
         
         procline = list(filter(lambda l: str(pid) in l, proclines))
-        print("process", procline)
+        # print("process", procline)
         if len(procline) == 1:
             l = procline[0]
             import re
             pa = re.compile(r'kernel-([-a-z0-9]*)\.json')
             rs = pa.findall(l)
-            print("rs", rs)
+            # print("rs", rs)
             if len(rs):
                 r = rs[0]
                 if len(r)<12:

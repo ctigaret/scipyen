@@ -3,16 +3,23 @@
 For signal processing on elecctorphysiology signal types (e.g. neo.AnalogSignals or datatypes.DataSignal)
 please use the "ephys" module.
 """
-
+import typing, numbers, functools
 #### BEGIN 3rd party modules
 import numpy as np
+import scipy
 import pandas as pd
 import quantities as pq
+import neo
 #### END 3rd party modules
 
-#### BEGIN pict.core modules
+#### BEGIN scipyen core modules
 from . import curvefitting as crvf
-#### END pict.core modules
+from . import quantities as scq
+from . import datasignal as sds
+from .datasignal import DataSignal, IrregularlySampledDataSignal
+from . import prog as prog
+from .prog import safeWrapper
+#### END scipyen core modules
 
 def simplify_2d_shape(xy:np.ndarray, max_points:int = 5, k:int = 3):
     """Creates an simplified version of a 2D shape defined by x,y coordinate array
@@ -227,6 +234,28 @@ def value_crossings(x:np.ndarray, value:float):
     x_ = x - value
     
     return zero_crossings(x_)
+
+def linear_range_map(x, range_max, ymin, ymax):
+    yrange = ymax-ymin
+    if x > range_max:
+        x = range_max
+        
+    if x < 0:
+        x = 0
+        
+    return ymin + yrange * x/range_max
+
+def inverse_linear_range_map(y, range_max, ymin, ymax):
+    yrange = ymax-ymin
+    
+    if y > ymax:
+        y = ymax
+        
+    if y < ymin:
+        y = ymin
+        
+    return (y - ymin) * range_max / yrange
+    
                                         
 def generate_bin_width(adcres:float=15, adcrange:float=10, adcscale:float=1):
     """Define a histogram bin width according to the ADC used to collect the data.
@@ -272,19 +301,84 @@ def is_positive_waveform(x:np.ndarray):
     
     return len(xPos) > len(xNeg)
 
-def normalise_waveform(x:np.ndarray):
+def scale_waveform(x:np.ndarray, α, β):
+    """Scales waveform by a rational factor (α/β) in place.
+    Returns a reference to x.
+    
+    Parameters:
+    ==========
+    x: the signal (waveform)
+    α, β: floats
+    
+    """
+    nanx = np.isnan(x)
+    if isinstance(x, pq.Quantity):
+        units = x.units
+        xx = x.magnitude # → this is a REFERENCE ; its changes will be reflected in x !!!
+        
+        if isinstance(α, pq.Quantity):
+            if not scq.units_convertible(α, x):
+                raise TypeError("numerator has wrong units")
+            if α.units != x.units:
+                α = α.rescale(x.units)
+                
+            α = α.magnitude
+        
+        if isinstance(β, pq.Quantity):
+            if not scq.units_convertible(β, x):
+                raise TypeError("denominator has wrong units")
+            if β.units != x.units:
+                β = β.rescale(x.units)
+                
+            β = β.magnitude
+            
+    else:
+        if any(isinstance(v, pq.Quantity) for v in (α, β)):
+            raise TypeError("α and β canot be quantities if x is not a quantity")
+        xx = x
+        units = None
+        
+    if np.any(nanx):
+        scaled = xx[~nanx] * α/β
+        xx[~nanx] = scaled
+        
+    else:
+        xx *= α/β
+    
+    return xx if units is None else xx * units
+
+def normalise_waveform(x:np.ndarray, axis:typing.Optional[int]=None, rng:typing.Optional[typing.Union[float, np.ndarray]] = None):
     """Waveform normalization.
+    
+    
+    Parameters:
+    ===========
+    x: numpy array (i.e., a vector)
+    
+    axis: int with vale in range(-(x.ndim), x.ndim), or None
+        When axis is -1 the last axis is used.
+    
+    rng: float, optional (default is None). The normalization range
+    
+    Returns:
+    =======
+    • For a positive waveform (i.e. "upward" deflection)
+
+        ∘ (x-x_min)/abs(rng) when rng is a float, else:
+
+        ∘ (x-x_min)/(x_max - x_min) 
+    
+    • For a negative waveform (i.e., "downward" deflection)
+
+        ∘ (x_max - x)/abs(rng) when rng is a float, else:
+
+        ∘ (x_max - x)/(x_min - x_max) 
     
     Keeps the waveform's orientation and polarity.
     
-    Returns:
-    
-    • (x-x_min)/(x_max - x_min) 
-        
-        for a positive waveform (i.e. "upward" deflection)
-    
-    • (x_max - x)/(x_min - x_max) 
-        for a negative waveform (i.e., "downward" deflection)
+    WARNING
+    When x is a quantities.Quantity, the result is a dimensioness Quantity!
+    WARNING
     
     The point is that waveform "min" is not its numerical minimum, but the sample 
     value closest to zero; likewise, the "max" is the sample value farthest away
@@ -298,21 +392,125 @@ def normalise_waveform(x:np.ndarray):
     In this case, shoud you decide to analyze such recording, you'd better
     remove the DC drift manually before proceeding...
     
-    Parameters:
-    ===========
-    x: 1D numpy array (i.e., a vector);
+    NOTE: when x is a Python Quantity, normalization will make it dimensionless
     
-    Returns:
-    =======
-    
-    Numpy array (vector) with values of `x` normalized between max and min
+    FIXME: 2022-12-13 16:57:47 This is NOT nan-friendly!
     
     """
-    
+    from core import datatypes as dt
+    if x.ndim != 1:
+        if x.ndim == 2:
+            if min(x.shape) != 1:
+                raise NotImplementedError("Only 1D vectors are supported")
+        else:
+            raise NotImplementedError("Only 1D vectors are supported")
+        
+            
+    # def __nrm__(x, ref, r):
+    #     return (x-ref)/r
+        
+#     #### BEGIN deal with the rng parameter
+#     if isinstance(x, pq.Quantity):
+#         if isinstance(rng, float):
+#             rng = rng * x.units
+#             
+#         elif isinstance(rng, np.ndarray):
+#             if rng.size != 1:
+#                 raise ValueError("rng must be a scalar")
+#             
+#             if isinstance(rng, pq.Quantity):
+#                 if not scq.units_convertible(x, rng):
+#                     raise TypeError(f"rng quantity ({rng.units.dimensionality}) is incompatible with x quantity ({x.units.dimensionality})")
+#                 if rng.units != x.units:
+#                     rng.rescale(x.units)
+#                     
+#             else:
+#                 rng = rng * x.units
+#                 
+#         elif rng is not None:
+#             raise TypeError(f"Bad rng type ({type(rng).__name__})")
+#                 
+#     elif isinstance(x. np.ndarray):
+#         if isinstance(rng, np.ndarray):
+#             if rng.size != 1:
+#                 raise ValueError("rng must be a scalar")
+#             
+#             if isinstance(rng, pq.Quantity):
+#                 rng = float(rng.magnitude[0])
+#             
+#         if not isinstance(rng, float) and rng is not None:
+#             raise TypeError(f"Bad rng type ({type(rng).__name__})")
+#         
+#     if rng is None:
+#         rng = abs(x.min()-x.max())
+# #         if x.ndim == 1:
+# #             rng = abs(x.min()-x.max())
+# #             
+# #         else:
+# #             raise NotImplementedError(f"arrays with {x.ndim} dimensions are not supported")
+# #             if axis is None:
+# #                 rng = abs(x.min()-x.max())
+# #                 
+# #             else:
+# #                 if not isinstance(axis, int):
+# #                     raise TypeError(f"axis expected to be an int or None; got {type(axis).__name__} instead")
+# #                 dims = x.ndim
+# #                 if axis not in range( -dims, dims):
+# #                     raise ValueError(f"Bad axis {axis} for x with {x.ndim} dimensions")
+# #                 
+# #                 rng = np.abs(x.max(axis=axis) - x.min(axis=axis)) # rng is a quantity if x is a quantity
+#     #### END deal with the rng parameter
+#     
+#     if is_positive_waveform(x):
+#         return (x-np.min(x))/rng
+#     
+#     return (np.max(x)-x)/rng
+# 
+# #     if x.ndim == 1:
+# #         if is_positive_waveform(x):
+# #             return (x-np.min(x))/rng
+# #         
+# #         return (np.max(x)-x)/rng
+# #         # return (x-np.min(x))/(np.max(x)-np.min(x))
+# #         
+# #     else:
+# #         raise NotImplementedError(f"arrays with {x.ndim} dimensions are not supported")
+#         # FIXME: 2022-12-22 11:50:13
+#         # should revisit this
+# #         if axis is None:
+# #             if isinstance(x, pq.Quantity):
+# #                 ispos = is_positive_waveform(x.magnitude.flatten())
+# #             else:
+# #                 ispos = is_positive_waveform(x.flatten())
+# #                 
+# #             if ispos:
+# #                 return (x-np.min(x))/rng
+# #             
+# #             return (np.max(x)-x)/rng
+# #         
+# #         else:
+# #             if isinstance(x, pq.Quantity):
+# #                 xx_ = x.magnitude
+# #             else:
+# #                 xx_ = x
+# #             
+# #             # ispos = [is_positive_waveform(x.magnitude[dt.array_slice(x, {axis:k})] for k in xx_.shape[axis])]
+# #             
+# #             ret = x.copy()
+# #             print(f"rng = array {rng.shape}: {rng}")
+# #             
+# #             # NOTE: 2022-12-22 12:15:06
+# #             # this is WRONG: axis indicates the axis along shich we calculate min max
+# #             for k in range(x.shape[axis]):
+# #                 ret[dt.array_slice(xx_, {axis:k})] = normalise_waveform(x[dt.array_slice(xx_, {axis:k})], axis = -1, rng=rng[k])
+        
+        
+    #### BEGIN original code
     if is_positive_waveform(x):
         return (x-np.min(x))/(np.max(x)-np.min(x))
-
+    
     return (np.max(x)-x)/(np.min(x)-np.max(x))
+    #### END original code
 
 def data_range(x:np.ndarray, **kwargs):
     """The difference between a signal max and min values.
@@ -388,7 +586,7 @@ def waveform_amplitude(x:np.ndarray, method:str="direct", axis=None):
         # CAUTION is we preserve the shape of the array, sl will be we'll get 
         sl = state_levels(x, axis=axis)
         
-        return np.abs(np.diff(sl))
+        return np.abs(np.diff(sl[0]))
         
 def shorth_estimator(x:np.ndarray):
     """Shorth estimator for step-like waveforms.
@@ -539,7 +737,7 @@ def state_levels(x:np.ndarray, **kwargs):
             
             number of bins (default: 100)
             
-            When None is passed herem, the function attempts to calculate the 
+            When None is passed here, the function attempts to calculate the 
             numbr of histogram bins according to ADC parameters specified , as
             described below.
             
@@ -648,7 +846,7 @@ def state_levels(x:np.ndarray, **kwargs):
         
         bw = x_range/bins
         
-    #print("state_levels bins:", bins)
+    # print("state_levels bins:", bins)
             
     sLevels = list()
         
@@ -673,7 +871,215 @@ def state_levels(x:np.ndarray, **kwargs):
     else:
         raise TypeError("Moment must be specified by a string ('mean' or 'mode') or a unary function; got %s instead" % type(moment).__name__)
     
-    return sLevels, counts, edges
+    return sLevels, counts, edges, ranges
+
+def remove_dc(x, value:typing.Optional[typing.Union[pq.Quantity, np.ndarray]] = None, channel:typing.Optional[int] = None):
+    """Returns a copy of x with DC offset removed.
+    
+    This provides a similar functionality to scipy.signal.detrend with parameters
+    `axis`= 0 and `type` = "constant", except that the offset value can be either
+    passed manually, or determined from the state levels of the signal (see below).
+    
+    NOTE: 
+    • scipy.signal.detrend with `type` = "constant" just removes the signal's 
+        mean value
+    • unlike scipy.signal.detrend, this function ALWAYS works on axis 0 i.e., it
+        accepts 1D signals with shape (N, ) and 2D signals with shape (N,M),
+        where:
+
+        N is the number of samples in the signal
+        M is the number of channels (the channels in 2D signals are columns)
+    
+    Parameters:
+    ===========
+    x: numpy ndarray with maximum two dimesions.
+    
+        1D signal with possibly more than one channel
+    
+    value: scalar float, python Quantity, numpy array, sequence of float, or None (default)
+            The constant value (DC) to subtract from the signal x
+    
+            When array-like, it must have size of 1 or as many channel indices were specvified
+    
+            When None, the DC level is estimated using the following algorithm:
+    
+            1) the signal (or specified channel) is parsed to determine two
+            state levels (low and high)
+    
+            2) the state level where most of the signal's samples belong is 
+                taken as the "DC" or "baseline" level, based on the assumption
+                than most of the signal is composed of this level
+    
+            WARNING: This breaks down if the assumption above does not hold.
+    
+    channel: int, sequence of int or None (default); when None, removes offset 
+            from all channels; otherwise, channel must be a valid index (or a 
+            sequence of unique valid indices) in the half open interval 
+    
+            [ -x.size[1], x.size[1] )
+    
+    Returns:
+    ========
+    
+    A copy of the signal `x` with the DC ("baseline") removed.
+    
+    """
+    if not isinstance(x, np.ndarray):
+        raise TypeError(f"Expecting a numpy array; got {type(x).__name__} instead")
+    if x.ndim > 2:
+        raise ValueError(f"Expecting an array of maximum 2D; instead, got an array with {x.ndim} dimensions")
+    
+    if isinstance(x, pq.Quantity):
+        xx = x.magnitude
+        
+    else:
+        xx = x
+        
+        
+#     def __guess_dc_(x_):
+#         levels, counts, edges, ranges = state_levels(x_)
+#         
+#         levelSizes = [np.sum(counts[level_range]) for level_range in ranges]
+#     
+#         ndx = np.argmax(levelSizes)
+#         val = levels[ndx]
+#             
+#         return val
+        
+    yy = np.full_like(xx, np.nan)
+    
+    if xx.ndim ==2:
+        if isinstance(channel, int) and channel not in range(-x.shape[1], x.shape[1]):
+            raise ValueError(f"Channel index {channel} outside range ({-x.shape[1]}, {x.shape[1]})")
+        
+        elif isinstance(channel, (tuple, int)) and all(isinstance(c, int) for c in channel):
+            if any(c not in range(-x.shape[1], x.shape[1])):
+                raise ValueError(f"At leqsty one channel index in {channel} is outside the range ({-x.shape[1]}, {x.shape[1]})")
+            
+        elif channel is not None:
+            raise TypeError(f"Channel expected to be an int or None; got {type(channel).__name__} instead")
+        
+        if isinstance(value, (pq.Quantity, np.ndarray)):
+            if isinstance(channel, int) and len(value) > 1:
+                raise ValueError(f"Value must be a scalar")
+            
+            elif isinstance(channel, (tuple, list)) and len(value) not in (1, len(channel)):
+                raise ValueError(f"Mismatch between number of values and specified channels")
+            
+            elif channel is None and value.size not in (1, x.shape[1]):
+                raise ValueError(f"Mismatch between number of values and signal channels")
+            
+            if isinstance(value, pq.Quantity) and isinstance(x, pq.Quantity):
+                if isinstance(x, pq.Quantity):
+                    if not scq.units_convertible(value, x):
+                        raise TypeError(f"Value units {value.units} are incompatible with signal units {x.units}")
+                    value = float(value.rescale(x.units))
+                else:
+                    value = float(value)
+                
+                
+        elif isinstance(value, (tuple, list)):
+            if not all(isinstance(v, number.number) for v in value):
+                raise TypeError(f"When a regular sequence, value must contain numbers")
+            
+            if isinstance(channel, (tuple, list)) and len(value) not in (1, len(channel)):
+                raise ValueError(f"Mismatch between number of values and specified channels")
+            
+            elif channel is None and len(value) not in (1, x.shape[1]):
+                raise ValueError(f"Mismatch between number of values and specified channels")
+            
+        if channel is None:
+            for k in range(xx.shape[1]):
+                if isinstance(value, float):
+                    val = value
+                    
+                elif isinstance(value, pq.Quantity):
+                    if value.size != 1:
+                        raise TypeError("When channel is not specified, value must be a scalar")
+                    
+                    if isinstance(x, pq.Quantity):
+                        if not scq.units_convertible(value, x):
+                            raise TypeError(f"Value units {value.units} are incompatible with signal units {x.units}")
+                        
+                        val = float(value.rescale(x.units))
+                        
+                    else:
+                        val = float(value)
+                    
+                elif isinstance(value, np.ndarray):
+                    if value.size != 1:
+                        raise TypeError("When channel is not specified, value must be a scalar")
+                    
+                    val = float(value)
+                    
+                elif isinstance(value, (tuple, list)) and all(isinstance(v, float) for v in value):
+                    val = value[0]
+                        
+                elif value is None:
+                    val = estimate_dc(xx[:,k])
+                    
+                yy[:,k] = xx[:,k] - val
+
+        elif isinstance(channel, int):
+            yy[:,:] = xx[:,:]
+            
+            if isinstance(value, float):
+                val = value
+                
+            elif isinstance(value, (tuple, list, np.ndarray)):
+                val = value[0]
+                
+            else:
+                val = __guess_dc_(xx[:,channel])
+                
+            yy[:,channel] = xx[:,channel] - val
+            
+        elif isinstance(channel, (tuple, list)):
+            yy[:,:] = xx[:,:]
+            
+            for k,c in enumerate(channel):
+                if isinstance(value, float):
+                    val = value
+                    
+                elif isinstance(value, (tuple, list, np.ndarray)):
+                    val = value[0] if len(value)==1 else value[k]
+                    
+                else:
+                    val = __guess_dc_(xx[:,c])
+                    
+                yy[:,c] = xx[:,c] - val
+            
+    else:
+        if isinstance(value, float):
+            val = value
+            
+        elif isinstance(value, (tuple, list, np.ndarray)):
+            val = value[0]
+            
+        else:
+            val = __guess_dc_(xx)
+                
+        yy = xx - val
+        
+
+    if isinstance(x, (neo.AnalogSignal, DataSignal)):
+        klass = x.__class__
+        
+        ret = klass(yy, units = x.units, t_start=x.t_start, sampling_rate=x.sampling_rate)
+        ret.segment = x.segment
+        ret.array_annotations = x.array_annotations
+        
+    elif isinstance(x, pq.Quantity):
+        ret = yy * x.units
+        
+    else:
+        ret = yy
+        
+    return ret
+        
+        
+        
+    
 
 def nansize(x, **kwargs):
     """
@@ -840,14 +1246,1171 @@ def rms(x:np.ndarray, **kwargs):
     x: 1D numpy array
     
     """
+    from core import datatypes as dt
+    if not isinstance(x, np.ndarray):
+        raise TypeError(f"Expecting a numpy array; got {type(x).__name__} instead")
+    if not dt.is_vector(x):
+        raise ValueError(f"Expecting a vector; instead, got data with shape: {x.shape}")
     
-    xsq = np.dot(x.T, x)
+    return np.sqrt(np.linalg.norm(x)/x.size)
     
-    if isinstance(xsq, pq.Quantity):
-        return np.sqrt(xsq.magnitude/x.size)
+#     if isinstance(x, pq.Quantity):
+#         xdot = np.dot(np.abs(x.magnitude).T, np.abs(x.magnitude))
+#     else:
+#         xdot = np.dot(x.T, x)
+#         
+#     return np.sqrt(xdot/x.size)
+
+#     if isinstance(xsq, pq.Quantity):
+#         return np.sqrt(xsq.magnitude/x.size)
+#     
+#     return np.sqrt(xsq/x.size)
+
+def detrend(x:typing.Union[neo.AnalogSignal, DataSignal], **kwargs):
+    """Detrend a signal.
     
-    return np.sqrt(xsq/x.size)
+    Delegates to scipy.signal.detrend
+    
+    Parameters:
+    ===========
+    x: neo.AnalogSignal or DataSignal
+    
+    Var-keyword parameters (see also scipy.signal.detrend)
+    ======================================================
+    axis: int, default is 0 (unlike scipy.signal.detrend qhere the default is the last axis, -1)
+    
+    type: str "linear" or "constant"; optional, default is "constant"
+        The default ("constant") subtracts x.mean(axis=axis) from `x`; "linear"
+        subtracts from `x` a linear least-squares fit to `x`.
+    
+    bp: array-like of int, or a scalar Quantity in signals' units; optional, 
+        default is None.
+    
+        When bd is a sequence of int, it represents the break points (given in 
+            sample numbers, or indices into `x`, NOT domain axis coordinates) 
+            between which a piecewise linear interpolation will be performed on
+            `x`. This pieceqise linear interpolation will be subtracted from `x`
+            when the `type` parameter(see above) is "linear".
+    
+        When bs is a scalar quantity (in signal units) AND `type` is "constant"
+            then the value of bp will be subtracted from `x` instead of its 
+            mean.
+    
+    
+    In a nutshell:
+        
+    `type`          `bp`                Result:
+    --------------------------------------------
+    "linear"        <sequence of int>  `x` after suubtracting a piecewise linear
+                                        interpolation between samples with indices
+                                        in bp
+                    
+                    <anything else>    `x` after subtracting a linear 
+                                        interpolation along the specified axis
+    
+    "constant"      <scalar quantity    `x` after subtracting bp value
+                    in signal's units>     
+    
+                    <anything else>     `x` after subtracting its mean
+    
+                    
+            When given, and `type` is "linear" an piecewise linear fit is 
+            performed on `x` between each break points.
+    
+    Returns:
+    =======
+    A detrended copy of the signal.
+        
+    NOTE: unlike scipy.signal.detrend, which ONLY works on plain numpy arrays, 
+    this function does NOT modify the signal in-place.
+    
+    """
+    axis = kwargs.pop("axis", 0)
+    detrend_type = kwargs.pop("type", "constant")
+    bp = kwargs.pop("bp", 0)
+    # overwrite_data = kwargs.pop("overwrite_data", True)
+    
+    func = functools.partial(scipy.signal.detrend, axis=axis, bp=bp,
+                             type=detrend_type, overwrite_data=False)
+    
+    if detrend_type.lower() == "linear":
+        if bp is None or isinstance(bp, typing.Sequence) and all(isinstance(v, int) for v in bp):
+            ret = func(x.magnitude)
+            
+        else:
+            raise TypeError(f"Unexpected 'bp' value ({bp}) for {detrend_type} detrending")
+        
+    elif detrend_type.lower() == "constant":
+        if isinstance(bp, pq.Quantity):
+            if bp.size == 1 and units_convertible(bp, x):
+                return x-bp
+            else:
+                raise TypeError(f"Wrong constant value in bp: {bp} for {detrend_type} detrending")
+            
+        elif bp is not None:
+            raise TypeError(f"Unexpected 'bp' value ({bp}) for {detrend_type} detrending")
+            
+        ret = func(x.magnitude)
+                
+    ret = type(x)(ret, t_start = x.t_start, units = x.units, 
+                    sampling_rate = x.sampling_rate, 
+                    file_origin = x.file_origin, 
+                    name=x.name, description = x.description)
+    
+    ret.segment = x.segment
+    ret.array_annotations = x.array_annotations
+    ret.annotations.update(x.annotations)
+    
+    return ret
+
+def sosfilter(sig:typing.Union[pq.Quantity, np.ndarray], kernel:np.ndarray):
+    if isinstance(sig, (neo.AnalogSignal, DataSignal)):
+        ret = scipy.signal.sosfiltfilt(kernel, sig.magnitude, axis=0)
+            
+        klass = sig.__class__
+        name = sig.name
+        if isinstance(name, str) and len(name.strip()):
+            name = f"{name}_filtered"
+        else:
+            name = "filtered"
+        ret = klass(ret, units = sig.units, t_start =  sig.t_start,
+                            sampling_rate = sig.sampling_rate,
+                            name=name, 
+                            description = f"{sig.description} filtered")
+        
+    else:
+        ret = scipy.signal.sosfiltfilt(kernel, sig, axis=0)
+                
+    return ret
+    
+    
+def estimate_dc(x_):
+    levels, counts, edges, ranges = state_levels(x_)
+    
+    levelSizes = [np.sum(counts[level_range]) for level_range in ranges]
+
+    ndx = np.argmax(levelSizes)
+    val = levels[ndx]
+        
+    return val
+        
+
+@safeWrapper
+def convolve(sig, w, **kwargs):
+    """1D convolution of neo.AnalogSignal sig with kernel "w".
+    
+    Parameters:
+    -----------
+    
+    sig : neo.AnalogSignal; if it has multiple channels, the convolution is
+        applied for each channel
+        
+    w : 1D array-like
+    
+    Var-keyword parameters are passed on to the scipy.signal.convolve function,
+    except for the "mode" which is always set to "same"
+    """
+    
+    from scipy.signal import convolve
+    
+    name = kwargs.pop("name", "")
+    
+    units = kwargs.pop("units", pq.dimensionless)
+    
+    kwargs["mode"] = "same" # force "same" mode for convolution
+    
+    if sig.shape[1] == 1:
+        ret = neo.AnalogSignal(convolve(sig.magnitude.flatten(), w, **kwargs),\
+                            units = sig.units, \
+                            t_start = sig.t_start, \
+                            sampling_period = sig.sampling_period,\
+                            name = "%s convolved" % sig.name)
+        
+    else:
+        csig = [convolve(sig[:,k].magnitude.flatten(), w, **kwargs)[:,np.newaxis] for k in range(sig.shape[1])]
+        
+        ret = neo.AnalogSignal(np.concatenate(csig, axis=1),
+                               units = sig.units,
+                               t_start = sig.t_start,
+                               sampling_period = sig.sampling_period,
+                               name = "%s convolved" % sig.name)
+        
+    ret.annotations.update(sig.annotations)
+    
+    return ret
+
+    
+@safeWrapper
+def parse_step_waveform_signal(sig, method="state_levels", **kwargs):
+    """Parse a step waveform -- containing two states ("high" and "low").
+    
+    Typical example is a depolarizing curent injection step (or rectangular pulse)
+    
+    Parameters:
+    ----------
+    sig = neo.AnalogSignal with one channel (i.e. sig.shape[1]==1)
+    
+    Named parameters:
+    -----------------
+    box_size = length of smoothing boxcar window (default, 0)
+    
+    method: str, one of "state_levels" (default) or "kmeans"
+    
+    The following are used only when methos is "state_levels" and are passed 
+    directly to signalprocessing.state_levels():
+    
+    adcres,
+    adcrange,
+    adcscale
+    
+    Returns:
+    
+    down: quantity array of high to low transitions times (in units of signal.times)
+    up:  the same, for low to high transition times (in units of signal.times)
+    inj: scalar quantity: the amplitude of the transition (in units of the signal)
+    centroids: numpy array with shape (2,1): the centroid values i.e., the mean values
+        of the two state levels
+        
+        
+    """
+    from scipy import cluster
+    from scipy.signal import boxcar
+    
+    if not isinstance(sig, neo.AnalogSignal):
+        raise TypeError("Expecting an analogsignal; got %s instead" % type(sig).__name__)
+    
+    if sig.ndim == 2 and sig.shape[1] > 1:
+        raise ValueError("Expecting a signal with one channel, instead got %d" % sig.shape[1])
+    
+    box_size = kwargs.pop("box_size", 0)
+    
+    if box_size > 0:
+        window = boxcar(box_size)/box_size
+        sig_flt = convolve(sig, window)
+        #sig_flt = convolve(np.squeeze(sig), window, mode="same")
+        #sig_flt = neo.AnalogSignal(sig_flt[:,np.newaxis], units = sig.units, t_start = sig.t_start, sampling_rate = 1/sig.sampling_period)
+    else:
+        sig_flt = sig
+        
+    # 1) get transition times from injected current
+    # use filtered signal, if available
+    
+    if method == "state_levels":
+        levels = kwargs.pop("levels", 0.5)
+        adcres = kwargs.pop("adcres", 15)
+        adcrange = kwargs.pop("adcrange", 10)
+        adcscale = kwargs.pop("adcrange", 1e3)
+    
+        centroids, cnt, edg, rng = state_levels(sig_flt.magnitude, levels = levels, 
+                                    adcres = adcres, 
+                                    adcrange = adcrange, 
+                                    adcscale = adcscale)
+        
+        centroids = np.array(centroids).T[:,np.newaxis]
+        
+    else:
+        centroids, distortion = cluster.vq.kmeans(sig_flt, 2)
+        centroids = np.sort(centroids, axis=0)
+    
+    #print(centroids)
+    
+    if len(centroids) == 0:
+        return None, None, None, None, None
+    
+    label, dst = cluster.vq.vq(sig, centroids) # use un-filtered signal here
+    edlabel = np.ediff1d(label, to_begin=0)
+    
+    down = sig.times[np.where(edlabel == -1)]
+    
+    up  = sig.times[np.where(edlabel == 1)]
+
+    # NOTE: 2017-08-31 23:04:26 FYI: depolarizing = down > up 
+    # in current-clamp, a depolarizing current injection is an outward current 
+    # which therefore goes up BEFORE it goes back down, hence down is later than
+    # up 
+    
+    # the step amplitude
+    #amplitude = np.diff(centroids.ravel()) * sig.units
+    amplitude = np.diff(centroids.flatten()) * sig.units
+    
+    return down, up, amplitude, centroids, label
+
+@safeWrapper
+def resample_pchip(sig, new_sampling_period, old_sampling_period = 1):
+    """Resample a signal using a piecewise cubic Hermite interpolating polynomial.
+    
+    Resampling is calculated using scipy.interpolate.PchipInterpolator, along the
+    0th axis.
+    
+    Parameters:
+    -----------
+    
+    sig: numpy ndarray, python Quantity array or numpy array subclass which has 
+        the attribute "sampling_period"
+    
+    new_sampling_period: float scalar
+        The desired sampling period after resampling
+        
+    old_sampling_period: float scalar or None (default)
+        Must be specified when sig is a generic numpy ndarray or Quantity array.
+        
+    Returns:
+    --------
+    
+    ret: same type as sig
+        A version of the signal resampled along 0th axis:
+        
+        * upsampled if new_sampling_period < old_sampling_period
+        
+        * downsampled if new_sampling_period > old_sampling_period
+        
+    When new_sampling_period == old_sampling_period, returns a reference to the
+        signal (no resampling is performed and no data is copied).
+        
+        CAUTION: In this case the result is a REFERENCE to the signal, and 
+                 therefore, any methods that modify the result in place will 
+                 also modify the original signal!
+    
+    """
+    # for upsampling this will introduce np.nan at the end
+    # we replace these values wihtt he last signal sample value
+    from scipy.interpolate import PchipInterpolator as pchip
+    
+    from . import datatypes as dt
+    
+    if isinstance(sig, (neo.AnalogSignal, DataSignal)):
+        if isinstance(new_sampling_period, pq.Quantity):
+            if not units_convertible(new_sampling_period, sig.sampling_period):
+                raise TypeError("new sampling period units (%s) are incompatible with those of the signal's sampling period (%s)" % (new_sampling_period.units, sig.sampling_period.units))
+            
+            new_sampling_period.rescale(sig.sampling_period.units)
+            
+        else:
+            new_sampling_period *= sig.sampling_period.units
+    
+        if sig.sampling_period > new_sampling_period:
+            scale = sig.sampling_period / new_sampling_period
+            new_axis_len = int(np.floor(len(sig) * scale))
+            descr = "Upsampled"
+            
+        elif sig.sampling_period < new_sampling_period:
+            scale = new_sampling_period / sig.sampling_period
+            new_axis_len = int(np.floor(len(sig) // scale))
+            descr = "Downsampled"
+            
+        else: # no resampling required; return reference to signal
+            return sig
+        
+        new_times, new_step = np.linspace(sig.t_start.magnitude, sig.t_stop.magnitude, 
+                                          num=new_axis_len, retstep=True, endpoint=False)
+        
+        #print("ephys.resample_pchip new_step", new_step, "new_sampling_period", new_sampling_period)
+        
+        assert(np.isclose(new_step, float(new_sampling_period.magnitude)))
+        
+        interpolator = pchip(sig.times.magnitude.flatten(), sig.magnitude.flatten(), 
+                             axis=0, extrapolate=False)
+        
+        new_sig = interpolator(new_times)
+        
+        new_sig[np.isnan(new_sig)] = sig[-1,...]
+        
+        ret = sig.__class__(new_sig, units=sig.units,
+                            t_start = new_times[0]*sig.times.units,
+                            sampling_period=new_sampling_period,
+                            name = sig.name,
+                            description="%s %s %d-fold" % (sig.name, descr, scale))
+        
+        ret.annotations.update(sig.annotations)
+    
+        return ret
+    
+    else:
+        if old_sampling_period is None:
+            raise ValueError("When signal is a generic array the old sampling period must be specified")
+        
+        if isinstance(old_sampling_period, pq.Quantity):
+            old_sampling_period = old_sampling_period.magnitude
+            
+        if isinstance(new_sampling_period, pq.Quantity):
+            new_sampling_period = new_sampling_period.magnitude
+            
+        if old_sampling_period > new_sampling_period:
+            scale = int(old_sampling_period / new_sampling_period)
+            new_axis_len = sig.shape[0] * scale
+            
+        elif old_sampling_period < new_sampling_period:
+            scale = int(new_sampling_period / old_sampling_period)
+            new_axis_len = sig.shape[0] // scale
+            
+        else: # no resampling required; return reference to signal
+            return sig
+        
+        t_start = 0
+        
+        t_stop = sig.shape[0] * old_sampling_period
+        
+        new_times, new_step = np.linspace(sig.t_start.magnitude, sig.t_stop.magnitude, 
+                                          num=new_axis_len, retstep=True, endpoint=False)
+        
+        assert(np.isclose(new_step,float(new_sampling_period.magnitude)))
+        
+        interpolator = pchip(sig.times.magnitude.flatten(), sig.magnitude.flatten(), 
+                             axis=0, extrapolate=False)
+        
+        ret = interpolator(new_times)
+        
+        ret[np.isnan(ret)] = sig[-1, ...]
+        
+        return ret
+
+@safeWrapper
+def diff(sig, n=1, axis=-1, prepend=False, append=True):
+    """Calculates the n-th discrete difference along the given axis.
+    
+    Calls numpy.diff() under the hood.
+    
+    Parameters:
+    ----------
+    sig: numpy.array or subclass
+        NOTE: singleton dimensions will be squeezed out
+    
+    Named parameters:
+    -----------------
+    These are passed directly to numpy.diff(). 
+    The numpy.diff() documentation is replicated below highlighting any differences.
+    
+    n: int, optional
+        The number of times values are differenced. 
+        If zero the input is returned as is.
+        
+        Default is 1 (one)
+    
+    prepend, append: None or array-like, or bool
+        Values to prepend/append to sig along the axis PRIOR to performing the 
+        difference!
+        
+        NOTE:   When booleans, a value of True means that prepend or append will
+        take, respectively, the first or last signal values along difference axis.
+        
+                A value of False is equivalent to None.
+                
+        NOTE:   "prepend" has default False; "append" has default True
+        
+    
+    """
+    if not isinstance(axis, int):
+        raise TypeError("Axis expected to be an int; got %s instead" % type(axis).__name__)
+    
+    # first, squeeze out the signal's sigleton dimensions
+    sig_data = np.array(sig).squeeze() # also copies the data; also we can use plain arrays
+    #sig_data = sig.magnitude.squeeze() # also copies the data
+    
+    if isinstance(append, bool):
+        if append:
+            append_ndx = [slice(k) for k in sig_data.shape]
+            append_ndx[axis] = -1
+            
+            append_shape = [slice(k) for k in sig_data.shape]
+            append_shape[axis] = np.newaxis
+            
+            append = sig_data[tuple(append_ndx)][tuple(append_shape)]
+            
+        else:
+            append = None
+            
+    if isinstance(prepend, bool):
+        if prepend:
+            prepend_ndx = [slice(k) for k in sig_data.shape]
+            prepend_ndx[axis] = 0
+            
+            prepend_shape = [slice(k) for k in sig_data.shape]
+            prepend_shape[axis] = np.newaxis
+            
+            prepend = sig_data[tuple(prepend_ndx)][tuple(prepend_shape)]
+            
+        else:
+            prepend = None
+            
+    diffsig = np.diff(sig_data, n = n, axis = axis, prepend=prepend, append=append)
+    
+    ret = neo.AnalogSignal(diffsig, 
+                           units = sig.units/(sig.times.units ** n),
+                           t_start = 0 * sig.times.units,
+                           sampling_rate = sig.sampling_rate,
+                           name = sig.name,
+                           description = "%dth order difference of %s" % (n, sig.name))
+    
+    ret.annotations.update(sig.annotations)
+    
+    return ret
+
+@safeWrapper
+def gradient(sig:[neo.AnalogSignal, DataSignal, np.ndarray], n:int=1, axis:int=0):
+    """ First order gradient through central differences.
+    
+    Parameters:
+    ----------
+    
+    sig: numpy.array or subclass
+        The signal; can have at most 2 dimensions.
+        When sig.shape[1] > 1, the gradient is calculated across the specified axis
+    
+    n: int; default is 1 (one)
+        The spacing of the gradient (see numpy.gradient() for details)
+    
+    axis: int; default is 0 (zero)
+        The axis along which the gradient is calculated;
+        Can be -1 (all axes), 0, or 1.
+        
+        TODO/FIXME 2019-04-27 10:07:26: 
+        At this time the function only supports axis = 0
+        
+    Returns:
+    -------
+    
+    ret: neo.AnalogSignal or DataSignal, according to the type of "sig".
+    
+    
+    """
+    diffsig = np.array(sig) # for a neo.AnalogSignal this also copies the signal's magnitude
+    
+    if diffsig.ndim == 2:
+        for k in range(diffsig.shape[1]):
+            diffsig[:,k] = np.gradient(diffsig[:,k], n, axis=0)
+            
+        diffsig /= (n * sig.sampling_period.magnitude)
+            
+    elif diffsig.ndim == 1:
+        diffsig = np.gradient(diffsig, n, axis=0)
+        diffsig /= (n * sig.sampling_period.magnitude)
+            
+    else:
+        raise TypeError("'sig' has too many dimensions (%d); expecting 1 or 2" % diffsig.ndim)
+        
+    if isinstance(sig, DataSignal):
+        ret = DataSignal(diffsig, 
+                            units = sig.units / sig.times.units, 
+                            t_start = sig.t_start, 
+                            sampling_period = sig.sampling_period, 
+                            name = sig.name,
+                            description = "Gradient of %s over %d samples along axis %d" % (sig.name, n, axis))
+ 
+    else:
+        ret = neo.AnalogSignal(diffsig, 
+                            units = sig.units / sig.times.units, 
+                            t_start = sig.t_start, 
+                            sampling_period = sig.sampling_period, 
+                            name = sig.name,
+                            description = "Gradient of %s over %d samples along axis %d" % (sig.name, n, axis))
+ 
+    ret.annotations.update(sig.annotations)
+    
+    return ret
+    
+@safeWrapper
+def ediff1d(sig:[neo.AnalogSignal, DataSignal, np.ndarray], to_end:numbers.Number=0, to_begin:[numbers.Number, type(None)]=None):
+    """Differentiates each channel of an analogsignal with respect to its time basis.
+    
+    Parameters:
+    -----------
+    
+    sig: neo.AnalogSignal, numpy.array, or Quantity array
+    
+    
+    Named parameters (see numpy.ediff1d):
+    -------------------------------------
+    Passed directly to numpy.ediff1d:
+    
+    to_end: scalar float, or 0 (default) NOTE: for numpy.ediff1d, the default is None
+    
+    to_begin: scalar float, or None (default)
+    
+    Returns:
+    --------
+    DataSignal or neo.AnalogSignal, according to the type of "sig"
+    
+    """
+    
+    diffsig = np.array(sig) # for a neo.AnalogSignal this also copies the signal's magnitude
+    
+    if diffsig.ndim == 2:
+        for k in range(diffsig.shape[1]):
+            diffsig[:,k] = np.ediff1d(diffsig[:,k], to_end=to_end, to_begin=to_begin)# to_end = to_end, to_begin=to_begin)
+            
+    elif diffsig.ndim == 1:
+        diffsig = np.ediff1d(diffsig, to_end=to_end, to_begin=to_begin)
+            
+    else:
+        raise TypeError("'sig' has too many dimensions (%d); expecting 1 or 2" % diffsig.ndim)
+        
+    diffsig /= sig.sampling_period.magnitude
+    
+    if isinstance(sig, DataSignal):
+        ret = DataSignal(diffsig, units = sig.units / sig.times.units, 
+                            t_start = sig.t_start, 
+                            sampling_period = sig.sampling_period, 
+                            name = sig.name,
+                            description = "First order forward difference of %s" % sig.name)
+    
+        
+    else:
+        ret = neo.AnalogSignal(diffsig, units = sig.units / sig.times.units, 
+                            t_start = sig.t_start, 
+                            sampling_period = sig.sampling_period, 
+                            name = sig.name,
+                            description = "First order forward difference of %s" % sig.name)
+    
+    ret.annotations.update(sig.annotations)
+    
+    return ret
+
+@safeWrapper
+def forward_difference(sig:[neo.AnalogSignal, DataSignal, np.ndarray], n:int=1, to_end:numbers.Number=0, to_begin:[numbers.Number, type(None)]=None):
+    """Calculates the forward difference along the time axis.
+    
+    Parameters:
+    -----------
+    
+    sig: neo.AnalogSignal, numpy.array, or Quantity array
+    
+    
+    Named parameters (see numpy.ediff1d):
+    -------------------------------------
+    
+    n: int;
+        number of samples in the difference.
+        
+        Must satisfy 0 <= n < len(sig) -2
+        
+        When n=0 the function returns a reference to the signal.
+        
+        When n=1 (the default), the function calls np.ediff1d() on the signal's 
+            magnitude and the result is divided by signals sampling period
+        
+        When n > 1 the function calculates the forward difference 
+            
+            (sig[n:] - sig[:-n]) / (n * sampling_rate)
+            
+        Values of n > 2 not really meaningful.
+            
+    to_end: scalar float, or 0 (default) NOTE: for numpy.ediff1d, the default is None
+    
+    to_begin: scalar float, or None (default)
+    
+    Returns:
+    --------
+    DataSignal or neo.AnalogSignal, according to the type of "sig"
+    
+    """
+    
+    def __n_diff__(ary, n, to_b, to_e):
+        dsig = ary[n:] - ary[:-n]
+        
+        shp = [s for s in ary.shape]
+        
+        if to_end is not None:
+            if to_begin is None:
+                shp[0] = n
+                dsig = np.append(dsig, np.full(tuple(shp), to_e), axis=0)
+                
+            else:
+                to_start = n//2
+                to_stop = n - to_start
+                
+                shp[0] = to_start
+                dsig = np.insert(dsig, np.full(tuple(shp), to_b), axis=0)
+                
+                shp[0] = to_stop
+                dsig = np.append(dsig, np.full(tuple(shp), to_e), axis=0)
+                
+        else:
+            if to_end is None:
+                shp[0] = n
+                dsig = np.insert(dsig, np.full(tuple(shp), to_b), axis=0)
+                
+            else:
+                to_start = n//2
+                to_stop = n - to_start
+                
+                shp[0] = to_start
+                dsig = np.insert(dsig, np.full(tuple(shp), to_b), axis=0)
+                
+                shp[0] = to_stop
+                dsig = np.append(dsig, np.full(tuple(shp), to_e), axis=0)
+                
+        return dsig
+        
+    
+    if not isinstance(n, int):
+        raise TypeError("'n' expected to be an int; got %s instead" % type(n).__name__)
+    
+    if n < 0: 
+        raise ValueError("'n' must be >= 0; got %d instead" % n)
+    
+    diffsig = np.array(sig) # for a neo.AnalogSignal this also copies the signal's magnitude
+    
+    if diffsig.ndim == 2:
+        if n >= diffsig.shape[0]:
+            raise ValueError("'n' is too large (%d); should be n < %d" % (n, diffsig.shape[0]))
+        
+        if n == 0:
+            return sig
+        
+        elif n == 1:
+            for k in range(diffsig.shape[1]):
+                diffsig[:,k] = np.ediff1d(diffsig[:,k], to_end=to_end, to_begin=to_begin)# to_end = to_end, to_begin=to_begin)
+                
+            diffsig /= sig.sampling_period.magnitude
+            
+        else:
+            for k in range(diffsig.shape[1]):
+                diffsig[:,k] = __n_diff__(diffsig[:,k], n=n, to_e=to_end, to_b=to_begin)# to_end = to_end, to_begin=to_begin)
+            
+            diffsig /= (n * sig.sampling_period.magnitude)
+            
+    elif diffsig.ndim == 1:
+        if n >= len(diffsig):
+            raise ValueError("'n' is too large (%d); should be < %d" % (n, len(diffsig)))
+        
+        if n == 0:
+            return sig
+        
+        elif n == 1:
+            diffsig = __n_diff__(diffsig, n=n, to_e = to_end, to_b = to_begin)
+            #diffsig = np.ediff1d(diffsig, to_end=to_end, to_begin=to_begin)
+            diffsig /= sig.sampling_period.magnitude
+            
+        else:
+                    
+            diffsig /= (n * sig.sampling_period.magnitude)
+            
+    else:
+        raise TypeError("'sig' has too many dimensions (%d); expecting 1 or 2" % diffsig.ndim)
+        
+        
+    if isinstance(sig, DataSignal):
+        ret = DataSignal(diffsig, units = sig.units / sig.times.units, 
+                            t_start = sig.t_start, 
+                            sampling_period = sig.sampling_period, 
+                            name = "%s_diff(1)" % sig.name,
+                            description = "Forward difference (%dth order) of %s" % (n, sig.name))
+ 
+    else:
+        ret = neo.AnalogSignal(diffsig, units = sig.units / sig.times.units, 
+                            t_start = sig.t_start, 
+                            sampling_period = sig.sampling_period, 
+                            name = "%s_diff(1)" % sig.name,
+                            description = "Forward difference (%dth order) of %s" % (n, sig.name))
+ 
+    ret.annotations.update(sig.annotations)
+    
+    return ret
+
+def root_mean_square(x, axis = None):
+    """ Computes the RMS of a signal.
+    
+    Positional parameters
+    =====================
+    x = neo.AnalogSignal, neo.IrregularlySampledSignal, or datatypes.DataSignal
+    
+    Named parameters
+    ================
+    
+    axis: None (defult), or a scalar int, or a sequence of int: index of the axis,
+            in the interval [0, x.ndim), or None (default)
+            
+            When a sequence of int, the RMS will be calculated across all the
+            specified axes
+    
+        When None (default) the RMS is calculated for the flattened signal array.
+        
+        This argument is passed on to numpy.mean
+        
+    Returns: a scalar float
+    RMS = sqrt(mean(x^2))
+    
+    """
+    from . import datatypes as dt
+    
+    if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
+        raise TypeError("Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datatypes.DataSignal; got %s instead" % type(x).__name__)
+    
+    if not isinstance(axis, (int, tuple, list, type(None))):
+        raise TypeError("axis expected to be an int or None; got %s instead" % type(axis).__name__)
+    
+    if isinstance(axis, (tuple, list)):
+        if not all([isinstance(a, int) for a in axis]):
+            raise TypeError("Axis nindices must all be integers")
+        
+        if any([a < 0 or a > x.ndim for a in axis]):
+            raise ValueError("Axis indices must be inthe interval [0, %d)" % x.ndim)
+    
+    if isinstance(axis, int):
+        if axis < 0 or axis >= x.ndim:
+            raise ValueError("Invalid axis index; expecting value between 0 and %d ; got %d instead" % (x.ndim, axis))
+        
+    return np.sqrt(np.mean(np.abs(x), axis=axis))
+    
+def signal_to_noise(x, axis=None, ddof=None, db=True):
+    """Calculates SNR for the given signal.
+    
+    Positional parameters:
+    =====================
+    x = neo.AnalogSignal, neo.IrregularlySampledSignal, or datatypes.DataSignal
+    
+    Named parameters
+    ================
+    
+    axis: None (defult), or a scalar int, or a sequence of int: index of the axis,
+            in the interval [0, x.ndim), or None (default)
+            
+            When a sequence of int, the RMS will be calculated across all the
+            specified axes
+    
+        When None (default) the RMS is calculated for the flattened signal array.
+        
+        This argument is passed on to numpy.mean and numpy.std
+        
+    ddof: None (default) or a scalar int: delta degrees of freedom
+    
+        When None, it sill be calculated from the size of x along the specified axes
+        
+        ddof is passed onto numpy.std (see numpy.std for details)
+        
+    db: boolean, default is True
+        When True, the result is expressed in decibel (10*log10(...))
+        
+    """
+    from . import datatypes as dt
+
+    if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
+        raise TypeError("Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datatypes.DataSignal; got %s instead" % type(x).__name__)
+    
+    if not isinstance(axis, (int, tuple, list, type(None))):
+        raise TypeError("axis expected to be an int or None; got %s instead" % type(axis).__name__)
+    
+    if isinstance(axis, (tuple, list)):
+        if not all([isinstance(a, int) for a in axis]):
+            raise TypeError("Axis nindices must all be integers")
+        
+        if any([a < 0 or a > x.ndim for a in axis]):
+            raise ValueError("Axis indices must be inthe interval [0, %d)" % x.ndim)
+    
+    if isinstance(axis, int):
+        if axis < 0 or axis >= x.ndim:
+            raise ValueError("Invalid axis index; expecting value between 0 and %d ; got %d instead" % (x.ndim, axis))
+        
+    if not isinstance(ddof, (int, type(None))):
+        raise TypeError("ddof expected to be an int or None; got %sinstead" % ype(ddof).__name__)
+    
+    if ddof is None:
+        if axis is None:
+            ddof = 1
+            
+        elif isinstance(axis, int):
+            ddof = 1
+            
+        else:
+            ddof = len(axis)
+            
+    else:
+        if ddof < 0:
+            raise ValueError("ddof must be >= 0; got %s instead" % ddof)
+        
+        
+    rms = root_mean_square(x, axis=axis)
+    
+    std = np.std(x, axis=axis, ddof=ddof)
+    
+    ret = rms/std
+    
+    if db:
+        return np.log10(ret.magnitude.flatten()) * 20 
+    
+    return ret
 
 
-
+@safeWrapper
+def resample_poly(sig, new_rate, p=1000, window=("kaiser", 5.0)):
+    """Resamples signal using a polyphase filtering.
     
+    Resampling uses polyphase filtering (scipy.signal.resample_poly) along the
+    0th axis.
+    
+    Parameters:
+    ===========
+    
+    sig: neo.AnalogSignal or datatypes.DataSignal
+    
+    new_rate: either a float scalar, or a Python Quantity 
+            When a Python Quantity, it must have the same units as signal's 
+            sampling RATE units.
+            
+            Alternatively, if it has the same units as the signal's sampling 
+            PERIOD, its inverse will be taken as the new sampling RATE.
+             
+            NOTE: It must be strictly positive i.e. new_rate > 0
+             
+            When new_rate == sig.sampling_rate, the function returns a copy of sig.
+             
+            Otherwise, the function returns a copy of sig where all columns are resampled via
+            scipy.signal.resample_poly
+    
+    p: int
+        factor of precision (default 1000): power of 10 used to calculate up/down sampling:
+        up = new_rate * p / signal_sampling_rate
+        down = p
+        
+    window: string, tuple, or array_like, optional
+        Desired window to use to design the low-pass filter, or the FIR filter 
+        coefficients to employ. see scipy.signal.resample_poly() for details
+    
+    """
+    from scipy.signal import resample_poly as resample
+    
+    using_rate=True
+    
+    if not isinstance(sig, neo.AnalogSignal):
+        raise TypeError("First parameter expected to be a neo.AnalogSignal; got %s instead" % type(sig).__name__)
+    
+    if isinstance(new_rate, numbers.Real):
+        new_rate = new_rate * sig.sampling_rate.units
+        
+    elif isinstance(new_rate, pq.Quantity):
+        if new_rate.size > 1:
+            raise TypeError("Expecting new_rate a scalar quantity; got a shaped array %d" % new_res)
+        
+        if new_rate.units != sig.sampling_rate.units:
+            if new_rate.units == sig.sampling_period.units:
+                using_rate = False
+                
+            else:
+                raise TypeError("Second parameter should have the same units as signal's sampling rate (%s); it has %s instead" % (sig.sampling_rate.units, new_rate.units))
+                
+    
+    if new_rate <= 0:
+        raise ValueError("New sampling rate (%s) must be strictly positive !" % new_rate)
+    
+    p = int(p)
+    
+    if using_rate:
+        if new_rate == sig.sampling_rate:
+            return sig.copy()
+        
+        up = int(new_rate / sig.sampling_rate * p)
+        
+    else:
+        if new_rate == sig.sampling_period:
+            return sig.copy()
+            
+        up = int(sig.sampling_period / new_rate * p)
+    
+    if using_rate:
+        ret = neo.AnalogSignal(resample(sig, up, p, window=window), 
+                               units = sig.units, 
+                               t_start = sig.t_start,
+                               sampling_rate = new_rate)
+        
+    else:
+        ret = neo.AnalogSignal(resample(sig, up, p, window=window), 
+                               t_start = sig.t_start,
+                               units = sig.units, 
+                               sampling_period = new_rate) 
+        
+    ret.name = sig.name
+    ret.description = "%s resampled %f fold on axis 0" % (sig.name, up)
+    ret.annotations = sig.annotations.copy()
+    
+    return ret
+
+
+@safeWrapper
+def remove_signal_offset(sig):
+    if not isinstance(sig, neo.AnalogSignal):
+        raise TypeError("Expecting an AnalogSignal; got %s instead" % type(sig).__name__)
+    
+    return sig - sig.min()
+
+@safeWrapper
+def batch_normalise_signals(*arg):
+    ret = list()
+    for sig in arg:
+        ret.append(peak_normalise_signal(sig))
+        
+    return ret
+
+@safeWrapper
+def batch_remove_offset(*arg):
+    ret = list()
+    for sig in arg:
+        ret.append(remove_signal_offset(sig))
+
+    return ret
+    
+@safeWrapper
+def peak_normalise_signal(sig, minVal=None, maxVal=None):
+    """Returns a peak-normalized copy of the I(V) curve
+    
+    Positional parameters:
+    ----------------------
+    
+    sig = AnalogSignal with Im data (typically, a time slice corresponding to the
+            Vm ramp)
+            
+    minVal, maxVal = the min and max values to normalize against;
+    
+    Returns:
+    -------
+    
+    AnalogSignal normalized according to:
+    
+            ret = (sig - minVal) / (maxVal - minVal)
+    
+    """
+    
+    #return neo.AnalogSignal((sig - minVal)/(maxVal - minVal), \
+                            #units = pq.dimensionless, \
+                            #sampling_rate = sig.sampling_rate, \
+                            #t_start = sig.t_start)
+                        
+    if any([v is None for v in (minVal, maxVal)]):
+        if isinstance(sig, neo.AnalogSignal):
+            maxVal = sig.max()
+            minVal = sig.min()
+            
+        else:
+            raise TypeError("When signal is not an analog signal both minVal and maxVal must be specified")
+
+    return (sig - minVal)/(maxVal - minVal)
+
+def correlate(in1, in2, **kwargs):
+    """Calls scipy.signal.correlate(in1, in2, **kwargs).
+    
+    Correlation mode is by default set to "same", but can be overridden.
+    
+    Parameters
+    
+    ----------
+    
+    in1 : neo.AnalogSignal, neo.IrregularlySampledSignal, datatypes.DataSignal, or np.ndarray.
+    
+        Must be a 1D signal i.e. with shape (N,) or (N,1) where N is the number 
+        of samples in "in1"
+    
+        The signal for which the correlation with "in2" is to be calculated. 
+        
+        Typically this is the longer of the signals to correlate.
+        
+    in2 : neo.AnalogSignal, neo.IrregularlySampledSignal, datatypes.DataSignal, or np.ndarray
+    
+        Must be a 1D signal, i.e. with shape (M,) or (M,1) where M is the number 
+        of samples in "in2"
+        
+        The signal that "in1" is correlated with (typically, shorter than "in1")
+        
+    Var-keyword parameters
+    
+    -----------------------
+    
+    method : str {"auto", "direct", "fft"}, optional; default is "auto"
+        Passed to scipy.signal.correlate
+        
+    name : str
+        The name attribute of the result
+        
+    units : None or a Python Quantity or UnitQuantity. Default is None.
+    
+        These is mandatory when "a" is a numpy array
+    
+        The units of the returned signal; when None, the units of the returned 
+        signal are pq.dimensionless (where "pq" is an alias for Python quantities
+        module)
+    
+    Returns
+    
+    -------
+    
+    ret : object of the same type as "in1"
+        Contains the result of correlating "in1" with "in2".
+        
+        When "in1" is a neo.AnalogSignal, neo.IrregularlySampledSignal, or datatypes.DataSignal,
+        ret will have "times" attribute copied from "in1" and with "units" attribute
+        set to dimensionless, unless specified explicitly by "units" var-keyword parameter.
+        
+        
+    NOTE
+    
+    ----
+    
+    The function correlates the magnitudes of the signals and does not take into
+    account their units, or their definition domains (i.e. "times" attribute).
+    
+    See also:
+    --------
+    scipy.signal.correlate
+    
+    """
+    
+    from scipy.signal import correlate
+    
+    from . import datatypes as dt
+    
+    name = kwargs.pop("name", "")
+    
+    units = kwargs.pop("units", pq.dimensionless)
+    
+    mode = kwargs.pop("mode", "same") # let mdoe be "same" by default but allow it to be overridden
+    
+    if in1.ndim > 1 and in1.shape[1] > 1:
+        raise TypeError("in1 expected to be a 1D signal")
+    
+    if in2.ndim > 1 and in2.shape[1] > 1:
+        raise TypeError("in2 expected to be a 1D signal")
+    
+    if isinstance(in1, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
+        in1_ = in1.magnitude.flatten()
+        
+    else:
+        in1_ = in1.flatten()
+
+    if isinstance(in2, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
+        in2_ = in2.magnitude.flatten()
+        
+    else:
+        in2_ = in2.flatten()
+        
+    in2_ = np.flipud(in2_)
+        
+    corr = correlate(in1_, in2_, mode=mode, **kwargs)
+    
+    if isinstance(in1, (neo.AnalogSignal, DataSignal)):
+        ret = neo.AnalogSignal(corr, t_start = in1.t_start,
+                                units = units, 
+                                sampling_period = in1.sampling_period,
+                                name = name)
+    
+        if isinstance(in2, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
+            ret.description = "Correlation of %s with %s" % (in1.name, in2.name)
+            
+        else:
+            ret.description = "Correlation of %s with an array" % in1.name
+            
+        return ret
+    
+    elif isinstance(in1, neo.IrregularlySampledSignal):
+        ret = neo.IrregularlySampledSignal(corr, 
+                                            units=units,
+                                            times = in1.times,
+                                            name = name)
+    
+        if isinstance(in2, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
+            ret.description = "Correlation of %s with %s" % (in1.name, in2.name)
+            
+        else:
+            ret.description = "Correlation of %s with an array" % in1.name
+            
+        return ret
+
+    else:
+        return corr

@@ -990,14 +990,6 @@ def loadAxonFile(fileName:str, create_group_across_segment:typing.Union[bool, di
     data : neo.Block; its "annotations" attribute is updated to include
         the axon_info "meta data" augumented with t_start and sampling_rate
         
-    NOTE: 2020-02-17 09:31:05
-    This now handles only axon binary files, and returns the data AND the metadata
-    in axon file as well.
-    
-    NOTE: 2020-02-17 18:07:53
-    Reverting back to a single return variable: a neo.Block. The metadata is
-    appended to the annotation block of the variable.
-    The "protocol_sweeps" are not useful: all signals contain zeros!
     """
     
     if not os.path.isfile(fileName):
@@ -1297,6 +1289,15 @@ def segment_to_atf(segment, fileName=None, skipHeader=True, skipTimes=True, acqu
     except Exception as e:
         traceback.print_exc()
         csvfile.close()
+        
+def saveJSON(obj, fileName):
+    from . import jsonio
+    with open(fileName, mode="wt") as jsonfile:
+        jsonio.dump(obj, jsonfile)
+        
+def loadJSON(fileName):
+    from . import jsonio
+    return jsonio.load(fileName)
             
 def saveText(s, fileName):
     with open(fileName, mode="wt") as fileDest:
@@ -1504,6 +1505,10 @@ def loadXMLFile(fileName):
         #raise OSError("File %s not found" % fileName)
 
 def loadTextFile(fileName, forceText=False):
+    """Reads a file as text, returns a string.
+    If the string contains <?xml version and forceText is False the result
+    is an xml Document.
+    """
     if os.path.isfile(fileName):
         # we may have been landed here from an Axon Text File
         root, ext = os.path.splitext(fileName)
@@ -1739,7 +1744,7 @@ def saveHDF5(data, fileName):
         fileName += ".h5"
         
     with h5py.File(fileName, mode="w") as h5file:
-        h5io.makeHDF5Entity(data, h5file, name=name)
+        h5io.makeHDF5Entity(data, h5file, name=os.path.basename(name))
     
 @safeWrapper
 def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None, ws:typing.Optional[dict]=None, mode:str="pkl", **kwargs):

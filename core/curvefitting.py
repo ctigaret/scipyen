@@ -13,6 +13,7 @@ import os, sys, traceback, warnings, numbers, collections
 #### BEGIN 3rd party modules
 import numpy as np
 import quantities as pq
+import pandas as pd
 from scipy import cluster, optimize, signal, integrate #, where
 import vigra
 import neo
@@ -23,7 +24,8 @@ import neo
 #import signalviewer as sv
 from . import tiwt
 from . import models
-#from . import datatypes as dt
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+from core import datatypes as dt
 #from .patchneo import *
 #### END pict.core modules
 
@@ -505,7 +507,7 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), method
     
     return fittedCurve, fittedComponentCurves, result
 
-def fit_mPSC_model(data, p0, **kwargs):
+def fit_Event_model(data, p0, **kwargs):
     """Fits a Clements & Bekkers '97 waveform through the data.
     
     Parameters:
@@ -558,8 +560,24 @@ def fit_mPSC_model(data, p0, **kwargs):
     """
     # TODO/FIXME: 2022-10-25 23:33:58
     # allow lower/upper bounds individually for each parameter
-    
+    from core import datatypes as dt
     from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+    
+    jac         = kwargs.pop("jac",         "2-point")
+    bounds      = kwargs.pop("bounds",      (-np.inf, np.inf))
+    method      = kwargs.pop("method",      "trf")
+    ftol        = kwargs.pop("ftol",        1e-8)
+    xtol        = kwargs.pop("xtol",        1e-8)
+    gtol        = kwargs.pop("gtol",        1e-8)
+    x_scale     = kwargs.pop("x_scale",     1.0)
+    loss        = kwargs.pop("loss",        "linear")
+    f_scale     = kwargs.pop("f_scale",     1.0)
+    max_nfev    = kwargs.pop("max_nfev",    None)
+    diff_step   = kwargs.pop("diff_step",   None)
+    tr_solver   = kwargs.pop("tr_solver",   None)
+    tr_options  = kwargs.pop("tr_options",  {})
+    jac_sparsity= kwargs.pop("jac_sparsity",None)
+    verbose     = kwargs.pop("verbose",     0)
     
     if not isinstance(data, (neo.AnalogSignal, DataSignal)):
         raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datatypes.DataSignal; got %s instead" % type(data).__name__)
@@ -579,22 +597,6 @@ def fit_mPSC_model(data, p0, **kwargs):
         ret = y-yf
         
         return ret
-    
-    jac         = kwargs.pop("jac",         "2-point")
-    bounds      = kwargs.pop("bounds",      (-np.inf, np.inf))
-    method      = kwargs.pop("method",      "trf")
-    ftol        = kwargs.pop("ftol",        1e-8)
-    xtol        = kwargs.pop("xtol",        1e-8)
-    gtol        = kwargs.pop("gtol",        1e-8)
-    x_scale     = kwargs.pop("x_scale",     1.0)
-    loss        = kwargs.pop("loss",        "linear")
-    f_scale     = kwargs.pop("f_scale",     1.0)
-    max_nfev    = kwargs.pop("max_nfev",    None)
-    diff_step   = kwargs.pop("diff_step",   None)
-    tr_solver   = kwargs.pop("tr_solver",   None)
-    tr_options  = kwargs.pop("tr_options",  {})
-    jac_sparsity= kwargs.pop("jac_sparsity",None)
-    verbose     = kwargs.pop("verbose",     0)
     
     # not used here, but remove it from kwargs anyway
     args        = kwargs.pop("args",        ()) 
@@ -628,28 +630,84 @@ def fit_mPSC_model(data, p0, **kwargs):
     
 
     x0 = p0
-#     lo = list()
-#     up = list()
-#     
-#     l0 = bounds[0]
-#     u0 = bounds[1]
-#     
-#     if isinstance(l0, numbers.Real):
-#         lo = [l0] * len(p0)
-#         
-#     elif isinstance(l0, (tuple, list)) and len(l0) == len(x0) and all(isinstance(l, numbers.Real) for l in l0):
-#         lo = [l for l in l0]
-#     else:
-#         raise ValueError(f"Incorrect lower bounds specified {l0}")
-#     
-#     if isinstance(u0, numbers.Real):
-#         up = [u0] * len(p0)
-#     elif isinstance(u0, (tuple, list)) and len(u0) == len(x0) and all(isinstance(l, numbers.Real) for l in u0):
-#         up = [l for l in u0]
-#     else:
-#         raise ValueError(f"Incorrect upper bounds specified {l0}")
-#     
-#     bnds = (lo, up)
+    lo = list()
+    up = list()
+    
+    l0 = bounds[0]
+    u0 = bounds[1]
+    
+    if isinstance(l0, numbers.Real):
+        lo = [l0] * len(p0)
+        
+    elif isinstance(l0, (tuple, list)):
+        if len(l0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {len(l0)} instead")
+
+        if all(isinstance(l, numbers.Real) for l in l0):
+            if len(l0) == 1:
+                lo = [l0[0]] * len(p0)
+            else:
+                lo = [l for l in l0]
+
+        elif all(isinstance(l, np.ndarray) and l.size == 1 and l.dtype == np.dtype(float) for l in l0):
+            if len(l0) == 1:
+                lo = [float(l)] * len(p0)
+            else:
+                lo = [float(l) for l in l0]
+                
+    elif isinstance(l0, np.ndarray):
+        if l0.size not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
+        
+        if not dt.is_vector(l0):
+            raise ValueError("Lower bounds must be a vector")
+        
+    elif isinstance(l0, pd.Series):
+        if len(l0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
+        
+        lo = [float(l.magnitude) if isinstance(l, pq.Quantity) else float(l) for l in l0]
+            
+    else:
+        raise ValueError(f"Incorrect lower bounds specified {l0}")
+    
+    if isinstance(u0, numbers.Real):
+        up = [u0] * len(p0)
+        
+    elif isinstance(u0, (tuple, list)):
+        if len(u0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {len(u0)} instead")
+
+        if all(isinstance(l, numbers.Real) for l in u0):
+            if len(u0) == 1:
+                up = [u0[0]] * len(p0)
+            else:
+                up = [l for l in u0]
+
+        elif all(isinstance(l, np.ndarray) and l.size == 1 and l.dtype == np.dtype(float) for l in u0):
+            if len(u0) == 1:
+                up = [float(l)] * len(p0)
+            else:
+                up = [float(l) for l in u0]
+                
+    elif isinstance(u0, np.ndarray):
+        if u0.size not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
+        
+        if not dt.is_vector(u0):
+            raise ValueError("Lower bounds must be a vector")
+        
+    elif isinstance(u0, pd.Series):
+        if len(u0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
+        
+        up = [float(l.magnitude) if isinstance(l, pq.Quantity) else float(l) for l in u0]
+            
+    else:
+        raise ValueError(f"Incorrect upper bounds specified {u0}")
+    
+    
+    bnds = (lo, up)
     
     # NOTE: 2022-10-30 14:39:57
     # solve a non-linear least-squares problem with bounds on the variables
@@ -689,7 +747,7 @@ def fit_mPSC_model(data, p0, **kwargs):
     
     return fittedCurve, result
 
-def fit_mPSC_wave(data, wave):
+def fit_Event_wave(data, wave):
     """R² between data and a template waveform
     
     Not a curve fit but a measure of how well the data is matched by the waveform
@@ -708,7 +766,7 @@ def fit_mPSC_wave(data, wave):
     if not isinstance(wave, (neo.AnalogSignal, DataSignal)):
         raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datatypes.DataSignal; got %s instead" % type(data).__name__)
     
-    if wave.ndim == 2 and save.shape[1] > 1:
+    if wave.ndim == 2 and wave.shape[1] > 1:
         raise ValueError("Data must contain a single channel")
     
     if data.size != wave.size:
@@ -721,6 +779,506 @@ def fit_mPSC_wave(data, wave):
     return 1 - sse/sst
     
     
+def scale_fit_wave(x, y, p0 = 1, method="nelder-mead"):
+    """ Finds a scale factor of y such that it matches x.
+    
+    The objective function being minimized is the scalar product x - p0 * y
+    
+    Parameters:
+    ----------
+    x: 1D vector to compare against
+    y: 1D vector with the same shape as x, which is to be scaled such that 
+        p * y ≈ x 
+    
+        in other words, 
+
+        Σ(x - p*y)² ≈ 0                                                 (1)
+    
+    p0: initial value of `p`
+    
+    Returns:
+    --------
+    a scipy.optimize.OptimizeResult data.
+    When optimization was successful, the `x` attribute of the result is the 
+    parameter value p that satisfies (1)
+    
+    WARNING: THIS FUNCTION DOES NOT SCALE ANY OF THE WAVES PASSED TO IT.
+    One should first inspect the `success` attribute  of the result, then if 
+    True, use the value of the `x` attribute of the result to scale the wave in 
+    `y` 
+    
+    """
+    if not all(isinstance(x, np.ndarray) for v in (x,y)):
+        raise TypeError("Expecting two numpy arrays")
+    
+    if not all(dt.is_vector(v) for v in (x,y)):
+        raise ValueError("Expecting two vectors")
+    
+    if x.ndim != y.ndim or x.shape != y.shape:
+        raise ValueError(f"x and y must have the same dimensionality and shape; gpt x with {x.ndim} dimensions and {x.shape} shape, and y with {y.ndim} dimensions and {y.shape} shape")
+
+    def __wave_fun__(x_, a, b):
+        """x_: scale; 
+           a : original wave
+           b: wave to be scaled"""
+        y = a - x_ * b
+        return np.dot(y.T, y)
+    
+    res = optimize.minimize(__wave_fun__, p0, args = (x,y),
+                            method = method)
+    
+    return res
+
+def scale_fit_wave2(x, y, p0 = (1,0)):
+    """Two-params version """
+    def __wave_fun__(x_, y_, a, b):
+        y = a - x_*b+y_
+        return np.dot(y.T, y)
+    
+    if not all(isinstance(x, np.ndarray) for v in (x,y)):
+        raise TypeError("Expecting two numpy arrays")
+    
+    if not all(dt.is_vector(v) for v in (x,y)):
+        raise ValueError("Expecting two vectors")
+    
+    if x.ndim != y.ndim or x.shape != y.shape:
+        raise ValueError(f"x and y must have the same dimensionality and shape; gpt x with {x.ndim} dimensions and {x.shape} shape, and y with {y.ndim} dimensions and {y.shape} shape")
+
+    scale, offset = p0
+    res = optimize.minimize(__wave_fun__, (scale, offset), args = (x,y),
+                            method=method)
+    return res
+    
+def fit_nsfa(data, p0, **kwargs):
+    """Fit the parabola y = x * i - x²/N + b throgh the observed variable data.
+    Parameters:
+    ===========
+    data: the observed variable
+    p0: tuple with the model parameters i, N, b
+    
+    Var-keyword parameters:
+    =======================
+    x: the independent variable
+    
+    The following are passed directly to scipy.optimize.least_squares:
+    bounds, jac, method, ftol, xtol, gtol, x_scale, loss, f_scale, max_nfev,
+    diff_step, tr_solver, tr_optoins, jac_sparsity, verbose
+    
+    (see scipy manual for details)
+    
+    Defaults are:
+    
+    jac          = "2-point"
+    bounds       = -np.inf, np.inf
+    method       = "trf"
+    ftol         = 1e-8
+    xtol         = 1e-8
+    gtol         = 1e-8
+    x_scale      = 1.0
+    loss         = "linear"
+    f_scale      = 1.0
+    max_nfev     = None
+    diff_step    = None
+    tr_solver    = None
+    tr_options   = {}
+    jac_sparsity = None
+    verbose      = 0
     
     
+    """
+    jac         = kwargs.pop("jac",         "2-point")
+    bounds      = kwargs.pop("bounds",      (-np.inf, np.inf))
+    method      = kwargs.pop("method",      "trf")
+    ftol        = kwargs.pop("ftol",        1e-8)
+    xtol        = kwargs.pop("xtol",        1e-8)
+    gtol        = kwargs.pop("gtol",        1e-8)
+    x_scale     = kwargs.pop("x_scale",     1.0)
+    loss        = kwargs.pop("loss",        "linear")
+    f_scale     = kwargs.pop("f_scale",     1.0)
+    max_nfev    = kwargs.pop("max_nfev",    None)
+    diff_step   = kwargs.pop("diff_step",   None)
+    tr_solver   = kwargs.pop("tr_solver",   None)
+    tr_options  = kwargs.pop("tr_options",  {})
+    jac_sparsity= kwargs.pop("jac_sparsity",None)
+    verbose     = kwargs.pop("verbose",     0)
+    x           = kwargs.pop("x",           None)
     
+    def __cost_fun__(x, t, y, *args, **kwargs):  # returns residuals
+        yf = models.nsfa(t, x)
+        
+        ret = y-yf
+        
+        return ret
+    
+    args        = kwargs.pop("args",        ()) 
+   
+    realDataNdx = ~np.isnan(data)
+    
+    if isinstance(data, neo.core.basesignal.BaseSignal):
+        ydata = data.magnitude[realDataNdx]
+    
+        realDataNdx = np.squeeze(realDataNdx)
+    
+        if isinstance(data, neo.AnalogSignal):
+            domaindata = data.times.magnitude
+            
+        else:
+            domaindata = data.domain.magnitude
+        
+        xdata  = domaindata[realDataNdx]
+        
+    else:
+        if not isinstance(x, np.ndarray): 
+            raise TypeError(f"When data id a numpy array, x must be given as a numpy array")
+        
+        if x.shape != data.shape:
+            raise ValueError(f"x shape {x.shape} is different to to data shape {data.shape}")
+        
+        ydata = data[realDataNdx]
+        xdata = x[realDataNdx]
+    
+    x0 = p0
+    lo = list()
+    up = list()
+    
+    l0 = bounds[0]
+    u0 = bounds[1]
+    
+    if isinstance(l0, numbers.Real):
+        lo = [l0] * len(p0)
+        
+    elif isinstance(l0, (tuple, list)):
+        if len(l0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {len(l0)} instead")
+
+        if all(isinstance(l, numbers.Real) for l in l0):
+            if len(l0) == 1:
+                lo = [l0[0]] * len(p0)
+            else:
+                lo = [l for l in l0]
+
+        elif all(isinstance(l, np.ndarray) and l.size == 1 and l.dtype == np.dtype(float) for l in l0):
+            if len(l0) == 1:
+                lo = [float(l)] * len(p0)
+            else:
+                lo = [float(l) for l in l0]
+                
+    elif isinstance(l0, np.ndarray):
+        if l0.size not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
+        
+        if not dt.is_vector(l0):
+            raise ValueError("Lower bounds must be a vector")
+        
+    elif isinstance(l0, pd.Series):
+        if len(l0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
+        
+        lo = [float(l.magnitude) if isinstance(l, pq.Quantity) else float(l) for l in l0]
+            
+    else:
+        raise ValueError(f"Incorrect lower bounds specified {l0}")
+    
+    if isinstance(u0, numbers.Real):
+        up = [u0] * len(p0)
+        
+    elif isinstance(u0, (tuple, list)):
+        if len(u0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {len(u0)} instead")
+
+        if all(isinstance(l, numbers.Real) for l in u0):
+            if len(u0) == 1:
+                up = [u0[0]] * len(p0)
+            else:
+                up = [l for l in u0]
+
+        elif all(isinstance(l, np.ndarray) and l.size == 1 and l.dtype == np.dtype(float) for l in u0):
+            if len(u0) == 1:
+                up = [float(l)] * len(p0)
+            else:
+                up = [float(l) for l in u0]
+                
+    elif isinstance(u0, np.ndarray):
+        if u0.size not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
+        
+        if not dt.is_vector(u0):
+            raise ValueError("Lower bounds must be a vector")
+        
+    elif isinstance(u0, pd.Series):
+        if len(u0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
+        
+        up = [float(l.magnitude) if isinstance(l, pq.Quantity) else float(l) for l in u0]
+            
+    else:
+        raise ValueError(f"Incorrect upper bounds specified {u0}")
+    
+    
+    bnds = (lo, up)
+    
+    res = optimize.least_squares(__cost_fun__, x0, args=(xdata, ydata), jac=jac,
+                                 bounds = bounds, method=method, loss=loss,
+                                 ftol=ftol, xtol=xtol, gtol=gtol, x_scale=x_scale,
+                                 f_scale=f_scale, max_nfev=max_nfev, 
+                                 diff_step=diff_step, tr_solver=tr_solver,
+                                 tr_options=tr_options, jac_sparsity=jac_sparsity,
+                                 verbose=verbose, kwargs=kwargs)
+    
+    res_x = list(res.x.flatten())
+
+    fC = models.nsfa(xdata, res_x)
+    
+    sst = np.sum( (ydata - ydata.mean()) ** 2.)
+    
+    sse = np.sum((fC - ydata) ** 2.)
+    
+    # R² for the entire fit
+    rsq = 1 - sse/sst # only one R²
+    
+    result = collections.OrderedDict()
+    result["Fit"] = res
+    result["Coefficients"] = res_x
+    result["Rsq"] = rsq
+    
+    initialSupport = np.full((data.shape[0],), np.NaN)
+    
+    fittedCurve = initialSupport.copy()
+    
+    fittedCurve[realDataNdx] = fC
+    
+    return fittedCurve, result
+
+                     
+def fit_model(data, func, p0, *args, **kwargs):
+    """Generic fitting function.
+    Applies scipy.optimize.least_squares using cost function to calculate the
+    residuals between the model function in `func` and `data`.
+    
+    Positional parameters:
+    =====================
+    data: 1D array-like, numeric - the "dependent" variable to be fitted
+    
+    func: python function that takes a scalar and a sequence of model parameters,
+        and returns a scalar, and with signature:
+    
+        func(x, p, /, *args, **kwargs)
+    
+    p0: initial values for the model realized by `func`
+    
+    Var-keyword parameters (**kwargs):
+    =================================
+    
+    x: the independent variable, array-like, with the same shape as `data`
+    
+    fargs: tuple with var-positional parameters to `func`
+    
+    fkwargs: dict with keyword parameters to `func`
+    
+    The following are passed directly to scipy.optimize.least_squares:
+    bounds, jac, method, ftol, xtol, gtol, x_scale, loss, f_scale, max_nfev,
+    diff_step, tr_solver, tr_optoins, jac_sparsity, verbose
+    
+    (see scipy manual for details)
+    
+    Defaults are:
+    
+    bounds       = -np.inf, np.inf
+    jac          = "2-point"
+    method       = "trf"
+    ftol         = 1e-8
+    xtol         = 1e-8
+    gtol         = 1e-8
+    x_scale      = 1.0
+    loss         = "linear"
+    f_scale      = 1.0
+    max_nfev     = None
+    diff_step    = None
+    tr_solver    = None
+    tr_options   = {}
+    jac_sparsity = None
+    verbose      = 0
+    
+    Returns:
+    ========
+    
+    A tuple: (fitted curve, collections.OrderedDict) where:
+    
+    • fitted curve is the realization of the model in `func` using the fitted 
+        parameters and the independent variable `x`
+    
+    • the OrderedDict has the following keys:
+    
+        Model           ↦ `func` module.name
+        Fit             ↦ the fit result output by scipy.optimize.least_squares
+        Coefficients    ↦ a tuple with fitted model parameter values
+        Rsq             ↦ R² correlation coefficient between the fitted curve 
+                         and the `data` (sort of goodness-of-fit)
+    
+    
+    """
+    jac         = kwargs.pop("jac",         "2-point")
+    bounds      = kwargs.pop("bounds",      (-np.inf, np.inf))
+    method      = kwargs.pop("method",      "trf")
+    ftol        = kwargs.pop("ftol",        1e-8)
+    xtol        = kwargs.pop("xtol",        1e-8)
+    gtol        = kwargs.pop("gtol",        1e-8)
+    x_scale     = kwargs.pop("x_scale",     1.0)
+    loss        = kwargs.pop("loss",        "linear")
+    f_scale     = kwargs.pop("f_scale",     1.0)
+    max_nfev    = kwargs.pop("max_nfev",    None)
+    diff_step   = kwargs.pop("diff_step",   None)
+    tr_solver   = kwargs.pop("tr_solver",   None)
+    tr_options  = kwargs.pop("tr_options",  {})
+    jac_sparsity= kwargs.pop("jac_sparsity",None)
+    verbose     = kwargs.pop("verbose",     0)
+    x           = kwargs.pop("x",           None)
+    fargs       = kwargs.pop("fargs",       tuple())
+    fkwargs     = kwargs.pop("fkwargs",     dict())
+    
+    def __cost_fun__(x, t, y, *args, **kwargs):  # returns residuals
+        yf = func(t, x, *fargs, **fkwargs)
+        
+        ret = y-yf
+        
+        return ret
+    
+    args        = kwargs.pop("args",        ()) 
+   
+    realDataNdx = ~np.isnan(data)
+    
+    if isinstance(data, neo.core.basesignal.BaseSignal):
+        ydata = data.magnitude[realDataNdx]
+    
+        realDataNdx = np.squeeze(realDataNdx)
+    
+        if isinstance(data, neo.AnalogSignal):
+            domaindata = data.times.magnitude
+            
+        else:
+            domaindata = data.domain.magnitude
+        
+        xdata  = domaindata[realDataNdx]
+        
+    else:
+        if not isinstance(x, np.ndarray): 
+            raise TypeError(f"When data id a numpy array, x must be given as a numpy array")
+        
+        if x.shape != data.shape:
+            raise ValueError(f"x shape {x.shape} is different to to data shape {data.shape}")
+        
+        ydata = data[realDataNdx]
+        xdata = x[realDataNdx]
+    
+    x0 = p0
+    lo = list()
+    up = list()
+    
+    l0 = bounds[0]
+    u0 = bounds[1]
+    
+    if isinstance(l0, numbers.Real):
+        lo = [l0] * len(p0)
+        
+    elif isinstance(l0, (tuple, list)):
+        if len(l0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {len(l0)} instead")
+
+        if all(isinstance(l, numbers.Real) for l in l0):
+            if len(l0) == 1:
+                lo = [l0[0]] * len(p0)
+            else:
+                lo = [l for l in l0]
+
+        elif all(isinstance(l, np.ndarray) and l.size == 1 and l.dtype == np.dtype(float) for l in l0):
+            if len(l0) == 1:
+                lo = [float(l)] * len(p0)
+            else:
+                lo = [float(l) for l in l0]
+                
+    elif isinstance(l0, np.ndarray):
+        if l0.size not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
+        
+        if not dt.is_vector(l0):
+            raise ValueError("Lower bounds must be a vector")
+        
+    elif isinstance(l0, pd.Series):
+        if len(l0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
+        
+        lo = [float(l.magnitude) if isinstance(l, pq.Quantity) else float(l) for l in l0]
+            
+    else:
+        raise ValueError(f"Incorrect lower bounds specified {l0}")
+    
+    if isinstance(u0, numbers.Real):
+        up = [u0] * len(p0)
+        
+    elif isinstance(u0, (tuple, list)):
+        if len(u0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {len(u0)} instead")
+
+        if all(isinstance(l, numbers.Real) for l in u0):
+            if len(u0) == 1:
+                up = [u0[0]] * len(p0)
+            else:
+                up = [l for l in u0]
+
+        elif all(isinstance(l, np.ndarray) and l.size == 1 and l.dtype == np.dtype(float) for l in u0):
+            if len(u0) == 1:
+                up = [float(l)] * len(p0)
+            else:
+                up = [float(l) for l in u0]
+                
+    elif isinstance(u0, np.ndarray):
+        if u0.size not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
+        
+        if not dt.is_vector(u0):
+            raise ValueError("Lower bounds must be a vector")
+        
+    elif isinstance(u0, pd.Series):
+        if len(u0) not in (1, len(p0)):
+            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
+        
+        up = [float(l.magnitude) if isinstance(l, pq.Quantity) else float(l) for l in u0]
+            
+    else:
+        raise ValueError(f"Incorrect upper bounds specified {u0}")
+    
+    
+    bnds = (lo, up)
+    
+    res = optimize.least_squares(__cost_fun__, x0, args=(xdata, ydata), jac=jac,
+                                 bounds = bounds, method=method, loss=loss,
+                                 ftol=ftol, xtol=xtol, gtol=gtol, x_scale=x_scale,
+                                 f_scale=f_scale, max_nfev=max_nfev, 
+                                 diff_step=diff_step, tr_solver=tr_solver,
+                                 tr_options=tr_options, jac_sparsity=jac_sparsity,
+                                 verbose=verbose, kwargs=kwargs)
+    
+    res_x = list(res.x.flatten())
+
+    fC = func(xdata, res_x, *fargs, **fkwargs)
+    
+    sst = np.sum( (ydata - ydata.mean()) ** 2.)
+    
+    sse = np.sum((fC - ydata) ** 2.)
+    
+    # R² for the entire fit
+    rsq = 1 - sse/sst # only one R²
+    
+    result = collections.OrderedDict()
+    result["Model"] = f"{func.__module__}.{func.__name__}"
+    result["Fit"] = res
+    result["Coefficients"] = res_x
+    result["Rsq"] = rsq
+    
+    initialSupport = np.full((data.shape[0],), np.NaN)
+    
+    fittedCurve = initialSupport.copy()
+    
+    fittedCurve[realDataNdx] = fC
+    
+    return fittedCurve, result

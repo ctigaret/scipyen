@@ -99,8 +99,17 @@
     <property name="title">
      <string>Settings</string>
     </property>
+    <widget class="QMenu" name="menuCode_editor">
+     <property name="title">
+      <string>Code editor</string>
+     </property>
+     <addaction name="actionChoose_code_editor"/>
+     <addaction name="actionUse_system_s_default_code_editor"/>
+    </widget>
     <addaction name="actionGUI_Style"/>
     <addaction name="actionAuto_launch_Script_Manager"/>
+    <addaction name="menuCode_editor"/>
+    <addaction name="actionAuto_delete_viewer"/>
    </widget>
    <widget class="QMenu" name="menuConsoles">
     <property name="title">
@@ -708,16 +717,25 @@ NOTE: you can click anywhere in the row to select</string>
    </attribute>
   </widget>
   <action name="actionSave">
+   <property name="icon">
+    <iconset theme="document-save"/>
+   </property>
    <property name="text">
     <string>&amp;Save As ...</string>
    </property>
   </action>
   <action name="actionQuit">
+   <property name="icon">
+    <iconset theme="application-exit"/>
+   </property>
    <property name="text">
     <string>&amp;Quit</string>
    </property>
   </action>
   <action name="action_Console">
+   <property name="icon">
+    <iconset theme="scriptnew"/>
+   </property>
    <property name="text">
     <string>&amp;Console</string>
    </property>
@@ -728,16 +746,25 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
   </action>
   <action name="actionHelp_On_Console">
+   <property name="icon">
+    <iconset theme="help-contextual"/>
+   </property>
    <property name="text">
     <string>&amp;On Console</string>
    </property>
   </action>
   <action name="actionImport_PrairieView_data">
+   <property name="icon">
+    <iconset theme="document-open"/>
+   </property>
    <property name="text">
     <string>PrairieView data</string>
    </property>
   </action>
   <action name="actionImport_XY_Raster_Scan_File">
+   <property name="icon">
+    <iconset theme="document-open"/>
+   </property>
    <property name="text">
     <string>&amp;XY Raster Scan</string>
    </property>
@@ -763,16 +790,25 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
   </action>
   <action name="actionView_Data_New_Window">
+   <property name="icon">
+    <iconset theme="window-new"/>
+   </property>
    <property name="text">
     <string>&amp;In New Window</string>
    </property>
   </action>
   <action name="actionView_Data">
+   <property name="icon">
+    <iconset theme="quickview"/>
+   </property>
    <property name="text">
     <string>In &amp;Current Window</string>
    </property>
   </action>
   <action name="actionReload_Plugins">
+   <property name="icon">
+    <iconset theme="view-refresh"/>
+   </property>
    <property name="text">
     <string>&amp;Reload Plugins</string>
    </property>
@@ -783,6 +819,9 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
   </action>
   <action name="actionChange_Working_Directory">
+   <property name="icon">
+    <iconset theme="document-open-folder"/>
+   </property>
    <property name="text">
     <string>&amp;Change Working Directory</string>
    </property>
@@ -798,6 +837,9 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
   </action>
   <action name="actionOpen">
+   <property name="icon">
+    <iconset theme="document-open"/>
+   </property>
    <property name="text">
     <string>&amp;Open...</string>
    </property>
@@ -873,6 +915,9 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
   </action>
   <action name="actionGUI_Style">
+   <property name="icon">
+    <iconset theme="edit-paste-style"/>
+   </property>
    <property name="text">
     <string>GUI Style...</string>
    </property>
@@ -881,8 +926,53 @@ NOTE: you can click anywhere in the row to select</string>
    <property name="checkable">
     <bool>true</bool>
    </property>
+   <property name="icon">
+    <iconset theme="dialog-scripts"/>
+   </property>
    <property name="text">
     <string>Auto-launch Script Manager</string>
+   </property>
+  </action>
+  <action name="actionChoose_code_editor">
+   <property name="icon">
+    <iconset theme="editor">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Choose code editor</string>
+   </property>
+  </action>
+  <action name="actionUse_system_s_default_code_editor">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="editor">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Use system's default code editor</string>
+   </property>
+  </action>
+  <action name="actionAuto_delete_viewer">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="window-unpin">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Auto-delete viewers</string>
+   </property>
+   <property name="toolTip">
+    <string>Remove viewer when closed</string>
+   </property>
+   <property name="statusTip">
+    <string>Remove viewer when closed</string>
+   </property>
+   <property name="whatsThis">
+    <string>When a viewer is closed , also remove it from the user workspace</string>
    </property>
   </action>
  </widget>

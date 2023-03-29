@@ -39,6 +39,10 @@ fi
 
 # export LD_LIBRARY_PATH=$VIRTUAL_ENV/lib:$VIRTUAL_ENV/lib64:$LD_LIBRARY_PATH
 
+# NOTE: 2022-11-23 15:03:59
+# stop annoying warning from outdated
+export OUTDATED_IGNORE=1
+
 # NOTE: 2021-02-04 18:00:07
 # On linux, override KDE or other DEs theming from overriding the resources 
 # (colors etc) in the InterViews GUI
