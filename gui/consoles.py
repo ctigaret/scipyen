@@ -112,7 +112,7 @@ from gui.guiutils import (get_font_style, get_font_weight,)
 
 if sys.version_info.minor < 11:
     from core import scipyen_inprocess_3_10
-    from scipyen_inprocess_3_10.import ScipyenInProcessKernel
+    from scipyen_inprocess_3_10 import ScipyenInProcessKernel
 else:
     ScipyenInProcessKernel = InProcessKernel
 
