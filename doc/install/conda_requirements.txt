@@ -561,16 +561,26 @@ inflect         # ✓ (conda install inflect)
 #   urllib3            conda-forge/noarch::urllib3-1.26.15-pyhd8ed1ab_0
 #   win_inet_pton      conda-forge/noarch::win_inet_pton-1.1.0-pyhd8ed1ab_6
 
-# the following MUST be installed using pip (inside the CONDA environment)
-pyabf       # ✓ (pip install pyabf) - no conda package, use upip
-imreg-dft   # ✓ (pip install imgreg-dft)
+seaborn
+qimage2ndarray  # ✓ (conda install qimage2ndarray)
+pyxdg           # ✓ (conda install pyxdg)
 
-# Optional packages
+### The following MUST be installed using pip (inside the CONDA environment), if
+# they are not available on current conda channels (at the time of installation).
+# NOTE: It is OK to do so, see 
+# https://docs.anaconda.com/anaconda-repository/user-guide/tasks/pkgs/use-pkg-managers/#working-with-pypi-packages
+# and
+# https://stackoverflow.com/questions/29286624/how-to-install-pypi-packages-using-anaconda-conda-command
+#
+pyabf           # ✓ (pip install pyabf) - no conda package, use upip
+imreg-dft       # ✓ (pip install imgreg-dft)
+nixio           # ✓ (pip install nixio)
+python-magic    # ✓ (pip install python-magic)
+
+# Optional packages (conda)
 qdarkstyle ; sys_platform == 'win32'       # ✓ optional (conda install qdarkstyle)
 # 
 bokeh
-python-magic
-pyxdg
 
 
 
@@ -716,7 +726,6 @@ python-magic
 pytz
 pywin32 ; sys_platform == 'win32'
 pyxdg
-qimage2ndarray
 ravenclaw
 rdflib
 readme-renderer
@@ -727,7 +736,6 @@ researchpy
 scikit-image
 scikit-learn
 scipy
-seaborn
 slytherin
 smart-open
 smmap
