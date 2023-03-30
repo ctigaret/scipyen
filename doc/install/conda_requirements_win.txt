@@ -703,9 +703,20 @@ scikit-image        # ✓ (conda install scikit-image)
 
 scikit-learn        # ✓ (conda install scikit-learn)
 
+graphviz            # ✓ (conda iunstall graphviz)
+# The following packages will be downloaded:
+# 
+#     package                    |            build
+#     ---------------------------|-----------------
+#     graphviz-2.38.0            |    h6538335_1011        41.0 MB  conda-forge
+#     ------------------------------------------------------------
+#                                            Total:        41.0 MB
+# 
+# The following NEW packages will be INSTALLED:
+# 
+#   graphviz           conda-forge/win-64::graphviz-2.38.0-h6538335_1011
 
 dill                # ✓ (conda install dill)
-colorama            # ✓
 # 
 jupyter_cms
 jupyterthemes
@@ -714,178 +725,3 @@ gnuplot_kernel
 matlab_kernel
 pandas-flavor
 modelspec
-
-#
-graphviz
-
-
-
-
-# # QtPy # solved for jupyter
-# 
-# 
-# 
-# # distlib
-# # Babel
-# # GitPython
-# # Jinja2
-# # MarkupSafe
-# # PyLEMS
-# # required to build PyQt5 locally using the host's Qt stack
-# # PyQt-builder ; sys_platform == 'linux'
-# # required to build PyQt5 locally using the host's Qt stack
-# # Pyqt5-sip ; sys_platform == 'linux'
-# # PyQt5 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
-# SecretStorage
-# airspeed
-# anyio
-# asttokens
-# attrs
-# base32hex
-# bleach
-# blis ; sys_platform == 'linux'
-# cachetools
-# catalogue
-# certifi
-# cffi
-# chardet
-# chronometry
-# click
-# cmasher
-# # cmocean
-# colouration
-# confection
-# cryptography
-# cymem
-# cython
-# debugpy
-# descartes
-# # dill
-# # editdistance
-# exceptiongroup
-# executing
-# filelock
-# fonttools
-# func-timeout
-# fuzzywuzzy
-# geographiclib
-# geopy
-# gitdb
-# # h5py
-# huggingface-hub
-# idna
-# octave_kernel
-# imagesize
-# importlib-metadata
-# # imreg-dft
-# # inflect
-# # ipyparallel
-# # ipython
-# # ipywidgets
-# isodate
-# jaraco.classes
-# jeepney
-# joblib
-# #jsonlib
-# # jsonschema
-# # jupyter
-# jupyter_qtconsole_colorschemes
-# jupyterlab
-# jupyterlab-pygments
-# jupyterlab-server
-# jupyterlab-widgets
-# keyring
-# kiwisolver
-# langcodes
-# language_tool_python
-# lazy_loader
-# lesscpy
-# linguistics
-# lxml
-# # matplotlib
-# # matplotlib-inline
-# metakernel
-# more-itertools
-# murmurhash
-# nbclassic
-# nbclient
-# nbconvert
-# nbsphinx
-# # neo
-# # nest-asyncio
-# # networkx
-# # neuron; sys_platform == "win32" # NOTE: does NOT work on windows; on linux, see install.sh for the option to build locally
-# neuromllite
-# nibabel
-# nixio
-# nodejs
-# nose            
-# notebook
-# notebook_shim
-# # numpy           
-# # pandas
-# pathy
-# patsy
-# pkginfo
-# platformdirs
-# plotly
-# plotnine
-# preshed; sys_platform == "linux"
-# prometheus-client
-# prompt-toolkit
-# psutil
-# pylmeasure      # optional
-# tables ; python_version >= '3.9.7'
-# pymongo
-# pyneuroml       # optional
-# pyparsing
-# #pyqt5-tools ; sys_platform == 'win32'
-# # pyqtgraph
-# pytest
-# # # python-magic
-# # pytz
-# # pywin32 ; sys_platform == 'win32'
-# # pyxdg
-# ravenclaw
-# rdflib
-# readme-renderer
-# recommonmark
-# regex
-# requests-toolbelt
-# # scikit-image
-# # scikit-learn
-# # scipy
-# slytherin
-# smart-open
-# smmap
-# sniffio
-# spacy
-# spacy-legacy
-# spacy-loggers
-# sphinx          
-# sphinx_rtd_theme
-# srsly
-# stack-data
-# # sympy
-# tabulate
-# tenacity
-# terminado
-# testpath
-# thinc
-# tiffile
-# tokenizers
-# torch
-# tqdm
-# traitlets
-# transformers
-# twine
-# txt
-# typing_extensions
-# viscm
-# wasabi
-# websocket-client
-# widgetsnbextension
-# # winshell ; sys_platform == 'win32'
-# # xarray
-# # xyzservices
-# # zipp

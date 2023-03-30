@@ -1,0 +1,13 @@
+### The following MUST be installed using pip (inside the CONDA environment), if
+# they are not available on current conda channels (at the time of installation).
+# NOTE: It is OK to do so, see 
+# https://docs.anaconda.com/anaconda-repository/user-guide/tasks/pkgs/use-pkg-managers/#working-with-pypi-packages
+# and
+# https://stackoverflow.com/questions/29286624/how-to-install-pypi-packages-using-anaconda-conda-command
+#
+pyabf           # ✓ (pip install pyabf) - no conda package, use upip
+imreg-dft       # ✓ (pip install imgreg-dft)
+nixio           # ✓ (pip install nixio)
+python-magic    # ✓ (pip install python-magic)
+researchpy      # ✓ (pip install researchpy)
+
