@@ -42,7 +42,7 @@ import json
 import sys, typing, traceback, itertools, subprocess, asyncio
 # BEGIN NOTE: 2022-03-05 16:07:04 For execute_request
 import inspect, time
-from ipykernel.jsonutil import json_clean
+# from ipykernel.jsonutil import json_clean
 # END
 from functools import partial, partialmethod
 from collections import OrderedDict
@@ -112,7 +112,7 @@ from gui.guiutils import (get_font_style, get_font_weight,)
 
 if sys.version_info.minor < 11:
     from core import scipyen_inprocess_3_10
-    from scipyen_inprocess_3_10 import ScipyenInProcessKernel
+    from core.scipyen_inprocess_3_10 import ScipyenInProcessKernel
 else:
     ScipyenInProcessKernel = InProcessKernel
 

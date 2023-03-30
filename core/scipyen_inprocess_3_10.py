@@ -1,3 +1,5 @@
+import asyncio, inspect, sys, time
+from ipykernel.jsonutil import json_clean
 from ipykernel.inprocess.ipkernel import InProcessKernel
 class ScipyenInProcessKernel(InProcessKernel):
     """Workaround the following exception when using InProcessKernel (see below).
