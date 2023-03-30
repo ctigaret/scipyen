@@ -619,195 +619,273 @@ nixio           # ✓ (pip install nixio)
 python-magic    # ✓ (pip install python-magic)
 researchpy      # ✓ (pip install researchpy)
 
-# Optional packages (conda)
+### The following packages are OPTIONAL
 qdarkstyle ; sys_platform == 'win32'       # ✓ optional (conda install qdarkstyle)
+bokeh           # ✓ (conda install bokeh)
+# The following packages will be downloaded:
 # 
-bokeh
+#     package                    |            build
+#     ---------------------------|-----------------
+#     bokeh-3.1.0                |     pyhd8ed1ab_0         5.3 MB  conda-forge
+#     xyzservices-2023.2.0       |     pyhd8ed1ab_0          35 KB  conda-forge
+#     ------------------------------------------------------------
+#                                            Total:         5.4 MB
+# 
+# The following NEW packages will be INSTALLED:
+# 
+#   bokeh              conda-forge/noarch::bokeh-3.1.0-pyhd8ed1ab_0
+#   xyzservices        conda-forge/noarch::xyzservices-2023.2.0-pyhd8ed1ab_0
+
+scikit-image        # ✓ (conda install scikit-image)
+# The following packages will be downloaded:
+# 
+#     package                    |            build
+#     ---------------------------|-----------------
+#     aom-3.5.0                  |       h63175ca_0        11.7 MB  conda-forge
+#     blosc-1.21.3               |       hdccc3a2_0          42 KB  conda-forge
+#     c-blosc2-2.8.0             |       h183a6f4_0         189 KB  conda-forge
+#     cfitsio-4.2.0              |       h9ebe7e4_0         546 KB  conda-forge
+#     charls-2.4.1               |       h1537add_0          94 KB  conda-forge
+#     click-8.1.3                | win_pyhd8ed1ab_2          75 KB  conda-forge
+#     cloudpickle-2.2.1          |     pyhd8ed1ab_0          27 KB  conda-forge
+#     cytoolz-0.12.0             |  py311ha68e1ae_1         330 KB  conda-forge
+#     dask-core-2023.3.2         |     pyhd8ed1ab_0         823 KB  conda-forge
+#     dav1d-1.0.0                |       h8ffe710_1         668 KB  conda-forge
+#     fsspec-2023.3.0            |     pyhd8ed1ab_1         109 KB  conda-forge
+#     giflib-5.2.1               |       h64bf75a_3          82 KB  conda-forge
+#     imagecodecs-2023.1.23      |  py311h2c9abbb_2         1.3 MB  conda-forge
+#     imageio-2.27.0             |     pyh24c5eb1_0         3.1 MB  conda-forge
+#     jxrlib-1.1                 |       h8ffe710_2         620 KB  conda-forge
+#     libavif-0.11.1             |       h8f5c5bc_0         2.4 MB  conda-forge
+#     libzopfli-1.0.3            |       h0e60522_0         203 KB  conda-forge
+#     locket-1.0.0               |     pyhd8ed1ab_0           8 KB  conda-forge
+#     lz4-c-1.9.4                |       hcfcfb64_0         131 KB  conda-forge
+#     networkx-3.0               |     pyhd8ed1ab_0         1.4 MB  conda-forge
+#     partd-1.3.0                |     pyhd8ed1ab_0          18 KB  conda-forge
+#     scikit-image-0.19.3        |  py311hf63dbb6_2        11.0 MB  conda-forge
+#     snappy-1.1.10              |       hfb803bf_0          56 KB  conda-forge
+#     tifffile-2023.3.21         |     pyhd8ed1ab_0         170 KB  conda-forge
+#     toolz-0.12.0               |     pyhd8ed1ab_0          48 KB  conda-forge
+#     zfp-1.0.0                  |       h63175ca_3         277 KB  conda-forge
+#     zlib-ng-2.0.7              |       hcfcfb64_0          89 KB  conda-forge
+#     ------------------------------------------------------------
+#                                            Total:        35.4 MB
+# 
+# The following NEW packages will be INSTALLED:
+# 
+#   aom                conda-forge/win-64::aom-3.5.0-h63175ca_0
+#   blosc              conda-forge/win-64::blosc-1.21.3-hdccc3a2_0
+#   c-blosc2           conda-forge/win-64::c-blosc2-2.8.0-h183a6f4_0
+#   cfitsio            conda-forge/win-64::cfitsio-4.2.0-h9ebe7e4_0
+#   charls             conda-forge/win-64::charls-2.4.1-h1537add_0
+#   click              conda-forge/noarch::click-8.1.3-win_pyhd8ed1ab_2
+#   cloudpickle        conda-forge/noarch::cloudpickle-2.2.1-pyhd8ed1ab_0
+#   cytoolz            conda-forge/win-64::cytoolz-0.12.0-py311ha68e1ae_1
+#   dask-core          conda-forge/noarch::dask-core-2023.3.2-pyhd8ed1ab_0
+#   dav1d              conda-forge/win-64::dav1d-1.0.0-h8ffe710_1
+#   fsspec             conda-forge/noarch::fsspec-2023.3.0-pyhd8ed1ab_1
+#   giflib             conda-forge/win-64::giflib-5.2.1-h64bf75a_3
+#   imagecodecs        conda-forge/win-64::imagecodecs-2023.1.23-py311h2c9abbb_2
+#   imageio            conda-forge/noarch::imageio-2.27.0-pyh24c5eb1_0
+#   jxrlib             conda-forge/win-64::jxrlib-1.1-h8ffe710_2
+#   libavif            conda-forge/win-64::libavif-0.11.1-h8f5c5bc_0
+#   libzopfli          conda-forge/win-64::libzopfli-1.0.3-h0e60522_0
+#   locket             conda-forge/noarch::locket-1.0.0-pyhd8ed1ab_0
+#   lz4-c              conda-forge/win-64::lz4-c-1.9.4-hcfcfb64_0
+#   networkx           conda-forge/noarch::networkx-3.0-pyhd8ed1ab_0
+#   partd              conda-forge/noarch::partd-1.3.0-pyhd8ed1ab_0
+#   scikit-image       conda-forge/win-64::scikit-image-0.19.3-py311hf63dbb6_2
+#   snappy             conda-forge/win-64::snappy-1.1.10-hfb803bf_0
+#   tifffile           conda-forge/noarch::tifffile-2023.3.21-pyhd8ed1ab_0
+#   toolz              conda-forge/noarch::toolz-0.12.0-pyhd8ed1ab_0
+#   zfp                conda-forge/win-64::zfp-1.0.0-h63175ca_3
+#   zlib-ng            conda-forge/win-64::zlib-ng-2.0.7-hcfcfb64_0
+
+scikit-learn        # ✓ (conda install scikit-learn)
 
 
-
-
-
-# QtPy # solved for jupyter
-dill
-imageio
-scikit-image
-scikit-learn
-colorama        # ✓
-
-
-
-# distlib
-Babel
-GitPython
-Jinja2
-MarkupSafe
-Pillow
-PyLEMS
-# required to build PyQt5 locally using the host's Qt stack
-# PyQt-builder ; sys_platform == 'linux'
-# required to build PyQt5 locally using the host's Qt stack
-# Pyqt5-sip ; sys_platform == 'linux'
-# PyQt5 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
-SecretStorage
-airspeed
-anyio
-asttokens
-attrs
-base32hex
-bleach
-blis ; sys_platform == 'linux'
-cachetools
-catalogue
-certifi
-cffi
-chardet
-chronometry
-click
-cmasher
-cmocean
-colouration
-confection
-cryptography
-cymem
-cython
-debugpy
-descartes
-dill
-editdistance
-exceptiongroup
-executing
-filelock
-fonttools
-func-timeout
-fuzzywuzzy
-geographiclib
-geopy
-gitdb
-gnuplot_kernel
-graphviz
-# h5py
-huggingface-hub
-idna
-imageio
-imagesize
-importlib-metadata
-imreg-dft
-inflect
-# ipyparallel
-# ipython
-# ipywidgets
-isodate
-jaraco.classes
-jeepney
-joblib
-#jsonlib
-jsonschema
-jupyter
+dill                # ✓ (conda install dill)
+colorama            # ✓
+# 
 jupyter_cms
-jupyter_qtconsole_colorschemes
-jupyterlab
-jupyterlab-pygments
-jupyterlab-server
-jupyterlab-widgets
 jupyterthemes
-keyring
-kiwisolver
-langcodes
-language_tool_python
-lazy_loader
-lesscpy
 libNeuroML
-linguistics
-lxml
+gnuplot_kernel
 matlab_kernel
-matplotlib
-matplotlib-inline
-metakernel
-modelspec
-more-itertools
-murmurhash
-nbclassic
-nbclient
-nbconvert
-nbsphinx
-neo
-nest-asyncio
-networkx
-# neuron; sys_platform == "win32" # NOTE: does NOT work on windows; on linux, see install.sh for the option to build locally
-neuromllite
-nibabel
-nixio
-nodejs
-nose            
-notebook
-notebook_shim
-numpy           
-octave_kernel
-pandas
 pandas-flavor
-pathy
-patsy
-pkginfo
-platformdirs
-plotly
-plotnine
-preshed; sys_platform == "linux"
-prometheus-client
-prompt-toolkit
-psutil
-pylmeasure      # optional
-pymongo
-pyneuroml       # optional
-pyparsing
-#pyqt5-tools ; sys_platform == 'win32'
-pyqtgraph
-pytest
-python-magic
-pytz
-pywin32 ; sys_platform == 'win32'
-pyxdg
-ravenclaw
-rdflib
-readme-renderer
-recommonmark
-regex
-requests-toolbelt
-scikit-image
-scikit-learn
-scipy
-slytherin
-smart-open
-smmap
-sniffio
-spacy
-spacy-legacy
-spacy-loggers
-sphinx          
-sphinx_rtd_theme
-srsly
-stack-data
-sympy
-tables ; python_version >= '3.9.7'
-tabulate
-tenacity
-terminado
-testpath
-thinc
-tiffile
-tokenizers
-torch
-tqdm
-traitlets
-transformers
-twine
-txt
-typing_extensions
-viscm
-wasabi
-websocket-client
-widgetsnbextension
-winshell ; sys_platform == 'win32'
-xarray
-xyzservices
-zipp
+modelspec
+
+#
+graphviz
+
+
+
+
+# # QtPy # solved for jupyter
+# 
+# 
+# 
+# # distlib
+# # Babel
+# # GitPython
+# # Jinja2
+# # MarkupSafe
+# # PyLEMS
+# # required to build PyQt5 locally using the host's Qt stack
+# # PyQt-builder ; sys_platform == 'linux'
+# # required to build PyQt5 locally using the host's Qt stack
+# # Pyqt5-sip ; sys_platform == 'linux'
+# # PyQt5 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
+# SecretStorage
+# airspeed
+# anyio
+# asttokens
+# attrs
+# base32hex
+# bleach
+# blis ; sys_platform == 'linux'
+# cachetools
+# catalogue
+# certifi
+# cffi
+# chardet
+# chronometry
+# click
+# cmasher
+# # cmocean
+# colouration
+# confection
+# cryptography
+# cymem
+# cython
+# debugpy
+# descartes
+# # dill
+# # editdistance
+# exceptiongroup
+# executing
+# filelock
+# fonttools
+# func-timeout
+# fuzzywuzzy
+# geographiclib
+# geopy
+# gitdb
+# # h5py
+# huggingface-hub
+# idna
+# octave_kernel
+# imagesize
+# importlib-metadata
+# # imreg-dft
+# # inflect
+# # ipyparallel
+# # ipython
+# # ipywidgets
+# isodate
+# jaraco.classes
+# jeepney
+# joblib
+# #jsonlib
+# # jsonschema
+# # jupyter
+# jupyter_qtconsole_colorschemes
+# jupyterlab
+# jupyterlab-pygments
+# jupyterlab-server
+# jupyterlab-widgets
+# keyring
+# kiwisolver
+# langcodes
+# language_tool_python
+# lazy_loader
+# lesscpy
+# linguistics
+# lxml
+# # matplotlib
+# # matplotlib-inline
+# metakernel
+# more-itertools
+# murmurhash
+# nbclassic
+# nbclient
+# nbconvert
+# nbsphinx
+# # neo
+# # nest-asyncio
+# # networkx
+# # neuron; sys_platform == "win32" # NOTE: does NOT work on windows; on linux, see install.sh for the option to build locally
+# neuromllite
+# nibabel
+# nixio
+# nodejs
+# nose            
+# notebook
+# notebook_shim
+# # numpy           
+# # pandas
+# pathy
+# patsy
+# pkginfo
+# platformdirs
+# plotly
+# plotnine
+# preshed; sys_platform == "linux"
+# prometheus-client
+# prompt-toolkit
+# psutil
+# pylmeasure      # optional
+# tables ; python_version >= '3.9.7'
+# pymongo
+# pyneuroml       # optional
+# pyparsing
+# #pyqt5-tools ; sys_platform == 'win32'
+# # pyqtgraph
+# pytest
+# # # python-magic
+# # pytz
+# # pywin32 ; sys_platform == 'win32'
+# # pyxdg
+# ravenclaw
+# rdflib
+# readme-renderer
+# recommonmark
+# regex
+# requests-toolbelt
+# # scikit-image
+# # scikit-learn
+# # scipy
+# slytherin
+# smart-open
+# smmap
+# sniffio
+# spacy
+# spacy-legacy
+# spacy-loggers
+# sphinx          
+# sphinx_rtd_theme
+# srsly
+# stack-data
+# # sympy
+# tabulate
+# tenacity
+# terminado
+# testpath
+# thinc
+# tiffile
+# tokenizers
+# torch
+# tqdm
+# traitlets
+# transformers
+# twine
+# txt
+# typing_extensions
+# viscm
+# wasabi
+# websocket-client
+# widgetsnbextension
+# # winshell ; sys_platform == 'win32'
+# # xarray
+# # xyzservices
+# # zipp

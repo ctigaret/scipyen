@@ -14,20 +14,21 @@ import faulthandler
 
 if sys.platform == "win32" and sys.version_info.minor >= 9:
     if "CONDA_DEFAULT_ENV" not in os.environ:
-        import win32api
-        vigraimpex_mod = "vigraimpex"
-        path_to_vigraimpex = win32api.GetModuleFileName(win32api.LoadLibrary(vigraimpex_mod))
-        os.add_dll_directory(os.path.dirname(path_to_vigraimpex))
-        lib_environ = os.environ.get("LIB", "")
-        
-        os.environ["QT_API"] = "pyqt5"
-        
-        if len(lib_environ.strip()):
-            libdirs = lib_environ.split(os.pathsep)
-            for d in libdirs:
-                if len(d.strip()) and  os.path.isdir(d):
-                    os.add_dll_directory(d)
+        raise OSError("On windows platform, Scipyen must be run inside a conda environment")
+#         import win32api
+#         vigraimpex_mod = "vigraimpex"
+#         path_to_vigraimpex = win32api.GetModuleFileName(win32api.LoadLibrary(vigraimpex_mod))
+#         os.add_dll_directory(os.path.dirname(path_to_vigraimpex))
+#         lib_environ = os.environ.get("LIB", "")
+#         
+#         
+#         if len(lib_environ.strip()):
+#             libdirs = lib_environ.split(os.pathsep)
+#             for d in libdirs:
+#                 if len(d.strip()) and  os.path.isdir(d):
+#                     os.add_dll_directory(d)
             
+    os.environ["QT_API"] = "pyqt5"
                     
     # try:
     #     import breeze_resources
