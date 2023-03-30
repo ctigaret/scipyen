@@ -600,6 +600,8 @@ pingouin            # ✓ (conda install pingouin)
 #   statsmodels        conda-forge/win-64::statsmodels-0.13.5-py311h59ca53f_2
 # 
 
+
+
 qimage2ndarray  # ✓ (conda install qimage2ndarray)
 pyxdg           # ✓ (conda install pyxdg)
 # statsmodels -- see pingouin
@@ -615,6 +617,7 @@ pyabf           # ✓ (pip install pyabf) - no conda package, use upip
 imreg-dft       # ✓ (pip install imgreg-dft)
 nixio           # ✓ (pip install nixio)
 python-magic    # ✓ (pip install python-magic)
+researchpy      # ✓ (pip install researchpy)
 
 # Optional packages (conda)
 qdarkstyle ; sys_platform == 'win32'       # ✓ optional (conda install qdarkstyle)
@@ -770,7 +773,6 @@ readme-renderer
 recommonmark
 regex
 requests-toolbelt
-researchpy
 scikit-image
 scikit-learn
 scipy
