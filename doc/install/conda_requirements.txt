@@ -561,9 +561,48 @@ inflect         # ✓ (conda install inflect)
 #   urllib3            conda-forge/noarch::urllib3-1.26.15-pyhd8ed1ab_0
 #   win_inet_pton      conda-forge/noarch::win_inet_pton-1.1.0-pyhd8ed1ab_6
 
-seaborn
+seaborn         # ✓ (conda install seaborn)
+# The following packages will be downloaded:
+# 
+#     package                    |            build
+#     ---------------------------|-----------------
+#     patsy-0.5.3                |     pyhd8ed1ab_0         189 KB  conda-forge
+#     seaborn-0.12.2             |       hd8ed1ab_0           6 KB  conda-forge
+#     seaborn-base-0.12.2        |     pyhd8ed1ab_0         226 KB  conda-forge
+#     statsmodels-0.13.5         |  py311h59ca53f_2        11.9 MB  conda-forge
+#     ------------------------------------------------------------
+#                                            Total:        12.3 MB
+# 
+# The following NEW packages will be INSTALLED:
+# 
+#   patsy              conda-forge/noarch::patsy-0.5.3-pyhd8ed1ab_0
+#   seaborn            conda-forge/noarch::seaborn-0.12.2-hd8ed1ab_0
+#   seaborn-base       conda-forge/noarch::seaborn-base-0.12.2-pyhd8ed1ab_0
+#   statsmodels        conda-forge/win-64::statsmodels-0.13.5-py311h59ca53f_2
+
+pingouin            # ✓ (conda install pingouin)
+# The following packages will be downloaded:
+# 
+#     package                    |            build
+#     ---------------------------|-----------------
+#     patsy-0.5.3                |     pyhd8ed1ab_0         189 KB  conda-forge
+#     seaborn-0.12.2             |       hd8ed1ab_0           6 KB  conda-forge
+#     seaborn-base-0.12.2        |     pyhd8ed1ab_0         226 KB  conda-forge
+#     statsmodels-0.13.5         |  py311h59ca53f_2        11.9 MB  conda-forge
+#     ------------------------------------------------------------
+#                                            Total:        12.3 MB
+# 
+# The following NEW packages will be INSTALLED:
+# 
+#   patsy              conda-forge/noarch::patsy-0.5.3-pyhd8ed1ab_0
+#   seaborn            conda-forge/noarch::seaborn-0.12.2-hd8ed1ab_0
+#   seaborn-base       conda-forge/noarch::seaborn-base-0.12.2-pyhd8ed1ab_0
+#   statsmodels        conda-forge/win-64::statsmodels-0.13.5-py311h59ca53f_2
+# 
+
 qimage2ndarray  # ✓ (conda install qimage2ndarray)
 pyxdg           # ✓ (conda install pyxdg)
+# statsmodels -- see pingouin
 
 ### The following MUST be installed using pip (inside the CONDA environment), if
 # they are not available on current conda channels (at the time of installation).
@@ -706,7 +745,6 @@ pandas
 pandas-flavor
 pathy
 patsy
-pingouin
 pkginfo
 platformdirs
 plotly
@@ -747,7 +785,6 @@ sphinx
 sphinx_rtd_theme
 srsly
 stack-data
-statsmodels
 sympy
 tables ; python_version >= '3.9.7'
 tabulate
