@@ -10,7 +10,7 @@ import atexit, re, inspect, gc, io, traceback, platform
 import faulthandler
 #import cProfile
 
-has_breeze_resources_for_win32 = False
+# has_breeze_resources_for_win32 = False
 
 if sys.platform == "win32" and sys.version_info.minor >= 9:
     if "CONDA_DEFAULT_ENV" not in os.environ:
@@ -29,11 +29,11 @@ if sys.platform == "win32" and sys.version_info.minor >= 9:
                     os.add_dll_directory(d)
             
                     
-    try:
-        import breeze_resources
-        has_breeze_resources_for_win32 = True
-    except:
-        has_breeze_resources_for_win32 = False
+    # try:
+    #     import breeze_resources
+    #     has_breeze_resources_for_win32 = True
+    # except:
+    #     has_breeze_resources_for_win32 = False
 
         
     
@@ -120,11 +120,11 @@ def main():
         # avoid global menus - must be called AFTER we have an instance of app!
         # QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_DontUseNativeMenuBar)
         
-        if has_breeze_resources_for_win32:
-            file = QtCore.QFile(":/dark/stylesheet.qss")
-            file.open(QtCore.QFile.ReadOnly | QtCore.QFile.Text)
-            stream = QtCore.QTextStream(file)
-            app.setStyleSheet(stream.readAll())
+        # if has_breeze_resources_for_win32:
+        #     file = QtCore.QFile(":/dark/stylesheet.qss")
+        #     file.open(QtCore.QFile.ReadOnly | QtCore.QFile.Text)
+        #     stream = QtCore.QTextStream(file)
+        #     app.setStyleSheet(stream.readAll())
             
         
         # NOTE: 2021-08-17 10:05:20

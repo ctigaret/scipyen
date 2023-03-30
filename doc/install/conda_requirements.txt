@@ -600,7 +600,7 @@ pingouin            # ✓ (conda install pingouin)
 #   statsmodels        conda-forge/win-64::statsmodels-0.13.5-py311h59ca53f_2
 # 
 
-
+jupyter_qtconsole_colorschemes      # ✓ (conda install jupyter_qtconsole_colorschemes)
 
 qimage2ndarray  # ✓ (conda install qimage2ndarray)
 pyxdg           # ✓ (conda install pyxdg)
