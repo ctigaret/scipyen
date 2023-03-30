@@ -527,23 +527,30 @@ scipy       # ✓ (conda install matplotlib scipy)
 #   urllib3            conda-forge/noarch::urllib3-1.26.15-pyhd8ed1ab_0
 #   win_inet_pton      conda-forge/noarch::win_inet_pton-1.1.0-pyhd8ed1ab_6
 
-pyabf       # (conda install pyabf)
+confuse         # ✓ (conda install confuse)
+inflect         
+
+# the following MUST be installed using pip (inside the CONDA environment)
+pyabf       # ✓ (pip install pyabf) - no conda package, use upip
+imreg-dft   # ✓ (pip install imgreg-dft)
+
+# Optional packages
+qdarkstyle ; sys_platform == 'win32'       # ✓ optional (conda install qdarkstyle)
+# 
+bokeh
+python-magic
+pyxdg
 
 
 
 
 
-qdarkstyle ; sys_platform == 'win32'
 # QtPy # solved for jupyter
 dill
 imageio
 scikit-image
 scikit-learn
-imreg-dft
-python-magic
-pyxdg
 colorama        # ✓
-bokeh
 
 
 
@@ -578,7 +585,6 @@ cmasher
 cmocean
 colouration
 confection
-confuse
 cryptography
 cymem
 cython

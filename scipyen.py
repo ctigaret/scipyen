@@ -13,20 +13,22 @@ import faulthandler
 has_breeze_resources_for_win32 = False
 
 if sys.platform == "win32" and sys.version_info.minor >= 9:
-    import win32api
-    vigraimpex_mod = "vigraimpex"
-    path_to_vigraimpex = win32api.GetModuleFileName(win32api.LoadLibrary(vigraimpex_mod))
-    os.add_dll_directory(os.path.dirname(path_to_vigraimpex))
-    lib_environ = os.environ.get("LIB", "")
-    
-    os.environ["QT_API"] = "pyqt5"
-    
-    if len(lib_environ.strip()):
-        libdirs = lib_environ.split(os.pathsep)
-        for d in libdirs:
-            if len(d.strip()) and  os.path.isdir(d):
-                os.add_dll_directory(d)
-                
+    if "CONDA_DEFAULT_ENV" not in os.environ:
+        import win32api
+        vigraimpex_mod = "vigraimpex"
+        path_to_vigraimpex = win32api.GetModuleFileName(win32api.LoadLibrary(vigraimpex_mod))
+        os.add_dll_directory(os.path.dirname(path_to_vigraimpex))
+        lib_environ = os.environ.get("LIB", "")
+        
+        os.environ["QT_API"] = "pyqt5"
+        
+        if len(lib_environ.strip()):
+            libdirs = lib_environ.split(os.pathsep)
+            for d in libdirs:
+                if len(d.strip()) and  os.path.isdir(d):
+                    os.add_dll_directory(d)
+            
+                    
     try:
         import breeze_resources
         has_breeze_resources_for_win32 = True
