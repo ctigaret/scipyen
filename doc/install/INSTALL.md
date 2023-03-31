@@ -1,10 +1,20 @@
 # Scipyen installation
-
 Author: Cezar M. Tigaret <cezar.tigaret@gmail.com>
 
 Distributed under GNU GPL License v.3
 
 * * * 
+
+# Table of Contents
+1. [Introduction](#Introduction )
+2. [Installation on Linux](#linux-install)
+    1. [Preamble](#linux-preamble)
+    2. [Installation under a locally built python environment](#with-virtualenv)
+        1. [Usage of install.sh script](#install_sh-usage)
+    3. [Installation using Anaconda](#linux_anaconda)
+3. [Installation on Windows](#windows-install)
+
+# <a name=Introduction/>Introduction
 
 **NOTE:** If you read this, this means you already have a local clone of the 
 Scipyen repository.
@@ -23,9 +33,9 @@ The virtual environment can be created automatically using
 **WARNING:** 
 The Scipyen repository ***should be*** be located ***outside*** the virtual environment directory.
 
-# Installation on Linux
+# <a name=linux-install/>Installation on Linux
 
-## Preamble
+## <a name=linux-preamble/>Preamble
 
 By default, the `install.sh` script will create a local virtual python environment
 where it will
@@ -53,18 +63,17 @@ it is worth checking that they are available beforehand:
 
   • development tools: `cmake`, `make`, C++ compiler suite, assembler, etc., see below.
   
-## Installation under a locally built python environment.
+## <a name=with-virtualenv/>Installation under a locally built python environment
 **NOTE** This method offers the greatest flexibility including the 
 possibility to use `NEURON` simulation environment from within Scipyen.
 
-### Usage
+### <a name=install_sh-usage/>Usage of install.sh script
 
 Assuming Scipyen is cloned inside `${HOME}/scipyen` launch the script like this:
 
 ```bash
 sh ${HOME}/scipyen/doc/install/install.sh
 ```
-#### Script options
 * `--install_dir=DIR` - specifies a directory where the virtual environment will be created (default is `${HOME}`)
 * `--environment=NAME` - specifies a custom name for the virtual environment; (default is `scipyenv.x.y.z` where `x`, `y`, and `z` are the `python` interpreter version numbers"
 * `--with_neuron` - when present, will install neuron python from PyPI. See also:
@@ -204,10 +213,10 @@ These flags are `.pipdone`, `.pyqtdone`, `.vigradone`, and `.nrndone`.
 Should you want to re-run a (previously sucessful) step, just remove the 
 corresponding flag from the environment directory and call this script again.
 
-## Installation using Anaconda
+## <a name=linux_anaconda/>Installation using Anaconda
 To be written.
 
-# Installation on Windows
+# Installation on Windows<a name=windows-install></a>
 
 **NOTE:** Below, we assume the `scipyen` git repository clone and the `conda`
 environment are in two distinct directories on drive E:. Please adapt according
