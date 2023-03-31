@@ -1,13 +1,15 @@
-# About install.sh - Scipyen installation script for Linux
+# Scipyen installation
 
 Author: Cezar M. Tigaret <cezar.tigaret@gmail.com>
 
-Distributed under GNU GPL License v.2
+Distributed under GNU GPL License v.3
 
 * * * 
 
 **NOTE:** If you read this, this means you already have a local clone of the 
 Scipyen repository.
+
+# Installation on Linux
 
 ## Preamble
 
@@ -32,14 +34,19 @@ it is worth checking that they are available beforehand:
   • [`glow`](https://github.com/charmbracelet/glow) (to display [Markdown](https://daringfireball.net/projects/markdown/) documents on the console)
 
   • development tools: `cmake`, `make`, C++ compiler suite, assembler, etc., see below.
-## Usage
+  
+## Installation under a locally built python environment.
+**NOTE** This method offers the greatest flexibility including the 
+possibility to use `NEURON` simulation environment from within Scipyen.
+
+### Usage
 
 Assuming Scipyen is cloned inside `${HOME}/scipyen` launch the script like this:
 
 ```bash
 sh ${HOME}/scipyen/doc/install/install_test.sh
 ```
-### Script options
+#### Script options
 * `--install_dir=DIR` - specifies a directory where the virtual environment will be created (default is `${HOME}`)
 * `--environment=NAME` - specifies a custom name for the virtual environment; (default is `scipyenv.x.y.z` where `x`, `y`, and `z` are the `python` interpreter version numbers"
 * `--with_neuron` - when present, will install neuron python from PyPI. See also:
@@ -58,10 +65,10 @@ can be passed more than once.
 * `--about` shows this document on the console (requires `glow`).
     
     
-## Description
+### Description
 Scipyen requires third party software installed in a virtual `python` environment.
 
-### Needed Python packages
+#### Needed Python packages
 Some of this is available as Python packages on [PyPI](https://pypi.org/) - hence installable via `pip`. 
 The required packages are listed in the file `pip_requirements.txt` in this directory.
 
@@ -72,12 +79,12 @@ A better (as in more explicit) solution is to call (see [pip user guide](https:/
 ```bash
 python3 -m pip <... pip commands & options ...>
 ```
-### Software that may have to be built locally
+#### Software built locally
 Other third party software may not be available on [PyPI](https://pypi.org/), or needs to be built
 locally (inside the virtual environment), provided that dependencies are 
 installed on the host computer:
 
-#### [PyQt5](https://www.riverbankcomputing.com/software/pyqt/) - Python bindings for `Qt5` toolkit
+##### [PyQt5](https://www.riverbankcomputing.com/software/pyqt/) - Python bindings for `Qt5` toolkit
 These are necessary for `Scipyen`'s GUI.
 
 * On Windows, this can be installed via `pip` directly from [the PyPI repository](https://pypi.org/project/PyQt5/) by calling
@@ -115,7 +122,7 @@ a file that is incomplete at that particular stage in the build).
 If this happens, then pass `--jobs=N` option to this script with `N` a small number 
 (half the number of cores is a good guess) or even `0`.
 
-#### [VIGRA](http://ukoethe.github.io/vigra/) - C++ library for computer vision
+##### [VIGRA](http://ukoethe.github.io/vigra/) - C++ library for computer vision
 This library privides `python` bindings (`vigranumpy`) that are used by `Scipyen` code for image analysis and processing.
 
 However, there are no `vigranumpy` packages available as of this time 
@@ -134,7 +141,7 @@ which include [`cmake`](https://cmake.org/), [`boost C++`](https://www.boost.org
 The script clones the latest [`vigra github`](http://ukoethe.github.io/vigra/) 
 repository and builds it locally.
 
-#### [NEURON](https://neuron.yale.edu/neuron/) simulation environment.
+##### [NEURON](https://neuron.yale.edu/neuron/) simulation environment.
 The `python` interface in recent versions of [NEURON](https://neuron.yale.edu/neuron/)
 enables Scipyen to launch and operate with `NEURON`. This interoperability 
 is still at an incipient stage, therefore `NEURON` is **NOT** installed by default.
@@ -149,7 +156,7 @@ package from its [PyPI repository](https://pypi.org/project/NEURON/).
     - When built locally, `NEURON` can be configured to use [The BlueBrain Project's](https://github.com/BlueBrain) [`coreneuron`](https://github.com/BlueBrain/CoreNeuron).
     
 
-## Environment customization
+### Environment customization
 If you want to add or remove packages manually, you can do so using `pip`; if 
 you think these changes are worth propagating to the main scipyen repository
 then please inform the main author ([Cezar Tigaret](tigaretc@cardiff.ac.uk)). 
@@ -159,7 +166,7 @@ or removal should be done **with the python virtual environment activated**. The
 author(s) cannot advise on possible troubleshooting when packages are installed
 outside the virtual environment.
 
-## What the script does
+### What the script does
 The script performs the following steps:
 
 1. Creates a virtual environment if necessary, then activates it
@@ -179,6 +186,36 @@ These flags are `.pipdone`, `.pyqtdone`, `.vigradone`, and `.nrndone`.
 Should you want to re-run a (previously sucessful) step, just remove the 
 corresponding flag from the environment directory and call this script again.
 
+## Installation using Anaconda
+To be written.
 
-2023-03-23
+# Installation on Windows
+
+**NOTE:** You need about 3 GiB disk space for the python environment
+(`conda`). Below, we assume the `scipyen` git repository clone and the `conda`
+environment are in two distinct directories on drive E:. Please adapt according
+to your situation, but **keep these directories separate**.
+
+
+1. Install Anaconda (conda)
+2. Launch Anaconda Command Prompt and create a conda environment e.g.,
+```
+conda create -p e:\scipyenv_conda
+```
+3. Activate the environment, install packages listed in `conda_requirements_win.txt`, then install packages listed in `pip_requirements_win.txt`
+**NOTE:** Some of these packages are *optional*; use a text editor to
+modify these files by commenting out unwanted packages i.e., place a
+hash `#` at the beginning of the lines
+```
+conda activate e:\scipyenv_conda
+conda install --file e:\scipyenv\doc\install\conda_requirements_win.txt
+pip install -r pip_requirements_win.txt
+```
+4. Withe the environment activated, launch `scipyen`
+```
+python e:\scipyen\scipyen.py
+```
+5. Enjoy.
+
+2023-03-31
 
