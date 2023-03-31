@@ -616,11 +616,11 @@ pyxdg           # ✓ (conda install pyxdg)
 # and
 # https://stackoverflow.com/questions/29286624/how-to-install-pypi-packages-using-anaconda-conda-command
 #
-pyabf           # ✓ (pip install pyabf) - no conda package, use upip
-imreg-dft       # ✓ (pip install imgreg-dft)
-nixio           # ✓ (pip install nixio)
-python-magic    # ✓ (pip install python-magic)
-researchpy      # ✓ (pip install researchpy)
+#pyabf           # ✓ (pip install pyabf) - no conda package, use upip
+#imreg-dft       # ✓ (pip install imgreg-dft)
+#nixio           # ✓ (pip install nixio)
+#python-magic    # ✓ (pip install python-magic)
+#researchpy      # ✓ (pip install researchpy)
 
 #### OPTIONAL packages
 qdarkstyle      # ✓ optional (conda install qdarkstyle)
