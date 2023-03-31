@@ -11,5 +11,6 @@ call "conda create --prefix %env_name%"
 call "conda install --prefix %env_name% --file %conda_reqs%"
 call "conda activate %env_name%"
 call "pip install -r %pip_reqs%"
+
 :eof
 endlocal

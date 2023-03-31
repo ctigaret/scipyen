@@ -9,18 +9,36 @@ Distributed under GNU GPL License v.3
 **NOTE:** If you read this, this means you already have a local clone of the 
 Scipyen repository.
 
+Scipyen requires [Python](https://www.python.org/) >= 3.9 and is meant to run 
+inside a virtual python environment. The recommended tools to create this are
+* [`virtualenv`](https://pypi.org/project/virtualenv/) for Linux
+* `conda` (from [Anaconda](https://www.anaconda.com/)) for Windows
+
+The virtual environment can be created automatically using
+* `install.sh` on Linux
+* `install.bat` on Windows
+
+**NOTE:** You will need about 3 GiB free disk space for the python environment.
+
+**WARNING:** 
+The Scipyen repository ***should be*** be located ***outside*** the virtual environment directory.
+
 # Installation on Linux
 
 ## Preamble
 
-Scipyen requires Python >= 3.9 and is meant to run inside a virtual python 
-environment. The `virtualenv` facility is recommended.
+By default, the `install.sh` script will create a local virtual python environment
+where it will
+* install required python packages from the [Python Package Index](https://pypi.org/)
+* build required C++-based libraries
+    - PyQt5
+    - boost
+    - vigra
+    - (optionally) NEURON
+    
+The build process can be configured with command line switched passed to the script (see below).
 
-This script will create the virtual environment and install any required third
-party software INSIDE the virtual environment. 
-
-**WARNING:** 
-Scipyen repository ***SHOULD NOT*** be stored inside the virtual environment directory!
+In the future, the script will allow the alternative use of `conda` on Linux also.
 
 **NOTE:**
 The script itself requires a few other command line tools - these are 
@@ -44,7 +62,7 @@ possibility to use `NEURON` simulation environment from within Scipyen.
 Assuming Scipyen is cloned inside `${HOME}/scipyen` launch the script like this:
 
 ```bash
-sh ${HOME}/scipyen/doc/install/install_test.sh
+sh ${HOME}/scipyen/doc/install/install.sh
 ```
 #### Script options
 * `--install_dir=DIR` - specifies a directory where the virtual environment will be created (default is `${HOME}`)
@@ -191,8 +209,7 @@ To be written.
 
 # Installation on Windows
 
-**NOTE:** You need about 3 GiB disk space for the python environment
-(`conda`). Below, we assume the `scipyen` git repository clone and the `conda`
+**NOTE:** Below, we assume the `scipyen` git repository clone and the `conda`
 environment are in two distinct directories on drive E:. Please adapt according
 to your situation, but **keep these directories separate**.
 
