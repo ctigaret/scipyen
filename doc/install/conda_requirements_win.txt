@@ -623,7 +623,7 @@ python-magic    # ✓ (pip install python-magic)
 researchpy      # ✓ (pip install researchpy)
 
 #### OPTIONAL packages
-qdarkstyle ; sys_platform == 'win32'       # ✓ optional (conda install qdarkstyle)
+qdarkstyle      # ✓ optional (conda install qdarkstyle)
 bokeh           # ✓ (conda install bokeh)
 # The following packages will be downloaded:
 # 
