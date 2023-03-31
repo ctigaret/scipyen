@@ -338,6 +338,10 @@ conda-forge::vigra      # ✓ (conda install conda-forge::vigra) !!!
 # NOTE: on some machines it may be best to install manually:
 # conda install -c conda-forge vigra
 # WARNING: vigra conda pacjages may not yet be available for the latest/greatest
+# Python version installed on the machine; in this case, search vigra on 
+# https://anaconda.org and take note of the python version that is required for
+# the available vigra package in conda. Then, create an environment using THAT
+# specific python version and try again.
 # The following packages will be downloaded:
 # 
 #     package                    |            build
