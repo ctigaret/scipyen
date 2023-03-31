@@ -10,7 +10,7 @@ if [%env_name%] equ [] set env_name=%default_env_name%
 echo %env_name%
 call conda create --prefix %env_name%
 call conda activate %env_name%
-call conda --add conda-forge
+call conda config --add channels conda-forge
 call conda install --prefix %env_name% -y --file %conda_reqs%
 rem  call conda install --previx %env_name% -y jupyter
 rem  call conda install --previx %env_name% -y jupyter_cms
