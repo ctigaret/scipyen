@@ -9,6 +9,8 @@ set /P env_name=Enter the full path name of the new environment (no spaces, plea
 if [%env_name%] equ [] set env_name=%default_env_name%
 echo %env_name%
 call conda create --prefix %env_name%
+call conda activate %env_name%
+call conda --add conda-forge
 call conda install --prefix %env_name% -y --file %conda_reqs%
 rem  call conda install --previx %env_name% -y jupyter
 rem  call conda install --previx %env_name% -y jupyter_cms
@@ -44,7 +46,6 @@ rem  call conda install --previx %env_name% -y octave-kernel
 
 
 
-call conda activate %env_name%
 call pip install -r %pip_reqs%
 
 rem  :eof

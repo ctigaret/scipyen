@@ -431,7 +431,7 @@ sympy           # ✓ (conda install sympy)
 #   mpmath             conda-forge/noarch::mpmath-1.3.0-pyhd8ed1ab_0
 #   sympy              conda-forge/noarch::sympy-1.11.1-pyh04b8f61_3
 
-quantities      # ✓ (conda install quantities)    
+conda-forge::quantities      # ✓ (conda install quantities)    
 python-neo      # ✓ (conda install python-neo → neo electrophysiology)
 cmocean         # ✓ (conda install cmocean)
 # The following packages will be downloaded:
