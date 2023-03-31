@@ -382,7 +382,7 @@ conda-forge::vigra      # ✓ (conda install conda-forge::vigra) !!!
 #   openexr            conda-forge/win-64::openexr-3.1.7-h52b6e62_0
 #   vigra              conda-forge/win-64::vigra-1.11.1-py311h13abfac_1041
 
-PyWavelets      # ✓ (conda install pyqtgraph)
+PyWavelets      # ✓ (conda install PyWavelets)
 
 h5py            # ✓ (conda install h5py)
 # The following packages will be downloaded:
