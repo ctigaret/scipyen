@@ -1,13 +1,16 @@
-# trying installation under anaconda for windows
-
-
-# NOTE as of 2021-10-12 11:59:52 might have to compile from source if using Python >= 3.9.7
-# also see nrn/docs/docs_requirements.txt, reproduced below after excluding 
-# linguistics
-# packages already listed above
-#wheel
-
-jupyter     # (conda install jupyter)✓ -- also installs the following:
+#### Package depedencies for running Scipyen under windows, inside a conda environment
+# Checkmarks (✓) indicate success on my own machine (followed by the comand used 
+# to install individual packes)
+# NOTE 1: Each package also installs its own depedencies (shown below each package
+# where available, but commented out so that `conda install` does not pull them 
+# again)
+# NOTE 2: Some packages cannot be found on the default conda channels; these will
+# have to be installed via pip -- see pip_requirements_win.txt
+# NOTE 3: Some packages below are NOT required to run Scipyen, hence marked as
+# OPTIONAL
+#
+# MANDATORY packages
+jupyter     # ✓ (conda install jupyter)
 # The following packages will be downloaded:
 # 
 #     package                    |            build
@@ -619,7 +622,7 @@ nixio           # ✓ (pip install nixio)
 python-magic    # ✓ (pip install python-magic)
 researchpy      # ✓ (pip install researchpy)
 
-### The following packages are OPTIONAL
+#### OPTIONAL packages
 qdarkstyle ; sys_platform == 'win32'       # ✓ optional (conda install qdarkstyle)
 bokeh           # ✓ (conda install bokeh)
 # The following packages will be downloaded:
@@ -717,11 +720,91 @@ graphviz            # ✓ (conda iunstall graphviz)
 #   graphviz           conda-forge/win-64::graphviz-2.38.0-h6538335_1011
 
 dill                # ✓ (conda install dill)
+
+jupyter_cms         # ✓ (conda install jupyter_cms)
+# The following packages will be downloaded:
 # 
-jupyter_cms
-jupyterthemes
-libNeuroML
-gnuplot_kernel
-matlab_kernel
-pandas-flavor
-modelspec
+#     package                    |            build
+#     ---------------------------|-----------------
+#     jupyter_cms-0.7.0          |py311h1ea47a8_1004          65 KB  conda-forge
+#     whoosh-2.7.4               |  py311h1ea47a8_7         904 KB  conda-forge
+#     ------------------------------------------------------------
+#                                            Total:         969 KB
+# 
+# The following NEW packages will be INSTALLED:
+# 
+#   jupyter_cms        conda-forge/win-64::jupyter_cms-0.7.0-py311h1ea47a8_1004
+#   whoosh             conda-forge/win-64::whoosh-2.7.4-py311h1ea47a8_7
+#
+# To initialize this nbextension in the browser every time the notebook (or other app) loads:
+# 
+#       jupyter nbextension enable jupyter_cms --py --sys-prefix
+
+jupyterthemes       # ✓ (conda install jupyterthemes)
+# The following packages will be downloaded:
+# 
+#     package                    |            build
+#     ---------------------------|-----------------
+#     jupyterthemes-0.20.0       |             py_1         6.1 MB  conda-forge
+#     lesscpy-0.15.1             |     pyhd8ed1ab_0          39 KB  conda-forge
+#     ------------------------------------------------------------
+#                                            Total:         6.1 MB
+# 
+# The following NEW packages will be INSTALLED:
+# 
+#   jupyterthemes      conda-forge/noarch::jupyterthemes-0.20.0-py_1
+#   lesscpy            conda-forge/noarch::lesscpy-0.15.1-pyhd8ed1ab_0
+# 
+libNeuroML          # ✓ (conda install libNeuroML)
+# The following packages will be downloaded:
+# 
+#     package                    |            build
+#     ---------------------------|-----------------
+#     dnspython-2.3.0            |     pyhd8ed1ab_0         152 KB  conda-forge
+#     jsonpickle-1.5.1           |     pyhd8ed1ab_0          32 KB  conda-forge
+#     libneuroml-0.3.1           |     pyh6c4a22f_0         164 KB  conda-forge
+#     libxslt-1.1.37             |       h0192164_0         505 KB  conda-forge
+#     lxml-4.9.2                 |  py311h5942461_0         1.0 MB  conda-forge
+#     numexpr-2.8.3              |mkl_py311hfb0f5fd_1         152 KB  conda-forge
+#     pymongo-4.3.3              |  py311h12c1d0e_0         1.3 MB  conda-forge
+#     pytables-3.7.0             |  py311h6e06090_4         1.7 MB  conda-forge
+#     ------------------------------------------------------------
+#                                            Total:         4.9 MB
+# 
+# The following NEW packages will be INSTALLED:
+# 
+#   dnspython          conda-forge/noarch::dnspython-2.3.0-pyhd8ed1ab_0
+#   jsonpickle         conda-forge/noarch::jsonpickle-1.5.1-pyhd8ed1ab_0
+#   libneuroml         conda-forge/noarch::libneuroml-0.3.1-pyh6c4a22f_0
+#   libxslt            conda-forge/win-64::libxslt-1.1.37-h0192164_0
+#   lxml               conda-forge/win-64::lxml-4.9.2-py311h5942461_0
+#   numexpr            conda-forge/win-64::numexpr-2.8.3-mkl_py311hfb0f5fd_1
+#   pymongo            conda-forge/win-64::pymongo-4.3.3-py311h12c1d0e_0
+#   pytables           conda-forge/win-64::pytables-3.7.0-py311h6e06090_4
+
+matlab_kernel       # ✓ (conda install matlab_kernel)
+# The following packages will be downloaded:
+# 
+#     package                    |            build
+#     ---------------------------|-----------------
+#     ipyparallel-8.5.1          |     pyhd8ed1ab_0         203 KB  conda-forge
+#     matlab_kernel-0.17.1       |  py311h1ea47a8_2          21 KB  conda-forge
+#     metakernel-0.29.4          |     pyhd8ed1ab_0         182 KB  conda-forge
+#     pexpect-4.8.0              |     pyh1a96a4e_2          48 KB  conda-forge
+#     portalocker-2.7.0          |  py311h1ea47a8_0          38 KB  conda-forge
+#     ptyprocess-0.7.0           |     pyhd3deb0d_0          16 KB  conda-forge
+#     tqdm-4.65.0                |     pyhd8ed1ab_1          86 KB  conda-forge
+#     ------------------------------------------------------------
+#                                            Total:         594 KB
+# 
+# The following NEW packages will be INSTALLED:
+# 
+#   ipyparallel        conda-forge/noarch::ipyparallel-8.5.1-pyhd8ed1ab_0
+#   matlab_kernel      conda-forge/win-64::matlab_kernel-0.17.1-py311h1ea47a8_2
+#   metakernel         conda-forge/noarch::metakernel-0.29.4-pyhd8ed1ab_0
+#   pexpect            conda-forge/noarch::pexpect-4.8.0-pyh1a96a4e_2
+#   portalocker        conda-forge/win-64::portalocker-2.7.0-py311h1ea47a8_0
+#   ptyprocess         conda-forge/noarch::ptyprocess-0.7.0-pyhd3deb0d_0
+#   tqdm               conda-forge/noarch::tqdm-4.65.0-pyhd8ed1ab_1
+
+octave-kernel       #
