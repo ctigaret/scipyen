@@ -44,6 +44,11 @@ The following 3<sup>rd</sup> party libraries are **necessary**:
 * pyqtgraph - for the GUI
 * jupyter and jupyer qtconsole - for the GUI console
 
+## Author:
+Cezar M. Tigaret <cezar.tigaret@gmail.com>
+
+Distributed under [GNU General Public License v.3.0 (GPLv3)](https://www.gnu.org/licenses/gpl-3.0.en.html)
+
 
 <a name=Scipyen_screenshot> ![Scipyen Screenshot](doc/ScipyenScreenshot1.png)</a>
 Scipyen session with:
@@ -53,11 +58,6 @@ Scipyen session with:
 3. The script manager
 4. Dictionary viewer (DataViewer_0)
 5. Electrophysiology data viewer (SignalViewer_0)
-
-## Author:
-Cezar M. Tigaret <cezar.tigaret@gmail.com>
-
-Distributed under [GNU General Public License v.3.0 (GPLv3)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 
 
 
