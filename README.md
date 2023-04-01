@@ -1,10 +1,10 @@
 # Welcome to Scipyen
 
 Scipyen (**Sci**entific **py**thon **e**nvironment for **n**euroscience) is an
-open-source python environment for analysis of electrophysiology and 
-microscopy imaging data. 
+open-source environment for the analysis of electrophysiology and 
+microscopy imaging data using Python programming language. 
 
-Scipyen provides a Python language-based framework, similar to an Integrated 
+Scipyen provides a framework similar to an Integrated 
 Development Environment (IDE)[<sup>1</sup>](#NOTE_1), where the user creates their own data 
 analysis workflows or pipelines according to their need. 
 
@@ -38,7 +38,7 @@ Scipyen session with:
 and [Eric](https://www.spyder-ide.org/) for Python programming with a wider purpose.
 Also, see [GNU Octave](https://octave.org/), [Scilab](https://www.scilab.org/),
 [Matlab](https://www.mathworks.com/products/matlab.html) 
-and [Sage](https://www.sagemath.org/) for scientific programming environments 'outside' the Python language universe.
+and [Sage](https://www.sagemath.org/) for scientific programming environments 'outside' the Python universe.
 
 <a name=NOTE_2>2.</a> Scipyen does contain some example analyses forkflows e.g. 
 for mEPSC analysis, action potential analysis, LTP, and two-photon line scanning 
