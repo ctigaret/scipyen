@@ -54,6 +54,13 @@ Scipyen session with:
 4. Dictionary viewer (DataViewer_0)
 5. Electrophysiology data viewer (SignalViewer_0)
 
+## Author:
+Cezar M. Tigaret <cezar.tigaret@gmail.com>
+
+Distributed under [GNU General Public License v.3.0 (GPLv3)](https://www.gnu.org/licenses/gpl-3.0.en.html)
+
+
+
 * * * 
 ###### Footnotes:
 <a name=NOTE_1></a>[1]: See [Spyder](https://www.spyder-ide.org/) for a comprehensive scientific python environment
