@@ -189,31 +189,28 @@ outside the virtual environment.
 To be written.
 
 # <a name=windows-install></a>Installation on Windows
-
+## Create a conda virtual environment
 **NOTE:** Below, we assume the `scipyen` git repository clone and the `conda`
 environment are in two distinct directories on drive E:. Please adapt according
 to your situation, but **keep these directories separate**.
 
 
 1. Install Anaconda (conda)
-2. Launch Anaconda Command Prompt and create a conda environment e.g.,
+2. Launch Anaconda Command Prompt and run the `scipyen\doc\install.bat` script.
+
+For example:
 ```
-conda create -p e:\scipyenv_conda
+e:\scipyen\doc\install\install.bat
 ```
-3. Activate the environment, install packages listed in `conda_requirements_win.txt`, then install packages listed in `pip_requirements_win.txt`
-**NOTE:** Some of these packages are *optional*; use a text editor to
-modify these files by commenting out unwanted packages i.e., place a
-hash `#` at the beginning of the lines
-```
-conda activate e:\scipyenv_conda
-conda install --file e:\scipyenv\doc\install\conda_requirements_win.txt
-pip install -r pip_requirements_win.txt
-```
-4. Withe the environment activated, launch `scipyen`
+
+## Run Scipyen
+1. Open Anaconda Prompt
+2. Activate the environment created above
+3. With the the environment activated, launch `scipyen`
 ```
 python e:\scipyen\scipyen.py
 ```
-5. Enjoy.
+
 
 2023-03-31
 
