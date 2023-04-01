@@ -26,13 +26,13 @@ mechanism to run your own Python scripts.
 ## <a name=use_virtual_environment></a>Getting started
 Scipyen should be used inside a [virtual Python environment](https://www.google.com/search?q=virtual+python+environment) which allows the local installation of 3<sup>rd</sup> party Python packages without interfering with the host computer. 
 
-Before using Scipyen, you need to create a virtual python environment, see [`doc/install/INSTALL.md`](doc/install/INSTALL.md) for details.
+Before using Scipyen, follow these steps:
 
-Then clone this repository then simply run the `scipyen.py` script located
-in the top `scipyen` directory, e.g.:
-```python
-python ~/scipyen/scipyen.py
-```
+1. Clone the Scipyenv repository:
+    ```
+    git clone github.com/ctigaret/scipyen.git
+    ```
+2. Create a virtual python environment, see [`doc/install/INSTALL.md`](doc/install/INSTALL.md) for details.
 
 The following 3<sup>rd</sup> party libraries are **necessary**:
 
@@ -41,6 +41,14 @@ The following 3<sup>rd</sup> party libraries are **necessary**:
 * pyqt5 - for the GUI
 * pyqtgraph - for the GUI
 * jupyter and jupyer qtconsole - for the GUI console
+
+
+3. Activate the virtual environment then simply run the `scipyen.py` script located
+in the top `scipyen` directory, e.g.:
+```python
+python ~/scipyen/scipyen.py
+```
+
 
 ## Author:
 Cezar M. Tigaret <cezar.tigaret@gmail.com>, <tigaretc@cardiff.ac.uk>
