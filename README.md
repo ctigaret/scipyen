@@ -22,7 +22,7 @@ mechanism to run your own Python scripts.
     - script manager[<sup>9</sup>](#Note_9)
 * A Python console[<sup>10</sup>](#NOTE_10)
 * Interaction with external python processes (including jupyter notebooks) via an "External console"
-* An extensible system for data plotting (via matplotlib, seaborn, pyqtgraph)<sup>11</sup>(#NOTE_11).
+* A system for data plotting (via [matplotlib](https://matplotlib.org/), [seaborn](https://seaborn.pydata.org/), [pyqtgraph](https://www.pyqtgraph.org/)) which can be extended<sup>11</sup>(#NOTE_11).
 
 
 <a name=Scipyen_screenshot> ![Scipyen Screenshot](doc/ScipyenScreenshot1.png)</a>
@@ -69,4 +69,4 @@ created, modified, or removed. The items in the viewer are actionable via a cont
 
 <a name=NOTE_10>10.</a> Scipyen's console is based on [jupyter qtconsole](https://qtconsole.readthedocs.io/en/stable/index.html), and gives access to the "user workspace"[<sup>7</sup>](#NOTE_7) and various modules (either part of Scipyen, or installed in your Python environment). To keep things "clean", the workspace viewer shows *only* the variables created since the start of the session.
 
-<a name=NOTE_11>11.</a> For more extensive data plotting applications see [Veusz](https://veusz.github.io/), [SciDaVis](https://scidavis.sourceforge.net/), [LabPlot2](https://labplot.kde.org/), [XmGrace](https://plasma-gate.weizmann.ac.il/Grace/), and not least the venerable [GNU Plot](http://www.gnuplot.info/), in addition to a galaxy of [Python-based data visualization frameworks] (https://www.google.com/search?q=data+visualization+in+python).
+<a name=NOTE_11>11.</a> For more extensive data plotting applications see [Veusz](https://veusz.github.io/), [SciDaVis](https://scidavis.sourceforge.net/), [LabPlot2](https://labplot.kde.org/), [XmGrace](https://plasma-gate.weizmann.ac.il/Grace/), and not least the venerable [GNU Plot](http://www.gnuplot.info/), in addition to a galaxy of [Python-based data visualization frameworks](https://www.google.com/search?q=data+visualization+in+python).
