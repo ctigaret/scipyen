@@ -74,10 +74,8 @@ Also, see [GNU Octave](https://octave.org/), [Scilab](https://www.scilab.org/),
 [Matlab](https://www.mathworks.com/products/matlab.html) 
 and [Sage](https://www.sagemath.org/) for scientific programming environments 'outside' the Python universe.
 
-[^2]: Scipyen does contain some example analyses forkflows e.g. 
-for mEPSC analysis, action potential analysis, LTP, and two-photon line scanning 
-for fluorescence Ca^2+^ imaging. These workflows are specific to the author's lab 
-environment and they are in continuous development.
+[^2]: Scipyen does contain some example analyses workflows e.g. for mEPSC analysis, action potential analysis, LTP, and two-photon line scanning 
+for fluorescence Ca^2+^ imaging. These workflows are specific to the author's lab environment and they are in continuous development.
 
 [^3]: Electrophysiology data is represented using [NeuralEnsemble](https://github.com/NeuralEnsemble)'s python [neo](https://github.com/NeuralEnsemble/python-neo) package.
 
@@ -86,22 +84,17 @@ open source, software for image analysis see, for example, [ImageJ/Fiji](https:/
 
 [^5]: DataFrame objects from Python [pandas](https://pandas.pydata.org/) package and Matrices.
 
-[^6]: This is by design. Scipyen's author tries hard to avoid 
-[re-inventing the wheel](https://en.wikipedia.org/wiki/Reinventing_the_wheel), and therefore Scipyen has no functionality to create/delete files and directories, other than saving data objects to the disk. Scipyen is intended to be used in a [Desktop 
-environment](https://en.wikipedia.org/wiki/Desktop_environment) with [tools](https://en.wikipedia.org/wiki/File_manager) to navigate and modify the file system, and gives the possibility to open the current working directory in
-a desktop [tool](https://en.wikipedia.org/wiki/File_manager) via a context menu.
+[^6]: This is by design. Scipyen's author tries hard to avoid [re-inventing the wheel](https://en.wikipedia.org/wiki/Reinventing_the_wheel), and therefore Scipyen has no functionality to create/delete files and directories, other than saving data objects to the disk. Scipyen is intended to be used in a [Desktop environment](https://en.wikipedia.org/wiki/Desktop_environment) with [tools](https://en.wikipedia.org/wiki/File_manager) to navigate and modify the file system, and gives the possibility to open the current working directory in a desktop [tool](https://en.wikipedia.org/wiki/File_manager) via a context menu.
 
-[^7]: Provides access to variables created during a session, including
-instances of data type-specific viewers, and updates itself whenever variables are
-created, modified, or removed. The items in the viewer are actionable via a context menu.
+[^7]: Provides access to variables created during a session, including instances of data type-specific viewers, and updates itself whenever variables are created, modified, or removed. The items in the viewer are actionable via a context menu.
 
 [^8]: Commands are grouped by session, and can be replayed by double clicking, dragging into the console, or copy/pasted in a text editor to create scripts.
 
-[^9]: Scipyen does not provide its own script editor, but script can be edited in any suitable editor
+[^9]: Scipyen does not provide its own script editor, but scripts can be edited in any suitable editor.
 
 [^10]: Scipyen's console is based on [jupyter qtconsole](https://qtconsole.readthedocs.io/en/stable/index.html), and gives access to the "user workspace"[^7] and various modules (either part of Scipyen, or installed in your Python environment). To keep things "clean", the workspace viewer shows *only* the variables created since the start of the session.
 
-[^11]: For more extensive data plotting applications see [Veusz](https://veusz.github.io/), [SciDaVis](https://scidavis.sourceforge.net/), [LabPlot2](https://labplot.kde.org/), [XmGrace](https://plasma-gate.weizmann.ac.il/Grace/), and not least the venerable [GNU Plot](http://www.gnuplot.info/), in addition to a galaxy of [Python-based data visualization frameworks](https://www.google.com/search?q=data+visualization+in+python). Python-based visualization frameworks can be used from within Scipyen's console as long as they provide modules and extensions available to Scipyen's python environment (this typcially required their installation (sinside* the environment in which Scuipyen is used).
+[^11]: For more extensive data plotting applications see [Veusz](https://veusz.github.io/), [SciDaVis](https://scidavis.sourceforge.net/), [LabPlot2](https://labplot.kde.org/), [XmGrace](https://plasma-gate.weizmann.ac.il/Grace/), and not least the venerable [GNU Plot](http://www.gnuplot.info/), in addition to a galaxy of [Python-based data visualization frameworks](https://www.google.com/search?q=data+visualization+in+python). Python-based visualization frameworks can be used from within Scipyen's console as long as they provide modules and extensions available to Scipyen's python environment (this typcially required their installation (sinside* the environment in which Scipyen is used).
 
 [^12]: The Script manager offers a flexible collection of python scripts to be readily available across sessions. Following the principle of [not reinventing the wheel](https://en.wikipedia.org/wiki/Reinventing_the_wheel)[^6], Scipyen **does not provide a code editor** for Python. While *any* text editor can be used, there are several powerful open source editors [available](https://en.wikipedia.org/wiki/List_of_text_editors) e.g., [Kate](https://kate-editor.org/), [vim](https://www.vim.org/), [GNU Emacs](https://www.gnu.org/software/emacs/), [NEdit (the Nirvana Editor)](https://sourceforge.net/projects/nedit/files/nedit-source/), [Atom](https://github.com/atom/atom), to name just a few.
 
