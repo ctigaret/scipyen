@@ -22,11 +22,11 @@ vigra
 qimage2ndarray
 scikit-image 
 scikit-learn
+pyxdg
 pillow 
 imageio
-pyxdg
-bokeh
 # --- optional
+bokeh
 graphviz
 libNeuroML
 matlab_kernel
@@ -37,6 +37,7 @@ nixio
 imreg-dft
 python-magic
 # --- optional
-researchpy
 modelspec
+researchpy
 gnuplot_kernel
+neuron
