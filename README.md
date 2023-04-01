@@ -23,7 +23,7 @@ mechanism to run your own Python scripts.
 * A Python console[<sup>10</sup>](#NOTE_10)
 * Interaction with external python processes (including [jupyter notebooks](https://jupyter.org/)) via an "External console"
 * A system for data plotting (via [matplotlib](https://matplotlib.org/), [seaborn](https://seaborn.pydata.org/), [pyqtgraph](https://www.pyqtgraph.org/)) which can be extended[<sup>11</sup>](#NOTE_11).
-* A script manager [<sup>12</sup>](#NOTE_12) for user-written Python code[<sup>14</sup>](#NOTE_13)
+* A script manager[<sup>12</sup>](#NOTE_12) for user-written Python code[<sup>13</sup>](#NOTE_13)
 
 ## <a name=use_virtual_environment></a>Recommended use
 Scipyen should be used inside a [virtual Python environment](https://www.google.com/search?q=virtual+python+environment) which allows the local installation of 3<sup>rd</sup> party Python packages without interfering with the host computer. 
