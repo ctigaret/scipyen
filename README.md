@@ -33,15 +33,6 @@ Before using Scipyen, follow these steps:
     ```
 2. Create a virtual python environment, see [`doc/install/INSTALL.md`](doc/install/INSTALL.md) for details.
 
-The following 3<sup>rd</sup> party libraries are **necessary**:
-
-* python-neo - for electrophysiology data
-* vigra - for image analysis and processing, and image I/O
-* pyqt5 - for the GUI
-* pyqtgraph - for the GUI
-* jupyter and jupyer qtconsole - for the GUI console
-
-
 3. Activate the virtual environment then simply run the `scipyen.py` script located
 in the top `scipyen` directory, e.g.:
 ```python
