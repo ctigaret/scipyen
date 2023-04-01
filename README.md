@@ -6,9 +6,7 @@ microscopy imaging data using Python programming language.
 
 Scipyen provides a framework similar to an Integrated 
 Development Environment (IDE)[<sup>1</sup>](#NOTE_1), where the user creates their own data 
-analysis workflows or pipelines according to their need. 
-
-Instead of offering a preset collection of analysis scenarios[<sup>2</sup>](#NOTE_2), Scipyen integrates
+analysis workflows or pipelines according to their need. Instead of offering a preset collection of analysis scenarios[<sup>2</sup>](#NOTE_2), Scipyen integrates
 third party numerical analysis software, a set of GUI tools for the visualization
 of electrophysiology[<sup>3</sup>](#NOTE_3), microscopy[<sup>4</sup>](#NOTE_4), and tabular[<sup>5</sup>](#NOTE_5) data, and a
 mechanism to run your own Python scripts.
