@@ -1,7 +1,7 @@
 # Scipyen installation
 Author: Cezar M. Tigaret <cezar.tigaret@gmail.com>
 
-Distributed under GNU GPL License v.3
+Distributed under [GNU General Public License v.3.0 (GPLv3)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 
 * * * 
 
