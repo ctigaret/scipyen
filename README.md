@@ -45,7 +45,7 @@ The following 3<sup>rd</sup> party libraries are **necessary**:
 * jupyter and jupyer qtconsole - for the GUI console
 
 ## Author:
-Cezar M. Tigaret <cezar.tigaret@gmail.com>
+Cezar M. Tigaret <cezar.tigaret@gmail.com>, <tigaretc@cardiff.ac.uk>
 
 Distributed under [GNU General Public License v.3.0 (GPLv3)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 
