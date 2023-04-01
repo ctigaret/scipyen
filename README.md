@@ -54,9 +54,8 @@ open source, software for image analysis see, for example, [ImageJ/Fiji](https:/
 
 <a name=NOTE_6>6.</a> This is by design. Scipyen's author tries hard to avoid 
 [re-inventing the wheel](https://en.wikipedia.org/wiki/Reinventing_the_wheel), and therefore Scipyen has no functionality to create/delete files and directories, other than saving data objects to the disk. Scipyen is intended to be used in a [Desktop 
-environment](https://en.wikipedia.org/wiki/Desktop_environment) with [tools](https://en.wikipedia.org/wiki/File_manager) to navigate and modify the file system.
-However, a context menu offers the possibility to open the current working directory in
-a desktop [tool](https://en.wikipedia.org/wiki/File_manager).
+environment](https://en.wikipedia.org/wiki/Desktop_environment) with [tools](https://en.wikipedia.org/wiki/File_manager) to navigate and modify the file system, and gives the possibility to open the current working directory in
+a desktop [tool](https://en.wikipedia.org/wiki/File_manager) via a context menu.
 
 <a name=NOTE_7>7.</a> Provides access to variables created during a session, including
 instances of data type-specific viewers, and updates itself whenever variables are
