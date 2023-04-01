@@ -23,6 +23,18 @@ mechanism to run your own Python scripts.
 * A Python console[<sup>10</sup>](#NOTE_10)
 * Interaction with external python processes (including [jupyter notebooks](https://jupyter.org/)) via an "External console"
 * A system for data plotting (via [matplotlib](https://matplotlib.org/), [seaborn](https://seaborn.pydata.org/), [pyqtgraph](https://www.pyqtgraph.org/)) which can be extended[<sup>11</sup>](#NOTE_11).
+* A script manager[<sup>12</sup>[#NOTE_12]
+
+## <a name=use_virtual_environment></a>Recommended use
+Scipyen should be used inside a [virtual Python environment](https://www.google.com/search?q=virtual+python+environment) which allows the local installation of 3<sup>rd</sup> party Python packages without interfering with the host computer. 
+
+The following 3<sup>rd</sup> party libraries are **necessary**:
+
+* python-neo - for electrophysiology data
+* vigra - for image analysis and processing, and image I/O
+* pyqt5 - for the GUI
+* pyqtgraph - for the GUI
+* jupyter and jupyer qtconsole - for the GUI console
 
 
 <a name=Scipyen_screenshot> ![Scipyen Screenshot](doc/ScipyenScreenshot1.png)</a>
@@ -69,4 +81,6 @@ created, modified, or removed. The items in the viewer are actionable via a cont
 
 <a name=NOTE_10>10.</a> Scipyen's console is based on [jupyter qtconsole](https://qtconsole.readthedocs.io/en/stable/index.html), and gives access to the "user workspace"[<sup>7</sup>](#NOTE_7) and various modules (either part of Scipyen, or installed in your Python environment). To keep things "clean", the workspace viewer shows *only* the variables created since the start of the session.
 
-<a name=NOTE_11>11.</a> For more extensive data plotting applications see [Veusz](https://veusz.github.io/), [SciDaVis](https://scidavis.sourceforge.net/), [LabPlot2](https://labplot.kde.org/), [XmGrace](https://plasma-gate.weizmann.ac.il/Grace/), and not least the venerable [GNU Plot](http://www.gnuplot.info/), in addition to a galaxy of [Python-based data visualization frameworks](https://www.google.com/search?q=data+visualization+in+python).
+<a name=NOTE_11>11.</a> For more extensive data plotting applications see [Veusz](https://veusz.github.io/), [SciDaVis](https://scidavis.sourceforge.net/), [LabPlot2](https://labplot.kde.org/), [XmGrace](https://plasma-gate.weizmann.ac.il/Grace/), and not least the venerable [GNU Plot](http://www.gnuplot.info/), in addition to a galaxy of [Python-based data visualization frameworks](https://www.google.com/search?q=data+visualization+in+python). Python-based visualization frameworks can be used from within Scipyen's console as long as they provide modules and extensions available to Scipyen's python environment (this typcially required their installation (sinside* the environment in which Scuipyen is used).
+
+<a name=NOTE_12>12.</a> Following the principle of [not reinventing the wheel](https://en.wikipedia.org/wiki/Reinventing_the_wheel), Scipyen does not provide a code editor for Python. While *any* text editor can be used, there are several powerful open source editors [available](https://en.wikipedia.org/wiki/List_of_text_editors) e.g., [Kate](https://kate-editor.org/), [vim](https://www.vim.org/), [GNU Emacs](https://www.gnu.org/software/emacs/), [NEdit (the Nirvana Editor)](https://sourceforge.net/projects/nedit/files/nedit-source/), [Atom](https://github.com/atom/atom), to name just a few.
