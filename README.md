@@ -22,7 +22,7 @@ mechanism to run your own Python scripts.
     - script manager[<sup>9</sup>](#Note_9)
 * A Python console[<sup>10</sup>](#NOTE_10)
 * Interaction with external python processes (including jupyter notebooks) via an "External console"
-* A system for data plotting (via [matplotlib](https://matplotlib.org/), [seaborn](https://seaborn.pydata.org/), [pyqtgraph](https://www.pyqtgraph.org/)) which can be extended<sup>11</sup>(#NOTE_11).
+* A system for data plotting (via [matplotlib](https://matplotlib.org/), [seaborn](https://seaborn.pydata.org/), [pyqtgraph](https://www.pyqtgraph.org/)) which can be extended[<sup>11</sup>](#NOTE_11).
 
 
 <a name=Scipyen_screenshot> ![Scipyen Screenshot](doc/ScipyenScreenshot1.png)</a>
