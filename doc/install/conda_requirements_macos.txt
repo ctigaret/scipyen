@@ -31,13 +31,13 @@ graphviz
 libNeuroML
 matlab_kernel
 octave_kernel
-# via pip
-pyabf
-nixio
-imreg-dft
-python-magic
-# --- optional
-modelspec
-researchpy
-gnuplot_kernel
-neuron
+# # via pip
+# pyabf
+# nixio
+# imreg-dft
+# python-magic
+# # --- optional
+# modelspec
+# researchpy
+# gnuplot_kernel
+# neuron
