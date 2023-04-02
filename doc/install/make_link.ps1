@@ -8,6 +8,7 @@ $myWindowsPrincipal=new-object System.Security.Principal.WindowsPrincipal($myWin
 # Get the security principal for the Administrator role
 $adminRole=[System.Security.Principal.WindowsBuiltInRole]::Administrator
 
+$shell = New-Object -ComObject WScript.Shell
 # Check to see if we are currently running "as Administrator"
 if ($myWindowsPrincipal.IsInRole($adminRole))
 {
@@ -40,7 +41,8 @@ else
 #     exit
 }
 # # Run your code that needs to be elevated here
-Param ($srcdir = $(throw " Source directory required "))
+# Param ($srcdir = $(throw " Source directory required "))
+$srcdir=Split-Path -Path $MyInvocation.InvocationName -Parent
 $myDrive=Split-Path -Path $MyInvocation.InvocationName -Qualifier
 $myRepo=Join-Path -Path $myDrive -ChildPath "scipyen"
 $myScipyenLaunchScript=Join-Path -Path $myRepo -ChildPath "scipyen.py"
@@ -50,7 +52,6 @@ $myActivate=Join-Path -Path $myAnaconda -ChildPath "Scripts\activate.bat"
 $targetPath="cmd.exe"
 $args = "/K $myActivate $myAnaconda && conda activate $myCondaEnv && python -Xfrozen_modules=off $myScipyenLaunchScript"
 $wdir=Join-Path -Path $Home -ChildPath "Documents"
-$shell = New-Object -ComObject WScript.Shell
 # $desktop=$shell.SpecialFolders.Item("AllUsersDesktop")
 $linkPath=Join-Path -Path $desktop -ChildPath "Scipyen.lnk"
 $iconPath=Join-Path -Path $srcdir -ChildPath "pythonbackend.ico"
