@@ -72,7 +72,7 @@ call conda install --prefix %env_name% -y libNeuroML || exit
 echo Installing matlab kernel
 call conda install --prefix %env_name% -y matlab_kernel || exit
 echo Installing octave kernel
-call conda install --prefix %env_name% -y octave-kernel || exit
+call conda install --prefix %env_name% -y octave_kernel || exit
 
 echo Installing additional PyPI packages
 call pip install -r %pip_reqs% || exit
