@@ -2535,6 +2535,27 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
     def launch(cls, argv=None, existing:typing.Optional[str]=None, **kwargs):
         # the launch_instance mechanism in jupyter and qtconsole does not return
         # an instance of this python "app"
+        #scipyenvdir = os.getenv("CONDA_PREFIX")
+        #if scipyenvdir is not None:
+            #if argv is None:
+                #argv=["-Xfrozen_modules=off"]
+            #elif isinstance(argv, tuple):
+                #if len(argv) == 0:
+                    #argv=("-Xfrozen_modules=off", )
+                #else:
+                    #aa = list(argv)
+                    #aa.append(" -Xfrozen_modules=off")
+                    #argv = tuple(aa)
+
+            #elif isinstance(argv, list):
+                #if len(argv) == 0:
+                    #argv=["-Xfrozen_modules=off"]
+                #else:
+                    #argv.append(" -Xfrozen_modules=off")
+
+
+
+
         # NOTE: 2021-08-29 21:49:44
         # Do NOT confuse this with Scipyen app (self.app)
         # In fact it is a reference to ExternalIPython, which is returned below
