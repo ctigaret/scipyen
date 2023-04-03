@@ -46,8 +46,16 @@ else
 # Param ($srcdir = $(throw " Source directory required "))
 $srcdir=Split-Path -Path $MyInvocation.InvocationName -Parent
 $myDrive=Split-Path -Path $MyInvocation.InvocationName -Qualifier
-$myRepo=Join-Path -Path $myDrive -ChildPath "scipyen"
-$myScipyenLaunchScript=Join-Path -Path $myRepo -ChildPath "scipyen.py"
+# find out where is this repository located
+$p=$srcdir
+while ( !(Test-Path -Path (Join-Path -Path $p -ChildPath ".git")))
+{
+    $p = Split-Path -Path $p
+}
+$repodir=$p
+# echo $repodir
+
+$myScipyenLaunchScript=Join-Path -Path $repodir -ChildPath "scipyen.py"
 $myCondaEnv=$Env:CONDA_PREFIX
 $myAnaconda=$Env:CONDA_PREFIX_1
 $myActivate=Join-Path -Path $myAnaconda -ChildPath "Scripts\activate.bat"
