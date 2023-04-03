@@ -13,6 +13,7 @@ $shell = New-Object -ComObject WScript.Shell
 if ($myWindowsPrincipal.IsInRole($adminRole))
 {
     $desktop=$shell.SpecialFolders.Item("AllUsersDesktop")
+    $wdir==$shell.SpecialFolders.Item("AllUsersDesktop")
     # We are running "as Administrator" - so change the title and background color to indicate this
 #     $Host.UI.RawUI.WindowTitle = $myInvocation.MyCommand.Definition + "(Elevated)"
 #     $Host.UI.RawUI.BackgroundColor = "DarkBlue"
@@ -21,6 +22,7 @@ if ($myWindowsPrincipal.IsInRole($adminRole))
 else
 {
     $desktop=$shell.SpecialFolders.Item("Desktop")
+    $wdir=Join-Path -Path $Home -ChildPath "Documents"
     # We are not running "as Administrator" - so relaunch as administrator
 
     # Create a new process object that starts PowerShell
@@ -51,7 +53,7 @@ $myAnaconda=$Env:CONDA_PREFIX_1
 $myActivate=Join-Path -Path $myAnaconda -ChildPath "Scripts\activate.bat"
 $targetPath="cmd.exe"
 $args = "/K $myActivate $myAnaconda && conda activate $myCondaEnv && python -Xfrozen_modules=off $myScipyenLaunchScript"
-$wdir=Join-Path -Path $Home -ChildPath "Documents"
+# $wdir=Join-Path -Path $Home -ChildPath "Documents"
 # $desktop=$shell.SpecialFolders.Item("AllUsersDesktop")
 $linkPath=Join-Path -Path $desktop -ChildPath "Scipyen.lnk"
 $iconPath=Join-Path -Path $srcdir -ChildPath "pythonbackend.ico"
