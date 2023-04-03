@@ -10,6 +10,8 @@ analysis workflows or pipelines according to their need. Instead of offering a p
 third party numerical analysis software, a set of GUI tools for the visualization
 of electrophysiology[^3], microscopy[^4], and tabular[^5] data, and provides a mechanism to run your own Python scripts[^6].
 
+THIS SOFTWARE IS PROVIDED AS IS AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
 ## Main features
 * [Graphical User Interface](https://en.wikipedia.org/wiki/Graphical_user_interface)[(GUI)](#Scipyen_screenshot) with 
     - read-only[^7] access to the file system
