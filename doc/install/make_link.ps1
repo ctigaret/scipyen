@@ -74,10 +74,10 @@ $shortcut.IconLocation=$iconPath
 $shortcut.Workingdirectory=$wdir
 $shortcut.Save()
 # create start menu shortcut - doesn't work ?!?'
-$startPath = Join-Path -Path $shell.SpecialFolders.Item("Startup") -ChildPath "Scipyen.lnk"
-$startshortcut=$shell.CreateShortcut($startPath)
-$startshortcut.TargetPath=$targetPath
-$startshortcut.Arguments=$args
-$startshortcut.IconLocation=$iconPath
-$startshortcut.Workingdirectory=$wdir
-$startshortcut.Save()
+# $startPath = Join-Path -Path $shell.SpecialFolders.Item("Startup") -ChildPath "Scipyen.lnk"
+# $startshortcut=$shell.CreateShortcut($startPath)
+# $startshortcut.TargetPath=$targetPath
+# $startshortcut.Arguments=$args
+# $startshortcut.IconLocation=$iconPath
+# $startshortcut.Workingdirectory=$wdir
+# $startshortcut.Save()
