@@ -86,20 +86,14 @@ The EPSC amplitudes are then calculated based on epochs set up in each of the fo
 
  **WARNING**: Check that data has:
      
-    1. appropriate names e.g. `base_X`, `chase_X`, `xtalk_X`, `tbp_0_X` etc
-    2. appropriate structure:
+1. appropriate names e.g. `base_X`, `chase_X`, `xtalk_X`, `tbp_0_X` etc
+2. appropriate structure:
     
-        * for the evoked epsc (or epsp), `base_*` and `chase_*` are `neo.Block` objects
-    expected to contain and *EVEN* number of segments: with the *EVEN* indices
-    (0, 2, 4, etc) containing signals related to one pathway index (say, path 0)
-    and the *ODD* indices (1,3,5, etc) containing signals related to the other
-    pathway index (path 1)
+* for the evoked epsc (or epsp), `base_*` and `chase_*` are `neo.Block` objects expected to contain and *EVEN* number of segments: with the *EVEN* indices(0, 2, 4, etc) containing signals related to one pathway index (say, path 0) and the *ODD* indices (1,3,5, etc) containing signals related to the other pathway index (path 1)
 
-        * make sure the `xtalk_*` blocks contain cross-talk data (if recorded)
+* make sure the `xtalk_*` blocks contain cross-talk data (if recorded)
 
-        * make sure that you can figure out which pathway the LTP induction was applied
-    to:
-            - e.g., check which digital signal was used inside the `tbp_*` blocks, unless their names already reflect that.
+* make sure that you can figure out which pathway the LTP induction was applied to (e.g., check which digital signal was used inside the `tbp_*` blocks, unless their names already reflect that).
 
 
 ### 2. <a name=gen_ltp_opts></a>Load or generate LTP analysis options; this is a `dict` so it can be modifed at the console.
@@ -108,7 +102,6 @@ If you do not yet have an `LTPOptions` `dict` saved somewhere, call:
 ```python
 LTPOptions=ltp.load_synaptic_plasticity_options() 
 ```
-
 otherwise, just load it (usually, from a pickle `*.pkl` file)
 
 ### 3. Concatenate the blocks to generate baseline and chase data for each pathway
