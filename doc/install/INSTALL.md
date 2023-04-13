@@ -14,7 +14,7 @@ Distributed under [GNU General Public License v.3.0 (GPLv3)](https://www.gnu.org
     3. [Installation using Anaconda](#linux_anaconda)
 3. [Installation on Windows](#windows-install)
 
-# <a name=Introduction/>Introduction
+# <a name=Introduction></a>Introduction
 
 Scipyen requires [Python](https://www.python.org/) >= 3.9 and is meant to run 
 inside a virtual python environment. The recommended tools to create this are
@@ -28,10 +28,10 @@ inside a virtual python environment. The recommended tools to create this are
 **WARNING:** 
 The Scipyen repository ***should be*** be located ***outside*** the virtual environment directory.
 
-# <a name=linux-install/>Installation on Linux
+# <a name=linux-install></a>Installation on Linux
 The virtual environment can be created automatically using the [`install.sh`](#install_sh_usage) [script](install.sh)
 
-## <a name=linux-preamble/>Preamble
+## <a name=linux-preamble></a>Preamble
 
 By default, the `install.sh` script will create a local virtual python environment
 where it will
@@ -59,11 +59,11 @@ it is worth checking that they are available beforehand:
 
   • development tools: `cmake`, `make`, C++ compiler suite, assembler, etc., see below.
   
-## <a name=with-virtualenv/>Installation under a locally built python environment
+## <a name=with-virtualenv></a>Installation under a locally built python environment
 **NOTE** This method offers the greatest flexibility including the 
 possibility to use `NEURON` simulation environment from within Scipyen.
 
-### <a name=install_sh_usage/>Usage of install.sh script
+### <a name=install_sh_usage></a>Usage of install.sh script
 
 Assuming Scipyen is cloned inside `${HOME}/scipyen` launch the script like this:
 
@@ -185,7 +185,7 @@ or removal should be done **with the python virtual environment activated**. The
 author(s) cannot advise on possible troubleshooting when packages are installed
 outside the virtual environment.
 
-## <a name=linux_anaconda/>Installation using Anaconda
+## <a name=linux_anaconda></a>Installation using Anaconda
 To be written.
 
 # <a name=windows-install></a>Installation on Windows
