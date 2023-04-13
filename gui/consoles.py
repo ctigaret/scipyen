@@ -2974,6 +2974,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
     """
     historyItemsDropped = pyqtSignal()
     workspaceItemsDropped = pyqtSignal()
+    fileSystemItemsDropped = pyqtSignal()
     #workspaceItemsDropped = pyqtSignal(bool)
     loadUrls = pyqtSignal(object, bool, QtCore.QPoint)
     pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
@@ -3095,7 +3096,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
         elif type(self.mainWindow).__name__ == "ScipyenWindow" and src is self.mainWindow.fileSystemTreeView:
             # NOTE: 2019-08-10 00:54:40
             # TODO: load data from disk
-            pass
+            self.fileSystemItemsDropped.emit()
                 
         else:
             #NOTE: 2019-08-02 13:35:52
@@ -3387,6 +3388,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     # 2) copy/paste
     historyItemsDropped = pyqtSignal()
     workspaceItemsDropped = pyqtSignal()
+    fileSystemItemsDropped = pyqtSignal()
     #workspaceItemsDropped = pyqtSignal(bool)
     loadUrls = pyqtSignal(object, bool, QtCore.QPoint)
     pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
@@ -3398,8 +3400,11 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.consoleWidget = ScipyenConsoleWidget(mainWindow=parent)
         self.consoleWidget.setAcceptDrops(True)
         self.setCentralWidget(self.consoleWidget)
+        
         self.consoleWidget.historyItemsDropped.connect(self.historyItemsDropped)
         self.consoleWidget.workspaceItemsDropped.connect(self.workspaceItemsDropped)
+        self.consoleWidget.fileSystemItemsDropped.connect(self.fileSystemItemsDropped)
+
         self.consoleWidget.loadUrls.connect(self.loadUrls)
         self.consoleWidget.pythonFileReceived.connect(self.pythonFileReceived)
         self.consoleWidget.executed.connect(self.executed)

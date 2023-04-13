@@ -1845,21 +1845,21 @@ def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptio
     
     if LTPOptions["Average"] is None:
         baseline = [neoutils.concatenate_blocks(baseline_blocks,
-                                                segment = LTPOptions["Pathway0"],
-                                                analog = LTPOptions["Signals"],
+                                                segments = LTPOptions["Pathway0"],
+                                                analogsignals = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path0_baseline"),
                     neoutils.concatenate_blocks(baseline_blocks,
-                                                segment = LTPOptions["Pathway1"],
-                                                analog = LTPOptions["Signals"],
+                                                segments = LTPOptions["Pathway1"],
+                                                analogsignals = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path1_baseline")]
     else:
-        baseline    = [ephys.average_blocks(baseline_blocks,
+        baseline    = [neoutils.average_blocks(baseline_blocks,
                                             segment = LTPOptions["Pathway0"],
                                             analog = LTPOptions["Signals"],
                                             count = LTPOptions["Average"]["Count"],
                                             every = LTPOptions["Average"]["Every"],
                                             name = result_name_prefix + "_path0_baseline"),
-                    ephys.average_blocks(baseline_blocks,
+                    neoutils.average_blocks(baseline_blocks,
                                             segment = LTPOptions["Pathway1"],
                                             analog = LTPOptions["Signals"],
                                             count = LTPOptions["Average"]["Count"], 
@@ -1872,22 +1872,22 @@ def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptio
     
     if LTPOptions["Average"] is None:
         chase   = [neoutils.concatenate_blocks(chase_blocks,
-                                                segment = LTPOptions["Pathway0"],
-                                                analog = LTPOptions["Signals"],
+                                                segments = LTPOptions["Pathway0"],
+                                                analogsignals = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path0_chase"),
                    neoutils.concatenate_blocks(chase_blocks,
-                                                segment = LTPOptions["Pathway1"],
-                                                analog = LTPOptions["Signals"],
+                                                segments = LTPOptions["Pathway1"],
+                                                analogsignals = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path1_chase")]
         
     else:
-        chase   = [ephys.average_blocks(chase_blocks,
+        chase   = [neoutils.average_blocks(chase_blocks,
                                             segment = LTPOptions["Pathway0"], 
                                             analog = LTPOptions["Signals"],
                                             count = LTPOptions["Average"]["Count"], 
                                             every = LTPOptions["Average"]["Every"],
                                             name = result_name_prefix + "_path0_chase"),
-                   ephys.average_blocks(chase_blocks,
+                   neoutils.average_blocks(chase_blocks,
                                             segment = LTPOptions["Pathway1"], 
                                             analog = LTPOptions["Signals"],
                                             count = LTPOptions["Average"]["Count"], 

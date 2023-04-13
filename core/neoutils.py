@@ -9,8 +9,6 @@ isolated signal samples; signal channels; spike trains
 =============================================================================
 assign_to_signal
 assign_to_signal_in_epoch
-batch_normalise_signals
-batch_remove_offset
 concatenate_blocks
 concatenate_signals
 set_relative_time_start
@@ -2920,17 +2918,34 @@ def _(obj, **kwargs):
     rec_datetime = kwargs.pop("rec_datetime", datetime.datetime.now())
     annotations = kwargs.pop("annotations", dict())
     
-    # for kwarg in kwargs.keys():
-    #     if kwarg not in obj._child_containers:
-    #         similars = [s for s in obj._child_containers if s.lower() in kwarg.lower() or kwarg.lower() in s.lower()]
-    #         if len(similars):
-    #             raise KeyError(f"Unexpected keyword {kwarg}; did you mean one of {similars}?")
-    #         else:
-    #             raise KeyError(f"Unexpected keyword {kwarg}")
+    # NOTE: 2023-04-13 09:45:19
+    # some kwargs are not suitable for a Block, but they may be suitable for 
+    # one of the Block's childrenn (e.g., Segment, etc)
+    # so we cache them here, to reinstate them later when copying the child
+    # (see NOTE: 2023-04-13 09:45:26)
+    not_kwargs = dict()
     
+    for kwarg in kwargs.keys():
+        if kwarg not in obj._child_containers:
+            similars = [s for s in obj._child_containers if s.lower() in kwarg.lower() or kwarg.lower() in s.lower()]
+            if len(similars):
+                warnings.warn(f"Unexpected keyword {kwarg} will be ignored; did you mean one of {similars}?")
+                # raise KeyError(f"Unexpected keyword {kwarg}; did you mean one of {similars}?")
+            else:
+                warnings.warn(f"Unexpected keyword {kwarg} will be ignored")
+                # raise KeyError(f"Unexpected keyword {kwarg}")
+                
+            not_kwargs[kwarg] = kwargs[kwarg]
+            
+    for kw in not_kwargs.keys():
+        kwargs.pop(kw, None)
     
+    # print(f"copy_with_data_subset(Block) kwargs {kwargs}")
     
     indexing = dict((s, kwargs.pop(s, None)) for s in obj._child_containers)
+    
+    # print(f"copy_with_data_subset(Block) indexing {indexing}")
+    
     ret = make_neo_object(obj)
     
     # NOTE: 2021-11-23 14:56:56
@@ -2944,7 +2959,15 @@ def _(obj, **kwargs):
         
     keep_segs_ndx = normalized_index(obj.segments, indexing["segments"])
     
+    # print(f"copy_with_data_subset(Block) indexing segments {indexing['segments']}")
+    
     keep_groups_ndx = normalized_index(obj.groups, indexing["groups"])
+    
+    # NOTE: 2023-04-13 09:45:26
+    # now, restore the kwargs removed earlier (see NOTE: 2023-04-13 09:45:19)
+    # as they may be useful for copy_with_data_subset on the child (in this case, 
+    # the Segment)
+    kwargs.update(not_kwargs)
     
     new_segments = list(copy_with_data_subset(obj.segments[k], **kwargs) 
                         for k in keep_segs_ndx)
@@ -3031,21 +3054,33 @@ def _(obj, **kwargs):
     annotations = kwargs.pop("annotations", dict())
     
     data_child_object_names = [_container_name(s) for s in obj._data_child_objects]
+    # print(f"copy_with_data_subset(Segment) data_child_object_names {data_child_object_names}")
     
-    for kw in kwargs:
+    not_kwargs = dict()
+    
+    for kw in kwargs.keys():
         if kw not in data_child_object_names:
             similar = [s for s in data_child_object_names if similar_strings(kw,s)>0.5]
             if len(similar):
                 if len(similar)> 1:
-                    raise KeyError(f"Unexpected keyword '{kw}'; did you mean one of {similar}?")
+                    warnings.warn(f"Unexpected keyword '{kw}' will be ignored; did you mean one of {similar}?")
+                    # raise KeyError(f"Unexpected keyword '{kw}'; did you mean one of {similar}?")
                 else:
-                    raise KeyError(f"Unexpected keyword '{kw}'; did you mean '{similar[0]}'?")
+                    warnings.warn(f"Unexpected keyword '{kw}' will be ignored; did you mean '{similar[0]}'?")
+                    # raise KeyError(f"Unexpected keyword '{kw}'; did you mean '{similar[0]}'?")
                 
             else:
-                raise KeyError(f"Unexpected keyword '{kw}'")
+                warnings.warn(f"Unexpected keyword '{kw}' will be ignored")
+                # raise KeyError(f"Unexpected keyword '{kw}'")
+                
+            not_kwargs[kw] = kwargs[kw]
+            
+    for k in not_kwargs.keys():
+        kwargs.pop(k, None)
     
     indexing = dict((_container_name(s), kwargs.pop(_container_name(s), None)) for s in obj._data_child_objects)
         
+    # print(f"copy_with_data_subset(Segment) indexing {indexing}")
     ret = make_neo_object(obj)
     
     for container_name, indices in indexing.items():
@@ -3135,11 +3170,12 @@ def concatenate_blocks(*args, **kwargs):
                 as analog, for neo.ImageSequence objects (for neo version
                 from 0.8.0 onwards)
                 
-    spiketrains:     as analog, for the spiketrains in the block's segments
+    spiketrains: 
+                as analog, for the spiketrains in the block's segments
                 
-    epochs:         as above for Epoch objects
+    epochs:     as above for Epoch objects
     
-    events:         as above for Event objects
+    events:     as above for Event objects
         
     Returns:
     -------
@@ -3172,6 +3208,23 @@ def concatenate_blocks(*args, **kwargs):
     if len(args) == 0:
         return None
     
+#     segments = kwargs.pop("segments", None)
+#     
+#     if isinstance(segments, (tuple, list)):
+#         if len(segments) == 0:
+#             segments = None
+#             
+#         elif not all(isinstance(v, int) for v in segments):
+#             raise TypeError(f"When specified, the 'segments' sequence must contain only integers")
+#         
+#     elif isinstance(segments, range):
+#         # convert range to a list of int indices
+#         segments = list(segments)
+#         
+#     elif not isinstance(segments, (int, slice)):
+#         if segments is not None:
+#             raise TypeError(f"When specified, 'segments' must be an int, a sequence (tuple, list) of int, a range, a slice, or None; got {type(segments)} instead")
+    
     if len(args) == 1:
         if isinstance(args[0], (str, type)):
             try:
@@ -3196,7 +3249,38 @@ def concatenate_blocks(*args, **kwargs):
 
     if isinstance(args, neo.Block):
         # a single Block object => just copy with data subsets
-        return copy_with_data_subset(arg, **kwargs)
+        new_block = copy_with_data_subset(arg, **kwargs)
+#         if isinstance(segments, int):
+#             if segments in range(len(arg.segments)):
+#                 seg = arg.segments[segments]
+#                 new_block.segments = [seg]
+#             
+#             else:
+#                 raise IndexError(f"Segment index {segements} is out of range for {len(arg.segments)} segments in the argument")
+#             
+#         elif isinstance(segments, (tuple, list)):
+#             if len(segments)> 0:
+#                 if all(isinstance(v, int) for v in segments):
+#                     segs = list()
+#                     for s_index in segments:
+#                         if s_index in range(len(arg.segments)):
+#                             segs.append(arg.segments[s_index])
+#                             
+#                         else:
+#                             raise IndexError(f"Segment index {s_index} is out of range for {len(arg.segments)} segments in the argument")
+#                     # new_block.segments.clear()
+#                     new_block.segments=segs
+#                     
+#         elif isinstance(segments, slice):
+#             segs = arg.segments[segments]
+#             new_block.segments = segs
+#             
+#             raise TypeError(f"Keyword 'segments' must map to an integer, a list of integers, or None; got {type(segments)} instead")
+            
+            
+            
+        return new_block
+        # return copy_with_data_subset(arg, **kwargs)
         
             
     if isinstance(args, neo.Segment):
@@ -5335,7 +5419,7 @@ def average_signals(*args, fun=np.mean):
 @safeWrapper
 def average_blocks(*args, **kwargs):
     """Generates a block containing a list of averaged AnalogSignal data from the *args.
-    
+    FIXME/TODO: revisit this
     Parameters:
     -----------
     
@@ -5343,13 +5427,14 @@ def average_blocks(*args, **kwargs):
     
     kwargs: keyword/value pairs:
     
-        count               how many analogsignals into one average
+        count               how many segments into one average
         
         every               how many segments to skip between averages
         
-        segment             index of segments taken into average
+        segments            index of segments taken into average: int, range,
+                            slice, or sequence (tuple, list) of int
         
-        analog              index of signal into each of the segments to be used;
+        analogsignals       index of signal into each of the segments to be used;
                             can also be a signal name
         
         name                see neo.Block docstring
@@ -5471,12 +5556,6 @@ def average_blocks(*args, **kwargs):
     m = None
     segment_index = None
     analog_index = None
-    
-# we do something like this:
-    #BaseDataPath0MinuteAverage = neo.Block()
-    #BaseDataPath0MinuteAverage.segments = ephys.average_segments(BaseDataPath0.segments, n=6, every=6)
-    #sgw.plot(BaseDataPath0MinuteAverage, signals=["Im_prim_1", "Vm_sec_1"])
-
     
     ret = neo.core.block.Block()
     
