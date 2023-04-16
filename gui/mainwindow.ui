@@ -7,8 +7,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1115</width>
-    <height>901</height>
+    <width>700</width>
+    <height>585</height>
    </rect>
   </property>
   <property name="acceptDrops">
@@ -24,30 +24,13 @@
      <height>0</height>
     </size>
    </property>
-   <layout class="QVBoxLayout" name="verticalLayout">
-    <property name="spacing">
-     <number>0</number>
-    </property>
-    <property name="leftMargin">
-     <number>0</number>
-    </property>
-    <property name="topMargin">
-     <number>0</number>
-    </property>
-    <property name="rightMargin">
-     <number>0</number>
-    </property>
-    <property name="bottomMargin">
-     <number>0</number>
-    </property>
-   </layout>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1115</width>
+     <width>700</width>
      <height>28</height>
     </rect>
    </property>
@@ -136,7 +119,7 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="features">
-    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+    <set>QDockWidget::AllDockWidgetFeatures</set>
    </property>
    <property name="windowTitle">
     <string>&amp;User Variables</string>
@@ -256,7 +239,7 @@ NOTE: you can click anywhere in the row to select</string>
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="features">
-    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+    <set>QDockWidget::AllDockWidgetFeatures</set>
    </property>
    <property name="windowTitle">
     <string>&amp;Command History</string>
@@ -374,7 +357,7 @@ NOTE: you can click anywhere in the row to select</string>
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="features">
-    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+    <set>QDockWidget::AllDockWidgetFeatures</set>
    </property>
    <property name="windowTitle">
     <string>File S&amp;ystem</string>
@@ -384,10 +367,16 @@ NOTE: you can click anywhere in the row to select</string>
    </attribute>
    <widget class="QWidget" name="dockWidgetFileSystemContents">
     <layout class="QVBoxLayout" name="verticalLayout_5">
+     <property name="sizeConstraint">
+      <enum>QLayout::SetNoConstraint</enum>
+     </property>
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout">
        <property name="spacing">
         <number>0</number>
+       </property>
+       <property name="sizeConstraint">
+        <enum>QLayout::SetNoConstraint</enum>
        </property>
        <item>
         <widget class="QToolButton" name="dirHomeBtn">
@@ -503,8 +492,8 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QComboBox" name="directoryComboBox">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-           <horstretch>3</horstretch>
+          <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+           <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
@@ -530,7 +519,10 @@ NOTE: you can click anywhere in the row to select</string>
      <item>
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <property name="spacing">
-        <number>0</number>
+        <number>6</number>
+       </property>
+       <property name="sizeConstraint">
+        <enum>QLayout::SetNoConstraint</enum>
        </property>
        <item>
         <widget class="QLabel" name="currentDirLabel">
@@ -548,7 +540,7 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QTreeView" name="fileSystemTreeView">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+          <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
@@ -570,6 +562,15 @@ NOTE: you can click anywhere in the row to select</string>
          </property>
          <property name="showDropIndicator" stdset="0">
           <bool>false</bool>
+         </property>
+         <property name="dragEnabled">
+          <bool>true</bool>
+         </property>
+         <property name="dragDropMode">
+          <enum>QAbstractItemView::DragOnly</enum>
+         </property>
+         <property name="alternatingRowColors">
+          <bool>true</bool>
          </property>
          <property name="selectionMode">
           <enum>QAbstractItemView::ExtendedSelection</enum>
@@ -624,6 +625,9 @@ NOTE: you can click anywhere in the row to select</string>
           <property name="spacing">
            <number>0</number>
           </property>
+          <property name="sizeConstraint">
+           <enum>QLayout::SetNoConstraint</enum>
+          </property>
           <property name="leftMargin">
            <number>0</number>
           </property>
@@ -672,8 +676,8 @@ NOTE: you can click anywhere in the row to select</string>
           <item>
            <widget class="QComboBox" name="fileSystemFilter">
             <property name="sizePolicy">
-             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-              <horstretch>1</horstretch>
+             <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+              <horstretch>0</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>
             </property>
@@ -718,7 +722,8 @@ NOTE: you can click anywhere in the row to select</string>
   </widget>
   <action name="actionSave">
    <property name="icon">
-    <iconset theme="document-save"/>
+    <iconset theme="document-save">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>&amp;Save As ...</string>
@@ -726,7 +731,8 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionQuit">
    <property name="icon">
-    <iconset theme="application-exit"/>
+    <iconset theme="application-exit">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>&amp;Quit</string>
@@ -734,7 +740,8 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="action_Console">
    <property name="icon">
-    <iconset theme="scriptnew"/>
+    <iconset theme="scriptnew">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>&amp;Console</string>
@@ -747,7 +754,8 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionHelp_On_Console">
    <property name="icon">
-    <iconset theme="help-contextual"/>
+    <iconset theme="help-contextual">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>&amp;On Console</string>
@@ -755,7 +763,8 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionImport_PrairieView_data">
    <property name="icon">
-    <iconset theme="document-open"/>
+    <iconset theme="document-open">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>PrairieView data</string>
@@ -763,7 +772,8 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionImport_XY_Raster_Scan_File">
    <property name="icon">
-    <iconset theme="document-open"/>
+    <iconset theme="document-open">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>&amp;XY Raster Scan</string>
@@ -791,7 +801,8 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionView_Data_New_Window">
    <property name="icon">
-    <iconset theme="window-new"/>
+    <iconset theme="window-new">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>&amp;In New Window</string>
@@ -799,7 +810,8 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionView_Data">
    <property name="icon">
-    <iconset theme="quickview"/>
+    <iconset theme="quickview">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>In &amp;Current Window</string>
@@ -807,7 +819,8 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionReload_Plugins">
    <property name="icon">
-    <iconset theme="view-refresh"/>
+    <iconset theme="view-refresh">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>&amp;Reload Plugins</string>
@@ -820,7 +833,8 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionChange_Working_Directory">
    <property name="icon">
-    <iconset theme="document-open-folder"/>
+    <iconset theme="document-open-folder">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>&amp;Change Working Directory</string>
@@ -838,7 +852,8 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionOpen">
    <property name="icon">
-    <iconset theme="document-open"/>
+    <iconset theme="document-open">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>&amp;Open...</string>
@@ -916,7 +931,8 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionGUI_Style">
    <property name="icon">
-    <iconset theme="edit-paste-style"/>
+    <iconset theme="edit-paste-style">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>GUI Style...</string>
@@ -927,7 +943,8 @@ NOTE: you can click anywhere in the row to select</string>
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="dialog-scripts"/>
+    <iconset theme="dialog-scripts">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Auto-launch Script Manager</string>

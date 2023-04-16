@@ -836,7 +836,7 @@ def build_vigra():
     
     cmake_args = " ".join([f"-DCMAKE_INSTALL_PREFIX={venv}",
                            f"-DCMAKE_PREFIX_PATH={venv}",
-                           "-DCMAKE_BUILD_TYPE=Release",
+                           # "-DCMAKE_BUILD_TYPE=Release",
                            f"-DPython_ROOT_DIR={venv}",
                            # "-DPython_FIND_VIRTUALENV=ONLY",
                            f"-DPython_EXECUTBALE={sys.executable}",
@@ -858,7 +858,7 @@ def build_vigra():
                            "-DCMAKE_SKIP_RPATH=0",
                            "-DAUTOEXEC_TESTS=OFF",
                            "-DBUILD_DOCS=ON",
-                           "-DBUILD_TESTS=ON",
+                           "-DBUILD_TESTS=OFF",
                            "-DAUTOBUILD_TESTS=OFF",
                            f"-S {vigra_src}",
                            f"-B {vigra_build}"])

@@ -2461,6 +2461,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # connect signals emitted by the console when processing a drop event
             self.console.historyItemsDropped.connect(self.slot_pasteHistorySelection) 
             self.console.workspaceItemsDropped.connect(self.slot_pasteWorkspaceSelection)
+            self.console.fileSystemItemsDropped.connect(self.slot_openSelectedFileItems)
             self.console.loadUrls[object, bool, QtCore.QPoint].connect(self.slot_loadDroppedURLs)
             self.console.pythonFileReceived[str, QtCore.QPoint].connect(self.slot_handlePythonTextFile)
             #self.console.sig_shell_msg_received[object].connect(self._slot_int_krn_shell_chnl_msg_recvd)
@@ -3400,6 +3401,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 self.workspaceModel.update()
                 self.currentVarItem = item
                 self.currentVarItemName = newVarName
+                self.workspaceView.sortByColumn(0, QtCore.Qt.AscendingOrder)
                 # self.workspaceModel.currentItem = item
                 # self.workspaceModel.currentItemName = newVarName
                 
@@ -3454,7 +3456,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.workspace[newVarNameOK] = self.workspace[varName]
         self.workspace.pop(varName, None)
         self.workspaceModel.update()
-        
+            
+        self.workspaceView.sortByColumn(0, QtCore.Qt.AscendingOrder)
         # NOTE: 2021-08-21 22:27:34 DO NOT DELETE - alternative way
         #cmd = "".join([newVarNameOK, "=", varName, "; del(", varName,")"])
         #self.console.execute(cmd, hidden=True)
@@ -3667,6 +3670,19 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             #self.slot_copyWorkspaceSelection()
             
         self.console.paste()
+       
+#     @pyqtSlot()
+#     @safeWrapper
+#     def slot_loadFileSystemItems(self):
+#         """
+#         Triggered when items in the file system viewer are dragged onto the console.
+#         Will try to load them
+#         """
+#         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes() \
+#                          if item.column() == 0]# list of QModelIndex
+#         
+#         if len(selectedItems):
+#             fileNames = set([self.fileSystemModel.filePath(i) for i in selectedItems])
         
     @pyqtSlot()
     @safeWrapper
@@ -3890,7 +3906,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # allow user to choose app style interactively -- 
         
         # list of available syle names
-        self._available_Qt_style_names_ = QtWidgets.QStyleFactory.keys()
+        # NOTE: 2023-03-29 14:08:58 CT - selecting bb10 bright & dark styles crashes the GUI - not sure why
+        self._available_Qt_style_names_ = [s for s in QtWidgets.QStyleFactory.keys() if not s.startswith("bb10")]
         if sys.platform == "win32" and has_qdarkstyle_for_win:
             self._available_Qt_style_names_.append("Dark Style")
             

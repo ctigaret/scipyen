@@ -141,54 +141,14 @@ use neo.Epoch to define the signal intervals where the measures are calculated.
 * when a single measure derived from two signal locations is needed, use 
 signalviewer.SignalCursors to define the locations.
 
-II. Statistics
-===========================================
-aggregate_signals: calculates several statistical moments across several
-                    single-channel signals with identical shapes; each moment 
-                    is returned as a
-                    new signal with the same shape as the arguments, contained 
-                    in a dictionary
-    
-average_blocks
-
-average_blocks_by_segments
-
-average_segments
-
-average_segments_in_block
-
-average_signals
-
-III. Electrophysiology signal processing
-========================================
-batch_normalise_signals
-batch_remove_offset
-convolve
-correlate
-diff
-ediff1d
-forward_difference
-gradient
-peak_normalise_signal -> signalprocessing
-remove_signal_offset
-parse_step_waveform_signal -> signalprocessing
-resample_pchip -> signalprocessing
-resample_poly
-root_mean_square
-sampling_rate_or_period
-signal_to_noise
-
-IV. Synthesis of artificial signals and waveforms
+II. Synthesis of artificial signals and waveforms
 =================================================
 generate_ripple_trace
 generate_spike_trace
 waveform_signal
 
-V. I/O-related
-=================
-parse_acquisition_metadata
-
 """
+
 #### BEGIN core python modules
 import traceback
 import datetime

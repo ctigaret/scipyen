@@ -1449,7 +1449,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         return record_data
     
             
-def generate_synaptic_plasticity_options(**kwargs):
+def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     """Constructs a dict with options for synaptic plasticity experiments.
     
     The options specify synaptic pathways, analysis cursors and optional 
@@ -1482,21 +1482,28 @@ def generate_synaptic_plasticity_options(**kwargs):
     4. Allow for monitoring extra synaptic pathways (e.g., cooperative LTP as in
        Golding et al, Nature 2002)
     5. Use in acquisition; on-line analysis.
+    6. Heuristic for cursors set up (single or paired pulse?); voltage clamp,
+        current clamp,, or field recordings (we calculate Rs Rin only for voltage-clamp)
+        
+        
+    Positional parameters:
+    ======================
+    npathways: int - the number of pathways recorded from - must be >= 1
+        
+    mode: int, one of 0, 1, 2 or str, one of "voltage", "current", or "field"
     
     Var-keyword parameters:
     =======================
     
-    "field":bool = flag indicating whether the options are for field recordings
-        (when True) or whole-cell and intracellular recordings (False)
-        Default is False.
-    
     "average":int = number of consecutive single-run trials to average 
         off-line (default: 6).
         
-        A value of 0 indicates no off-line averaging. 
+        NOTE: Any value < 2 indicates no off-line averaging. 
         
     "every":int   = number of consecutive single-run trials to skip before next 
         offline average (default: 6)
+        
+        NOTE: This is only considered when average is >= 2
         
     "reference":int  = number of minute-average responses used to assess 
         plasticity; this is the number of reponses at the end of the chase
@@ -1510,8 +1517,9 @@ def generate_synaptic_plasticity_options(**kwargs):
             
             
     "cursor_measures": dict = cursor-based measurements used in analysis.
-        Can be empty
-        each key is a str (measurement name) that is mapped to a nested dict 
+        Can be empty.
+        
+        Each key is a str (measurement name) that is mapped to a nested dict 
             with the following keys:
         
             "function": a cursor-based signal function as defined in the 
@@ -1545,7 +1553,7 @@ def generate_synaptic_plasticity_options(**kwargs):
             "pathway": int, the index of the pathway where the measurement is
                 performed, or None (applied to both pathways)
                 
-        "epoch_measures": dict: epoch_based measurements
+        "epoch_measures": dict: epoch-based measurements
             Can be empty.
             
             Has a similar structure to cursor_measures, but uses epoch-based
@@ -1561,14 +1569,9 @@ def generate_synaptic_plasticity_options(**kwargs):
             Examples:
             ephys.epoch_average
         
-        Using the examples above:
-        
-        measures[""]
-        
-        
-        
-    "test":int , default = 0 index of the "test" pathway, for dual pathway
-        interleaved experiments.
+    "test":int , default = 0 index of the "test" pathway; for dual pathway
+        interleaved experiments, this is either 0 or 1, and the control payhway
+        is implied.
         
         For data acquired using Clampex with a custom LTP protocol, this 
         represents the index of the test pathway sweep within each run.
@@ -1582,24 +1585,74 @@ def generate_synaptic_plasticity_options(**kwargs):
         also contain two sweeps, with data for the corresponding pathway being 
         averaged acrosss the runs.
     
-    "control":int, default = 1
+    "control":int, or None (default).
+        NOTE: when there are more than one pathway, the control is implied from 
+        the value of the test pathway, which is OK for two pathway experiments.
+        For more than two pathways this SHOULD be specified, and MUST be different
+        from the index of the test pathway.
+        
+    "Im": str, int: name or index of the signal carrying synaptic responses (epscs, for
+        voltage-clamp experiments) or command current (for current-clamp experiments)
+        
+        Default is 0
+        
+        NOTE: This signal must be present in all sweeps!
+        
+    "Vm": str, int: name or index of the signal carrying command voltage (for 
+        voltage-clamp experiments) or synaptic responses (epsp, for current-clamp experiments)
+        
+        Default is 1
+        
+        NOTE: This signal must be present in all sweeps!
+        
+    "triggers": list of signal names or indices containing the digital triggers 
+        for the recorded pathways (e.g. 1st is for pathway 0, etc)
+    
+        Default is [2]
     
     """
-    field = kwargs.pop("field", False)
+    
+    recording_types = {1:"voltage",2:"current", 3:"field"}
+    
+    if npathways < 1:
+        raise ValueError(f"Expecting at least one pathway; got {npathways} instead")
+    
+    if isinstance(mode, str):
+        if mode not in ("voltage", "current", "field"):
+            raise ValueError(f"Invalid mode; expecting one of 'voltage', 'current', 'field'; got {mode} instead")
+        
+    elif isinstance(mode, int):
+        if mode not in [1,2,3]:
+            raise ValueError(f"Invalid mode; expecting 1, 2, or 3; got {mode} instead")
+        
+        mode = recording_types[mode]
+        
+    else:
+        raise TypeError(f"Invalid mode type; expecting a str or int; got {type(mode).__name__} instead")
+    
+    # field = kwargs.pop("field", False)
     
     test_path = kwargs.pop("test", 0)
     
-    if test_path < 0 or test_path > 1:
-        raise ValueError("Invalid test path index (%d); expecting 0 or 1" % test_path)
+    if test_path < 0 or test_path >= npathways:
+        raise ValueError(f"Invalid test path index {test_path}; expecting a value between 0 and {npathways-1}")
     
     control_path = kwargs.pop("control", None)
     
-    if isinstance(control_path, int):
-        if control_path < 0 or control_path > 1:
-            raise ValueError("Invalid control path index (%d) expecting 0 or 1" % control_path)
+    if npathways >= 2:
+        if control_path is None:
+            control_path = 1 if test_path == 0 else 0
+        elif control_path == test_path:
+            raise ValueError(f"control path cannot have the same index ({control_path}) as the test path index ({test_path})")
+    else:
+        control_path = None
         
-        if control_path == test_path:
-            raise ValueError("Control path index must be different from the test path index (%d)" % test_path)
+#     if isinstance(control_path, int):
+#         if control_path < 0 or control_path > 1:
+#             raise ValueError("Invalid control path index (%d) expecting 0 or 1" % control_path)
+#         
+#         if control_path == test_path:
+#             raise ValueError("Control path index must be different from the test path index (%d)" % test_path)
     
     average = kwargs.pop("average", 6)
     average_every = kwargs.pop("every", 6)
@@ -1608,43 +1661,89 @@ def generate_synaptic_plasticity_options(**kwargs):
     
     measure = kwargs.pop("measure", "amplitude")
     
-    cursors = kwargs.pop("cursors", dict())
+    default_cursors_dict = dict()
+    
+    default_cursors_dict["Labels"] = ["Rbase", "Rs", "Rin", "EPSC0Base", "EPSC0Peak", "EPSC1Base", "EPSC1Peak"]
+    default_cursors_dict["Windows"] = [0.01, 0.003, 0.01, 0.01, 0.005, 0.01, 0.005]
+    default_cursors_dict["Pathways"] = list()
+    default_cursors_dict["Pathways"][0] = [0.06, 0.066, 0.16, 0.26, 0.28, 0.31, 0.33]
+    default_cursors_dict["Pathways"][1] = [c + 5 for c in default_cursors_dict["Pathways"][0]]
+    
+    cursors = kwargs.pop("cursors", default_cursors_dict)
+    
+    if len(cursors) == 0:
+        raise ValueError(f"cursors must be specified")
+    
+    Im = kwargs.pop("Im", 0)
+    Vm = kwargs.pop("Vm", 1)
+    triggers = kwargs.pop("triggers", None)
+    
+    if isinstance(triggers, (tuple, list)):
+        if len(triggers) == 0:
+            triggers = None
+            
+        elif len(triggers) > npathways:
+            raise ValueError(f"When specified, triggers must have the same length as the number of pathways or less")
+    
+    pathways = list()
+
+    for k in range(npathways):
+        path = {"Im":Im, "Vm": Vm}
+        path["test"] = k==test_path
+        
+        if k < len(triggers):
+            path["triggers"] = triggers[k]
+            
+        if k < len(cursors["Pathways"]):
+            path["cursors"] = cursors["Pathways"][k]
+            
+        pathways.append(path)
+    
+
+    signals = [Im, Vm]
+    signals.extend(triggers)
     
     LTPopts = dict()
     
     LTPopts["Average"] = {'Count': average, 'Every': average_every}
-    LTPopts["Pathways"] = dict()
+    LTPopts["Pathways"] = pathways
     LTPopts["Pathways"]["Test"] = test_path
     
     if isinstance(control_path, int):
         LTPopts["Pathways"]["Control"] = control_path
         
-    LTPopts["Reference"] = kwargs.get("Reference", 5)
+    LTPopts["Reference"] = reference
+    
+    LTPopts["Signals"] = signals
+    
+    LTPopts["Cursors"] = dict()
+    LTPopts["Cursors"]["Labels"]  = cursors["Labels"]
+    LTPopts["Cursors"]["Windows"] = cursors["Windows"]
     
     
-    if field:
-        LTPopts["Signals"] = kwargs.get("Signals",['Vm_sec_1'])
-        
-        if len(cursors):
-            LTPopts["Cursors"] = cursors
-            
-        else:
-            LTPopts["Cursors"] = {"fEPSP0_10": (0.168, 0.001), 
-                                  "fEPSP0_90": (0.169, 0.001)}
-            
-            #LTPopts["Cursors"] = {'Labels': ['fEPSP0','fEPSP1'],
-                                #'time': [0.168, 0.169], 
-                                #'Pathway1': [5.168, 5.169], 
-                                #'Windows': [0.001, 0.001]} # NOTE: cursor windows are not used here
-            
-        
-    else:
-        LTPopts["Signals"] = kwargs.get("Signals",['Im_prim_1', 'Vm_sec_1'])
-        LTPopts["Cursors"] = {'Labels': ['Rbase','Rs','Rin','EPSC0Base','EPSC0Peak','EPSC1Base','EPSC1peak'],
-                              'Pathway0': [0.06, 0.06579859882206893, 0.16, 0.26, 0.273, 0.31, 0.32334583993039734], 
-                              'Pathway1': [5.06, 5.065798598822069,   5.16, 5.26, 5.273, 5.31, 5.323345839930397], 
-                              'Windows': [0.01, 0.003, 0.01, 0.01, 0.005, 0.01, 0.005]}
-        
+#     if mode=="field":
+#         LTPopts["Signals"] = kwargs.get("Signals",['Vm_sec_1'])
+#         
+#         if len(cursors):
+#             LTPopts["Cursors"] = cursors
+#             
+#         else:
+#             LTPopts["Cursors"] = {"fEPSP0_10": (0.168, 0.001), 
+#                                   "fEPSP0_90": (0.169, 0.001)}
+#             
+#             #LTPopts["Cursors"] = {'Labels': ['fEPSP0','fEPSP1'],
+#                                 #'time': [0.168, 0.169], 
+#                                 #'Pathway1': [5.168, 5.169], 
+#                                 #'Windows': [0.001, 0.001]} # NOTE: cursor windows are not used here
+#             
+#         
+#     else:
+#         LTPopts["Signals"] = kwargs.get("Signals",['Im_prim_1', 'Vm_sec_1'])
+#         LTPopts["Cursors"] = {'Labels': ['Rbase','Rs','Rin','EPSC0Base','EPSC0Peak','EPSC1Base','EPSC1peak'],
+#                               'Pathway0': [0.06, 0.06579859882206893, 0.16, 0.26, 0.273, 0.31, 0.32334583993039734], 
+#                               'Pathway1': [5.06, 5.065798598822069,   5.16, 5.26, 5.273, 5.31, 5.323345839930397], 
+#                               'Windows': [0.01, 0.003, 0.01, 0.01, 0.005, 0.01, 0.005]}
+#         
     
     return LTPopts
     
@@ -1845,21 +1944,21 @@ def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptio
     
     if LTPOptions["Average"] is None:
         baseline = [neoutils.concatenate_blocks(baseline_blocks,
-                                                segment = LTPOptions["Pathway0"],
-                                                analog = LTPOptions["Signals"],
+                                                segments = LTPOptions["Pathway0"],
+                                                analogsignals = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path0_baseline"),
                     neoutils.concatenate_blocks(baseline_blocks,
-                                                segment = LTPOptions["Pathway1"],
-                                                analog = LTPOptions["Signals"],
+                                                segments = LTPOptions["Pathway1"],
+                                                analogsignals = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path1_baseline")]
     else:
-        baseline    = [ephys.average_blocks(baseline_blocks,
+        baseline    = [neoutils.average_blocks(baseline_blocks,
                                             segment = LTPOptions["Pathway0"],
                                             analog = LTPOptions["Signals"],
                                             count = LTPOptions["Average"]["Count"],
                                             every = LTPOptions["Average"]["Every"],
                                             name = result_name_prefix + "_path0_baseline"),
-                    ephys.average_blocks(baseline_blocks,
+                    neoutils.average_blocks(baseline_blocks,
                                             segment = LTPOptions["Pathway1"],
                                             analog = LTPOptions["Signals"],
                                             count = LTPOptions["Average"]["Count"], 
@@ -1872,22 +1971,22 @@ def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptio
     
     if LTPOptions["Average"] is None:
         chase   = [neoutils.concatenate_blocks(chase_blocks,
-                                                segment = LTPOptions["Pathway0"],
-                                                analog = LTPOptions["Signals"],
+                                                segments = LTPOptions["Pathway0"],
+                                                analogsignals = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path0_chase"),
                    neoutils.concatenate_blocks(chase_blocks,
-                                                segment = LTPOptions["Pathway1"],
-                                                analog = LTPOptions["Signals"],
+                                                segments = LTPOptions["Pathway1"],
+                                                analogsignals = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path1_chase")]
         
     else:
-        chase   = [ephys.average_blocks(chase_blocks,
+        chase   = [neoutils.average_blocks(chase_blocks,
                                             segment = LTPOptions["Pathway0"], 
                                             analog = LTPOptions["Signals"],
                                             count = LTPOptions["Average"]["Count"], 
                                             every = LTPOptions["Average"]["Every"],
                                             name = result_name_prefix + "_path0_chase"),
-                   ephys.average_blocks(chase_blocks,
+                   neoutils.average_blocks(chase_blocks,
                                             segment = LTPOptions["Pathway1"], 
                                             analog = LTPOptions["Signals"],
                                             count = LTPOptions["Average"]["Count"], 
@@ -1992,7 +2091,6 @@ def calculate_LTP_measures_in_block(block: neo.Block, \
         When None, then this epoch is supposed to exist (embedded) in every
         segment of the block.
         
-        used in the Vm test pulse
     
         
     Returns:
@@ -2020,13 +2118,15 @@ def calculate_LTP_measures_in_block(block: neo.Block, \
     PPR    = list()
     ISI    = list()
     
-    
     ui = None
     ri = None
     
+    # print(f"calculate_LTP_measures_in_block signal_index_Im, {signal_index_Im}")
     
     if isinstance(signal_index_Im, str):
         signal_index_Im = ephys.get_index_of_named_signal(block, signal_index_Im)
+        
+    # print(f"calculate_LTP_measures_in_block signal_index_Im, {signal_index_Im}")
     
     if isinstance(signal_index_Vm, str):
         signal_index_Vm = ephys.get_index_of_named_signal(block, signal_index_Vm)
@@ -2036,9 +2136,19 @@ def calculate_LTP_measures_in_block(block: neo.Block, \
         
     for (k, seg) in enumerate(block.segments):
         #print("segment %d" % k)
+        if isinstance(signal_index_Im, (tuple, list)):
+            im_signal = signal_index_Im[k]
+        else:
+            im_signal = signal_index_Im
+            
+        if isinstance(signal_index_Vm, (tuple, list)):
+            vm_signal = signal_index_Vm[k]
+        else:
+            vm_signal = signal_index_Vm
+            
         (irbase, rs, rin, epsc0, epsc1, ppr, isi_) = segment_synplast_params_v_clamp(seg, 
-                                                                                    signal_index_Im, 
-                                                                                    signal_index_Vm=signal_index_Vm, 
+                                                                                    im_signal, 
+                                                                                    signal_index_Vm=vm_signal, 
                                                                                     trigger_signal_index=trigger_signal_index,
                                                                                     testVm=testVm, 
                                                                                     stim=stim,
@@ -2196,7 +2306,7 @@ def segment_synplast_params_v_clamp(s: neo.Segment, \
         TriggerEventType.presynaptic) with one or two elements, corresponding to
         the first and, optionally, the second synaptic stimulus trigger.
         
-        When present, it will be used to determine the inter-stimulsu interval.
+        When present, it will be used to determine the inter-stimulus interval.
         
         When absent, the interstimulus interval can be manually specified ("isi"
         parameter, below) or detected from a trigger signal (specified using the
@@ -2551,6 +2661,9 @@ def analyse_LTP_in_pathway(baseline_block: neo.Block, \
         #pass
         
     #else:
+    
+    # print(f"analyse_LTP_in_pathway signal_index_Im = {signal_index_Im}")
+
 
     baseline_result     = calculate_LTP_measures_in_block(baseline_block, signal_index_Im, 
                                                           signal_index_Vm = signal_index_Vm, 
@@ -2597,52 +2710,66 @@ def analyse_LTP_in_pathway(baseline_block: neo.Block, \
     
     return result
 
-def LTP_analysis_new(path0_base:neo.Block, path0_chase:neo.Block, path0_options:dict,\
-                 path1_base:typing.Optional[neo.Block]=None, \
-                 path1_chase:typing.Optional[neo.Block]=None, \
-                 path1_options:typing.Optional[dict]=None,\
-                 basename:typing.Optional[str]=None):
-    """
-    path0_base: neo.Block with minute-averaged sweeps with synaptic responses
-            on pathway 0 before conditioning
-                
-    path0_chase: neo.Block with minute-average sweeps with synaptic reponses
-            on pathway 0 after conditioning
-                
-    path0_options: a mapping (dict-like) wiht the key/value items listed below
-            (these are passed directly as parameters to analyse_LTP_in_pathway):
-                
-            Im: int, str                    index of the Im signal
-            Vm: int, str, None              index of the Vm signal
-            DIG: int, str, None             index of the trigger signal
-            base_epoch: neo.Epoch, None
-            chase_epoch: neo.Epoxh, None
-            testVm: float, python Quantity, None
-            stim: TriggerEvent, None
-            isi: float, Quantity, None
-            normalize: bool
-            field: bool                     Vm must be a valid index
-            is_test: bool
-            v_clamp:bool
-            index: int
-            baseline_sweeps: iterable (sequence of ints, or range)
-                
+# def LTP_analysis_new(path0_base:neo.Block, path0_chase:neo.Block, path0_options:dict,\
+#                  path1_base:typing.Optional[neo.Block]=None, \
+#                  path1_chase:typing.Optional[neo.Block]=None, \
+#                  path1_options:typing.Optional[dict]=None,\
+#                  basename:typing.Optional[str]=None):
+#     """
+#     path0_base: neo.Block with minute-averaged sweeps with synaptic responses
+#             on pathway 0 before conditioning
+#                 
+#     path0_chase: neo.Block with minute-average sweeps with synaptic reponses
+#             on pathway 0 after conditioning
+#                 
+#     path0_options: a mapping (dict-like) wiht the key/value items listed below
+#             (these are passed directly as parameters to analyse_LTP_in_pathway):
+#                 
+#             Im: int, str                    index of the Im signal
+#             Vm: int, str, None              index of the Vm signal
+#             DIG: int, str, None             index of the trigger signal
+#             base_epoch: neo.Epoch, None
+#             chase_epoch: neo.Epoxh, None
+#             testVm: float, python Quantity, None
+#             stim: TriggerEvent, None
+#             isi: float, Quantity, None
+#             normalize: bool
+#             field: bool                     Vm must be a valid index
+#             is_test: bool
+#             v_clamp:bool
+#             index: int
+#             baseline_sweeps: iterable (sequence of ints, or range)
+#                 
+#     
+#     """
+#     pass
     
+def LTP_analysis(mean_average_dict, current_signal, vm_command, /, LTPOptions=None, results_basename=None, normalize=False):
     """
-    pass
+    LTP analysis for voltage-clamp experiments with paired-pulse stimulation
+    interleaved on two pathways.
     
-def LTP_analysis(mean_average_dict, LTPOptions, results_basename=None, normalize=False):
-    """
-    Arguments:
-    ==========
+    Positional arguments:
+    ====================
     mean_average_dict = dictionary (see generate_minute_average_data_for_LTP)
+    
+    current_signal: index or name of the signal carrying synaptic response (EPSCs)
+    
+    vm_command: index or name of the signal carrying the command voltage
+    
+    Named arguments:
+    ================
     result_basename = common prefix for result variables
-    LTPoptions    = dictionary (see generate_LTP_options()); optional, default 
-        is None, expecting that mean_average_dict contains an "LTPOptions"key.
+    LTPoptions      = dictionary (see generate_LTP_options()); optional, default 
+        is None, expecting that mean_average_dict contains an "LTPOptions" key.
+    
+    normalize:bool  = flag whether to calculate EPSC amplitude normalization
+                    default is False
         
     Returns:
     
-    ret_test, ret_control - two dictionaries with results for test and control (as calculated by analyse_LTP_in_pathway)
+    ret_test, ret_control - two dictionaries with results for test and control 
+        (as calculated by analyse_LTP_in_pathway)
     
     NOTE 1: The segments in the blocks inside mean_average_dict must have already been assigned epochs from cursors!
     NOTE 2: The "Test" and "Control" dictionaries in mean_average_dict must contain a field "Path" with the actual path index
@@ -2660,15 +2787,26 @@ def LTP_analysis(mean_average_dict, LTPOptions, results_basename=None, normalize
     elif not isinstance(results_basename, str):
         raise TypeError("results_basename parameter must be a str or None; for %s instead" % type(results_basename).__name__)
     
+    if LTPOptions is None:
+        LTPOptions = mean_average_dict["LTPOptions"]
+    
     ret_test = analyse_LTP_in_pathway(mean_average_dict["Test"]["Baseline"],
-                                 mean_average_dict["Test"]["Chase"], 0, 1, 
+                                 mean_average_dict["Test"]["Chase"], 
+                                 current_signal, 
                                  mean_average_dict["Test"]["Path"], 
+                                 baseline_range=range(-1*LTPOptions["Reference"], -1),
+                                 signal_index_Vm = vm_command,
                                  basename=results_basename+"_test", 
-                                 pathType="Test", 
                                  normalize=normalize)
     
-    ret_control = analyse_LTP_in_pathway(mean_average_dict["Control"]["Baseline"], mean_average_dict["Control"]["Chase"], 0, 1, mean_average_dict["Control"]["Path"], \
-                                basename=results_basename+"_control", pathType="Control", normalize=normalize)
+    ret_control = analyse_LTP_in_pathway(mean_average_dict["Control"]["Baseline"], 
+                                         mean_average_dict["Control"]["Chase"], 
+                                         current_signal,
+                                         mean_average_dict["Control"]["Path"], 
+                                         baseline_range=range(-1*LTPOptions["Reference"], -1),
+                                         signal_index_Vm = vm_command,
+                                         basename=results_basename+"_control", 
+                                         normalize=normalize)
     
     return (ret_test, ret_control)
 

@@ -1,0 +1,18 @@
+### The following packages are installed using pip (inside the CONDA environment), 
+# until they may become available on a conda channel
+# NOTE: It is OK to do use pip for this purpose, see 
+# https://docs.anaconda.com/anaconda-repository/user-guide/tasks/pkgs/use-pkg-managers/#working-with-pypi-packages
+# and
+# https://stackoverflow.com/questions/29286624/how-to-install-pypi-packages-using-anaconda-conda-command
+#
+# MANDATORY packages
+pyabf           # ✓ (pip install pyabf) - no conda package, use upip
+imreg-dft       # ✓ (pip install imgreg-dft)
+nixio           # ✓ (pip install nixio)
+python-magic    # ✓ (pip install python-magic)
+
+#### OPTIONAL packages
+researchpy      # ✓ (pip install researchpy)
+modelspec       # ✓ (pip install modelspec)
+gnuplot_kernel  # ✓ (pip install gnuplot_kernel)
+neuron          # ✓ (pip install neurondoes not install)
