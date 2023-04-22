@@ -3106,8 +3106,9 @@ def _(obj, **kwargs):
 def concatenate_blocks(*args, **kwargs):
     """Concatenates the segments in *args into a new Block.
     
-    Copies of neo.Segment objects in the source data (*args) are appended in the
-    order they are encountered.
+    Copies of neo.Segment objects in the source data (*args) are appended to the
+    in the result in the order they are encountered (i.e. the same order as they
+    are passed in *args).
     
     Optionally a subset of the signals contained in the source data are retained
     in the concatenated Block.

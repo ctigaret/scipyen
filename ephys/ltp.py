@@ -635,7 +635,7 @@ import core.triggerprotocols as tp
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 
 #from core.patchneo import neo
-from core.utilities import safeWrapper
+from core.utilities import safeWrapper, reverse_mapping_lookup
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
@@ -1452,40 +1452,6 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
 def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     """Constructs a dict with options for synaptic plasticity experiments.
     
-    The options specify synaptic pathways, analysis cursors and optional 
-    minute-by-minute averaging of data from synaptic plasticity experiments.
-    
-    All synaptic plasticity experiments have a stimulation pathway 
-    ("test pathway") where synaptic responses are monitored before and after 
-    a conditioning protocol is applied. Homo-synaptic plasticity is considered
-    to occur when the conditioning protocol induces changes in the magnitude
-    of the synaptic response in the conditioned pathway.
-    
-    The "test" pathway is assigned index 0 by default, unless specified 
-    otherwise.
-    
-    Ideally, synaptic responses are also monitored on a "control" pathway, which 
-    is unperturbed during the conditioning, in order to distinguish the changes
-    in synaptic responses in the conditioned ("test") pathway, from changes 
-    induced by other causes conditioned (test) pathway.
-    
-    When a "control" pathway is present, the data from the two pathways is
-    expected to have been recorded in alternative, interleaved sweeps.
-    
-    NOTE: These options are adapted for off-line analysis of data acquired with
-    custom protocols in Clampex.
-    
-    TODO: 
-    1. Accommodate data acquired in Clampex using the built-in LTP protocol
-    2. Accommodate data acquired with CED Signal (v5 and later).
-    3. Allow for single pathway experiments (i.e. test pathway only)
-    4. Allow for monitoring extra synaptic pathways (e.g., cooperative LTP as in
-       Golding et al, Nature 2002)
-    5. Use in acquisition; on-line analysis.
-    6. Heuristic for cursors set up (single or paired pulse?); voltage clamp,
-        current clamp,, or field recordings (we calculate Rs Rin only for voltage-clamp)
-        
-        
     Positional parameters:
     ======================
     npathways: int - the number of pathways recorded from - must be >= 1
@@ -1494,6 +1460,26 @@ def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     
     Var-keyword parameters:
     =======================
+    "pathways": dict with pathway designation, mapping a str (pathway type)
+        to int (pathway index)
+        
+        e.g. {"test":0, "control":1, "ripples": 2, etc}
+        
+        default is {"test":0, "control":1}
+        
+        The keys must contain at least "test".
+        
+        The indices must be valid given the number of pathways in npathways
+        
+    "cursors": dict with vertical cursor coordinates for each pathway where 
+        measurements are made, this must contain the following key-value pairs
+        (default values are show below):
+        
+        "Labels" = ["Rbase", "Rs", "Rin", "EPSC0Base", "EPSC0Peak", "EPSC1Base", "EPSC1Peak"]
+        "Windows" = [0.01, 0.003, 0.01, 0.01, 0.005, 0.01, 0.005]
+        "Pathways" = [
+                        [0.06, 0.066, 0.16, 0.26, 0.28, 0.31, 0.33],
+                        [5.06, 5.066, 5.16, 5.26, 5.28, 5.31, 5.33]]
     
     "average":int = number of consecutive single-run trials to average 
         off-line (default: 6).
@@ -1548,7 +1534,8 @@ def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
                 represented by their parameter tuple (time, window) which can be
                 stored on disk, and used to generate a cursor at runtime.
                 
-            "channel": (optional) if present, it must contain an int
+            "channel": (optional) if present, it must contain an int, which is
+                the index of the signal where the cursors are used
             
             "pathway": int, the index of the pathway where the measurement is
                 performed, or None (applied to both pathways)
@@ -1569,28 +1556,6 @@ def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
             Examples:
             ephys.epoch_average
         
-    "test":int , default = 0 index of the "test" pathway; for dual pathway
-        interleaved experiments, this is either 0 or 1, and the control payhway
-        is implied.
-        
-        For data acquired using Clampex with a custom LTP protocol, this 
-        represents the index of the test pathway sweep within each run.
-        The sampling protocol is expected to record data alternatively
-        from the test and control pathway. 
-        
-        Trials with a single run will be saved to disk as files contains two 
-        sweeps, one for each pathway. 
-        
-        When the protocol specifies several runs per trial, the saved file will
-        also contain two sweeps, with data for the corresponding pathway being 
-        averaged acrosss the runs.
-    
-    "control":int, or None (default).
-        NOTE: when there are more than one pathway, the control is implied from 
-        the value of the test pathway, which is OK for two pathway experiments.
-        For more than two pathways this SHOULD be specified, and MUST be different
-        from the index of the test pathway.
-        
     "Im": str, int: name or index of the signal carrying synaptic responses (epscs, for
         voltage-clamp experiments) or command current (for current-clamp experiments)
         
@@ -1605,11 +1570,49 @@ def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
         
         NOTE: This signal must be present in all sweeps!
         
-    "triggers": list of signal names or indices containing the digital triggers 
+    "stim": list of signal names or indices containing the digital triggers 
         for the recorded pathways (e.g. 1st is for pathway 0, etc)
     
         Default is [2]
     
+    Description
+    ============
+        
+    The function constructs an options dict specifying synaptic pathways, 
+    analysis cursors and optional minute-by-minute averaging of data from 
+    synaptic plasticity experiments.
+    
+    All synaptic plasticity experiments have a stimulation pathway 
+    ("test pathway") where synaptic responses are monitored before and after 
+    a conditioning protocol is applied. Homo-synaptic plasticity is considered
+    to occur when the conditioning protocol induces changes in the magnitude
+    of the synaptic response in the conditioned pathway.
+    
+    The "test" pathway is assigned index 0 by default, unless specified 
+    otherwise.
+    
+    Ideally, synaptic responses are also monitored on a "control" pathway, which 
+    is unperturbed during the conditioning, in order to distinguish the changes
+    in synaptic responses in the conditioned ("test") pathway, from changes 
+    induced by other causes conditioned (test) pathway.
+    
+    When a "control" pathway is present, the data from the two pathways is
+    expected to have been recorded in alternative, interleaved sweeps.
+    
+    NOTE: These options are adapted for off-line analysis of data acquired with
+    custom protocols in Clampex.
+    
+    TODO: 
+    1. Accommodate data acquired in Clampex using the built-in LTP protocol
+    2. Accommodate data acquired with CED Signal (v5 and later).
+    3. Allow for single pathway experiments (i.e. test pathway only)
+    4. Allow for monitoring extra synaptic pathways (e.g., cooperative LTP as in
+       Golding et al, Nature 2002)
+    5. Use in acquisition; on-line analysis.
+    6. Heuristic for cursors set up (single or paired pulse?); voltage clamp,
+        current clamp,, or field recordings (we calculate Rs Rin only for voltage-clamp)
+        
+        
     """
     
     recording_types = {1:"voltage",2:"current", 3:"field"}
@@ -1631,21 +1634,21 @@ def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
         raise TypeError(f"Invalid mode type; expecting a str or int; got {type(mode).__name__} instead")
     
     # field = kwargs.pop("field", False)
-    
-    test_path = kwargs.pop("test", 0)
-    
-    if test_path < 0 or test_path >= npathways:
-        raise ValueError(f"Invalid test path index {test_path}; expecting a value between 0 and {npathways-1}")
-    
-    control_path = kwargs.pop("control", None)
-    
-    if npathways >= 2:
-        if control_path is None:
-            control_path = 1 if test_path == 0 else 0
-        elif control_path == test_path:
-            raise ValueError(f"control path cannot have the same index ({control_path}) as the test path index ({test_path})")
-    else:
-        control_path = None
+#     
+#     test_pathway_index = kwargs.pop("test", 0)
+#     
+#     if test_pathway_index < 0 or test_pathway_index >= npathways:
+#         raise ValueError(f"Invalid test path index {test_pathway_index}; expecting a value between 0 and {npathways-1}")
+#     
+#     control_pathway_index = kwargs.pop("control", None)
+#     
+#     if npathways >= 2:
+#         if control_path is None:
+#             control_path = 1 if test_path == 0 else 0
+#         elif control_path == test_path:
+#             raise ValueError(f"control path cannot have the same index ({control_path}) as the test path index ({test_path})")
+#     else:
+#         control_path = None
         
 #     if isinstance(control_path, int):
 #         if control_path < 0 or control_path > 1:
@@ -1666,52 +1669,55 @@ def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     default_cursors_dict["Labels"] = ["Rbase", "Rs", "Rin", "EPSC0Base", "EPSC0Peak", "EPSC1Base", "EPSC1Peak"]
     default_cursors_dict["Windows"] = [0.01, 0.003, 0.01, 0.01, 0.005, 0.01, 0.005]
     default_cursors_dict["Pathways"] = list()
-    default_cursors_dict["Pathways"][0] = [0.06, 0.066, 0.16, 0.26, 0.28, 0.31, 0.33]
-    default_cursors_dict["Pathways"][1] = [c + 5 for c in default_cursors_dict["Pathways"][0]]
+    default_cursors_dict["Pathways"].append([0.06, 0.066, 0.16, 0.26, 0.28, 0.31, 0.33])
+    default_cursors_dict["Pathways"].append([c + 5 for c in default_cursors_dict["Pathways"][0]])
     
     cursors = kwargs.pop("cursors", default_cursors_dict)
-    
     if len(cursors) == 0:
         raise ValueError(f"cursors must be specified")
     
+    default_pathways = {"test":0}
+    if npathways > 1:
+        default_pathways["control"] = 1
+    
+    pathways = kwargs.pop("pathways", default_pathways)
+    
+    if "test" not in pathways.keys():
+        raise ValueError("The index of the test pathway must be specified")
+
+    if max(pathways.values()) >= npathways:
+        raise ValueError(f"Invalid pathway value {max(pathways.values())} for {npathways} pathways")
+    
     Im = kwargs.pop("Im", 0)
     Vm = kwargs.pop("Vm", 1)
-    triggers = kwargs.pop("triggers", None)
+    stim = kwargs.pop("stim", list())
     
-    if isinstance(triggers, (tuple, list)):
-        if len(triggers) == 0:
-            triggers = None
-            
-        elif len(triggers) > npathways:
-            raise ValueError(f"When specified, triggers must have the same length as the number of pathways or less")
+    if len(stim) > npathways:
+        raise ValueError(f"When specified, triggers must have the same length as the number of pathways or less")
     
-    pathways = list()
+    pathways_conf = list()
 
     for k in range(npathways):
         path = {"Im":Im, "Vm": Vm}
-        path["test"] = k==test_path
         
-        if k < len(triggers):
-            path["triggers"] = triggers[k]
+        if k < len(stim):
+            path["stim"] = stim[k]
             
         if k < len(cursors["Pathways"]):
             path["cursors"] = cursors["Pathways"][k]
             
-        pathways.append(path)
-    
+        path["assignment"] = reverse_mapping_lookup(pathways, k)
+        
+        pathways_conf.append(path)
 
     signals = [Im, Vm]
-    signals.extend(triggers)
+    signals.extend(stim)
     
     LTPopts = dict()
     
     LTPopts["Average"] = {'Count': average, 'Every': average_every}
-    LTPopts["Pathways"] = pathways
-    LTPopts["Pathways"]["Test"] = test_path
-    
-    if isinstance(control_path, int):
-        LTPopts["Pathways"]["Control"] = control_path
-        
+    LTPopts["Pathways"] = pathways_conf
+
     LTPopts["Reference"] = reference
     
     LTPopts["Signals"] = signals
