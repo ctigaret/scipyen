@@ -3901,6 +3901,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         ''' Collect file menu actions & submenus that are built in the UI file. This should be 
             done before loading the plugins.
         '''
+        self.setDockNestingEnabled(True)
         
         # NOTE: 2021-04-15 10:12:33 TODO
         # allow user to choose app style interactively -- 

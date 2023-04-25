@@ -692,7 +692,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # this includes signals in numpy arrays
         self.guiSelectedAnalogSignalEntries = list() # list of signal names sl
         
-        #self.guiSelectedIrregularSignals = list() # signal indices in collection
         # list of irregularly sampled signal names selected from what is available
         # in the current frame, using the combobox for irregularly sampled signals
         self.guiSelectedIrregularSignalEntries = list()
@@ -998,6 +997,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.analogSignalComboBox.clear()
         self.analogSignalComboBox.setCurrentIndex(0)
         self.analogSignalComboBox.currentIndexChanged[int].connect(self.slot_analogSignalsComboBoxIndexChanged)
+        # self.analogSignalComboBox.textActivated[str].connect(self.slot_analogSignalsComboBoxTextActivated)
         
         self.plotAnalogSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
         self.plotAnalogSignalsCheckBox.stateChanged[int].connect(self._slot_plotAnalogSignalsCheckStateChanged_)
@@ -1005,6 +1005,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.irregularSignalComboBox.clear()
         self.irregularSignalComboBox.setCurrentIndex(0)
         self.irregularSignalComboBox.currentIndexChanged[int].connect(self.slot_irregularSignalsComboBoxIndexChanged)
+        # self.irregularSignalComboBox.textActivated[str].connect(self.slot_irregularSignalsComboBoxTextActivated)
         
         self.plotIrregularSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
         self.plotIrregularSignalsCheckBox.stateChanged[int].connect(self._slot_plotIrregularSignalsCheckStateChanged_)
@@ -2033,29 +2034,48 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if current_ndx < 0: # for empty combo this is -1
                 current_ndx = 0
                 
-            current_txt = combo.currentText() # for empty ombo this is ""
+            current_txt = combo.currentText() # for empty combo this is ""
             
-            if current_txt in entries:
-                new_ndx = entries.index(current_txt)
-                
-            elif current_ndx < len(entries):
-                new_ndx = current_ndx
-                new_txt = entries[new_ndx]
-                
+            if combo == self.analogSignalComboBox:
+                signal_selection = self.guiSelectedAnalogSignalEntries
             else:
-                new_ndx = 0
+                signal_selection = self.guiSelectedIrregularSignalEntries
                 
-            if new_ndx < 0:
-                new_ndx = 0
+            selected_signals_for_frame = list()
                 
-            if new_ndx >= len(entries) - 1:
-                new_ndx = 0
+            if len(signal_selection):
+                selected_signals_for_frame = [i for i in signal_selection if i in mapping]
+            else:
+                selected_signals_for_frame = list()
                 
-            # print(f"new_ndx = {new_ndx}")
+            cname = "Analog" if combo == self.analogSignalComboBox else "Irregular"
+            # print(f"{self.__class__.__name__}._populate_signal_chooser_ {cname} selected_signals_for_frame = {selected_signals_for_frame}")
                 
-            combo.clear()
-            combo.addItems(entries)
-            combo.setCurrentIndex(new_ndx)
+            if len(selected_signals_for_frame)>1:
+                new_ndx = len(entries)-1
+                new_txt = entries[-1]
+                combo.setCurrentIndex(new_ndx)
+
+            else:
+                if current_txt in entries:
+                    new_ndx = entries.index(current_txt)
+                    
+                elif current_ndx < len(entries):
+                    new_ndx = current_ndx
+                    new_txt = entries[new_ndx]
+                    
+                else:
+                    new_ndx = 0
+            
+                if new_ndx < 0:
+                    new_ndx = 0
+                    
+                if new_ndx >= len(entries) - 1:
+                    new_ndx = 0
+                    
+                combo.clear()
+                combo.addItems(entries)
+                combo.setCurrentIndex(new_ndx)
         else:
             combo.clear()
         
@@ -2789,27 +2809,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
     # ### BEGIN PyQt slots
     
-    @pyqtSlot(int)
+    @pyqtSlot(str)
     @safeWrapper
-    def slot_analogSignalsComboBoxIndexChanged(self, index):
-        if len(self._frame_analog_map_) == 0:
-            return
-        
-        if index == 0: # "All" selected
-            self.guiSelectedAnalogSignalEntries.clear()
-            
-        elif index == self.analogSignalComboBox.count()-1: # "Choose" selected
-            self.guiSelectedAnalogSignalEntries.clear()
-            # TODO call selection dialog
-            
+    def slot_analogSignalsComboBoxTextActivated(self, txt):
+        if txt == "Choose":
             current_txt = self.analogSignalComboBox.currentText()
             
             available = [self.analogSignalComboBox.itemText(k) for k in range(1, self.analogSignalComboBox.count()-1)]
             
-            if current_txt in available:
-                preSelected = current_txt
-                
-            else:
+            preSelected = [i for i in self.guiSelectedAnalogSignalEntries if i in available]
+            
+            if len(preSelected) == 0:
                 preSelected = None
                 
             dlg = ItemsListDialog(parent=self,
@@ -2824,6 +2834,47 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 if len(sel_items):
                     self.guiSelectedAnalogSignalEntries[:] = sel_items[:]
+                    
+    @pyqtSlot(int)
+    @safeWrapper
+    def slot_analogSignalsComboBoxIndexChanged(self, index):
+        # print(f"{self.__class__.__name__}.slot_analogSignalsComboBoxIndexChanged index = {index}")
+        # self.analogSignalComboBox.textActivated[str].disconnect(self.slot_analogSignalsComboBoxTextActivated)
+        # try:
+        #     self.analogSignalComboBox.textActivated[str].disconnect()
+        # except:
+        #     pass
+        
+        if len(self._frame_analog_map_) == 0:
+            return
+        
+        if index == 0: # "All" selected
+            self.guiSelectedAnalogSignalEntries.clear()
+            
+        elif index == self.analogSignalComboBox.count()-1: # "Choose" selected
+            # self.guiSelectedAnalogSignalEntries.clear()
+            
+            available = [self.analogSignalComboBox.itemText(k) for k in range(1, self.analogSignalComboBox.count()-1)]
+            
+            preSelected = [i for i in self.guiSelectedAnalogSignalEntries if i in available]
+            
+            if len(preSelected) == 0:
+                preSelected = None
+            
+            dlg = ItemsListDialog(parent=self,
+                                       itemsList = available,
+                                       preSelected=preSelected,
+                                       title="Select Analog Signals to Plot",
+                                       modal = True,
+                                       selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
+            
+            if dlg.exec() == 1:
+                sel_items = dlg.selectedItemsText
+                
+                if len(sel_items):
+                    self.guiSelectedAnalogSignalEntries[:] = sel_items[:]
+                    # self.analogSignalComboBox.textActivated[str].connect(self.slot_analogSignalsComboBoxTextActivated)
+                
                     
         else:
             self.guiSelectedAnalogSignalEntries = [self.analogSignalComboBox.currentText()]
@@ -2882,29 +2933,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def slot_reportCursorPosition(self, crsId = None):
         self.reportCursors()
         
-    @pyqtSlot(int)
+    @pyqtSlot(str)
     @safeWrapper
-    def slot_irregularSignalsComboBoxIndexChanged(self, index):
-        if len(self._frame_irregs_map_) == 0 :
-            return
-        if index == 0:
-            # "All" selected ⇒ display all signals
-            self.guiSelectedIrregularSignalEntries.clear()
-            
-        elif index == self.irregularSignalComboBox.count()-1:
-            # "Choose" ⇒ popup up dialog to select which signal to choose
-            self.guiSelectedIrregularSignalEntries.clear()
-            
-            current_txt = self.irregularSignalComboBox.currentText()
-        
+    def slot_irregularSignalsComboBoxTextActivated(self, txt):
+        if txt == "Choose":
             available = [self.irregularSignalComboBox.itemText(k) for k in range(1, self.irregularSignalComboBox.count()-1)]
             
-            if current_txt in available:
-                preSelected = current_txt
-                
-            else:
-                preSelected=None
-            
+            preSelected = [i for i in self.guiSelectedIrregularSignalEntries if i in available]
+            if len(preSelected) == 0:
+                preSelected = None
+
             dlg = ItemsListDialog(parent=self, 
                                        itemsList = available, 
                                        preSelected = preSelected,
@@ -2917,6 +2955,43 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 if len(sel_items):
                     self.guiSelectedIrregularSignalEntries[:] = sel_items[:]
+            
+    @pyqtSlot(int)
+    @safeWrapper
+    def slot_irregularSignalsComboBoxIndexChanged(self, index):
+        # self.irregularSignalComboBox.textActivated[str].connect(self.slot_irregularSignalsComboBoxTextActivated)
+        # try:
+        #     self.irregularSignalComboBox.textActivated[str].disconnect()
+        # except:
+        #     pass
+                
+        if len(self._frame_irregs_map_) == 0 :
+            return
+        if index == 0:
+            # "All" selected ⇒ display all signals
+            self.guiSelectedIrregularSignalEntries.clear()
+            
+        elif index == self.irregularSignalComboBox.count()-1:
+            # "Choose" ⇒ popup up dialog to select which signal to choose
+            available = [self.irregularSignalComboBox.itemText(k) for k in range(1, self.irregularSignalComboBox.count()-1)]
+            
+            preSelected = [i for i in self.guiSelectedIrregularSignalEntries if i in available]
+            if len(preSelected) == 0:
+                preSelected = None
+
+            dlg = ItemsListDialog(parent=self, 
+                                       itemsList = available, 
+                                       preSelected = preSelected,
+                                       title="Select Irregular Signals to Plot", 
+                                       modal=True,
+                                       selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
+            
+            if dlg.exec() == 1:
+                sel_items = dlg.selectedItemsText
+                
+                if len(sel_items):
+                    self.guiSelectedIrregularSignalEntries[:] = sel_items[:]
+                    # self.irregularSignalComboBox.textActivated[str].connect(self.slot_irregularSignalsComboBoxTextActivated)
                     
         else:
             self.guiSelectedIrregularSignalEntries = [self.irregularSignalComboBox.currentText()]
@@ -7242,14 +7317,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         Plots the signals (optionally the selected ones) present in a segment, 
         and the associated epochs, events, and spike trains.
         """
-        plotTitle = kwargs.pop("plotTitle", getattr(obj, "name", "Segment"))
-        
         analog = obj.analogsignals
         irregs = obj.irregularlysampledsignals
         spiketrains = get_non_empty_spike_trains(obj.spiketrains)
         # spiketrains = obj.spiketrains
         events = get_non_empty_events(obj.events)
         epochs = get_non_empty_epochs(obj.epochs)
+        plotTitle = kwargs.pop("plotTitle", getattr(obj, "name", "Segment"))
         
         self._plot_signals_(analog, irregs, *args, **kwargs)
         # print(f"{self.__class__.__name__}._plot_data_(obj<{type(obj).__name__}>) minX = {minX}, maxX = {maxX}")
@@ -7660,47 +7734,38 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             guiSelection = self.guiSelectedIrregularSignalEntries
             mapping = self._frame_irregs_map_
             
+        # cname = "Analog" if signalCBox == self.analogSignalComboBox else "Irregular"
+        # print(f"{self.__class__.__name__}._signals_select_ {cname} guiSelection = {guiSelection}")
+        
         selected_signals = list()
         selected_signal_names = list()
         selected_signal_ndx = list()
         selected_signal_axis_names = list()
         
-        current_ndx = signalCBox.currentIndex() 
-        current_txt = signalCBox.currentText()
-        cboxSignames = list(signalCBox.itemText(k) for k in range(1, signalCBox.count()-1))
-        
-        if current_ndx == 0: # "All" selected
+        if len(guiSelection):
+            selected_signal_axis_names = guiSelection
+            selected_signal_ndx, selected_signal_names = zip(*list(mapping[k] for k in selected_signal_axis_names))
+            # selected_signal_ndx = [mapping[k][0] for k in guiSelection]
+            selected_signals = [signals[ndx] for ndx in selected_signal_ndx]
+            
+        else:
             selected_signals[:] = signals[:]
             selected_signal_ndx = range(len(signals))
             selected_signal_names = list(x[1] for x in mapping.values())
             selected_signal_axis_names = list(mapping.keys())
-            
-        elif current_ndx == signalCBox.count() - 1: # "Choose" selected
-            # read the multiple choices previously set up by a dialog
-            # selected_analogs = list()
-            if len(guiSelection):
-                for entry in guiSelection:
-                    ndx, sig_name = mapping[entry]
-                    selected_signal_names.append(sig_name)
-                    selected_signal_ndx.append(ndx)
-                    selected_signals.append(signals[ndx])
-                    selected_signal_axis_names.append(entry)
-                    
-        elif current_ndx > -1: # any single signal selected
-            ndx, sig_name = mapping[current_txt]
-            selected_signal_names.append(sig_name)
-            selected_signal_ndx.append(ndx)
-            selected_signals.append(signals[ndx])
-            selected_signal_axis_names.append(current_txt)
-                
+        
+        current_ndx = signalCBox.currentIndex() 
+        current_txt = signalCBox.currentText()
+        # print(f"{self.__class__.__name__}._signals_select_ {cname} current_ndx = {current_ndx}, current_txt = {current_txt}")
+        
         return selected_signals, selected_signal_names, selected_signal_ndx, selected_signal_axis_names
     
     @safeWrapper
     def _plot_signals_(self, analog, irregs, *args, **kwargs):
         """Common landing zone for plotting collections (sequences) of signals.
         
-        By signals I mean neo.AnalogSignal, DataSignal, neo.IrregularlySampledSignal
-        and IrregularlySampledDataSignal.
+        Signals are neo.AnalogSignal, DataSignal, neo.IrregularlySampledSignal
+        and IrregularlySampledDataSignal objects.
         
         The collections are passed as part of a segment, or as standalone objects.
         
@@ -8748,8 +8813,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             label=lbl, show_value = self.setCursorsShowValue.isChecked(),
                             axis=ax[k])
 
-
-            
     @safeWrapper
     def _reportMouseCoordinatesInAxis_(self, pos, plotitem):
         if isinstance(plotitem, pg.PlotItem):
