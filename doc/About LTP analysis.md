@@ -140,6 +140,17 @@ The call [above](#gen_ltp_dict) returns a `dict` containing:
 * `Test`:`dict` with data for the `test` pathway - same structure as the `Control`, shown [above](#Control_subdict).
 * `LTPOptions`:`dict` a copy of the LTP options object passed as argument (see [above](#gen_ltp_dict))
 
+#### 3.1 If you want more atomic control of this step:
+
+* collect the blocks in two separate lists, e.g. `baseline_blocks` and `chase_blocks`
+* concatenate the sweeps (i.e., `segments`) corresponding to each pathway in separate blocks, e.g.:
+```python
+path0_baseline = neoutils.concatenate_blocks(baseline_blocks, segments = 0, analogsignals = LTPOptions["Signals"], name = result_name_prefix + "_path0_baseline")
+
+path1_baseline = neoutils.concatenate_blocks(baseline_blocks, segments = 1, analogsignals = LTPOptions["Signals"], name = result_name_prefix + "_path1_baseline")
+```
+
+
 ### 4. View the [`ltp_data`](#gen_ltp_dict) (double-click in the `User Variables` table to open it in a `DataViewer`).
 
 Expand the tree and right-click on, say, the `Control/Baseline` then select `View` to view this in a `SignalViewer` window.
