@@ -472,6 +472,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         super(QMainWindow, self).__init__(parent)
         
+        # NOTE: 2023-04-26 12:07:26
+        # for each axis, the following has a tuple of offset, factor
+        # where:
+        # • offset is the difference between the view range leftmost point and
+        #   the leftmost domain value
+        # • factor is the ratio between the vew range and data domain range
+        self._axes_X_view_states_ = list()
+        
         # define these early
         self._xData_ = None
         self._yData_ = None
@@ -6621,6 +6629,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         ax = self.sender()
         
+        ax_ndx = self.axes.index(ax)
+        
+        # print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed ax_ndx = {ax_ndx}")
+        
+        if len(self._axes_X_view_states_) == 0:
+            self._get_axes_X_view_states_()
+        else:
+            self._axes_X_view_states_[ax_ndx] = self._get_axis_X_view_state(ax)
+        
         if self.currentFrame in self._cached_epochs_:
             if len(self._cached_epochs_[self.currentFrame]):
                 self._plotEpochs_(from_cache=True)
@@ -6764,7 +6781,81 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
         self._align_X_range()
         
-          
+        
+    def _get_axes_X_view_states_(self):
+        self._axes_X_view_states_.clear()
+        for ax in self.axes:
+            data_x_range = self._get_axis_data_X_range_(ax)
+            
+            if any(v is None for v in data_x_range):
+                self._axes_X_view_states_.append((None, None))
+            
+            else:
+                view_x_range = ax.vb.viewRange()[0]
+                
+                offset = view_x_range[0] - data_x_range[0]
+                
+                factor = (view_x_range[1] - view_x_range[0]) / (data_x_range[1] - data_x_range[0])
+                
+                self._axes_X_view_states_.append((offset, factor))
+                
+    def _get_axis_X_view_state(self, ax:typing.Union[int, pg.PlotItem]):
+        if isinstance(ax, pg.PlotItem):
+            if ax not in self.axes:
+                raise ValueError(f"Axis {ax} not found in this viewer")
+            ax_ndx = self.axes.index(ax)
+            
+        elif isinstance(ax, int):
+            if ax not in range(self.axes):
+                raise ValueError(f"Invalid axis index {ax} for {len(self.axes)} axes")
+            
+            ax_ndx = ax
+            ax = self.axes[ax_ndx]
+            
+        else:
+            raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(ax).__name__} instead")
+        
+        data_x_range = self._get_axis_data_X_range_(ax)
+        
+        if any(v is None for v in data_x_range):
+            return (None, None)
+        else:
+            view_x_range = ax.vb.viewRange()[0]
+            
+            offset = view_x_range[0] - data_x_range[0]
+            
+            factor = (view_x_range[1] - view_x_range[0]) / (data_x_range[1] - data_x_range[0])
+            
+            return (offset, factor)
+            
+        
+    def _get_axis_data_X_range_(self, axis:typing.Union[int, pg.PlotItem]):
+        if isinstance(axis, int):
+            if axis not in range(len(self.axes)):
+                raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
+            
+            axis = self.axes[axis]
+            
+        elif isinstance(axis, pg.PlotItem):
+            if axis not in self.axes:
+                raise ValueError(f"Axis {axis} is not in this viewer")
+            
+        else:
+            raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(axis).__name__} instead")
+        
+        pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
+        
+        if len(pdis):
+            items_min_x, items_max_x = zip(*list((float(np.nanmin(i.xData)), float(np.nanmax(i.xData))) for i in pdis))
+            
+            min_x = items_min_x[0] if isinstance(items_min_x, (tuple, list)) else items_min_x
+            max_x = items_max_x[0] if isinstance(items_max_x, (tuple, list)) else items_max_x
+            
+            return [min_x, max_x]
+            
+        else:
+            return [None, None]
+        
     def _align_X_range(self, padding:typing.Optional[float] = None):
         """ Heuristic to align plot items X axis:
         • if the plotitems have x boundaries that overlap then align them
@@ -6787,80 +6878,109 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
         
+        if len(visibleAxes) == 0:
+            return
+        
         if len(visibleAxes) == 1:
             ax = visibleAxes[0]
-            pdis = [i for i in ax.items if isinstance(i, pg.PlotDataItem)]
-            if len(pdis):
-                items_min_x, items_max_x = zip(*list((float(np.nanmin(i.xData)), float(np.nanmax(i.xData))) for i in pdis))
-                min_x = items_min_x[0] if isinstance(items_min_x, (tuple, list)) else items_min_x
-                max_x = items_max_x[0] if isinstance(items_max_x, (tuple, list)) else items_max_x
-            ax.setXRange(min_x, max_x, padding = padding)
+            
+            min_x, max_x = self._get_axis_data_X_range_(ax)
+            
+            if any(v is None for v in (min_x, max_x)):
+                return
+            
+            # NOTE: 2023-04-26 12:19:23
+            # restore the view state: offset from leftmost domain limit, and 
+            # view factor (a.k.a "zoom")
+            # see NOTE: 2023-04-26 12:07:26
+            # each element is the tuple (offset, factor) where BOTH are either a number, or None
+            if len(self._axes_X_view_states_) and all(v is not None for v in self._axes_X_view_states_[0]):
+                v0 = min_x + self._axes_X_view_states_[0][0]
+                v1 = v0 + (max_x - min_x) * self._axes_X_view_states_[0][1]
+                # print(f"{self.__class__.__name__}._align_X_range v0 = {v0} ; v1 = {v1}")
+                ax.setXRange(v0, v1, padding=padding)
+                
+            else:
+                ax.setXRange(min_x, max_x, padding = padding)
+            
             visibleAxes[0].getAxis("bottom").showLabel(True)
             visibleAxes[0].getAxis("bottom").setStyle(showValues = True)
         
-        axes_with_X_overlap = list()
-        minX, maxX = None, None
-        
-        for k, ax in enumerate(self.axes):
-            if ax.isVisible():
-                pdis = [i for i in ax.items if isinstance(i, pg.PlotDataItem)]
-                if len(pdis) == 0:
-                    continue
-                items_min_x, items_max_x = zip(*list((float(np.nanmin(i.xData)), float(np.nanmax(i.xData))) for i in pdis))
-                min_x = items_min_x[0] if isinstance(items_min_x, (tuple, list)) else items_min_x
-                max_x = items_max_x[0] if isinstance(items_max_x, (tuple, list)) else items_max_x
-                # print(f"min_x = {min_x}, max_x = {max_x}")
-                if k == 0 or any(v is None for v in (minX, maxX)):
-                    minX = min_x
-                    maxX = max_x
-                    axes_with_X_overlap.append(ax)
-                    
-                else:
-                    if min_x > maxX: 
-                        # this axis X domain does not overlap with the one from prev axis
-                        ax.setXRange(min_x, max_x, padding = padding)
-                        # ax.getAxis("bottom").showLabel(True)
-                        # ax.getAxis("bottom").setStyle(showValues=True)
-                    else:
-                        minX = min(minX, min_x) # allow growing to the left
-                        maxX = max(maxX, max_x) # allow growing to the right
-                        axes_with_X_overlap.append(ax)
-                        
-        # NOTE: 2023-01-17 17:43:47
-        # hide X axis values for axes with same X boundaries ONLY if their X dmain have same units (as described in the label)
-        for kax, ax in enumerate(self.axes):
-            if ax.isVisible():
-                # print(f"minX = {minX}, maxX = {maxX}")
-                if ax in axes_with_X_overlap and all(isinstance(v, float) for v in (minX, maxX)):
-                    ax.setXRange(minX, maxX, padding = padding)
-                if kax > 0:
-                    ndx = kax - 1
-                    prev_ax = None
-                    while ndx >= 0:
-                        prev_ax = self.axes[ndx]
-                        if prev_ax.isVisible():
-                            break
-                        ndx -= 1
-                        if ndx < 0:
-                            break
-                        
-                    if prev_ax is None or not prev_ax.isVisible():
+        else:
+            axes_with_X_overlap = list()
+            minX, maxX = None, None
+            
+            for k, ax in enumerate(self.axes):
+                if ax.isVisible():
+                    min_x, max_x = self._get_axis_data_X_range_(ax)
+                    if any(v is None for v in (min_x, max_x)):
                         continue
-                    sameLabel = ax.getAxis("bottom").labelText == prev_ax.getAxis("bottom").labelText
-                    # print(f"kax {kax} sameLabel {sameLabel}: ax {kax-1} {prev_ax.getAxis('bottom').labelText} ; ax {kax} {ax.getAxis('bottom').labelText} ")
-                    prev_ax.getAxis("bottom").showLabel(not sameLabel)
-                    if ax in axes_with_X_overlap: # also hide axis values if same boundaries
-                        prev_ax.getAxis("bottom").setStyle(showValues=False)
+                    if len(self._axes_X_view_states_) and all(v is not None for v in self._axes_X_view_states_[k]):
+                        v0 = min_x + self._axes_X_view_states_[k][0]
+                        v1 = v0 + (max_x - min_x) * self._axes_X_view_states_[k][1]
+                        ax.setXRange(v0, v1, padding=padding)
+                    else:
+                        if k == 0 or any(v is None for v in (minX, maxX)):
+                            minX = min_x
+                            maxX = max_x
+                            
+                            axes_with_X_overlap.append(ax)
+                            
+                        else:
+                            if min_x > maxX: 
+                                # this axis X domain does not overlap with the one from prev axis
+                                ax.setXRange(min_x, max_x, padding = padding)
+                            else:
+                                minX = min(minX, min_x) # allow growing to the left
+                                maxX = max(maxX, max_x) # allow growing to the right
+                                
+                                axes_with_X_overlap.append(ax)
+                        
+            # NOTE: 2023-01-17 17:43:47
+            # update visibility ansd view range for axes with overlapping domains
+            # hide X axis values for axes with same X boundaries ONLY if their X 
+            # domain have same units (as described in the label)
+            for kax, ax in enumerate(self.axes):
+                if ax.isVisible():
+                    # print(f"minX = {minX}, maxX = {maxX}")
+                    if ax in axes_with_X_overlap and all(isinstance(v, float) for v in (minX, maxX)):
+                        if len(self._axes_X_view_states_) and all(v is not None for v in self._axes_X_view_states_[k]):
+                            v0 = min_x + self._axes_X_view_states_[k][0]
+                            v1 = v0 + (max_x - min_x) * self._axes_X_view_states_[k][1]
+                            ax.setXRange(v0, v1, padding=padding)
+                        else:
+                            ax.setXRange(minX, maxX, padding = padding)
+                        
+                    if kax > 0:
+                        ndx = kax - 1
+                        prev_ax = None
+                        while ndx >= 0:
+                            prev_ax = self.axes[ndx]
+                            if prev_ax.isVisible():
+                                break
+                            ndx -= 1
+                            if ndx < 0:
+                                break
+                            
+                        if prev_ax is None or not prev_ax.isVisible():
+                            continue
+                        sameLabel = ax.getAxis("bottom").labelText == prev_ax.getAxis("bottom").labelText
+
+                        prev_ax.getAxis("bottom").showLabel(not sameLabel)
+
+                        if ax in axes_with_X_overlap: # also hide axis values if same boundaries
+                            prev_ax.getAxis("bottom").setStyle(showValues=False)
+                        
+                    # ALWAYS show X axis label & values on the bottom axis
+                    self.axes[-1].getAxis("bottom").showLabel(True)
+                    self.axes[-1].getAxis("bottom").setStyle(showValues = True)
                     
-                # ALWAYS show X axis label & values on the bottom axis
-                self.axes[-1].getAxis("bottom").showLabel(True)
-                self.axes[-1].getAxis("bottom").setStyle(showValues = True)
-                
-                if self.signalAxes[-1].isVisible:
-                    self.signalAxes[-1].getAxis("bottom").showLabel(True)
-                    self.signalAxes[-1].getAxis("bottom").setStyle(showValues = True)
+                    if self.signalAxes[-1].isVisible:
+                        self.signalAxes[-1].getAxis("bottom").showLabel(True)
+                        self.signalAxes[-1].getAxis("bottom").setStyle(showValues = True)
                     
-                    
+        self._get_axes_X_view_states_()
+        
     @safeWrapper
     def _plotSpikeTrains_(self, trains:typing.Optional[typing.Union[neo.SpikeTrain, neo.core.spiketrainlist.SpikeTrainList, tuple, list]] = None, clear:bool = False, plotLabelText = None, **kwargs):
         """Common landing zone for SpikeTrainList or collection of SpikeTrain.
@@ -8441,9 +8561,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.signalsLayout.removeItem(self._spiketrains_axis_)
             
         if len(self.signalAxes) < self._n_signal_axes_:
-            # there exist fewer signal axes than needed - create here as necessary
+            # there are fewer signal axes than needed - create here as necessary
+            
             for k, plotItem in enumerate(self.signalAxes):
-                # re-use existing PlotItem objects
+                # re-use & update existing PlotItem objects
                 plotname = f"signal_axis_{k}"
                 self._register_plot_item_name_(plotItem, plotname)
                 plotItem.setVisible(False)

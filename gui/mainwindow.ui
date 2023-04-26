@@ -23,6 +23,9 @@
   <property name="windowTitle">
    <string>Scipyen</string>
   </property>
+  <property name="windowIcon">
+   <iconset theme="python"/>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <property name="sizePolicy">
     <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
