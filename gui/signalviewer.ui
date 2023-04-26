@@ -167,9 +167,94 @@
     </property>
     <addaction name="actionShow_Legends"/>
     <addaction name="actionIgnore_empty_spike_trains"/>
+    <addaction name="actionLink_X_axes"/>
+   </widget>
+   <widget class="QMenu" name="cursorsMenu">
+    <property name="title">
+     <string>Cursors</string>
+    </property>
+    <widget class="QMenu" name="addCursorsMenu">
+     <property name="title">
+      <string>Add Cursors</string>
+     </property>
+     <widget class="QMenu" name="addMultiAxesCursorMenu">
+      <property name="title">
+       <string>Multi-axis</string>
+      </property>
+      <addaction name="addMultiAxisVCursorAction"/>
+      <addaction name="addMultiAxisCCursorAction"/>
+      <addaction name="separator"/>
+      <addaction name="addDynamicMultiAxisVCursorAction"/>
+      <addaction name="addDynamicMultiAxisCCursorAction"/>
+     </widget>
+     <addaction name="addMultiAxesCursorMenu"/>
+     <addaction name="addVerticalCursorAction"/>
+     <addaction name="addHorizontalCursorAction"/>
+     <addaction name="addCrosshairCursorAction"/>
+     <addaction name="separator"/>
+     <addaction name="addDynamicVerticalCursorAction"/>
+     <addaction name="addDynamicHorizontalCursorAction"/>
+     <addaction name="addDynamicCrosshairCursorAction"/>
+    </widget>
+    <widget class="QMenu" name="editCursorsMenu">
+     <property name="title">
+      <string>Edit Cursor</string>
+     </property>
+     <addaction name="editAnyCursorAction"/>
+     <addaction name="editCursorAction"/>
+    </widget>
+    <widget class="QMenu" name="removeCursorsMenu">
+     <property name="title">
+      <string>Remove Cursors</string>
+     </property>
+     <addaction name="removeCursorAction"/>
+     <addaction name="removeSelectedCursorAction"/>
+     <addaction name="removeAllCursorsAction"/>
+    </widget>
+    <widget class="QMenu" name="cursorsColorsMenu">
+     <property name="title">
+      <string>Cursor Colors</string>
+     </property>
+     <addaction name="verticalCursorColorsAction"/>
+     <addaction name="horizontalCursorColorsAction"/>
+     <addaction name="crosshairCursorColorsAction"/>
+     <addaction name="cursorHoverColorAction"/>
+    </widget>
+    <addaction name="addCursorsMenu"/>
+    <addaction name="editCursorsMenu"/>
+    <addaction name="removeCursorsMenu"/>
+    <addaction name="separator"/>
+    <addaction name="setCursorsShowValue"/>
+    <addaction name="setCursorsLabelPrecisionAction"/>
+    <addaction name="cursorsColorsMenu"/>
+   </widget>
+   <widget class="QMenu" name="epochsMenu">
+    <property name="title">
+     <string>Epochs</string>
+    </property>
+    <widget class="QMenu" name="makeEpochsMenu">
+     <property name="title">
+      <string>Make Epochs</string>
+     </property>
+     <addaction name="epochsFromCursorsAction"/>
+     <addaction name="epochFromSelectedCursorAction"/>
+     <addaction name="epochBetweenCursorsAction"/>
+    </widget>
+    <widget class="QMenu" name="makeEpochsInDataMenu">
+     <property name="title">
+      <string>Make Epocks In Data</string>
+     </property>
+     <addaction name="epochsInDataFromCursorsAction"/>
+     <addaction name="epochInDataFromSelectedCursorAction"/>
+     <addaction name="epochInDataBetweenCursors"/>
+    </widget>
+    <addaction name="makeEpochsMenu"/>
+    <addaction name="makeEpochsInDataMenu"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuTools"/>
+   <addaction name="cursorsMenu"/>
+   <addaction name="epochsMenu"/>
    <addaction name="menuSettings"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -221,6 +306,18 @@
      </item>
     </layout>
    </widget>
+  </widget>
+  <widget class="QToolBar" name="mainToolBar">
+   <property name="windowTitle">
+    <string>MainToolbar</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="actionLink_X_axes"/>
   </widget>
   <action name="actionClose">
    <property name="text">
@@ -311,6 +408,174 @@
    </property>
    <property name="text">
     <string>Ignore empty spike trains</string>
+   </property>
+  </action>
+  <action name="setCursorsShowValue">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Cursors Show Value</string>
+   </property>
+  </action>
+  <action name="setCursorsLabelPrecisionAction">
+   <property name="text">
+    <string>Cursor Label Precision...</string>
+   </property>
+  </action>
+  <action name="addVerticalCursorAction">
+   <property name="text">
+    <string>Vertical</string>
+   </property>
+  </action>
+  <action name="addHorizontalCursorAction">
+   <property name="text">
+    <string>Horizontal</string>
+   </property>
+  </action>
+  <action name="addMultiAxisVCursorAction">
+   <property name="text">
+    <string>Vertical</string>
+   </property>
+  </action>
+  <action name="addMultiAxisCCursorAction">
+   <property name="text">
+    <string>Crosshair</string>
+   </property>
+  </action>
+  <action name="addDynamicMultiAxisVCursorAction">
+   <property name="text">
+    <string>Dynamic Vertical</string>
+   </property>
+  </action>
+  <action name="addDynamicMultiAxisCCursorAction">
+   <property name="text">
+    <string>Dynamic Crosshair</string>
+   </property>
+  </action>
+  <action name="addCrosshairCursorAction">
+   <property name="text">
+    <string>Crosshair</string>
+   </property>
+  </action>
+  <action name="addDynamicVerticalCursorAction">
+   <property name="text">
+    <string>Dynamic Vertical</string>
+   </property>
+  </action>
+  <action name="addDynamicHorizontalCursorAction">
+   <property name="text">
+    <string>Dynamic Horizontal</string>
+   </property>
+  </action>
+  <action name="addDynamicCrosshairCursorAction">
+   <property name="text">
+    <string>Dynamic Crosshair</string>
+   </property>
+  </action>
+  <action name="editAnyCursorAction">
+   <property name="text">
+    <string>Choose...</string>
+   </property>
+  </action>
+  <action name="editCursorAction">
+   <property name="text">
+    <string>Selected...</string>
+   </property>
+  </action>
+  <action name="removeCursorAction">
+   <property name="text">
+    <string>Remove A Cursor...</string>
+   </property>
+  </action>
+  <action name="removeSelectedCursorAction">
+   <property name="text">
+    <string>Remove Selected Cursor</string>
+   </property>
+  </action>
+  <action name="removeAllCursorsAction">
+   <property name="text">
+    <string>Remove All Cursors</string>
+   </property>
+  </action>
+  <action name="verticalCursorColorsAction">
+   <property name="text">
+    <string>Vertical  Cursor Colors</string>
+   </property>
+  </action>
+  <action name="horizontalCursorColorsAction">
+   <property name="text">
+    <string>Horizontal Cursor Colors</string>
+   </property>
+  </action>
+  <action name="crosshairCursorColorsAction">
+   <property name="text">
+    <string>Crosshair Cursor Colors</string>
+   </property>
+  </action>
+  <action name="cursorHoverColorAction">
+   <property name="text">
+    <string>Cursor Hover Color</string>
+   </property>
+  </action>
+  <action name="epochsFromCursorsAction">
+   <property name="text">
+    <string>From Vertical Cursors</string>
+   </property>
+  </action>
+  <action name="epochFromSelectedCursorAction">
+   <property name="text">
+    <string>From Selected Vertical Cursor</string>
+   </property>
+  </action>
+  <action name="epochBetweenCursorsAction">
+   <property name="text">
+    <string>Between Two Vertical Cursors</string>
+   </property>
+  </action>
+  <action name="epochsInDataFromCursorsAction">
+   <property name="text">
+    <string>From Vertical Cursors</string>
+   </property>
+  </action>
+  <action name="epochInDataFromSelectedCursorAction">
+   <property name="text">
+    <string>From Selected Vertical Cursor</string>
+   </property>
+  </action>
+  <action name="epochInDataBetweenCursors">
+   <property name="text">
+    <string>Between Two Vertical Cursors</string>
+   </property>
+  </action>
+  <action name="actionLink_X_axes">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="link">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Link X axes</string>
+   </property>
+   <property name="toolTip">
+    <string>Link all X axes</string>
+   </property>
+  </action>
+  <action name="actionUnlink_X_Axes">
+   <property name="icon">
+    <iconset theme="remove-link">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Unlink X Axes</string>
+   </property>
+   <property name="toolTip">
+    <string>Unlink all X axes</string>
    </property>
   </action>
  </widget>
