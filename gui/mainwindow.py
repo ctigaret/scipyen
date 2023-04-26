@@ -2622,8 +2622,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.cwd = os.getcwd()
             self._setRecentDirectory_(self.cwd)
             self._updateFileSystemView_(self.cwd, False)
-            #self.fileSystemTreeView.scrollTo(self.fileSystemModel.index(self.cwd))
-            #self.fileSystemTreeView.setCurrentIndex(self.fileSystemModel.index(self.cwd))
             self._resizeFileColumn_()
             self._refreshRecentDirsComboBox_()
             
@@ -3664,11 +3662,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def slot_pasteWorkspaceSelection(self):
         self.slot_copyWorkspaceSelection()
-        #if quoted:
-            #self.slot_copyWorkspaceSelectionQuoted()
-        #else:
-            #self.slot_copyWorkspaceSelection()
-            
         self.console.paste()
        
 #     @pyqtSlot()
@@ -4792,8 +4785,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot(QtCore.QModelIndex)
     @safeWrapper
     def slot_fileSystemItemActivated(self, ndx):
-        """ Signal activated from self.fileSystemTreeView is connected to this.
+        """ 
         Triggered by double-click on an item in the file system tree view.
+        Connected to the 'activated' signal emited by self.fileSystemTreeView.
         """
         #print(self.fileSystemModel.filePath(ndx))
         if self.fileSystemModel.isDir(ndx):
