@@ -24,7 +24,8 @@
    <string>Scipyen</string>
   </property>
   <property name="windowIcon">
-   <iconset theme="python"/>
+   <iconset theme="python">
+    <normaloff>.</normaloff>.</iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
    <property name="sizePolicy">
@@ -46,7 +47,7 @@
      <x>0</x>
      <y>0</y>
      <width>812</width>
-     <height>28</height>
+     <height>30</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -511,31 +512,44 @@ NOTE: you can click anywhere in the row to select</string>
         </widget>
        </item>
        <item>
-        <widget class="QComboBox" name="directoryComboBox">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
+        <spacer name="horizontalSpacer_2">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
          </property>
-         <property name="acceptDrops">
-          <bool>true</bool>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
          </property>
-         <property name="toolTip">
-          <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
-         </property>
-         <property name="statusTip">
-          <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
-         </property>
-         <property name="whatsThis">
-          <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
-         </property>
-         <property name="editable">
-          <bool>true</bool>
-         </property>
-        </widget>
+        </spacer>
        </item>
       </layout>
+     </item>
+     <item>
+      <widget class="QComboBox" name="directoryComboBox">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="acceptDrops">
+        <bool>true</bool>
+       </property>
+       <property name="toolTip">
+        <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
+       </property>
+       <property name="statusTip">
+        <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
+       </property>
+       <property name="whatsThis">
+        <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
+       </property>
+       <property name="editable">
+        <bool>true</bool>
+       </property>
+      </widget>
      </item>
      <item>
       <layout class="QVBoxLayout" name="verticalLayout_2">
