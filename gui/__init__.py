@@ -22,6 +22,7 @@ from .signalviewer import SignalViewer
 from .tableeditor import TableEditor
 from .textviewer import TextViewer
 from .xmlviewer import XMLViewer
+from .widgets.breadcrumb_nav import Navigator
 
 # NOTE: 2022-12-25 23:19:16
 # plugins frameworm takes care of this
