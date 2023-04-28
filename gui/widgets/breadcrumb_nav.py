@@ -296,6 +296,9 @@ class BreadCrumbsNavigator(QtWidgets.QWidget):
                 # isBranch = k < nCrumbs-1
                 if k > 0:
                     b = BreadCrumb(p, True, parentCrumb = self.crumbs[-1])#, parent=self)
+                else:
+                    b = BreadCrumb(p, True)#, parent=self)
+                    
                 b.sig_navigate.connect(self.slot_crumb_request)
                 self.crumbs.append(b)
                 # self.layout.addWidget(b)
