@@ -183,11 +183,10 @@ class BreadCrumb(QtWidgets.QWidget):
         self.fileSystemModel.setRootPath(self.path.as_posix())
         self.rootIndex = self.fileSystemModel.index(self.fileSystemModel.rootPath())
 
-        self.layout = QtWidgets.QHBoxLayout(self)
-        self.layout.setContentsMargins(0,0,0,0)
-        self.setLayout(self.layout)
-        # pathParts = self.path.parts
-        # self.dirButton = QtWidgets.QPushButton(pathParts[-1])
+        self.hlayout = QtWidgets.QHBoxLayout(self)
+        self.hlayout.setContentsMargins(0,0,0,0)
+        self.hlayout.setSpacing(0)
+        self.setLayout(self.hlayout)
         w,h = guiutils.get_text_width_and_height(self.name)
         self.dirButton = QtWidgets.QPushButton(self.name, self)
         self.dirButton.setFlat(True)
@@ -209,8 +208,8 @@ class BreadCrumb(QtWidgets.QWidget):
         self.branchButton.clicked.connect(self.branchButtonClicked)
         
         
-        self.layout.addWidget(self.dirButton)
-        self.layout.addWidget(self.branchButton)
+        self.hlayout.addWidget(self.dirButton)
+        self.hlayout.addWidget(self.branchButton)
         
         self.branchButton.setVisible(self.isBranch)
 
@@ -270,7 +269,7 @@ class BreadCrumbsNavigator(QtWidgets.QWidget):
         super().__init__(parent=parent)
         if not path.is_dir():
             path = path.parent
-        self._path_=path
+        self._path_= path
         self.crumbs = list()
         self._configureUI_()
         self._setupCrumbs_()
@@ -278,46 +277,63 @@ class BreadCrumbsNavigator(QtWidgets.QWidget):
     def _configureUI_(self):
         self.hlayout = QtWidgets.QHBoxLayout(self)
         self.hlayout.setContentsMargins(0,0,0,0)
+        self.hlayout.setSpacing(0)
         self.setLayout(self.hlayout)
         
     def _setupCrumbs_(self):
-        parts = self.path.parts
+        parts = self._path_.parts
         # print(f"{self.__class__.__name__}._setupCrumbs_ parts = {parts}")
         partPaths = [pathlib.Path(*parts[0:k]) for k in range(1, len(parts))] # avoid this dir dot
         nCrumbs = len(partPaths)
-        
+
+        # NOTE: 2023-04-28 21:52:31
+        # when chaning the path it's easier to just remove all widgets and 
+        # populate anew.
         if len(self.crumbs):
-            crumbNames = [bc.name for bc in self.crumbs]
-            commonCrumbs = [bc for bc in self.crumbs if bc.name in parts]
-            
-        else:
-            for k, p in enumerate(partPaths):
-                # print(f"k = {k}; p = {p}")
-                # isBranch = k < nCrumbs-1
-                if k > 0:
-                    b = BreadCrumb(p, True, parentCrumb = self.crumbs[-1])#, parent=self)
-                else:
-                    b = BreadCrumb(p, True)#, parent=self)
-                    
-                b.sig_navigate.connect(self.slot_crumb_request)
-                self.crumbs.append(b)
-                # self.layout.addWidget(b)
+            self._clearCrumbs_()
                 
-            b = BreadCrumb(self.path, False, parentCrumb=self.crumbs[-1]) # last dir in path = LEAF !!!
-            b.sig_navigate.connect(self.slot_crumb_request)
+        for k, p in enumerate(partPaths):
+            # print(f"k = {k}; p = {p}")
+            # isBranch = k < nCrumbs-1
+            if k > 0:
+                b = BreadCrumb(p, True, parentCrumb = self.crumbs[-1])#, parent=self)
+            else:
+                b = BreadCrumb(p, True)#, parent=self)
+                
+            b.sig_navigate.connect(self.slot_crumb_clicked)
             self.crumbs.append(b)
-            for bc in self.crumbs:
-                self.hlayout.addWidget(bc)
-            self.navspot = QtWidgets.QPushButton("", self)
-            self.navspot.setFlat(True)
-            self.navspot.clicked.connect(self.slot_editPath_request)
-            self.hlayout.addWidget(self.navspot)
             
+        b = BreadCrumb(self._path_, False, parentCrumb=self.crumbs[-1]) # last dir in path = LEAF !!!
+        b.sig_navigate.connect(self.slot_crumb_clicked)
+        self.crumbs.append(b)
         
+        for bc in self.crumbs:
+            self.hlayout.addWidget(bc)
+                
+        self.navspot = QtWidgets.QPushButton("", self)
+        self.navspot.setFlat(True)
+        self.navspot.clicked.connect(self.slot_editPath_request)
+        self.hlayout.addWidget(self.navspot)
+            
+    def _clearCrumbs_(self):
+        """
+        Removes all BreadCrumbs from this BreadCrumbsNavigator/.
+        Leaves the last Pushbutton bedinh (for switching to path editor)
+        """
+        for k, bc in enumerate(self.crumbs):
+            bc.setParent(None)
+            bc = None
+            
+        self.crumbs.clear()
+        self.navspot = None
+
+        for k in range(self.hlayout.count()):
+            self.hlayout.takeAt(0)
+            
     @pyqtSlot(str)
-    def slot_crumb_request(self, path):
+    def slot_crumb_clicked(self, path):
         self.sig_chDirString.emit(path)
-        # print(f"{self.__class__.__name__}.slot_crumb_request {path}")
+        # print(f"{self.__class__.__name__}.slot_crumb_clicked {path}")
         
     @pyqtSlot()
     def slot_editPath_request(self):
@@ -330,7 +346,8 @@ class BreadCrumbsNavigator(QtWidgets.QWidget):
     
     @path.setter
     def path(self, value:pathlib.Path):
-        self._path_ = path
+        self._path_ = value
+        self._setupCrumbs_()
         
         
 class PathEditor(QtWidgets.QWidget):
@@ -339,10 +356,11 @@ class PathEditor(QtWidgets.QWidget):
     sig_clearRecentDirsList = pyqtSignal(str, name = "sig_clearRecentDirsList")
     sig_switchToNavigator = pyqtSignal(name="sig_switchToNavigator")
     
-    def __init__(self, path:pathlib.Path, recentDirs:list = [], parent=None):
+    def __init__(self, path:pathlib.Path, recentDirs:list = [], maxRecent:int=10, parent=None):
         super().__init__(parent=parent) 
         self._path_ = path
         self._recentDirs_ = recentDirs
+        self._maxRecent_ = maxRecent
         self._configureUI_()
        
     def _configureUI_(self):
@@ -351,6 +369,7 @@ class PathEditor(QtWidgets.QWidget):
         self.directoryComboBox.lineEdit().setClearButtonEnabled(True)
         self.directoryComboBox.lineEdit().undoAvailable = True
         self.directoryComboBox.lineEdit().redoAvailable = True
+        
         for i in [self._path_.as_posix()] + self._recentDirs_:
             self.directoryComboBox.addItem(i)
             
@@ -394,18 +413,56 @@ class PathEditor(QtWidgets.QWidget):
         self.hlayout.addWidget(self.directoryComboBox)
         
     @property
+    def path(self):
+        return self._path_
+    
+    @path.setter
+    def path(self, value:pathlib.Path):
+        oldp = self._path_.as_posix()
+        if oldp not in self.history:
+            self.history.insert(0, oldp)
+        self._path_ = value
+        ps = self._path_.as_posix()
+        
+        signalBlocker = QtCore.QSignalBlocker(self.directoryComboBox)
+        
+        self.directoryComboBox.clear()
+        
+        for i in [ps] + self.history:
+            self.directoryComboBox.addItem(i)
+            
+        self.directoryComboBox.setCurrentIndex(0)
+        
+    @property
     def history(self):
         return self._recentDirs_
     
     @history.setter
     def history(self, value:list=list()):
+        sigBlocker = QtCore.QSignalBlocker(self.directoryComboBox)
+        
+        if len(value) > self._maxRecent_:
+            value = value[0:self._maxRecent_]
+            
         self._recentDirs_[:] = value
         if len(self._recentDirs_):
             self.directoryComboBox.clear()
-            for item in self._recentDirs_:
+            ps = self._path_.as_posix()
+            for item in [ps] + self._recentDirs_:
                 self.directoryComboBox.addItem(item)
                 
         self.directoryComboBox.setCurrentIndex(0)
+        
+    @property
+    def maxHistory(self):
+        return self._maxRecent_
+    
+    @maxHistory.setter
+    def maxHistory(self, value:int):
+        self._maxRecent_ = value
+        
+        if len(self.history) > self._maxRecent_:
+            self.history = self.history[0:self._maxRecent_]
         
     @pyqtSlot()
     def slot_removeDirFromHistory(self):
@@ -421,13 +478,24 @@ class PathEditor(QtWidgets.QWidget):
         
     @pyqtSlot(str)
     def slot_dirChange(self, value):
+        hh = self.history
+        if value not in hh:
+            hh.insert(0, value)
+            self.history = hh
+            
+        else:
+            ndx = hh.index(value)
+            del hh[ndx]
+            hh.insert(0, value)
+            self.history = hh
+
         self.sig_chDirString.emit(value)
         
 class Navigator(QtWidgets.QWidget):
-    def __init__(self, path:pathlib.Path, editMode:bool=False, recentDirs:list = list(), parent=None):
+    def __init__(self, path:pathlib.Path, editMode:bool=False, recentDirs:list = list(), maxRecent:int=10,parent=None):
         super().__init__(parent=parent)
-        self.path = path
-        posixpathstr = self.path.as_posix()
+        self._path_ = path
+        posixpathstr = self._path_.as_posix()
         self._recentDirs_ = [posixpathstr]
         if posixpathstr in recentDirs:
             rd = [i for i in recentDirs if i != posixpathstr]
@@ -438,14 +506,15 @@ class Navigator(QtWidgets.QWidget):
         self._configureUI_()
         
     def _configureUI_(self):
-        self.bcnav = BreadCrumbsNavigator(self.path, parent=self)
+        self.bcnav = BreadCrumbsNavigator(self._path_, parent=self)
         self.bcnav.sig_chDirString[str].connect(self.slot_dirChange)
         self.bcnav.sig_switchToEditor.connect(self.slot_switchToEditor)
-        self.editor = PathEditor(self.path, self._recentDirs_, parent=self)
+        self.editor = PathEditor(self._path_, self._recentDirs_, parent=self)
         self.editor.sig_chDirString[str].connect(self.slot_dirChange)
         self.editor.sig_switchToNavigator.connect(self.slot_switchToNavigator)
         self.hlayout = QtWidgets.QHBoxLayout(self)
         self.hlayout.setContentsMargins(0,0,0,0)
+        self.hlayout.setSpacing(0)
         self.setLayout(self.hlayout)
         self.bcnav.setVisible(False)
         self.editor.setVisible(False)
@@ -465,6 +534,17 @@ class Navigator(QtWidgets.QWidget):
     @recentDirs.setter
     def recentDirs(self, value:list):
         self._recentDirs_[:] = value
+        
+    @property
+    def path(self):
+        return self._path_
+    
+    @path.setter
+    def path(self, value:pathlib.Path):
+        self._path_ = value
+        signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.bcnav, self.editor)]
+        self.bcnav.path = value
+        self.editor.path = value
         
     @property
     def editMode(self):
@@ -495,10 +575,7 @@ class Navigator(QtWidgets.QWidget):
     def slot_dirChange(self, value):
         print(f"{self.__class__.__name__}.slot_dirChange value: {value}" )
         
-        newPath = pathlib.Path(value)
-        
-        
-            
+        self.path = pathlib.Path(value)
         
     @pyqtSlot()
     def slot_switchToNavigator(self):
