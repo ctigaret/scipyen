@@ -149,7 +149,7 @@ class ArrowButton(QtWidgets.QToolButton):
 class BreadCrumb(QtWidgets.QWidget):
     sig_navigate = pyqtSignal(str, name="sig_navigate")
         
-    def __init__(self, path:pathlib.Path, isBranch:bool=False, parent:typing.Optional[QtWidgets.QWidget]=None):
+    def __init__(self, path:pathlib.Path, isBranch:bool=False, parentCrumb=None,parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent=parent)
         # if not path.is_absolute():
         path = path.resolve()
@@ -160,6 +160,9 @@ class BreadCrumb(QtWidgets.QWidget):
         self.path=path
 
         self.name = self.path.name
+        
+        self.parentCrumb = parentCrumb
+        
         if len(self.name) == 0:
             self.name = self.path.parts[0]
             
@@ -210,8 +213,7 @@ class BreadCrumb(QtWidgets.QWidget):
         self.layout.addWidget(self.branchButton)
         
         self.branchButton.setVisible(self.isBranch)
-        
-    # def painEvent(self)
+
     @property
     def isBranch(self):
         return self._isBranch_
@@ -268,13 +270,10 @@ class BreadCrumbsNavigator(QtWidgets.QWidget):
         super().__init__(parent=parent)
         if not path.is_dir():
             path = path.parent
-        self.path=path
+        self._path_=path
         self.crumbs = list()
         self._configureUI_()
         self._setupCrumbs_()
-        
-        for bc in self.crumbs:
-            self.hlayout.addWidget(bc)
         
     def _configureUI_(self):
         self.hlayout = QtWidgets.QHBoxLayout(self)
@@ -286,22 +285,32 @@ class BreadCrumbsNavigator(QtWidgets.QWidget):
         # print(f"{self.__class__.__name__}._setupCrumbs_ parts = {parts}")
         partPaths = [pathlib.Path(*parts[0:k]) for k in range(1, len(parts))] # avoid this dir dot
         nCrumbs = len(partPaths)
-        for k, p in enumerate(partPaths):
-            # print(f"k = {k}; p = {p}")
-            # isBranch = k < nCrumbs-1
-            b = BreadCrumb(p, True)#, parent=self)
+        
+        if len(self.crumbs):
+            crumbNames = [bc.name for bc in self.crumbs]
+            commonCrumbs = [bc for bc in self.crumbs if bc.name in parts]
+            
+        else:
+            for k, p in enumerate(partPaths):
+                # print(f"k = {k}; p = {p}")
+                # isBranch = k < nCrumbs-1
+                if k > 0:
+                    b = BreadCrumb(p, True, parentCrumb = self.crumbs[-1])#, parent=self)
+                b.sig_navigate.connect(self.slot_crumb_request)
+                self.crumbs.append(b)
+                # self.layout.addWidget(b)
+                
+            b = BreadCrumb(self.path, False, parentCrumb=self.crumbs[-1]) # last dir in path = LEAF !!!
             b.sig_navigate.connect(self.slot_crumb_request)
             self.crumbs.append(b)
-            # self.layout.addWidget(b)
+            for bc in self.crumbs:
+                self.hlayout.addWidget(bc)
+            self.navspot = QtWidgets.QPushButton("", self)
+            self.navspot.setFlat(True)
+            self.navspot.clicked.connect(self.slot_editPath_request)
+            self.hlayout.addWidget(self.navspot)
             
-        b = BreadCrumb(self.path, False) # last dir in path = LEAF !!!
-        b.sig_navigate.connect(self.slot_crumb_request)
-        self.crumbs.append(b)
-        self.navspot = QtWidgets.QPushButton("", self)
-        self.navspot.setFlat(True)
-        self.navspot.clicked.connect(self.slot_editPath_request)
-        self.crumbs.append(self.navspot)
-            
+        
     @pyqtSlot(str)
     def slot_crumb_request(self, path):
         self.sig_chDirString.emit(path)
@@ -311,6 +320,14 @@ class BreadCrumbsNavigator(QtWidgets.QWidget):
     def slot_editPath_request(self):
         self.sig_switchToEditor.emit()
         # print("to switch to path editing mode")
+        
+    @property
+    def path(self):
+        return self._path_
+    
+    @path.setter
+    def path(self, value:pathlib.Path):
+        self._path_ = path
         
         
 class PathEditor(QtWidgets.QWidget):
@@ -474,6 +491,11 @@ class Navigator(QtWidgets.QWidget):
     @pyqtSlot(str)
     def slot_dirChange(self, value):
         print(f"{self.__class__.__name__}.slot_dirChange value: {value}" )
+        
+        newPath = pathlib.Path(value)
+        
+        
+            
         
     @pyqtSlot()
     def slot_switchToNavigator(self):
