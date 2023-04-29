@@ -34,7 +34,7 @@ function show_help ()
     echo -e "--build_neuron\t\tBuild neuron python locally\n"
     echo -e "--with_coreneuron\tWhen '--build_neuron' is passed, build local neuron with coreneuron; by default coreneuron is not used.\n"
     echo -e "--jobs=N\t\tNumber of parallel tasks during building PyQt5 and neuron; default is 4; set to 0 to disable parallel build\n"
-    echo -e "--reinstall=NAME\t\t\tRe-install/re-building NAME, where NAME is one of pips, pyqt5, vigra, or neuron; can be passed more than once\n"
+    echo -e "--reinstall=NAME\t\t\tRe-install/re-building NAME, where NAME is one of pips, pyqt5, vigra, neuron, or desktopentry; can be passed more than once\n"
     echo -e "--about\t\t\tDisplay Install.md at the console (requires the program 'glow')\n"
     echo -e "-h | -? | --help \tShow this help message and quit\n"
     echo -e "\nFor details, execute install.sh --about\n"
@@ -133,12 +133,12 @@ function installpipreqs ()
         # by setting up the environment variable below
         # For details please see https://pypi.org/project/sklearn/
         export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
-#        if [[ $for_msys -eq 1 ]] ; then
-#            python3 -m pip install -r "$installscriptdir"/pip_requirements_msys.txt
-#        else
-#            python3 -m pip install -r "$installscriptdir"/pip_requirements.txt
-#        fi
-#NOTE: commented out previous to prevent a bug with installation
+        #        if [[ $for_msys -eq 1 ]] ; then
+        #            python3 -m pip install -r "$installscriptdir"/pip_requirements_msys.txt
+        #        else
+        #            python3 -m pip install -r "$installscriptdir"/pip_requirements.txt
+        #        fi
+        #NOTE: commented out previous to prevent a bug with installation
         python3 -m pip install -r "$installscriptdir"/pip_requirements.txt
         
         if [[ $? -ne 0 ]] ; then
@@ -274,6 +274,43 @@ function dovigra ()
     fi
     
     
+}
+
+function make_desktop_entry ()
+{
+if [ ! -r ${VIRTUAL_ENV}/.desktopdone ] || [[ $reinstall_desktop -gt 0 ]] ; then
+tmpfiledir=$(mktemp -d)
+tmpfile=${tmpfiledir}/cezartigaret-Scipyen.desktop
+cat<<END > ${tmpfile}
+[Desktop Entry]
+Type=Application
+Name[en_GB]=Scipyen
+Name=Scipyen
+Comment[en_GB]=Scientific Python Environment for Neurophysiology
+Comment=Scientific Python Environment for Neurophysiology
+GenericName[en_GB]=Scientific Python Environment for Neurophysiology
+GenericName=Scientific Python Environment for Neurophysiology
+Icon=pythonbackend
+Categories=Science;
+Exec=${scipyendir}/scipyen
+MimeType=
+Path=
+StartupNotify=true
+Terminal=true
+TerminalOptions=\s
+X-DBUS-ServiceName=
+X-DBUS-StartupType=
+X-KDE-SubstituteUID=false
+X-KDE-Username=
+END
+xdg-desktop-menu install ${tmpfile}
+if [[ $? -ne 0 ]] ; then
+echo -e "Installation of Scipyen Desktop file failed\n"
+exit 1
+else
+echo "Scipyen Desktop file has been installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.desktopdone
+fi
+fi
 }
 
 function doneuron ()
@@ -497,6 +534,7 @@ reinstall_pyqt5=0
 reinstall_vigra=0
 reinstall_neuron=0
 reinstall_pips=0
+reinstall_desktop=0
 # for_msys=0
 
 # if [ -n $MSYSTEM_PREFIX ] ; then
@@ -546,6 +584,9 @@ for i in "$@" ; do
             ;;    
             pips)
             reinstall_pips=1
+            ;;
+            desktopentry)
+            reinstall_desktop=1
             ;;
             *)
             ;;
@@ -615,12 +656,9 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     fi
     
     # make scripts
-    make_scipyenrc && update_bashrc && linkscripts
+    make_scipyenrc && update_bashrc && linkscripts && make_desktop_entry
     
 fi
-
-# stop_time=`date +%s`
-# echo Execution time was `expr $stop_time - $start_time` seconds.
 
 t=$SECONDS
 
