@@ -291,7 +291,7 @@ Comment=Scientific Python Environment for Neurophysiology
 GenericName[en_GB]=Scientific Python Environment for Neurophysiology
 GenericName=Scientific Python Environment for Neurophysiology
 Icon=pythonbackend
-Categories=Science;
+Categories=Science;Utilities;
 Exec=${scipyendir}/scipyen
 MimeType=
 Path=
@@ -307,9 +307,13 @@ xdg-desktop-menu install ${tmpfile}
 if [[ $? -ne 0 ]] ; then
 echo -e "Installation of Scipyen Desktop file failed\n"
 exit 1
-else
-echo "Scipyen Desktop file has been installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.desktopdone
 fi
+xdg-desktop-icon install ${tmpfile}
+if [[ $? -ne 0 ]] ; then
+echo -e "Installation of Scipyen Desktop file failed\n"
+exit 1
+fi
+echo "Scipyen Desktop file has been installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.desktopdone
 fi
 }
 
