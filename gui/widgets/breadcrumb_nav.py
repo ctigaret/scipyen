@@ -8,6 +8,7 @@ from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 from PyQt5.uic import loadUiType
 
 from core import desktoputils
+from core.prog import safeWrapper
 import gui.pictgui as pgui
 from gui import guiutils
 from iolib import pictio
@@ -20,14 +21,15 @@ class DisplayHint(IntEnum):
     PopupActiveHint = 4
     
 class NavigatorButtonBase(QtWidgets.QPushButton):
-    """Common ancestor for NavigatorDropDownButton and NavigatorButton
+    """Common ancestor for breadcrumbs buttons
     """
     BorderWidth = 2
     
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent)
-        self._active=True
-        self._displayHint = 0
+        self._isLeaf_=False
+        self._active_=True
+        self._displayHint_ = 0
         self.setFocusPolicy(QtCore.Qt.TabFocus)
         self.setSizePolicy(QtWidgets.QSizePolicy.Maximum, 
                            QtWidgets.QSizePolicy.Fixed)
@@ -37,35 +39,36 @@ class NavigatorButtonBase(QtWidgets.QPushButton):
         self.setAttribute(QtCore.Qt.WA_LayoutUsesWidgetRect)
         
         if hasattr(parent, "requestActivation"):
-            self.pressed.connect(parent.requestActivation)
+            self._pressed_.connect(parent.requestActivation)
             
     def setActive(self, active:bool):
-        if self._active != active:
-            self._active = active is True
+        if self._active_ != active:
+            self._active_ = active is True
             self.update()
             
     def isActive(self) -> bool:
-        return self._active
+        return self._active_
     
     @property
     def active(self) -> bool:
-        return self._active
+        return self._active_
     
     @active.setter
     def active(self, value:bool):
-        if self._active != value:
-            self._active = value is True
+        if self._active_ != value:
+            self._active_ = value is True
             self.update()
     
     def setDisplayHintEnabled(self, hint:typing.Union[DisplayHint, int], enable:bool):
         if enable:
-            self._displayHint = self._displayHint | hint
+            self._displayHint_ = self._displayHint_ | hint
         else:
-            self._displayHint = self._displayHint & ~hint
-        update()
+            self._displayHint_ = self._displayHint_ & ~hint
+            
+        self.update()
 
     def isDisplayHintEnabled(self, hint:typing.Union[DisplayHint, int]) -> bool:
-        return (self._displayHint & hint) > 0
+        return (self._displayHint_ & hint) > 0
     
     def focusInEvent(self, event:QtGui.QFocusEvent):
         self.setDisplayHintEnabled(DisplayHint.EnteredHint, True)
@@ -75,7 +78,6 @@ class NavigatorButtonBase(QtWidgets.QPushButton):
         self.setDisplayHintEnabled(DisplayHint.EnteredHint, False)
         super().focusOutEvent(event)
         
-    #def enterEvent(self, event:QtGui.QEnterEvent):
     def enterEvent(self, event:QtCore.QEvent):
         super().enterEvent(event)
         self.setDisplayHintEnabled(DisplayHint.EnteredHint, True)
@@ -89,13 +91,13 @@ class NavigatorButtonBase(QtWidgets.QPushButton):
     def drawHoverBackground(self, painter:QtGui.QPainter):
         isHighlighted = self.isDisplayHintEnabled(DisplayHint.EnteredHint) or self.isDisplayHintEnabled(DisplayHint.DraggedHint) or self.isDisplayHintEnabled(DisplayHint.PopupActiveHint)
         backgroundColor = self.palette().color(QtGui.QPalette.Highlight) if isHighlighted else QtCore.Qt.transparent
-        if not self._active and isHighlighted:
+        if not self._active_ and isHighlighted:
             backgroundColor.setAlpha(128)
             
         if backgroundColor != QtCore.Qt.transparent:
             option = QtWidgets.QStyleOptionViewItem()
             option.initFrom(self)
-            option.state = QtWidgets.QStyle.State_Enabled | QtWidgets.QStyle.State_Mouseover
+            option.state = QtWidgets.QStyle.State_Enabled | QtWidgets.QStyle.State_MouseOver
             option.viewItemPosition = QtWidgets.QStyleOptionViewItem.OnlyOne
             self.style().drawPrimitive(QtWidgets.QStyle.PE_PanelItemViewItem, option, painter, self)
             
@@ -104,9 +106,9 @@ class NavigatorButtonBase(QtWidgets.QPushButton):
         
         foregroundColor = self.palette().color(QtGui.QPalette.Foreground)
         
-        alpha = 255 if self._active else 128
+        alpha = 255 if self._active_ else 128
         
-        if not self._active and not isHighlighted:
+        if not self._active_ and not isHighlighted:
             alpha -= alpha/4
             
         foregroundColor.setAlpha(alpha)
@@ -117,35 +119,258 @@ class NavigatorButtonBase(QtWidgets.QPushButton):
         self.active = True
         #self.setActive(true)
         
-class ArrowButton(QtWidgets.QToolButton):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setArrowType(QtCore.Qt.RightArrow)
-        self.setPopupMode(QtWidgets.QToolButton.InstantPopup)
-        self.icon = QtGui.QIcon.fromTheme("go-next")
-        self.iconSize = self.icon.actualSize(QtCore.QSize(16,16), state=QtGui.QIcon.On)
-        self.setMinimumSize(self.iconSize.width(), self.iconSize.height())
-        self.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum))
-        opt = QtWidgets.QStyleOptionFrame()
-        self.initStyleOption(opt)
         
-    # def paintEvent(self, ev = QtGui.QPaintEvent):
-    #     painter = QtGui.QPainter(self)
-    #     style = self.style()
-    #     super().paintEvent(ev)
 
-    def initStyleOption(self, opt:QtWidgets.QStyleOptionFrame):
-        """Required in all concrete subclasses of QWidget
-        """
-        opt.initFrom(self)
-        # opt.state = QtWidgets.QStyle.State_Sunken if self.isDown() else QtWidgets.QStyle.State_Raised
-        #  NOTE: 2021-05-14 21:52:32
-        opt.features |= 0
-        # if isinstance(self, QtWidgets.QPushButton) and self.isDefault():
-        #     opt.features |= QtWidgets.QStyleOptionButton.DefaultButton
-        # opt.text=""
-        # opt.icon = QtGui.QIcon()
-  
+# class ArrowButton_old(QtWidgets.QToolButton):
+#     def __init__(self, parent=None):
+#         super().__init__(parent)
+#         self.setArrowType(QtCore.Qt.RightArrow)
+#         self.setPopupMode(QtWidgets.QToolButton.InstantPopup)
+#         self.icon = QtGui.QIcon.fromTheme("go-next")
+#         self.iconSize = self.icon.actualSize(QtCore.QSize(16,16), state=QtGui.QIcon.On)
+#         self.setMinimumSize(self.iconSize.width(), self.iconSize.height())
+#         self.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum))
+#         opt = QtWidgets.QStyleOptionFrame()
+#         self.initStyleOption(opt)
+#         
+#     # def paintEvent(self, ev = QtGui.QPaintEvent):
+#     #     painter = QtGui.QPainter(self)
+#     #     style = self.style()
+#     #     super().paintEvent(ev)
+# 
+#     def initStyleOption(self, opt:QtWidgets.QStyleOptionFrame):
+#         """Required in all concrete subclasses of QWidget
+#         """
+#         opt.initFrom(self)
+#         # opt.state = QtWidgets.QStyle.State_Sunken if self.isDown() else QtWidgets.QStyle.State_Raised
+#         #  NOTE: 2021-05-14 21:52:32
+#         opt.features |= 0
+#         # if isinstance(self, QtWidgets.QPushButton) and self.isDefault():
+#         #     opt.features |= QtWidgets.QStyleOptionButton.DefaultButton
+#         # opt.text=""
+#         # opt.icon = QtGui.QIcon()
+
+class NavigatorButton(NavigatorButtonBase):
+    sig_navigate = pyqtSignal(str, name="sig_navigate")
+    
+    # def __init__(self, text:str, leaf:bool=False, parent=None):
+    # def __init__(self, path:pathlib.Path, isBranch:bool=False, parentCrumb=None, parent=None):
+    def __init__(self, path:pathlib.Path, isBranch:bool=False, parent=None):
+        super().__init__(parent=parent)
+        self._isLeaf_ = not isBranch
+        self._hoverArrow_ = False
+        self._pressed_ = False
+        path = path.resolve()
+        if not path.is_dir():
+            path = path.parent
+            
+        self.path = path
+        self.name = self.path.name
+        if len(self.name) == 0:
+            self.name = self.path.parts[0]
+    
+        self.setText(self.name)
+        
+        # self.parentCrumb = parentCrumb
+        
+        self.subDirsMenu = None
+        
+        # NOTE: 2023-04-29 15:57:58
+        # defines self.fileSystemModel, self.rootIndex
+        self._configureUI_()
+
+        # self.frameStyleOptions = QtWidgets.QStyleOptionFrame()
+        # self.frameStyleOptions.initFrom(self)
+        # self.frameStyleOptions.
+        
+    def _configureUI_(self):
+        self.fileSystemModel = QtWidgets.QFileSystemModel(parent=self)
+        self.fileSystemModel.setReadOnly(True)
+        self.fileSystemModel.setFilter(QtCore.QDir.AllDirs | QtCore.QDir.CaseSensitive | QtCore.QDir.NoDotAndDotDot)
+        self.fileSystemModel.setRootPath(self.path.as_posix())
+        self.rootIndex = self.fileSystemModel.index(self.fileSystemModel.rootPath())
+        # self.clicked.connect(self.dirButtonClicked)
+        
+    def setText(self, text):
+        super().setText(text)
+        self.updateMinimumWidth()
+        
+    def arrowWidth(self):
+        width = 0
+        if not self.isLeaf:
+            width = self.height()/2
+            if width < 4:
+                width = 4
+        
+        return width
+    
+    def isAboveArrow(self, x:int):
+        leftToRight = self.layoutDirection() == QtCore.Qt.LeftToRight
+        if x >= self.width() - self.arrowWidth():
+            return leftToRight
+        else:
+            return x < self.arrowWidth()
+        
+    def updateMinimumWidth(self):
+        oldMinWidth = self.minimumWidth()
+        minWidth = self.sizeHint().width()
+        
+        if minWidth < 40:
+            minWidth = 40
+            
+        elif minWidth > 150:
+            minWidth = 150
+            
+        if oldMinWidth != minWidth:
+            self.setMinimumWidth(minWidth)
+            
+    def paintEvent(self, evt:QtGui.QPaintEvent):
+        painter = QtGui.QPainter(self)
+        
+        adjustedFont = QtGui.QFont(self.font())
+        adjustedFont.setBold(self.isLeaf)
+        painter.setFont(adjustedFont)
+        
+        buttonWidth = self.width()
+        preferredWidth = self.sizeHint().width()
+        
+        if preferredWidth < self.minimumWidth():
+            preferredWidth = self.minimumWidth()
+            
+        if buttonWidth > preferredWidth:
+            buttonWidth = preferredWidth
+            
+        buttonHeight = self.height()
+        
+        fgColor = self.foregroundColor()
+        
+        self.drawHoverBackground(painter)
+        
+        textLeft = 0
+        textWidth = buttonWidth
+        
+        leftToRight = self.layoutDirection() == QtCore.Qt.LeftToRight
+        
+        if not self.isLeaf:
+            arrowSize = self.arrowWidth()
+            arrowX = int((buttonWidth - arrowSize) - self.BorderWidth) if leftToRight else int(self.BorderWidth)
+            arrowY = int((buttonHeight - arrowSize) / 2)
+            
+            option = QtWidgets.QStyleOption()
+            option.initFrom(self)
+            option.rect = QtCore.QRect(int(arrowX), int(arrowY), int(arrowSize), int(arrowSize))
+            option.palette = self.palette()
+            option.palette.setColor(QtGui.QPalette.Text, fgColor)
+            option.palette.setColor(QtGui.QPalette.WindowText, fgColor)
+            option.palette.setColor(QtGui.QPalette.ButtonText, fgColor)
+            
+            if self._hoverArrow_:
+                hoverColor = self.palette().color(QtGui.QPalette.HighlightedText)
+                hoverColor.setAlpha(96)
+                painter.setPen(QtCore.Qt.NoPen)
+                painter.setBrush(hoverColor)
+                
+                hoverX = arrowX
+                
+                if not leftToRight:
+                    hoverX -= self.BorderWidth
+                    
+                painter.drawRect(QtCore.QRect(hoverX, 0, arrowSize + self.BorderWidth, buttonHeight))
+            
+            arrow = QtWidgets.QStyle.PE_IndicatorArrowDown if self._pressed_ else QtWidgets.QStyle.PE_IndicatorArrowRight if leftToRight else QtWidgets.QStyle.PE_IndicatorArrowLeft
+
+            self.style().drawPrimitive(arrow, option, painter, self)
+        
+        painter.setPen(fgColor)
+        
+        clipped = self.isTextClipped()
+        textRect = QtCore.QRect(textLeft, 0, textWidth, buttonHeight)
+        
+        if clipped:
+            bgColor = fgColor
+            bgColor.setAlpha(0)
+            gradient = QtGui.QLinearGradient(textRect.topLeft(), textRect.topRight())
+            if leftToRight:
+                gradient.setColorAt(0.8, fgColor)
+                gradient.setColorAt(1.0, bgColor)
+            else:
+                gradient.setColorAt(0.8, bgColor)
+                gradient.setColorAt(0.2, fgColor)
+                
+            pen = QtGui.QPen()
+            pen.setBrush(QtGui.QBrush(gradient))
+            painter.setPen(pen)
+            
+        textFlags = QtCore.Qt.AlignVCenter if clipped else QtCore.Qt.AlignCenter
+        painter.drawText(textRect, textFlags, self.text())
+        
+    def isTextClipped(self):
+        availableWidth = self.width() - 2*self.BorderWidth
+        adjustedFont = self.font()
+        adjustedFont.setBold(self.isLeaf)
+        return QtGui.QFontMetrics(adjustedFont).size(QtCore.Qt.TextSingleLine, self.text()).width() >= availableWidth
+        
+    def mouseReleaseEvent(self, evt:QtGui.QMouseEvent):
+        if self.isAboveArrow(round(evt.pos().x())) or evt.button() != QtCore.Qt.LeftButton:
+            self.subDirMenuRequested(evt)
+        else:
+            self.sig_navigate.emit(self.path.as_posix())
+            
+        super().mouseReleaseEvent(evt)
+        
+    def mousePressEvent(self, evt:QtGui.QMouseEvent):
+        super().mousePressEvent(evt)
+        if self.isAboveArrow(round(evt.pos().x())):
+            self._pressed_ = True
+            self.update()
+        
+    def mouseMoveEvent(self, evt:QtGui.QMouseEvent):
+        super().mouseMoveEvent(evt)
+        hoverArrow = self.isAboveArrow(round(evt.pos().x()))
+        if hoverArrow != self._hoverArrow_:
+            self._hoverArrow_ = hoverArrow
+            self.update()
+        
+    @safeWrapper
+    def subDirMenuRequested(self, evt:QtGui.QMouseEvent):
+        if self.subDirsMenu is None:
+            self.subDirsMenu = QtWidgets.QMenu("", self)
+            self.subDirsMenu.aboutToHide.connect(self.slot_menuHiding)
+            
+        self.subDirsMenu.clear()
+        
+        if self.fileSystemModel.hasChildren(self.rootIndex):
+            subDirs = [self.fileSystemModel.data(self.fileSystemModel.index(row, 0, self.rootIndex)) for row in range(self.fileSystemModel.rowCount(self.rootIndex))]
+            # print(f"{self.__class__.__name__}.subDirMenuRequested rootIndex subDirs {subDirs}")
+            if len(subDirs):
+                for k, subDir in enumerate(subDirs):
+                    # print(f"subDir {subDir}")
+                    action = self.subDirsMenu.addAction(subDir)
+                    action.setText(subDir)
+                    action.triggered.connect(self.slot_subDirClick)
+        
+                self.subDirsMenu.popup(self.mapToGlobal(evt.pos()))
+    
+    @pyqtSlot()
+    def slot_subDirClick(self):
+        action = self.sender()
+        ps = os.path.join(self.path.as_posix(), action.text())
+        self.sig_navigate.emit(ps)
+        
+    @pyqtSlot()
+    def slot_menuHiding(self):
+        self._pressed_ = False
+        self.update()
+        
+    @property
+    def isLeaf(self):
+        return self._isLeaf_
+    
+    @isLeaf.setter
+    def isLeaf(self, value:bool):
+        self._isLeaf_ = value
+        
+    
 class BreadCrumb(QtWidgets.QWidget):
     sig_navigate = pyqtSignal(str, name="sig_navigate")
         
@@ -189,13 +414,16 @@ class BreadCrumb(QtWidgets.QWidget):
         self.setLayout(self.hlayout)
         w,h = guiutils.get_text_width_and_height(self.name)
         self.dirButton = QtWidgets.QPushButton(self.name, self)
+        isLeaf = not self._isBranch_
+        # self.dirButton = NavigatorButton(self.name, isLeaf, self)
         self.dirButton.setFlat(True)
         self.dirButton.setMinimumSize(w,h)
-        self.dirButton.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed))
+        # self.dirButton.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed))
+        # self.dirButton.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Fixed))
         self.dirButton.clicked.connect(self.dirButtonClicked)
         
-        self.branchIcon = QtGui.QIcon.fromTheme("go-next")
-        self.iconSize = self.branchIcon.actualSize(QtCore.QSize(16,h), state=QtGui.QIcon.On)
+        # self.branchIcon = QtGui.QIcon.fromTheme("go-next")
+        # self.iconSize = self.branchIcon.actualSize(QtCore.QSize(16,h), state=QtGui.QIcon.On)
         
         # self.branchButton = QtWidgets.QPushButton(self.branchIcon, "", self)
         # self.branchButton = ArrowButton(self)
@@ -203,8 +431,9 @@ class BreadCrumb(QtWidgets.QWidget):
         self.branchButton.setArrowType(QtCore.Qt.RightArrow)
         # self.branchButton.setFlat(True)
         self.branchButton.setPopupMode(QtWidgets.QToolButton.InstantPopup)
-        self.branchButton.setMinimumSize(self.iconSize.width(), self.iconSize.height())
-        self.branchButton.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum))
+        # self.branchButton.setMinimumSize(self.iconSize.width(), self.iconSize.height())
+        # self.branchButton.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum))
+        self.branchButton.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Fixed))
         self.branchButton.clicked.connect(self.branchButtonClicked)
         
         
@@ -246,6 +475,7 @@ class BreadCrumb(QtWidgets.QWidget):
                     action.triggered.connect(self.slot_subDirClick)
         
                 self.branchButton.setMenu(self.subDirsMenu)
+                
             self.branchButton.setArrowType(QtCore.Qt.DownArrow)
             self.branchButton.showMenu()
         
@@ -293,17 +523,18 @@ class BreadCrumbsNavigator(QtWidgets.QWidget):
             self._clearCrumbs_()
                 
         for k, p in enumerate(partPaths):
-            # print(f"k = {k}; p = {p}")
-            # isBranch = k < nCrumbs-1
             if k > 0:
-                b = BreadCrumb(p, True, parentCrumb = self.crumbs[-1])#, parent=self)
+                # b = BreadCrumb(p, True, parentCrumb = self.crumbs[-1])#, parent=self)
+                b = NavigatorButton(p, True)#, parentCrumb = self.crumbs[-1])
             else:
-                b = BreadCrumb(p, True)#, parent=self)
+                # b = BreadCrumb(p, True)#, parent=self)
+                b = NavigatorButton(p, True)#, parent=self)
                 
             b.sig_navigate.connect(self.slot_crumb_clicked)
             self.crumbs.append(b)
             
-        b = BreadCrumb(self._path_, False, parentCrumb=self.crumbs[-1]) # last dir in path = LEAF !!!
+        # b = BreadCrumb(self._path_, False, parentCrumb=self.crumbs[-1]) # last dir in path = LEAF !!!
+        b = NavigatorButton(self._path_, False)#, parentCrumb=self.crumbs[-1]) # last dir in path = LEAF !!!
         b.sig_navigate.connect(self.slot_crumb_clicked)
         self.crumbs.append(b)
         
@@ -318,18 +549,29 @@ class BreadCrumbsNavigator(QtWidgets.QWidget):
     def _clearCrumbs_(self):
         """
         Removes all BreadCrumbs from this BreadCrumbsNavigator/.
-        Leaves the last Pushbutton bedinh (for switching to path editor)
+        Leaves the last Pushbutton behind (for switching to path editor)
         """
-        for k, bc in enumerate(self.crumbs):
-            bc.setParent(None)
-            bc = None
+        for k, b in enumerate(self.crumbs):
+            b.hide()
+            b.deleteLater()
             
         self.crumbs.clear()
+        
+#         for k in range(self.hlayout.count()):
+#             wi = self.hlayout.takeAt(0)
+#             w = wi.widget()
+#             if w in self.crumbs:
+#                 ndx = self.crumbs.index(w)
+#                 del self.crumbs[ndx]
+#             w.destroy()
+#             
+        # for k, bc in enumerate(self.crumbs):
+        #     bc.setParent(None)
+        #     bc = None
+            
+        self.navspot.destroy()
         self.navspot = None
 
-        for k in range(self.hlayout.count()):
-            self.hlayout.takeAt(0)
-            
     @pyqtSlot(str)
     def slot_crumb_clicked(self, path):
         self.sig_chDirString.emit(path)
@@ -346,6 +588,7 @@ class BreadCrumbsNavigator(QtWidgets.QWidget):
     
     @path.setter
     def path(self, value:pathlib.Path):
+        print(f"{self.__class__.__name__}.path = {value}")
         self._path_ = value
         self._setupCrumbs_()
         
@@ -358,7 +601,7 @@ class PathEditor(QtWidgets.QWidget):
     
     def __init__(self, path:pathlib.Path, recentDirs:list = [], maxRecent:int=10, parent=None):
         super().__init__(parent=parent) 
-        self._path_ = path
+        self._path_ = path.resolve()
         self._recentDirs_ = recentDirs
         self._maxRecent_ = maxRecent
         self._configureUI_()
@@ -421,7 +664,7 @@ class PathEditor(QtWidgets.QWidget):
         oldp = self._path_.as_posix()
         if oldp not in self.history:
             self.history.insert(0, oldp)
-        self._path_ = value
+        self._path_ = value.resolve()
         ps = self._path_.as_posix()
         
         signalBlocker = QtCore.QSignalBlocker(self.directoryComboBox)
@@ -445,8 +688,10 @@ class PathEditor(QtWidgets.QWidget):
             value = value[0:self._maxRecent_]
             
         self._recentDirs_[:] = value
+        
         if len(self._recentDirs_):
             self.directoryComboBox.clear()
+            
             ps = self._path_.as_posix()
             for item in [ps] + self._recentDirs_:
                 self.directoryComboBox.addItem(item)
@@ -474,19 +719,27 @@ class PathEditor(QtWidgets.QWidget):
     @pyqtSlot()
     def slot_clearRecentDirList(self):
         signalBlocker = QtCore.QSignalBlocker(self.directoryComboBox)
+        self.history.clear()
+        self.history = [self.path.as_posix()]
         self.directoryComboBox.clear()
+        for i in self.history:
+            self.directoryComboBox.addItem(i)
+            
+        self.directoryComboBox.setCurrentIndex(0)
         
     @pyqtSlot(str)
     def slot_dirChange(self, value):
         hh = self.history
-        if value not in hh:
-            hh.insert(0, value)
+        p = pathlib.Path(value).resolve().as_posix()
+        
+        if p not in hh:
+            hh.insert(0, p)
             self.history = hh
             
         else:
-            ndx = hh.index(value)
+            ndx = hh.index(p)
             del hh[ndx]
-            hh.insert(0, value)
+            hh.insert(0, p)
             self.history = hh
 
         self.sig_chDirString.emit(value)
@@ -494,11 +747,11 @@ class PathEditor(QtWidgets.QWidget):
 class Navigator(QtWidgets.QWidget):
     def __init__(self, path:pathlib.Path, editMode:bool=False, recentDirs:list = list(), maxRecent:int=10,parent=None):
         super().__init__(parent=parent)
-        self._path_ = path
+        self._path_ = path.resolve()
         posixpathstr = self._path_.as_posix()
         self._recentDirs_ = [posixpathstr]
         if posixpathstr in recentDirs:
-            rd = [i for i in recentDirs if i != posixpathstr]
+            rd = [i for i in recentDirs if pathlib.Path(i) != self._path_]
         else:
             rd = recentDirs
         self._recentDirs_ = rd
@@ -541,8 +794,9 @@ class Navigator(QtWidgets.QWidget):
     
     @path.setter
     def path(self, value:pathlib.Path):
-        self._path_ = value
+        self._path_ = value.resolve()
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.bcnav, self.editor)]
+        print(f"{self.__class__.__name__}.path = {self._path_}")
         self.bcnav.path = value
         self.editor.path = value
         
