@@ -196,10 +196,15 @@ function dopyqt5 ()
         
         # NOTE: good practice is to create an out-of-source build tree, » ...
         pyqt5_build_dir="PyQt5-build"
+        
+        # NOTE: clear build dir if it exists -- best to start fresh
+        if [ -d ${pyqt5_build_dir} ] ; then
+            rm -fr ${pyqt5_build_dir}
+        fi
         mkdir -p ${pyqt5_build_dir}
         
         # NOTE: » ... but run the build process INSIDE the expanded sdist dir
-        # is because sip-wheel will get extra options from there :)
+        # this is because sip-wheel will get extra options from there :)
         cd ${pyqt5_src_dir}
         
         echo "Generating PyQt5 wheel in "$(pwd)"..."
@@ -228,7 +233,7 @@ function dopyqt5 ()
             echo -e "No wheel file found in "$(pwd)" - goodbye!\n"
             exit 1
         else
-            python -m pip install ${wheel_file}
+            python -m pip install --force-reinstall ${wheel_file}
             
             if [[ $? -ne 0 ]] ; then
                 echo -e "Cannot install the PyQt5 wheel; check console output. Goodbye!\n"
