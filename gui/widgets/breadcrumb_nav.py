@@ -554,21 +554,10 @@ class BreadCrumbsNavigator(QtWidgets.QWidget):
         for k, b in enumerate(self.crumbs):
             b.hide()
             b.deleteLater()
+            b = None
             
         self.crumbs.clear()
         
-#         for k in range(self.hlayout.count()):
-#             wi = self.hlayout.takeAt(0)
-#             w = wi.widget()
-#             if w in self.crumbs:
-#                 ndx = self.crumbs.index(w)
-#                 del self.crumbs[ndx]
-#             w.destroy()
-#             
-        # for k, bc in enumerate(self.crumbs):
-        #     bc.setParent(None)
-        #     bc = None
-            
         self.navspot.destroy()
         self.navspot = None
 
