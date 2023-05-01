@@ -41,7 +41,8 @@ class CoreUrlNavigator(QtCore.QObject):
 # NOTE: 2022-05-02 15:18:54
 # placeholders for use by _NavigatorPrivate; redefined below
 class Navigator 
-class PlacesModel # TODO consider defining it in desktoputils
+   
+    
 
 class NavigatorButtonBase(QtWidgets.QPushbutton):
     """Common ancestor for NavigatorDropDownButton and NavigatorButton

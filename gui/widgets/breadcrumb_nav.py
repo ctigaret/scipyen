@@ -20,6 +20,9 @@ class DisplayHint(IntEnum):
     DraggedHint = 2
     PopupActiveHint = 4
     
+class Navigator:
+    pass # fwd decl
+    
 class NavigatorButtonBase(QtWidgets.QPushButton):
     """Common ancestor for breadcrumbs buttons
     """
@@ -30,6 +33,7 @@ class NavigatorButtonBase(QtWidgets.QPushButton):
         self._isLeaf_=False
         self._active_=True
         self._displayHint_ = 0
+        
         self.setFocusPolicy(QtCore.Qt.TabFocus)
         self.setSizePolicy(QtWidgets.QSizePolicy.Maximum, 
                            QtWidgets.QSizePolicy.Fixed)
@@ -42,15 +46,13 @@ class NavigatorButtonBase(QtWidgets.QPushButton):
             self._pressed_.connect(parent.requestActivation)
             
     def setActive(self, active:bool):
-        if self._active_ != active:
-            self._active_ = active is True
-            self.update()
+        self.active = value == True
             
-    def isActive(self) -> bool:
+    def isActive(self):
         return self._active_
     
     @property
-    def active(self) -> bool:
+    def active(self):
         return self._active_
     
     @active.setter
@@ -67,7 +69,7 @@ class NavigatorButtonBase(QtWidgets.QPushButton):
             
         self.update()
 
-    def isDisplayHintEnabled(self, hint:typing.Union[DisplayHint, int]) -> bool:
+    def isDisplayHintEnabled(self, hint:typing.Union[DisplayHint, int]):
         return (self._displayHint_ & hint) > 0
     
     def focusInEvent(self, event:QtGui.QFocusEvent):
@@ -91,6 +93,7 @@ class NavigatorButtonBase(QtWidgets.QPushButton):
     def drawHoverBackground(self, painter:QtGui.QPainter):
         isHighlighted = self.isDisplayHintEnabled(DisplayHint.EnteredHint) or self.isDisplayHintEnabled(DisplayHint.DraggedHint) or self.isDisplayHintEnabled(DisplayHint.PopupActiveHint)
         backgroundColor = self.palette().color(QtGui.QPalette.Highlight) if isHighlighted else QtCore.Qt.transparent
+        
         if not self._active_ and isHighlighted:
             backgroundColor.setAlpha(128)
             
@@ -101,7 +104,7 @@ class NavigatorButtonBase(QtWidgets.QPushButton):
             option.viewItemPosition = QtWidgets.QStyleOptionViewItem.OnlyOne
             self.style().drawPrimitive(QtWidgets.QStyle.PE_PanelItemViewItem, option, painter, self)
             
-    def foregroundColor(self) -> QtGui.QColor:
+    def foregroundColor(self):
         isHighlighted = self.isDisplayHintEnabled(DisplayHint.EnteredHint) or self.isDisplayHintEnabled(DisplayHint.DraggedHint) or self.isDisplayHintEnabled(DisplayHint.PopupActiveHint)
         
         foregroundColor = self.palette().color(QtGui.QPalette.Foreground)
@@ -118,37 +121,69 @@ class NavigatorButtonBase(QtWidgets.QPushButton):
     def activate(self):
         self.active = True
         #self.setActive(true)
-        
-        
 
-# class ArrowButton_old(QtWidgets.QToolButton):
-#     def __init__(self, parent=None):
-#         super().__init__(parent)
-#         self.setArrowType(QtCore.Qt.RightArrow)
-#         self.setPopupMode(QtWidgets.QToolButton.InstantPopup)
-#         self.icon = QtGui.QIcon.fromTheme("go-next")
-#         self.iconSize = self.icon.actualSize(QtCore.QSize(16,16), state=QtGui.QIcon.On)
-#         self.setMinimumSize(self.iconSize.width(), self.iconSize.height())
-#         self.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum))
-#         opt = QtWidgets.QStyleOptionFrame()
-#         self.initStyleOption(opt)
-#         
-#     # def paintEvent(self, ev = QtGui.QPaintEvent):
-#     #     painter = QtGui.QPainter(self)
-#     #     style = self.style()
-#     #     super().paintEvent(ev)
-# 
-#     def initStyleOption(self, opt:QtWidgets.QStyleOptionFrame):
-#         """Required in all concrete subclasses of QWidget
-#         """
-#         opt.initFrom(self)
-#         # opt.state = QtWidgets.QStyle.State_Sunken if self.isDown() else QtWidgets.QStyle.State_Raised
-#         #  NOTE: 2021-05-14 21:52:32
-#         opt.features |= 0
-#         # if isinstance(self, QtWidgets.QPushButton) and self.isDefault():
-#         #     opt.features |= QtWidgets.QStyleOptionButton.DefaultButton
-#         # opt.text=""
-#         # opt.icon = QtGui.QIcon()
+class NavigatorToggleButton(NavigatorButtonBase):
+    _iconSize_ = 16
+    def __init__(self, parent:Navigator=None):
+        super().__init__(parent=parent)
+        self._pixmap_ = None
+        self.setCheckable(True)
+        self.toggled.connect(self.updateToolTip)
+        self.clicked.connect(self.updateCursor)
+        
+        self.updateToolTip()
+        
+    def sizeHint(self):
+        size = super().sizeHint()
+        size.setWidth(max(self._iconSize_, self.iconSize().width()) + 4)
+        
+        return size
+    
+    def enterEvent(self, evt:QtGui.QEnterEvent):
+        super().enterEvent(evt)
+        self.updateCursor()
+    
+    def leaveEvent(self, evt:QtCore.QEvent):
+        super().leaveEvent(evt)
+        self.setCursor(QtCore.Qt.ArrowCursor)
+    
+    def paintEvent(self, evt:QtGui.QPaintEvent):
+        painter = QtGui.QPainter(self)
+        painter.setClipRect(evt.rect())
+        buttonWidth = int(self.width())
+        buttonHeight = int(self.height())
+        
+        if self.isChecked():
+            self.drawHoverBackground(painter)
+            
+            if self._pixmap_ is None:
+                self._pixmap_ = QtGui.QIcon.fromTheme("dialog-ok").pixmap(QtCore.QSize(self._iconSize_, self._iconSize_)).expandedTo(self.iconSize())
+                
+            self.style().drawItemPixmap(painter, self.rect(), QtCore.Qt.AlignCenter, self._pixmap_)
+            
+        elif self.isDisplayHintEnabled(DisplayHint.EnteredHint):
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(self.palette().color(self.foregroundRole()))
+            
+            verticalGap = 4
+            caretWidth = 2
+            x = 0 if self.layoutDirection() == QtCore.Qt.LeftToRight else buttonWidth - caretWidth
+            
+            painter.drawRect(x, verticalGap. caretWidth, buttonHeight - 2 * verticalGap)
+    
+    @pyqtSlot()
+    def updateToolTip(self):
+        if self.isChecked():
+            self.setToolTip("Click for Navigation")
+        else:
+            self.setToolTip("Click to Edit Location")
+    
+    @pyqtSlot()
+    def updateCursor(self):
+        if self.isChecked():
+            self.setCursor(QtCore.Qt.ArrowCursor)
+        else:
+            self.setCursor(QtCore.Qt.IBeamCursor)
 
 class NavigatorButton(NavigatorButtonBase):
     sig_navigate = pyqtSignal(str, name="sig_navigate")
@@ -194,6 +229,20 @@ class NavigatorButton(NavigatorButtonBase):
     def setText(self, text):
         super().setText(text)
         self.updateMinimumWidth()
+        
+    def plainText(self):
+        source = self.text()
+        sourceLength = len(source)
+        
+        dest = list()
+        
+        for c in source:
+            if c == '&':
+                continue
+            
+            dest.append(c)
+            
+        return "".join(dest)
         
     def arrowWidth(self):
         width = 0
@@ -369,6 +418,90 @@ class NavigatorButton(NavigatorButtonBase):
     @isLeaf.setter
     def isLeaf(self, value:bool):
         self._isLeaf_ = value
+        
+class NavigatorPlacesSelector(NavigatorButtonBase):
+    def __init__(self, parent, placesModel):
+        super().__init__(parent=parent)
+        
+        self._selectedItem_ = -1
+        self._placesModel_ = placesModel
+        
+        self.setFocusPolicy(QtCore.Qt.NoFocus)
+        self._placesMenu_ = QtWidgets.QMenu(self)
+        self._placesMenu_.installEventFilter(self)
+        self._selectedUrl_ = QtCore.QUrl()
+        
+        self.updateMenu()
+        
+        self._placesModel_.reloaded.connect(self.updateMenu)
+        # self._placesMenu_.triggered.connect() ### use updateMenu to connect each action
+        
+        self.setMenu(self._placesMenu_)
+        
+        self.setAcceptDrops(True)
+        
+    def updateMenu(self):
+        for obj in self._placesMenu_.children():
+            obj.deleteLater()
+            
+        self._placesMenu_.clear()
+        
+        self.updateSelection(self._selectedUrl_)
+        
+        previousGroup = ""
+        subMenu = None
+        
+        rowCount = self._placesModel_.rowCount()
+        
+        for i in range(rowCount):
+            index = self._placesModel_.index(i, 0)
+            if self._placesModel_.ishidden(index):
+                continue
+            
+            placeAction = QtWidgets.QAction(self._placesModel_.icon(index),
+                                           self._placesModel_.text(index),
+                                           self._placesMenu_)
+            
+            placeAction.setData(i)
+            
+            groupName = index.data(desktoputils.AdditionalRoles.GroupRole).toString()
+            
+            if len(previousGroup) == 0:
+                previousGroup = groupName
+                
+            if previousGroup != groupName:
+                subMenuAction = QtWidgets.QAction(groupName, self._placesMenu_)
+                subMenu = QtWidgets.QMenu(self._placesMenu_)
+                subMenu.installEventFilter(self)
+                subMenuAction.setMenu(subMenu)
+                
+                self._placesMenu_.addAction(subMenuAction)
+                
+                previousGroup = groupName
+                
+            if isinstance(subMenu, QtWidgets.QMenu):
+                subMenu.addAction(placeAction)
+            else:
+                self._placesMenu_.addAction(placeAction)
+                
+            if i == self._selectedItem_:
+                self.setIcon(self._placesModel_.icon(index))
+                
+        self.updateTeardownAction()
+        
+    def updateTeardownAction(self):
+        teardownActionId = "teardownAction"
+        
+        actions = self._placesMenu_.actions()
+        
+        for action in actions:
+            if action.data() == teardownActionId:
+                action.deleteLater()
+                action = None
+                
+        index = self._placesModel_.index(self._selectedItem_, 0)
+        
+        teardown = self._placesModel_.teardownActionForIndex(index)
         
     
 class BreadCrumb(QtWidgets.QWidget):
@@ -734,96 +867,108 @@ class PathEditor(QtWidgets.QWidget):
         self.sig_chDirString.emit(value)
         
 class Navigator(QtWidgets.QWidget):
-    def __init__(self, path:pathlib.Path, editMode:bool=False, recentDirs:list = list(), maxRecent:int=10,parent=None):
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
-        self._path_ = path.resolve()
-        posixpathstr = self._path_.as_posix()
-        self._recentDirs_ = [posixpathstr]
-        if posixpathstr in recentDirs:
-            rd = [i for i in recentDirs if pathlib.Path(i) != self._path_]
-        else:
-            rd = recentDirs
-        self._recentDirs_ = rd
-        self._editMode_ = editMode==True
-        self._configureUI_()
+        self._hlayout_ = QtWidgets.QHBoxLayout(self)
+        self._navButtons_ = list()
+        self._supportedSchemes_ = list()
+        self._homeUrl = QtCore.QUrl()
+        self._placesSelector_ = None # (KUrlNavigatorPlacesSelector)
+        self._pathBox_ = None # QComboBox (KUrlComboBox)
+        self._schemes_ = None # QComboBox (KUrlNavigatorSchemeCombo)
         
-    def _configureUI_(self):
-        self.bcnav = BreadCrumbsNavigator(self._path_, parent=self)
-        self.bcnav.sig_chDirString[str].connect(self.slot_dirChange)
-        self.bcnav.sig_switchToEditor.connect(self.slot_switchToEditor)
-        self.editor = PathEditor(self._path_, self._recentDirs_, parent=self)
-        self.editor.sig_chDirString[str].connect(self.slot_dirChange)
-        self.editor.sig_switchToNavigator.connect(self.slot_switchToNavigator)
-        self.hlayout = QtWidgets.QHBoxLayout(self)
-        self.hlayout.setContentsMargins(0,0,0,0)
-        self.hlayout.setSpacing(0)
-        self.setLayout(self.hlayout)
-        self.bcnav.setVisible(False)
-        self.editor.setVisible(False)
-        if self._editMode_:
-            self.editor.setVisible(True)
-            self.layout().addWidget(self.editor)
-            self.bcnav.setVisible(False)
-        else:
-            self.bcnav.setVisible(True)
-            self.layout().addWidget(self.bcnav)
-            self.editor.setVisible(False)
         
-    @property
-    def recentDirs(self):
-        return self._recentDirs_
-    
-    @recentDirs.setter
-    def recentDirs(self, value:list):
-        self._recentDirs_[:] = value
-        
-    @property
-    def path(self):
-        return self._path_
-    
-    @path.setter
-    def path(self, value:pathlib.Path):
-        self._path_ = value.resolve()
-        signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.bcnav, self.editor)]
-        print(f"{self.__class__.__name__}.path = {self._path_}")
-        self.bcnav.path = value
-        self.editor.path = value
-        
-    @property
-    def editMode(self):
-        return self._editMode_
-    
-    @editMode.setter
-    def editMode(self, value:bool):
-        self._editMode_ = value==True
-        self.update()
-    
-    def update(self):
-        if self.hlayout.count() > 0:
-            self.hlayout.takeAt(0)
-            
-        if self._editMode_:
-            self.bcnav.setVisible(False)
-            self.hlayout.addWidget(self.editor)
-            self.editor.setVisible(True)
-            
-            
-        else:
-            self.editor.setVisible(False)
-            self.hlayout.addWidget(self.bcnav)
-            self.bcnav.setVisible(True)
-            
-        
-    @pyqtSlot(str)
-    def slot_dirChange(self, value):
-        print(f"{self.__class__.__name__}.slot_dirChange value: {value}" )
-        
-        self.path = pathlib.Path(value)
-        
-    @pyqtSlot()
-    def slot_switchToNavigator(self):
-        self.editMode = False
-        
-    @pyqtSlot()
-    def slot_switchToEditor(self):
-        self.editMode = True
+# class Navigator_old(QtWidgets.QWidget):
+#     def __init__(self, path:pathlib.Path, editMode:bool=False, recentDirs:list = list(), maxRecent:int=10,parent=None):
+#         super().__init__(parent=parent)
+#         self._path_ = path.resolve()
+#         posixpathstr = self._path_.as_posix()
+#         self._recentDirs_ = [posixpathstr]
+#         if posixpathstr in recentDirs:
+#             rd = [i for i in recentDirs if pathlib.Path(i) != self._path_]
+#         else:
+#             rd = recentDirs
+#         self._recentDirs_ = rd
+#         self._editMode_ = editMode==True
+#         self._configureUI_()
+#         
+#     def _configureUI_(self):
+#         self.bcnav = BreadCrumbsNavigator(self._path_, parent=self)
+#         self.bcnav.sig_chDirString[str].connect(self.slot_dirChange)
+#         self.bcnav.sig_switchToEditor.connect(self.slot_switchToEditor)
+#         self.editor = PathEditor(self._path_, self._recentDirs_, parent=self)
+#         self.editor.sig_chDirString[str].connect(self.slot_dirChange)
+#         self.editor.sig_switchToNavigator.connect(self.slot_switchToNavigator)
+#         self.hlayout = QtWidgets.QHBoxLayout(self)
+#         self.hlayout.setContentsMargins(0,0,0,0)
+#         self.hlayout.setSpacing(0)
+#         self.setLayout(self.hlayout)
+#         self.bcnav.setVisible(False)
+#         self.editor.setVisible(False)
+#         if self._editMode_:
+#             self.editor.setVisible(True)
+#             self.layout().addWidget(self.editor)
+#             self.bcnav.setVisible(False)
+#         else:
+#             self.bcnav.setVisible(True)
+#             self.layout().addWidget(self.bcnav)
+#             self.editor.setVisible(False)
+#         
+#     @property
+#     def recentDirs(self):
+#         return self._recentDirs_
+#     
+#     @recentDirs.setter
+#     def recentDirs(self, value:list):
+#         self._recentDirs_[:] = value
+#         
+#     @property
+#     def path(self):
+#         return self._path_
+#     
+#     @path.setter
+#     def path(self, value:pathlib.Path):
+#         self._path_ = value.resolve()
+#         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.bcnav, self.editor)]
+#         print(f"{self.__class__.__name__}.path = {self._path_}")
+#         self.bcnav.path = value
+#         self.editor.path = value
+#         
+#     @property
+#     def editMode(self):
+#         return self._editMode_
+#     
+#     @editMode.setter
+#     def editMode(self, value:bool):
+#         self._editMode_ = value==True
+#         self.update()
+#     
+#     def update(self):
+#         if self.hlayout.count() > 0:
+#             self.hlayout.takeAt(0)
+#             
+#         if self._editMode_:
+#             self.bcnav.setVisible(False)
+#             self.hlayout.addWidget(self.editor)
+#             self.editor.setVisible(True)
+#             
+#             
+#         else:
+#             self.editor.setVisible(False)
+#             self.hlayout.addWidget(self.bcnav)
+#             self.bcnav.setVisible(True)
+#             
+#         
+#     @pyqtSlot(str)
+#     def slot_dirChange(self, value):
+#         print(f"{self.__class__.__name__}.slot_dirChange value: {value}" )
+#         
+#         self.path = pathlib.Path(value)
+#         
+#     @pyqtSlot()
+#     def slot_switchToNavigator(self):
+#         self.editMode = False
+#         
+#     @pyqtSlot()
+#     def slot_switchToEditor(self):
+#         self.editMode = True
