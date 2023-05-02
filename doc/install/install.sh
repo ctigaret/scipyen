@@ -38,8 +38,15 @@ function show_help ()
     echo -e "--about\t\t\tDisplay Install.md at the console (requires the program 'glow')\n"
     echo -e "-h | -? | --help \tShow this help message and quit\n"
     echo -e "\nFor details, execute install.sh --about\n"
-    
+    echo -e "\n"
+    echo -e "When run with the virtual Pythob environment already activated,\n"
+    echo -e "the script will use the current virtual environment to perform \n"
+    echo -e "(re)installations. WARNING: Make sure you activate the appropriate\n"
+    echo -e "Python environment for this !\n"
+   
 }
+
+
 function findqmake ()
 {
     qmake_binary=`which qmake`
@@ -622,7 +629,9 @@ for i in "$@" ; do
 done
 
 # makes a virtual environment and activates it
+if ! [ -v VIRTUAL_ENV ] ; then
 upgrade_virtualenv && makevirtenv
+fi
 
 if [[ $? -ne 0 ]] ; then
     echo -e "\nCould not create and/or activate a virtual environment. Goodbye!\n"
