@@ -261,11 +261,27 @@ function dovigra ()
     fi
     
     if [ ! -r ${VIRTUAL_ENV}/.vigradone ] || [[ $reinstall_vigra -gt 0 ]]; then
-        cd $VIRTUAL_ENV/src
+        mkdir -p ${VIRTUAL_ENV}/src && cd $VIRTUAL_ENV/src
         
         findcmake
         
-        git clone https://github.com/ukoethe/vigra.git && mkdir -p vigra-build && cd vigra-build
+        vigra_src=$VIRTUAL_ENV/src/vigra
+        vigra_build=$VIRTUAL_ENV/src/vigra-build
+        
+        if [ ! -r ${vigra_src} ] ; then
+            git clone https://github.com/ukoethe/vigra.git
+            if [[ $? -ne 0 ]] ; then
+                echo -e "Cannot clone vigra git repository. Goodbye!\n"
+                exit 1
+            fi
+        fi
+          
+        if [ -d ${vigra_build} ] ; then
+            rm -fr ${vigra_build}
+        fi
+        
+        echo -e "Creating vigra build tree outside the source tree\n"
+        mkdir -p vigra-build && cd vigra-build
         
         $cmake_binary -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
         
