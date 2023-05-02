@@ -343,6 +343,7 @@ if [[ $? -ne 0 ]] ; then
 echo -e "Installation of Scipyen Desktop file failed\n"
 exit 1
 fi
+# NOTE: 2023-05-02 15:25:50 this below installs an Icon on the desktop
 xdg-desktop-icon install ${tmpfile}
 if [[ $? -ne 0 ]] ; then
 echo -e "Installation of Scipyen Desktop file failed\n"
