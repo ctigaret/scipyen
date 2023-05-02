@@ -7,8 +7,8 @@ from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 from PyQt5.uic import loadUiType
 
-from core import desktoputils
-from desktoputils import PlacesModel
+from core import desktoputils as dutils
+from core.desktoputils import PlacesModel
 from core.prog import safeWrapper
 import gui.pictgui as pgui
 from gui import guiutils
