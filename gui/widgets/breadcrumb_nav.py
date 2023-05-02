@@ -8,6 +8,7 @@ from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 from PyQt5.uic import loadUiType
 
 from core import desktoputils
+from desktoputils import PlacesModel
 from core.prog import safeWrapper
 import gui.pictgui as pgui
 from gui import guiutils
@@ -867,7 +868,8 @@ class PathEditor(QtWidgets.QWidget):
         self.sig_chDirString.emit(value)
         
 class Navigator(QtWidgets.QWidget):
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None):
+    def __init__(self, placesModel:typing.Optional[PlacesModel]=None, url:typing.Optional[QtCore.QUrl]=None, parent:typing.Optional[QtWidgets.QWidget] = None):
+        
         super().__init__(parent=parent)
         self._hlayout_ = QtWidgets.QHBoxLayout(self)
         self._navButtons_ = list()
@@ -876,6 +878,15 @@ class Navigator(QtWidgets.QWidget):
         self._placesSelector_ = None # (KUrlNavigatorPlacesSelector)
         self._pathBox_ = None # QComboBox (KUrlComboBox)
         self._schemes_ = None # QComboBox (KUrlNavigatorSchemeCombo)
+        
+        
+    def __del__(self):
+        self._dropDownButton_.removeEventFilter(self)
+        self._pathBox_.removeEventFilter(self)
+        self._toggleEditableMode_.removeEventFilter(self)
+        
+        for button in self._navButtons_:
+            button.removeEventFilter(self)
         
         
 # class Navigator_old(QtWidgets.QWidget):

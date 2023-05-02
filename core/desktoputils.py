@@ -132,6 +132,9 @@ def get_desktop_places():
             place_name = b.getElementsByTagName("title")[0].childNodes[0].data
             place_url = b.getAttribute("href")
             
+            if len(place_name) == 0 or len(place_url) == 0:
+                continue
+            
             info_node = b.getElementsByTagName("info")[0]
             info_metadata_nodes = info_node.getElementsByTagName("metadata")
             
@@ -361,6 +364,9 @@ class PlacesItem(QtCore.QObject):
     Solid framework, and special KIO protocols (e.g. kdeconnect:/, remote:/, etc.)
     
     """
+    
+    # itemChanged = pyqtSignal(str, name="itemChanged")
+    
     def __init__(self, address:str, parent):
         super().__init__(parent)
         self._isAccessible_ = False
