@@ -33,6 +33,8 @@ function show_help ()
     echo -e "--with_neuron\t\tInstall binary neuron python distribution from PyPI\n"
     echo -e "--build_neuron\t\tBuild neuron python locally\n"
     echo -e "--with_coreneuron\tWhen '--build_neuron' is passed, build local neuron with coreneuron; by default coreneuron is not used.\n"
+    echo -e "--refresh_repos\t When '--refresh_repos' is passed, local repository clones will be refreshed before rebuilding\n"
+    echo -e "\tNOTE: This applies to vigra and to local neuron build only\n"
     echo -e "--jobs=N\t\tNumber of parallel tasks during building PyQt5 and neuron; default is 4; set to 0 to disable parallel build\n"
     echo -e "--reinstall=NAME\t\t\tRe-install/re-building NAME, where NAME is one of pips, pyqt5, vigra, neuron, or desktopentry; can be passed more than once\n"
     echo -e "--about\t\t\tDisplay Install.md at the console (requires the program 'glow')\n"
@@ -269,10 +271,20 @@ function dovigra ()
         vigra_build=$VIRTUAL_ENV/src/vigra-build
         
         if [ ! -r ${vigra_src} ] ; then
+            echo -e "Cloning vigra git repository...\n"
             git clone https://github.com/ukoethe/vigra.git
             if [[ $? -ne 0 ]] ; then
                 echo -e "Cannot clone vigra git repository. Goodbye!\n"
                 exit 1
+            fi
+            
+        else
+            # refresh the gir repo...
+            if [[ $refresh_git_repos -gt 0 ]] ; then
+                echo -e "Refreshing vigra git repository...\n"
+                cd ${vigra_src}
+                git pull
+                cd ..
             fi
         fi
           
@@ -381,9 +393,18 @@ function doneuron ()
             
             findcmake
             
+            nrn_build=${VIRTUAL_ENV}/src/nrn-build
+            
             if [ ! -d ${VIRTUAL_ENV}/src/nrn ] ; then
                 echo -e "Cloning nrn repository"
                 git clone https://github.com/neuronsimulator/nrn
+            else
+                if [[ $refresh_git_repos -gt 0 ]] ; then
+                    echo -e "Refreshing nrn repository"
+                    cd ${VIRTUAL_ENV}/src/nrn
+                    git pull
+                    cd ..
+                fi
             fi
             
             mkdir -p ${VIRTUAL_ENV}/src/nrn-build && cd ${VIRTUAL_ENV}/src/nrn-build
@@ -565,6 +586,7 @@ reinstall_vigra=0
 reinstall_neuron=0
 reinstall_pips=0
 reinstall_desktop=0
+refresh_git_repos=0
 # for_msys=0
 
 # if [ -n $MSYSTEM_PREFIX ] ; then
@@ -589,6 +611,10 @@ for i in "$@" ; do
         ;;
         --install_dir=*)
         ve_path="${i#*=}"
+        shift
+        ;;
+        --refresh_repos)
+        refresh_git_repos=1
         shift
         ;;
         --jobs=*)
