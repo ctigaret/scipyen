@@ -321,6 +321,7 @@ echo -e "Installation of Scipyen Desktop file failed\n"
 exit 1
 fi
 echo "Scipyen Desktop file has been installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.desktopdone
+echo -e "Scipyen Desktop file has been installed \n"
 fi
 }
 
@@ -511,6 +512,8 @@ function linkscripts ()
         mv ${HOME}/bin/scipyen ${HOME}/bin/scipyen.$dt
     fi
     ln -s ${scipyendir}/scipyen ${HOME}/bin/scipyen
+    
+    echo -e "Link to scipyen startup script created in ${HOME}/bin \n"
 }
 
 #### Execution starts here ###
@@ -669,7 +672,11 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     fi
     
     # make scripts
-    make_scipyenrc && update_bashrc && linkscripts && make_desktop_entry
+    make_scipyenrc && update_bashrc
+    
+    linkscripts
+    
+    make_desktop_entry
     
 fi
 
