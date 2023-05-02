@@ -867,6 +867,9 @@ class PathEditor(QtWidgets.QWidget):
 
         self.sig_chDirString.emit(value)
         
+class NavigatorPrivate:
+    pass
+
 class Navigator(QtWidgets.QWidget):
     def __init__(self, placesModel:typing.Optional[PlacesModel]=None, url:typing.Optional[QtCore.QUrl]=None, parent:typing.Optional[QtWidgets.QWidget] = None):
         
@@ -878,6 +881,7 @@ class Navigator(QtWidgets.QWidget):
         self._placesSelector_ = None # (KUrlNavigatorPlacesSelector)
         self._pathBox_ = None # QComboBox (KUrlComboBox)
         self._schemes_ = None # QComboBox (KUrlNavigatorSchemeCombo)
+        self._d_ = None # NavigatorPrivate
         
         
     def __del__(self):
@@ -887,6 +891,14 @@ class Navigator(QtWidgets.QWidget):
         
         for button in self._navButtons_:
             button.removeEventFilter(self)
+        
+class NavigatorPrivate:
+    def __init__(self, url:QtCore.QUrl, qq:Navigator, placesModel:typing.Optional[PlacesModel] = None):
+        self._q_ = qq
+        self._showPlacesSelector_ = isinstance(placesModel, PlacesModel)
+        self._layout_ = QtWidgets.QHBoxLayout(self._q_)
+        self._layout_.setSpacing(0)
+        self._layout_.setContentsMargins(0,0,0,0)
         
         
 # class Navigator_old(QtWidgets.QWidget):
