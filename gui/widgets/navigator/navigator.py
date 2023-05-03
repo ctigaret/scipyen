@@ -920,7 +920,14 @@ class PathEditor(QtWidgets.QWidget):
 # class NavigatorPrivate:
 #     pass
 
-class UrlNavigator:
+class UrlNavigator(QtCore.QObject):
+    def __init__(self, url:QtCore.QUrl = QtCore.QUrl(), parent:typing.Optional[QtCore.QObject] = None):
+        self._history_ = list()
+        self._historyIndex_ = 0
+        
+    def isCompressedPath(self, path:QtCore.QUrl, archiveMimeTypes:list = list()):
+        
+        
     pass
 
 class Navigator(QtWidgets.QWidget):
