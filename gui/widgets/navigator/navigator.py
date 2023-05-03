@@ -420,7 +420,17 @@ class NavigatorButton(NavigatorButtonBase):
     def isLeaf(self, value:bool):
         self._isLeaf_ = value
         
+class NavigatorProtocolCombo(NavigatorButtonBase):
+    sig_activated = pyqtSignal()
+    def __init__(self, protocol:str, parent=None):
+        super().__init__(parent)
+        
+        
+        
 class NavigatorPlacesSelector(NavigatorButtonBase):
+    sig_placeActivated = pyqtSignal(str, name = "sig_activated")
+    sig_tabRequested = pyqtSignal()
+    
     def __init__(self, parent, placesModel):
         super().__init__(parent=parent)
         
@@ -867,21 +877,64 @@ class PathEditor(QtWidgets.QWidget):
 
         self.sig_chDirString.emit(value)
         
-class NavigatorPrivate:
+# class NavigatorPrivate:
+#     pass
+
+class UrlNavigator:
     pass
 
 class Navigator(QtWidgets.QWidget):
+    # NOTE: 2023-05-03 08:16:42
+    # NavigatorPrivate API
+    sig_urlChanged = pyqtSignal(object)
+    sig_urlAboutToBeChanged = pyqtSignal()
+    sig_historyChanged = pyqtSignal()
+    
     def __init__(self, placesModel:typing.Optional[PlacesModel]=None, url:typing.Optional[QtCore.QUrl]=None, parent:typing.Optional[QtWidgets.QWidget] = None):
         
         super().__init__(parent=parent)
-        self._hlayout_ = QtWidgets.QHBoxLayout(self)
-        self._navButtons_ = list()
         self._supportedSchemes_ = list()
         self._homeUrl = QtCore.QUrl()
-        self._placesSelector_ = None # (KUrlNavigatorPlacesSelector)
+        self._schemes_ = None # QComboBox (KUrlNavigatorSchemeCombo) # TODO ?!?
+        # self._d_ = None # NavigatorPrivate
+        
+        # NOTE:2023-05-03 08:14:35 
+        # ### BEGIN NavigatorPrivate API
+        self._navButtons_ = list()
+        # self._coreUrlNavigator = None # TODO ?!?
         self._pathBox_ = None # QComboBox (KUrlComboBox)
-        self._schemes_ = None # QComboBox (KUrlNavigatorSchemeCombo)
-        self._d_ = None # NavigatorPrivate
+        self._layout_ = QtWidgets.QHBoxLayout(self)
+        self._layout_.setSpacing(0)
+        self._layout_.setContentsMargins(0,0,0,0)
+        self._dropDownButton_ = None # (KUrlNavigatorDropDownButton) # TODO
+        self._toggleEditableMode_ = NavigatorToggleButton(self)
+        self._dropWidget_ = None
+        
+        self._protocols_ = None # QComboBox (KUrlNavigatorProtocolCombo) # TODO
+        
+        self._subfolderOptions_ = Bunch({"showHidden":False, "showHiddenLast": False})
+        
+        self._showPlacesSelector_ = isinstance(placesModel, PlacesModel) # FIXME not needed
+        self._editable_ = False
+        self._active_ = True
+        self._showFullPath_ = False
+        
+        self.setAutoFillBackground(False)
+        
+        if isinstance(placesModel, PlacesModel):
+            self._placesSelector_ = NavigatorPlacesSelector(self, placesModel)
+            self._placesSelector_.sig_placeActivated.connect(self.setLocationUrl)
+            self._placesSelector_.sig_tabRequested.connect(self.tabRequested)
+            self._placesModel_.rowsInserted.connect(self.updateContent)
+            self._placesModel_.rowsRemoved.connect(self.updateContent)
+            self._placesModel_.dataChanged.connect(self.updateContent)
+        else:
+            self._placesSelector_ = None
+            
+        self._protocols_ = NavigatorProtocolCombo("", self)
+        self._protocols_.sig_activated.connect(self.slotProtocolChanged)
+        
+        # ### END NavigatorPrivate API
         
         
     def __del__(self):
@@ -891,15 +944,10 @@ class Navigator(QtWidgets.QWidget):
         
         for button in self._navButtons_:
             button.removeEventFilter(self)
-        
-class NavigatorPrivate:
-    def __init__(self, url:QtCore.QUrl, qq:Navigator, placesModel:typing.Optional[PlacesModel] = None):
-        self._q_ = qq
-        self._showPlacesSelector_ = isinstance(placesModel, PlacesModel)
-        self._layout_ = QtWidgets.QHBoxLayout(self._q_)
-        self._layout_.setSpacing(0)
-        self._layout_.setContentsMargins(0,0,0,0)
-        
+            
+    @pyqtSlot(str)
+    def slotProtocolChanged(self, protocol:str):
+        pass # TODO
         
 # class Navigator_old(QtWidgets.QWidget):
 #     def __init__(self, path:pathlib.Path, editMode:bool=False, recentDirs:list = list(), maxRecent:int=10,parent=None):
