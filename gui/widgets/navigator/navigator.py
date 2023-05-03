@@ -32,6 +32,7 @@ class NavigatorButtonBase(QtWidgets.QPushButton):
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent)
         self._isLeaf_=False
+        self._isDown_ = False
         self._active_=True
         self._displayHint_ = 0
         
@@ -514,7 +515,46 @@ class NavigatorPlacesSelector(NavigatorButtonBase):
         
         teardown = self._placesModel_.teardownActionForIndex(index)
         
+class NavigatorDropDownButton(NavigatorButtonBase):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # self._isDown_ = False # def'ed in NavigatorButtonBase
+        
+        
+    def sizeHint(self):
+        size = super().sizeHint()
+        size.setWidth(size.height() / 2)
+        return size
     
+    def keyPressEvent(evt:QtGui.QKeyEvent):
+        if evt.key() == QtCore.Qt.Key_Down:
+            self.clicked.emit()
+            
+        else:
+            super().keyPressEvent(evt)
+    
+    def paintEvent(evt:QtGui.QPaintEvent):
+        painter = QtGui.QPainter(self)
+        self.drawHoverBackground(painter)
+        fgColor = QtGui.QColor(self.foregroundColor())
+        
+        option = QtWidgets.QStyleOption()
+        option.initFrom(self)
+        option.rect = QtCore.QRect(0,0, int(self.width()), int(self.height()))
+        option.palette = self.palette()
+        option.palette.setColor(QtGui.QPalette.Text, fgColor)
+        option.palette.setColor(QtGui.QPalette.WindowText, fgColor)
+        option.palette.setColor(QtGui.QPalette.ButtonText, fgColor)
+        
+        if self._isDown_:
+            # self._isDown_ def'ed in superclass
+            self.style().drawPrimitive(QtWidgets.QStyle.PE_IndicatorArrowDown, option, painter, self)
+        else:
+            if self.layoutDirection() == QtCore.Qt.Left:
+                self.style().drawPrimitive(QtWidgets.QStyle.PE_IndicatorArrowRight, option, painter, self)
+            else:
+                self.style().drawPrimitive(QtWidgets.QStyle.PE_IndicatorArrowLeft, option, painter, self)
+            
 class BreadCrumb(QtWidgets.QWidget):
     sig_navigate = pyqtSignal(str, name="sig_navigate")
         
@@ -894,19 +934,19 @@ class Navigator(QtWidgets.QWidget):
         
         super().__init__(parent=parent)
         self._supportedSchemes_ = list()
-        self._homeUrl = QtCore.QUrl()
         self._schemes_ = None # QComboBox (KUrlNavigatorSchemeCombo) # TODO ?!?
         # self._d_ = None # NavigatorPrivate
         
         # NOTE:2023-05-03 08:14:35 
         # ### BEGIN NavigatorPrivate API
         self._navButtons_ = list()
+        self._customProtocols_ = list()
+        self._homeUrl = QtCore.QUrl()
         # self._coreUrlNavigator = None # TODO ?!?
         self._pathBox_ = None # QComboBox (KUrlComboBox)
         self._layout_ = QtWidgets.QHBoxLayout(self)
         self._layout_.setSpacing(0)
         self._layout_.setContentsMargins(0,0,0,0)
-        self._dropDownButton_ = None # (KUrlNavigatorDropDownButton) # TODO
         self._toggleEditableMode_ = NavigatorToggleButton(self)
         self._dropWidget_ = None
         
@@ -934,6 +974,10 @@ class Navigator(QtWidgets.QWidget):
         self._protocols_ = NavigatorProtocolCombo("", self)
         self._protocols_.sig_activated.connect(self.slotProtocolChanged)
         
+        self._dropDownButton_ = NavigatorDropDownButton(self)
+        self._dropDownButton_.setForegroundRole(QtGui.QPalette.WindowText)
+        self._dropDownButton_.installEventFilter(self)
+        self._dropDownButton_.clicked.connect(self.openPathSelectorMenu)
         # ### END NavigatorPrivate API
         
         
@@ -948,6 +992,10 @@ class Navigator(QtWidgets.QWidget):
     @pyqtSlot(str)
     def slotProtocolChanged(self, protocol:str):
         pass # TODO
+    
+    @pyqtSlot()
+    def openPathSelectorMenu(self):
+        pass
         
 # class Navigator_old(QtWidgets.QWidget):
 #     def __init__(self, path:pathlib.Path, editMode:bool=False, recentDirs:list = list(), maxRecent:int=10,parent=None):
