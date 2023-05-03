@@ -921,21 +921,127 @@ class PathEditor(QtWidgets.QWidget):
 #     pass
 
 class UrlNavigator(QtCore.QObject):
+    currentUrlAboutToChange = pyqtSignal(QtCore.QUrl, name = "currentUrlAboutToChange")
+    currentLocationUrlChanged = pyqtSignal(name = "currentLocationUrlChanged")
+    urlSelectionRequested = pyqtSignal(QtCore.QUrl, name = "urlSelectionRequested")
+    historyIndexChanged = pyqtSignal(name = "historyIndexChanged")
+    historyChanged = pyqtSignal(name = "historyChanged")
+    
     def __init__(self, url:QtCore.QUrl = QtCore.QUrl(), parent:typing.Optional[QtCore.QObject] = None):
+        super().__init__(parent)
+        
+        # NOTE: 2023-05-03 23:48:23
+        # Originally, a list of LocationData structs.
+        # Here, this is a list of Bunch with the fields "url" and "state"
         self._history_ = list()
         self._historyIndex_ = 0
+        self._history_.insert(0, Bunch({"url": url.adjusted(QtCore.QUrl.NormalizePathSegments),
+                               "state":None}))
+        
+    @property
+    def historyIndex(self):
+        return self._historyIndex_
+    
+    @historyIndex.setter
+    def historyIndex(self, value:int):
+        self._historyIndex_ = value
+        self.historyIndexChanged.emit()
+        
+    @property
+    def historySize(self):
+        return len(self._history_)
+    
+    @property
+    def currentLocationUrl(self):
+        return self.locationUrl()
+    
+    @currentLocationUrl.setter
+    def currentLocationUrl(self, newUrl:QtCore.QUrl):
+        if newUrl == self.locationUrl():
+            return
+        
+        url = newUrl.adjusted(QtCore.QUrl.NormalizePathSegments)
+        
+        # firstChildUrl = # TODO
         
     def isCompressedPath(self, path:QtCore.QUrl, archiveMimeTypes:list = list()):
+        db = QtCore.QMimeDatabase()
+        mime = db.mimeTypeForUrl(QtCore.QUrl(url.toString(QtCore.QUrl.StripTrailingSlash)))
+        
+        return any(mime.inherits(archiveType) for archiveType in archiveMimeTypes)
+        
+    def adjustedHistoryIndex(self, historyIndex:int):
+        historySize = len(self._history_)
+        if historyIndex < 0:
+            historyIndex = self._historyIndex_
+        elif historyIndex >= historySize:
+            historyIndex = historySize - 1
+            assert historyIndex >= 0
+            
+        return historyIndex
+    
+    def locationUrl(self, historyIndex:int = -1):
+        historyIndex = self.adjustedHistoryIndex(historyIndex)
+        return self._history_[historyIndex].url
+    
+    def saveLocationState(self, state:object):
+        self._history_[self._historyIndex_].state = state
+        
+    def locationState(self, historyIndex:int = -1):
+        historyIndex = self.adjustedHistoryIndex(historyIndex)
+        return self._history_[historyIndex].state
+    
+    def goBack(self):
+        count = len(self._history_)
+        
+        if self._historyIndex_ < count - 1:
+            newUrl = self.locationUrl(self._historyIndex_ + 1)
+            self.currentUrlAboutToChange.emit(newUrl)
+            self._historyIndex_ += 1
+            self.historyIndexChanged.emit()
+            self.historyChanged.emit()
+            self.currentLocationUrlChanged.emit()
+            return True
+        
+        return False
+    
+    def goForward(self):
+        if self._historyIndex_ > 0:
+            newUrl = self.locationUrl(self._historyIndex_ - 1)
+            self.currentUrlAboutToChange(newUrl)
+            self._historyIndex_ -= 1
+            self.historyIndexChanged.emit()
+            self.historyChanged.emit()
+            self.currentLocationUrlChanged.emit()
+            return True
+        
+        return False
+    
+    def goUp(self):
+        currentUrl = self.locationUrl()
+        
+        if not currentUrl.isValid() or currentUrl.isRelative():
+            return QtCore.QUrl()
+        
+        u = QtCore.QUrl(currentUrl)
+        if currentUrl.hasQuery():
+            u.setQuery("")
+            return u
+        
+        if currentUrl.hasFragment():
+            u.setFragment("")
+            
+            u = u.adjusted(QtCore.QUrl.StripTrailingSlash)
+            return u.adjusted(QtCore.QUrl.RemoveFilename)
         
         
-    pass
 
 class Navigator(QtWidgets.QWidget):
     # NOTE: 2023-05-03 08:16:42
     # NavigatorPrivate API
-    sig_urlChanged = pyqtSignal(object)
-    sig_urlAboutToBeChanged = pyqtSignal()
-    sig_historyChanged = pyqtSignal()
+    urlChanged = pyqtSignal(object)
+    urlAboutToBeChanged = pyqtSignal()
+    historyChanged = pyqtSignal()
     
     def __init__(self, placesModel:typing.Optional[PlacesModel]=None, url:typing.Optional[QtCore.QUrl]=None, parent:typing.Optional[QtWidgets.QWidget] = None):
         
