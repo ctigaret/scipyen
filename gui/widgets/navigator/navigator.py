@@ -1,5 +1,6 @@
 import typing, pathlib, functools, os
 from urllib.parse import urlparse, urlsplit
+from collections import namedtuple
 from enum import Enum, IntEnum
 import sip # for sip.isdeleted() - not used yet, but beware
 from traitlets.utils.bunch import Bunch
@@ -16,7 +17,30 @@ from iolib import pictio
 
 # Root > dir > subdir
 
+archiveTypeStr = ("-compress", "arj", "zip", "rar", "zoo", "lha", "cab", "iso")
+
+class LocationData(typing.NamedTuple):
+    """Encapsulates location data"""
+    url:str
+    state:object = None
+    def __repr__(self):
+        return f"LocationData url = {self.url}, state = {self.state}"
+    
+class UrlNavigatorData(typing.NamedTuple):
+    """Encapsulates UrlNavigator data"""
+    rootUrl: QtCore.QUrl
+    pos: QtCore.QPoint
+    state: bytes
+        
+
+def getSystemArchiveMimeTypes():
+    mimebd = QtCore.QMimeDatabase()
+    types = [m for m in mimedb.allMimeTypes() if any(v in m.name() for v in archiveTypeStr)]
+    
+    return types
+
 def firstChildUrl(lastUrl:QtCore.QUrl, currentUrl:QtCore.QUrl):
+    
     adjustedLastUrl = lastUrl.adjusted(QtCore.QUrl.StripTrailingSlash)
     adjustedCurrentUrl = currentUrl.adjusted(QtCore.QUrl.StripTrailingSlash)
     
@@ -952,22 +976,22 @@ class PathEditor(QtWidgets.QWidget):
 #     pass
 
 class UrlNavigator(QtCore.QObject):
-    currentUrlAboutToChange = pyqtSignal(QtCore.QUrl, name = "currentUrlAboutToChange")
-    currentLocationUrlChanged = pyqtSignal(name = "currentLocationUrlChanged")
-    urlSelectionRequested = pyqtSignal(QtCore.QUrl, name = "urlSelectionRequested")
-    historyIndexChanged = pyqtSignal(name = "historyIndexChanged")
-    historyChanged = pyqtSignal(name = "historyChanged")
+    currentUrlAboutToChange     = pyqtSignal(QtCore.QUrl, name = "currentUrlAboutToChange")
+    currentLocationUrlChanged   = pyqtSignal(name = "currentLocationUrlChanged")
+    urlSelectionRequested       = pyqtSignal(QtCore.QUrl, name = "urlSelectionRequested")
+    historyIndexChanged         = pyqtSignal(name = "historyIndexChanged")
+    historyChanged              = pyqtSignal(name = "historyChanged")
+    historySizeChanged          = pyqtSignal(name = "historySizeChanged")
     
     def __init__(self, url:QtCore.QUrl = QtCore.QUrl(), parent:typing.Optional[QtCore.QObject] = None):
         super().__init__(parent)
         
         # NOTE: 2023-05-03 23:48:23
         # Originally, a list of LocationData structs.
-        # Here, this is a list of Bunch with the fields "url" and "state"
+        # Here, this is a NamedTuple with the fields "url" and "state"
         self._history_ = list()
+        self._history_.insert(0, LocationData(url.adjusted(QtCore.QUrl.NormalizePathSegments), None))
         self._historyIndex_ = 0
-        self._history_.insert(0, Bunch({"url": url.adjusted(QtCore.QUrl.NormalizePathSegments),
-                               "state":None}))
         
     @property
     def historyIndex(self):
@@ -996,10 +1020,39 @@ class UrlNavigator(QtCore.QObject):
         firstUrlChild = firstChildUrl(self.locationUrl(), url)
         
         scheme = url.scheme()
+        # NOTE: 2023-05-04 15:15:30
+        # Scipyen's file manager does NOT use special protocols (which include
+        # compressed archives)
+
+        data = self._history_[self._historyIndex_]
         
-        if len(scheme):
+        isUrlEqual = url.matches(self.locationUrl(), QtCore.QUrl.StripTrailingSlash) or (not url.isValid() and url.matches(data.url, QtCore.QUrl.StripTrailingSlash))
+        
+        if isUrlEqual:
+            return
+        
+        self.currentUrlAboutToChange.emit(url)
+        
+        if self._historyIndex_ > 0:
+            self._history_[0:self._historyIndex_] = []
+            self._historyIndex_ = 0
+
+        assert self._historyIndex_ == 0
+        self._history_.insert(0, LocationData(url))
+        
+        historyMax = 100 # TODO make configurable -> link with mainWindow !!!
+        
+        if len(self._history_) > historyMax:
+            self._history_[0:historyMax] = []
             
+        self.historyIndexChanged.emit()
+        self.historySizeChanged.emit()
+        self.historyChanged.emit()
+        self.currentLocationUrlChanged.emit()
         
+    def setCurrentLocation(self, newUrl:QtCore.QUrl):
+        self.currentLocation = newUrl
+            
     def isCompressedPath(self, path:QtCore.QUrl, archiveMimeTypes:list = list()):
         db = QtCore.QMimeDatabase()
         mime = db.mimeTypeForUrl(QtCore.QUrl(url.toString(QtCore.QUrl.StripTrailingSlash)))
@@ -1021,7 +1074,9 @@ class UrlNavigator(QtCore.QObject):
         return self._history_[historyIndex].url
     
     def saveLocationState(self, state:object):
-        self._history_[self._historyIndex_].state = state
+        oldLoc = self._history_[self._historyIndex_]
+        newLoc = LocationData(oldLoc.url, state)
+        self._history_[self._historyIndex_] = newLoc
         
     def locationState(self, historyIndex:int = -1):
         historyIndex = self.adjustedHistoryIndex(historyIndex)
@@ -1075,12 +1130,21 @@ class UrlNavigator(QtCore.QObject):
 class Navigator(QtWidgets.QWidget):
     # NOTE: 2023-05-03 08:16:42
     # NavigatorPrivate API
-    urlChanged = pyqtSignal(object)
-    urlAboutToBeChanged = pyqtSignal()
-    historyChanged = pyqtSignal()
+    urlChanged          = pyqtSignal(QtCore.QUrl, name="urlChanged")
+    urlAboutToBeChanged = pyqtSignal(QtCore.QUrl, name = "urlAboutToBeChanged")
+    historyChanged      = pyqtSignal(name = "historyChanged")
+    activated           = pyqtSignal(name = "activated")
+    editableStateChanged = pyqtSignal(bool, name = "editableStateChanged")
+    urlsDropped         = pyqtSignal(QtCore.QUrl, QtGui.QDropEvent, name = "urlsDropped")
+    returnPressed       = pyqtSignal(name = "returnPressed")
+    # tabRequested        = pyqtSignal(QtCore.QUrl, name = "tabRequested")
+    # activeTabRequested  = pyqtSignal(QtCore.QUrl, name = "activeTabRequested")
+    # newWindowRequested  = pyqtSignal(QtCore.QUrl, name = "newWindowRequested")
+    urlSelectionRequested = pyqtSignal(QtCore.QUrl, name = "urlSelectionRequested")
+    
+    
     
     def __init__(self, placesModel:typing.Optional[PlacesModel]=None, url:typing.Optional[QtCore.QUrl]=None, parent:typing.Optional[QtWidgets.QWidget] = None):
-        
         super().__init__(parent=parent)
         self._supportedSchemes_ = list()
         self._schemes_ = None # QComboBox (KUrlNavigatorSchemeCombo) # TODO ?!?
@@ -1091,8 +1155,9 @@ class Navigator(QtWidgets.QWidget):
         self._navButtons_ = list()
         self._customProtocols_ = list()
         self._homeUrl = QtCore.QUrl()
-        # self._coreUrlNavigator = None # TODO ?!?
+        self._urlNavigator_ = UrlNavigator(self) # m_coreUrlNavigator
         self._pathBox_ = None # QComboBox (KUrlComboBox)
+        
         self._layout_ = QtWidgets.QHBoxLayout(self)
         self._layout_.setSpacing(0)
         self._layout_.setContentsMargins(0,0,0,0)
@@ -1107,6 +1172,12 @@ class Navigator(QtWidgets.QWidget):
         self._editable_ = False
         self._active_ = True
         self._showFullPath_ = False
+        
+        self._urlNavigator_.currentLocationUrlChanged.connect(self._slot_urlNavigatorUrlChanged)
+        self._urlNavigator_.currentUrlAboutToChange[QtCore.QUrl].connect(self._slot_urlNavigatorUrlAboutToBeChanged)
+        self._urlNavigator_.historySizeChanged.connect(self.historyChanged)
+        self._urlNavigator_.historyIndexChanged.connect(self.historyChanged)
+        self._urlNavigator_.historyChanged.connect(self.historyChanged)
         
         self.setAutoFillBackground(False)
         
@@ -1127,6 +1198,8 @@ class Navigator(QtWidgets.QWidget):
         self._dropDownButton_.setForegroundRole(QtGui.QPalette.WindowText)
         self._dropDownButton_.installEventFilter(self)
         self._dropDownButton_.clicked.connect(self.openPathSelectorMenu)
+        
+        # self._pathBox_ = # TODO KUrlComboBox
         # ### END NavigatorPrivate API
         
         
@@ -1144,7 +1217,39 @@ class Navigator(QtWidgets.QWidget):
     
     @pyqtSlot()
     def openPathSelectorMenu(self):
-        pass
+        pass # TODO
+    
+    @pyqtSlot(QtCore.QUrl)
+    def setLocationUrl(self, url:QtCore.QUrl):
+        pass # TODO
+    
+    @pyqtSlot()
+    def requestActivation(self):
+        pass # TODO
+    
+    @pyqtSlot()
+    def setFocus(self):
+        pass # TODO
+    
+    @pyqtSlot(QtCore.QUrl)
+    def setUrl(self, url:QtCore.QUrl):
+        pass # TODO DEPRECATED
+    
+    @pyqtSlot(QtCore.QUrl)
+    def saveRootUrl(self, url:QtCore.QUrl):
+        pass # TODO DEPRECATED
+    
+    @pyqtSlot(int, int)
+    def savePosition(self, x:int, y:int):
+        pass # TODO DEPRECATED
+    
+    @pyqtSlot()
+    def _slot_urlNavigatorUrlChanged(self):
+        self.urlChanged.emit(self._urlNavigator_.currentLocationUrl)
+        
+    @pyqtSlot(QtCore.QUrl)
+    def _slot_urlNavigatorUrlAboutToBeChanged(self, url):
+        self.urlAboutToBeChanged.emit(url)
         
 # class Navigator_old(QtWidgets.QWidget):
 #     def __init__(self, path:pathlib.Path, editMode:bool=False, recentDirs:list = list(), maxRecent:int=10,parent=None):
