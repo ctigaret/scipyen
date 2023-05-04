@@ -16,6 +16,37 @@ from iolib import pictio
 
 # Root > dir > subdir
 
+def firstChildUrl(lastUrl:QtCore.QUrl, currentUrl:QtCore.QUrl):
+    adjustedLastUrl = lastUrl.adjusted(QtCore.QUrl.StripTrailingSlash)
+    adjustedCurrentUrl = currentUrl.adjusted(QtCore.QUrl.StripTrailingSlash)
+    
+    if not adjustedCurrentUrl.isParentOf(adjustedLastUrl):
+        return QtCore.QUrl()
+    
+    childPath = adjustedLastUrl.path()
+    parentPath = adjustedCurrentUrl.path()
+    
+    minIndex = 1 if parentPath == "/" else 2
+    
+    if len(childPath) < len(parentPath) + minIndex:
+        return QtCore.QUrl()
+    
+    idx2 = childPath.find('/', len(parentPath) + minIndex)
+    
+    len2 = len(childPath) if idx2 < 0 else idx2
+    
+    path3 = childPath[:len2]
+    
+    res = QtCore.QUrl(url)
+    res.setPath(path3)
+    return res
+    
+def findProtocol(protocol:str):
+    assert len(protocol) > 0
+    assert ':' in protocol
+    
+    
+
 class DisplayHint(IntEnum):
     EnteredHint = 1
     DraggedHint = 2
@@ -962,7 +993,12 @@ class UrlNavigator(QtCore.QObject):
         
         url = newUrl.adjusted(QtCore.QUrl.NormalizePathSegments)
         
-        # firstChildUrl = # TODO
+        firstUrlChild = firstChildUrl(self.locationUrl(), url)
+        
+        scheme = url.scheme()
+        
+        if len(scheme):
+            
         
     def isCompressedPath(self, path:QtCore.QUrl, archiveMimeTypes:list = list()):
         db = QtCore.QMimeDatabase()
