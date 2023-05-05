@@ -90,7 +90,7 @@ def removeTrailingPath(path:str):
 
 def appendSlashToPath(url:QtCore.QUrl):
     path = url.path()
-    if len(path) && not path.endswith('/'):
+    if len(path) and not path.endswith('/'):
         path = appendSlash(path)
         url.setPath(path)
         
@@ -136,23 +136,27 @@ class UrlComboMode(IntEnum):
     Both = 0
     
 class UrlComboOverLoadResolving(IntEnum):
-    RemoveTop
-    RemoveBottom
+    RemoveTop = 0
+    RemoveBottom = 1
     
 class UrlComboBox(QtWidgets.QComboBox):
+    urlActivated = pyqtSignal(QtCore.QUrl, name="urlActivated")
+    
     def __init__(self, mode:UrlComboMode, rw:bool, parent:QtWidgets.QWidget):
         super().__init__(parent)
+        
         self._completer_ = QtWidgets.QCompleter(self)
         self._completer_.setModel(QtWidgets.QFileSystemModel(self._completer_))
         self._completer_.setModelSorting(QtWidgets.QCompleter.CaseSensitivelySortedModel)
         self._completer_.setCaseSensitivity(QtCore.Qt.CaseSensitive)
+        
         self.setEditable(rw==True)
         self.lineEdit().setCompleter(self._completer_)
         self._dirIcon_ = QtGui.QIcon.fromTheme("folder")
         self._opendirIcon_ = QtGui.QIcon.fromTheme("folder-open")
-        self.myMode = mode
-        self.urlAdded = False
-        self.myMaximum = 10
+        self._mode_ = mode
+        self._urlAdded_ = False
+        self._maximum_ = 10
         self._dragPoint_ = QtCore.QPoint()
         self.itemList = list() # list of UrlComboItem
         self.defaultList = list()
@@ -164,9 +168,11 @@ class UrlComboBox(QtWidgets.QComboBox):
         if isinstance(self.completer(), QtWidgets.QCompleter):
             self.completer().setModelSorting(QtWidgets.QCompleter.CaseSensitivelySortedModel)
         
-        
-    def init(self, mode:UrlComboMode):
-        pass
+    def getIcon(self, url:QtCore.QUrl):
+        if self._mode_ == UrlComboMode.Directories:
+            return self._dirIcon_
+        else:
+            return QtGui.QIcon.fromTheme(dutils.iconNameForUrl(url))
     
     def textForItem(self, item:UrlComboItem):
         if len(item.text):
@@ -174,7 +180,7 @@ class UrlComboBox(QtWidgets.QComboBox):
         
         url = item.url
         
-        if self.myMode == UrlComboMode.Directories:
+        if self._mode_ == UrlComboMode.Directories:
             url = appendSlashToPath(url)
         else:
             url = url.adjusted(QtCore.QUrl.StripTrailingSlash)
@@ -187,10 +193,219 @@ class UrlComboBox(QtWidgets.QComboBox):
     def insertUrlItem(self, item:UrlComboItem):
         ndx = self.count()
         self.insertItem(ndx, item.icon, self.textForItem(item))
-        self.itemMapped[ndx] = item
+        self.itemMapper[ndx] = item
+        
+    def updateItem(self, item:UrlComboItem, index:int, icon:QtGui.QIcon):
+        self.setItemIcon(index, icon)
+        self.setItemText(index, self.textForItem(item))
+        
+    def maxItems(self):
+        return self._maximum_
+    
+    def setMaxItems(self, value:int):
+        self._maximum_ = value
+        
+        if self.count() > self._maximum_:
+            oldCurrent = self.currentIndex()
+            
+            self.setDefaults()
+            
+            offset = max(0, len(self.itemList) + self.defaultList - self._maximum_)
+            
+            for k in range(offset, len(self.itemList)):
+                self.insertUrlItem(self.itemList[k])
+                
+            if self.count() > 0: # restore prev current item
+                if oldCurrent >= self.count():
+                    oldCurrent = self.count() - 1
+                    
+                self.setCurrentIndex(oldCurrent)
+                
+                
+    def removeUrl(self, url:QtCore.QUrl, checkDefaultURLs:bool):
+        for k, v in self.itemMapper.items():
+            if url.toString(QtCore.QUrl.StripTrailingSlash) == v.url.toString(QtCore.QUrl.StripTrailingSlash):
+                lst = [i for i in self.itemList if i != url]
+                
+                self.itemList[:] = lst
+                
+                if checkDefaultURLs:
+                    self.defaultList[:] = lst
+                    
+        signalBlocker = QtCore.QSignalBlocker(self)
+        
+        self.setDefaults()
+        
+        for item in self.itemList:
+            self.insertUrlItem(item)
+    
+    def urls(self):
+        ulist = list()
+        for i in range(len(self.defaultList), self.count()):
+            url = self.itemText(i)
+            if len(url):
+                if isAbsoluteLocalPath(url):
+                    ulist.append(QtCore.QUrl.fromLocalFile(url).toString())
+                else:
+                    ulist.append(url)
+                    
+        return ulist
+    
+    def addDefaultUrl(self, url:QtCore.QUrl, icon:typing.Optional[QtGui.QIcon] = None, text:str=""):
+        if not isinstance(icon, QtGui.QIcon):
+            icon = self.getIcon(url)
+            
+        self.defaultList.append(UrlComboItem(url, icon, text))
             
         
-    
+    def setDefaults(self):
+        self.clear()
+        self.itemMapper.clear()
+        
+        for item in self.defaultList:
+            self.insertUrlItem(item)
+            
+    def setUrls(self, ulist:list, remove:UrlComboOverLoadResolving = UrlComboOverLoadResolving.RemoveBottom):
+        self.setDefaults()
+        self.itemList.clear()
+        self._urlAdded_ = False
+        
+        if len(ulist) == 0:
+            return
+        
+        urls = list()
+        for u in ulist:
+            if u not in urls:
+                urls.append(u)
+                
+        Overload = len(urls) - self._maximum_ + len(self.defaultList)
+        
+        while Overload > 0:
+            if remove == UrlComboOverLoadResolving.RemoveBottom:
+                if len(urls):
+                    urls = urls[:-1]
+            else:
+                if len(urls):
+                    urls = urls[1:]
+                    
+            Overload = Overload - 1
+            
+        uu = QtCore.QUrl()
+        
+        for u in urls:
+            if u.isEmpty():
+                continue
+            
+            if isAbsoluteLocalPath(u):
+                uu = QtCore.QUrl.fromLocalFile(u)
+            else:
+                uu.setUrl(u)
+                
+            if u.isLocalFile() and not QtCore.QFile.exists(u.toLocalFile()):
+                continue
+            ucon = self.getIcon(uu)
+            item = UrlComboItem(uu, icon)
+            self.insertUrlItem(item)
+            self.itemList.append(item)
+            
+    def setUrl(self, url:QtCore.QUrl):
+        if url.isEmpty():
+            return
+        
+        signalBlocker = QtCore.QSignalBlocker(self)
+        
+        urlToInsert = url.toString(QtCore.QUrl.StripTrailingSlash)
+        
+        # checks for duplicates
+        for k, v in self.itemMapper.items():
+            if urlToInsert == v.toString(QtCore.QUrl.StripTrailingSlash):
+                self.setCurrentItem(k)
+                
+                if self._mode_ == UrlComboMode.Directories:
+                    self.updateItem(v, k, self._opendirIcon_)
+                    
+                return
+        
+        if self._urlAdded_:
+            if len(self.itemList):
+                self.itemList = self.itemList[:-1]
+                self._urlAdded_ = False
+                
+        self.setDefaults()
+        
+        offset = max(0, len(self.itemList) + len(self.defaultList) - self._maximum_)
+        
+        for k in range(offset, len(self.itemList)):
+            self.insertUrlItem(self.itemList[k])
+        
+        icon = self.getIcon(url)
+        item = UrlComboItem(url, icon)
+        
+        ndx = self.count()
+        text = self.textForItem(item)
+        
+        if self._mode_ == UrlComboMode.Directories:
+            self.insertItem(ndx, self._opendirIcon_, text)
+        else:
+            self.insertItem(ndx, item.icon, text)
+            
+        self.itemMapper[ndx] = item
+        
+        self.itemList.append(item)
+        
+        self.setCurrentIndex(ndx)
+        
+        if len(self.itemList):
+            self._urlAdded_ = True
+            
+    @pyqtSlot(int)
+    def slot_activated(self, ndx:int):
+        item = self.itemMapper.get(ndx, None)
+        
+        if isinstance(item, UrlComboItem):
+            self.setUrl(item.url)
+            self.urlActivated.emit(item.url)
+            
+    def mousePressEvent(self, evt:QtGui.QMouseEvent):
+        comboOpt = QtWidgets.QStyleOptionComboBox()
+        comboOpt.initFrom(self)
+        x0 = QtWidgets.QStyle.visualRect(self.layoutDirection(), 
+                                         self.rect(),
+                                         self.style().subControlRect(QtWidgets.QStyle.CC_ComboBox,
+                                                                     QtWidgets.QStyle.SC_ComboBoxEditField,
+                                                                     self)).x()
+        frameWidth = self.style().pixelMetric(QtWidgets.QStyle.PM_DefaultFrameWidth,
+                                              comboOpt, self)
+        
+        if evt.x() < (x0 + 16 + frameWidth):
+            self._dragPoint_ = evt.pos()
+        else:
+            self._dragPoint_ = QtCore.QPoint()
+            
+        super().mousePressEvent(evt)
+        
+    def mouseMoveEvent(self, evt:QtGui.QMouseEvent):
+        ndx = self.currentIndex()
+        item = self.itemMapperget(ndx, None)
+        
+        if isinstance(item, UrlComboItem) and not self._dragPoint_.isNull() and evt.buttons() & QtCore.Qt.LeftButton and (evt.pos() - self._dragPoint_).manhattanLength() > QtWidgets.QApplication.startDragDistance():
+            drag = QtGui.QDrag(self)
+            mime = QtCore.QMimeData()
+            mime.setUrls([item.url])
+            mime.settext(self.itemText(ndx))
+            if not self.itemIcon(ndx).isNull():
+                # self.itemIcon inherited from QComboBox
+                drag.setPixmap(self.itemIcon(ndx)).pixmap(32)
+                
+            drag.setMimeData(mime)
+            drag.exec()
+            
+        super().mousemoveEvent(evt)
+                        
+            
+    # def setCompletionObject(self, compObj:QtWidgets.QCompleter, hsig:bool):
+    #     compObj.setModelSorting(QtWidgets.QCompleter.CaseSensitivelySortedModel)
+                    
 class Navigator:
     pass # fwd decl
     

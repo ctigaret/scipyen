@@ -41,7 +41,7 @@
 # ------------------------
 # urllib.parse.urlparse
 
-import sys, os, pathlib, urllib, typing, warnings
+import sys, os, pathlib, urllib, typing, warnings, subprocess, traceback
 import core.xmlutils as xmlutils
 import iolib.pictio as pio
 import xml.etree.ElementTree as ET
@@ -69,7 +69,7 @@ except:
     # except:
     #     pass
     
-def special_places():
+def get_local_filesystem_places():
     """
     Get special directories (KDE Plasma5 specific)
     """
@@ -81,6 +81,30 @@ def special_places():
         return result
     
     return ret
+
+def get_my_desktop_session():
+    env = dict((k,v) for k,v in os.environ.items() if any(s in k.lower() for s in ("desktop", "session", "xdg")))
+    if len(env) == 0:
+        return
+    
+    xdg_session_desktop = env.get("XDG_SESSION_DESKTOP", "")
+    return xdg_session_desktop
+
+def get_trash_icon_name():
+    if get_my_desktop_session() == "KDE":
+        try:
+            trashproc = subprocess.run(["kioclient", "stat", "trash:/"],
+                                       capture_output=True)
+            
+            trashstat = dict(v for v in (s.split() for s in trashproc.stdout.decode().split("\n")) if len(v) == 2)
+
+            return trashstat.get("ICON_NAME", "user-trash")
+        except:
+            # traceback.print_exc()
+            return "user-trash"
+        
+    return "user-trash"
+        
 
 def get_desktop_places():
     """Collect user places as defined in the freedesktop.org XDG framework.
@@ -105,7 +129,7 @@ def get_desktop_places():
     NOTE: Not all these places will be useful in Scipyen. 
 
     In particular, the places relating to specific IO protocols and KDE Solid 
-    devices should be filterd out of the results (e.g., see special_places).
+    devices should be filterd out of the results (e.g., see get_local_filesystem_places).
     
     
     """
@@ -186,6 +210,51 @@ def get_desktop_places():
             ret[place_url] = {"name": place_name, "url": place_url, "icon": loc_icon,"system":False, "hidden": False, "app":None}
         
     return ret
+
+def iconNameForUrl(url:QtCore.QUrl):
+    if len(url.scheme()) == 0:
+        return "unknown"
+    
+    iconName = ""
+    
+    mimeDB = QtCore.QMimeDatabase()
+    
+    mimeType = mimeDB.mimeTypeForUrl(url)
+    
+    if url.isLocalFile():
+        if mimeType.inherits("inode/directory"):
+            iconName = iconForStandardPath(url.toLocalFile())
+            
+        if len(iconName) == 0:
+            iconName = "unknown" # FIXME/TODO
+            
+    else:
+        if url.scheme().startswith("http"):
+            iconName = favIconForUrl(url)
+            
+        elif url.scheme() == "trash":
+            if len(url.path()) <= 1:
+                iconName = get_trash_icon_name()
+            else:
+                iconName = mimeType.iconName()
+                
+        if len(iconName) == 0 and (mimeType.isDefault() or len(url.path()) <= 1):
+            if get_my_desktop_session() == "KDE":
+                try:
+                    kioproc = subprocess.run(["kioclient", "stat", url.scheme()],
+                                            capture_output=True)
+                    
+                    kiostat = dict(v for v in (s.split() for s in kioproc.stdout.decode().split("\n")) if len(v) == 2)
+
+                    iconName = kiostat.get("ICON_NAME", "")
+                    
+                except:
+                    pass
+                
+    if len(iconName) == 0:
+        iconName = mimeType.iconName()
+        
+    return iconName
 
 def findByAddress(address:str):
     places = get_desktop_places()
