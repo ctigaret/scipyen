@@ -69,12 +69,127 @@ def findProtocol(protocol:str):
     assert len(protocol) > 0
     assert ':' in protocol
     
+def isAbsoluteLocalPath(path:str):
+    # TODO/FIXME use pathlib here
+    return not path.startwith(':') and QtCore.QDir.isAbsolutePath(path)
+
+def appendSlash(path:str):
+    if len(path) == 0:
+        return path
+    
+    if not path.endswith('/'):
+        path += '/'
+        
+    return path
+
+def removeTrailingPath(path:str):
+    if path.endswith('/'):
+        path = path[:-1]
+        
+    return path
+
+def appendSlashToPath(url:QtCore.QUrl):
+    path = url.path()
+    if len(path) && not path.endswith('/'):
+        path = appendSlash(path)
+        url.setPath(path)
+        
+    return url
+
+def concatPaths(path1:str, path2:str):
+    assert not path2.startswith('/')
+    
+    if len(path1) == 0:
+        return path2
+    
+    path1 = appendSlash(path1)
+    path1 += path2
+    return path1
+
+def isRegFileMask(mode):
+    # TODO: use pathlib
+    pass
+
+def isDirMask(mode):
+    # TODO: use pathlib
+    pass
+
+def isLinkMask(mode):
+    # TODO: use pathlib
+    pass
+    
     
 
 class DisplayHint(IntEnum):
     EnteredHint = 1
     DraggedHint = 2
     PopupActiveHint = 4
+    
+class UrlComboItem(typing.NamedTuple):
+    url:QtCore.QUrl
+    icon: QtGui.QIcon
+    text:str = ""
+    
+class UrlComboMode(IntEnum):
+    Files = -1
+    Directories = 1
+    Both = 0
+    
+class UrlComboOverLoadResolving(IntEnum):
+    RemoveTop
+    RemoveBottom
+    
+class UrlComboBox(QtWidgets.QComboBox):
+    def __init__(self, mode:UrlComboMode, rw:bool, parent:QtWidgets.QWidget):
+        super().__init__(parent)
+        self._completer_ = QtWidgets.QCompleter(self)
+        self._completer_.setModel(QtWidgets.QFileSystemModel(self._completer_))
+        self._completer_.setModelSorting(QtWidgets.QCompleter.CaseSensitivelySortedModel)
+        self._completer_.setCaseSensitivity(QtCore.Qt.CaseSensitive)
+        self.setEditable(rw==True)
+        self.lineEdit().setCompleter(self._completer_)
+        self._dirIcon_ = QtGui.QIcon.fromTheme("folder")
+        self._opendirIcon_ = QtGui.QIcon.fromTheme("folder-open")
+        self.myMode = mode
+        self.urlAdded = False
+        self.myMaximum = 10
+        self._dragPoint_ = QtCore.QPoint()
+        self.itemList = list() # list of UrlComboItem
+        self.defaultList = list()
+        self.itemMapper = dict() # int ↦ UrlComboItem
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.setLayoutDirection(QtCore.Qt.LeftToRight)
+        self.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
+        
+        if isinstance(self.completer(), QtWidgets.QCompleter):
+            self.completer().setModelSorting(QtWidgets.QCompleter.CaseSensitivelySortedModel)
+        
+        
+    def init(self, mode:UrlComboMode):
+        pass
+    
+    def textForItem(self, item:UrlComboItem):
+        if len(item.text):
+            return item.text
+        
+        url = item.url
+        
+        if self.myMode == UrlComboMode.Directories:
+            url = appendSlashToPath(url)
+        else:
+            url = url.adjusted(QtCore.QUrl.StripTrailingSlash)
+            
+        if url.isLocalFile():
+            return url.toLocalFile()
+        else:
+            return url.toDisplayString()
+        
+    def insertUrlItem(self, item:UrlComboItem):
+        ndx = self.count()
+        self.insertItem(ndx, item.icon, self.textForItem(item))
+        self.itemMapped[ndx] = item
+            
+        
     
 class Navigator:
     pass # fwd decl
