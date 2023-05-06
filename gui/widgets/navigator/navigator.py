@@ -142,7 +142,7 @@ class UrlComboOverLoadResolving(IntEnum):
 class UrlComboBox(QtWidgets.QComboBox):
     urlActivated = pyqtSignal(QtCore.QUrl, name="urlActivated")
     
-    def __init__(self, mode:UrlComboMode, rw:bool, parent:QtWidgets.QWidget):
+    def __init__(self, mode:UrlComboMode, rw:typing.Optional[bool]=False, parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent)
         
         self._completer_ = QtWidgets.QCompleter(self)
@@ -817,7 +817,7 @@ class NavigatorPlacesSelector(NavigatorButtonBase):
     sig_placeActivated = pyqtSignal(str, name = "sig_activated")
     sig_tabRequested = pyqtSignal()
     
-    def __init__(self, parent, placesModel):
+    def __init__(self, placesModel:PlacesModel, parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent=parent)
         
         self._selectedItem_ = -1
@@ -1482,44 +1482,46 @@ class Navigator(QtWidgets.QWidget):
         
         # NOTE:2023-05-03 08:14:35 
         # ### BEGIN NavigatorPrivate API
-        self._navButtons_ = list()
-        self._customProtocols_ = list()
-        self._homeUrl = QtCore.QUrl()
-        self._urlNavigator_ = UrlNavigator(self) # m_coreUrlNavigator
-        self._pathBox_ = None # QComboBox (KUrlComboBox)
-        
         self._layout_ = QtWidgets.QHBoxLayout(self)
         self._layout_.setSpacing(0)
         self._layout_.setContentsMargins(0,0,0,0)
         self._toggleEditableMode_ = NavigatorToggleButton(self)
         self._dropWidget_ = None
         
-        self._protocols_ = None # QComboBox (KUrlNavigatorProtocolCombo) # TODO
-        
-        self._subfolderOptions_ = Bunch({"showHidden":False, "showHiddenLast": False})
-        
-        self._showPlacesSelector_ = isinstance(placesModel, PlacesModel) # FIXME not needed
-        self._editable_ = False
-        self._active_ = True
-        self._showFullPath_ = False
-        
+        self._urlNavigator_ = UrlNavigator(url, self) # m_coreUrlNavigator
         self._urlNavigator_.currentLocationUrlChanged.connect(self._slot_urlNavigatorUrlChanged)
         self._urlNavigator_.currentUrlAboutToChange[QtCore.QUrl].connect(self._slot_urlNavigatorUrlAboutToBeChanged)
         self._urlNavigator_.historySizeChanged.connect(self.historyChanged)
         self._urlNavigator_.historyIndexChanged.connect(self.historyChanged)
         self._urlNavigator_.historyChanged.connect(self.historyChanged)
         
-        self.setAutoFillBackground(False)
+        self._navButtons_ = list()
+        self._customProtocols_ = list()
+        self._homeUrl = QtCore.QUrl()
         
         if isinstance(placesModel, PlacesModel):
-            self._placesSelector_ = NavigatorPlacesSelector(self, placesModel)
+            self._placesSelector_ = NavigatorPlacesSelector(placesModel, self)
             self._placesSelector_.sig_placeActivated.connect(self.setLocationUrl)
             self._placesSelector_.sig_tabRequested.connect(self.tabRequested)
             self._placesModel_.rowsInserted.connect(self.updateContent)
             self._placesModel_.rowsRemoved.connect(self.updateContent)
             self._placesModel_.dataChanged.connect(self.updateContent)
+            self._showPlacesSelector_ = True
         else:
             self._placesSelector_ = None
+            self._showPlacesSelector_ = False
+        
+        
+        self._protocols_ = None # QComboBox (KUrlNavigatorProtocolCombo) # TODO
+        
+        self._subfolderOptions_ = Bunch({"showHidden":False, "showHiddenLast": False})
+        
+        # self._showPlacesSelector_ = isinstance(placesModel, PlacesModel) 
+        self._editable_ = False
+        self._active_ = True
+        self._showFullPath_ = False
+        
+        self.setAutoFillBackground(False)
             
         self._protocols_ = NavigatorProtocolCombo("", self)
         self._protocols_.sig_activated.connect(self.slotProtocolChanged)
@@ -1529,7 +1531,10 @@ class Navigator(QtWidgets.QWidget):
         self._dropDownButton_.installEventFilter(self)
         self._dropDownButton_.clicked.connect(self.openPathSelectorMenu)
         
-        # self._pathBox_ = # TODO KUrlComboBox
+        self._pathBox_ = UrlComboBox(UrlComboMode.Directories, False, self)
+        # self._pathBox_.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContentsOnFirstShow)
+        self._pathBox_.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self._pathBox_.installEventFilter(self)
         # ### END NavigatorPrivate API
         
         
