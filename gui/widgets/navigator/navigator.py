@@ -19,6 +19,10 @@ from iolib import pictio
 
 archiveTypeStr = ("-compress", "arj", "zip", "rar", "zoo", "lha", "cab", "iso")
 
+class Navigator:
+    pass # fwd decl
+
+
 class LocationData(typing.NamedTuple):
     """Encapsulates location data"""
     url:str
@@ -118,7 +122,13 @@ def isLinkMask(mode):
     # TODO: use pathlib
     pass
     
-    
+class SchemeCategory(IntEnum):
+    CoreCategory = 0
+    PlacesCategory = 2
+    DevicesCategory = 3
+    SubversionCategory = 4
+    OtherCategory = 5
+    CategoryCount = 6 # mandatory last entry
 
 class DisplayHint(IntEnum):
     EnteredHint = 1
@@ -402,12 +412,10 @@ class UrlComboBox(QtWidgets.QComboBox):
             
         super().mousemoveEvent(evt)
                         
-            
+    # TODO/FIXME ?
     # def setCompletionObject(self, compObj:QtWidgets.QCompleter, hsig:bool):
     #     compObj.setModelSorting(QtWidgets.QCompleter.CaseSensitivelySortedModel)
                     
-class Navigator:
-    pass # fwd decl
     
 class NavigatorButtonBase(QtWidgets.QPushButton):
     """Common ancestor for breadcrumbs buttons
@@ -806,12 +814,42 @@ class NavigatorButton(NavigatorButtonBase):
     def isLeaf(self, value:bool):
         self._isLeaf_ = value
         
-class NavigatorProtocolCombo(NavigatorButtonBase):
+class NavigatorProtocolCombo(NavigatorButtonBase): # TODO
     sig_activated = pyqtSignal()
     def __init__(self, protocol:str, parent=None):
         super().__init__(parent)
         
+class NavigatorSchemeCombo(NavigatorButtonBase):
+    sig_activated = pyqtSignal(str, name="sig_activated")
+    
+    def __init__(self, scheme:str, parent:typing.Optional[Navigator]=None):
+        super().__init__(parent)
+        self._menu_ = QtWidgets.QMenu(self)
+        self._schemes_ = list()
+        self._categories_ = dict() # str ↦ SchemeCategory
         
+        self._menu_.triggered.connect(self.setSchemeFromMenu)
+        self.setText(scheme)
+        self.setMenu(self._menu_)
+        
+    @pyqtSlot()
+    def setSchemeFromMenu(self):
+        pass # TODO
+    
+    @pyqtSlot()
+    def setScheme(self):
+        pass # TODO
+    
+    def setSupportedSchemes(self, schemes:list):
+        self._schemes_ = schemes
+        self._menu_.clear()
+        for scheme in schemes:
+            action = self._menu_.addAction(scheme)
+            action.setData(scheme)
+            
+    def sizeHint(self):
+        size = super().sizeHint()
+        width = self.fontMetrics().boundingRect(self.text()).width()
         
 class NavigatorPlacesSelector(NavigatorButtonBase):
     sig_placeActivated = pyqtSignal(str, name = "sig_activated")

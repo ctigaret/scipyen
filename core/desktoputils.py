@@ -427,6 +427,51 @@ def createSearchUrl(url:QtCore.QUrl):
     
     return searchUrl
 
+def removeAcceleratorMarker(label_:str):
+    # NOTE: 2023-05-06 10:48:50
+    # from ki18n frameworks i18n common_helpers.cpp
+    # https://invent.kde.org/frameworks/ki18n/-/blob/master/src/i18n/common_helpers.cpp
+    label = label_
+    
+    p = 0
+    accmarkRemoved = False
+    while True:
+        if '&' not in label:
+            break
+        
+        p = label.index('&', p)
+        
+        if p + 1 == len(label):
+            break
+        
+        marker = label[p+1]
+        
+        if marker.isalnum():
+            label = label[:,p] + label[p+1:]
+            
+            label = removeReducedCJKAccMark(label, p)
+            accmarkRemoved = True
+        
+        elif marker == '&':
+            label = label[:,p] + label[p+1,:]
+            
+        p += 1
+    
+    if not accmarkRemoved:
+        hasCJK = False
+        for c in label:
+            if c >= chr(ord('\u2e00')):
+                hasCJK = True
+                break
+            
+        if hasCJK:
+            p = 0
+            while True:
+                p = label.index('(', p)
+    
+        
+        
+
 class PlacesItem(QtCore.QObject):
     """Thin port of KFilePlacesItem.
     Has no functionality related to the Trash (Wastebin) protocol, the KDE
@@ -483,7 +528,7 @@ class PlacesModelPrivate: # not really needed !
         self.supportedSchemes = list()
         
     
-class PlacesModel(QtCore.QAbstractItemModel):
+class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
     """
     Extremely thin port of the KDE Plasma 5 KIO framework places model.
     
