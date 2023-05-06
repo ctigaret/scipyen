@@ -15,9 +15,23 @@ import gui.pictgui as pgui
 from gui import guiutils
 from iolib import pictio
 
+# TODO/FIXME: 2023-05-06 23:12:19
+# Since this is only intended for use with local file system (i.e. file:// URI 
+# protocol) I should use pathlib.Path instead of QtCore.QUrl
+
 # Root > dir > subdir
 
 archiveTypeStr = ("-compress", "arj", "zip", "rar", "zoo", "lha", "cab", "iso")
+
+NetworkProtocols = ("fish", "ftp", "sftp", "smb", "webdav")
+
+Protocols = ("file", "desktop")
+
+SpecialProtocols = ("trash")
+
+SupportedProtocols = Protocols
+
+ArrowSize = 10
 
 class Navigator:
     pass # fwd decl
@@ -814,42 +828,68 @@ class NavigatorButton(NavigatorButtonBase):
     def isLeaf(self, value:bool):
         self._isLeaf_ = value
         
-class NavigatorProtocolCombo(NavigatorButtonBase): # TODO
-    sig_activated = pyqtSignal()
-    def __init__(self, protocol:str, parent=None):
-        super().__init__(parent)
+# NOTE: 2023-05-06 22:30:40
+# WE only use the "file://" protocol, so this is not needed
+#
+# class NavigatorProtocolCombo(NavigatorButtonBase): # TODO
+#     sig_activated = pyqtSignal()
+#     def __init__(self, protocol:str, parent=None):
+#         super().__init__(parent)
         
-class NavigatorSchemeCombo(NavigatorButtonBase):
-    sig_activated = pyqtSignal(str, name="sig_activated")
-    
-    def __init__(self, scheme:str, parent:typing.Optional[Navigator]=None):
-        super().__init__(parent)
-        self._menu_ = QtWidgets.QMenu(self)
-        self._schemes_ = list()
-        self._categories_ = dict() # str ↦ SchemeCategory
-        
-        self._menu_.triggered.connect(self.setSchemeFromMenu)
-        self.setText(scheme)
-        self.setMenu(self._menu_)
-        
-    @pyqtSlot()
-    def setSchemeFromMenu(self):
-        pass # TODO
-    
-    @pyqtSlot()
-    def setScheme(self):
-        pass # TODO
-    
-    def setSupportedSchemes(self, schemes:list):
-        self._schemes_ = schemes
-        self._menu_.clear()
-        for scheme in schemes:
-            action = self._menu_.addAction(scheme)
-            action.setData(scheme)
+# NOTE: 2023-05-06 22:26:18
+# By design we only use the 'file://' protocol hence this is NOT needed
+#
+# class NavigatorSchemeCombo(NavigatorButtonBase):
+#     sig_activated = pyqtSignal(str, name="sig_activated")
+#     
+#     def __init__(self, scheme:str, parent:typing.Optional[Navigator]=None):
+#         super().__init__(parent)
+#         self._menu_ = QtWidgets.QMenu(self)
+#         self._schemes_ = list()
+#         self._categories_ = dict() # str ↦ SchemeCategory
+#         
+#         self._menu_.triggered.connect(self.setSchemeFromMenu)
+#         self.setText(scheme)
+#         self.setMenu(self._menu_)
+#         
+#     def _testProtocol_(self, scheme:str):
+#         url = QtCore.QUrl()
+#         url.setScheme(scheme)
+#         return True
+#         
+#     @pyqtSlot()
+#     def setSchemeFromMenu(self):
+#         pass # TODO
+#     
+#     @pyqtSlot(str)
+#     def setScheme(self, scheme:str):
+#         self.setText(scheme)
+#         
+#     def currentScheme(self):
+#         return self.text()
+#     
+#     def setSupportedSchemes(self, schemes:list):
+#         self._schemes_ = schemes
+#         self._menu_.clear()
+#         for scheme in schemes:
+#             action = self._menu_.addAction(scheme)
+#             action.setData(scheme)
+#             
+#     def sizeHint(self):
+#         size = super().sizeHint()
+#         width = self.fontMetrics().boundingRect(dutils.removeAcceleratorMarker(self.text())).width()
+#         width += (3 * self.BorderWidth) + ArrowSize
+#         
+#         return QtCore.QSize(width, size.height())
+#     
+#     def showEvent(self, evt:QtGui.QShowEvent):
+#         super().showEvent(evt)
+#         if not evt.spontaneous() and len(self._schemes_) == 0:
+#             protocols = [p for p in ProtocolInfo.protocols() if self._testProtocol_(p)]
+#             self._schemes_[:] = sorted(protocols)
             
-    def sizeHint(self):
-        size = super().sizeHint()
-        width = self.fontMetrics().boundingRect(self.text()).width()
+            
+            
         
 class NavigatorPlacesSelector(NavigatorButtonBase):
     sig_placeActivated = pyqtSignal(str, name = "sig_activated")
@@ -1514,8 +1554,15 @@ class Navigator(QtWidgets.QWidget):
     
     def __init__(self, placesModel:typing.Optional[PlacesModel]=None, url:typing.Optional[QtCore.QUrl]=None, parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
-        self._supportedSchemes_ = list()
-        self._schemes_ = None # QComboBox (KUrlNavigatorSchemeCombo) # TODO ?!?
+        
+        # NOTE: 2023-05-06 22:27:36
+        # We only suppoert "file:" protocol
+        # self._supportedSchemes_ = list()
+        
+        # NOTE: 2023-05-06 22:25:07
+        # by design we only support a file: protocol
+        # hence we do NOT need self._schemes_
+        # self._schemes_ = None # QComboBox (KUrlNavigatorSchemeCombo) # TODO ?!?
         # self._d_ = None # NavigatorPrivate
         
         # NOTE:2023-05-03 08:14:35 
@@ -1540,7 +1587,7 @@ class Navigator(QtWidgets.QWidget):
         if isinstance(placesModel, PlacesModel):
             self._placesSelector_ = NavigatorPlacesSelector(placesModel, self)
             self._placesSelector_.sig_placeActivated.connect(self.setLocationUrl)
-            self._placesSelector_.sig_tabRequested.connect(self.tabRequested)
+            # self._placesSelector_.sig_tabRequested.connect(self.tabRequested)
             self._placesModel_.rowsInserted.connect(self.updateContent)
             self._placesModel_.rowsRemoved.connect(self.updateContent)
             self._placesModel_.dataChanged.connect(self.updateContent)
@@ -1548,9 +1595,6 @@ class Navigator(QtWidgets.QWidget):
         else:
             self._placesSelector_ = None
             self._showPlacesSelector_ = False
-        
-        
-        self._protocols_ = None # QComboBox (KUrlNavigatorProtocolCombo) # TODO
         
         self._subfolderOptions_ = Bunch({"showHidden":False, "showHiddenLast": False})
         
@@ -1560,9 +1604,11 @@ class Navigator(QtWidgets.QWidget):
         self._showFullPath_ = False
         
         self.setAutoFillBackground(False)
-            
-        self._protocols_ = NavigatorProtocolCombo("", self)
-        self._protocols_.sig_activated.connect(self.slotProtocolChanged)
+
+        # NOTE: 2023-05-06 22:30:13
+        # We only use "file://" protocol
+        # self._protocols_ = NavigatorProtocolCombo("", self)
+        # self._protocols_.sig_activated.connect(self.slotProtocolChanged)
         
         self._dropDownButton_ = NavigatorDropDownButton(self)
         self._dropDownButton_.setForegroundRole(QtGui.QPalette.WindowText)
@@ -1573,6 +1619,9 @@ class Navigator(QtWidgets.QWidget):
         # self._pathBox_.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContentsOnFirstShow)
         self._pathBox_.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self._pathBox_.installEventFilter(self)
+        
+        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.openContextMenu)
         # ### END NavigatorPrivate API
         
         
@@ -1584,13 +1633,27 @@ class Navigator(QtWidgets.QWidget):
         for button in self._navButtons_:
             button.removeEventFilter(self)
             
-    @pyqtSlot(str)
-    def slotProtocolChanged(self, protocol:str):
-        pass # TODO
+    # @pyqtSlot(str)
+    # def slotProtocolChanged(self, protocol:str):
+    #     pass # TODO
+    
+    @pyqtSlot(QtCore.QPoint)
+    def openContextMenu(self, pos:QtCore.Qpoint):
+        pass
     
     @pyqtSlot()
     def openPathSelectorMenu(self):
-        pass # TODO
+        # KUrlNavigatorPrivate
+        if len(self._navButtons_) == 0:
+            return
+        
+        firstVisibleUrl = self._navButtons_[0].url()
+        
+        spacer = ""
+        
+        popup = QtWidgets.QMenu(self)
+        
+        # TODO: see my own code for retrieving the subdirs here
     
     @pyqtSlot(QtCore.QUrl)
     def setLocationUrl(self, url:QtCore.QUrl):
@@ -1623,6 +1686,71 @@ class Navigator(QtWidgets.QWidget):
     @pyqtSlot(QtCore.QUrl)
     def _slot_urlNavigatorUrlAboutToBeChanged(self, url):
         self.urlAboutToBeChanged.emit(url)
+        
+    @pyqtSlot(QtCore.QUrl)
+    def slotApplyUrl(self, url:QtCore.QUrl):
+        # KUrlNavigatorPrivate
+        if not url.isEmpty() and len(url.path()) == 0:
+            url.setPath("/")
+            
+        urlStr = url.toString()
+        
+        urls = [u for u in self._pathBox_.urls() if u != urlStr]
+        urls.insert(0, urlStr)
+        
+        self.setLocationUrl(url)
+        self._pathBox_.setUrl(self.locationUrl())
+        
+    @pyqtSlot(str)
+    def slotCheckFilters(self, text:str):
+        # KUrlNavigatorPrivate
+        # TODO 2023-05-06 22:53:38
+        # KIO used KUriFilterData
+        # need to figure out what this does and replace with simpler pythonic code
+        #
+        # for now, just return True (i.e. wasFiltered)
+        return True
+    
+    @pyqtSlot()
+    def slotReturnPressed(self):
+        # KUrlNavigatorPrivate
+        self.applyUncommitedUrl()
+        self.returnPressed.emit()
+        
+        if QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier:
+            self.switchToBreadcrumbMode()
+            
+    # @pyqtSlot(str)
+    # def slotSchemeChanged(self, scheme:str):
+    #     pass
+        
+    
+    def applyUncommitedUrl(self):
+        # KUrlNavigatorPrivate
+        text = self._pathBox_.currentText().strip()
+        url = self.locationUrl()
+        # if url.isEmpty() and len(text) > 0:
+            # if self.slotCheckFilters(text):
+            #     return
+        
+        if text.startswith('/'):
+            url.setPath(text)
+        else:
+            url.setPath(concatPaths(url.path(), text))
+            
+        if os.path.isdir(url.path()):
+            self.slotApplyUrl(url)
+            return
+        
+        # NOTE: 2023-05-06 23:04:42
+        # not sure we need this either...
+        self.slotApplyUrl(QtCore.QUrl.fromUserInput(text))
+        
+    def appendWidget(self, widget:QtWidgets.QWidget, stretch:int=0):
+        # KUrlNavigatorPrivate
+        self._layout_.insertWidget(self._layout_.count()-1, widget, stretch)
+        
+    
         
 # class Navigator_old(QtWidgets.QWidget):
 #     def __init__(self, path:pathlib.Path, editMode:bool=False, recentDirs:list = list(), maxRecent:int=10,parent=None):

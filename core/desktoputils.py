@@ -427,19 +427,51 @@ def createSearchUrl(url:QtCore.QUrl):
     
     return searchUrl
 
-def removeAcceleratorMarker(label_:str):
+def removeReducedCJKAccMark(label:str, pos:int):
+    # NOTE: 2023-05-06 18:06:09
+    # from ki18n frameworks i18n common_helpers.cpp
+    # https://invent.kde.org/frameworks/ki18n/-/blob/master/src/i18n/common_helpers.cpp
+    if pos > 0 and pos + 1 < len(label) and label[pos-1] == '(' and label[pos+1] == ')' and label[pos].isalnum():
+        length = len(label)
+        p1 = pos-2
+        
+        while p1 >= 0 and not label[p1].isalnum():
+            p1 -= 1
+            
+        p1 += 1
+        
+        p2 = pos + 2
+        
+        while p2 < length and not label[p2].isalnum():
+            p2 += 1
+            
+        p2 -= 1
+        
+        if p1 == 0:
+            return label[0:(pos-1)] + label[(p2+1):]
+        elif p2 + 1 == length:
+            return label[0:p1] + label[(pos+2):]
+        
+    return label
+        
+
+def removeAcceleratorMarker(label:str):
     # NOTE: 2023-05-06 10:48:50
     # from ki18n frameworks i18n common_helpers.cpp
     # https://invent.kde.org/frameworks/ki18n/-/blob/master/src/i18n/common_helpers.cpp
-    label = label_
     
     p = 0
     accmarkRemoved = False
     while True:
         if '&' not in label:
             break
+        print(f"label = {label}")
         
-        p = label.index('&', p)
+        try:
+            p = label.index('&', p)
+        except:
+            traceback.print_exc()
+            break
         
         if p + 1 == len(label):
             break
@@ -447,13 +479,13 @@ def removeAcceleratorMarker(label_:str):
         marker = label[p+1]
         
         if marker.isalnum():
-            label = label[:,p] + label[p+1:]
+            label = label[:p] + label[(p+1):]
             
             label = removeReducedCJKAccMark(label, p)
             accmarkRemoved = True
         
         elif marker == '&':
-            label = label[:,p] + label[p+1,:]
+            label = label[:p] + label[(p+1):]
             
         p += 1
     
@@ -467,7 +499,15 @@ def removeAcceleratorMarker(label_:str):
         if hasCJK:
             p = 0
             while True:
+                if '(' not in label:
+                    break
+                
                 p = label.index('(', p)
+                
+                label = removeReducedCJKAccMark(label, p+1)
+                p == 1
+                
+    return label
     
         
         
