@@ -1,4 +1,4 @@
-import typing, pathlib, functools, os
+import typing, pathlib, functools, os, itertools
 from urllib.parse import urlparse, urlsplit
 from collections import namedtuple
 from enum import Enum, IntEnum
@@ -143,6 +143,15 @@ def isDirMask(mode):
 def isLinkMask(mode):
     # TODO: use pathlib
     pass
+
+de upUrl(url:QtCore.QUrl):
+    if not url.isValid() and url.isRelative():
+        return QtCore.QUrl()
+    
+    u = QtCore.QUrl(url)
+    
+    if url.hasQuery():
+        u.setQuery("")
     
 class SchemeCategory(IntEnum):
     CoreCategory = 0
@@ -1293,12 +1302,14 @@ class Navigator(QtWidgets.QWidget):
         # supported in Scipyen, see also NOTE: 2023-05-06 22:30:13 below
         # self._protocols_ = NavigatorProtocolCombo("", self)
         # self._protocols_.sig_activated.connect(self.slotProtocolChanged)
+        self._protocols_ = None # I might revisit this
         
         # NOTE: 2023-05-06 22:25:07
         # by design we only support a file: protocol
         # hence we do NOT need self._schemes_
         # self._schemes_ = None # QComboBox (KUrlNavigatorSchemeCombo) # TODO ?!?
         # self._schemes_.activated.connect(self.slotSchemeChanged)
+        self._schemes_ = None # I might revisit this
         
         # NOTE: 2023-05-07 22:59:49
         # drops down a menu of places or parent paths
@@ -1440,8 +1451,10 @@ class Navigator(QtWidgets.QWidget):
             
     @pyqtSlot(QtCore.QUrl, QtCore.Qt.KeyboardModifiers)
     def _slot_navigatorButtonActivated(self, url:QtCore.QUrl, modifiers:QtCore.Qt.KeyboardModifiers):
-        # TODO finalize
-        button = self.sender()
+        # button = self.sender()
+        btn = QtWidgets.QApplication.mouseButtons()
+        
+        self.slotNavigatorButtonClicked(url, btn, modifiers)
         
     # @pyqtSlot(str)
     # def slotProtocolChanged(self, protocol:str):
@@ -1602,10 +1615,59 @@ class Navigator(QtWidgets.QWidget):
                     button.installEventFilter(self)
                     button.setForegroundRole(QtGui.QPalette.WindowText)
                     button.urlsDroppedOnNavButton.connect(self._slot_dropUrls) # CMT: wraps to dropUrls
-                    
-                    activatedFunc = 
-            
+                    button.navigatorButtonActivated.connect(self._slot_navigatorButtonActivated)
+                    button.finishedTextResolving.connect(self.updateButtonVisibility)
         
+
+    def updateButtonVisibility(self):
+        # KUrlNavigatorPrivate
+        if self._editable_:
+            return
+        
+        buttonsCount = len(self._navButtons_)
+        if buttonsCount == 0:
+            self._dropDownButton_.hide()
+            return
+        
+        availableWidth = self.width() - self._toggleEditableMode_.minimumWidth()
+        
+        if self._placesSelector_ is not None and self._placesSelector_.isVisible():
+            availableWidth -= self._placesSelector_.width()
+            
+        if self._protocols_ is not None and self._protocols_.isVisible():
+            availableWidth -= self._protocols_.width()
+            
+        requiredButtonWidth = sum(int(button.minimumWidth()) for button in self._navButtons_)
+        
+        if requiredButtonWidth > availableWidth:
+            availableWidth -= self._dropDownButton_.width()
+            
+        isLastButton = True
+        hasHiddenButtons = False
+        
+        buttonsToShow = list()
+        
+        for button in self._navButtons_:
+            availableWidth -= button.minimumWidth()
+            if availableWidth <= 0 and not isLastButton:
+                button.hide()
+                hasHiddenButtons = True
+                
+            else:
+                buttonsToShow.append(button)
+                
+            isLastButton = False
+            
+        for button in buttonsToShow:
+            button.show()
+            
+        if hasHiddenButtons:
+            self._dropDownButton_.show()
+            
+        else:
+            url = self._navButtons_[0].url()
+            
+            visible = not url.matches() # TODO finalize
             
     def setUrlEditable(self, editable:bool):
         if self._editable_ != editable:
