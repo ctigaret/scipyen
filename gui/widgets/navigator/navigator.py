@@ -38,14 +38,20 @@ class Navigator:
 
 
 class LocationData(typing.NamedTuple):
-    """Encapsulates location data"""
+    """
+    Encapsulates location data
+    """
+    # KCoreUrlNavigator API`
     url:str
     state:object = None
     def __repr__(self):
         return f"LocationData url = {self.url}, state = {self.state}"
     
 class UrlNavigatorData(typing.NamedTuple):
-    """Encapsulates UrlNavigator data"""
+    """
+    Encapsulates UrlNavigator data
+    """
+    # KUrlNavigator API
     rootUrl: QtCore.QUrl
     pos: QtCore.QPoint
     state: bytes
@@ -144,7 +150,7 @@ def isLinkMask(mode):
     # TODO: use pathlib
     pass
 
-de upUrl(url:QtCore.QUrl):
+def upUrl(url:QtCore.QUrl):
     if not url.isValid() and url.isRelative():
         return QtCore.QUrl()
     
@@ -152,6 +158,14 @@ de upUrl(url:QtCore.QUrl):
     
     if url.hasQuery():
         u.setQuery("")
+        return u
+    
+    if url.hasFragment():
+        u.setFragment("")
+        
+    u = u.adjusted(QtCore.QUrl.StripTrailingSlash)
+    
+    return u.adjusted(QtCore.QUrl.RemoveFilename)
     
 class SchemeCategory(IntEnum):
     CoreCategory = 0
@@ -614,7 +628,7 @@ class NavigatorToggleButton(NavigatorButtonBase):
 class NavigatorButton(NavigatorButtonBase): # FIXME/TODO 2023-05-07 23:34:55 finalize
     navigate = pyqtSignal(str, name="navigate")
     urlsDroppedOnNavButton = pyqtSignal(QtCore.QUrl, QtGui.QDropEvent, name = "urlsDroppedOnNavButton")
-    navigatorButtonActivated = pyqtSignal(QtCore.QUrl, QtCore.Qt.KeyboardModifiers, name = "navigatorButtonActivated")
+    navigatorButtonActivated = pyqtSignal(QtCore.QUrl, QtCore.Qt.MouseButton, QtCore.Qt.KeyboardModifiers, name = "navigatorButtonActivated")
     startedTextResolving = pyqtSignal(name = "startedTextResolving")
     finishedTextResolving = pyqtSignal(name = "finishedTextResolving")
     
@@ -631,6 +645,7 @@ class NavigatorButton(NavigatorButtonBase): # FIXME/TODO 2023-05-07 23:34:55 fin
         self._showMnemonic_ = False
         self._wheelSteps_ = 1
         self._url_ = None # QtCore.QUrl() # TODO
+        self._subDirsJob_ = None # originally, a KIO.listDir → TODO: replace with Python logic (async?)
         self._subDir_ = "" # TODO
         self._subDirsMenu_ = None # NavigatorMenu # TODO
         self._openSubDirTimer_ = None # QtCore.QTimer() # TODO
@@ -711,6 +726,9 @@ class NavigatorButton(NavigatorButtonBase): # FIXME/TODO 2023-05-07 23:34:55 fin
         if oldMinWidth != minWidth:
             self.setMinimumWidth(minWidth)
             
+    def showMnemonic(self):
+        return self._showMnemonic_
+        
     def paintEvent(self, evt:QtGui.QPaintEvent):
         painter = QtGui.QPainter(self)
         
@@ -791,11 +809,86 @@ class NavigatorButton(NavigatorButtonBase): # FIXME/TODO 2023-05-07 23:34:55 fin
         textFlags = QtCore.Qt.AlignVCenter if clipped else QtCore.Qt.AlignCenter
         painter.drawText(textRect, textFlags, self.text())
         
-    def isTextClipped(self):
-        availableWidth = self.width() - 2*self.BorderWidth
-        adjustedFont = self.font()
-        adjustedFont.setBold(self.isLeaf)
-        return QtGui.QFontMetrics(adjustedFont).size(QtCore.Qt.TextSingleLine, self.text()).width() >= availableWidth
+    def enterEvent(self, evt:QtGui.QEnterEvent):
+        super().enterEvent(evt)
+        
+        if self.isTextClipped():
+            self.setToolTip(self.plainText())
+            
+    def leaveEvent(self, evt:QtCore.QEvent):
+        super().leaveEvent(evt)
+        
+        self.setToolTip("")
+        
+        if self._hoverArrow_:
+            self._hoverArrow_ = False
+            self.update()
+            
+    def keyPressEvent(self, evt:QtGui.QKeyEvent):
+        evtKey = evt.key()
+        
+        if evtKey == QtCore.Qt.Key_Enter:
+            pass
+        elif evtKey == QtCore.Qt.Key_Return:
+            self.navigatorButtonActivated.emit(self._url, QtCore.Qt.LeftButton, evt.modifiers())
+            return
+        elif evtKey == QtCore.Qt.Key_Down:
+            pass
+        elif evtKey == QtCore.Qt.Key_Space:
+            self.startSubDirsJob() # TODO 2023-05-08 13:18:48
+            return
+        
+        else:
+            super().keyPressEvent(evt)
+            
+    def dropEvent(self, evt:QtGui.QDropEvent):
+        if evt.mimeData().hasUrls():
+            self.setDisplayHintEnabled(DisplayHint.DraggedHint, True)
+            self.urlsDroppedOnNavButton.emit(self._url_, evt)
+            self.setDisplayHintEnabled(DisplayHint.DraggedHint, False)
+            self.update()
+            
+    def dragEnterEvent(self, evt:QtGui.QDragEnterEvent):
+        if evt.mimeData().hasUrls():
+            self.setDisplayHintEnabled(DisplayHint.DraggedHint, True)
+            evt.acceptProposedAction()
+            self.update()
+            
+    def dragMoveEvent(self, QtGui.QDragMoveEvent):
+        rect = evt.answerRect()
+        if self.isAboveArrow(rect.center().x()):
+            self._hoverArrow_ = True
+            self.update()
+            
+            if self._subDirsMenu_ is None:
+                self.requestSubDirs() # TODO: 2023-05-08 13:27:04
+            elif self._subDirsMenu_.parent() != self:
+                self._subDirsMenu_.close()
+                self._subDirsMenu_.deleteLater()
+                self._subDirsMenu_ = None
+                
+                self.requestSubDirs()
+                
+        else:
+            if self._openSubDirTimer_.isActive(): # TODO 2023-05-08 13:28:35 self._openSubDirTimer_
+                self.cancelSubDirsRequest() # TODO 2023-05-08 13:29:04
+                
+            self._subDirsMenu_.deleteLater()
+            self._subDirsMenu_ = None
+            self._hoverArrow_ = False
+            self.update()
+            
+    def dragLeaveEvent(self, evt:QtGui.QDragLeaveEvent):
+        super().dragLeaveEvent(evt)
+        self._hoverArrow_ = False
+        self.setDisplayHintEnabled(DisplayHint.DraggedHint, False)
+        self.update()
+        
+    def mousePressEvent(self, evt:QtGui.QMouseEvent):
+        super().mousePressEvent(evt)
+        if self.isAboveArrow(round(evt.pos().x())):
+            self._pressed_ = True
+            self.update()
         
     def mouseReleaseEvent(self, evt:QtGui.QMouseEvent):
         if self.isAboveArrow(round(evt.pos().x())) or evt.button() != QtCore.Qt.LeftButton:
@@ -805,18 +898,44 @@ class NavigatorButton(NavigatorButtonBase): # FIXME/TODO 2023-05-07 23:34:55 fin
             
         super().mouseReleaseEvent(evt)
         
-    def mousePressEvent(self, evt:QtGui.QMouseEvent):
-        super().mousePressEvent(evt)
-        if self.isAboveArrow(round(evt.pos().x())):
-            self._pressed_ = True
-            self.update()
-        
     def mouseMoveEvent(self, evt:QtGui.QMouseEvent):
         super().mouseMoveEvent(evt)
         hoverArrow = self.isAboveArrow(round(evt.pos().x()))
         if hoverArrow != self._hoverArrow_:
             self._hoverArrow_ = hoverArrow
             self.update()
+            
+    def wheelEvent(self, QtGui.QWheelEvent):
+        if evt.angleDelta().y() != 0:
+            self._wheelSteps_ = evt.angleDelta().y() / 120
+            self._replaceButton_ = True
+            self.startSubDirsJob()
+            
+        super().wheelEvent(evt)
+            
+    def isTextClipped(self):
+        availableWidth = self.width() - 2*self.BorderWidth
+        adjustedFont = self.font()
+        adjustedFont.setBold(self.isLeaf)
+        return QtGui.QFontMetrics(adjustedFont).size(QtCore.Qt.TextSingleLine, self.text()).width() >= availableWidth
+        
+    def requestSubDirs(self): # TODO 2023-05-08 13:39:57 finalize
+        if not self._openSubDirTimer_.isActive() and self._subDirsJob_ is None:
+            self._openSubDirTimer_.start() # TODO/FIXME 2023-05-08 13:36:13 make sure you understand what this does
+    
+    def startSubDirsJob(self): # TODO/FIXME 2023-05-08 13:37:00 make sure you understand what this does
+        if self._subDirsJob_ is None:
+            return
+        
+        url = upUrl(self._url_) if self._replaceButton_ else self._url_
+        
+        # TODO 2023-05-08 13:19:49 create a listDir job iobject to work with QTimer
+        pass
+    
+    
+    def cancelSubDirsRequest(self):
+        # TODO 2023-05-08 13:29:21
+        pass
         
     @safeWrapper
     def subDirMenuRequested(self, evt:QtGui.QMouseEvent):
@@ -920,7 +1039,7 @@ class NavigatorButton(NavigatorButtonBase): # FIXME/TODO 2023-05-07 23:34:55 fin
             
             
         
-class NavigatorPlacesSelector(NavigatorButtonBase): # TODO: 2023-05-07 23:07:25
+class NavigatorPlacesSelector(NavigatorButtonBase): # TODO: 2023-05-07 23:07:25 finalize
     sig_placeActivated = pyqtSignal(str, name = "sig_activated")
     tabRequested = pyqtSignal()
     
@@ -1007,9 +1126,11 @@ class NavigatorPlacesSelector(NavigatorButtonBase): # TODO: 2023-05-07 23:07:25
         
         teardown = self._placesModel_.teardownActionForIndex(index)
         
-    def selectedPlaceUrl(self):
-        # TODO
-        return QtCore.QUrl() # TODO/FIXME
+    def selectedPlaceUrl(self): # TODO/FIXME finalize
+        return QtCore.QUrl()
+    
+    def selectedPlaceText(self): # TODO/FIXME finalize
+        return ""
         
 class NavigatorDropDownButton(NavigatorButtonBase):
     def __init__(self, parent=None):
@@ -1068,7 +1189,7 @@ class UrlNavigator(QtCore.QObject):
         # NOTE: 2023-05-03 23:48:23
         # Originally, a list of LocationData structs.
         # Here, this is a NamedTuple with the fields "url" and "state"
-        self._history_ = list()
+        self._history_ = list() # of LocationData
         self._history_.insert(0, LocationData(url.adjusted(QtCore.QUrl.NormalizePathSegments), None))
         self._historyIndex_ = 0
         
@@ -1129,8 +1250,10 @@ class UrlNavigator(QtCore.QObject):
         self.historyChanged.emit()
         self.currentLocationUrlChanged.emit()
         
-    def setCurrentLocation(self, newUrl:QtCore.QUrl):
-        self.currentLocation = newUrl
+    def setCurrentLocationUrl(self, newUrl:QtCore.QUrl):
+        if newUrl == self.locationUrl():
+            return
+        self.currentLocationUrl = newUrl
             
     def isCompressedPath(self, path:QtCore.QUrl, archiveMimeTypes:list = list()):
         db = QtCore.QMimeDatabase()
@@ -1152,11 +1275,13 @@ class UrlNavigator(QtCore.QObject):
         historyIndex = self.adjustedHistoryIndex(historyIndex)
         return self._history_[historyIndex].url
     
+    @safeWrapper
     def saveLocationState(self, state:object):
         oldLoc = self._history_[self._historyIndex_]
         newLoc = LocationData(oldLoc.url, state)
         self._history_[self._historyIndex_] = newLoc
         
+    @safeWrapper
     def locationState(self, historyIndex:int = -1):
         historyIndex = self.adjustedHistoryIndex(historyIndex)
         return self._history_[historyIndex].state
@@ -1274,7 +1399,7 @@ class Navigator(QtWidgets.QWidget):
         
         self._navButtons_ = list() # list of "breadcrumb buttons" - instances of NavigatorButton
         self._customProtocols_ = list()
-        self._homeUrl = QtCore.QUrl()
+        self._homeUrl_ = QtCore.QUrl()
         
         if isinstance(placesModel, PlacesModel):
             self._placesSelector_ = NavigatorPlacesSelector(placesModel, self)
@@ -1351,6 +1476,9 @@ class Navigator(QtWidgets.QWidget):
         
         # ### END NavigatorPrivate API
         
+        self.setMinimumHeight(self._pathBox_.sizeHint().height())
+        self.setMinimumWidth(100)
+        self.updateContent()
         
     def __del__(self):
         self._dropDownButton_.removeEventFilter(self)
@@ -1359,6 +1487,8 @@ class Navigator(QtWidgets.QWidget):
         
         for button in self._navButtons_:
             button.removeEventFilter(self)
+        
+    # ### BEGIN KUrlNavigatorPrivate API
             
     def switchView(self, editable:bool):
         # KUrlNavigatorPrivate
@@ -1380,7 +1510,7 @@ class Navigator(QtWidgets.QWidget):
             self._dropWidget_ = dropButton
             self.urlsDropped.emit(destination, evt)
             
-    def applyUncommitedUrl(self):
+    def applyUncommittedUrl(self):
         # KUrlNavigatorPrivate
         text = self._pathBox_.currentText().strip()
         url = self.locationUrl()
@@ -1403,6 +1533,10 @@ class Navigator(QtWidgets.QWidget):
         
     def appendWidget(self, widget:QtWidgets.QWidget, stretch:int=0):
         # KUrlNavigatorPrivate
+        # NOTE: 2023-05-08 11:04:33
+        # CAUTION: does NOT append to self._navButtons_!!!
+        # this must eb done separately when appending a NavigatorButton, see
+        # NOTE: 2023-05-08 11:05:23
         self._layout_.insertWidget(self._layout_.count()-1, widget, stretch)
         
     def retrievePlaceUrl(self): # TODO/FIXME: 2023-05-07 23:09:25
@@ -1410,6 +1544,10 @@ class Navigator(QtWidgets.QWidget):
         currentUrl = self.locationUrl()
         currentUrl.setPath("")
         return currentUrl
+    
+    def switchToBreadcrumbMode(self):
+        # KUrlNavigatorPrivate
+        self.setUrlEditable(False)
         
     def buttonUrl(self, ndx:int):
         # KUrlNavigatorPrivate
@@ -1434,6 +1572,214 @@ class Navigator(QtWidgets.QWidget):
         
         return url
     
+    def deleteButtons(self):
+        # KUrlNavigatorPrivate
+        for button in self._navButtons_:
+            button.hide()
+            buttton.deleteLater()
+            
+        self._navButtons_.clear()
+    
+            
+    def updateContent(self):
+        # KUrlNavigatorPrivate  
+        currentUrl = self.locationUrl()
+        if self._placesSelector_ is not None:
+            self._placesSelector_.updateSelection(currentUrl)
+            
+        if self._editable_:
+            # self._schemes_.hide() # see NOTE: 2023-05-06 22:30:13
+            self._dropDownButton_.hide()
+            
+            self.deleteButtons() # clear the breadcrumbs
+            
+            self._toggleEditableMode_.setsizePolicy(QtWidgets.QSizePolicy.Fixed,
+                                                    QtWidgets.QSizePolicy.Preferred)
+            self.setSizePolicy(QtWidgets.QSizePolicy.Minimum,
+                               QtWidgets.QSizePolicy.Fixed)
+            
+            self._pathBox_.show()
+            self._pathBox_.setUrl(currentUrl)
+            
+        else:
+            self._pathBox_.hide()
+            # self._schemes_.hide() # see NOTE: 2023-05-06 22:30:13
+            self._toggleEditableMode_.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                                    QtWidgets.QSizePolicy.Preferred)
+            
+            self.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                               QtWidgets.QSizePolicy.Fixed)
+            
+            placeUrl = QtCore.QUrl()
+            if self._placesSelector_ is not None and not self._showFullPath_:
+                placeUrl = self._placesSelector_.selectedPlaceUrl()
+                
+            if not placeUrl.isValid():
+                placeUrl = self.retrievePlaceUrl()
+                
+            placePath = trailingSlashRemoved(placeUrl.path())
+            
+            startIndex = placePath.count('/')
+            
+            self.updateButtons(startIndex)
+            
+    def updateButtons(self, startIndex:int): # NOTE: 2023-05-08 11:05:23
+        # KUrlNavigatorPrivate  
+        currentUrl = self.locationUrl()
+        if not currentUrl.isValid():
+            return
+        
+        path = currentUrl.path()
+        
+        oldButtonCount = len(self._navButtons_)
+        
+        ndx = startIndex
+        
+        hasNext = True
+        
+        while hasNext:
+            createButton = ((ndx - startIndex) >= oldButtonCount)
+            isFirstButton = (ndx == startIndex)
+            
+            pathParts = pathlib.Path(path).parts
+            if ndx >= len(pathParts) - 1:
+                hasNext = False
+                break
+            
+            dirName = pathParts[ndx]
+            
+            hasNext = isFirstButton or len(dirName) > 0
+            
+            if hasNext:
+                button = None
+                if createButton:
+                    button = NavigatorButton(self.buttonUrl(ndx), self)
+                    button.installEventFilter(self)
+                    button.setForegroundRole(QtGui.QPalette.WindowText)
+                    button.urlsDroppedOnNavButton.connect(self._slot_dropUrls) # CMT: wraps to dropUrls
+                    button.navigatorButtonActivated.connect(self._slot_navigatorButtonActivated)
+                    button.finishedTextResolving.connect(self.updateButtonVisibility)
+                    
+                    self.appendWidget(button)
+                    
+                else:
+                    button = self._navButtons_[ndx-startIndex]
+                    button.setUrl(self.buttonUrl(ndx))
+                    
+                if isFirstButton:
+                    button.setText(self.firstButtonText())
+                    
+                button.setActive(self.isActive())
+                
+                if createButton:
+                    if not isFirstButton:
+                        self.setTabOrder(self._navButtons_[-1], button)
+                        
+                    self._navButtons_.append(button)
+                    
+            ndx += 1
+            
+            button.setActiveSubDirectory(pathParts[ndx])
+        
+            if not hasNext:
+                break
+            
+        newButtonCount = ndx - startIndex
+        
+        if newButtonCount < oldButtonCount:
+            for button in self._navButtons_[newButtonCount:]:
+                button.hide()
+                button.deleteLater()
+                
+            self._navButtons_ = self._navButtons_[:newButtonCount]
+            
+        self.setTabOrder(self._dropDownButton_, self._navButtons_[0])
+        self.setTabOrder(self._navButtons_[-1], self._toggleEditableMode_)
+        
+        self.updateButtonVisibility()
+            
+    def updateButtonVisibility(self):
+        # KUrlNavigatorPrivate
+        if self._editable_:
+            return
+        
+        buttonsCount = len(self._navButtons_)
+        if buttonsCount == 0:
+            self._dropDownButton_.hide()
+            return
+        
+        availableWidth = self.width() - self._toggleEditableMode_.minimumWidth()
+        
+        if self._placesSelector_ is not None and self._placesSelector_.isVisible():
+            availableWidth -= self._placesSelector_.width()
+            
+        if self._protocols_ is not None and self._protocols_.isVisible():
+            availableWidth -= self._protocols_.width()
+            
+        requiredButtonWidth = sum(int(button.minimumWidth()) for button in self._navButtons_)
+        
+        if requiredButtonWidth > availableWidth:
+            availableWidth -= self._dropDownButton_.width()
+            
+        # Hide buttons ...
+        isLastButton = True
+        hasHiddenButtons = False
+        
+        buttonsToShow = list()
+        
+        for button in self._navButtons_:
+            availableWidth -= button.minimumWidth()
+            if availableWidth <= 0 and not isLastButton:
+                button.hide()
+                hasHiddenButtons = True
+                
+            else:
+                buttonsToShow.append(button)
+                
+            isLastButton = False
+            
+        for button in buttonsToShow:
+            button.show()
+            
+        if hasHiddenButtons:
+            self._dropDownButton_.show()
+            
+        else:
+            url = self._navButtons_[0].url()
+            
+            visible = (not url.matches(upUrl(url), QtCore.QUrl.StripTrailingSlash)) and url.scheme() not in ("baloosearch", "filenamesearch")
+            self._dropDownButton_.setVibisle(visible)
+            
+    def firstButtonText(self):
+        # KUrlNavigatorPrivate
+        text = ""
+        
+        if self._placesSelector_ is not None and not self._showFullPath_:
+            text = self._placesSelector_.selectedPlaceText()
+            
+        currentUrl = self.locationUrl()
+        
+        if len(text) == 0:
+            if currentUrl.isLocalFile():
+                if sys.platform == "win32":
+                    text = currentUrl.path()[:2] if len(currentUrl.path()) > 1 else QtCore.QDir.rootPath()
+                else:
+                    text = "/"
+                    
+        if len(text) == 0:
+            if len(currentUrl.path()) == 0 or currentUrl.path() == '/':
+                query = QtCore.QUrlQuery(currentUrl)
+                text = query.queryItemValue("title")
+                
+        if len(text) == 0:
+            text = currentUrl.scheme() + ':'
+            if len(currentUrl.host()) > 0:
+                text += " " + currentUrl.host()
+        
+        return  text
+    
+    # ### END KUrlNavigatorPrivate API
+    
     def showFullPath(self):
         return self._showFullPath_
     
@@ -1441,24 +1787,133 @@ class Navigator(QtWidgets.QWidget):
         if self._showFullPath_ != show:
             self._showFullPath_ = show
             self.updateContent()
-    
-    
-    @pyqtSlot(QtCore.QUrl, QtGui.QDropEvent) # CMT
-    def _slot_dropUrls(self, url:QtCore.QUrl, evt:QtGui.QDropEvent):
-        button = self.sender()
-        if isinstance(button, NavigatorButton):
-            self.dropUrls(url, evt, button)
             
-    @pyqtSlot(QtCore.QUrl, QtCore.Qt.KeyboardModifiers)
-    def _slot_navigatorButtonActivated(self, url:QtCore.QUrl, modifiers:QtCore.Qt.KeyboardModifiers):
-        # button = self.sender()
-        btn = QtWidgets.QApplication.mouseButtons()
+    def setUrlEditable(self, editable:bool):
+        if self._editable_ != editable:
+            self.switchView(editable)
+            
+    def isUrlEditable(self):
+        return self._editable_
+    
+    def locationUrl(self, historyIndex:int = -1):
+        return self._urlNavigator_.locationUrl(historyIndex)
+    
+    @safeWrapper
+    def saveLocationState(self, state):
+        currentState = self._urlNavigator_.locationState()
+        self._urlNavigator_.saveLocationState(currentState)
         
-        self.slotNavigatorButtonClicked(url, btn, modifiers)
+    @safeWrapper
+    def locationState(self, historyIndex:int = -1):
+        return self._urlNavigator_.locationState(historyIndex)
         
-    # @pyqtSlot(str)
-    # def slotProtocolChanged(self, protocol:str):
-    #     pass # TODO
+        
+    def goBack(self):
+        return self._urlNavigator_.goBack()
+    
+    def goForward(self):
+        return self._urlNavigator_.goForward()
+    
+    def goUp(self):
+        return self._urlNavigator_.goUp()
+    
+    def goHome(self):
+        if self._homeUrl_.isEmpty() or not self._homeUrl_.isValid():
+            self.setLocationUrl(QtCore.QUrl.fromLocalFile(QtCore.QDir.homePath()))
+        else:
+            self.setLocationUrl(self._homeUrl_)
+            
+    def setHomeUrl(self, url:QtCore.QUrl):
+        self._homeUrl_ = url
+        
+    def homeUrl(self):
+        return self._homeUrl_
+    
+    def setActive(self, active:bool):
+        if active != self._active_:
+            self._active_ = active
+            
+            self._dropDownButton_.setActive(active)
+            
+            for button in self._navButtons_:
+                button.setActive(active)
+                
+            self.update()
+            
+            if active:
+                self.activated.emit()
+                
+    def isActive(self):
+        return self._active_
+    
+    def setPlacesSelectorVisible(self, visible:bool):
+        if visible == self._showPlacesSelector_:
+            return
+        
+        if visible and self._placesSelector_ is None:
+            # places selector is None when no places model is available
+            return
+        
+        self._showPlacesSelector_ = visible
+        self._placesSelector_.setVisible(visible)
+        
+    def isPlacesSelectorVisible(self):
+        return self._showPlacesSelector_
+    
+    def uncommittedUrl(self):
+        pass # TODO/FIXME implement KUriFilter functionality
+    
+    def keyPressEvent(self, evt:QtGui.QKeyEvent):
+        if self.isUrlEditable() and evt.key() == QtCore.Qt.Key_Escape:
+            self.setUrlEditable(False)
+            
+        else:
+            super().keyPressEvent(evt)
+            
+    def keyReleaseEvent(self, evt:QtGui.QKeyEvent):
+        super().keyReleaseEvent(evt)
+        
+    def mousePressEvent(self, evt:QtGui.QMouseEvent):
+        if evt.button() == QtCore.Qt.MiddleButton:
+            self.requestActivation()
+            
+        super().mousePressEvent(evt)
+        
+    def mouseReleaseEvent(self, evt:QtGui.QMouseEvent):
+        if evt.button() == QtCore.Qt.MiddleButton:
+            bounds = self._toggleEditableMode_.geometry()
+            if bounds.contains(evt.pos()):
+                clipboard = QtWidgets.QApplication.clipboard()
+                mimeData = clipboard.mimeData()
+                if mimeData.hasText():
+                    text = mimeData.text()
+                    self.setLocationUrl(QtCore.QUrl.fromUserInput(text))
+                    
+        super().mouseReleaseEvent(evt)
+        
+    def resizeEvent(self, evt:QtGui.QResizeEvent):
+        QtCore.QTimer.singleShot(0, self.updateButtonVisibility)
+        
+        super().resizeEvent(evt)
+        
+    def wheelEvent(self, evt:QtGui.QWheelEvent):
+        self.setActive(True)
+        super().wheelEvent(evt)
+        
+    def eventFilter(self, watched:QtCore.QObject, evt:QtCore.QEvent):
+        eType = evt.type()
+        
+        if eType == QtCore.QEvent.FocusIn:
+            if watched == self._pathBox_:
+                self.requestActivation()
+                self.setFocus()
+                
+            for button in self._navButtons_:
+                button.setShowMnemonic(True)
+            
+        
+    
+    # ### BEGIN KUrlNavigatorPrivate slots
     
     @pyqtSlot(QtCore.QPoint)
     def openContextMenu(self, p:QtCore.Qpoint):
@@ -1538,151 +1993,6 @@ class Navigator(QtWidgets.QWidget):
         if popup is not None:
             popup.deleteLater()
             
-            
-    def updateContent(self):
-        # KUrlNavigatorPrivate  
-        currentUrl = self.locationUrl()
-        if self._placesSelector_ is not None:
-            self._placesSelector_.updateSelection(currentUrl)
-            
-        if self._editable_:
-            # self._schemes_.hide() # see NOTE: 2023-05-06 22:30:13
-            self._dropDownButton_.hide()
-            
-            self.deleteButtons() # clear the breadcrumbs
-            
-            self._toggleEditableMode_.setsizePolicy(QtWidgets.QSizePolicy.Fixed,
-                                                    QtWidgets.QSizePolicy.Preferred)
-            self.setSizePolicy(QtWidgets.QSizePolicy.Minimum,
-                               QtWidgets.QSizePolicy.Fixed)
-            
-            self._pathBox_.show()
-            self._pathBox_.setUrl(currentUrl)
-            
-        else:
-            self._pathBox_.hide()
-            # self._schemes_.hide() # see NOTE: 2023-05-06 22:30:13
-            self._toggleEditableMode_.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
-                                                    QtWidgets.QSizePolicy.Preferred)
-            
-            self.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
-                               QtWidgets.QSizePolicy.Fixed)
-            
-            placeUrl = QtCore.QUrl()
-            if self._placesSelector_ is not None and not self._showFullPath_:
-                placeUrl = self._placesSelector_.selectedPlaceUrl()
-                
-            if not placeUrl.isValid():
-                placeUrl = self.retrievePlaceUrl()
-                
-            placePath = trailingSlashRemoved(placeUrl.path())
-            
-            startIndex = placePath.count('/')
-            
-            self.updateButtons(startIndex)
-            
-    def updateButtons(self, startIndex:int):
-        # KUrlNavigatorPrivate  
-        currentUrl = self.locationUrl()
-        if not currentUrl.isValid():
-            return
-        
-        path = currentUrl.path()
-        
-        oldButtonCount = len(self._navButtons_)
-        
-        ndx = startIndex
-        
-        hasNext = True
-        
-        while hasNext:
-            createButton = ((ndx - startIndex) >= oldButtonCount)
-            isFirstButton = (ndx == startIndex)
-            
-            pathParts = pathlib.Path(path).parts
-            if ndx >= len(pathParts) - 1:
-                hasNext = False
-                break
-            
-            dirName = pathParts[ndx]
-            
-            hasNext = isFirstButton or len(dirName) > 0
-            
-            if hasNext:
-                button = None
-                if createButton:
-                    button = NavigatorButton(self.buttonUrl(ndx), self)
-                    button.installEventFilter(self)
-                    button.setForegroundRole(QtGui.QPalette.WindowText)
-                    button.urlsDroppedOnNavButton.connect(self._slot_dropUrls) # CMT: wraps to dropUrls
-                    button.navigatorButtonActivated.connect(self._slot_navigatorButtonActivated)
-                    button.finishedTextResolving.connect(self.updateButtonVisibility)
-        
-
-    def updateButtonVisibility(self):
-        # KUrlNavigatorPrivate
-        if self._editable_:
-            return
-        
-        buttonsCount = len(self._navButtons_)
-        if buttonsCount == 0:
-            self._dropDownButton_.hide()
-            return
-        
-        availableWidth = self.width() - self._toggleEditableMode_.minimumWidth()
-        
-        if self._placesSelector_ is not None and self._placesSelector_.isVisible():
-            availableWidth -= self._placesSelector_.width()
-            
-        if self._protocols_ is not None and self._protocols_.isVisible():
-            availableWidth -= self._protocols_.width()
-            
-        requiredButtonWidth = sum(int(button.minimumWidth()) for button in self._navButtons_)
-        
-        if requiredButtonWidth > availableWidth:
-            availableWidth -= self._dropDownButton_.width()
-            
-        isLastButton = True
-        hasHiddenButtons = False
-        
-        buttonsToShow = list()
-        
-        for button in self._navButtons_:
-            availableWidth -= button.minimumWidth()
-            if availableWidth <= 0 and not isLastButton:
-                button.hide()
-                hasHiddenButtons = True
-                
-            else:
-                buttonsToShow.append(button)
-                
-            isLastButton = False
-            
-        for button in buttonsToShow:
-            button.show()
-            
-        if hasHiddenButtons:
-            self._dropDownButton_.show()
-            
-        else:
-            url = self._navButtons_[0].url()
-            
-            visible = not url.matches() # TODO finalize
-            
-    def setUrlEditable(self, editable:bool):
-        if self._editable_ != editable:
-            self.switchView(editable)
-            
-    def isUrlEditable(self):
-        return self._editable_
-                    
-    @pyqtSlot()
-    def _slot_newWindowRequested_(self):
-        action = self.sender()
-        url = QtCore.QUrl(action.data().toString())
-        if url.isValid():
-            self.newWindowRequested.emit(url)
-    
     @pyqtSlot()
     def openPathSelectorMenu(self):
         # KUrlNavigatorPrivate
@@ -1763,41 +2073,9 @@ class Navigator(QtWidgets.QWidget):
     def slotTogleEditableButtonToggled(self, editable:bool):
         # KUrlNavigatorPrivate
         if self._editable_:
-            self.applyUncommitedUrl()
+            self.applyUncommittedUrl()
             
         self.switchView(editable)
-        
-    @pyqtSlot(QtCore.QUrl)
-    def setLocationUrl(self, url:QtCore.QUrl):
-        pass # TODO
-    
-    @pyqtSlot()
-    def requestActivation(self):
-        pass # TODO
-    
-    @pyqtSlot()
-    def setFocus(self):
-        pass # TODO
-    
-    @pyqtSlot(QtCore.QUrl)
-    def setUrl(self, url:QtCore.QUrl):
-        pass # TODO DEPRECATED
-    
-    @pyqtSlot(QtCore.QUrl)
-    def saveRootUrl(self, url:QtCore.QUrl):
-        pass # TODO DEPRECATED
-    
-    @pyqtSlot(int, int)
-    def savePosition(self, x:int, y:int):
-        pass # TODO DEPRECATED
-    
-    @pyqtSlot()
-    def _slot_urlNavigatorUrlChanged(self):
-        self.urlChanged.emit(self._urlNavigator_.currentLocationUrl)
-        
-    @pyqtSlot(QtCore.QUrl)
-    def _slot_urlNavigatorUrlAboutToBeChanged(self, url):
-        self.urlAboutToBeChanged.emit(url)
         
     @pyqtSlot(str)
     def slotPathBoxChanged(self, text:str):
@@ -1859,18 +2137,85 @@ class Navigator(QtWidgets.QWidget):
     @pyqtSlot()
     def slotReturnPressed(self):
         # KUrlNavigatorPrivate
-        self.applyUncommitedUrl()
+        self.applyUncommittedUrl()
         self.returnPressed.emit()
         
         if QtWidgets.QApplication.KeyboardModifiers() & QtCore.Qt.ControlModifier:
             self.switchToBreadcrumbMode()
             
+    
+    # ### END KUrlNavigatorPrivate slots
+    
+    # ### BEGIN Slots
+    @pyqtSlot(QtCore.QUrl, QtGui.QDropEvent) # CMT
+    def _slot_dropUrls(self, url:QtCore.QUrl, evt:QtGui.QDropEvent):
+        button = self.sender()
+        if isinstance(button, NavigatorButton):
+            self.dropUrls(url, evt, button)
+            
+    @pyqtSlot(QtCore.QUrl, QtCore.Qt.KeyboardModifiers)
+    def _slot_navigatorButtonActivated(self, url:QtCore.QUrl, modifiers:QtCore.Qt.KeyboardModifiers):
+        # button = self.sender()
+        btn = QtWidgets.QApplication.mouseButtons()
+        
+        self.slotNavigatorButtonClicked(url, btn, modifiers)
+        
+    # @pyqtSlot(str)
+    # def slotProtocolChanged(self, protocol:str):
+    #     pass # TODO
+    
+    @pyqtSlot()
+    def _slot_newWindowRequested_(self):
+        action = self.sender()
+        url = QtCore.QUrl(action.data().toString())
+        if url.isValid():
+            self.newWindowRequested.emit(url)
+    
+    @pyqtSlot(QtCore.QUrl)
+    def setLocationUrl(self, url:QtCore.QUrl):
+        self._urlNavigator_.setCurrentLocationUrl(url)
+        self.updateContent()
+        self.requestActivation()
+    
+    @pyqtSlot()
+    def requestActivation(self):
+        self.setActive(True)
+    
+    @pyqtSlot()
+    def setFocus(self):
+        if self.isUrlEditable():
+            self._pathBox_.setFocus()
+        else:
+            super().setFocus()
+    
+#     @pyqtSlot(QtCore.QUrl)
+#     def setUrl(self, url:QtCore.QUrl):
+#         pass # TODO DEPRECATED
+#     
+#     @pyqtSlot(QtCore.QUrl)
+#     def saveRootUrl(self, url:QtCore.QUrl):
+#         pass # TODO DEPRECATED
+#     
+#     @pyqtSlot(int, int)
+#     def savePosition(self, x:int, y:int):
+#         pass # TODO DEPRECATED
+    
+    @pyqtSlot()
+    def _slot_urlNavigatorUrlChanged(self):
+        self.urlChanged.emit(self._urlNavigator_.currentLocationUrl)
+        
+    @pyqtSlot(QtCore.QUrl)
+    def _slot_urlNavigatorUrlAboutToBeChanged(self, url):
+        self.urlAboutToBeChanged.emit(url)
+    
     @pyqtSlot(str)
     def slotSchemeChanged(self, scheme:str):
         # TODO ?!?
         pass
         
     
+    # ### END Slots
+
    
         
 # class Navigator_old(QtWidgets.QWidget):
