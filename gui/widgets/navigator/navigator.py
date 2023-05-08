@@ -98,8 +98,12 @@ def findProtocol(protocol:str):
     assert ':' in protocol
     
 def isAbsoluteLocalPath(path:str):
-    # TODO/FIXME use pathlib here
-    return not path.startwith(':') and QtCore.QDir.isAbsolutePath(path)
+    if path.startwith(':'):
+        return False
+    plpath = pathlib.Path(path)
+    return plpath.is_absolute()
+    # NOTE: 2023-05-08 17:49:03 use pathlib
+    # return not path.startwith(':') and QtCore.QDir.isAbsolutePath(path)
 
 def appendSlash(path:str):
     if len(path) == 0:
@@ -625,7 +629,8 @@ class NavigatorToggleButton(NavigatorButtonBase):
         else:
             self.setCursor(QtCore.Qt.IBeamCursor)
 
-class NavigatorButton(NavigatorButtonBase): # FIXME/TODO 2023-05-07 23:34:55 finalize
+class NavigatorButton(NavigatorButtonBase): 
+    # FIXME/TODO 2023-05-07 23:34:55 finalize
     navigate = pyqtSignal(str, name="navigate")
     urlsDroppedOnNavButton = pyqtSignal(QtCore.QUrl, QtGui.QDropEvent, name = "urlsDroppedOnNavButton")
     navigatorButtonActivated = pyqtSignal(QtCore.QUrl, QtCore.Qt.MouseButton, QtCore.Qt.KeyboardModifiers, name = "navigatorButtonActivated")
@@ -643,45 +648,111 @@ class NavigatorButton(NavigatorButtonBase): # FIXME/TODO 2023-05-07 23:34:55 fin
         self._pendingTextChange_ = False
         self._replaceButton_ = False
         self._showMnemonic_ = False
-        self._wheelSteps_ = 1
-        self._url_ = None # QtCore.QUrl() # TODO
-        self._subDirsJob_ = None # originally, a KIO.listDir → TODO: replace with Python logic (async?)
+        self._wheelSteps_ = 0
+        self._url_ = url
         self._subDir_ = "" # TODO
+        self._openSubDirsTimer_ = None # QtCore.QTimer() # TODO
+        self._subDirsJob_ = None # originally, a KIO.listDir → TODO: replace with Python logic (async?)
         self._subDirsMenu_ = None # NavigatorMenu # TODO
-        self._openSubDirTimer_ = None # QtCore.QTimer() # TODO
         self._subDirs_ = list() # of SubdirInfo
         
+        self.setAcceptDrops(True)
+        self.setUrl(url)
+        self.setMouseTracking(True)
         
-        path = path.resolve()
-        if not path.is_dir():
-            path = path.parent
-            
-        self.path = path
-        self.name = self.path.name
-        if len(self.name) == 0:
-            self.name = self.path.parts[0]
-    
-        self.setText(self.name)
+        self._openSubDirsTimer_ = QtCore.QTimer(self)
+        self._openSubDirsTimer_.setSingleShot(True)
+        self._openSubDirsTimer_.setInterval(300)
+        self._openSubDirsTimer_.timeout.connect(self.startSubDirsJob)
         
-        # self.parentCrumb = parentCrumb
+        self.pressed.connect(self.requestSubDirs)
         
-        self.subDirsMenu = None
-        
-        # NOTE: 2023-05-07 23:42:42 
-        # use Qt file system model; does away with KIOJob etc (?!?)
-        self.fileSystemModel = QtWidgets.QFileSystemModel(parent=self)
-        self.fileSystemModel.setReadOnly(True)
-        self.fileSystemModel.setFilter(QtCore.QDir.AllDirs | QtCore.QDir.CaseSensitive | QtCore.QDir.NoDotAndDotDot)
-        self.fileSystemModel.setRootPath(self.path.as_posix())
-        self.rootIndex = self.fileSystemModel.index(self.fileSystemModel.rootPath())
+#         # ### BEGIN CMT 2023-05-08 17:56:23
+#         
+#         path = path.resolve()
+#         
+#         if not path.is_dir():
+#             path = path.parent
+#             
+#         self.path = path
+#         self.name = self.path.name
+#         if len(self.name) == 0:
+#             self.name = self.path.parts[0]
+#     
+#         self.setText(self.name)
+#         
+#         # self.parentCrumb = parentCrumb
+#         
+#         self.subDirsMenu = None
+#         
+#         # NOTE: 2023-05-07 23:42:42 
+#         # use Qt file system model; does away with KIOJob etc (?!?)
+#         self.fileSystemModel = QtWidgets.QFileSystemModel(parent=self)
+#         self.fileSystemModel.setReadOnly(True)
+#         self.fileSystemModel.setFilter(QtCore.QDir.AllDirs | QtCore.QDir.CaseSensitive | QtCore.QDir.NoDotAndDotDot)
+#         self.fileSystemModel.setRootPath(self.path.as_posix())
+#         self.rootIndex = self.fileSystemModel.index(self.fileSystemModel.rootPath())
+# 
+#         # self.frameStyleOptions = QtWidgets.QStyleOptionFrame()
+#         # self.frameStyleOptions.initFrom(self)
+#         # self.frameStyleOptions.
+#         
+#         # ### END CMT 2023-05-08 17:56:23
 
-        # self.frameStyleOptions = QtWidgets.QStyleOptionFrame()
-        # self.frameStyleOptions.initFrom(self)
-        # self.frameStyleOptions.
+    def setUrl(self, url:QtCore.QUrl): # FIXME/TODO: replace with a pythonic async protocol
+        self._url_ = url
         
-    def setText(self, text):
+        # NOTE: 2023-05-08 18:06:14 KIO original
+        protocolBlackList = {"nfs", "fish", "ftp", "sftp", "smb", "webdav", "mtp"}
+        
+        # protocolBlackList = {"nfs", "fish", "ftp", "sftp", "smb", "webdav", "mtp",
+        #                      "http", "https", "man", "info", "gopher", "baloosearch", "filenamesearch", # CMT
+        #                      "recoll", "rkward", "remote", "applications", "fonts"} # CMT
+        
+        startTextResolving = self._url_.isValid() and not self._url_.isLocalFile() and self._url_.scheme() is not in protocolBlackList
+        
+        if startTextResolving:
+            # A-ha! whenever the protocol specified by the url scheme is not black-listed,
+            # start aynchronous job to resolve it
+            # This is for a url that IS NOT local, and , as per KIO original, the scheme
+            # indicates:
+            # • internet protocol (http, htpps, )
+            # • special KDE frameworks protocol - WARNING these may be supplied by
+            #  3ʳᵈ party KDE applications via KDE plugins framework (so-called
+            #  KIO slaves); examples include Rkward, Recoll, Clementine, Amarok, etc.
+            #
+            # NOTE: A list of available protocols can be seen in KDE gui via the
+            # file nmanager Dolphin: open a Dolphin window, click in the navigator
+            # bar to show is as an editable field, clear the field ⇒ the leftmost
+            # dropdown menu shows the available protocols in YOUR system 
+            #
+            # The 'special' ones are usually in an "Other" submenu
+            #
+            # TODO: contemplate calling kioexec5 for these !!!
+            # TODO: filter these out so that they only show for sys.platform == "linux"
+            #
+            self._pendingTextChange_ = True
+            # starts a KIO job via 
+            # job = KIO.stat(self._url_, hide progress info)
+            # then connects job.result to self.statFinished
+            # finally, emit self.startedTextResolving
+            
+        else:
+            self.setText(self._url_.fileName().replace('&', '&&'))
+            
+    def url(self):
+        return self._url_
+        
+    def setText(self, text): 
+        if len(text) == 0:
+            text = self._url_.scheme()
+            
+        
         super().setText(text)
+        
         self.updateMinimumWidth()
+        
+        self._pendingTextChange_ = False
         
     def plainText(self):
         source = self.text()
@@ -870,7 +941,7 @@ class NavigatorButton(NavigatorButtonBase): # FIXME/TODO 2023-05-07 23:34:55 fin
                 self.requestSubDirs()
                 
         else:
-            if self._openSubDirTimer_.isActive(): # TODO 2023-05-08 13:28:35 self._openSubDirTimer_
+            if self._openSubDirsTimer_.isActive(): # TODO 2023-05-08 13:28:35 self._openSubDirsTimer_
                 self.cancelSubDirsRequest() # TODO 2023-05-08 13:29:04
                 
             self._subDirsMenu_.deleteLater()
@@ -920,8 +991,8 @@ class NavigatorButton(NavigatorButtonBase): # FIXME/TODO 2023-05-07 23:34:55 fin
         return QtGui.QFontMetrics(adjustedFont).size(QtCore.Qt.TextSingleLine, self.text()).width() >= availableWidth
         
     def requestSubDirs(self): # TODO 2023-05-08 13:39:57 finalize
-        if not self._openSubDirTimer_.isActive() and self._subDirsJob_ is None:
-            self._openSubDirTimer_.start() # TODO/FIXME 2023-05-08 13:36:13 make sure you understand what this does
+        if not self._openSubDirsTimer_.isActive() and self._subDirsJob_ is None:
+            self._openSubDirsTimer_.start() # TODO/FIXME 2023-05-08 13:36:13 make sure you understand what this does
     
     def startSubDirsJob(self): # TODO/FIXME 2023-05-08 13:37:00 make sure you understand what this does
         if self._subDirsJob_ is None:
@@ -938,7 +1009,7 @@ class NavigatorButton(NavigatorButtonBase): # FIXME/TODO 2023-05-07 23:34:55 fin
         pass
         
     @safeWrapper
-    def subDirMenuRequested(self, evt:QtGui.QMouseEvent):
+    def subDirMenuRequested(self, evt:QtGui.QMouseEvent): # TODO/FIXME finalize
         if self.subDirsMenu is None:
             self.subDirsMenu = QtWidgets.QMenu("", self)
             self.subDirsMenu.aboutToHide.connect(self.slot_menuHiding)
@@ -958,7 +1029,7 @@ class NavigatorButton(NavigatorButtonBase): # FIXME/TODO 2023-05-07 23:34:55 fin
                 self.subDirsMenu.popup(self.mapToGlobal(evt.pos()))
     
     @pyqtSlot()
-    def slot_subDirClick(self):
+    def slot_subDirClick(self): # TODO/FIXME NOW - self.path not existent
         action = self.sender()
         ps = os.path.join(self.path.as_posix(), action.text())
         self.navigate.emit(ps)
@@ -969,15 +1040,15 @@ class NavigatorButton(NavigatorButtonBase): # FIXME/TODO 2023-05-07 23:34:55 fin
         self.update()
         
     @property
-    def isLeaf(self):
+    def isLeaf(self): # CMT - not used FIXME/TODO
         return self._isLeaf_
     
     @isLeaf.setter
-    def isLeaf(self, value:bool):
+    def isLeaf(self, value:bool): # CMT - not used FIXME/TODO
         self._isLeaf_ = value
         
 # NOTE: 2023-05-06 22:30:40
-# WE only use the "file://" protocol, so this is not needed
+# We only use the "file://" protocol, so this is not needed
 #
 # class NavigatorProtocolCombo(NavigatorButtonBase): # TODO
 #     sig_activated = pyqtSignal()
@@ -1172,9 +1243,6 @@ class NavigatorDropDownButton(NavigatorButtonBase):
             else:
                 self.style().drawPrimitive(QtWidgets.QStyle.PE_IndicatorArrowLeft, option, painter, self)
             
-# class NavigatorPrivate:
-#     pass
-
 class UrlNavigator(QtCore.QObject):
     currentUrlAboutToChange     = pyqtSignal(QtCore.QUrl, name = "currentUrlAboutToChange")
     currentLocationUrlChanged   = pyqtSignal(name = "currentLocationUrlChanged")
@@ -1413,9 +1481,8 @@ class Navigator(QtWidgets.QWidget):
             self._placesSelector_ = None
             self._showPlacesSelector_ = False
         
-        self._subfolderOptions_ = Bunch({"showHidden":False, "showHiddenLast": False})
+        self._subfolderOptions_ = Bunch({"showHidden":False, "sortHiddenLast": False})
         
-        # self._showPlacesSelector_ = isinstance(placesModel, PlacesModel) 
         self._editable_ = False
         self._active_ = True
         self._showFullPath_ = False
@@ -1910,7 +1977,40 @@ class Navigator(QtWidgets.QWidget):
                 
             for button in self._navButtons_:
                 button.setShowMnemonic(True)
-            
+                
+        elif eType == QtCore.QEvent.FocusOut:
+            for button in self._navButtons_:
+                button.setShowMnemonic(False)
+                
+        return super().eventFilter(watched, evt)
+    
+    def historySize(self):
+        return self._urlNavigator_.historySize()
+    
+    def historyIndex(self):
+        return self._urlNavigator_.historyIndex()
+    
+    def editor(self):
+        return self._pathBox_
+    
+    def setCustomProtocols(self, protocols:typing.List[str]):
+        self._customProtocols_[:] = [protocols]
+        # self._protocols_.setCustomProtocols(self._customProtocols_) # TODO/FIXME
+        
+    def customProtocols(self):
+        return self._customProtocols_
+    
+    def dropWidget(self):
+        return self._dropWidget_
+    
+    def setShowHiddenFolders(self, showHiddenFolders:bool):
+        self._subfolderOptions_.showHidden = showHiddenFolders
+        
+    def setSortHiddenFoldersLast(self, sortHiddenFoldersLast:bool):
+        self._subfolderOptions_.sortHiddenLast = sortHiddenFoldersLast
+        
+    def sortHiddenFoldersLast(self):
+        return self._subfolderOptions_.sortHiddenLast
         
     
     # ### BEGIN KUrlNavigatorPrivate slots
