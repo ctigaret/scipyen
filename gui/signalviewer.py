@@ -6819,7 +6819,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             offset = view_x_range[0] - data_x_range[0]
             
-            factor = (view_x_range[1] - view_x_range[0]) / (data_x_range[1] - data_x_range[0])
+            dx = data_x_range[1] - data_x_range[0] if data_x_range[1] != data_x_range[0] else 1.
+            
+            factor = (view_x_range[1] - view_x_range[0]) / dx
+            # factor = (view_x_range[1] - view_x_range[0]) / (data_x_range[1] - data_x_range[0])
             
             return (offset, factor)
             
