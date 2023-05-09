@@ -299,6 +299,8 @@ jupyter     # ✓ (conda install jupyter)
 #   zipp               conda-forge/noarch::zipp-3.15.0-pyhd8ed1ab_0
 #   zstd               conda-forge/win-64::zstd-1.5.2-h12be248_6
 
+qasync
+aiohttp
 pyqtgraph   # (conda install pyqtgraph) ✓ also installs the listed below
 # The following packages will be downloaded:
 # 
