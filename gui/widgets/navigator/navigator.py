@@ -652,7 +652,7 @@ class NavigatorButton(NavigatorButtonBase):
         self._url_ = url
         self._subDir_ = "" # TODO
         self._openSubDirsTimer_ = None # QtCore.QTimer() # TODO
-        self._subDirsJob_ = None # originally, a KIO.listDir → TODO: replace with Python logic (async?)
+        self._subDirsJob_ = None # originally, a KIO.listDir → TODO: replace with Python logic (qasync?)
         self._subDirsMenu_ = None # NavigatorMenu # TODO
         self._subDirs_ = list() # of SubdirInfo
         

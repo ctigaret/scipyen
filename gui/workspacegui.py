@@ -21,7 +21,7 @@ from core.strutils import InflectEngine
 import gui.quickdialog as qd
 from gui.itemslistdialog import ItemsListDialog
 
-class _X11WMBridge_(QtCore.QObject):
+class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
     sig_wm_inspect_done = pyqtSignal(name="sig_wm_inspect_done")
     
     def __init__(self, parent=None):
