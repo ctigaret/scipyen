@@ -883,6 +883,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #### END Epoch actions
         
         self.actionLink_X_axes.toggled.connect(self._slot_setXAxesLinked)
+        self.actionLink_X_axes.setEnabled(False)
         
         # the actual layout of the plot items (pyqtgraph framework)
         self.signalsLayout = pg.GraphicsLayout()
@@ -1114,25 +1115,37 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.configurable_traits["CursorLabelPrecision"] = self._cursorLabelPrecision_
             
     @property
-    def xAxesLinked(self):
+    def xAxesLinked(self): 
+        if len(self.axes) > 0:
+            # NOTE 2023-05-09 18:21:53 
+            # allow for SOME axes to be linked; dump self._xAxesLinked_
+            # read link status from vb states
+            xLinks = [ax.vb.state["linkedViews"][0] for ax in self.axes]
+            allXLinked = not all(v is None for v in xLinks)
+            if self._xAxesLinked_ != allXLinked:
+                self._xAxesLinked_ = allXLinked
+                signalBlocker = QtCore.QSignalBlocker(self.actionLink_X_axes)
+                self.actionLink_X_axes.setChecked(self._xAxesLinked_)
+        
         return self._xAxesLinked_
     
     @markConfigurable("XAxesLinked")
     @xAxesLinked.setter
     def xAxesLinked(self, value):
-        self._xAxesLinked_ = value == True
+        setAllXLink = value == True
         signalBlocker = QtCore.QSignalBlocker(self.actionLink_X_axes)
-        self.actionLink_X_axes.setChecked(self._xAxesLinked_)
+        self.actionLink_X_axes.setChecked(setAllXLink)
+        
+        self._xAxesLinked_ = setAllXLink
         
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits["XAxesLinked"] = self._xAxesLinked_
             
         if len(self.axes):
             if self._xAxesLinked_:
-                self.xAxesLink()
+                self.linkAllXAxes()
             else:
-                self.xAxesUnlink()
-            
+                self.unlinkAllXAxes()
             
     @property
     def cursorsShowValue(self):
@@ -6773,7 +6786,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
         # NOTE: 2023-05-09 10:41:27
         # thsi also sets up axes lines visibility & tickmarks
-        # self._align_X_range()
+        self._align_X_range()
         self._update_axes_spines_()
         
     def _get_axes_X_view_states_(self):
@@ -6873,97 +6886,113 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         if padding is None:
             padding = self._common_axes_X_padding_
-            
-        visibleAxes = [ax for ax in self.axes if ax.isVisible()]
-        # print(self._axes_X_view_states_)
         
-        if len(visibleAxes) == 0:
-            return
+        x0, x1 = zip(*[ax.vb.state["viewRange"][0] for ax in self.signalAxes])
         
-        elif len(visibleAxes) == 1:
-            ax = visibleAxes[0]
-            
-            min_x, max_x = self._get_axis_data_X_range_(ax)
-            
-            if any(v is None for v in (min_x, max_x)):
-                return
-            
-            # NOTE: 2023-04-26 12:19:23
-            # restore the view state: offset from leftmost domain limit, and 
-            # view factor (a.k.a "zoom")
-            # see NOTE: 2023-04-26 12:07:26
-            # each element is the tuple (offset, factor) where BOTH are either a number, or None
-            if len(self._axes_X_view_states_) and all(v is not None for v in self._axes_X_view_states_[0]):
-                v0 = min_x + self._axes_X_view_states_[0][0]
-                v1 = v0 + (max_x - min_x) * self._axes_X_view_states_[0][1]
-                # print(f"{self.__class__.__name__}._align_X_range v0 = {v0} ; v1 = {v1}")
-                ax.setXRange(v0, v1)#, padding=padding)
-                ax.getAxis("bottom").setRange(v0, v1)
-                
-            else:
-                # no previously saved state - let the viewbox deal with it
-                ax.setXRange(min_x, max_x)#, padding = padding)
-                # ax.getAxis("bottom").setRange(min_x, max_x)
-            
-            visibleAxes[0].getAxis("bottom").showLabel(True)
-            visibleAxes[0].getAxis("bottom").setStyle(showValues = True)
+        minX = min(x0)
+        maxX = max(x1)
         
-        else:
-            axes_with_X_overlap = list()
-            minX, maxX = None, None
+        print(f"{self.__class__.__name__}._align_X_range minX = {minX} ; maxX = {maxX}")
+        
+        
+        # for ax in self.signalAxes:
+        for kax, ax in enumerate(self.axes):
+            if ax.isVisible() and ax.vb.state["linkedViews"][0] is None:
+                print(f"setting X range axis {kax}, minX = {minX} ; maxX = {maxX}")
+                ax.setXRange(minX, maxX, 0)
+                # ax.setXRange(minX, maxX)
+                # ax.setXRange(minX, maxX, padding)
             
-            # NOTE: 2023-05-09 11:05:59
-            # self._axes_X_view_states_ is a list of tuples: (offset, scale)
-            # • offset is added to min data X range
-            # • scale is a multiplier for the data X range (min - max) ("zoom"-like factor)
-            
-            
-            for k, ax in enumerate(self.axes):
-                if ax.isVisible():
-                    min_x, max_x = self._get_axis_data_X_range_(ax)
-                    
-                    if any(v is None for v in (min_x, max_x)):
-                        continue
-                    
-                    if k < len(self._axes_X_view_states_) and all(v is not None for v in self._axes_X_view_states_[k]):
-                        # NOTE: 2023-05-09 11:41:11
-                        # a view state exists; this axis will NOT be considered
-                        # as overlapping
-                        v0 = min_x + self._axes_X_view_states_[k][0]
-                        v1 = v0 + (max_x - min_x) * self._axes_X_view_states_[k][1]
-                        # ax.setXRange(v0, v1)#, padding=padding)
-                        ax.getAxis("bottom").setRange(v0, v1)
-                        
-                    else:
-                        # NOTE: 2023-05-09 11:41:46
-                        # for axes where a previous view state was not generated,
-                        # we check to see if there is overlap between their intial
-                        # X ranges
-                        if k == 0 or any(v is None for v in (minX, maxX)):
-                            minX = min_x
-                            maxX = max_x
-                            
-                            axes_with_X_overlap.append(ax)
-                            
-                        else:
-                            if min_x > maxX: 
-                                # this axis X domain does not overlap with the one from prev axis
-                                ax.setXRange(min_x, max_x)#, padding = padding)
-                            else:
-                                minX = min(minX, min_x) # allow growing to the left
-                                maxX = max(maxX, max_x) # allow growing to the right
-                                
-                                axes_with_X_overlap.append(ax)
-            
-            # NOTE: 2023-01-17 17:43:47
-            # update visibility and view range for axes with overlapping domains
-            # hide X axis values for axes with same X boundaries ONLY if their X 
-            # domain have same units (as described in the label)
-            for kax, ax in enumerate(self.axes):
-                if ax.isVisible(): # NOTE: 2023-05-09 11:44:20 apply this only to visible axes
-                    if ax in axes_with_X_overlap and all(isinstance(v, float) for v in (minX, maxX)):
-                        ax.setXRange(minX, maxX)#, padding = padding)
-                        
+#         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
+#         # print(self._axes_X_view_states_)
+#         
+#         if len(visibleAxes) == 0:
+#             return
+#         
+#         elif len(visibleAxes) == 1:
+#             ax = visibleAxes[0]
+#             
+#             min_x, max_x = self._get_axis_data_X_range_(ax)
+#             
+#             if any(v is None for v in (min_x, max_x)):
+#                 return
+#             
+#             # NOTE: 2023-04-26 12:19:23
+#             # restore the view state: offset from leftmost domain limit, and 
+#             # view factor (a.k.a "zoom")
+#             # see NOTE: 2023-04-26 12:07:26
+#             # each element is the tuple (offset, factor) where BOTH are either a number, or None
+#             if len(self._axes_X_view_states_) and all(v is not None for v in self._axes_X_view_states_[0]):
+#                 v0 = min_x + self._axes_X_view_states_[0][0]
+#                 v1 = v0 + (max_x - min_x) * self._axes_X_view_states_[0][1]
+#                 # print(f"{self.__class__.__name__}._align_X_range v0 = {v0} ; v1 = {v1}")
+#                 ax.setXRange(v0, v1)#, padding=padding)
+#                 ax.getAxis("bottom").setRange(v0, v1)
+#                 
+#             else:
+#                 # no previously saved state - let the viewbox deal with it
+#                 ax.setXRange(min_x, max_x)#, padding = padding)
+#                 # ax.getAxis("bottom").setRange(min_x, max_x)
+#             
+#             visibleAxes[0].getAxis("bottom").showLabel(True)
+#             visibleAxes[0].getAxis("bottom").setStyle(showValues = True)
+#         
+#         else:
+#             axes_with_X_overlap = list()
+#             minX, maxX = None, None
+#             
+#             # NOTE: 2023-05-09 11:05:59
+#             # self._axes_X_view_states_ is a list of tuples: (offset, scale)
+#             # • offset is added to min data X range
+#             # • scale is a multiplier for the data X range (min - max) ("zoom"-like factor)
+#             
+#             
+#             for k, ax in enumerate(self.axes):
+#                 if ax.isVisible():
+#                     min_x, max_x = self._get_axis_data_X_range_(ax)
+#                     
+#                     if any(v is None for v in (min_x, max_x)):
+#                         continue
+#                     
+#                     if k < len(self._axes_X_view_states_) and all(v is not None for v in self._axes_X_view_states_[k]):
+#                         # NOTE: 2023-05-09 11:41:11
+#                         # a view state exists; this axis will NOT be considered
+#                         # as overlapping
+#                         v0 = min_x + self._axes_X_view_states_[k][0]
+#                         v1 = v0 + (max_x - min_x) * self._axes_X_view_states_[k][1]
+#                         # ax.setXRange(v0, v1)#, padding=padding)
+#                         ax.getAxis("bottom").setRange(v0, v1)
+#                         
+#                     else:
+#                         # NOTE: 2023-05-09 11:41:46
+#                         # for axes where a previous view state was not generated,
+#                         # we check to see if there is overlap between their intial
+#                         # X ranges
+#                         if k == 0 or any(v is None for v in (minX, maxX)):
+#                             minX = min_x
+#                             maxX = max_x
+#                             
+#                             axes_with_X_overlap.append(ax)
+#                             
+#                         else:
+#                             if min_x > maxX: 
+#                                 # this axis X domain does not overlap with the one from prev axis
+#                                 ax.setXRange(min_x, max_x)#, padding = padding)
+#                             else:
+#                                 minX = min(minX, min_x) # allow growing to the left
+#                                 maxX = max(maxX, max_x) # allow growing to the right
+#                                 
+#                                 axes_with_X_overlap.append(ax)
+#             
+#             # NOTE: 2023-01-17 17:43:47
+#             # update visibility and view range for axes with overlapping domains
+#             # hide X axis values for axes with same X boundaries ONLY if their X 
+#             # domain have same units (as described in the label)
+#             for kax, ax in enumerate(self.axes):
+#                 if ax.isVisible(): # NOTE: 2023-05-09 11:44:20 apply this only to visible axes
+#                     if ax in axes_with_X_overlap and all(isinstance(v, float) for v in (minX, maxX)):
+#                         ax.setXRange(minX, maxX)#, padding = padding)
+#                         
                         # NOTE: 2023-05-09 11:43:12
                         # at this point there should be no X view state for the
                         # axes in the "axes with X overlap" list
@@ -8534,7 +8563,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if self.currentAxis == plotItem:
             self.currentAxis = self.axes[0] if len(self.axes) else None
             
-    def xAxesLink(self):
+    def linkAllXAxes(self):
         if len(self.axes) < 1:
             return
 
@@ -8551,7 +8580,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             for ax in pairwise(self.axes):
                 ax[1].vb.setXLink(ax[0])
         
-    def xAxesUnlink(self):
+    def unlinkAllXAxes(self):
         if len(self.axes) < 1:
             return
         
@@ -8686,10 +8715,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 # plotItem.showAxes([True, False, False, True], showValues=[True, False, False, True])
                 plotItem.setVisible(False)
                 
-        if self.xAxesLinked:
-            self.xAxesLink()
-        else:
-            self.xAxesUnlink()
+        if len(self.axes):
+            self.actionLink_X_axes.setEnabled(True)
+            
+            if self.xAxesLinked:
+                self.linkAllXAxes()
+            else:
+                self.unlinkAllXAxes()
             
         # for ax in self._signal_axes_:
         # for ax in self.axes:
