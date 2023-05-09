@@ -1722,7 +1722,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     ax.removeItem(l)
                     
     
-    # def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list], axis:typing.Optional[int]=None, clear:bool=True, **kwargs):
     @safeWrapper
     def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list, neo.core.spiketrainlist.SpikeTrainList], axis:pg.PlotItem, clear:bool=True, adapt_X_range:bool=True, minX:typing.Optional[float]=None, maxX:typing.Optional[float]=None, **kwargs):
         """For plotting events and spike trains on their own (separate) axis
@@ -6771,12 +6770,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         for tgt in targetItems:
                             ax.addItem(tgt)
                     
-                ax.getAxis("left").setWidth(60)
                 
         # NOTE: 2023-05-09 10:41:27
         # thsi also sets up axes lines visibility & tickmarks
         # self._align_X_range()
-        self._update_X_spines_()
+        self._update_axes_spines_()
         
     def _get_axes_X_view_states_(self):
         self._axes_X_view_states_.clear()
@@ -6976,13 +6974,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
         self._get_axes_X_view_states_()
         
-    def _update_X_spines_(self):
+    def _update_axes_spines_(self):
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
         
         if len(visibleAxes) == 0:
             return
         
         for k, ax in enumerate(self.axes):
+            # ax.enableAutoRange()
             if k > 0:
                 ndx = k-1
                 prev_ax = None
@@ -7002,6 +7001,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 prev_ax.getAxis("bottom").showLabel(not sameLabel)
                 prev_ax.getAxis("bottom").setStyle(showValues=False)
 
+                ax.getAxis("left").setWidth(60)
+                
                 # if ax in axes_with_X_overlap: # also hide axis values if same boundaries
                 #     prev_ax.getAxis("bottom").setStyle(showValues=False)
         
@@ -7042,7 +7043,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.spikeTrainsAxis.setVisible(False)
                 
 
-    # def _plotEvents_(self, events: typing.Optional[typing.Union[typing.Sequence[neo.Event], typing.Sequence[DataMark]]] = None, clear: bool = True, from_cache: bool = False, plotLabelText=None, **kwargs):
     @safeWrapper
     def _plotEvents_(self, events: typing.Optional[typing.Union[typing.Sequence[neo.Event], typing.Sequence[DataMark]]] = None, plotLabelText=None, **kwargs):
         """ Common landing zone for Event/DataMark plotting 
@@ -8109,7 +8109,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.docTitle = signal_name
             
         # self._align_X_range()
-        self._update_X_spines_()
+        self._update_axes_spines_()
             
     def _make_sig_plot_dict_(self, plotItem:pg.PlotItem, x:np.ndarray, y:np.ndarray, xlabel:(str, type(None))=None,  ylabel:(str, type(None))=None, title:(str, type(None))=None, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, *args, **kwargs):
         return {"plotItem":plotItem, 
@@ -8539,7 +8539,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             for ax in pairwise(self.signalAxes):
                 ax[1].vb.setXLink(ax[0])
                 
-            nonSigAxes = list(filter(lambda x: x in self.signalAxes, self.axes))
+            nonSigAxes = list(filter(lambda x: x not in self.signalAxes, self.axes))
+            
             for ax in nonSigAxes:
                 ax.vb.setXLink(self.signalAxes[0])
                 
@@ -8677,16 +8678,21 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                                     autoReduceTextSpace=False)
             
             if plotItem in (self._events_axis_, self._spiketrains_axis_):
-                plotItem.showAxis("bottom", True)
-                plotItem.showAxes([True, False, False, True], showValues=[True, False, False, True])
+                # plotItem.showAxis("bottom", True)
+                #                  left  top    right  bottom             left  top    right  bottom
+                # plotItem.showAxes([True, False, False, True], showValues=[True, False, False, True])
                 plotItem.setVisible(False)
-                
-            plotItem.enableAutoRange()
                 
         if self.xAxesLinked:
             self.xAxesLink()
         else:
             self.xAxesUnlink()
+            
+        # for ax in self._signal_axes_:
+        # for ax in self.axes:
+        #     ax.enableAutoRange()
+            
+        
         
     @pyqtSlot(object)
     @safeWrapper
