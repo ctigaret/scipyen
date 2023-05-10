@@ -478,7 +478,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # • offset is the difference between the view range leftmost point and
         #   the leftmost domain value
         # • factor is the ratio between the vew range and data domain range
-        # self._axes_X_view_states_ = list()
+        self._axes_X_view_states_ = list()
         
         # define these early
         self._xData_ = None
@@ -489,6 +489,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._show_legends_ = False
         self._ignore_empty_spiketrains_ = True
         self._common_axes_X_padding_ = 0.
+        
+        # self._axes_range_changed_manually_ = list()
         
         # NOTE: 2023-01-04 22:06:48
         # guard against replotting signals when there's no actual frame change
@@ -6639,14 +6641,35 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         # print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed ax_ndx = {ax_ndx}")
         
-        # if len(self._axes_X_view_states_) == 0:
-        #     self._get_axes_X_view_states_()
-        # else:
-        #     self._axes_X_view_states_[ax_ndx] = self._get_axis_X_view_state(ax)
+        if len(self._axes_X_view_states_) == 0:
+            self._get_axes_X_view_states_()
+        else:
+            self._axes_X_view_states_[ax_ndx] = self._get_axis_X_view_state(ax)
+            
+        # print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed newState = {self._axes_X_view_states_[ax_ndx]}")
         
         if self.currentFrame in self._cached_epochs_:
             if len(self._cached_epochs_[self.currentFrame]):
                 self._plotEpochs_(from_cache=True)
+                
+    @pyqtSlot(object)
+    def _slot_plot_axis_range_changed_manually(self, value:object):
+        vb = self.sender()
+        
+        ax = [ax for ax in self.axes if ax.vb == vb]
+        
+        if len(ax) == 0:
+            return
+        
+        ax = ax[0]
+        ax.sigXRangeChanged.emit(None, None)
+        
+#         ndx = self.axes.index(ax)
+#         
+#         if len(self._axes_range_changed_manually_) != len(self.axes):
+#             self._axes_range_changed_manually_ = [None for ax_ in self.axes]
+#             
+#         self._axes_range_changed_manually_[ndx] = value
                 
     @safeWrapper
     def refresh(self):
@@ -6789,55 +6812,63 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._align_X_range()
         self._update_axes_spines_()
         
-#     def _get_axes_X_view_states_(self):
-#         self._axes_X_view_states_.clear()
-#         
-#         for ax in self.axes:
-#             data_x_range = self._get_axis_data_X_range_(ax)
-#             
-#             if any(v is None for v in data_x_range):
-#                 self._axes_X_view_states_.append((None, None))
-#             
-#             else:
-#                 view_x_range = ax.vb.viewRange()[0]
-#                 
-#                 offset = view_x_range[0] - data_x_range[0]
-#                 
-#                 factor = (view_x_range[1] - view_x_range[0]) / (data_x_range[1] - data_x_range[0])
-#                 
-#                 self._axes_X_view_states_.append((offset, factor))
+    def _get_axes_X_view_states_(self):
+        self._axes_X_view_states_.clear()
+        
+        for ax in self.axes:
+            data_x_range = self._get_axis_data_X_range_(ax)
+            
+            if any(v is None for v in data_x_range):
+                self._axes_X_view_states_.append((None, None))
+            
+            else:
+                view_x_range = ax.vb.viewRange()[0]
                 
-#     def _get_axis_X_view_state(self, ax:typing.Union[int, pg.PlotItem]):
-#         if isinstance(ax, pg.PlotItem):
-#             if ax not in self.axes:
-#                 raise ValueError(f"Axis {ax} not found in this viewer")
-#             ax_ndx = self.axes.index(ax)
-#             
-#         elif isinstance(ax, int):
-#             if ax not in range(self.axes):
-#                 raise ValueError(f"Invalid axis index {ax} for {len(self.axes)} axes")
-#             
-#             ax_ndx = ax
-#             ax = self.axes[ax_ndx]
-#             
-#         else:
-#             raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(ax).__name__} instead")
-#         
-#         data_x_range = self._get_axis_data_X_range_(ax)
-#         
-#         if any(v is None for v in data_x_range):
-#             return (None, None)
-#         else:
-#             view_x_range = ax.vb.viewRange()[0]
-#             
-#             offset = view_x_range[0] - data_x_range[0]
-#             
-#             dx = data_x_range[1] - data_x_range[0] if data_x_range[1] != data_x_range[0] else 1.
-#             
-#             factor = (view_x_range[1] - view_x_range[0]) / dx
-#             # factor = (view_x_range[1] - view_x_range[0]) / (data_x_range[1] - data_x_range[0])
-#             
-#             return (offset, factor)
+                offset = view_x_range[0] - data_x_range[0]
+                
+                viewXspan = view_x_range[1] - view_x_range[0]
+                dataXspan = data_x_range[1] - data_x_range[0]
+                
+                if dataXspan == 0:
+                    factor = 1.0
+                else:
+                    factor = (view_x_range[1] - view_x_range[0]) / (data_x_range[1] - data_x_range[0])
+                
+                self._axes_X_view_states_.append((offset, factor))
+                
+        return self._axes_X_view_states_ # for convenience
+                
+    def _get_axis_X_view_state(self, ax:typing.Union[int, pg.PlotItem]):
+        if isinstance(ax, pg.PlotItem):
+            if ax not in self.axes:
+                raise ValueError(f"Axis {ax} not found in this viewer")
+            ax_ndx = self.axes.index(ax)
+            
+        elif isinstance(ax, int):
+            if ax not in range(self.axes):
+                raise ValueError(f"Invalid axis index {ax} for {len(self.axes)} axes")
+            
+            ax_ndx = ax
+            ax = self.axes[ax_ndx]
+            
+        else:
+            raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(ax).__name__} instead")
+        
+        data_x_range = self._get_axis_data_X_range_(ax)
+        
+        if any(v is None for v in data_x_range):
+            return (None, None)
+        else:
+            view_x_range = ax.vb.viewRange()[0]
+            
+            offset = view_x_range[0] - data_x_range[0]
+            
+            dx = data_x_range[1] - data_x_range[0] if data_x_range[1] != data_x_range[0] else 1.
+            
+            factor = (view_x_range[1] - view_x_range[0]) / dx
+            # factor = (view_x_range[1] - view_x_range[0]) / (data_x_range[1] - data_x_range[0])
+            
+            return (offset, factor)
             
         
     def _get_axis_data_X_range_(self, axis:typing.Union[int, pg.PlotItem]):
@@ -6884,6 +6915,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if len(self.axes) == 0:
             return
         
+        # update self._axes_X_view_states_
+        if len(self._axes_X_view_states_) == 0:
+            self._get_axes_X_view_states_()
+        
         if padding is None:
             padding = self._common_axes_X_padding_
         
@@ -6902,32 +6937,46 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         # for ax in self.signalAxes:
         for kax, ax in enumerate(self.axes):
-            xLinkedAxes = [ax_ for ax_ in self.axes if ax_ != ax and ax_.state["linkedViews"][0]() == ax.vb]
-            
+            # xLinkedAxes = [ax_ for ax_ in self.axes if ax_ != ax and (ax_.vb.state["linkedViews"][0] is not None and ax_.vb.state["linkedViews"][0]() == ax.vb)]
             if ax.isVisible() and ax.vb.state["linkedViews"][0] is None:
-                # print(f"setting X range axis {kax}, minX = {minX} ; maxX = {maxX}")
-                ax.setXRange(minDataX, maxDataX, padding)
-#                 if ax in self.signalAxes:
+                # ax.setXRange(minDataX, maxDataX, padding)
+                
+                offset, scale = self._axes_X_view_states_[kax]
+            
+                if offset is not None and scale is not None:
+                    newX0 = minDataX + offset
+                    newX1 = newX0 + (maxDataX - minDataX) * scale
+                    ax.setXRange(newX0, newX1, padding)
+                else:
+                    ax.setXRange(minDataX, maxDataX, padding)
+                
+                # print(f"{self.__class__.__name__}.align_X_range :\n\toffset = {offset} ; scale = {scale} \n\tnewX0 = {newX0} ; newX1 = {newX1}")
+            
+                
+            
+#             if ax.isVisible() and ax.vb.state["linkedViews"][0] is None:
+#                 if len(self._axes_range_changed_manually_) == len(self.axes) and isinstance(self._axes_range_changed_manually_[kax], (tuple, list)) and self._axes_range_changed_manually_[kax][0] == True:
 #                     viewXrange  = [x0[kax], x1[kax]]
 #                     dataXrange = [xdata0[kax], xdata1[kax]]
-#                     newMinX = minDataX
-#                     newMaxX = maxDataX
 #                     if dataXrange[0] != viewXrange[0] or dataXrange[1] != viewXrange[1]:
 #                         viewXspan = viewXrange[1] - viewXrange[0]
 #                         dataXspan = dataXrange[1] - dataXrange[0]
-#                         if dataXspan > 0:
+#                         if dataXspan != 0:
 #                             offset = dataXrange[0] - viewXrange[0]
 #                             xscale = viewXspan / dataXspan
 #                             minmaxSpan = maxDataX - minDataX
 #                             newMinX = minDataX + offset
 #                             newMaxX = newMinX + minmaxSpan * xscale
+#                             ax.setXRange(newMinX, newMaxX, padding)
+#                         else:
+#                             ax.setXRange(minDataX, maxDataX, padding)
 #                             
-#                     ax.setXRange(newMinX, newMaxX, padding)
+#                     else:
+#                         ax.setXRange(minDataX, maxDataX, padding)
 #                             
 #                 else:
 #                     ax.setXRange(minDataX, maxDataX, padding)
-            
-        
+                
     def _update_axes_spines_(self):
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
         
@@ -8576,10 +8625,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 plotItem = pg.PlotItem(name = plotname)
                 self.signalsLayout.addItem(plotItem, row=k, col=0)
                 plotItem.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
+                plotItem.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
                 plotItem.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
                 plotItem.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
                 plotItem.setVisible(False)
                 self._signal_axes_.append(plotItem)
+                
                 
         elif len(self.signalAxes) > self._n_signal_axes_:
             # more signal axes than necessary
@@ -8610,6 +8661,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         if self._events_axis_ not in self.signalsLayout.items:
             self._events_axis_.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
+            self._events_axis_.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
             self.signalsLayout.addItem(self._events_axis_, row=self._n_signal_axes_, col=0)
             
         # NOTE: 2023-01-17 10:45:24
@@ -8620,6 +8672,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
         if self._spiketrains_axis_ not in self.signalsLayout.items:
             self._spiketrains_axis_.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
+            self._spiketrains_axis_.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
             self.signalsLayout.addItem(self._spiketrains_axis_, row = self._n_signal_axes_ + 1, col = 0)
             
         if self.signalsLayout.scene() is not None:

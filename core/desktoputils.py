@@ -744,7 +744,7 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
     def mimeTypes(self):
         pass
     
-    def mineData(self, indexes:list):
+    def mimeData(self, indexes:list):
         pass
     
     def dropMimeData(self, data:QtCore.QMimeData, action:QtCore.Qt.DropAction, row:int, column:int, parent:QtCore.QModelIndex):
