@@ -108,7 +108,7 @@ otherwise, just load it (usually, from a pickle `*.pkl` file)
 
 <a name=gen_ltp_dict></a>
 
-```python
+```
 ltp_data = ltp.generate_minute_average_data_for_LTP(base, chase, LTPOptions, test_index, cell_name)
 ```
 
@@ -140,16 +140,48 @@ The call [above](#gen_ltp_dict) returns a `dict` containing:
 * `Test`:`dict` with data for the `test` pathway - same structure as the `Control`, shown [above](#Control_subdict).
 * `LTPOptions`:`dict` a copy of the LTP options object passed as argument (see [above](#gen_ltp_dict))
 
-#### 3.1 If you want more atomic control of this step:
+#### 3.1 Optionally, do this manually, without LTPOptions:
 
 * collect the blocks in two separate lists, e.g. `baseline_blocks` and `chase_blocks`
+* make sure each block in the list has exactly TWO segments (minute-averages, one per pathway)
+* make sure these blocks DO NOT include cross-talk!
 * concatenate the sweeps (i.e., `segments`) corresponding to each pathway in separate blocks, e.g.:
 ```python
 path0_baseline = neoutils.concatenate_blocks(baseline_blocks, segments = 0, analogsignals = LTPOptions["Signals"], name = result_name_prefix + "_path0_baseline")
-
 path1_baseline = neoutils.concatenate_blocks(baseline_blocks, segments = 1, analogsignals = LTPOptions["Signals"], name = result_name_prefix + "_path1_baseline")
 ```
-
+* do the same for chase blocks
+* set up cursors manually:
+    * with any of the concatenated blocks obtained as above, open the block in SignalViewer
+    * select the membrane current axis (containing synaptic responses)
+    * place vertical cursors in the axis (do NOT select multi-axis cursors!):
+        * for single-pulse stimulation set EXACTLY 5 (five) cursors named as follows (case-sensitive!) and with the following X window sizes (in brackets):
+            * Rbase (0.01)
+            * Rs (0.003)
+            * Rin (0.01)
+            * EPSC0Base (0.01)
+            * EPSC0Peak (0.005)
+        * for paired-pulse stimulation, set EXACTLY 7 (seven) cursors named as follows (case-sensitive!):
+            * Rbase (0.01)
+            * Rs (0.003)
+            * Rin (0.01)
+            * EPSC0Base (0.01)
+            * EPSC0Peak (0.005)
+            * EPSC1Base (0.01)
+            * ESPC1Peak (0.005)
+        * **NOTE:** Windows can be readjusted
+            
+    * align these cursors as follows:
+        * Rbase ↦ current baseline BEFORE deplarization transient (for membrane Rs and Rin)
+        * Rs ↦ peak of the first capacitive transient 
+        * Rin ↦ steady-state current during depolarization
+        * EPSC0Base ↦ current baseline BEFORE 1<sup>st</sup> stimulus artifact (first pulse)
+        * EPSC0Peak ↦ trough of the 1<sup>st</sup> EPSC
+        * EPSC1Base ↦ current baseline BEFORE 2<sup>nd</sup> stimulus artifact (first pulse)
+        * EPSC1Peak ↦ trough of the 2<sup>nd</sup> EPSC
+        * **NOTE:** positions can/should be readjusted
+        
+* create epochs:
 
 ### 4. View the [`ltp_data`](#gen_ltp_dict) (double-click in the `User Variables` table to open it in a `DataViewer`).
 

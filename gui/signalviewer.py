@@ -6637,6 +6637,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         ax = self.sender()
         
+        if ax not in self.axes:
+            return
+        
         ax_ndx = self.axes.index(ax)
         
         # print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed ax_ndx = {ax_ndx}")
