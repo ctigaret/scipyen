@@ -180,6 +180,7 @@ from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventTyp
 from core.triggerprotocols import TriggerProtocol
 
 from core import datatypes as dt
+from core.datatypes import TypeEnum
 from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities
@@ -197,14 +198,24 @@ from gui.cursors import (SignalCursor, SignalCursorTypes)
 
 #### END pict.core modules
 
-# class SignalCursor:
-#     # dummy
-#     pass
 
 if __debug__:
     global __debug_count__
 
     __debug_count__ = 0
+    
+class ClampMode(TypeEnum):
+    NoClamp=1
+    VoltageClamp=2
+    CurrentClamp=4
+    
+    
+class ElectrodeMode(TypeEnum):
+    Field=1
+    WholeCellPatch=2
+    ExcisedPatch=4
+    Sharp=8
+    
     
 def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], start:int = 0, span:int=1, isISI:bool=False):
     """Calculates the reciprocal of an inter-event interval.

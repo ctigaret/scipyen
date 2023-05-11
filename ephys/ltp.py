@@ -655,6 +655,7 @@ import iolib.pictio as pio
 #### END pict.iolib modules
 
 import ephys.ephys as ephys
+from ephys.ephys import ClampMode, ElectrodeMode
 
 LTPOptionsFile = os.path.join(os.path.dirname(__file__), "options", "LTPOptions.pkl")
 optionsDir     = os.path.join(os.path.dirname(__file__), "options")
@@ -973,14 +974,6 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         self._data_["Chase"]["Test"] = None
         self._data_["Chase"]["Control"] = None
         
-        self._viewers_ = dict()
-        
-        self._viewers_["baseline_source"] = None
-        self._viewers_["conditioning_source"] = None
-        self._viewers_["chase_source"] = None
-        
-        self._viewers_["pathways"] = dict()
-        
         
         # NOTE: 2020-02-23 11:10:20
         # During conditioning the "Control" synaptic pathway is unperturbed but
@@ -994,6 +987,41 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         # stimulation there would be no LTP on the weak ("Test") pathway.
         self._data_["Conditioning"] = dict()
         self._data_["Conditioning"]["Test"] = None
+        
+        self._viewers_ = dict()
+        self._viewers_["baseline_source"] = None
+        self._viewers_["conditioning_source"] = None
+        self._viewers_["chase_source"] = None
+        
+        self._viewers_["pathways"] = dict()
+        
+        # NOTE: 2023-05-11 11:00:47 recording configuration
+        # electrode mode see ephys.ElectrodeMode; one of:
+        # • ephys.ElectrodeMode.WholeCellPatch (default)
+        # • ephys.ElectrodeMode.Field
+        # • ephys.ElectrodeMode.Sharp
+        # clamp mode: one for tracking (i.e. baseline + chase) and one for induction
+        # NOTE: normally baseline and chase have both the same clamping mode unless
+        # you need to so something extremely unorthodox
+        # By default, these are:
+        # • tracking = ClampMode.VoltageClamp
+        # • induction = ClampMode.CurrentClamp
+        #
+        # • possible values are 
+        #   ∘ ClampMode.NoClamp ↦ For Multiclamp series using MultiClamp commander,
+        #                          this is achieved by turning OFF Holding in either
+        #                           clamp modes (VC, IC) or by using IC=0 mode
+        #                         For other amplifiers, see the appropriate manuals.
+        #
+        #                         Typically, this is used in field recordings.
+        #
+        #
+        #   ∘ ClampMode.VoltageClamp, 
+        #   ∘ ClampMode.CurrentClamp ↦ any patch mode, and sharp electrodes.
+        self._recording_configuration_ = dict()
+        self._recording_configuration_["ElectrodeMode"] = ElectrodeMode.WholeCellPatch
+        self._recording_configuration_["ClampMode"]["tracking"] = ClampMode.VoltageClamp
+        self._recording_configuration_["ClampMode"]["induction"] = ClampMode.CurrentClamp
         
         
         # raw data: collections of neo.Blocks, sources from software 
