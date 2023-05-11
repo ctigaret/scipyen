@@ -169,12 +169,12 @@ import matplotlib as mpl
 
 # import pyqtgraph as pg
 
-try:
-    import pyabf
-    hasPyABF = True
-except:
-    hasPyABF = False
-
+# try:
+#     import pyabf
+#     hasPyABF = True
+# except:
+#     hasPyABF = False
+# 
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -198,6 +198,9 @@ from . import signalprocessing as sigp
 from . import utilities
 from core.utilities import (normalized_index, name_lookup,
                             elements_types, index_of, isclose, similar_strings)
+
+# from iolib.pictio import getABF
+# from core.pyabfbridge import getABFProtocolEpochs
 
 
 #from .patchneo import neo
@@ -251,30 +254,6 @@ if __debug__:
     global __debug_count__
 
     __debug_count__ = 0
-    
-def getABF(obj):
-    import os
-    if not hasPyABF:
-        return
-    
-    if not os.path.exists(getattr(obj, "file_origin", None)):
-        return
-    
-    try:
-        return pyabf.ABF(obj.file_origin)
-    except:
-        pass
-    
-def getABFProtocolEpochs(obj):
-    if not hasPyABF:
-        return
-    
-    from core import pyabfbridge
-    
-    abf = getABF(obj)
-    
-    if abf:
-        return pyabfbridge.getEpochTables(abf, as_dataFrame=True)
     
 def copy_to_segment(obj:neo.core.dataobject.DataObject, new_seg:neo.Segment):
     new_obj = obj.copy()
@@ -742,6 +721,11 @@ def get_member_collections(container:typing.Union[type, neo.core.container.Conta
     #elif isinstance(membertype, type) and membertype in 
 
 def get_neo_version():
+    """
+    Returns the version number of the installed neo package as a tuple
+    (major, minor, dot)
+    
+    """
     major, minor, dot = neo.version.version.split(".")
     return eval(major), eval(minor), eval(dot)
 

@@ -59,8 +59,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 #### BEGIN pict.core modules
 #from core import neo
 #from core import patchneo
-from core import (xmlutils, strutils, datatypes, datasignal,
-                  triggerprotocols, neoutils,)
+from core import (xmlutils, strutils, datasignal)
 
 
 from core.prog import (ContextExecutor, safeWrapper,)
@@ -71,11 +70,10 @@ from core.monkey import (check_neo_patch,
 from core.workspacefunctions import (user_workspace, assignin, debug_scipyen,
                                      get_symbol_in_namespace,)
 
-from imaging import (axisutils, axiscalibration, scandata, )
-from imaging.axisutils import *
+# from imaging import (axisutils, axiscalibration, scandata, )
+# from imaging.axisutils import *
 from iolib import h5io
 
-#import datatypes
 #### END pict.core modules
 
 #import signalviewer as sv
@@ -1731,6 +1729,40 @@ def is_spreadsheet(fileName:str):
     
     return any(any(m in s.lower() for m in ("spreadsheet", "excel", "csv", "tab-separated-values")) for s in (mime_type, file_type)) or os.path.splitext(fileName)[-1] in (".csv", ".tsv", ".xls", ".xlsx")
     
+def getABF(obj):
+    """
+    Returns a pyabf.ABF object from an ABF file.
+    
+    Parameters:
+    ----------
+    obj: str (ABF file name) or a neo.core.baseneo.BaseNeo object containing an
+        attrribute named "file_origin" that points to an ABF file on disk where
+        its data is stored.
+    """
+    import os
+    if not hasPyABF:
+        warning.warn("getABF requires pyabf package")
+        return
+
+    if isinstance(obj, str):
+        filename = obj
+    else:
+        filename = getattr(obj, "file_origin", None)
+        
+    if not os.path.exists(filename):
+        return
+    
+    loader = getLoaderForFile(filename)
+    
+    if loader == loadAxonFile:
+        try:
+            return pyabf.ABF(filename)
+        except:
+            pass
+        
+    else:
+        warning.warn(f"{filename} is not an Axon file")
+
 def loadFile(fName):
     value = None
     fileLoader = getLoaderForFile(fName)

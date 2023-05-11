@@ -997,30 +997,6 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         # str (pathway name) ↦ int (pathway index)
         self._viewers_["pathways"] = dict()
         
-        # NOTE: 2023-05-11 18:14:08
-        # str (analog signal name) ↦ int (signal index)
-        self._input_signals_ = dict()
-        
-        # name or index of the command analogsignal (is recorded as auxiliary 
-        # input signal, anf therefore present in self._input_signals_)
-        self._command_signal_ =  None
-        
-        # NOTE: 2023-05-11 18:17:55
-        # name or index of the input analogsignal that carries the synaptic 
-        # response - 
-        # ATTENTION: this signal MUST be present in self._input_signals_ and
-        # can be:
-        # • a current signal (if ElectrodeMode is WholeCellPatch AND ClampMode
-        #     for tracking is VoltageClamp)
-        #
-        # • a voltage signal, if one of the following is satisfied:
-        #   ∘ ElectrodeMode is WholeCellPatch AND tracking ClampMode is CurrentClamp
-        #   ∘ ElectrodeMode is Field (tracking ClampMode MAY BE NoClamp or CurrentClamp)
-        #   ∘ ElectrodeMode is Sharp AND tracking ClampMode is CurrentClamp
-        #
-        # This relies on the signal having appopriate units
-        self._synaptic_signal_ = None
-        
         # NOTE: 2023-05-11 11:00:47 recording configuration
         # electrode mode see ephys.ElectrodeMode; one of:
         # • ephys.ElectrodeMode.WholeCellPatch (default)
@@ -1048,6 +1024,44 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         self._recording_configuration_["ElectrodeMode"] = ElectrodeMode.WholeCellPatch
         self._recording_configuration_["ClampMode"]["tracking"] = ClampMode.VoltageClamp
         self._recording_configuration_["ClampMode"]["induction"] = ClampMode.CurrentClamp
+        
+        
+        # NOTE: 2023-05-11 18:14:08
+        # str (analog signal name) ↦ int (signal index)
+        self._input_signals_ = dict()
+        
+        # NOTE: 2023-05-11 18:17:55 self._synaptic_signal_
+        # name or index of the input analogsignal that carries the synaptic 
+        # response - 
+        # ATTENTION: this signal MUST be present in self._input_signals_ and
+        # can be:
+        # • a current signal - units pA (usually) or nA
+        #       if ElectrodeMode is WholeCellPatch AND tracking ClampMode is VoltageClamp)
+        #
+        # • a voltage signal - units of mV 
+        #       if any of the following is satisfied:
+        #           ∘ ElectrodeMode is WholeCellPatch and ClampMode is CurrentClamp
+        #           ∘ ElectrodeMode is Field ( ClampMode may be NoClamp or CurrentClamp)
+        #           ∘ ElectrodeMode is Sharp and ClampMode is CurrentClamp
+        #
+        # This relies on the signal having appropriate units. In turn, this requires
+        # a Telegraph input from the amplitifer to the DAQ board; failing that,
+        # the units should be set up correctly in the recording software (either
+        # as part of the protocol, or in software configuration)
+        #
+        # As a last resort, the units can be set up manually in this GUI (TODO)
+        self._synaptic_signal_ = None
+        
+        # NOTE: 2023-05-11 21:35:06 self._command_signal_
+        # name or index of the command analogsignal (is recorded as auxiliary 
+        # input signal, and therefore present in self._input_signals_)
+        #
+        # This signal can be (with appropriate units, see e.g., NOTE: 2023-05-11 18:17:55):
+        # • a voltage signal:   in ElectrodeMode WholeCellPatch and ClampMode VoltageClamp
+        # • a current signal:   in (ElectrodeMode.WholeCellPatch or ElectrodeMode.Sharp) and Clampmode.CurrentClamp
+        # • None:               in ElectrodeMode.Field or ClampMode NoClamp
+        self._command_signal_ =  None
+        
         
         
         # raw data: collections of neo.Blocks, sources from software 
