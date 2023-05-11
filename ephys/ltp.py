@@ -993,7 +993,33 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         self._viewers_["conditioning_source"] = None
         self._viewers_["chase_source"] = None
         
+        # NOTE: 2023-05-11 18:10:06
+        # str (pathway name) ↦ int (pathway index)
         self._viewers_["pathways"] = dict()
+        
+        # NOTE: 2023-05-11 18:14:08
+        # str (analog signal name) ↦ int (signal index)
+        self._input_signals_ = dict()
+        
+        # name or index of the command analogsignal (is recorded as auxiliary 
+        # input signal, anf therefore present in self._input_signals_)
+        self._command_signal_ =  None
+        
+        # NOTE: 2023-05-11 18:17:55
+        # name or index of the input analogsignal that carries the synaptic 
+        # response - 
+        # ATTENTION: this signal MUST be present in self._input_signals_ and
+        # can be:
+        # • a current signal (if ElectrodeMode is WholeCellPatch AND ClampMode
+        #     for tracking is VoltageClamp)
+        #
+        # • a voltage signal, if one of the following is satisfied:
+        #   ∘ ElectrodeMode is WholeCellPatch AND tracking ClampMode is CurrentClamp
+        #   ∘ ElectrodeMode is Field (tracking ClampMode MAY BE NoClamp or CurrentClamp)
+        #   ∘ ElectrodeMode is Sharp AND tracking ClampMode is CurrentClamp
+        #
+        # This relies on the signal having appopriate units
+        self._synaptic_signal_ = None
         
         # NOTE: 2023-05-11 11:00:47 recording configuration
         # electrode mode see ephys.ElectrodeMode; one of:
