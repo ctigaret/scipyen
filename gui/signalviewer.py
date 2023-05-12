@@ -6642,9 +6642,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         ax_ndx = self.axes.index(ax)
         
-        # print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed ax_ndx = {ax_ndx}")
+        # print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed ax_ndx = {ax_ndx}, x0 = {x0}, x1 = {x1}")
         
-        if len(self._axes_X_view_states_) == 0:
+        if len(self._axes_X_view_states_) != len(self.axes):
             self._get_axes_X_view_states_()
         else:
             self._axes_X_view_states_[ax_ndx] = self._get_axis_X_view_state(ax)
@@ -6667,13 +6667,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         ax = ax[0]
         ax.sigXRangeChanged.emit(None, None)
         
-#         ndx = self.axes.index(ax)
-#         
-#         if len(self._axes_range_changed_manually_) != len(self.axes):
-#             self._axes_range_changed_manually_ = [None for ax_ in self.axes]
-#             
-#         self._axes_range_changed_manually_[ndx] = value
-                
     @safeWrapper
     def refresh(self):
         """
@@ -6937,48 +6930,25 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # print(f"{self.__class__.__name__}._align_X_range minX = {minX} ; maxX = {maxX}")
         # print(f"{self.__class__.__name__}._align_X_range minDataX = {minDataX} ; maxDataX = {maxDataX}")
         
-        
         # for ax in self.signalAxes:
         for kax, ax in enumerate(self.axes):
             # xLinkedAxes = [ax_ for ax_ in self.axes if ax_ != ax and (ax_.vb.state["linkedViews"][0] is not None and ax_.vb.state["linkedViews"][0]() == ax.vb)]
             if ax.isVisible() and ax.vb.state["linkedViews"][0] is None:
                 # ax.setXRange(minDataX, maxDataX, padding)
-                
-                offset, scale = self._axes_X_view_states_[kax]
-            
-                if offset is not None and scale is not None:
-                    newX0 = minDataX + offset
-                    newX1 = newX0 + (maxDataX - minDataX) * scale
+                if ax.vb.state["autoRange"][0] == False:
+                    # I think by default this is True, so upon the first axis show,
+                    # this will skip this branch and enable full auto-range
+                    offset, scale = self._axes_X_view_states_[kax]
+                    
+                    if offset is not None and scale is not None:
+                        # print(f"{self.__class__.__name__}._align_X_range :\n\toffset = {offset} ; scale = {scale}")
+                        newX0 = minDataX + offset
+                        newX1 = newX0 + (maxDataX - minDataX) * scale
+                    else:
+                        newX0 = minDataX
+                        newX1 = maxDataX
+                    # print(f"{self.__class__.__name__}._align_X_range : newX0 = {newX0}, newX1 = {newX1}")
                     ax.setXRange(newX0, newX1, padding)
-                else:
-                    ax.setXRange(minDataX, maxDataX, padding)
-                
-                # print(f"{self.__class__.__name__}.align_X_range :\n\toffset = {offset} ; scale = {scale} \n\tnewX0 = {newX0} ; newX1 = {newX1}")
-            
-                
-            
-#             if ax.isVisible() and ax.vb.state["linkedViews"][0] is None:
-#                 if len(self._axes_range_changed_manually_) == len(self.axes) and isinstance(self._axes_range_changed_manually_[kax], (tuple, list)) and self._axes_range_changed_manually_[kax][0] == True:
-#                     viewXrange  = [x0[kax], x1[kax]]
-#                     dataXrange = [xdata0[kax], xdata1[kax]]
-#                     if dataXrange[0] != viewXrange[0] or dataXrange[1] != viewXrange[1]:
-#                         viewXspan = viewXrange[1] - viewXrange[0]
-#                         dataXspan = dataXrange[1] - dataXrange[0]
-#                         if dataXspan != 0:
-#                             offset = dataXrange[0] - viewXrange[0]
-#                             xscale = viewXspan / dataXspan
-#                             minmaxSpan = maxDataX - minDataX
-#                             newMinX = minDataX + offset
-#                             newMaxX = newMinX + minmaxSpan * xscale
-#                             ax.setXRange(newMinX, newMaxX, padding)
-#                         else:
-#                             ax.setXRange(minDataX, maxDataX, padding)
-#                             
-#                     else:
-#                         ax.setXRange(minDataX, maxDataX, padding)
-#                             
-#                 else:
-#                     ax.setXRange(minDataX, maxDataX, padding)
                 
     def _update_axes_spines_(self):
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
@@ -8704,12 +8674,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.linkAllXAxes()
             else:
                 self.unlinkAllXAxes()
-            
-        # for ax in self._signal_axes_:
-        # for ax in self.axes:
-        #     ax.enableAutoRange()
-            
-        
         
     @pyqtSlot(object)
     @safeWrapper

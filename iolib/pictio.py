@@ -1584,6 +1584,10 @@ def getLoaderForFile(fName):
 
     #print(f"in getLoaderForFile: mime_type: {mime_type} file_type: {file_type}")
     
+    if isinstance(file_type, str) and len(file_type):
+        if "Axon Binary" in file_type:
+            return loadAxonFile
+    
     ret = fileLoaders[mime_type] # fileLoaders is a default dict with None the default value
     
     if ret is None: 
@@ -1651,13 +1655,20 @@ def getMimeAndFileType(fileName):
         the encoding of the file as reported by the system's mime-type utilities 
     """
     
+    # TODO/FIXME: 2023-05-12 08:44:27
+    # Not sure why on the same machine xdgmime reports some abf files as 
+    # MIMEtype('text', 'plain')
+    # and others as 
+    # MIMEtype('application', 'executable')
+    # whereas, in both cases libmagic reports Axon Binary correctly.
+    # This appears to be machine-specific, as it does not occur everywhere
+    #
+    # NOTE: 2023-05-12 08:50:39
+    # As a workaround, check file_type first, THEN mime_type
+
     file_type = None
     mime_type = None
     encoding = None
-    
-    #file_type = None
-    #mime_type = None
-    #encoding = None
     
     # NOTE: 2020-02-16 18:15:34
     # 1) DETERMINE THE FILE TYPE
@@ -1674,12 +1685,7 @@ def getMimeAndFileType(fileName):
         except Exception as e:
             traceback.print_exc()
 
-    #print(f"file_type: {file_type}")
-    #print(f"sys.platform: {sys.platform}")
-
-    # 1.2) try the system "file" command
-    # NOTE: 2022-01-18 13:13:26
-    # 'file' is NOT available on win32 platform
+    # 1.2) try the system "file" command - only available on Linux/UNIX
     if file_type is None:
         if sys.platform == "linux":
             try:
@@ -1688,14 +1694,18 @@ def getMimeAndFileType(fileName):
 
             except Exception as e:
                 traceback.print_exc()
+                
+    # finally, try python's mimetypes
+    if file_type is None:
+        mime_type, encoding = mimetypes.guess_type(fileName)
+        mime_type = file_type
 
-        elif sys.platform == "win32":
-            file_type, encoding = mimetypes.guess_type(fileName)
-            mime_type = file_type
             
     # 2) DETERMINE THE MIME TYPE
-    # 2.1) try the pyxdg module
-    if mime_type is None and  xdgmime: # is not None:
+    # 2.1) try python's mimetypes
+    mime_type, encoding = mimetypes.guess_type(fileName)
+    # 2.2) try the pyxdg module
+    if mime_type is None and xdgmime: # is not None:
         try:
             mime = xdgmime.get_type(fileName)
             mime_type = "/".join([mime.media, mime.subtype]) # e.g. "text/plain"
@@ -1706,16 +1716,16 @@ def getMimeAndFileType(fileName):
 
     #print(f"in getMimeAndFileType: mime_type: {mime_type} file_type: {file_type}")
 
-    # 2.2) try the mimetypes module
-    # NOTE: 2021-04-12 11:31:29
-    # this is in case the actual file type and mime type are not registered
-    # with either the global or the user mime data base(s)
-    if mime_type in ["application/executable", None] or file_type == "data":
-        _mime_type, encoding = mimetypes.guess_type(fileName)
-        if _mime_type is not None:
-            # NOTE: 2021-04-12 11:31:24
-            # if mimetypes report None for type, revert to what xdgmime returned
-            mime_type = _mime_type
+    # # 2.2) try the mimetypes module
+    # # NOTE: 2021-04-12 11:31:29
+    # # this is in case the actual file type and mime type are not registered
+    # # with either the global or the user mime data base(s)
+    # if mime_type in ["application/executable", None] or file_type == "data":
+    #     _mime_type, encoding = mimetypes.guess_type(fileName)
+    #     if _mime_type is not None:
+    #         # NOTE: 2021-04-12 11:31:24
+    #         # if mimetypes report None for type, revert to what xdgmime returned
+    #         mime_type = _mime_type
         
     return mime_type, file_type, encoding
 
@@ -1736,7 +1746,7 @@ def getABF(obj):
     Parameters:
     ----------
     obj: str (ABF file name) or a neo.core.baseneo.BaseNeo object containing an
-        attrribute named "file_origin" that points to an ABF file on disk where
+        attribute named "file_origin" that points to an ABF file on disk where
         its data is stored.
     """
     import os

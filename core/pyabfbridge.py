@@ -2,8 +2,8 @@
 
 Requires pyabf.
 
-NOTE: PyABF (https://swharden.com/pyabf/) is not currently used to load 
-Axon ABF files - Scipyen uses neo package instead (https://neo.readthedocs.io/en/stable/)
+PyABF (https://swharden.com/pyabf/) is not currently used to load Axon ABF files.
+Scipyen uses the neo package (https://neo.readthedocs.io/en/stable/) to represent
 
 This is because all electrophysiology signals are represented in Scipyen as
 objects of the types defined in the neo framework. 
@@ -43,7 +43,7 @@ def getABFProtocolEpochs(obj):
     if abf:
         return getABFEpochsTable(abf, as_dataFrame=True)
     
-def getABFEpochsTable(x:object, as_dataFrame:bool=False, allTables:bool=False):
+def getABFEpochsTable(x:pyabf.ABF, as_dataFrame:bool=False, allTables:bool=False):
     if not isinstance(x, pyabf.ABF):
         raise TypeError(f"Expecting a pyabf.ABF object; got {type(x).__name__} instead")
     
@@ -61,7 +61,7 @@ def getABFEpochsTable(x:object, as_dataFrame:bool=False, allTables:bool=False):
     return etables
     # return [e for e in etables if len(e.epochs)]
 
-def epochTable2DF(x:object, abf:typing.Optional[pyabf.ABF] = None):
+def epochTable2DF(x:pyabf.ABF, abf:typing.Optional[pyabf.ABF] = None):
     """Returns a pandas.DataFrame with the data from the epoch table 'x'
     """
     if not isinstance(x, pyabf.waveform.EpochTable):
@@ -117,7 +117,3 @@ def epochTable2DF(x:object, abf:typing.Optional[pyabf.ABF] = None):
         
         return pd.DataFrame(epochData, index = rowIndex)
     
-    
-    
-    
-
