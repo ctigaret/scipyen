@@ -1809,8 +1809,9 @@ class ElectrophysiologyProtocol(object):
     Intended to provide a common denominator for data acquired with various 
         electrophysiology software vendors. 
         
-    WARNING API under development (i.e. unstable) TODO
+    WARNING DO NOT USE YET - API under development (i.e. unstable) TODO
     """
+    # TODO/FIXME see if pyabf can be used
     def __init__(self):
         # possible values for self._data_source_:
         # "Axon", "CEDSignal", "CEDSpike", "Ephus", "NA", "unknown"
@@ -1840,6 +1841,9 @@ class ElectrophysiologyProtocol(object):
         self._n_sweeps_ = data_protocol.get("lEpisodesPerRun",1)
         self._alternative_digital_outputs_ = data_protocol.get("nAlternativeDigitalOutputState", 0) == 1
         self._alternative_DAC_command_output_ = data_protocol.get("nAlternativeDACOutputState", 0) == 1
+        
+    def _parse_ced_data_(self, data:object):
+        pass
 
 def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs):
     """Generates a signal containing a synthetic waveform, as a column vector.

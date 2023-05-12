@@ -627,6 +627,7 @@ import core.workspacefunctions as wf
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.datatypes as dt
+from core.datatypes import TypeEnum
 from core.quantities import units_convertible
 import plots.plots as plots
 import core.models as models
@@ -959,6 +960,38 @@ Configuration fields:
 
 #"def" pairedPulseEPSCs(data_block, Im_signal, Vm_signal, epoch = None):
 
+class PathwayType(TypeEnum):
+    Test = 1
+    Control = 2
+    Other = 3
+    
+    
+
+class SynapticPathway():
+    """Encapsulates a stimulus-response relationship between signals.
+
+    Signals are:
+    • response (analog, regularly sampled)
+    • analogCommand (analog signal) - command waveform
+    • digitalCommand - TTL waveform
+
+    In most circumstances, the analogCommand and digitalCommand are records
+    (as analog signals) respectively, of the command signal from the amplifier
+    and of the TTL signal sent out by the DAC/ADC board
+
+    In addition, the synaptic pathway has a pathwayType attribute with value of
+    type PathwayType
+    
+    """
+    def __init__(self, pathwayType:PathwayType = PathwayType.Test, analogCommand:typing.Union[typing.Union[str, int]] = None, digitalCommand:typing.Optional[typing.Union[str, int]] = None, response:typing.Optional[typing.Union[str, int]]=None,name:str="Test"):
+        self._analog_ = analog
+        self._digital_ = digital
+        self._response_ = response
+        self._type_ = pathType
+        self._name_ = name
+        
+        
+
 class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -1028,6 +1061,9 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         
         # NOTE: 2023-05-11 18:14:08
         # str (analog signal name) ↦ int (signal index)
+        # Since there can be multiple stimulation pathways (e.g. Test & Control,
+        # or Test & Control & Ripple) we need a list of these for each pathway
+        # we need
         self._input_signals_ = dict()
         
         # NOTE: 2023-05-11 18:17:55 self._synaptic_signal_
@@ -1050,19 +1086,43 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         # as part of the protocol, or in software configuration)
         #
         # As a last resort, the units can be set up manually in this GUI (TODO)
-        self._synaptic_signal_ = None
+        self._synaptic_signal_ = dict()
+        self._synaptic_signal_["tracking"] = None
+        self._synaptic_signal_["induction"] = None
         
-        # NOTE: 2023-05-11 21:35:06 self._command_signal_
-        # name or index of the command analogsignal (is recorded as auxiliary 
-        # input signal, and therefore present in self._input_signals_)
+        # NOTE: 2023-05-11 21:35:06 self._command_signal_as_input_
+        # stores the signal names of the command signals RECORDED AS AUXILIARY
+        # INPUTS IN THE PROTOCOL
+        #
+        # this approach is recommended until we can successfully parse the ABF
+        # protocols
+        #
+        # NOTE: these may be None!
+        #
+        # The names of these signals MUST be found among the keys of self._input_signals_
         #
         # This signal can be (with appropriate units, see e.g., NOTE: 2023-05-11 18:17:55):
         # • a voltage signal:   in ElectrodeMode WholeCellPatch and ClampMode VoltageClamp
         # • a current signal:   in (ElectrodeMode.WholeCellPatch or ElectrodeMode.Sharp) and Clampmode.CurrentClamp
         # • None:               in ElectrodeMode.Field or ClampMode NoClamp
-        self._command_signal_ =  None
+        self._command_signal_as_input_ = dict()
+        self._command_signal_as_input_["tracking"] = None
+        self._command_signal_as_input_["induction"] = None
         
-        
+        # NOTE:2023-05-12 10:55:03 self._digital_signal_as_input_ 
+        # stored the names of the digital stimuli AS RECORDED THROUGH AUXILIARY
+        # INPUTS
+        #
+        # As for self._command_signal_as_input_, this approach is recommended
+        # until I can succesfully parse the digital waveforms from the ABF protocol
+        #
+        # Until then, this signal is useful to determine the timing of the 
+        # presynaptic stimulations.
+        #
+        # Also, since there typically are two pathways (rarely one, exceptionally
+        # more than one), we need to have dictionary for each pathway
+        self._digital_signal_as_input_ = dict()
+        self._digital_signal_as_input_["tracking"] = None
         
         # raw data: collections of neo.Blocks, sources from software 
         # vendor-specific data files. These can be:
