@@ -669,294 +669,6 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,
                                                    import_from="gui") #  so that resources can be imported too
 
 
-"""
-NOTE: 2020-02-14 16:54:19 LTP options revamp
-NOTATIONS: Im = membrane current; Vm = membrane potential
-
-Configurations for synaptic plasticity experiments (ex vivo slice) = dictionary with the following fields:
-
-A synaptic plasticity experiment takes place in three stages:
-        1. pre-conditioning ("baseline") test synaptic responses
-        2. conditioning (plasticity induction protocol)
-        3. post-conditioning ("chase") test synaptic responses
-        
-Test synaptic responses are evoked at low frequency (< 1 Hz) by stimulations of 
-presynaptic axons. Because of normal fluctuations in the synaptic response, the 
-average synaptic response during each minute is usually more relevant: for 0.1 Hz 
-stimulation this is the average of six consecutive responses.
-
-Averaging can be performed "on-line" during the experiment, and the minute-average
-responses are recorded directly (Signal2 from CED, and Clampex from Axon/MolecularDevices
-can do this). Alternatively, the averaging can be performed off-line, using the saved
-data.
-
-The synaptic responses can be recorded as:
-    * evoked post-synaptic currents or potentials, using in whole-cell patch clamp 
-        or with intracellular (sharp) electrodes, in current clamp;
-        
-    * evoked field potentials, using in extracellular field recordings.
-        
-Conditioning consists of a sequence of stimulations delivered to presynaptic axons,
-optionally combined with depolarization of the postsynaptic cell(s). 
-
-Postsynaptic cell depolarization:
---------------------------------
-Postsynaptic current injections are used to elicit postsynaptic action potentials
-(with intracellular sharp electrodes or whole-cell patch clamp), or tonic 
-depolarization (whole-cell patch clamp with Na+ channel blockers in the intracellular 
-solution). Antidromic stimulation of the efferent axons using extracellulal electrodes
-can also be used to elicit postsynaptic action potentials in extracellular field 
-recordings.
-
-1. Single pathway experiments:
---------------------------------
-A single stimulation electrode is used to stimulate a single pathway (bundle of 
-presynaptic axons), and the evoked responses are recorded. 
-
-Synaptic plasticity is determined by comparing the magnitude of the average 
-synaptic response some time after conditioning, to that of the average synaptic 
-response during the baseline immediately prior conditioning.
-
-2. Dual-pathway experiments. 
---------------------------------
-Synaptic responses are recorded, ideally, from two  pathways: 
-* a conditioned ("Test") pathway - the pathway ot which the conditioning protocol
-    is applied
-    
-* a non-conditioned ("Control") pathway which is left unperturbed (not stimulated)
-    during conditioning.
-
-The occurrence of synaptic plasticity is determined by comparing the averaged
-synaptic responses some time after conditioning, to the averaged synaptic responses
-during the baseline immediately before conditioning, in each pathway. 
-
-Homosynaptic plasticity is indicated by a persistent change in synaptic response
-magnitude in the Test pathway, and no change in the Control pathway.
-
-3 Single recording electrode
---------------------------------
-In dual-pathway experiments, the two pathways converge and make synapses on the 
-same cell (in whole-cell recording) or within the same cell population (in 
-extracellular field recording), and a single electrode is used to record the evoked
-synaptic responses from both pathways. The Control pathway serves as a "reference" 
-(or "internal control") for the stability of synaptic responses in the absence of
-conditioning. 
-
-To distinguish between the pathway source of synaptic responses, the experiment
-records intervealed sweeps, with each pathway stimulated alternatively.
-
-4 Two recording electrodes
-------------------------------
-Two recording electrodes may be used to combine whole-cell recording with 
-extracellular field recording (e.g., Zalutsky & Nicoll, 1990).
-
-This can be used in single- or dual-pathway configurations.
-
-Configuration ("LTP_options") -- dictionary
--------------------------------------------
-
-"paths": dictionary of path specifications, with each key being a path "name"
-
-Must contain at least one key: "Test", mapped to the specification of the "test"
-    pathway
-    
-Members (keys) of a pathway specification dictionary:
-"sweep_index"
-    
-
-
-Configuration fields:
-        
-"paths": collection of one or two path dictionaries
-
-    Test synaptic responses from each path are recorded in interleaved sweeps.
-    
-    For Clampex, this means the experiment is recorded in runs containing 
-        
-    The test responses during (or typically at the end of) the chase are compared
-    to the average baseline test response, on a specific measure, e.g. the amplitude
-    of the EPSC or EPSP, or the slope of the (field) EPSP, to determine whether
-    synaptic plasticity has been induced.
-        
-    There is no prescribed duration of the baseline or chase stages - these
-    depend on the protocol, recording mode and what it is sought by the
-    experiment. 
-    
-    Very short baselines (less than 5 min) are not considered reliable. 
-    Long baselines (15 min or more) while not commonly used in LTP experiments
-    with whole-cell recordings in order to avoid "LTP wash-out", unless the 
-    perforated patch technique is used. On the other hand, long baselines are 
-    recommended for when using field potential recordings and for LTD 
-    experiments with whole-cell recordings (wash-out is thought not to be an
-    issue).
-        
-    When only a path dictionary is present, this is implied to represent the 
-        conditioned (test) pathway.
-    
-    For two pathways, the conditioned pathway is indicated by the name 
-        "Test". The other pathways can have any unique name, but the one that is
-        used as a control should be distinguished by its name (e.g. "Control")
-        
-    Key/value pairs in the path dictionary:
-        name: str, possible vales: "Test", "Control", or any name
-        index: the index of the sweep that contains data recorded from this path
-        
-    
-"mode":str, one of ["VC", "IC", "fEPSP"]
-
-
-
-"paired":bool. When True, test stimulation is paired-pulse; this applies to all 
-    paths in the experiment (see below)
-
-"isi":[float, pq.quantity] - interval between stimuli in paired-pulse stimulation
-    when a pq.quantity, it must be in time units compatible with the data
-    when a float, the time units of the data are implicit
-    
-
-"paths":dict with keys "Test" and "Control", or empty
-    paths["Test"]:int
-    paths["Control"]:[int, NoneType]
-    
-    When present and non-empty, indicates that this is a dual pathway experiment
-    where one is the test pathway and the other, the control pathway.
-    
-    The values of the "Test" pathway is the integer index of the sweep corresponding 
-    to the test pathway, in each "Run" stored as an *.abf file
-    
-    Similarly, the value of "Control" is the integer index of the sweep containing
-    data recorded on the control pathway, in each run stored in the *.abf file
-    
-    Although the paths key is used primarily when importing abf files into an
-    experiment, it is also used during analysis, to signal that the experiment is
-    a dual-pathway experiment.
-    
-    An Exception is raised when:
-        a) both "Test" and "Control" have the same value, or
-        b) any of "Test" and "Control" have values < 0 or > max number of sweeps
-        in the run (NOTE: a run is stored internally as a neo.Block; hence the 
-        number of sweeps in the run equals the number of segments in the Block)
-    
-    The experiment is implicitly considered to be single-pathway when:
-    a) "paths" is absent
-    b) "paths" is None or an empty dictionary
-    c) "paths" only contains one pathway specification (any name, any value)
-    d) "paths" contains both "Test", and "Control" fields but Control is either
-        None, or has a negative value
-        
-"xtalk": dictionary with configuration parameters for testing cross-talk between
-    pathways
-    Ignored when "dual" is False.
-    
-
-
-1) allow for one or two pathways experiment
-
-2) allow for single or paired-pulse stimulation (must be the same in both pathways)
-
-3) allow for the following recording modes:
-3.a) whole-cell patch clamp:
-3.a.1) mode="VC": voltage clamp mode => measures series and input resistances,
-    and the peak amplitude of EPSC (one or two, if paire-pulse is True
-    
-    field: "Rm": 
-        defines the baseline region for series and input resistance calculation
-            
-        subfields:
-        
-        "Rbase" either:
-            tuple(position:[float, pq.quantity], window:[float, pq.quantity], name:str)
-            
-            of sequence of two tuples as above
-            
-            each tuple defines a cursor;
-                when a single cursor is defined, its window defines the baseline
-                region
-                
-                when two cursors are defined, their positions delimit the baseline region
-            
-            
-        
-            sets up the cursor Rbase - for Rs and Rin calculations
-            type: vertical, position, window, name = Rbase
-            
-            placed manually before the depolarizing Vm square waveform
-            for the membrane resistance test 
-        
-        field: "Rs":
-        
-        tuple(position:[float, pq.quantity], window:[float, pq.quantity], name:str)
-        
-            sets up the second cursors for the calculation of Rs:
-            this can be
-        
-        * Rs: 
-            required LTP options fields:
-                cursor 1 for resistance test baseline 
-                        
-                cursor 2 for peak of capacitance transient
-                    type: vertical, position, window, name = Rs
-                    
-                    placed manually
-                        either on the peak of the 1st capacitance transient at the
-                        onset of the positive Vm step waveform for the membrane
-                        resistance test
-                        
-                        or after this peak, to use with positive peak detection
-                    
-                value of Vm step (mV)
-                
-                name of the Im signal
-                
-                use peak detection: bool, default False
-            
-            calculation of Rs:
-                Irs = Im_Rs - Im_Rbase where:
-                    Im_Rs = average Im across the window of Rs cursor
-                    Im_Rbase = averae Im across the window of the Rbase cursor
-                
-            Rs = Vm_step/Irs in megaohm
-            
-            
-        * Rin:
-            required LTP options fields:
-                cursor 1 for steady-state Im during the positive (i.e. depolarizing)
-                    VM step waveform
-                    
-                    type: vertical, position, window, name=Rin
-                    
-                    placed manualy towards the end of the Vm step waveform BEFORE repolarization
-                    
-            calculated as :
-                Irin = Im_Rin - Im_Rbase, where:
-                    Im_Rin = average Im acros the window of the Rin cursor
-                    Im_Rbase -- see Rs
-                    
-                Rin = Vm_step/Irin
-                
-        * EPSC0: peak amplitude of 1st EPSC
-            required LTP options fields:
-                cursor for baseline before stimulus artifact
-                type: vertical; position, window, name=EPSC0_base
-                manually placed before stimuus artifact for 1st EPSC
-                
-                cursor for peak of EPSC0
-                type: vertical, position, window, name=EPSC0
-                placed either manually, or use inward peak detection between
-                    two cursors
-                
-                
-        if paired-pulse stimulation: 
-            peak amplitude of 2nd EPSC
-            ratio 2nd EPSC peak amplitude / 1st EPSC peak amplitude
-            
-        EPSC amplitudes measurements:
-            - at cursor placed at EPSC peak (manually) or by peak-finding
-            - relative to baseline cursor before stimulus artifact
-            - value = average of data within cursor's WINDOW
-            
-            
-"""
 
 #"def" pairedPulseEPSCs(data_block, Im_signal, Vm_signal, epoch = None):
 
@@ -964,32 +676,135 @@ class PathwayType(TypeEnum):
     Test = 1
     Control = 2
     Other = 3
-    
-    
 
 class SynapticPathway():
-    """Encapsulates a stimulus-response relationship between signals.
+    """Encapsulates a logical stimulus-response relationship between signals.
 
-    Signals are:
+    Signals are identified by name or their index in the collection of a sweep's
+    analogsignals (the `analgosignals` attribute of a neo.Segment object).
+
+    The signals are:
     • response (analog, regularly sampled)
     • analogCommand (analog signal) - command waveform
     • digitalCommand - TTL waveform
 
-    In most circumstances, the analogCommand and digitalCommand are records
-    (as analog signals) respectively, of the command signal from the amplifier
-    and of the TTL signal sent out by the DAC/ADC board
+    In most circumstances, the command signals are, respectively, records of the
+    command signal from the amplifier and of the TTL signal sent out by the 
+    DAC/ADC board, and fed back into the ADC board's auxiliary inupt ports.
 
-    In addition, the synaptic pathway has a pathwayType attribute with value of
-    type PathwayType
+    In addition, the synaptic pathway has a pathwayType attribute which specifies
+    the pathway's role in a synaptic plasticity experiment.
     
     """
-    def __init__(self, pathwayType:PathwayType = PathwayType.Test, analogCommand:typing.Union[typing.Union[str, int]] = None, digitalCommand:typing.Optional[typing.Union[str, int]] = None, response:typing.Optional[typing.Union[str, int]]=None,name:str="Test"):
-        self._analog_ = analog
-        self._digital_ = digital
-        self._response_ = response
-        self._type_ = pathType
-        self._name_ = name
+    # def __init__(self, data:typing.Optional[neo.Block]=None, pathwayType:PathwayType = PathwayType.Test, name:str=pathwayType.name, response:typing.Optional[typing.Union[str, int]]=None, analogCommand:typing.Union[typing.Union[str, int]] = None, digitalCommand:typing.Optional[typing.Union[str, int]] = None):
+    def __init__(self, data:neo.Block, pathwayType:PathwayType = PathwayType.Test, name:typing.Optional[str]=None, response:typing.Optional[typing.Union[str, int]]=None, analogCommand:typing.Union[typing.Union[str, int]] = None, digitalCommand:typing.Optional[typing.Union[str, int]] = None):
+        """
+        Named parameters:
+        ----------------
+        data: recorded sweeps belonging to the pathway (neo.Block) or None
+    
+        pathwayType: the role of the pathway in a synaptic plasticity experiment
+                        (Test, Control, Other)
+    
+        name: name of the pathway (by default is the name of the pathwayType)
+    
+        response: name or index¹ of the analog signal containing the synaptic response
+    
+        analogCommand: name or index¹ of the analog signal containing the analog
+                command signal
+    
+        digitalCommand: name or index¹ of the analog signal containing the digital
+                command signal
         
+        """
+        self._data_ = data
+        
+        if len(data.segments) == 0:
+            raise ValueError("Data is an empty neo.Block")
+        
+        emptysegs = [k for k, s in enumerate(data.segments) if len(s.analogsignals) == 0]
+        
+        if len(emptysegs):
+            raise ValueError(f"Segments {emptysegs} have no analogsignals")
+        
+        self._analog_ = self._check_signal_param_(analogCommand, "analogCommand")
+        self._digital_ = self._check_signal_param_(digitalCommand, "digitalCommand")
+        self._response_ = self._check_signal_param_(response, "response")
+        
+        self._type_ = pathwayType
+        
+        self._name_ = name
+        if self._name_ is None:
+            self._name_ = self._type_.name
+
+        
+    def _check_signal_param_(self, sig, param):
+        if sig is None:
+            return sig
+        
+        if isinstance(sig, str):
+            if len(sig):
+                nosig = [k for k,s in enumerate(data.segments) if s not in [sig.name for sig in s.analogsignals]]
+                if len(nosig):
+                    raise ValueError(f"The {param} signal {sig} not found in segments {nosig}")
+                
+            else:
+                sig = None
+                
+        elif isinstance(sig, int):
+            if sig < 0:
+                raise ValueError(f"Invalid {param} signal index {sig}; should be >= 0")
+                
+            nosig = [k for k,s in enumerate(data.segments) if sig >= len(s.analogsignals)]
+            
+            if len(nosig):
+                raise ValueError(f"Invalid {param} signal index {sig} for segments {nosig}")
+            
+        else:
+            raise TypeError(f"Expecting {param} an int or str; got {type(sig).__name__} instead")
+        
+        return sig
+            
+        
+    @property
+    def pathwayType(self):
+        return self._type_
+    
+    @pathwayType.setter
+    def pathwayType(self, value:PathwayType):
+        self._type_ = value
+        
+    @property
+    def analogCommandSignal(self):
+        return self._analog_
+    
+    @analogCommandSignal.setter
+    def analogCommandSignal(self, value:typing.Optional[typing.Union[str, int]] = None):
+        self._analog_ = self._check_signal_param_(value, "analogCommand")
+        
+    @property
+    def digitalCommandSignal(self):
+        return self._digital_
+    
+    @digitalCommandSignal.setter
+    def digitalCommandSignal(self, value:typing.Optional[typing.Union[str, int]] = None):
+        self._digital_ = self._check_signal_param_(value, "digitalCommand")
+        
+    @property
+    def responseSignal(self):
+        return self._response_
+    
+    @responseSignal.setter
+    def responseSignal(self, value:typing.Optional[typing.Union[str, int]] = None):
+        self._response_ = self._check_signal_param_(value, "response")
+        
+    @property
+    def pathName(self):
+        return self._name_
+    
+    @pathName.setter
+    def pathName(self, value:typing.Union[str] = None):
+        self._name_ = value
         
 
 class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
