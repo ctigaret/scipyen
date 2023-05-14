@@ -808,8 +808,8 @@ class SynapticPathway():
         
 
 class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, data=None, win_title:str = "Synaptic plasticity", parent:typing.Optional[QtWidgets.QMainWindow]=None, **kwargs):
+        super().__init__(data=data, win_title = win_title, doc_title="", parent=parent)
         
         self.qsettings = QtCore.QSettings()
         self.threadpool = QtCore.QThreadPool()
@@ -993,6 +993,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         
         self.pushButtonBaselineSources.clicked.connect(self.slot_viewBaselineSourceData)
         
+        self._viewers_
         
     @pyqtSlot()
     @safeWrapper
