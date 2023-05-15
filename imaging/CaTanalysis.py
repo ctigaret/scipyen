@@ -3493,16 +3493,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
 
     def __init__(self, *args, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="LSCaT", **kwargs):
         self.threadpool = QtCore.QThreadPool()
-        #self.timer = QtCore.QTimer()
-        #self.timer.setInterval(1000)
         
         # guard variables for filtering
         self._scene_processing_idle_ = True
         self._scans_processing_idle_ = True
         self._epscat_analysis_idle_ = True
         self._generic_work_idle_ = True
-        
-        #self._scipyenWindow_ = pwin
         
         #self._data_ = None # inherited from ScipyenViewer
         self._current_frame_scan_region_ = list() # so that its contents will be updated

@@ -344,8 +344,6 @@ class ProgressWorkerThreaded(QtCore.QObject):
         The worker function is called from within the run 
         
     """
-    # def __init__(self, fn, /, *args, **kwargs):
-    # def __init__(self, fn, /, progressDialog=None, refreshTime=200, *args, **kwargs):
     def __init__(self, fn, /, progressDialog=None, loopControl=None, *args, **kwargs):
         """
         fn: callable

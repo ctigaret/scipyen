@@ -610,6 +610,20 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._frame_analog_map_ = dict()
         self._frame_irregs_map_ = dict()
         
+        # NOTE: 2023-05-15 13:49:42 meta-indexing array
+        # made this a numpy record array (recarray) with shape (nframes, 1)
+        # the records are:
+        # • for neo.Block or sequence of neo.Block: 'block' and 'segment'
+        # • anything else: 'frame', where a  'frame' depends on data layout and 
+        #   on the values of separateSignalChannels, separateChannelsIn
+        # 
+        # ATTENTION: Currently this is used ONLY when plotted data is a sequence
+        # of blocks - although self._parse_data_ sets this array for all supported
+        # data types; the intention is to make use of it in the future for
+        # indexing in complex structured data  
+        
+        self._meta_index = None
+        
         # NOTE: 2017-05-10 22:57:30
         # these are linked cursors in the same window
         self.linkedCrosshairCursors = []
@@ -2204,6 +2218,187 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.removeLegend(axis)
                 
         self.refresh()
+        
+    @singledispatchmethod
+    def addDataFrame(self, obj):
+        """
+        Adds a new data frame to the displayed data.
+        
+        The following table shows what this method supports:
+        
+    Current data type   Added data type     Allowed     Resulting data type     Comments & side effects
+    ===================================================================================================
+    None                neo.Block           ✓           same as new data        New data      
+                                                                                'takes over'
+                        neo.Segment         ✓           same as new data
+        
+                        neo signal-like†    ✓           same as new data
+        
+                        NoneType            ✓           does nothing (noop) ---------------------------
+
+    neo.Block           neo.Block           ✓           list of neo.Block       Updates internal 
+                                                                                variables (self._meta_index, etc)
+
+                        neo.Segment         ✓           neo.Block               Segment added to 
+                                                                                the current data segments
+                                                                                CAUTION You may not want this
+        
+                        anything else       ❌
+        
+    list of neo.Block   neo.Block           ✓           list of neo.Block       Appends data to
+                                                                                current list; updates self._meta_index
+                        anything else       ❌
+        
+    neo.Segment         neo.Block           ❌
+        
+                        neo.Segment         ✓           list of neo.Segment
+        
+                        anything else       ❌
+        
+    list of neo.Segment neo.Segment         ✓
+        
+                        anything else       ❌
+        
+    anything else       anything else       ❌
+    =====================================================================================
+        
+    † these are neo.Analogsignal, neo.IrregularlySampledSignal, DataSignal and
+        IrregularlySampledDataSignal
+    
+        """
+        raise NotImplementedError(f"Objects of type {type(obj).__name__} are not supported")
+
+    @addDataFrame.register(type(None))
+    def _(self, obj=None):
+        return
+    
+    @addDataFrame.register(neo.Block)
+    def _(self, obj:neo.Block):
+        if len(obj.segments) == 0:
+            return
+        
+        if self.yData is None:
+            self.setData(obj)
+            return
+            
+        
+        if isinstance(self.yData, neo.Block):
+            newData = [self.yData, obj]
+            
+        elif isinstance(self.yData, (tuple, list)):
+            if all(isinstance(v, neo.Block) for v in self.yData):
+                newData = list(self.yData)
+                newData.append(obj)
+                
+            else:
+                warnings.warn(f"Cannot append {type(obj).__name__} to a sequence of {type(self.yData[0]).__name__}")
+                return
+            
+        else:
+            warnings.warn(f"Cannot add frame {type(obj).__name__} data to {type(self.yData).__name__}")
+            return
+            
+        self._data_frames_ += len(obj.segments)
+        
+        self.frameIndex = normalized_index(self._data_frames_)
+        
+        self._number_of_frames_ = len(self.frameIndex)
+        
+        obj_signal_axes = max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in obj.segments)
+        if obj_signal_axes != self._n_signal_axes_:
+            self._n_signal_axes_ = max(self._n_signal_axes_, obj_signal_axes)
+            self._setup_axes_()
+        
+        new_frame_meta_index = np.recarray((len(obj.segments),1),
+                                           dtype = [('block', int), ('segment', int)])
+        
+        bk = len(newData)-1
+        
+        mIndex = np.array(list(((bk,sk) for sk in range(len(obj.segments)))))
+        
+        new_frame_meta_index = np.recarray((len(obj.segments), 1),
+                                            dtype = [('block', int), ('segment', int)])
+        
+        new_frame_meta_index.block[:,0] = mIndex[:,0]
+        new_frame_meta_index.segment[:,0] = mIndex[:,1]
+        
+        self._meta_index = np.concatenate((self._meta_index, new_frame_meta_index)).view(np.recarray)
+        
+        self._yData_ = newData
+        
+        # with self.observed_vars.observer.hold_trait_notifications():
+        if self.observed_vars.get("yData", None) is not None:
+            self.observed_vars["yData"] = None
+        self.observed_vars["yData"] = self._yData_
+        
+        self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self._yData_))
+
+        self._frames_spinBoxSlider_.range = range(self._number_of_frames_)
+        self.currentFrame = self._number_of_frames_ - 1
+        
+    @addDataFrame.register(neo.Segment)
+    def _(self, obj:neo.Segment):
+        if self.yData is None:
+            self.setData(obj)
+            return
+    
+        if isinstance(self.yData, neo.Block):
+            self._yData_.segments.append(obj)
+            
+            self._data_frames_ = len(self._yData_.segments)
+            self.frameIndex = normalized_index(self._data_frames_)
+            self._number_of_frames_ = len(self._frameIndex_)
+            
+            self._meta_index = np.recarray((self._number_of_frames_, 1),
+                                           dtype = [('block', int), ('segment', int)])
+            
+            self._meta_index.block[:,0] = 0
+            self._meta_index.segment[:,0] = self.frameIndex
+            
+        else:
+            if isinstance(self.yData, neo.Segment):
+                newData = [self.yData, obj]
+                
+            elif isinstance(self.yData, (tuple, list)):
+                if all(isinstance(v, neo.Segment) for v in self.yData):
+                    newData = list(self.yData)
+                    newData.append(obj)
+                    
+                else:
+                    warnings.warn(f"Cannot append {type(obj).__name__} to a sequence of {type(self.yData[0]).__name__}")
+                    return
+                
+            else:
+                warnings.warn(f"Cannot add frame {type(obj).__name__} data to {type(self.yData).__name__}")
+                return
+            
+            self.frameIndex = range(len(newData))
+            self._data_frames_  = len(newData)
+            
+            self._number_of_frames_ = len(self.frameIndex)
+            
+            self._meta_index = np.recarray((self._number_of_frames_,1),
+                                            dtype = [('frame', int)])
+            
+            self._meta_index.frame[:,0] = self.frameIndex
+            
+            self._yData_ = newData
+            
+        obj_signal_axes = len(obj.analogsignals) + len(obj.irregularlysampledsignals)
+        if obj_signal_axes != self._n_signal_axes_:
+            self._n_signal_axes_ = max(self._n_signal_axes_, obj_signal_axes)
+            
+            self._setup_axes_()
+                
+        if self.observed_vars.get("yData", None) is not None:
+            self.observed_vars["yData"] = None
+        self.observed_vars["yData"] = self._yData_
+        
+        self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self._yData_))
+
+        self._frames_spinBoxSlider_.range = range(self._number_of_frames_)
+        
+        self.currentFrame = self._number_of_frames_ - 1
         
     def addLegend(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None, x=30, y=30, **kwargs):
         axis, axNdx = self._check_axis_spec_ndx_(axis)
@@ -5068,6 +5263,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # by default, all signal channels are plotted on the same axis
         # when below is True, then plot each channel on a separate axis
         self.separateSignalChannels = False 
+        
         if separateChannelsIn in ("axes", "frames"):
             self.separateChannelsIn = separateChannelsIn
         else:
@@ -5085,8 +5281,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.globalAnnotations = {type(y).__name__ : y.annotations}
         
         if isinstance(y, neo.core.Block):
-            # self._xData_ = None # domain is contained in the signals inside the block
-            # self._yData_ = y
             x = None
             self._cached_title = getattr(y, "name", None)
             
@@ -5139,7 +5333,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.frameIndex = normalized_index(self._data_frames_, frameIndex)
             self._number_of_frames_ = len(self.frameIndex)
             
-            self._n_signal_axes_ = max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in y.segments)
+            self._n_signal_axes_ = 0 if len(y.segments) == 0 else max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in y.segments)
+            
+            self._meta_index = np.recarray((self._number_of_frames_, 1),
+                                           dtype = [('block', int), ('segment', int)])
+            
+            self._meta_index.block[:,0] = 0
+            self._meta_index.segment[:,0] = self.frameIndex
             
             #### BEGIN NOTE: 2019-11-21 23:09:52 
             # TODO/FIXME handle self.plot_start and self.plot_start
@@ -5148,10 +5348,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             #### END NOTE: 2019-11-21 23:09:52 
 
         elif isinstance(y, neo.core.Segment):
+            # a segment is ALWAYS plotted in a single frame, with all signals in 
+            # their own axes (i.e. PlotItem objects)
+            
             x = None
             self._cached_title = getattr(y, "name", None)
             
-            # one segment is one frame
             self.frameAxis = None
             self._number_of_frames_ = 1
             self._data_frames_ = 1
@@ -5172,6 +5374,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             self._n_signal_axes_ = len(y.analogsignals) + len(y.irregularlysampledsignals)
             
+            self._meta_index = np.recarray((self._number_of_frames_,1),
+                                           dtype=[("frame", int)])
+            
+            self._meta_index.frame[:,0] = self.frameIndex
+            
         elif isinstance(y, (neo.core.AnalogSignal, DataSignal)):
             x = None
             self._cached_title = getattr(y, "name", None)
@@ -5180,12 +5387,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.signalIndex = None
             self.irregularSignalIndex = None
             self.irregularSignalChannelIndex = None
+            
             # treat these as a 2D numpy array, but with the following conditions:
-            # signalChannelAxis is always 1
-            # frameAxis is 1 or None: the data itself has only one logical "frame"
-            # but the signal's channels MAY be plotted one per frame, if frameAxis is one
-            # signal domain is already present, although it can be overridden
-            # by user-supplied "x" data
+            # • signalChannelAxis is always 1
+            # • frameAxis is None, or 1: the data itself has only one logical "frame"
+            #   ∘ frameAxis == None:
+            #       □ self.separateSignalChannels == True:
+            #           ⋆ self.separateChannelsIn == "axes" → plot each channel in its own axis, use a single frame for all channels
+            #           ⋆ self.separateChannelsIn != "axes" → plot each channel in its own frame, one axis per frame
+            #       □ self.separateSignalChannels == False → plot all channels in a single frame, single axis
+            #   ∘ frameAxis == 1:
+            #   
+            # • signal domain is already present, although it can be overridden
+            #   by user-supplied "x" data
             
             self.dataAxis = 0 # data as column vectors
             
@@ -5198,25 +5412,52 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._data_frames_ = 1
             
             if frameAxis is None:
+                # all signal's channels plotted on the same frame, or on separate
+                # frames IF self.separateSignalChannels is True
                 self.frameAxis = None
                 self._number_of_frames_ = 1
-                self.frameIndex = range(self._number_of_frames_)
 
                 self.separateSignalChannels = separateSignalChannels
                 
                 if self.separateSignalChannels:
+                    # each channel to be plotted separately; this can be
+                    # a) separate axes in the same frame
+                    # b) single axis, in separate frames
                     if self.separateChannelsIn == "axes":
+                        # separate axes, same frame (one frame) (case 'a')
                         self._number_of_frames_ = 1
+                        self.frameIndex = range(self._number_of_frames_)
                         self._n_signal_axes_ = y.shape[self.signalChannelAxis]
+                        
+                        self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                        self._meta_index.frame[:,0] = self.frameIndex
+                        
                     else:
+                        # separate frames, one axis per frame (case 'b')
                         self._number_of_frames_ = y.shape[1]
+                        self.frameIndex = range(self._number_of_frames_)
                         self._n_signal_axes_ = 1
                         
+                        self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                        self._meta_index.frame[:,0] = self.frameIndex
+                        
+                        
                 else:
-                    self._n_signal_axes_ = 1    
+                    # all channels in one axis, single frame
+                    self._n_signal_axes_ = 1  
+                    self._number_of_frames_ = 1
+                    self.frameIndex = range(self._number_of_frames_)
+                    
+                    self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                    self._meta_index.frame[:,0] = self.frameIndex
                 
             else:
+                # frameAxis can only be '1' here
+                # this forces plotting one signal channel per axis, one axis 
+                # per frame
+                # ⇒ implies separate signal channels is True
                 frameAxis = normalized_axis_index(y.as_array(), frameAxis)
+                
                 if frameAxis != self.signalChannelAxis:
                     raise ValueError("For structured signals, frame axis and signal channel axis must be identical")
                 
@@ -5226,6 +5467,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 self.separateSignalChannels = False
                 self._n_signal_axes_ = 1
+                
+                self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                self._meta_index.frame[:,0] = self.frameIndex
+                
                 
         elif isinstance(y, (neo.core.IrregularlySampledSignal,  IrregularlySampledDataSignal)):
             # self._xData_ = None
@@ -5248,23 +5493,35 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             if frameAxis is None:
                 self.frameAxis = None
-                self._number_of_frames_ = 1
-                self.frameIndex = range(self._number_of_frames_)
                 self.separateSignalChannels  = separateSignalChannels
                 
                 if self.separateSignalChannels:
                     if self.separateChannelsIn == "axes":
                         self._number_of_frames_ = 1
+                        self.frameIndex = range(self._number_of_frames_)
                         self._n_signal_axes_ = y.shape[self.signalChannelAxis]
+                        self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                        self._meta_index.frame[:,0] = self.frameIndex
+                        
+                        
                     else:
                         # self.frameAxis = 1
                         self._number_of_frames_ = y.shape[1]
+                        self.frameIndex = range(self._number_of_frames_)
                         self._n_signal_axes_ = 1
+                        self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                        self._meta_index.frame[:,0] = self.frameIndex
                         
                 else:
+                    self._number_of_frames_ = 1
+                    self.frameIndex = range(self._number_of_frames_)
                     self._n_signal_axes_ = 1
+                    self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                    self._meta_index.frame[:,0] = self.frameIndex
+                    
                 
             else:
+                # ⇒ implies separate signal channels is True
                 frameAxis = normalized_axis_index(y.as_array(), frameAxis)
                 if frameAxis != self.signalChannelAxis:
                     raise ValueError("For structured signals, frame axis and signal channel axis must be identical")
@@ -5274,6 +5531,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._number_of_frames_ = len(self.frameIndex)
                 self.separateSignalChannels  = False
                 self._n_signal_axes_ = 1
+                self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                self._meta_index.frame[:,0] = self.frameIndex
                 
         elif isinstance(y, (neo.core.SpikeTrain, neo.core.spiketrainlist.SpikeTrainList)): # plot a SpikeTrain independently of data
             # NOTE: 2023-01-01 18:17:26
@@ -5283,26 +5542,32 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._cached_title = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
-            self.frameIndex = range(1)
             self._number_of_frames_ = 1
-        
+            self.frameIndex = range(self._number_of_frames_)
+            self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+            self._meta_index.frame[:,0] = self.frameIndex
+                        
         elif isinstance(y, (neo.core.Event, DataMark, TriggerEvent)): # plot an event independently of data
             x = None
             self._cached_title = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
-            self.frameIndex = range(1)
             self._number_of_frames_ = 1
+            self.frameIndex = range(self._number_of_frames_)
             self._n_signal_axes_ = 0
+            self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+            self._meta_index.frame[:,0] = self.frameIndex
         
         elif isinstance(y, (neo.core.Epoch, DataZone)): # plot an Epoch independently of data
             x = None
             self._cached_title = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
-            self.frameIndex = range(1)
             self._number_of_frames_ = 1
+            self.frameIndex = range(self._number_of_frames_)
             self._n_signal_axes_ = 0
+            self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+            self._meta_index.frame[:,0] = self.frameIndex
             
             if self._docTitle_ is None or (isinstance(self._docTitle_, str) and len(self._docTitle_.strip()) == 0):
                 #because these may be plotted as an add-on so we don't want to mess up the title
@@ -5318,11 +5583,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             self.dataAxis = 0 # data as column vectors
             self.frameAxis = None
-            self.frameIndex = range(1)
-            self.signalIndex = range(1)
             self._number_of_frames_ = 1
-            
+            self.frameIndex = range(self._number_of_frames_)
+            self.signalIndex = range(1)
             self._n_signal_axes_ = 1
+            self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+            self._meta_index.frame[:,0] = self.frameIndex
             
         elif isinstance(y, np.ndarray): # NOTE: this includes vigra.VigraArray, quantities.Quantity
             # NOTE 2021-11-14 12:39:57
@@ -5382,12 +5648,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.dataAxis = 0 # data as column vectors; there is only one axis
                 self.signalChannelAxis = None
                 self.frameAxis = None
-                self.frameIndex = range(1)
-                self.signalChannelIndex = range(1)
                 self._number_of_frames_ = 1
+                self.frameIndex = range(self._number_of_frames_)
+                self.signalChannelIndex = range(1)
                 self.separateSignalChannels = False
-                
                 self._n_signal_axes_ = 1
+                
+                self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                self._meta_index.frame[:,0] = self.frameIndex
                 
             elif y.ndim == 2:
                 if not isinstance(frameAxis, (int, str, vigra.AxisInfo, type(None))):
@@ -5435,20 +5703,32 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             self.frameAxis = self.signalChannelAxis
                             self._data_frames_ = y.shape[self.frameAxis]
                             self._number_of_frames_ = y.shape[self.frameAxis]
+                            self.frameIndex = range(self._number_of_frames_)
                             self._n_signal_axes_ = 1
+                            self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                            self._meta_index.frame[:,0] = self.frameIndex
                         else:
                             self.frameAxis = None
                             self._data_frames_ = 1
                             self._number_of_frames_ = 1
                             self._n_signal_axes_ = y.shape[self.signalChannelAxis]
                             
+                        
+                        self.frameIndex = range(self._number_of_frames_)
+                        self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                        self._meta_index.frame[:,0] = self.frameIndex
+                        
                     else:
                         self.frameAxis = None
                         self._data_frames_ = 1
                         self._number_of_frames_ = 1
                         self._n_signal_axes_ = 1
                             
-                    self.frameIndex = range(self._number_of_frames_)
+                        self.frameIndex = range(self._number_of_frames_)
+                        
+                        self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                        self._meta_index.frame[:,0] = self.frameIndex
+                    
                     
                 else:
                     # for 2D arrays, specifying a frameAxis forces the plotting 
@@ -5469,10 +5749,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self._number_of_frames_ = len(self.frameIndex)
                     
                     self._n_signal_axes_ = 1 
+                    
+                    self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                    self._meta_index.frame[:,0] = self.frameIndex
                 
             elif y.ndim == 3: 
                 # NOTE: 2019-11-22 13:33:27
                 # both frameAxis and signalChannelAxis SHOULD be specified
+                #
+                # for 3D arrays there will be several frames, each frame with
+                # • one axis if separateSignalChannels is False
+                # • several axes if SeparateSignalChannels is True
                 #
                 # NOTE: 2022-12-13 22:22:16
                 # below, we assume the following
@@ -5493,20 +5780,26 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         # data on highest dim
                         frameAxis = 0
                         signalChannelAxis = 1
+                        
                     elif frameAxis == 0:
                         # as above
                         signalChannelAxis = 1
+                        
                     elif frameAxis == 1:
                         # data on lowest dim
                         signalChannelAxis = 2
+                        
                     else:
                         # data on 2nd dim
                         signalChannelAxis = 0
+                        
                 elif frameAxis is None:
                     if signalChannelAxis == 0:
                         frameAxis = 2
+                        
                     elif signalChannelAxis == 1:
                         frameAxis = 0
+                        
                     elif signalChannelAxis == 2:
                         frameAxis = 1
                         
@@ -5517,12 +5810,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 
                 frameAxis = normalized_axis_index(y, frameAxis)
+                
                 signalChannelAxis = normalized_axis_index(y, signalChannelAxis)
                 
                 if frameAxis  ==  signalChannelAxis:
                     self.criticalMessage(f"Set data ({y.__class__.__name__})", "For 3D arrays the index of the frame axis must be different from the index of the signal channel axis")
                 
                 self.frameAxis = frameAxis
+                
                 self.signalChannelAxis = signalChannelAxis
                 
                 axes = set([k for k in range(y.ndim)])
@@ -5546,6 +5841,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.separateSignalChannels = separateSignalChannels
                 
                 self._n_signal_axes_ = y.shape[self.signalChannelAxis] if self.separateSignalChannels else 1 
+                
+                self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                self._meta_index.frame[:,0] = self.frameIndex
                 
             if x is not None:
                 if isinstance(x, (tuple, list)):
@@ -5632,10 +5930,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._cached_title = "Vigra Kernel1D objects"
                 
                 self._n_signal_axes_ = 1
+                
+                self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                self._meta_index.frame[:,0] = self.frameIndex
+                
             
             elif all([isinstance(i, neo.Segment) for i in y]):
                 # NOTE: 2019-11-30 09:35:42 
                 # treat this as the segments attribute of a neo.Block
+                # a segment is ALWAYS plotted in a single frame 
                 self.frameIndex = range(len(y))
                 self.frameAxis = None
                 
@@ -5658,6 +5961,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 self._n_signal_axes_ = max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in y)
                 
+                self._meta_index = np.recarray((self._number_of_frames_,1),
+                                               dtype = [('frame', int)])
+                
+                self._meta_index.frame[:,0] = self.frameIndex
+                
             elif all([isinstance(i, neo.Block) for i in y]):
                 # NOTE 2021-01-02 11:31:05
                 # treat this as a sequence of segments, but do NOT concatenate
@@ -5669,14 +5977,21 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.irregularSignalChannelAxis = None
                 self.irregularSignalChannelIndex = None
                 self.separateSignalChannels = False
-                self._data_frames_ = tuple(accumulate((len(b.segments) for b in self._yData_)))[-1]
+                self._data_frames_ = tuple(accumulate((len(b.segments) for b in y)))[-1]
                 self.frameIndex = range(self._data_frames_)
                 self._number_of_frames_ = len(self.frameIndex)
                 self.signalIndex                    = signalIndex
                 self.irregularSignalIndex           = irregularSignalIndex
                 self._cached_title = "Neo blocks"
                 
-                self._n_signal_axes_ = max(max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in b) for b in y)
+                self._n_signal_axes_ = max(max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in b.segments) for b in y if len(b.segments))
+                
+                mIndex = np.array(list(chain.from_iterable([[(bk,sk) for sk in range(len(b.segments))] for bk,b in enumerate(y) if len(b.segments)])))
+                
+                self._meta_index = np.recarray((mIndex.shape[0], 1), dtype=[('block', int), ('segment', int)])
+                
+                self._meta_index.block[:,0] = mIndex[:,0]
+                self._meta_index.segment[:,0] = mIndex[:,1]
                 
             elif all([isinstance(i, SIGNAL_OBJECT_TYPES) for i in y]):
                 # NOTE: 2019-11-30 09:42:27
@@ -5685,7 +6000,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 # there can be signals with different domains (e.g., t_start
                 # & t_stop).
                 # If signals must be plotted on stacked axes in the same 
-                # frame then either collected them in a segment, or merge them
+                # frame then either collect them in a segment, or merge them
                 # them in a 3D numpy array.
                 self.dataAxis = 0
                 self.signalChannelAxis = 1
@@ -5713,7 +6028,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         frameAxis is None
                     
                 # below, frameAxis None means all in one frame, many PlotItems
-                # frameAixs not None means each in its own frame, one PlotItem per
+                # frameAxis not None means each in its own frame, one PlotItem per
                 # frame
                 if frameAxis is None:
                     self.frameAxis = None
@@ -5725,16 +6040,24 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     # frame, using separateSignalChannels is cumbersome (albeit
                     # possible); to keep things simple, we preempt this here
                     self.separateSignalChannels = False
+                    
                 else:
+                    # one signal per frame; this allows plotting channels in their
+                    # own (separate) axes in one frame
                     self.frameAxis = 1
                     self.frameIndex = range(len(y))
+                    self._number_of_frames_ = len(self.frameIndex)
                     self._data_frames_ = len(y)
+                    
                     if self.separateSignalChannels:
                         self._n_signal_axes_ = max(sig.shape[1] for sig in y)
+                        
                     else:
                         self._n_signal_axes_ = 1
                     
-                self._number_of_frames_ = len(self.frameIndex)
+                self._meta_index = np.recarray((self._number_of_frames_, 1),
+                                                dtype=[('frame', int)])
+                self._meta_index.frame[:,0] = self.frameIndex
                 
                 self.signalIndex = 0 # FIXME is this needed anywhere?
                 
@@ -5755,6 +6078,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 # self._plotEpochs_(self._yData_)
             
                 self._n_signal_axes_ = 0
+                
+                self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                self._meta_index.frame[:,0] = self.frameIndex
 
             elif all(isinstance(i, (neo.Epoch, DataZone)) for i in y):
                 # self._yData_ = y
@@ -5765,12 +6091,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.frameIndex = range(1)
                 self._number_of_frames_ = 1
                 # self._plotEpochs_(self._yData_) # why?
-            
                 self._n_signal_axes_ = 1
+            
+                self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                self._meta_index.frame[:,0] = self.frameIndex
                 
             elif all([isinstance(i, neo.SpikeTrain) for i in y]):
-                #self.dataAnnotations = [{s.name: s.annotations} for s in y]
-                # self._yData_ = y
                 x = None
                 self.dataAxis = 0
                 self.signalChannelAxis = 1
@@ -5778,8 +6104,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.frameIndex = range(1)
                 self._number_of_frames_ = 1
                 self._cached_title = "Spike trains"
-            
                 self._n_signal_axes_ = 0
+            
+                self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                self._meta_index.frame[:,0] = self.frameIndex
                 
             elif all([isinstance(i, np.ndarray) for i in y]):
                 if not all(i.ndim <= 2 for i in y):
@@ -5816,6 +6144,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     else:
                         raise TypeError("Invalid x specified")
                     
+                self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
+                self._meta_index.frame[:,0] = self.frameIndex
+                
                 self._cached_title = "Numpy arrays"
                 # FIXME - in progress 2023-01-19 08:17:25
                 self._n_signal_axes_ = max(list(map(lambda x: 1 if x.ndim == 1 or not self.separateSignalChannels else x.shape[self.signalChannelAxis], y)))
@@ -5827,7 +6158,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         else:
             self.criticalMessage(f"Set data ({y.__class__.__name__})", 
-                                 f"Plotting is not implemented for {type(self._yData_).__name__} data types")
+                                 f"Plotting is not implemented for {type(y).__name__} data types")
             return False, None, None
         
         return True, x, y
@@ -6165,10 +6496,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         # print(f"{self.__class__.__name__} self.setData")
         
-        uiParamsPrompt = kwargs.pop("uiParamsPrompt", False)
+        uiParamsPrompt = kwargs.pop("uiParamsPrompt", False) # ?!?
         
         if uiParamsPrompt:
-            # TODO 2023-01-18 08:48:13
+            # TODO 2023-01-18 08:48:13 - what for?
             pass
             # print(f"{self.__class__.__name__}.setData uiParamsPrompt")
             
@@ -6232,13 +6563,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         signalBlocker = QtCore.QSignalBlocker(self._frames_spinBoxSlider_)
         self._frames_spinBoxSlider_.setValue(self._current_frame_index_)
-#         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in \
-#             (self.framesQSpinBox, self.framesQSlider)]
-#         
-#         self.framesQSpinBox.setValue(self._current_frame_index_)
-#         self.framesQSlider.setValue(self._current_frame_index_)
 
         self.displayFrame()
+        
         if self._new_frame_:
             self.frameChanged.emit(self._current_frame_index_)
 
@@ -7588,20 +7915,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         elif all([isinstance(y_, neo.Block) for y_ in obj]):
             frIndex = self.frameIndex[self._current_frame_index_]
             
-            # NOTE: 2021-01-04 11:13:33
-            # sequence-block-segment indexing array, e.g.:
-            # array([[0, 0, 0],
-            #        [1, 1, 0],
-            #        [2, 2, 0]])
-
-            # i.e. [[sequence index, block index, segment index in block]]:
-            # column 0 = overall running index of Segment in "virtual" sequence
-            # column 1 = running index of the Block
-            # column 2 = running index of Segment in Block with current 
-            #            running block index
-            sqbksg = np.array([(q, *kg) for q, kg in enumerate(enumerate(chain(*((k for k in range(len(b.segments))) for b in obj))))])
+            frame = self._meta_index[frIndex]
             
-            (blockIndex, blockSegmentIndex) = sqbksg[frIndex,1:]
+            (blockIndex, blockSegmentIndex) = int(frame.block), int(frame.segment)
             
             segment = obj[blockIndex].segments[blockSegmentIndex]
             

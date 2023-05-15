@@ -6663,13 +6663,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if type(parentMenuOrMenuBar).__name__ == "QMenu": 
                 if parentMenuOrMenuBar.title() != "Plugins":
                     self._removeMenu_(parentMenuOrMenuBar)
-        # if len(menu.actions()) > 0:
-        #     parentMenuOrMenuBar = menu.parent()
-        #     if parentMenuOrMenuBar is not None: # parent should never be None, but let's check anyway
-        #         parentMenuOrMenuBar.removeAction(menu.menuAction())
-        #         if type(parentMenuOrMenuBar).__name__ == "QMenu": 
-        #             if parentMenuOrMenuBar.title() != "Plugins":
-        #                 self._removeMenu_(parentMenuOrMenuBar)
             
     @pyqtSlot()
     @safeWrapper
@@ -6699,23 +6692,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 
             self.plugins.clear()
             scipyen_plugin_loader.loaded_plugins.clear()  # need to clear this, too              
-        # pass
-    
-#         if len(self.pluginActions) > 0:
-#             for action in self.pluginActions:
-#                 parentMenuOrMenuBar = action.parent()
-#                 if parentMenuOrMenuBar is not None: # parent should never be None, but let's check anyway
-#                     parentMenuOrMenuBar.removeAction(action)
-#                     if type(parentMenuOrMenuBar).__name__ == "QMenu":
-#                         if parentMenuOrMenuBar.title() != "Plugins": # check if menu left empy, chances are it is created by the plugin => remove it
-#                             self._removeMenu_(parentMenuOrMenuBar)
-# 
-#         plugins_members = self.plugins.__dict__.keys()
-#         
-#         for m in plugins_members:
-#             if isinstance(self.plugins.__dict__[m], types.ModuleType):
-#                 del(self.plugins.__dict__[m])
-
 
     @pyqtSlot()
     @safeWrapper

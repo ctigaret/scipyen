@@ -1355,7 +1355,7 @@ def is_type_or_subclass(x, y):
     
     return isinstance(x, y)
 
-def parse_descriptor_specification(x:tuple) -> dict:
+def parse_descriptor_specification(x:tuple):
     """
     x: tuple with 1 to 6 elements:
         x[0]: str, name of the attribute
@@ -1743,7 +1743,7 @@ class WithDescriptors(object):
     elements, where:
     
     1) the first element is always a str: the public name of the descriptor, 
-        i.e. the name under which the user accesses the underlying data as if an 
+        i.e. the name under which the user accesses the underlying data as an 
         instance attribute)
         
     2) an object (the default value, type specification, validation parameters,
@@ -1752,8 +1752,8 @@ class WithDescriptors(object):
         concrete examples)
     
     Together with the validator classes (Python descriptors) defined in this
-    module, and with AttributeAdapter, this provides framework implementing the
-    Python's descriptors protocol, useful for code factoring.
+    module, and with AttributeAdapter, this provides a framework that implements
+    the Python's descriptors protocol, useful for code factoring.
     
     In addition, derived :classes: wishing to execute additional code either 
     immediately before, or after a value is set to a descriptor, also need to

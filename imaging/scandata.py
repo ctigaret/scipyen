@@ -1459,6 +1459,16 @@ class ScanData(BaseScipyenData):
         
     # NOTE: 2021-11-30 16:07:40
     # 'triggers' is inherited from BaseScipyenData along with others
+    
+    # NOTE: 2023-05-15 11:05:46
+    # each element is a tuple: 
+    # (attribute name, attribute type (or types), default value)
+    # or
+    # (attribute name, default value)
+    #
+    # when the attrbiute type is a sequence, the third elements is the type (or 
+    #   types) of the elements in the sequence
+    #
     _data_children_ = (
         ("scans",                           (list, tuple),   vigra.VigraArray),
         ("scene",                           (list, tuple),   vigra.VigraArray),
