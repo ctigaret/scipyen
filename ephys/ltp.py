@@ -105,7 +105,7 @@ class PathwayType(TypeEnum):
     Control = 2
     Other = 3
 
-class SynapticPathway():
+class SynapticPathway(BaseScipyenData):
     """Encapsulates a logical stimulus-response relationship between signals.
 
     Signals are identified by name or their index in the collection of a sweep's
@@ -124,7 +124,19 @@ class SynapticPathway():
     the pathway's role in a synaptic plasticity experiment.
     
     """
-    # def __init__(self, data:typing.Optional[neo.Block]=None, pathwayType:PathwayType = PathwayType.Test, name:str=pathwayType.name, response:typing.Optional[typing.Union[str, int]]=None, analogCommand:typing.Union[typing.Union[str, int]] = None, digitalCommand:typing.Optional[typing.Union[str, int]] = None):
+    _data_children_ = (
+        ("data", neo.Block(name="Data"), None),
+        )
+    
+    _data_attributes_ = (
+        ("pathwayType", PathwayType, PathwayType.Test),
+        ("responseSignal", (str, int), 0),
+        ("analogCommandSignal", (str, int), 1),
+        ("digitalCommandSignal", (str, int), 2),
+        )
+    
+    _descriptor_attributes_ = _data_children_ + _data_attributes_ + BaseScipyenData._data_attributes_
+    
     def __init__(self, data:neo.Block, pathwayType:PathwayType = PathwayType.Test, name:typing.Optional[str]=None, response:typing.Optional[typing.Union[str, int]]=None, analogCommand:typing.Union[typing.Union[str, int]] = None, digitalCommand:typing.Optional[typing.Union[str, int]] = None):
         """
         Named parameters:
@@ -252,7 +264,7 @@ class SynapticPathway():
         
 class SynapticPlasticityData(BaseScipyenData):
     _data_children_ = (
-        ("pathways", (list, tuple), SynapticPathway)
+        ("pathways", (list, tuple), SynapticPathway),
         )
     
     _derived_data_children_ = (
@@ -271,7 +283,21 @@ class SynapticPlasticityData(BaseScipyenData):
         ("epochs", dict)
         )
     
-    _descriptor_attributes_ = _data_children_ + _derived_data_children_ + _result_data_ + _graphics_attributes_
+    _data_attributes_ = (
+        ("clampMode", ClampMode, ClampMode.VoltageClamp),
+        ("electrodeModel", ElectrodeMode, ElectrodeMode.WholeCellPatch),
+        ("baselineReference", range),
+        )
+    
+    _option_attributes_ = ()
+    
+    _descriptor_attributes_ = _data_children_ + _derived_data_children_ + _result_data_ + _data_attributes_ + _graphics_attributes_ + BaseScipyenData._data_attributes_ 
+        
+    def __init__(self, pathways:typing.Optional[typing.Sequence[SynapticPathway]]=None, **kwargs):
+        super().__init__(**kwargs)
+        
+    def __reduce__(self): # TODO
+        pass
         
 
 def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):

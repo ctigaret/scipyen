@@ -1737,14 +1737,18 @@ class ScanData(BaseScipyenData):
         self._modified_ = False
         
     def _repr_pretty_(self, p, cycle):
+        name = self.name if isinstance(self.name, str) else ""
+        
         if cycle:
-            p.text(f"{self.__class__.__name__} {self.name}")
+            p.text(f"{self.__class__.__name__} {name}")
         else:
-            p.text(f"{self.__class__.__name__} {self.name}")
+            p.text(f"{self.__class__.__name__} {name}")
             p.breakable()
             p.text("With components:\n")
             for c in ("scene", "scans", "electrophysiology"):
                 attr = getattr(self, c)
+                if attr is None:
+                    continue
                 frames = getattr(self, f"{c}Frames")
                 if isinstance(attr, neo.Block):
                     p.text(f"\t{c} with {frames} segments")
@@ -1786,9 +1790,10 @@ class ScanData(BaseScipyenData):
         multi-channel VigraArray
 
         """
+        name = self.name if isinstance(self.name, str) else ""
         result = list()
         result.append("%s: " % self.__class__.__name__)
-        result.append("Name: %s;" % self.name)
+        result.append("Name: %s;" % name)
         result.append("Type: %s;" % self.scanType.name)
         result.append("Analysis mode: %s;" % self.analysisMode.name)
         result.append("Scene channels: %s;" % str(self.sceneChannelNames))
@@ -8469,6 +8474,9 @@ class ScanData(BaseScipyenData):
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
         """
+        if self.scene is None:
+            return
+        
         if len(self.scene) == 0:
             return 0
         
@@ -8479,12 +8487,15 @@ class ScanData(BaseScipyenData):
             return len(self.scene)
 
     @property
-    def sceneChannelNames(self) -> tuple:
+    def sceneChannelNames(self):
         """
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
         
         """
+        if self.scene is None:
+            return tuple()
+        
         if len(self.scene) == 0:
             return tuple()
         
@@ -8500,6 +8511,9 @@ class ScanData(BaseScipyenData):
         multi-channel VigraArray
         
         """
+        if self.scene is None:
+            return
+        
         if len(self.scene) == 0:
             return
         
@@ -8528,7 +8542,7 @@ class ScanData(BaseScipyenData):
                 axcal.calibrateAxis(s.axistags["c"])
             
     @property
-    def scansFrames(self) -> int:
+    def scansFrames(self):
         """Read-only.
         
         Can only be modifier indirectly by either:
@@ -8542,18 +8556,21 @@ class ScanData(BaseScipyenData):
         return self.nFrames("scans")
     
     @property
-    def scansFrameAxis(self) -> int:
+    def scansFrameAxis(self):
         return self.scansLayout.framesAxis
     
     @property
-    def scansChannels(self) -> int:
+    def scansChannels(self):
         """The number of channels; read-only
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
         
         """
-        if len(self._scans_) == 0:
+        if self.scans is None:
+            return 0
+        
+        if len(self.scans) == 0:
             return 0
         
         if len(self.scans) == 1:
@@ -8563,11 +8580,14 @@ class ScanData(BaseScipyenData):
             return len(self.scans)
     
     @property
-    def scansChannelNames(self) -> tuple:
+    def scansChannelNames(self):
         """
         """
-        if len(self._scans_) == 0:
-            return list()
+        if self.scans is None:
+            return tuple()
+        
+        if len(self.scans) == 0:
+            return tuple()
         
         if len(self.scans) == 1: # this may be a multi-band image
             return AxesCalibration(self.scans[0])["c"].channelNames # to ensure we get a virtual channel if needed
@@ -8582,7 +8602,10 @@ class ScanData(BaseScipyenData):
         multi-channel VigraArray
         
         """
-        if len(self._scans_) == 0:
+        if self.scans is None:
+            return
+        
+        if len(self.scans) == 0:
             return
         
         if not isinstance(value, (tuple, list)) or not all([isinstance(v, str) for v in value]):
@@ -8656,7 +8679,6 @@ class ScanData(BaseScipyenData):
             else:
                 return max(self._get_component_nFrames_(c[0]) for c in self._data_children_)
                 
-    #def remapFrames(self, )
     def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
                        entity_cache):
         

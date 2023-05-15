@@ -1475,6 +1475,7 @@ def parse_descriptor_specification(x:tuple):
         * default_value_type is a tuple of types
     """
     from core.quantities import units_convertible
+    print(f"parse_descriptor_specification {x}")
     def __check_attr_type__(attr_type, specs):
         if isinstance(specs, type):
             specs = (specs,)
@@ -1493,6 +1494,7 @@ def parse_descriptor_specification(x:tuple):
                 
     
     def __check_array_attribute__(rt, param):
+        print(f"rt = {rt}; param = {param}")
         if rt["default_value"] is not None:
             if not isinstance(rt["default_value"], np.ndarray):
                 raise ValueError(f"Type of the default value type {type(rt['default_value']).__name__} is not a numpy ndarray")
