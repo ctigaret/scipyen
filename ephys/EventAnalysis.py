@@ -1060,6 +1060,14 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         """Overloads ScipyenFrameViewer.displayFrame"""
         self._refresh_signalNameComboBox()
         self._refresh_epochComboBox()
+        
+        if self._ephysViewer_.yData is None:
+            if isinstance(self._data_, (neo.Block, neo.Segment)):
+                doctitle = self._data_.name
+            else:
+                doctitle = self.metaDataWidget.dataVarName
+            self._ephysViewer_.view(self._data_, doc_title=doctitle)
+            
         self._ephysViewer_.currentFrame = self.currentFrame
         
         # NOTE: 2022-11-27 13:49:44
@@ -1078,8 +1086,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                     self.eventsViewer.currentFrame = events_frame
                     return
                 
-            self._slot_plot_detected_events_in_sweep_()
-                
+            else:
+                self._slot_plot_detected_events_in_sweep_()
         
     def clear(self):
         if isinstance(self._ephysViewer_,sv.SignalViewer):
@@ -1713,23 +1721,26 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 # see NOTE: 2022-12-15 13:38:13
                 if self._ephysViewer_ not in self.linkedViewers:
                     self.linkToViewers(self._ephysViewer_)
-                
-            if isinstance(self._data_, (neo.Block, neo.Segment)):
-                doctitle = self._data_.name
-            else:
-                doctitle = self.metaDataWidget.dataVarName
+                    
+            # if isinstance(self._data_, (neo.Block, neo.Segment)):
+            #     doctitle = self._data_.name
+            # else:
+            #     doctitle = self.metaDataWidget.dataVarName
                 
             for ax in self._ephysViewer_.axes:
                 self._ephysViewer_.removeTargetsOverlay(ax)
                 
-            self._ephysViewer_.view(self._data_, doc_title=doctitle)
-            
-            self._ephysViewer_.currentFrame = self.currentFrame
+            # self._ephysViewer_.view(self._data_, doc_title=doctitle)
+
+            self.displayFrame()
                 
-            self._refresh_signalNameComboBox()
-            self._refresh_epochComboBox()
-            
-            self._slot_plot_detected_events_in_sweep_()
+#             
+#             self._ephysViewer_.currentFrame = self.currentFrame
+#                 
+#             self._refresh_signalNameComboBox()
+#             self._refresh_epochComboBox()
+#             
+#             self._slot_plot_detected_events_in_sweep_()
             
     @pyqtSlot()
     def _slot_previewDetectionTheta(self):
@@ -2001,12 +2012,14 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
             if not isinstance(self._detected_Events_Viewer_, sv.SignalViewer):
                 self._detected_Events_Viewer_ = sv.SignalViewer(win_title="Detected events", 
-                                                            parent=self, configTag="mPSCViewer")
+                                                                parent=self, configTag="mPSCViewer")
 
                 self._detected_Events_Viewer_.sig_closeMe.connect(self._slot_detected_mPSCViewer_closed)
 
                 self._detected_Events_Viewer_.frameChanged.connect(self._slot_eventsViewer_frame_changed)
                 
+            sigBlock = QtCore.QSignalBlocker(self._detected_Events_Viewer_)
+            
             self._events_spinBoxSlider_.range = range(0, len(self._detected_events_))
             
             self.accept_eventCheckBox.setEnabled(True)
@@ -2014,14 +2027,13 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             if len(self._detected_Events_Viewer_.axes):
                 self._detected_Events_Viewer_.removeLabels(0)
 
-            # sigBlock = QtCore.QSignalBlocker(self._detected_Events_Viewer_)
-            self._detected_Events_Viewer_.view(self._detected_events_, 
-                                               doc_title = f"Events in sweep {self.currentFrame}",
-                                               frameAxis=1)
-            
-            # print(f"events viewer has {len(self._detected_Events_Viewer_.yData)} frames")
-            
-            self._indicate_events_()
+            # self._detected_Events_Viewer_.clear()
+            QtCore.QTimer.singleShot(100, self._view_frame_events)
+#             self._detected_Events_Viewer_.view(self._detected_events_, 
+#                                                doc_title = f"Events in sweep {self.currentFrame}",
+#                                                frameAxis=1)
+#             
+            # self._indicate_events_()
             
         else:
             if isinstance(self._detected_Events_Viewer_, sv.SignalViewer):
@@ -2033,6 +2045,12 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 self._ephysViewer_.removeTargetsOverlay(self._ephysViewer_.axes[self._signal_index_])
                 
             self._detected_events_.clear()
+            
+    def _view_frame_events(self):
+        self._detected_Events_Viewer_.view(self._detected_events_, 
+                                            doc_title = f"Events in sweep {self.currentFrame}",
+                                            frameAxis=1)
+        self._indicate_events_()
             
     def _indicate_events_(self, waves=None):
         """Indicates detcted events inside the signal plot.
@@ -2111,10 +2129,14 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
 
         acctext = "Accept" if accepted else "Reject"
         
+        accolor = (128,0,0) if accepted else (0,0,128)
+        
         wavelabel = acctext
         
         if waveR2 is not None:
             wavelabel = "%s R² = %.2f" % (acctext, waveR2)
+            
+        # lw, lh = guiutils.get_text_width_and_height(wavelabel)
                 
         waxis = self._detected_Events_Viewer_.axis(0) # the axis in the event viewer (always 0)
         
@@ -2122,10 +2144,35 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         [[x0,x1], [y0,y1]]  = waxis.viewRange()
         
-        # self._detected_Events_Viewer_.addLabel(wavelabel, 0, pos = (x0,y1), 
-        #                                     color=(0,0,0), anchor=(0,1))
-        self._detected_Events_Viewer_.addLabel(wavelabel, waxis, pos = (x0,y1), 
-                                            color=(0,0,0), anchor=(0,1))
+        # print(f"x0, x1 = {x0}, {x1}")
+        # print(f"y0, y1 = {y0}, {y1}")
+        
+        x_range = self._detected_Events_Viewer_._get_axis_data_X_range_(waxis)
+        y_range = self._detected_Events_Viewer_._get_axis_data_Y_range_(waxis)
+        
+        # print(f"x_range = {x_range}")
+        # print(f"y_range = {y_range}")
+        
+        # labelSize = QtCore.QPointF(lw, lh)
+        
+        labelpos = QtCore.QPointF(x0, y0)
+        # labelpos = QtCore.QPointF(x_range[0], y_range[0])
+        
+#         labelviewpos = waxis.mapFromView(QtCore.QPointF(x0, y1))
+#         
+#         point = waxis.mapToView(labelviewpos + labelSize)
+#         
+#         print(f"point = {point}")
+        
+        # NOTE: 2023-05-16 14:40:33
+        # anchor (0,0) is upper-left
+        # anchor (0,1) is lower-left
+        # anchor (1,0) is upper-right
+        # anchor (1,1) is lower-right
+        self._detected_Events_Viewer_.addLabel(wavelabel, waxis, pos = labelpos, 
+                                            color=accolor, anchor=(-1,1))
+        
+        
         #### END decorate the event plot in the event viewer
                 
         #### BEGIN decorate the signal plot in ephys viewer - targets indicate

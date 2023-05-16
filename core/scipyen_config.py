@@ -1421,20 +1421,6 @@ class ScipyenConfigurable(object):
                     except Exception as e:
                         traceback.print_exc()
                         continue
-#                     getset = cfg.get(k, {})
-#                     gettername = getset.get("getter", None)
-#                     
-#                     if not isinstance(gettername, str) or len(gettername.strip())==0:
-#                         continue
-#                     
-#                     getter = inspect.getattr_static(self, gettername, None)
-#                     
-#                     if isinstance(getter, property):
-#                         val = getattr(self, gettername)
-#                         
-#                     elif getter is not None:
-#                         getter = getattr(self, gettername)
-#                         val  = getter()
 
                     #### BEGIN debug - comment out when done
                     # if self.__class__.__name__ == "EventAnalysis":

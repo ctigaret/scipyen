@@ -1132,22 +1132,23 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
     @property
     def xAxesLinked(self): 
-        if len(self.axes) > 0:
-            # NOTE 2023-05-09 18:21:53 
-            # allow for SOME axes to be linked; dump self._xAxesLinked_
-            # read link status from vb states
-            xLinks = [ax.vb.state["linkedViews"][0] for ax in self.axes]
-            allXLinked = not all(v is None for v in xLinks)
-            if self._xAxesLinked_ != allXLinked:
-                self._xAxesLinked_ = allXLinked
-                signalBlocker = QtCore.QSignalBlocker(self.actionLink_X_axes)
-                self.actionLink_X_axes.setChecked(self._xAxesLinked_)
+        # if len(self.axes) > 0:
+        #     # NOTE 2023-05-09 18:21:53 
+        #     # allow for SOME axes to be linked; dump self._xAxesLinked_
+        #     # read link status from vb states
+        #     xLinks = [ax.vb.state["linkedViews"][0] for ax in self.axes]
+        #     allXLinked = not all(v is None for v in xLinks)
+        #     if self._xAxesLinked_ != allXLinked:
+        #         self._xAxesLinked_ = allXLinked
+        #         signalBlocker = QtCore.QSignalBlocker(self.actionLink_X_axes)
+        #         self.actionLink_X_axes.setChecked(self._xAxesLinked_)
         
         return self._xAxesLinked_
     
     @markConfigurable("XAxesLinked")
     @xAxesLinked.setter
     def xAxesLinked(self, value):
+        # print(f"{self.__class__.__name__}.xAxesLinked.setter value = {value}")
         setAllXLink = value == True
         signalBlocker = QtCore.QSignalBlocker(self.actionLink_X_axes)
         self.actionLink_X_axes.setChecked(setAllXLink)
@@ -2170,11 +2171,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         text: the label contents
         axis: axis index, PlotItem, or None (meaning the label will be added to
                 the current axis)
+        pos: the position of the label in axis coordinates
+            When None, a null point (0,0) will be created 
         
         Var-keyword parameters:
         =======================
         Passed directly to pyqtgraph TextItem constructor, see below for details:
         https://pyqtgraph.readthedocs.io/en/latest/api_reference/graphicsItems/textitem.html
+        
+        color: typically, a tuple of int/float each in the range 0 ⋯ 256 ; default is (0,0,0)
+        anchor: a tuple, default is (0,1)
+        
         """
         #### BEGIN debug
         # print(f"{self.__class__.__name__}.addLabel(text={text})")
@@ -2206,7 +2213,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         self._label_overlays_[cFrame][axNdx] = textItem
         
-        axis.addItem(textItem)
+        axis.addItem(textItem, ignoreBounds=True)
         
     def showLegends(self, value:bool):
         if value == True:
@@ -7221,6 +7228,35 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             return [None, None]
         
+    def _get_axis_data_Y_range_(self, axis:typing.Union[int, pg.PlotItem]):
+        if isinstance(axis, int):
+            if axis not in range(len(self.axes)):
+                raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
+            
+            axis = self.axes[axis]
+            
+        elif isinstance(axis, pg.PlotItem):
+            if axis not in self.axes:
+                raise ValueError(f"Axis {axis} is not in this viewer")
+            
+        else:
+            raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(axis).__name__} instead")
+        
+        pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
+        
+        if len(pdis):
+            items_min_y, items_max_y = zip(*list((float(np.nanmin(i.yData)), float(np.nanmax(i.yData))) for i in pdis))
+            
+            min_y = items_min_y[0] if isinstance(items_min_y, (tuple, list)) else items_min_y
+            max_y = items_max_y[0] if isinstance(items_max_y, (tuple, list)) else items_max_y
+            
+            return [min_y, max_y]
+            
+        else:
+            return [None, None]
+        
+        
+        
     def _align_X_range(self, padding:typing.Optional[float] = None):
         """ Heuristic to align plot items X axis:
             • if the plotitems have x boundaries that overlap then align them
@@ -7284,7 +7320,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             return
         
         for k, ax in enumerate(self.axes):
-            # ax.enableAutoRange()
             if k > 0:
                 ndx = k-1
                 prev_ax = None
@@ -7333,7 +7368,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             if len(obj_):
                 if self._new_frame_:
-                    kwargs["adapt_X_range"] = True
+                    # kwargs["adapt_X_range"] = True
                         
                     self._plot_discrete_entities_(obj_, axis=self._spiketrains_axis_, **kwargs)
                     
@@ -7360,7 +7395,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if events is None or isinstance(events, (tuple, list)) and len(events) == 0:
                     self._events_axis_.setVisible(False)
                     return
-                kwargs["adapt_X_range"] = True
+                # kwargs["adapt_X_range"] = True
                 minX = kwargs.pop("minX", None)
                 maxX = kwargs.pop("maxX", None)
                 
@@ -8943,26 +8978,36 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 plotItem.setVisible(False)
                 
         # NOTE: 2023-01-17 10:45:04
-        # create, if needed, the add the events axis back to the layout
+        # add the events axis back to the layout (after creating it, if needed)
         # see WARNING 2023-01-17 10:46:04 and NOTE: 2023-01-17 10:44:37 
         if not isinstance(self._events_axis_, pg.PlotItem):
             self._events_axis_ = pg.PlotItem(name=self._default_events_axis_name_)
-        
-        if self._events_axis_ not in self.signalsLayout.items:
             self._events_axis_.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
             self._events_axis_.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
+            if self._events_axis_.scene() is not None:
+                self._events_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
+                self._events_axis_.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
+        
+        if self._events_axis_ not in self.signalsLayout.items:
             self.signalsLayout.addItem(self._events_axis_, row=self._n_signal_axes_, col=0)
+            self._events_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
+            self._events_axis_.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
             
         # NOTE: 2023-01-17 10:45:24
-        # create, if needed, then add the spiketrains axis back to the layout
+        # add the spiketrains axis back to the layout (after creating it, if needed)
         # see WARNING 2023-01-17 10:46:04 and NOTE: 2023-01-17 10:44:37 
         if not isinstance(self._spiketrains_axis_, pg.PlotItem):
             self._spiketrains_axis_ = pg.PlotItem(name=self._default_spiketrains_axis_name_)
-                
-        if self._spiketrains_axis_ not in self.signalsLayout.items:
             self._spiketrains_axis_.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
             self._spiketrains_axis_.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
+            if self._spiketrains_axis_.scene() is not None:
+                self._spiketrains_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
+                self._spiketrains_axis_.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
+                
+        if self._spiketrains_axis_ not in self.signalsLayout.items:
             self.signalsLayout.addItem(self._spiketrains_axis_, row = self._n_signal_axes_ + 1, col = 0)
+            self._spiketrains_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
+            self._spiketrains_axis_.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
             
         if self.signalsLayout.scene() is not None:
             self.signalsLayout.scene().sigMouseClicked.connect(self._slot_mouseClickSelectPlotItem)
