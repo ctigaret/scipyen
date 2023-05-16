@@ -3145,11 +3145,25 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     # ### END PyQt slots
     
     def var_observer(self, change):
-        # print(f"{self.__class__.__name__}.var_observer change = {change}")
+        # print(f"{self.__class__.__name__}_{self.windowTitle()}.var_observer change = {change}")
+        # old = change["old"]
+        # if isinstance(old, neo.Block):
+        #     print(f"old: name = {old.name}\n\t with segments = {old.segments}")
+        
+#         newObj = change["new"]
+#         
+#         if isinstance(newObj, neo.Block):
+#             print(f"new: {newObj} name = {newObj.name}\n\t with segments = {newObj.segments}")
+        
         if self.currentFrame not in self.frameIndex:
             self.currentFrame = self.frameIndex[-1]
         else:
-            self._new_frame_ = True # to force re-plotting
+            self._new_frame_ = True # to force re-plotting data, see:
+                                    # NOTE: 2023-01-04 22:14:55 - _plot_signals_()
+                                    # NOTE: 2023-05-16 23:05:22 - _plot_signals_()
+                                    # NOTE: 2023-05-16 23:04:37 - _plotEvents_()
+                                    # NOTE: 2023-05-16 23:02:20 - _plotSpikeTrains_()
+                                    
             self.displayFrame()
             self._new_frame_ = False
         
@@ -5480,14 +5494,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 
         elif isinstance(y, (neo.core.IrregularlySampledSignal,  IrregularlySampledDataSignal)):
-            # self._xData_ = None
-            # self._yData_ = y
             x = None
             self._cached_title = getattr(y, "name", None)
-            # self.frameIndex = range(1)
             self.dataAxis = 0 # data as column vectors
             self.signalChannelAxis = 1
-            #self.signalIndex = range(1)
             
             self._number_of_frames_ = 1
             self._data_frames_ = 1
@@ -5512,7 +5522,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         
                         
                     else:
-                        # self.frameAxis = 1
                         self._number_of_frames_ = y.shape[1]
                         self.frameIndex = range(self._number_of_frames_)
                         self._n_signal_axes_ = 1
@@ -5577,7 +5586,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._meta_index.frame[:,0] = self.frameIndex
             
             if self._docTitle_ is None or (isinstance(self._docTitle_, str) and len(self._docTitle_.strip()) == 0):
-                #because these may be plotted as an add-on so we don't want to mess up the title
+                # because these may be plotted as an add-on so we don't want to mess up the title
                 if isinstance(y.name, str) and len(y.name.strip()) > 0:
                     self._doctTitle_ = y.name
                     
@@ -6068,21 +6077,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 self.signalIndex = 0 # FIXME is this needed anywhere?
                 
-                # self._xData_ = None
-                # self._yData_ = y
                 x = None
                 self._cached_title = "Neo signals"
                 
             elif all([isinstance(i, (neo.Event, DataMark)) for i in y]):
-                #self.dataAnnotations = [{s.name: s.annotations} for s in y]
-                # self._yData_ = y
                 x = None
                 self._cached_title = "Events and marks"
                 self.dataAxis = 0
                 self.signalChannelAxis = 1
                 self.frameIndex = range(1)
                 self._number_of_frames_ = 1
-                # self._plotEpochs_(self._yData_)
             
                 self._n_signal_axes_ = 0
                 
@@ -6090,14 +6094,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._meta_index.frame[:,0] = self.frameIndex
 
             elif all(isinstance(i, (neo.Epoch, DataZone)) for i in y):
-                # self._yData_ = y
                 x = None
                 self._cached_title = "Epochs and zones"
                 self.dataAxis = 0
                 self.signalChannelAxis = 1
                 self.frameIndex = range(1)
                 self._number_of_frames_ = 1
-                # self._plotEpochs_(self._yData_) # why?
                 self._n_signal_axes_ = 1
             
                 self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
@@ -6172,6 +6174,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     @safeWrapper
     def _set_data_(self, x,  y = None, doc_title:(str, type(None)) = None, frameAxis:(int, str, vigra.AxisInfo, type(None)) = None, signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, separateChannelsIn:str="axes", singleFrame:bool=False, interval:(tuple, list, neo.Epoch, type(None)) = None, plotStyle:str = "plot", showFrame:int = None, *args, **kwargs):
+        # if self.parent().__class__.__name__ == "EventAnalysis" and "Detected events" in self.windowTitle():
+        #     print(f"{self.windowTitle()} - _set_data_")
+        #     stack = inspect.stack()
+        #     for s in stack:
+        #         print(f"\tcaller {s.function}")
         self.plot_start = None
         self.plot_stop = None
         
@@ -6194,82 +6201,95 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.plot_start = interval[0]
             self.plot_stop = interval[1]
             
-        with self.observed_vars.observer.hold_trait_notifications():
-            try:
-                dataOK, x, y = self._parse_data_( x=x,
-                                            y=y, 
-                                            frameIndex=frameIndex, 
-                                            frameAxis=frameAxis,
-                                            signalIndex=signalIndex, 
-                                            signalChannelAxis=signalChannelAxis,
-                                            signalChannelIndex=signalChannelIndex,
-                                            irregularSignalIndex=irregularSignalIndex,
-                                            irregularSignalChannelAxis=irregularSignalChannelAxis,
-                                            irregularSignalChannelIndex=irregularSignalChannelIndex,
-                                            separateSignalChannels=separateSignalChannels,
-                                            separateChannelsIn = separateChannelsIn,
-                                            singleFrame=singleFrame)
-                
-                # print(f"self._set_data_ dataOK = {dataOK}")
-                
-                if dataOK:
-                    # remove gremlins from previous plot
-                    # self._plotEpochs_(clear=True)
-                    # self._cached_epochs_.pop(self.currentFrame, None)
-                    self._clear_lris_()
-                    self._setup_axes_()
-                    self._xData_ = x
-                    self._yData_ = y
+            
+        # with self.observed_vars.observer.hold_trait_notifications():
+        try:
+            dataOK, x, y = self._parse_data_( x=x,
+                                        y=y, 
+                                        frameIndex=frameIndex, 
+                                        frameAxis=frameAxis,
+                                        signalIndex=signalIndex, 
+                                        signalChannelAxis=signalChannelAxis,
+                                        signalChannelIndex=signalChannelIndex,
+                                        irregularSignalIndex=irregularSignalIndex,
+                                        irregularSignalChannelAxis=irregularSignalChannelAxis,
+                                        irregularSignalChannelIndex=irregularSignalChannelIndex,
+                                        separateSignalChannels=separateSignalChannels,
+                                        separateChannelsIn = separateChannelsIn,
+                                        singleFrame=singleFrame)
+            
+            # print(f"self._set_data_ dataOK = {dataOK}")
+            
+            if dataOK:
+                # remove gremlins from previous plot
+                # self._plotEpochs_(clear=True)
+                # self._cached_epochs_.pop(self.currentFrame, None)
+                self._clear_lris_()
+                self._setup_axes_()
+                self._xData_ = x
+                self._yData_ = y
 
-                    if self.observed_vars.get("xData", None) is not None:
-                        self.observed_vars["xData"] = None
+#                 if self.observed_vars.get("xData", None) is not None:
+#                     self.observed_vars["xData"] = None
+#                     
+#                 self.observed_vars["xData"] = self._xData_
+#                     
+#                 if self.observed_vars.get("yData", None) is not None:
+#                     self.observed_vars["yData"] = None
+#                     
+#                 self.observed_vars["yData"] = self._yData_
+
+                # print(f"observed xData = {self.observed_vars.get('xData', None)}")
+                # print(f"new xData = {self._xData_}")
+                # print(f"observed yData = {self.observed_vars.get('yData', None)}")
+                # print(f"new yData = {self._yData_}")
+                
+                if self.observed_vars.get("xData", None) != self._xData_:
                     self.observed_vars["xData"] = self._xData_
-                        
-                    if self.observed_vars.get("yData", None) is not None:
-                        self.observed_vars["yData"] = None
+                    
+                if self.observed_vars.get("yData", None) != self._yData_:
                     self.observed_vars["yData"] = self._yData_
-                
-                    self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self._yData_))
-                                
-                    if isinstance(showFrame, int):
-                        if showFrame < 0:
-                            showFrame = 0
+            
+                self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self._yData_))
                             
-                        elif showFrame > self._number_of_frames_:
-                            showFrame = self._number_of_frames_ - 1
-                            
-                        self._current_frame_index_ = showFrame
+                if isinstance(showFrame, int):
+                    if showFrame < 0:
+                        showFrame = 0
                         
-                    else:
-                        if self._current_frame_index_ not in self.frameIndex:
-                            self._current_frame_index_ = self.frameIndex[-1]
-                            
-
-                    if plotStyle is not None and isinstance(plotStyle, str):
-                        self.plotStyle = plotStyle
+                    elif showFrame > self._number_of_frames_:
+                        showFrame = self._number_of_frames_ - 1
                         
-                    elif style is not None and isinstance(style, str):
-                        self.plotStyle = style
-                        
-                    self._frames_spinBoxSlider_.range = range(self._number_of_frames_)
-                    self._frames_spinBoxSlider_.setValue(self._current_frame_index_)
-                    
-                    # NOTE: 2022-11-01 10:37:06
-                    # overwrites self.docTitle set by self._parse_data_
-                    if isinstance(doc_title, str) and len(doc_title.strip()):
-                        self.docTitle = doc_title
-                    else:
-                        self.docTile = self._cached_title
-                    
-                    self.frameChanged.emit(self._current_frame_index_)
+                    self._current_frame_index_ = showFrame
                     
                 else:
-                    warnings.warn(f"Could not parse the data x: {x}, y: {y}")
-                    return
+                    if self._current_frame_index_ not in self.frameIndex:
+                        self._current_frame_index_ = self.frameIndex[-1]
+                        
+                if plotStyle is not None and isinstance(plotStyle, str):
+                    self.plotStyle = plotStyle
+                    
+                elif style is not None and isinstance(style, str):
+                    self.plotStyle = style
+                    
+                self._frames_spinBoxSlider_.range = range(self._number_of_frames_)
+                self._frames_spinBoxSlider_.setValue(self._current_frame_index_)
                 
+                # NOTE: 2022-11-01 10:37:06
+                # overwrites self.docTitle set by self._parse_data_
+                if isinstance(doc_title, str) and len(doc_title.strip()):
+                    self.docTitle = doc_title
+                else:
+                    self.docTile = self._cached_title
+                
+                self.frameChanged.emit(self._current_frame_index_)
+                
+            else:
+                warnings.warn(f"Could not parse the data x: {x}, y: {y}")
+                return
+            
 
-            except Exception as e:
-                traceback.print_exc()
+        except Exception as e:
+            traceback.print_exc()
             
     @safeWrapper
     def setData(self, x, /, y = None, doc_title:(str, type(None)) = None, frameAxis:(int, str, vigra.AxisInfo, type(None)) = None, signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, separateChannelsIn:str="axes", singleFrame:bool=False, interval:(tuple, list, neo.Epoch, type(None)) = None, plotStyle:str = "plot", get_focus:bool = False, showFrame = None, *args, **kwargs):
@@ -6501,7 +6521,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 #warngins.warn("I need something to plot")
                 return
             
-        # print(f"{self.__class__.__name__} self.setData")
         
         uiParamsPrompt = kwargs.pop("uiParamsPrompt", False) # ?!?
         
@@ -6534,10 +6553,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if get_focus:
             self.activateWindow()
             
-        ## NOTE: 2020-09-25 10:07:37
-        ## Calls ScipyenViewer setData() which in turn delegates to self._set_data_()
-        #super().setData(*args, **kwargs)
-            
     @property
     def currentFrame(self):
         return self._current_frame_index_
@@ -6560,6 +6575,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         val = int(val)
         
+        # to force re-plotting spike trains, 
+        # see NOTE: 2023-01-04 22:14:55,
+        # NOTE: 2023-05-16 23:04:37,
+        # NOTE: 2023-05-16 23:05:22
+        # NOTE: 2023-05-16 23:02:20
         self._new_frame_ = self._current_frame_index_ != val
         self._current_frame_index_ = val
         
@@ -7055,7 +7075,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         Anything else                   ↦ ignored
         
         """
-        # print(f"self.displayFrame {type(self._yData_).__name__}")
+        # if self.parent().__class__.__name__ == "EventAnalysis" and "Detected events" in self.windowTitle():
+        #     print(f"{self.windowTitle()} - displayFrame")
+        #     stack = inspect.stack()
+        #     for s in stack:
+        #         print(f"\tcaller {s.function} in {s.filename}")
+        
         if self._yData_ is None:
             self.clear()
             return
@@ -7367,9 +7392,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 obj_ = trains
                 
             if len(obj_):
+                # NOTE: 2023-05-16 23:02:20:
+                # is this is a new frame, then call the actual function (_plot_discrete_entities_)
+                # otherwise, just set the entities axis visible
                 if self._new_frame_:
-                    # kwargs["adapt_X_range"] = True
-                        
                     self._plot_discrete_entities_(obj_, axis=self._spiketrains_axis_, **kwargs)
                     
                     self._spiketrains_axis_.update()
@@ -7387,10 +7413,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         Delegates further to _plot_discrete_entities_
         """
         if self._plot_events_:
-            if self._new_frame_:
-                # self._events_axis_.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, 
-                #                                             QtWidgets.QSizePolicy.Minimum, 
-                #                                             QtWidgets.QSizePolicy.Frame))
+            if self._new_frame_: # NOTE: 2023-05-16 23:04:37
                 self._events_axis_.clear()
                 if events is None or isinstance(events, (tuple, list)) and len(events) == 0:
                     self._events_axis_.setVisible(False)
@@ -7654,6 +7677,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         segmentNdx = self.frameIndex[self._current_frame_index_]
         
         if segmentNdx >= len(self._yData_.segments):
+            print("no plot")
             return
         
         segment = obj.segments[segmentNdx]
@@ -7673,17 +7697,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         analog = obj.analogsignals
         irregs = obj.irregularlysampledsignals
         spiketrains = get_non_empty_spike_trains(obj.spiketrains)
-        # spiketrains = obj.spiketrains
         events = get_non_empty_events(obj.events)
         epochs = get_non_empty_epochs(obj.epochs)
         plotTitle = kwargs.pop("plotTitle", getattr(obj, "name", "Segment"))
         
         self._plot_signals_(analog, irregs, *args, **kwargs)
-        # print(f"{self.__class__.__name__}._plot_data_(obj<{type(obj).__name__}>) minX = {minX}, maxX = {maxX}")
         
         if len(events):
             self._plotEvents_(events, **kwargs)
-            # self._plotEvents_(events, minX = minX, maxX = maxX, **kwargs)
         else:
             self.eventsAxis.setVisible(False)
             
@@ -7693,11 +7714,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.spikeTrainsAxis.setVisible(False)
             
         if self._plot_epochs_ and len(epochs):
-            # print(f"{self.__class__.__name__}._plot_data_(obj<{type(obj).__name__}>): self._plot_epochs_ = {self._plot_epochs_}, len(obj.epochs) = {len(obj.epochs)}")
             self._plot_data_(epochs)
         else:
             self._clear_lris_()
-            # pass
             
         # NOTE: 2023-01-16 22:59:30 TODO:
         # delegate this to _plot_signals_
@@ -8170,7 +8189,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     plotItemName = plotItemNames[plot_name_ndx]
                     # NOTE: 2023-01-04 22:14:55
                     # avoid plotting if frame hasn't changed - just change plotItem's visibility
-                    # if new_data: 
                     if self._new_frame_: 
                         sig_name = selected_analog_names[selected_analog_ndx.index(k)]
                         self._plot_signal_data_(signal, sig_name, plotItem, plotItemName, *args, **kwargs)
@@ -8203,7 +8221,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if k in selected_irreg_ndx:
                     plot_name_ndx = selected_irreg_ndx.index(k)
                     plotItemName = plotItemNames[plot_name_ndx]
-                    if self._new_frame_:
+                    if self._new_frame_: # NOTE: 2023-05-16 23:05:22
                         sig_name = selected_irreg_names[selected_irreg_ndx.index(k)]
                         self._plot_signal_data_(signal, sig_name, plotItem, plotItemName, *args, **kwargs)
             

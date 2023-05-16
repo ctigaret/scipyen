@@ -1146,7 +1146,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             if self._owns_viewer_:
                 self._ephysViewer_.clear()
                 self._ephysViewer_.close()
-                self._ephysViewer_ = None
+                # self._ephysViewer_ = None
             else:
                 self._ephysViewer_.refresh()
                 
@@ -1154,7 +1154,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             self._waveFormViewer_.clear()
             self._waveFormViewer_.close()
             
-        self._waveFormViewer_= None
+        # self._waveFormViewer_= None
         
         if isinstance(self._detected_Events_Viewer_, sv.SignalViewer):
             self._detected_Events_Viewer_.clear()
@@ -1164,7 +1164,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._reportWindow_.clear()
         self._reportWindow_.close()
             
-        self._detected_Events_Viewer_= None
+        # self._detected_Events_Viewer_= None
         
         # this one is also supposed to call saveSettings()
         super().closeEvent(evt)
@@ -2027,7 +2027,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             if len(self._detected_Events_Viewer_.axes):
                 self._detected_Events_Viewer_.removeLabels(0)
 
-            # self._detected_Events_Viewer_.clear()
             QtCore.QTimer.singleShot(100, self._view_frame_events)
 #             self._detected_Events_Viewer_.view(self._detected_events_, 
 #                                                doc_title = f"Events in sweep {self.currentFrame}",
