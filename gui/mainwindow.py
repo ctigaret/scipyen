@@ -146,6 +146,14 @@ from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 from PyQt5.uic import loadUiType
 #### END PyQt5 modules
 
+#### BEGIN pyqtdarktheme - recommended for Windows
+hasQDarkTheme = False
+try:
+    import qdarktheme
+    hasQDarkTheme = True
+except:
+    pass
+#### END pyqtdarktheme
 #from IPython.lib.deepreload import reload as dreload
 
 from IPython.core.history import HistoryAccessor
@@ -1817,6 +1825,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.app.setStyle(QtWidgets.QApplication.style())
         elif val == "Dark Style" and has_qdarkstyle_for_win:
             self.app.setStyleSheet(qdarkstyle.load_stylesheet())
+        elif val.startswith("PyQtDarkTheme_") and hasQDarkTheme:
+            theme = val.replace("PyQtDarkTheme_", "")
+            qdarktheme.set_theme(theme)
         else:
             self.app.setStyle(val)
             
@@ -6125,6 +6136,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     
         self.statusbar.showMessage("Done!")
         
+    @pyqtSlot(bool)
+    def _slot_setAutoRemoveViewers(self, value):
+        self.autoRemoveViewers = value == True
+            
     @pyqtSlot(str)
     @safeWrapper
     def _slot_test_gui_style(self, val:str):
@@ -6134,17 +6149,24 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.app.setStyle(QtWidgets.QApplication.style())
             self._current_GUI_style_name = "Default"
         else:
-            self.app.setStyle(val)
+            if hasQDarkTheme and val.startswith("PyQtDarkTheme_"):
+                theme = val.replace("PyQtDarkTheme_", "")
+                qdarktheme.set_theme(theme)
+            else:
+                self.app.setStyle(val)
+                
             self._current_GUI_style_name = val
-            
-    @pyqtSlot(bool)
-    def _slot_setAutoRemoveViewers(self, value):
-        self.autoRemoveViewers = value == True
             
     @pyqtSlot()
     @safeWrapper
     def _slot_set_Application_style(self):
         from .itemslistdialog import ItemsListDialog
+        themeslist = ["Default"] + self._available_Qt_style_names_
+        if hasQDarkTheme:
+            qdarkthemes = [f"PyQtDarkTheme_{t}" for t in qdarktheme.get_themes()]
+            
+            themeslist.extend(qdarkthemes)
+            
         d = ItemsListDialog(self, itemsList = ["Default"] + self._available_Qt_style_names_,
                             title="Choose Application GUI Style",
                             preSelected = self._current_GUI_style_name)

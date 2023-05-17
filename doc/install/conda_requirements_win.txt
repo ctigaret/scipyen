@@ -334,6 +334,7 @@ pyqtgraph   # (conda install pyqtgraph) ✓ also installs the listed below
 #   pyqtgraph          conda-forge/noarch::pyqtgraph-0.13.2-pyhd8ed1ab_0
 #   tbb                conda-forge/win-64::tbb-2021.8.0-h91493d7_0
 
+pyqtdarktheme
 #pyqt5-sip              # pyqt5 apparently not found but see below ✓ - not needed?
 numpy                   # ✓ -- see pyqtgraph above
 conda-forge::vigra      # ✓ (conda install conda-forge::vigra) !!! 

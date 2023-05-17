@@ -45,6 +45,12 @@ if sys.platform == "win32" and sys.version_info.minor >= 9:
 
 from PyQt5 import (QtCore, QtWidgets, QtGui, )
 import sip
+hasQDarkTheme = False
+try:
+    import qdarktheme
+    hasQDarkTheme = True
+except:
+    pass
 #### END 3rd party modules
 
 #### BEGIN Scipyen modules
@@ -116,6 +122,9 @@ def main():
         # BEGIN 
         # 1. create the pyqt5 app
         app = QtWidgets.QApplication(sys.argv)
+        
+        # if hasQDarkTheme:
+        #     qdarktheme.setup_theme("auto")
         
         # NOTE: 2023-01-08 00:48:47
         # avoid global menus - must be called AFTER we have an instance of app!
