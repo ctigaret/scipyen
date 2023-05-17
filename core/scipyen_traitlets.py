@@ -48,7 +48,7 @@ from .triggerevent import DataMark, TriggerEvent
 # import core.triggerprotocols import TriggerProtocol # circular import !
 #from .traitutils import (enhanced_traitlet_set, standard_traitlet_set)
 
-from .utilities import gethash
+from .utilities import (gethash, safe_identity_test)
 
 # NOTE: DataBagTrait <- Instance <- ClassBasedTraitType <- TraitType <- BaseDescriptor
 
@@ -525,6 +525,7 @@ class NeoBaseNeoTrait(Instance):
             if result:
                 # check annotations
                 result = new_value.annotations == old_value.annotations
+                # result = safe_identity_test(new_value.annotations, old_value.annotations)
             
             
             if result:
@@ -532,6 +533,7 @@ class NeoBaseNeoTrait(Instance):
                 # check it we changed and notify
                 # silent = (new_hash == self.hashed)
                 result = new_value == old_value
+                # result = safe_identity_test(new_value, old_value)
         except:
             traceback.print_exc()
             result = False

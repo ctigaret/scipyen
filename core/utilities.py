@@ -285,7 +285,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     if ret: # check for equality of mapping keys
         ret &= reduce(operator.and_, (operator.eq(k1, k2) for (k1, k2) in zip(x.keys(), y.keys())))
         
-    if ret: # not compare the values
+    if ret: # now compare the values
         ret &= reduce(operator.and_, (simp_fun(a,b) for (a,b) in zip(x.values(), y.values())))
         
     return ret
