@@ -149,7 +149,8 @@ from core.prog import safeWrapper, show_caller_stack
 from core.datatypes import (array_slice, is_column_vector, is_vector, )
 
 from core.utilities import (normalized_index, normalized_axis_index, 
-                            normalized_sample_index, counter_suffix)
+                            normalized_sample_index, counter_suffix,
+                            safe_identity_test)
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.triggerprotocols import TriggerProtocol
 # NOTE: 2021-11-13 16:27:30
@@ -6229,25 +6230,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._xData_ = x
                 self._yData_ = y
 
-#                 if self.observed_vars.get("xData", None) is not None:
-#                     self.observed_vars["xData"] = None
-#                     
-#                 self.observed_vars["xData"] = self._xData_
-#                     
-#                 if self.observed_vars.get("yData", None) is not None:
-#                     self.observed_vars["yData"] = None
-#                     
-#                 self.observed_vars["yData"] = self._yData_
-
-                # print(f"observed xData = {self.observed_vars.get('xData', None)}")
-                # print(f"new xData = {self._xData_}")
-                # print(f"observed yData = {self.observed_vars.get('yData', None)}")
-                # print(f"new yData = {self._yData_}")
-                
-                if self.observed_vars.get("xData", None) != self._xData_:
+                # if self.observed_vars.get("xData", None) != self._xData_:
+                if not safe_identity_test (self.observed_vars.get("xData", None), self._xData_):
                     self.observed_vars["xData"] = self._xData_
                     
-                if self.observed_vars.get("yData", None) != self._yData_:
+                # if self.observed_vars.get("yData", None) != self._yData_:
+                if not safe_identity_test(self.observed_vars.get("yData", None), self._yData_):
                     self.observed_vars["yData"] = self._yData_
             
                 self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self._yData_))

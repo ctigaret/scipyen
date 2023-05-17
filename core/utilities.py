@@ -26,13 +26,13 @@ from neo.core.container import Container as NeoContainer
 import pandas as pd
 import quantities as pq
 import vigra
-
+import pyqtgraph # for their own eq operator
 #import language_tool_python
 
-try:
-    from pyqtgraph import eq # not sure is needed
-except:
-    from operator import eq
+# try:
+#     from pyqtgraph import eq # not sure is needed
+# except:
+#     from operator import eq
 
 from core import prog
 from .prog import safeWrapper, deprecation
@@ -79,7 +79,7 @@ class SafeComparator(object):
     # operator.le ge lt gt accept ONLY numeric values hence MAY not work with
     # either numpy array or pandas objects
     
-    def __init__(comp=eq):
+    def __init__(comp=pyqtgraph.eq):
         self.comp = comp
         
     def __call__(self, x, y):
@@ -885,8 +885,7 @@ def safe_identity_test(x, y, idcheck=False):
         return x==y
     
     if idcheck:
-        ret &= id(x) == id(y)
-        
+        ret &= idcheck(x, y)
         if not ret:
             return ret
     
@@ -946,11 +945,15 @@ def safe_identity_test(x, y, idcheck=False):
     
     if isinstance(x, (np.ndarray, str, Number, pd.DataFrame, pd.Series, pd.Index)):
         ret &= np.all(x==y)
-    
-        if not ret:
-            return ret
         
-    ret &= eq(x,y)
+        return ret
+        # NOTE: 2023-05-17 08:54:39
+        # event if ret was True here, not sure that falling throhugh to eq would
+        # work for arrays
+        # if not ret:
+        #     return ret
+        
+    ret &= pyqtgraph.eq(x,y)
     
     return ret ## good fallback, though potentially expensive
 
