@@ -13,8 +13,9 @@ from __future__ import print_function
 #### BEGIN core python modules
 import collections 
 from collections import deque
+from functools import singledispatch
 import datetime
-from enum import (Enum, IntEnum,)
+from enum import (Enum, IntEnum, EnumMeta)
 import inspect
 import numbers
 import math
@@ -143,6 +144,38 @@ GENOTYPES = ["NA", "wt", "het", "hom", "+/+", "+/-", "-/-"]
 RELATIVE_TOLERANCE = 1e-4
 ABSOLUTE_TOLERANCE = 1e-4
 EQUAL_NAN = True
+
+def default_value(x:type):
+    if not isinstance(x, type):
+        return x
+    try:
+        if x == datetime.datetime:
+            return datetime.datetime.now()
+        elif x == datetime.date:
+            return datetime.date.today()
+        
+        elif is_enum(x):
+            if isinstance(x, TypeEnum):
+                return x.default()
+            else:
+                mk = list(x.__members__.keys())
+                return x[mk[0]]
+        else:
+            ret = x()
+    except:
+        return None
+
+def is_enum(x):
+    if not isinstance(x, type):
+        return False
+    
+    return Enum in inspect.getmro(x)
+
+def is_enum_value(x):
+    if isinstance(x, type):
+        return False
+    
+    return isinstance(type(x), EnumMeta)
 
 def is_routine(x):
     """ Similar to is_callable but excludes classes with __call__ method.
@@ -567,6 +600,14 @@ def categorize_data_frame_columns(data, *column_names, inplace=True):
 class TypeEnum(IntEnum):
     """Common ancestor for enum types used in Scipyen
     """
+    
+    @classmethod
+    def default(cls):
+        """Aways returns the first member of the enum class
+        """
+        names = list(cls.names())
+        return cls[names[0]]
+    
     @classmethod
     def names(cls):
         """Iterate through the names in TypeEnum enumeration.

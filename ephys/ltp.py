@@ -268,14 +268,14 @@ class SynapticPlasticityData(BaseScipyenData):
         )
     
     _derived_data_children_ = (
-        ("Rs", neo.IrregularlySampledSignal),
-        ("Rin", neo.IrregularlySampledSignal),
-        ("SynapticResponse", list, neo.IrregularlySampledSignal) # one per pathway
+        ("Rs", neo.IrregularlySampledSignal, neo.IrregularlySampledSignal([], [], units=pq.Mohm, time_units=pq.s, name="Rs")),
+        ("Rin", neo.IrregularlySampledSignal, neo.IrregularlySampledSignal([], [], units=pq.Mohm, time_units=pq.s, name="Rin")),
+        ("SynapticResponse", list, neo.IrregularlySampledSignal, neo.IrregularlySampledSignal([], [], units=pq.dimensionless, time_units=pq.s, name="")) # one per pathway
         )
     
     
     _result_data_ = (
-        ("result", pd.DataFrame)
+        ("result", pd.DataFrame),
         )
     
     _graphics_attributes_ = (
