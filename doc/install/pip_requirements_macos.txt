@@ -10,7 +10,7 @@ pyabf           # ✓ (pip install pyabf) - no conda package, use upip
 imreg-dft       # ✓ (pip install imgreg-dft)
 nixio           # ✓ (pip install nixio)
 python-magic    # ✓ (pip install python-magic)
-
+pyqtdarktheme
 #### OPTIONAL packages
 researchpy      # ✓ (pip install researchpy)
 modelspec       # ✓ (pip install modelspec)

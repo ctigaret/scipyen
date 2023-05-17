@@ -10,7 +10,6 @@ scipy
 sympy
 h5py 
 pyqtgraph
-pyqtdarktheme
 pandas
 seaborn # installs pandas if not already there
 pingouin
