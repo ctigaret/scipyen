@@ -123,8 +123,8 @@ def main():
         # 1. create the pyqt5 app
         app = QtWidgets.QApplication(sys.argv)
         
-        # if hasQDarkTheme:
-        #     qdarktheme.setup_theme("auto")
+        if hasQDarkTheme and sys.platform == "win32":
+            qdarktheme.setup_theme("auto")
         
         # NOTE: 2023-01-08 00:48:47
         # avoid global menus - must be called AFTER we have an instance of app!
