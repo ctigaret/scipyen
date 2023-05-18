@@ -20,8 +20,9 @@ import inspect
 import numbers
 import math
 import dataclasses
+from dataclasses import (dataclass, KW_ONLY, MISSING)
 import sys
-import time
+import time, datetime
 import traceback
 import typing
 import types
@@ -913,3 +914,98 @@ def inspect_members(obj, predicate=None):
 #         
 #     return dict(mb)
         
+@dataclass
+class Episode:
+    name:str = ""
+    _:KW_ONLY
+    begin:datetime.datetime = datetime.datetime.now()
+    end:datetime.datetime = datetime.datetime.now()
+    startFrame:int = 0
+    endFrame:int = 1
+    
+    
+class ProcedureType(TypeEnum):
+    treatment = 1
+    surgery = 2
+    behaviour = 4 # to include navigation in real or virtual environment, rotarod, inclined plane, licking etc # TODO to refine
+    biopsy = 8
+    tagging = 16
+    mating = 128
+    cull = 255
+    
+class AdministrationRoute(TypeEnum):
+    intraperitoneal = 1
+    intramuscular = 2
+    intravenous = 4
+    intraarterial = 8
+    intracerebral = 16
+    intraventricular = 32
+    intracerebroventricular = intracerebral | intraventricular # 48
+    intracardiac = 64
+    peros = 128 # e.g. gavage
+    other = 256
+    
+    # aliases
+    ip = intraperitoneal
+    iv = intravenous
+    ia = intraarterial
+    im = intramuscular
+    icb = intracerebral
+    icv = intracerebroventricular
+    ic = intracardiac
+    gavage = peros
+    
+    
+    
+class Procedure:
+    def __init__(self, name:str = "", procedureType:ProcedureType = ProcedureType.treatment, episodes:list[Episode] = [Episode()]):
+        self._name_ = name
+        self._procedureType_ = procedureType
+        self._episodes_ = episodes
+        
+    @property
+    def name(self):
+        return self._name_
+    
+    @name.setter
+    def name(self, value:str):
+        self._name_ = value
+        
+    @property
+    def procedureType(self):
+        return self._procedureType_
+    
+    @procedureType.setter
+    def procedureType(self, value:ProcedureType):
+        self._procedureType_ = value
+        
+    @property
+    def episodes(self):
+        return self._episodes_
+    
+    @episodes.setter
+    def episodes(self, value:list[Episode]):
+        self._episodes_ = value
+        
+def TreatmentProcedure(Procedure):
+    def __init__(self, name:str="", episodes = [], dose:pq.Quantity = math.nan*pq.g, route:AdministrationRoute=AdministrationRoute.ip):
+        super().__init__(name=name, procedureType = ProcedureType.treatment, episodes = episodes)
+        self._dose_ = dose
+        self._route_ = route
+        
+    @property
+    def dose(self):
+        return self._dose_
+    
+    @dose.setter
+    def dose(self, value:pq.Quantity):
+        pass
+        
+        
+    
+    
+
+    
+    
+    
+    

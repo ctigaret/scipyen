@@ -380,7 +380,7 @@ class InteractiveTreeWidget(DataTreeWidget):
         
         # type-specific changes
         try:
-            if isinstance(data, NestedFinder.nesting_types):
+            if isinstance(data, NestedFinder.nesting_types + (set,)):
                 if data not in SINGLETONS and id(data) in self._visited_.keys():
                     objtype = self._visited_[id(data)][0]
                     path = "/".join(list(self._visited_[id(data)][1]))
@@ -406,7 +406,7 @@ class InteractiveTreeWidget(DataTreeWidget):
                             items = [i for i in data.items()]
                             children = OrderedDict([items[k] for k in ndx])
                             
-                    elif isinstance(data, (list, tuple, deque)):
+                    elif isinstance(data, (list, tuple, deque, set)):
                         desc = "length=%d" % len(data)
                         # NOTE: 2021-07-24 14:57:02
                         # accommodate namedtuple types
@@ -473,13 +473,8 @@ class InteractiveTreeWidget(DataTreeWidget):
                 # Hence, we STOP here (i.e. at first level).
                 desc = str(data)
                 
-#             elif isinstance(data, (type, numbers.Number, str, bytes, types.FrameType)) or dt.is_routine(data):
-#                 desc = str(data)
-#                 
-#             else:
-#                 children = dt.inspect_members(data, predicate)
-                    
             return typeStr, desc, children, widget, typeTip 
+        
         except:
             print(f"{self.__class__.__name__}.parse data type : {type(data).__name__}, data: {data}")
             raise

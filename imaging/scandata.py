@@ -18,7 +18,8 @@ from core.quantities import(arbitrary_unit,
                             pixel_unit, 
                             channel_unit,
                             space_frequency_unit,
-                            angle_frequency_unit,day_in_vitro,
+                            angle_frequency_unit,
+                            day_in_vitro,
                             week_in_vitro, postnatal_day, postnatal_month,
                             embryonic_day, embryonic_week, embryonic_month,
                             unit_quantity_from_name_or_symbol,
@@ -1773,9 +1774,13 @@ class ScanData(BaseScipyenData):
             p.text("\n")
             p.text("With trigger protocols:")
             p.breakable()
-            p.pretty(self.triggers)
+            if isinstance(self.triggers, (typing.Sequence, typing.Set)) and len(self.triggers):
+                p.pretty(self.triggers)
             
-            if len(self.analysisUnits):
+            p.text("\n")
+            p.text("With analysis units:")
+            p.breakable()
+            if isinstance(self.analysisUnits, (typing.Sequence, typing.Set)) and len(self.analysisUnits):
                 for a in self.analysisUnits:
                     p.pretty(a)
                     

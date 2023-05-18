@@ -51,7 +51,7 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
             
     procedure: dict; optional, default is None
         When a dict it may contain:
-            'type' -> str e.g., "treatment", "surgery", "rotarod", etc informative
+            'type' -> datatypes.ProcedureType or str e.g., "treatment", "surgery", "rotarod", etc informative
                 enough to allow data classification later
                 
             'name' -> str e.g., the name of the drug, or of the procedure
