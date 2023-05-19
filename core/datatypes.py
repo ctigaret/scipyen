@@ -987,7 +987,7 @@ class Procedure:
     def episodes(self, value:list[Episode]):
         self._episodes_ = value
         
-def TreatmentProcedure(Procedure):
+class TreatmentProcedure(Procedure):
     def __init__(self, name:str="", episodes = [], dose:pq.Quantity = math.nan*pq.g, route:AdministrationRoute=AdministrationRoute.ip):
         super().__init__(name=name, procedureType = ProcedureType.treatment, episodes = episodes)
         self._dose_ = dose
@@ -999,7 +999,14 @@ def TreatmentProcedure(Procedure):
     
     @dose.setter
     def dose(self, value:pq.Quantity):
-        pass
+        from core import quantities as scq
+        
+        unitFamily = scq.getUnitFamily(value)
+        
+        if isinstance(unitFamily, str) and unitFamily not in ("Mass", "Volume", "Substance", "Concentration", "Flow"):
+            raise ValueError(f"'dose' has wrong units")
+        
+        self._dose_ = value
         
         
     

@@ -254,17 +254,40 @@ del(cq, _pqpfx) # better keep __custom_quantities__
 
 def testme():
     print(__file__, __name__)
+    
+def get_constants():
+    ret = dict()
+    
+    modules = [(k,v) for (k,v) in pq.constants.__dict__.items() if inspect.ismodule(v) and k not in ("_codata", "_utils")]
+    
+    for (modname, module) in modules:
+        ret[modname] = set([v for v in module.__dict__.values() if isinstance(v, pq.UnitConstant)])
+        
+    return ret
 
 def get_units():
-    """Returns all units definitions in the Python Quantities package, augmented.
+    """Collects all units definitions in the Python Quantities package, augmented.
     This is typically called AFTER importing this module, therefore it SHOULD
     contain custom units defined at the top of this module.
+    
+    Returns:
+    ========
+    
+    unit_dict: mapping family name ↦ mapping irreducible ↦ set, derived ↦ set
+    irreducible: mapping UnitQuantity ↦ family name
+    derived: mapping UnitQuantity ↦ family name
     """
-    ret = dict()
     
     unitsmodules = [(k,v) for (k,v) in pq.units.__dict__.items() if inspect.ismodule(v)] # + [pq.unitquantity]
     
-    _upriority = ("length", "time", "temperature", "mass", "substance", "information", "other")
+    # _upriority = ("length", "time", "temperature", "mass", "substance", "information", "other")
+    
+    # get the main families of unit quantities:
+    uq = [(k,v) for (k,v) in pq.unitquantity.__dict__.items() if isinstance(v, type) and issubclass(v, pq.UnitQuantity)]
+    
+    main_families = sorted([u[1].__name__.replace("Unit", "") for u in uq if u[1].__name__.startswith("Unit") and not any(u[1].__name__.endswith(s) for s in ("Constant", "Quantity", "LuminousIntensity"))])
+    
+    ret = dict((k, {"irreducible":set(), "derived":set()}) for k in main_families)
     
     for module in unitsmodules:
         # check for all quantities
@@ -277,20 +300,37 @@ def get_units():
         # hence they can be used as dict keys
         
         if len(module_units):
-            ugroup = module[0].capitalize()
+            ufamily = module[0].capitalize()
             units = set(u[1] for u in module_units)
-            ir_units = set(u[1] for u in module_units if isinstance(u[1], pq.unitquantity.IrreducibleUnit) ) # and type(u[1]).__name__.replace("Unit","") == ugroup)
-            der_units = units - ir_units
             
-            ret[ugroup]=dict()
+            imported = [u[1] for u in module_units if type(u[1]).__name__.replace("Unit", "") not in (ufamily, "Quantity")]
             
-            ret[ugroup]["irreducible"] = ir_units
-            ret[ugroup]["derived"] = der_units
-
-    # now, add the unit quantities defined directly in pq.unitquantity
-    
-    # unit_qs = list([(kn, kv) for kn, kv in pq.unitquantity.__dict__.items() if isinstance(kv, pq.UnitQuantity)])
+            for u in imported:
+                _fam = type(u).__name__.replace("Unit", "")
                 
+                if _fam == "LuminousIntensity":
+                    _fam = "Electromagnetism"
+                
+                if _fam not in ret:
+                    ret[_fam] = {"irreducible":set(), "derived":set()}
+                    
+                if isinstance(u, pq.unitquantity.IrreducibleUnit):
+                    ret[_fam]["irreducible"].add(u)
+                else:
+                    ret[_fam]["derived"].add(u)
+                    
+            local = units - set(imported)
+                    
+            ir_units = set(u for u in local if isinstance(u, pq.unitquantity.IrreducibleUnit) ) # and type(u[1]).__name__.replace("Unit","") == ufamily)
+            
+            der_units = local - ir_units
+            
+            if ufamily not in ret:
+                ret[ufamily]={"irreducible":set(), "derived":set()}
+            
+            ret[ufamily]["irreducible"] |= ir_units
+            ret[ufamily]["derived"] |= der_units
+
     # add the custom quantities
     for family in custom_unit_families:
         f = family.capitalize()
@@ -309,12 +349,20 @@ def get_units():
         else:
             ret[f] = custom_unit_families[family]
                     
-    ret["Other"]={"irreducible": {arbitrary_unit, pixel_unit, channel_unit},
-                  "derived": set()}
+    ret["Other"]={"irreducible": {arbitrary_unit, pixel_unit, channel_unit, pq.dimensionless},
+                  "derived": set()} 
+    
+    # ret["Electromagnetism"]["irreducible"].add(pq.candela)
             
+    result = dict(sorted([(k,v) for (k,v) in ret.items()]))
+    
+    for v in result.values():
+        v["irreducible"] = set(sorted(list(v["irreducible"]), key = lambda x: x.name))
+        v["derived"] = set(sorted(list(v["derived"]), key = lambda x: x.name))
+    
     # reverse-locate irreducible
     irreducible = dict()
-    for k, v in ret.items():
+    for k, v in result.items():
         if len(v["irreducible"]):
             for i in v["irreducible"]:
                 if i not in irreducible:
@@ -323,20 +371,42 @@ def get_units():
                 
     # similarly, grab the derived ones
     derived = dict()
-    for k, v in ret.items():
+    for k, v in result.items():
         if len(v["derived"]):
             for i in v["derived"]:
                 if i not in derived:
                     derived[i] = set()
                 derived[i].add(k)
                 
-            
-    return ret, irreducible, derived
+    return result, irreducible, derived
 
 UNITS_DICT, IRREDUCIBLES, DERIVED = get_units()
+
+CONSTANTS = get_constants()
         
+def constantsFamilies():
+    return list(CONSTANTS.keys())
+
+def getUnitConstantFamily(c:pq.UnitConstant):
+    if not isinstance(c, pq.UnitConstant):
+        raise TypeError(f"Expecting a UnitConstant; instead, got {type(c).__name__}")
+    
+    families = [f for f, v in CONSTANTS.items() if c in v]
+    
+    if len(families) > 1:
+        return set(families)
+    
+    elif len(families) == 1:
+        return families[0]
+    
+def familyConstants(family:str):
+    if family not in CONSTANTS:
+        raise ValueError(f"Family {family} is not a family of constants; valid families are {constantsFamlies()}")
+    
+    return CONSTANTS[family]
+
 def unitFamilies():
-    return [k for k in UNITS_DICT]
+    return list(UNITS_DICT.keys())
 
 def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity]):
     if isinstance(unit, pq.Quantity):
@@ -344,6 +414,9 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity]):
         
     elif isinstance(unit, pq.UnitQuantity):
         u = unit
+        
+    else:
+        raise TypeError(f"Expecting a Python Quantity or UnitQuantity; instead, got {type(unit).__name__}")
     
     families = list()
     
@@ -356,8 +429,25 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity]):
     
     elif len(families) > 1:
         return set(families)
+    
+def familyUnits(family:str, kind:typing.Optional[str]=None):
+    if family not in UNITS_DICT:
+        raise ValueError(f"{family} is not a valid UnitQuantity family; valid families are {list(UNITS_DICT.keys())}")
+    
+    if kind is None:
+        return UNITS_DICT[family]["irreducible"] | UNITS_DICT[family]["derived"]
+    elif isinstance(kind, str):
+        if kind == "irreducible":
+            return UNITS_DICT[family]["irreducible"]
         
-
+        elif kind == "derived":
+            return UNITS_DICT[family]["derived"]
+        else:
+            raise ValueError(f"Invalid UnitQuantity kind : {kind}; expecting one of 'irreducible' or 'derived'")
+        
+    else:
+        raise TypeError(f"UnitQuantity kind expected to be None or a str; instead, got {type(kind).__name__}")
+    
 def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]):
     """
     """

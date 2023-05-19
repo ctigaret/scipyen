@@ -17,6 +17,8 @@ from core.prog import (ArgumentError, OneOf,
                        parse_descriptor_specification, WithDescriptors,
                        setup_descriptor)
 
+from core.datatypes import (Episode, ProcedureType, AdministrationRoute, Procedure, TreatmentProcedure, TypeEnum)
+
 class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
     """Simple repository for the minimally-required, common attributes.
     

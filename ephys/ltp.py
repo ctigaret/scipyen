@@ -313,8 +313,6 @@ class SynapticPlasticityData(BaseScipyenData):
             if isinstance(self.pathways, (tuple, list)) and len(self.pathways):
                 for sp in self.pathways:
                     p.text(f"Pathway: {sp}")
-            
-        
 
 def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     """Constructs a dict with options for synaptic plasticity experiments.
