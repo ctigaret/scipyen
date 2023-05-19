@@ -406,21 +406,95 @@ def familyConstants(family:str):
 def unitFamilies():
     return list(UNITS_DICT.keys())
 
-def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity]):
-    if isinstance(unit, pq.Quantity):
-        u = list(unit.units.dimensionality.keys())[0]
-        
-    elif isinstance(unit, pq.UnitQuantity):
-        u = unit
+def isCompound(x:pq.Quantity | pq.UnitQuantity):
+    if len(x.dimensionality) == 1:
+         base = list(x.dimensionality.keys())[0]
+         return isCompound(base.definition)
+     
+    else:
+         return True
+         
+def getBaseUnitQuantities(x:pq.Quantity | pq.UnitQuantity):
+    xdim = x.dimensionality
+    ret = list()
+    if len(xdim) == 1:
+        base = list(xdim.keys())[0]
+        if isinstance(base, pq.UnitQuantity):
+            if base._reference.dimensionality == base.dimensionality:
+                ret.append(base)
+                
+            else:
+                bdef = base.definition
+                if not isinstance(bdef, pq.UnitQuantity) or isCompound(bdef):
+                    bases = getBaseUnitQuantities(bdef)
+                    if isinstance(bases, list):
+                        ret.extend(bases)
+                    else:
+                        ret.append(bases)
+                else:
+                    ret.append(base)
+        else:
+            bases = getBaseUnitQuantities(base.definition)
+            if isinstance(bases, list):
+                ret.extend(bases)
+            else:
+                ret.append(bases)
         
     else:
-        raise TypeError(f"Expecting a Python Quantity or UnitQuantity; instead, got {type(unit).__name__}")
+        for base in xdim.keys():
+            bbase = getBaseUnitQuantities(base)
+            if isinstance(bbase, list):
+                ret.extend(bbase)
+            else:
+                ret.append(bbase)
+    return ret
+        # bases = [getBaseUnitQuantities(base) for base in xdim.keys()]
+            
+def getIrreducibleDimensionality(x:pq.Quantity | pq.UnitQuantity):
+    """
+    Work-around for derievd unit quantities that won't get simplified.
+    Prime example is the pq.statampere
+    """
+    xdim = x.dimensionality
     
+
+def getSimplified(x:pq.Quantity | pq.UnitQuantity):
+    try:
+        return x.simplified
+    except:
+        # NOTE: dimensionality is the mapping UnitQuantity ↦ exponent (float, int)
+        mag = x.magnitude
+        xdim = x.dimensionality
+        if isCompound(x):
+            pass
+        return x
+    
+    finally:
+        return x
+
+def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity]):
+    """
+    Retrieves the family of units for this quantity
+    """
     families = list()
+    u = unit.dimensionality
     
     for family in UNITS_DICT:
-        if u in UNITS_DICT[family]["irreducible"] | UNITS_DICT[family]["derived"]:
+        # uset = UNITS_DICT[family]["irreducible"] | UNITS_DICT[family]["derived"]
+        uset = familyUnits(family)
+        udims = [u.dimensionality for u in uset]
+        
+        if u in udims:
             families.append(family)
+
+        else: # see is the simplified unit is in one of the families (simplified)
+            print(f"family = {family}")
+            if family == "Currency":
+                continue
+            usimp = [u_.simplified.dimensionality for u_ in uset]
+            us = unit.simplified.dimensionality
+            if us in usimp:
+                families.append(family)
             
     if len(families) == 1:
         return families[0]
@@ -434,6 +508,7 @@ def familyUnits(family:str, kind:typing.Optional[str]=None):
     
     if kind is None:
         return UNITS_DICT[family]["irreducible"] | UNITS_DICT[family]["derived"]
+    
     elif isinstance(kind, str):
         if kind == "irreducible":
             return UNITS_DICT[family]["irreducible"]
@@ -445,6 +520,7 @@ def familyUnits(family:str, kind:typing.Optional[str]=None):
         
     else:
         raise TypeError(f"UnitQuantity kind expected to be None or a str; instead, got {type(kind).__name__}")
+    
     
 def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]):
     """

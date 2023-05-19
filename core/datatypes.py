@@ -20,7 +20,7 @@ import inspect
 import numbers
 import math
 import dataclasses
-from dataclasses import (dataclass, KW_ONLY, MISSING)
+from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 import sys
 import time, datetime
 import traceback
@@ -188,23 +188,9 @@ def is_routine(x):
                       types.CoroutineType, types.MethodDescriptorType,
                       types.ClassMethodDescriptorType)
     
-    # testers = (inspect.isfunction, inspect.ismethod, 
-    #            inspect.isgeneratorfunction, 
-    #            inspect.iscoroutinefunction,
-    #            inspect.isasyncgenfunction,
-    #            inspect.isbuiltin, 
-    #            inspect.isroutine # NOTE: is this redundant? (isfunction or ismethod or isbuiltin)
-    #            )
-    
-    
     return isinstance(x, function_types)
     
 
-#     if not ret:
-#         ret = any(f(x) for f in testers)
-#         
-#     return ret
-    
 def is_callable(x):
     """Brief reminder:
     An object is callable if it is:
@@ -923,6 +909,12 @@ class Episode:
     startFrame:int = 0
     endFrame:int = 1
     
+@dataclass
+class Schedule:
+    name:str = ""
+    _:KW_ONLY
+    episodes:typing.Sequence[Episode]
+    
     
 class ProcedureType(TypeEnum):
     null = 0
@@ -949,7 +941,8 @@ class AdministrationRoute(TypeEnum):
     peros = 512 # e.g. gavage
     inhalation = 1024
     intranasal = 2048
-    food_water = 4096
+    intraorbital = 4096
+    food_water = 8192
     other = 8192
     
     # aliases
@@ -960,15 +953,22 @@ class AdministrationRoute(TypeEnum):
     icb = intracerebral
     icv = intracerebroventricular
     ic = intracardiac
-    ins = intranasal # in is a reserved keyword
+    ins = intranasal # 'in' is a reserved keyword
     ih = inhalation
+    io = intraorbital
     sc = subcutaneous
     tc = transcutaneous
     gavage = peros
     
-    
-    
+@dataclass
 class Procedure:
+    name:str = ""
+    _:KW_ONLY
+    procedureType:ProcedureType = ProcedureType.null
+    episodes:typing.Sequence[Episode] = field(default_factory = lambda : [Episode()])
+    
+    
+class Procedure_:
     def __init__(self, name:str = "", procedureType:ProcedureType = ProcedureType.treatment, episodes:list[Episode] = [Episode()]):
         self._name_ = name
         self._procedureType_ = procedureType
@@ -998,44 +998,63 @@ class Procedure:
     def episodes(self, value:list[Episode]):
         self._episodes_ = value
         
+@dataclass
 class TreatmentProcedure(Procedure):
-    def __init__(self, name:str="", episodes = [], dose:pq.Quantity = math.nan*pq.g, route:AdministrationRoute=AdministrationRoute.ip):
-        super().__init__(name=name, procedureType = ProcedureType.treatment, episodes = episodes)
-        
-        unitFamily = scq.getUnitFamily(dose)
-        
-        if not isinstance(unitFamily, str) or unitFamily not in ("Mass", "Volume", "Substance", "Concentration", "Flow"):
-            raise ValueError(f"'dose' has wrong units")
-        
-        self._dose_ = dose
-        
-        if not isinstance(route, AdministrationRoute):
-            raise TypeError(f"Invalid 'route' {route}")
-        
-        self._route_ = route
-        
-    @property
-    def dose(self):
-        return self._dose_
+    _:KW_ONLY
+    dose:pq.Quantity = field(default_factory=lambda : math.nan * pq.g)
+    route:AdministrationRoute = AdministrationRoute.null
     
-    @dose.setter
-    def dose(self, value:pq.Quantity):
-        from core import quantities as scq
+    def __post_init__(self):
+        # super().__init__(name=self.name, self.procedureType = ProcedureType.treatment, episodes = self.episodes)
         
-        unitFamily = scq.getUnitFamily(value)
-        
-        if not isinstance(unitFamily, str) or unitFamily not in ("Mass", "Volume", "Substance", "Concentration", "Flow"):
-            raise ValueError(f"'dose' has wrong units")
-        
-        self._dose_ = value
-        
-    @property
-    def route(self):
-        return self._route_
+        unitFamily = scq.getUnitFamily(self.dose)
     
-    @route.setter
-    def route(self, value:AdministrationRoute):
-        self._route_ = value
+        acceptableUnitFamilies = ("Mass", "Volume", "Substance", "Concentration", "Flow")
+    
+        if unitFamily not in acceptableUnitFamilies:
+            raise ValueError(f"'dose' has wrong units; the units should be units of {acceptableUnitFamilies}")
+        
+        self.procedureType = ProcedureType.treatment
+        
+        
+        
+#     def __init__(self, name:str="", episodes = [], dose:pq.Quantity = math.nan*pq.g, route:AdministrationRoute=AdministrationRoute.null):
+#         super().__init__(name=name, procedureType = ProcedureType.treatment, episodes = episodes)
+#         
+#         unitFamily = scq.getUnitFamily(dose)
+#         
+#         if not isinstance(unitFamily, str) or unitFamily not in ("Mass", "Volume", "Substance", "Concentration", "Flow"):
+#             raise ValueError(f"'dose' has wrong units")
+#         
+#         self._dose_ = dose
+#         
+#         if not isinstance(route, AdministrationRoute):
+#             raise TypeError(f"Invalid 'route' {route}")
+#         
+#         self._route_ = route
+        
+#     @property
+#     def dose(self):
+#         return self._dose_
+#     
+#     @dose.setter
+#     def dose(self, value:pq.Quantity):
+#         from core import quantities as scq
+#         
+#         unitFamily = scq.getUnitFamily(value)
+#         
+#         if not isinstance(unitFamily, str) or unitFamily not in ("Mass", "Volume", "Substance", "Concentration", "Flow"):
+#             raise ValueError(f"'dose' has wrong units")
+#         
+#         self._dose_ = value
+#         
+#     @property
+#     def route(self):
+#         return self._route_
+#     
+#     @route.setter
+#     def route(self, value:AdministrationRoute):
+#         self._route_ = value
         
         
         
