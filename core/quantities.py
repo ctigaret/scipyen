@@ -352,8 +352,6 @@ def get_units():
     ret["Other"]={"irreducible": {arbitrary_unit, pixel_unit, channel_unit, pq.dimensionless},
                   "derived": set()} 
     
-    # ret["Electromagnetism"]["irreducible"].add(pq.candela)
-            
     result = dict(sorted([(k,v) for (k,v) in ret.items()]))
     
     for v in result.values():
