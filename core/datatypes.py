@@ -925,6 +925,7 @@ class Episode:
     
     
 class ProcedureType(TypeEnum):
+    null = 0
     treatment = 1
     surgery = 2
     behaviour = 4 # to include navigation in real or virtual environment, rotarod, inclined plane, licking etc # TODO to refine
@@ -934,6 +935,7 @@ class ProcedureType(TypeEnum):
     cull = 255
     
 class AdministrationRoute(TypeEnum):
+    null = 0
     intraperitoneal = 1
     intramuscular = 2
     intravenous = 4
@@ -942,8 +944,13 @@ class AdministrationRoute(TypeEnum):
     intraventricular = 32
     intracerebroventricular = intracerebral | intraventricular # 48
     intracardiac = 64
-    peros = 128 # e.g. gavage
-    other = 256
+    subcutaneous = 128
+    transcutaneous = 256
+    peros = 512 # e.g. gavage
+    inhalation = 1024
+    intranasal = 2048
+    food_water = 4096
+    other = 8192
     
     # aliases
     ip = intraperitoneal
@@ -953,6 +960,10 @@ class AdministrationRoute(TypeEnum):
     icb = intracerebral
     icv = intracerebroventricular
     ic = intracardiac
+    ins = intranasal # in is a reserved keyword
+    ih = inhalation
+    sc = subcutaneous
+    tc = transcutaneous
     gavage = peros
     
     
@@ -990,7 +1001,17 @@ class Procedure:
 class TreatmentProcedure(Procedure):
     def __init__(self, name:str="", episodes = [], dose:pq.Quantity = math.nan*pq.g, route:AdministrationRoute=AdministrationRoute.ip):
         super().__init__(name=name, procedureType = ProcedureType.treatment, episodes = episodes)
+        
+        unitFamily = scq.getUnitFamily(dose)
+        
+        if not isinstance(unitFamily, str) or unitFamily not in ("Mass", "Volume", "Substance", "Concentration", "Flow"):
+            raise ValueError(f"'dose' has wrong units")
+        
         self._dose_ = dose
+        
+        if not isinstance(route, AdministrationRoute):
+            raise TypeError(f"Invalid 'route' {route}")
+        
         self._route_ = route
         
     @property
@@ -1003,10 +1024,20 @@ class TreatmentProcedure(Procedure):
         
         unitFamily = scq.getUnitFamily(value)
         
-        if isinstance(unitFamily, str) and unitFamily not in ("Mass", "Volume", "Substance", "Concentration", "Flow"):
+        if not isinstance(unitFamily, str) or unitFamily not in ("Mass", "Volume", "Substance", "Concentration", "Flow"):
             raise ValueError(f"'dose' has wrong units")
         
         self._dose_ = value
+        
+    @property
+    def route(self):
+        return self._route_
+    
+    @route.setter
+    def route(self, value:AdministrationRoute):
+        self._route_ = value
+        
+        
         
         
     
