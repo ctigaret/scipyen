@@ -13,7 +13,7 @@ from __future__ import print_function
 #### BEGIN core python modules
 import collections 
 from collections import deque
-from functools import singledispatch
+from functools import (singledispatch, singledispatchmethod)
 import datetime
 from enum import (Enum, IntEnum, EnumMeta)
 import inspect
@@ -49,7 +49,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 from core import quantities as scq
 from . import xmlutils
 from . import strutils
-from .prog import safeWrapper, is_hashable, is_type_or_subclass
+from .prog import safeWrapper, is_hashable, is_type_or_subclass, ImmutableDescriptor
 
 #### END pict.core.modules
 
@@ -913,8 +913,40 @@ class Episode:
 class Schedule:
     name:str = ""
     _:KW_ONLY
-    episodes:typing.Sequence[Episode]
+    episodes:typing.Sequence[Episode] = field(default_factory = lambda : [Episode()])
     
+    @singledispatchmethod
+    def episode(self, ndx):
+        pass
+    
+    @episode.register(int)
+    def _(self, ndx:int):
+        if ndx < 0 or ndx >= len(self.episodes):
+            raise IndexError(f"Invalid episode index {ndx} for {len(self.episodes)}")
+        
+        return self.episodes[ndx]
+    
+    @episode.register(str)
+    def _(self, name:str):
+        episodes = [e for e in self.episodes if e.name == name]
+        if len(episodes):
+            return episodes[0]
+        else:
+            raise IndexError(f"Episode name {name} does not exist")
+        
+    def episodeNames(self):
+        return [e.name for e in self.episodes]
+    
+    def addEpisode(self, episode:Episode):
+        if episode not in self.episodes:
+            self.episodes.append(episode)
+            
+    def addEpisodes(self, episodes:typing.Sequence[Episode]):
+        self.episodes.extend([e for e in episodes if e not in self.episodes])
+        
+    def removeEpisode(self, episode):
+        if episode in self.episodes:
+            self.episodes.remove(episode)
     
 class ProcedureType(TypeEnum):
     null = 0
@@ -965,47 +997,18 @@ class Procedure:
     name:str = ""
     _:KW_ONLY
     procedureType:ProcedureType = ProcedureType.null
-    episodes:typing.Sequence[Episode] = field(default_factory = lambda : [Episode()])
+    schedule:Schedule = Schedule()
     
-    
-class Procedure_:
-    def __init__(self, name:str = "", procedureType:ProcedureType = ProcedureType.treatment, episodes:list[Episode] = [Episode()]):
-        self._name_ = name
-        self._procedureType_ = procedureType
-        self._episodes_ = episodes
-        
-    @property
-    def name(self):
-        return self._name_
-    
-    @name.setter
-    def name(self, value:str):
-        self._name_ = value
-        
-    @property
-    def procedureType(self):
-        return self._procedureType_
-    
-    @procedureType.setter
-    def procedureType(self, value:ProcedureType):
-        self._procedureType_ = value
-        
-    @property
-    def episodes(self):
-        return self._episodes_
-    
-    @episodes.setter
-    def episodes(self, value:list[Episode]):
-        self._episodes_ = value
-        
 @dataclass
 class TreatmentProcedure(Procedure):
     _:KW_ONLY
     dose:pq.Quantity = field(default_factory=lambda : math.nan * pq.g)
     route:AdministrationRoute = AdministrationRoute.null
+    procedureType:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
     
     def __post_init__(self):
-        # super().__init__(name=self.name, self.procedureType = ProcedureType.treatment, episodes = self.episodes)
+        super().__init__(name=self.name, episodes = self.episodes)
+        # super().__init__(name=self.name, procedureType = ProcedureType.treatment, episodes = self.episodes)
         
         unitFamily = scq.getUnitFamily(self.dose)
     
@@ -1014,55 +1017,3 @@ class TreatmentProcedure(Procedure):
         if unitFamily not in acceptableUnitFamilies:
             raise ValueError(f"'dose' has wrong units; the units should be units of {acceptableUnitFamilies}")
         
-        self.procedureType = ProcedureType.treatment
-        
-        
-        
-#     def __init__(self, name:str="", episodes = [], dose:pq.Quantity = math.nan*pq.g, route:AdministrationRoute=AdministrationRoute.null):
-#         super().__init__(name=name, procedureType = ProcedureType.treatment, episodes = episodes)
-#         
-#         unitFamily = scq.getUnitFamily(dose)
-#         
-#         if not isinstance(unitFamily, str) or unitFamily not in ("Mass", "Volume", "Substance", "Concentration", "Flow"):
-#             raise ValueError(f"'dose' has wrong units")
-#         
-#         self._dose_ = dose
-#         
-#         if not isinstance(route, AdministrationRoute):
-#             raise TypeError(f"Invalid 'route' {route}")
-#         
-#         self._route_ = route
-        
-#     @property
-#     def dose(self):
-#         return self._dose_
-#     
-#     @dose.setter
-#     def dose(self, value:pq.Quantity):
-#         from core import quantities as scq
-#         
-#         unitFamily = scq.getUnitFamily(value)
-#         
-#         if not isinstance(unitFamily, str) or unitFamily not in ("Mass", "Volume", "Substance", "Concentration", "Flow"):
-#             raise ValueError(f"'dose' has wrong units")
-#         
-#         self._dose_ = value
-#         
-#     @property
-#     def route(self):
-#         return self._route_
-#     
-#     @route.setter
-#     def route(self, value:AdministrationRoute):
-#         self._route_ = value
-        
-        
-        
-        
-    
-    
-
-    
-    
-    
-    

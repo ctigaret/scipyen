@@ -56,11 +56,11 @@ class BaseDescriptorValidator(ABC):
     """
     @staticmethod
     def get_private_name(name:str) -> str:
-        """Find out what private name thus would operate on
+        """Find out what private name this would operate on
         """
         return f"_{name}_"
     
-    def __set_name__(self, name:str) -> None:
+    def __set_name__(self, owner, name:str) -> None:
         """Call this in the implementation's __init__
         """
         self.private_name = f"_{name}_"
@@ -145,6 +145,32 @@ class BaseDescriptorValidator(ABC):
     def validate(self, value):
         pass
     
+class ImmutableDescriptor(BaseDescriptorValidator):
+    """
+        Crude implementation of a read-only descriptor.
+    """
+    def __init__(self, *, default):
+        self._default = default
+        
+    # def __set_name__(self, owner, name:str) -> None:
+    #     """Call this in the implementation's __init__
+    #     """
+    #     self.private_name = f"_{name}_"
+    #     self.public_name = name
+        
+    def __get__(self, obj, objtype=None) -> object:
+        if obj is None:
+            return self._default
+        
+        return getattr(obj, self.private_name, self._default)
+     
+    def __set__(self, obj, value):
+        pass
+        # warnings.warn(f"{self.public_name} attribute is immutable")
+    
+    def validate(self, value):
+        return value == self._default
+        
 class OneOf(BaseDescriptorValidator):
     def __init__(self, name:str, /, *options):
         self.options = set(options)

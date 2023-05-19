@@ -1,4 +1,4 @@
-import inspect, typing
+import inspect, typing, traceback
 from math import (log, inf, nan)
 from pandas import NA
 from numpy import log10
@@ -407,7 +407,9 @@ def unitFamilies():
     return list(UNITS_DICT.keys())
 
 def isCompound(x:pq.Quantity | pq.UnitQuantity):
-    if len(x.dimensionality) == 1:
+    if len(x.dimensionality) == 0:
+        return False
+    elif len(x.dimensionality) == 1:
          base = list(x.dimensionality.keys())[0]
          return isCompound(base.definition)
      
@@ -448,30 +450,7 @@ def getBaseUnitQuantities(x:pq.Quantity | pq.UnitQuantity):
             else:
                 ret.append(bbase)
     return ret
-        # bases = [getBaseUnitQuantities(base) for base in xdim.keys()]
             
-def getIrreducibleDimensionality(x:pq.Quantity | pq.UnitQuantity):
-    """
-    Work-around for derievd unit quantities that won't get simplified.
-    Prime example is the pq.statampere
-    """
-    xdim = x.dimensionality
-    
-
-def getSimplified(x:pq.Quantity | pq.UnitQuantity):
-    try:
-        return x.simplified
-    except:
-        # NOTE: dimensionality is the mapping UnitQuantity ↦ exponent (float, int)
-        mag = x.magnitude
-        xdim = x.dimensionality
-        if isCompound(x):
-            pass
-        return x
-    
-    finally:
-        return x
-
 def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity]):
     """
     Retrieves the family of units for this quantity
@@ -480,27 +459,24 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity]):
     u = unit.dimensionality
     
     for family in UNITS_DICT:
-        # uset = UNITS_DICT[family]["irreducible"] | UNITS_DICT[family]["derived"]
-        uset = familyUnits(family)
+        uset = UNITS_DICT[family]["irreducible"] | UNITS_DICT[family]["derived"]
         udims = [u.dimensionality for u in uset]
         
         if u in udims:
             families.append(family)
 
-        else: # see is the simplified unit is in one of the families (simplified)
-            print(f"family = {family}")
-            if family == "Currency":
-                continue
-            usimp = [u_.simplified.dimensionality for u_ in uset]
-            us = unit.simplified.dimensionality
-            if us in usimp:
+        else: # see if the reference unit is in one of the reference units in the family
+            urefs = [u_._reference.units for u_ in uset]
+            uref = unit._reference.units
+            if uref in urefs:
                 families.append(family)
             
     if len(families) == 1:
         return families[0]
     
     elif len(families) > 1:
-        return set(families)
+        return sorted(list(set(families)))
+        
     
 def familyUnits(family:str, kind:typing.Optional[str]=None):
     if family not in UNITS_DICT:

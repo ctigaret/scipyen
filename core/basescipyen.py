@@ -129,11 +129,42 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
         super().__init__(name=name, description=description, file_origin=file_origin, **kwargs)
         
     def __attr_str__(self):
+        result = list()
         for a in self._descriptor_attributes_:
-            result.append(f"{a[0]}: {getattr(self, a[0], None)}")
+            attr = getattr(self, a[0], None)
+            attr_str = type(attr).__name__
             
-        return "\n".join(result)
+            if isinstance(attr, neo.Block):
+                attr_str += f" with {len(attr.segments)} segments"
+                
+            elif isinstance(attr, np.ndarray):
+                attr_str += f" with shape {attr.shape}"
+                
+            else:
+                attr_str = f"{attr}"
+                
+            result.append(f"{a[0]}: {attr_str}")
+            
+        return result
+        # return "\n".join(result)
     
+    def _repr_pretty_(self, p, cycle):
+        name = self.name if isinstance(self.name, str) else ""
+        
+        if cycle:
+            p.text(f"{self.__class__.__name__} {name}")
+        else:
+            p.text(f"{self.__class__.__name__} {name}")
+            p.breakable()
+            attr_repr = self.__attr_str__()
+            with p.group(4 ,"(",")"):
+                for t in attr_repr:
+                    p.text(t)
+                    p.breakable()
+                p.text("\n")
+                
+            p.breakable()
+            
     @property
     def mandatory_descriptors(self):
         return dict((a[0], getattr(self, a[0], None)) for a in self._descriptor_attributes_)

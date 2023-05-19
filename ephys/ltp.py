@@ -28,7 +28,7 @@ import core.workspacefunctions as wf
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.datatypes as dt
-from core.datatypes import TypeEnum
+from core.datatypes import (Episode, Schedule, TypeEnum)
 from core.quantities import units_convertible
 import plots.plots as plots
 import core.models as models
@@ -66,6 +66,7 @@ from core.utilities import (safeWrapper,
                             reverse_mapping_lookup, 
                             get_index_for_seq, 
                             sp_set_loc )
+
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
@@ -134,11 +135,12 @@ class SynapticPathway(BaseScipyenData):
         ("responseSignal", (str, int), 0),
         ("analogCommandSignal", (str, int), 1),
         ("digitalCommandSignal", (str, int), 2),
+        ("schedule", Schedule, Schedule()),
         )
     
     _descriptor_attributes_ = _data_children_ + _data_attributes_ + BaseScipyenData._descriptor_attributes_
     
-    def __init__(self, data:neo.Block=neo.Block(), pathwayType:PathwayType = PathwayType.Test, name:typing.Optional[str]=None, response:typing.Optional[typing.Union[str, int]]=None, analogCommand:typing.Union[typing.Union[str, int]] = None, digitalCommand:typing.Optional[typing.Union[str, int]] = None, **kwargs):
+    def __init__(self, data:neo.Block=neo.Block(), pathwayType:PathwayType = PathwayType.Test, name:typing.Optional[str]=None, response:typing.Optional[typing.Union[str, int]]=None, analogCommand:typing.Union[typing.Union[str, int]] = None, digitalCommand:typing.Optional[typing.Union[str, int]] = None, schedule:typing.Optional[Schedule] = None, **kwargs):
         """
         Named parameters:
         ----------------
@@ -159,110 +161,44 @@ class SynapticPathway(BaseScipyenData):
         
         """
         super().__init__(**kwargs)
-#         self._data_ = data
-#         
-#         if len(data.segments) == 0:
-#             raise ValueError("Data is an empty neo.Block")
-#         
-#         emptysegs = [k for k, s in enumerate(data.segments) if len(s.analogsignals) == 0]
-#         
-#         if len(emptysegs):
-#             raise ValueError(f"Segments {emptysegs} have no analogsignals")
-        
-#         self._analog_ = self._check_signal_param_(analogCommand, "analogCommand")
-#         self._digital_ = self._check_signal_param_(digitalCommand, "digitalCommand")
-#         self._response_ = self._check_signal_param_(response, "response")
-#         
-        # self._type_ = pathwayType
-        
-        # self._name_ = name
-        # if self._name_ is None:
-        #     self._name_ = self._type_.name
 
-        # NOTE: 2023-05-15 09:14:05
-        # mapping tag ↦ indices, where:
-        # • tag = str = tag name (e.g. baseline, baseline_drug, etc)
-        # • indices of baseline segments - can be:
-        #   ∘ a sequence (tuple, list) of unique int indices
-        #   ∘ a range
-        #   ∘ None
-        self._baseline_ = dict()
+#         # NOTE: 2023-05-15 09:14:05
+#         # mapping tag ↦ indices, where:
+#         # • tag = str = tag name (e.g. baseline, baseline_drug, etc)
+#         # • indices of baseline segments - can be:
+#         #   ∘ a sequence (tuple, list) of unique int indices
+#         #   ∘ a range
+#         #   ∘ None
+#         self._baseline_ = dict()
+#         
+#         # NOTE: 2023-05-15 09:15:25
+#         # mapping tag ↦ indices, see NOTE: 2023-05-15 09:14:05 for details
+#         self._chase_ = dict()
+#         
+#         # NOTE: 2023-05-15 09:45:08
+#         # mapping tag ↦ indices, see NOTE: 2023-05-15 09:14:05 for details
+#         self._xtalk_ = dict()
+
+    @staticmethod
+    def fromBlocks(segment:int, analogsignals=None, irregularlysampledsignals=None, imagesequences=None, spiketrains=None, epochs=None, events=None, **episodeSpecs):
+        # NOTE: 2023-05-19 17:08:53
+        # an episode spec is a mapping of str ↦ sequence of neo Blocks
+        # 
+        # The blocks in the sequence are ordered here by their rec_datetime
+        # WARNING/TODO: check argument types
+        #
+        nBlocks = sum(len(bl) for bl in episodeSpecs.values())
         
-        # NOTE: 2023-05-15 09:15:25
-        # mapping tag ↦ indices, see NOTE: 2023-05-15 09:14:05 for details
-        self._chase_ = dict()
+        for episodeName, blocks, in episodeSpecs.items():
+            bb = sorted(blocks, key = lambda x: x.rec_datetime)
+            
+            datetime_start = bb[0].rec_datetime
+            datetime_end = bb[-1].rec_datetime
+            
         
-        # NOTE: 2023-05-15 09:45:08
-        # mapping tag ↦ indices, see NOTE: 2023-05-15 09:14:05 for details
-        self._xtalk_ = dict()
+        pass
         
-#     def _check_signal_param_(self, sig, param):
-#         if sig is None:
-#             return sig
-#         
-#         if isinstance(sig, str):
-#             if len(sig):
-#                 nosig = [k for k,s in enumerate(data.segments) if s not in [sig.name for sig in s.analogsignals]]
-#                 if len(nosig):
-#                     raise ValueError(f"The {param} signal {sig} not found in segments {nosig}")
-#                 
-#             else:
-#                 sig = None
-#                 
-#         elif isinstance(sig, int):
-#             if sig < 0:
-#                 raise ValueError(f"Invalid {param} signal index {sig}; should be >= 0")
-#                 
-#             nosig = [k for k,s in enumerate(data.segments) if sig >= len(s.analogsignals)]
-#             
-#             if len(nosig):
-#                 raise ValueError(f"Invalid {param} signal index {sig} for segments {nosig}")
-#             
-#         else:
-#             raise TypeError(f"Expecting {param} an int or str; got {type(sig).__name__} instead")
-#         
-#         return sig
-#             
-#         
-#     @property
-#     def pathwayType(self):
-#         return self._type_
-#     
-#     @pathwayType.setter
-#     def pathwayType(self, value:PathwayType):
-#         self._type_ = value
-#         
-#     @property
-#     def analogCommandSignal(self):
-#         return self._analog_
-#     
-#     @analogCommandSignal.setter
-#     def analogCommandSignal(self, value:typing.Optional[typing.Union[str, int]] = None):
-#         self._analog_ = self._check_signal_param_(value, "analogCommand")
-#         
-#     @property
-#     def digitalCommandSignal(self):
-#         return self._digital_
-#     
-#     @digitalCommandSignal.setter
-#     def digitalCommandSignal(self, value:typing.Optional[typing.Union[str, int]] = None):
-#         self._digital_ = self._check_signal_param_(value, "digitalCommand")
-#         
-#     @property
-#     def responseSignal(self):
-#         return self._response_
-#     
-#     @responseSignal.setter
-#     def responseSignal(self, value:typing.Optional[typing.Union[str, int]] = None):
-#         self._response_ = self._check_signal_param_(value, "response")
-#         
-#     @property
-#     def pathName(self):
-#         return self._name_
-    
-    # @pathName.setter
-    # def pathName(self, value:typing.Union[str] = None):
-    #     self._name_ = value
+        
         
 class SynapticPlasticityData(BaseScipyenData):
     _data_children_ = (
@@ -298,22 +234,9 @@ class SynapticPlasticityData(BaseScipyenData):
     def __init__(self, pathways:typing.Optional[typing.Sequence[SynapticPathway]]=None, **kwargs):
         super().__init__(**kwargs)
         
-    def __reduce__(self): # TODO
-        pass
+    # def __reduce__(self): # TODO
+    #     pass
     
-    def _repr_pretty_(self, p, cycle):
-        name = self.name if isinstance(self.name, str) else ""
-        
-        if cycle:
-            p.text(f"{self.__class__.__name__} {name}")
-        else:
-            p.text(f"{self.__class__.__name__} {name}")
-            p.breakable()
-            p.text("With pathways:\n")
-            if isinstance(self.pathways, (tuple, list)) and len(self.pathways):
-                for sp in self.pathways:
-                    p.text(f"Pathway: {sp}")
-
 def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     """Constructs a dict with options for synaptic plasticity experiments.
     

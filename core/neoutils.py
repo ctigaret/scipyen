@@ -3161,14 +3161,33 @@ def concatenate_blocks(*args, **kwargs):
     epochs:     as above for Epoch objects
     
     events:     as above for Event objects
+    
+    copy:       bool, default True;
+    
+                When False, the concatenated block contains a reference to the
+                data in 'args'. 
+    
+                WARNING: this is important, as changes to the attributes of the 
+                concatenated block will alter the original data (e.g., segment
+                names, time bases, etc). As long as the source data is still 
+                'alive', any indirect changes incurred in this fashion will be 
+                also saved to the file (should you decide to save the data again)!
+    
+                However, this link is lost when the result is serialized to a 
+                file, or when the source data is removed from the workspace
+    
+                When True (the default), the results stores a deep copy of the 
+                data in 'args', so that any changes to the concatenated block 
+                will NOT be propagated to the source data. While this uses more
+                resources, it may be considered more safe.
         
     Returns:
     -------
     a new neo.Block object
     
     NOTE: this is different from what neo.core.container.Container.merge()
-    achieves. `merge` is inhetied by Block, Segment, and Group) and basically
-    appends dataobjects to their corresponding child data containers 
+    achieves. `merge` is inherited by Block, Segment, and Group) and basically
+    appends data objects to their corresponding child data containers 
     (hence requiring identical time bases)
     
     Example:
@@ -3189,26 +3208,10 @@ def concatenate_blocks(*args, **kwargs):
     file_datetime = kwargs.get("file_datetime", None)
     rec_datetime = kwargs.get("datetime", datetime.datetime.now())
     annotations = kwargs.get("annotations", dict())
+    toCopy = kwargs.get("copy", True)
     
     if len(args) == 0:
         return None
-    
-#     segments = kwargs.pop("segments", None)
-#     
-#     if isinstance(segments, (tuple, list)):
-#         if len(segments) == 0:
-#             segments = None
-#             
-#         elif not all(isinstance(v, int) for v in segments):
-#             raise TypeError(f"When specified, the 'segments' sequence must contain only integers")
-#         
-#     elif isinstance(segments, range):
-#         # convert range to a list of int indices
-#         segments = list(segments)
-#         
-#     elif not isinstance(segments, (int, slice)):
-#         if segments is not None:
-#             raise TypeError(f"When specified, 'segments' must be an int, a sequence (tuple, list) of int, a range, a slice, or None; got {type(segments)} instead")
     
     if len(args) == 1:
         if isinstance(args[0], (str, type)):
@@ -3233,48 +3236,24 @@ def concatenate_blocks(*args, **kwargs):
             args = args[0] # unpack the args tuple
 
     if isinstance(args, neo.Block):
-        # a single Block object => just copy with data subsets
-        new_block = copy_with_data_subset(arg, **kwargs)
-#         if isinstance(segments, int):
-#             if segments in range(len(arg.segments)):
-#                 seg = arg.segments[segments]
-#                 new_block.segments = [seg]
-#             
-#             else:
-#                 raise IndexError(f"Segment index {segements} is out of range for {len(arg.segments)} segments in the argument")
-#             
-#         elif isinstance(segments, (tuple, list)):
-#             if len(segments)> 0:
-#                 if all(isinstance(v, int) for v in segments):
-#                     segs = list()
-#                     for s_index in segments:
-#                         if s_index in range(len(arg.segments)):
-#                             segs.append(arg.segments[s_index])
-#                             
-#                         else:
-#                             raise IndexError(f"Segment index {s_index} is out of range for {len(arg.segments)} segments in the argument")
-#                     # new_block.segments.clear()
-#                     new_block.segments=segs
-#                     
-#         elif isinstance(segments, slice):
-#             segs = arg.segments[segments]
-#             new_block.segments = segs
-#             
-#             raise TypeError(f"Keyword 'segments' must map to an integer, a list of integers, or None; got {type(segments)} instead")
-            
-            
+        # a single Block object => just copy with data subsets ONLY if toCopy is True
+        new_block = copy_with_data_subset(args, **kwargs) if toCopy else args
             
         return new_block
-        # return copy_with_data_subset(arg, **kwargs)
-        
             
     if isinstance(args, neo.Segment):
+        # FIXME: 2023-05-19 17:36:25
+        # obviously, here the segment index in the kwargs does NOT help
+        # TODO take this code out into a concatenate_segments() function
         # make a new Block, append a copied segment
         ret = neo.core.Block(name=name, description=description, file_origin=file_origin,
                             file_datetime=file_datetime, rec_datetime=rec_datetime, 
                             **annotations)
-        #kwargs.pop("segments", None) # remove segments index if any
-        ret.segments.append(copy_with_data_subset(args, **kwargs))
+        if toCopy:
+            ret.segments.append(copy_with_data_subset(args, **kwargs))
+            
+        else:
+            ret.segments.append(args)
         
         for k, seg in enumerate(ret.segments):
             seg.block = ret
@@ -3289,6 +3268,9 @@ def concatenate_blocks(*args, **kwargs):
         # make a new Block, append segments
         # when Blocks, we need to take into account the existence of Groups and
         # ChannelViews
+        # TODO/FIXME: 2023-05-19 17:38:00
+        # only accept Blocks, not Segments in args - refactor into a new function
+        # to append Segments to an existing Block
         ret = neo.core.Block(name=name, description=description, file_origin=file_origin,
                             file_datetime=file_datetime, rec_datetime=rec_datetime, 
                             **annotations)
@@ -3296,7 +3278,10 @@ def concatenate_blocks(*args, **kwargs):
         
         for (k,arg) in enumerate(args):
             if isinstance(arg, neo.Block):
-                new_block = copy_with_data_subset(arg, **kwargs)
+                if toCopy:
+                    new_block = copy_with_data_subset(arg, **kwargs)
+                else:
+                    new_block = arg
                 
                 ret.segments.extend(new_block.segments)
                 
