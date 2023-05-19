@@ -3135,8 +3135,8 @@ def concatenate_blocks(*args, **kwargs):
     segments: int or None; 
                 when None, all segments in each block will be used;
                 when int then only segments with given index will be used
-                (i.e. only one segment from each block will be retained in 
-                the concatenated data)
+                (i.e. only the segment with the given index from each block will 
+                be retained in the concatenated data)
                     
     analogsignals: int, str, range, slice, typing.Sequence
                 Indexing of analog signal(s) into each of the segments, that
@@ -3210,6 +3210,19 @@ def concatenate_blocks(*args, **kwargs):
     annotations = kwargs.get("annotations", dict())
     toCopy = kwargs.get("copy", True)
     
+    # cache here the selection parameters:
+    segmentsNdx = kwargs.get("segments", None)
+    analogsignalsNdx = kwargs.get("analogsignals", None)
+    irregularlysampledsignalsNdx = kwargs.get("irregularlysampledsignals", None)
+    imagesequencesNdx = kwargs.get("imagesequences", None)
+    spiketrainsNdx = kwargs.get("spiketrains", None)
+    epochsNdx = kwargs.get("epochs", None)
+    eventsNdx = kwargs.get("events", None)
+    
+    segmentComponentsSelection = (analogsignalsNdx, irregularlysampledsignalsNdx,
+                                  imagesequencesNdx, spiketrainsNdx,
+                                  epochsNdx, eventsNdx)
+    
     if len(args) == 0:
         return None
     
@@ -3279,11 +3292,40 @@ def concatenate_blocks(*args, **kwargs):
         for (k,arg) in enumerate(args):
             if isinstance(arg, neo.Block):
                 if toCopy:
+                    # copy arg to a new block; the **kwargs will take care of 
+                    # selective copy of segments and of their contents
                     new_block = copy_with_data_subset(arg, **kwargs)
+                    ret.segments.extend(new_block.segments)
                 else:
-                    new_block = arg
-                
-                ret.segments.extend(new_block.segments)
+                    # since a Segment is a simple container, we can just copy it
+                    # if a subset of signals is requested;
+                    # otherwise, we just store a reference to the segment
+                    if isinstance(segmentsNdx, int):
+                        if segmentsNdx in range(len(arg.segments)):
+                            if all(v is None for v in segmentComponentsSelection):
+                                # no segment component selection ⇒ just get the whole segment
+                                ret.segments.append(arg.segments[segmentsNdx])
+                            else:
+                                seg = arg.segments[segmentsNdx]
+                                # we need to create a new segment here, but the 
+                                # contents are copied by reference from the original segment;
+                                # this is ok as a segment is a not very expensive container
+                                new_seg = neo.Segment(name = seg.name, index = seg.index) # CAUTION this will be reindexed
+                                # NOTE: 2023-05-19 22:42:11 THIS IS ESSENTIAL !
+                                # also store the container block rec_datetime into this segment !
+                                new_seg.rec_datetime = arg.rec_datetime
+                                # TODO: 2023-05-19 22:39:17
+                                # code to select, as necessary:
+                                # • analogsignals
+                                # • irregularlysampledsignals
+                                # • etc
+                        else:
+                            raise ValueError(f"Invalid segment index {segmentxNdx} for block {k} with {len(args.segments)} segments")
+                    else:
+                        if all(v is None for v in segmentComponentsSelection):
+                            ret.segments.extend(args.segments)
+                        else:
+                            
                 
                 if len(new_block.groups):
                     for group in new_block.groups:
