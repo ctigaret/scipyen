@@ -2787,29 +2787,41 @@ def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_
     else:
         raise TypeError("Expecting a sequence of neo.AnalogSignal or datatypes.DataSignal objects")
                 
+
 @singledispatch
 def copy_with_data_subset(obj, **kwargs):
-    """Copy a container's data to another container of the same type.
+    """Copy data from a source neo container to a new container of the same type.
     
-    The container's children are copied by creating new instances (as in 
-    'copy-construction') with the possibility of selecting specific subsets 
-    of the container's children.
+    It is possible to select specific subsets of the source container children.
     
-    This is useful to store a subset of a container's data to another container 
-    of the same type as the source. Typical examples are to store a subset of 
-    segments from a block into a new block, with each of the retained segments 
+    The container's children (signal-like objects, spike trains, images, 
+    epochs and events) are, by default, copied by creating new instances 
+    (as in 'copy-construction') - see the "copy" parameter, below. 
+
+    Optionally, the children can be stored as references (CAUTION: in this case,
+    any changes made to these objects as stored in the new object WILL affect
+    their originals)
+
+    The function can store a subset of a container's data to another container 
+    having the same type as the source. Typical examples are to store a subset
+    of segments from a block into a new block, where each retained segment
     possibly containing subsets of child data objects (analogsignals, 
-    irregularlysampledsignals, spiketrains, etc.). Such situations arise when 
-    the intentions is to stored and concatenate a selection of block segments 
-    form several blocks, as another (new) block, while retaining a subset of #
-    each segment's data objects.
+    irregularlysampledsignals, spiketrains, etc.).
+
+    This is useful in the cases intended to concatenate a selection of block 
+    segments from several blocks, as another (new) block, while retaining a 
+    subset of each segment's data objects.
     
     In these cases one cannot simply work on regular (shallow) copies of a
     container and manipulate its contents later: changes to these shallow copies
     (e.g, leaving segments out, or leaving analogsignals out from each segment) 
-    will be reflected on the originals as well.
+    will be reflected on the originals as well. 
+
+    However, this function allows the creation of new container copies that 
+    include references (shallow copies) of the data objects (signal-like, event,
+    epochs, etc) for reasons of efficiency.
     
-    Subsets of segments and of chidl data objects in each segment can be selected
+    Subsets of segments and of child data objects in each segment can be selected
     either using the neo object's `name` property, or by their indices in the 
     corresponding 'child' containers of the original container.
     
@@ -2824,64 +2836,71 @@ def copy_with_data_subset(obj, **kwargs):
     
     Parameters:
     -----------
-    obj: neo.Block or neo.Segment
+    obj: neo.Block or neo.Segment - the source container.
     
-        Var-keyword parameters:
-        ----------------------
-        
-        segments:       int, str, range, slice, typing.Sequence or None; 
-                        Indexing of the segments to be retained in the result.
-                        
-                        This index can be (see normalized_index):
-                        int, str (signal name), sequence of int or str, a range,
-                        a slice, or a numpy array of int or booleans.
-                        
-                        When None, all segments in each block will be retained.
-                        
-        groups:         int, str, range, slice, typing.Sequence or None; 
-                        Indexing of the segments to be retained in the result.
-                        
-                        This index can be (see normalized_index):
-                        int, str (signal name), sequence of int or str, a range,
-                        a slice, or a numpy array of int or booleans.
-                        
-                        When None, all groups in each block will be retained.
-                        
-                        NOTE: Ignored when 'segments' is not None, because 
-                        'groups' represent a view of the data organization that
-                        is orthogonal to the organization in segments. 
-                        
-        analogsignals:  
-                        int, str, range, slice, typing.Sequence or None;
-                        
-                        Indexing of analog signal(s) into each of the segments, that
-                        will be retained in the concatenated data. These include
-                        neo.AnalogSignal and datatypes.DataSignal
+    Var-keyword parameters:
+    ----------------------
+    
+    copy:           bool: When True (the default) the signal objects stored in
+                    the data will be copied.
+    
+                    When False, the signal objects will be stored by reference 
+                    in the result.
+                
+    
+    segments:       int, str, range, slice, typing.Sequence or None (default); 
+                    Indexing of the segments to be retained in the result.
                     
-                        This index can be (see normalized_index):
-                        int, str (signal name), sequence of int or str, a range,
-                        a slice, or a numpy array of int or booleans.
-                        
-                        When None, all analogsignals available in each segment
-                        are retained.
-                        
-                        
-                        
-        irregularlysampledsignals:
-                        as analog, for irregularly sampled signals. These 
-                        include neo.IrregularlySampledSignal and 
-                        datatypes.IrregularlySampledDataSignal
-        
-        imagesequences:
-                        as analog, for neo.ImageSequence objects (for neo version
-                        from 0.8.0 onwards)
+                    This index can be (see normalized_index):
+                    int, str (signal name), sequence of int or str, a range,
+                    a slice, or a numpy array of int or booleans.
                     
-        spiketrains:    as analog, for the spiketrains in the block's segments
-        
-        epochs:         as above for Epoch objects
-        
-        events:         as above for Event objects
-        
+                    When None, all segments in each block will be retained.
+                    
+    groups:         int, str, range, slice, typing.Sequence or None; 
+                    Indexing of the segments to be retained in the result.
+                    
+                    This index can be (see normalized_index):
+                    int, str (signal name), sequence of int or str, a range,
+                    a slice, or a numpy array of int or booleans.
+                    
+                    When None, all groups in each block will be retained.
+                    
+                    NOTE: Ignored when 'segments' is not None, because 
+                    'groups' represent a view of the data organization that
+                    is orthogonal to the organization in segments. 
+                    
+    analogsignals:  
+                    int, str, range, slice, typing.Sequence or None (default);
+                    
+                    Indexing of analog signal(s) into each of the segments, that
+                    will be retained in the concatenated data. These include
+                    neo.AnalogSignal and datatypes.DataSignal
+                
+                    This index can be (see normalized_index):
+                    int, str (signal name), sequence of int or str, a range,
+                    a slice, or a numpy array of int or booleans.
+                    
+                    When None, all analogsignals available in each segment
+                    are retained.
+                    
+                    
+                    
+    irregularlysampledsignals:
+                    as analog, for irregularly sampled signals. These 
+                    include neo.IrregularlySampledSignal and 
+                    datatypes.IrregularlySampledDataSignal
+    
+    imagesequences:
+                    as analog, for neo.ImageSequence objects (for neo version
+                    from 0.8.0 onwards)
+                
+    spiketrains:    as analog, for the spiketrains in the block's segments
+    
+    epochs:         as above for Epoch objects
+    
+    events:         as above for Event objects
+    
     """
     raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
 
@@ -2889,35 +2908,50 @@ def copy_with_data_subset(obj, **kwargs):
 def _(obj, **kwargs):
     """Deep copy for a subset of data & containers in Block.
     """     
-    # TODO: 2021-11-23 14:56:21
-    # ChannelView
-    
-    #name = kwargs.pop("name", "Copied Block")
-    #description = kwargs.pop("description", "Copied block")
-    
+    # NOTE: 2023-05-20 09:48:31
+    # ### BEGIN allow overwriting these here, 
+    # and store the orignals in the new annotations of the new object;
+    sourceMetaData = dict()
     name = kwargs.pop("name", obj.name)
+    if name != obj.name:
+        sourceMetaData["name"] = obj.name
     description = kwargs.pop("description", obj.description)
-    file_origin = kwargs.pop("file_origin", "")
-    file_datetime = kwargs.pop("file_datetime", None)
-    rec_datetime = kwargs.pop("rec_datetime", datetime.datetime.now())
-    annotations = kwargs.pop("annotations", dict())
+    if description != obj.description:
+        sourceMetaData["description"] = obj.description
+    file_origin = kwargs.pop("file_origin", obj.file_origin)
+    if file_origin != obj.file_origin:
+        sourceMetaData["file_origin"] = obj.file_origin
+    file_datetime = kwargs.pop("file_datetime", obj.file_datetime)
+    if file_datetime != obj.file_datetime:
+        sourceMetaData["file_datetime"] = obj.file_datetime
+    rec_datetime = kwargs.pop("rec_datetime", obj.rec_datetime)
+    if rec_datetime != obj.rec_datetime:
+        sourceMetaData["rec_datetime"] = obj.rec_datetime
+    annotations = kwargs.pop("annotations", obj.annotations)
+    if annotations is None:
+        annotations = dict()
+    if annotations != obj.annotations:
+        sourceMetaData["annotations"] = obj.annotations
+        if sourceMetaData["annotations"] is None:
+            sourceMetaData["annotations"] = dict()
+    # ### END
+    
+    toCopy = kwargs.pop("copy", True)
     
     # NOTE: 2023-04-13 09:45:19
     # some kwargs are not suitable for a Block, but they may be suitable for 
-    # one of the Block's childrenn (e.g., Segment, etc)
+    # one of the Block's children (e.g., Segment, etc)
     # so we cache them here, to reinstate them later when copying the child
     # (see NOTE: 2023-04-13 09:45:26)
     not_kwargs = dict()
     
     for kwarg in kwargs.keys():
         if kwarg not in obj._child_containers:
-            similars = [s for s in obj._child_containers if s.lower() in kwarg.lower() or kwarg.lower() in s.lower()]
-            if len(similars):
-                warnings.warn(f"Unexpected keyword {kwarg} will be ignored; did you mean one of {similars}?")
-                # raise KeyError(f"Unexpected keyword {kwarg}; did you mean one of {similars}?")
-            else:
-                warnings.warn(f"Unexpected keyword {kwarg} will be ignored")
-                # raise KeyError(f"Unexpected keyword {kwarg}")
+            # similars = [s for s in obj._child_containers if s.lower() in kwarg.lower() or kwarg.lower() in s.lower()]
+            # if len(similars):
+            #     warnings.warn(f"Unexpected keyword {kwarg} will be ignored; did you mean one of {similars}?")
+            # else:
+            #     warnings.warn(f"Unexpected keyword {kwarg} will be ignored")
                 
             not_kwargs[kwarg] = kwargs[kwarg]
             
@@ -2952,6 +2986,7 @@ def _(obj, **kwargs):
     # as they may be useful for copy_with_data_subset on the child (in this case, 
     # the Segment)
     kwargs.update(not_kwargs)
+    kwargs["copy"] = toCopy
     
     new_segments = list(copy_with_data_subset(obj.segments[k], **kwargs) 
                         for k in keep_segs_ndx)
@@ -2970,11 +3005,11 @@ def _(obj, **kwargs):
     ret.file_datetime = file_datetime
     ret.rec_datetime = rec_datetime
     ret.annotations.update(annotations)
-    ret.annotate(original_file = obj.file_origin, original_block = obj.name, original_datetime = obj.rec_datetime, original_file_recording = obj.file_datetime)
+    ret.annotate(sourceMetaData = sourceMetaData)
     
     # NOTE: 2021-11-23 12:06:31
-    # Sicne the number of segments and the sizes of their signal containers MAY 
-    # have changed, we need to re-create the orthogonal organization in Group
+    # Because the number of segments and the sizes of their signal containers 
+    # MAY have changed, we need to re-create the orthogonal organization in Group
     # objects and possible ChannelView objects.
     
     if len(obj.groups):
@@ -3030,33 +3065,57 @@ def _(obj, **kwargs):
     from neo.core.spiketrainlist import SpikeTrainList
     import difflib
     
+    # NOTE: 2023-05-20 09:48:31
+    # ### BEGIN allow overwriting these here, 
+    # and store the orignals in the new annotations of the new object;
+    sourceMetaData = dict()
     name = kwargs.pop("name", obj.name)
+    if name != obj.name:
+        sourceMetaData["name"] = obj.name
     description = kwargs.pop("description", obj.description)
-    file_origin = kwargs.pop("file_origin", "")
-    file_datetime = kwargs.pop("file_datetime", None)
-    rec_datetime = kwargs.pop("rec_datetime", datetime.datetime.now())
-    annotations = kwargs.pop("annotations", dict())
+    if description != obj.description:
+        sourceMetaData["description"] = obj.description
+    file_origin = kwargs.pop("file_origin", obj.file_origin)
+    if file_origin != obj.file_origin:
+        sourceMetaData["file_origin"] = obj.file_origin
+    file_datetime = kwargs.pop("file_datetime", obj.file_datetime)
+    if file_datetime != obj.file_datetime:
+        sourceMetaData["file_datetime"] = obj.file_datetime
+    rec_datetime = kwargs.pop("rec_datetime", obj.rec_datetime)
+    if rec_datetime != obj.rec_datetime:
+        sourceMetaData["rec_datetime"] = obj.rec_datetime
+    annotations = kwargs.pop("annotations", obj.annotations)
+    if annotations is None:
+        annotations = dict()
+    if annotations != obj.annotations:
+        sourceMetaData["annotations"] = obj.annotations
+        if sourceMetaData["annotations"] is None:
+            sourceMetaData["annotations"] = dict()
+    # ### END
+    
+    toCopy = kwargs.pop("copy", True)
     
     data_child_object_names = [_container_name(s) for s in obj._data_child_objects]
     # print(f"copy_with_data_subset(Segment) data_child_object_names {data_child_object_names}")
     
     not_kwargs = dict()
     
+    # see NOTE: 2023-04-13 09:45:19
     for kw in kwargs.keys():
         if kw not in data_child_object_names:
-            similar = [s for s in data_child_object_names if similar_strings(kw,s)>0.5]
-            if len(similar):
-                if len(similar)> 1:
-                    warnings.warn(f"Unexpected keyword '{kw}' will be ignored; did you mean one of {similar}?")
-                    # raise KeyError(f"Unexpected keyword '{kw}'; did you mean one of {similar}?")
-                else:
-                    warnings.warn(f"Unexpected keyword '{kw}' will be ignored; did you mean '{similar[0]}'?")
-                    # raise KeyError(f"Unexpected keyword '{kw}'; did you mean '{similar[0]}'?")
-                
-            else:
-                warnings.warn(f"Unexpected keyword '{kw}' will be ignored")
-                # raise KeyError(f"Unexpected keyword '{kw}'")
-                
+#             similar = [s for s in data_child_object_names if similar_strings(kw,s)>0.5]
+#             if len(similar):
+#                 if len(similar)> 1:
+#                     warnings.warn(f"Unexpected keyword '{kw}' will be ignored; did you mean one of {similar}?")
+#                     # raise KeyError(f"Unexpected keyword '{kw}'; did you mean one of {similar}?")
+#                 else:
+#                     warnings.warn(f"Unexpected keyword '{kw}' will be ignored; did you mean '{similar[0]}'?")
+#                     # raise KeyError(f"Unexpected keyword '{kw}'; did you mean '{similar[0]}'?")
+#                 
+#             else:
+#                 warnings.warn(f"Unexpected keyword '{kw}' will be ignored")
+#                 # raise KeyError(f"Unexpected keyword '{kw}'")
+#                 
             not_kwargs[kw] = kwargs[kw]
             
     for k in not_kwargs.keys():
@@ -3072,15 +3131,17 @@ def _(obj, **kwargs):
         # the conversion to list also takes care of SpikeTrainList object
         container = list(getattr(obj, container_name))
         keep_ndx = normalized_index(container, indices)
-        keep_data = list(make_neo_object(container[k]) for k in keep_ndx) # copy c'tor
+        if toCopy:
+            keep_data = list(make_neo_object(container[k]) for k in keep_ndx) # copy c'tor
+        else:
+            keep_data = list(container[k] for k in keep_ndx) # store a reference
+            
         for d in keep_data:
             d.segment = ret
             
         setattr(ret, container_name, keep_data)
         
-    ret.annotate(original_file = obj.file_origin, original_segment = obj.name, 
-                 original_datetime = obj.rec_datetime, 
-                 original_file_recording = obj.file_datetime)
+    ret.annotate(sourceMetaData = sourceMetaData)
     
     ret.create_relationship()
     
@@ -3088,7 +3149,8 @@ def _(obj, **kwargs):
 
 @safeWrapper
 def concatenate_blocks(*args, **kwargs):
-    """Concatenates the segments in *args into a new Block.
+    """Concatenates the segments in the neo.Blocks supplied in *args.
+    Generates a new Block.
     
     Copies of neo.Segment objects in the source data (*args) are appended to the
     in the result in the order they are encountered (i.e. the same order as they
@@ -3108,7 +3170,7 @@ def concatenate_blocks(*args, **kwargs):
     Var-keyword parameters:
     -----------------------
     
-    1. Parameters that specify new metadata for the newly creates Block (see the
+    1. Parameters that specify new metadata for the newly created Block (see the
     documentation of the neo.Block):
     
     name:str            
@@ -3208,20 +3270,6 @@ def concatenate_blocks(*args, **kwargs):
     file_datetime = kwargs.get("file_datetime", None)
     rec_datetime = kwargs.get("datetime", datetime.datetime.now())
     annotations = kwargs.get("annotations", dict())
-    toCopy = kwargs.get("copy", True)
-    
-    # cache here the selection parameters:
-    segmentsNdx = kwargs.get("segments", None)
-    analogsignalsNdx = kwargs.get("analogsignals", None)
-    irregularlysampledsignalsNdx = kwargs.get("irregularlysampledsignals", None)
-    imagesequencesNdx = kwargs.get("imagesequences", None)
-    spiketrainsNdx = kwargs.get("spiketrains", None)
-    epochsNdx = kwargs.get("epochs", None)
-    eventsNdx = kwargs.get("events", None)
-    
-    segmentComponentsSelection = (analogsignalsNdx, irregularlysampledsignalsNdx,
-                                  imagesequencesNdx, spiketrainsNdx,
-                                  epochsNdx, eventsNdx)
     
     if len(args) == 0:
         return None
@@ -3249,9 +3297,7 @@ def concatenate_blocks(*args, **kwargs):
             args = args[0] # unpack the args tuple
 
     if isinstance(args, neo.Block):
-        # a single Block object => just copy with data subsets ONLY if toCopy is True
-        new_block = copy_with_data_subset(args, **kwargs) if toCopy else args
-            
+        new_block = copy_with_data_subset(args, **kwargs)
         return new_block
             
     if isinstance(args, neo.Segment):
@@ -3262,11 +3308,7 @@ def concatenate_blocks(*args, **kwargs):
         ret = neo.core.Block(name=name, description=description, file_origin=file_origin,
                             file_datetime=file_datetime, rec_datetime=rec_datetime, 
                             **annotations)
-        if toCopy:
-            ret.segments.append(copy_with_data_subset(args, **kwargs))
-            
-        else:
-            ret.segments.append(args)
+        ret.segments.append(copy_with_data_subset(args, **kwargs))
         
         for k, seg in enumerate(ret.segments):
             seg.block = ret
@@ -3281,52 +3323,21 @@ def concatenate_blocks(*args, **kwargs):
         # make a new Block, append segments
         # when Blocks, we need to take into account the existence of Groups and
         # ChannelViews
-        # TODO/FIXME: 2023-05-19 17:38:00
-        # only accept Blocks, not Segments in args - refactor into a new function
-        # to append Segments to an existing Block
         ret = neo.core.Block(name=name, description=description, file_origin=file_origin,
                             file_datetime=file_datetime, rec_datetime=rec_datetime, 
                             **annotations)
-        #ret.groups = list()
         
         for (k,arg) in enumerate(args):
             if isinstance(arg, neo.Block):
-                if toCopy:
-                    # copy arg to a new block; the **kwargs will take care of 
-                    # selective copy of segments and of their contents
-                    new_block = copy_with_data_subset(arg, **kwargs)
-                    ret.segments.extend(new_block.segments)
-                else:
-                    # since a Segment is a simple container, we can just copy it
-                    # if a subset of signals is requested;
-                    # otherwise, we just store a reference to the segment
-                    if isinstance(segmentsNdx, int):
-                        if segmentsNdx in range(len(arg.segments)):
-                            if all(v is None for v in segmentComponentsSelection):
-                                # no segment component selection ⇒ just get the whole segment
-                                ret.segments.append(arg.segments[segmentsNdx])
-                            else:
-                                seg = arg.segments[segmentsNdx]
-                                # we need to create a new segment here, but the 
-                                # contents are copied by reference from the original segment;
-                                # this is ok as a segment is a not very expensive container
-                                new_seg = neo.Segment(name = seg.name, index = seg.index) # CAUTION this will be reindexed
-                                # NOTE: 2023-05-19 22:42:11 THIS IS ESSENTIAL !
-                                # also store the container block rec_datetime into this segment !
-                                new_seg.rec_datetime = arg.rec_datetime
-                                # TODO: 2023-05-19 22:39:17
-                                # code to select, as necessary:
-                                # • analogsignals
-                                # • irregularlysampledsignals
-                                # • etc
-                        else:
-                            raise ValueError(f"Invalid segment index {segmentxNdx} for block {k} with {len(args.segments)} segments")
-                    else:
-                        if all(v is None for v in segmentComponentsSelection):
-                            ret.segments.extend(args.segments)
-                        else:
-                            
-                
+                # copy arg to a new block; the **kwargs will take care of 
+                # selective copy of segments and of their contents
+                new_block = copy_with_data_subset(arg, **kwargs)
+                # NOTE: propagate time & file stamps to these segments
+                for seg in new_block.segments:
+                    seg.rec_datetime = new_block.rec_datetime
+                    seg.file_origin = new_block.file_origin
+                ret.segments.extend(new_block.segments)
+
                 if len(new_block.groups):
                     for group in new_block.groups:
                         existing_groups = [g for g in ret.groups if g.name == group.name]
@@ -3380,7 +3391,8 @@ def concatenate_blocks(*args, **kwargs):
                                             
                 
             elif isinstance(arg, neo.core.Segment):
-                kw = dict((n,v) for n,v in kwargs if n != "segments")
+                kw = dict((n,v) for n,v in kwargs if n not in ("segments", "groups"))
+                # kw = dict((n,v) for n,v in kwargs if n != "segments")
                 new_seg = copy_with_data_subset(arg, **kw)
                 
                 new_seg.rec_datetime = rec_datetime
