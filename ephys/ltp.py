@@ -34,8 +34,9 @@ import plots.plots as plots
 import core.models as models
 import core.neoutils as neoutils
 
-from core.neoutils import (clear_events, get_index_of_named_signal, is_empty,)
-from core.neoutils import (average_segments, )
+from core.neoutils import (clear_events, get_index_of_named_signal, is_empty, 
+                           concatenate_blocks, concatenate_signals,
+                           average_segments)
 
 import core.triggerprotocols as tp
 from core.triggerprotocols import (TriggerProtocol,
@@ -65,7 +66,8 @@ from core.quantities import(arbitrary_unit,
 from core.utilities import (safeWrapper, 
                             reverse_mapping_lookup, 
                             get_index_for_seq, 
-                            sp_set_loc )
+                            sp_set_loc,
+                            normalized_index)
 
 #### END pict.core modules
 
@@ -103,6 +105,7 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,
 #"def" pairedPulseEPSCs(data_block, Im_signal, Vm_signal, epoch = None):
 
 class PathwayType(TypeEnum):
+    Null = 0
     Test = 1
     Control = 2
     Other = 3
@@ -140,7 +143,12 @@ class SynapticPathway(BaseScipyenData):
     
     _descriptor_attributes_ = _data_children_ + _data_attributes_ + BaseScipyenData._descriptor_attributes_
     
-    def __init__(self, data:neo.Block=neo.Block(), pathwayType:PathwayType = PathwayType.Test, name:typing.Optional[str]=None, response:typing.Optional[typing.Union[str, int]]=None, analogCommand:typing.Union[typing.Union[str, int]] = None, digitalCommand:typing.Optional[typing.Union[str, int]] = None, schedule:typing.Optional[Schedule] = None, **kwargs):
+    def __init__(self, data:neo.Block=neo.Block(), pathwayType:PathwayType = PathwayType.Test, 
+                 name:typing.Optional[str]=None, 
+                 response:typing.Optional[typing.Union[str, int]]=None, 
+                 analogCommand:typing.Union[typing.Union[str, int]] = None, 
+                 digitalCommand:typing.Optional[typing.Union[str, int]] = None, 
+                 schedule:typing.Optional[Schedule] = None, **kwargs):
         """
         Named parameters:
         ----------------
@@ -180,24 +188,91 @@ class SynapticPathway(BaseScipyenData):
 #         self._xtalk_ = dict()
 
     @staticmethod
-    def fromBlocks(segment:int, analogsignals=None, irregularlysampledsignals=None, imagesequences=None, spiketrains=None, epochs=None, events=None, **episodeSpecs):
+    def fromBlocks(pathName:str, pathwayType:PathwayType=PathwayType.Test, 
+                   response:typing.Optional[typing.Union[str, int]]=None, 
+                   analogCommand:typing.Union[typing.Union[str, int]] = None, 
+                   digitalCommand:typing.Optional[typing.Union[str, int]] = None, 
+                   segments:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None, 
+                   analogsignals:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None, 
+                   irregularlysampledsignals:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None,
+                   imagesequences:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None,
+                   spiketrains:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None, 
+                   epochs:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None, 
+                   events:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None, 
+                   **episodeSpecs):
         # NOTE: 2023-05-19 17:08:53
         # an episode spec is a mapping of str ↦ sequence of neo Blocks
         # 
         # The blocks in the sequence are ordered here by their rec_datetime
         # WARNING/TODO: check argument types
         #
+        
+        epiNameSet = set(episodeSpecs.keys())
+        
+        if len(epiNameSet) != len(episodeSpecs):
+            dupl_ = [k for k in episodeSpecs.keys() if k not in epiNameSet]
+            raise ValueError(f"Duplicate episode names were specified: {dupl_}")
+        
         nBlocks = sum(len(bl) for bl in episodeSpecs.values())
+        
+        segments = list()
+        
+        episodes = list()
+        episodeBlocks = list() # temporary store of episode blocks
+                            # will be concatenated to generate final data for the
+                            # pathway
+                            
+        # NOTE: 2023-05-20 11:06:02
+        # Because we want to concatenate all segments in a single neo.Block for
+        # this pathway (associated with the 'data' field) we store references
+        # to the start frame & end frame in the episode
+        startFrame = 0
         
         for episodeName, blocks, in episodeSpecs.items():
             bb = sorted(blocks, key = lambda x: x.rec_datetime)
             
+            for k, b in enumerate(bb):
+                try:
+                    _ = normalized_index(b.segments, segments) 
+                except:
+                    raise ValueError(f"Invaid segment index {segments} for block {k} ({b.name}) in episode {episodeName}")
+            
             datetime_start = bb[0].rec_datetime
             datetime_end = bb[-1].rec_datetime
             
+            # TODO/FIXME: 2023-05-21 23:41:45
+            # copy segments directly with data subset, here
+            # fullBlockList.extend(bb)
+            
+            # episodeBlock = concatenate_blocks(*bb, segments=segments,
+            #                                   analogsignals=analogsignals,
+            #                                   irregularlysampledsignals=irregularlysampledsignals,
+            #                                   imagesequences=imagesequences,
+            #                                   spiketrains=spiketrains,
+            #                                   epochs=epochs,event=events)
+
+            
+
+            episodes.append(Episode(episodeName, 
+                              begin=datetime_start,
+                              end=datetime_end,
+                              startFrame=startFrame,
+                              endFrame=startFrame + sum(len(b.segments) for b in bb)-1))
+            
+            # episodeBlocks.append(episodeBlock)
+            
+            startFrame += len(episodeBlock.segments)
+            
+        data = concatenate_blocks(*episodeBlocks) # no data subset selection here
         
-        pass
+        schedule = Schedule(episodes)
         
+        return SynapticPathway(data=data, name=pathName,
+                               pathwayType=pathwayType,
+                               response=response,
+                               analogCommand=analogCommand,
+                               digitalCommand=digitalCommand,
+                               schedule=schedule)
         
         
 class SynapticPlasticityData(BaseScipyenData):
@@ -541,7 +616,7 @@ def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     
     return LTPopts
     
-def generate_LTP_options(cursors, signal_names, path0, path1, baseline_minutes, \
+def generate_LTP_options(cursors, signal_names, path0, path1, baseline_minutes, 
                         average_count, average_every):
     """Save LTP options for Voltage-clamp experiments
     
@@ -660,7 +735,8 @@ def save_LTP_options(val):
         pickle.dump(val, fileDest, pickle.HIGHEST_PROTOCOL)
     
 @safeWrapper
-def load_synaptic_plasticity_options(LTPOptionsFile:[str, type(None)]=None, **kwargs):
+def load_synaptic_plasticity_options(LTPOptionsFile:[str, type(None)]=None, 
+                                     **kwargs):
     """Loads LTP options from a file or generates one from arguments.
     
     Parameters:
@@ -700,7 +776,8 @@ def load_synaptic_plasticity_options(LTPOptionsFile:[str, type(None)]=None, **kw
     return LTPopts
 
 @safeWrapper
-def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptions, test_pathway_index, result_name_prefix):
+def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, 
+                                         LTPOptions, test_pathway_index, result_name_prefix):
     """
     basenames : two-element tuple with regexp strings, respectively for the variable names of 
                 the baseline and chase Blocks
@@ -797,10 +874,10 @@ def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptio
 
     return ret
 
-def calculate_fEPSP(block:neo.Block,\
-                    signal_index:[int, str],\
-                    epoch:[neo.Epoch, type(None)]=None,\
-                    out_file:[str, type(None)]=None):# -> dict:
+def calculate_fEPSP(block:neo.Block,
+                    signal_index:[int, str],
+                    epoch:[neo.Epoch, type(None)]=None,
+                    out_file:[str, type(None)]=None) -> dict:
     """
     Calculates the slope of field EPSPs. TODO
     
@@ -846,15 +923,15 @@ def calculate_fEPSP(block:neo.Block,\
     for k, seg in enumerate(block.segments):
         pass
     
-def calculate_LTP_measures_in_block(block: neo.Block, \
-                                    signal_index_Im, /, \
-                                    signal_index_Vm = None, \
-                                    trigger_signal_index = None,\
-                                    testVm = None, \
-                                    epoch = None, \
-                                    stim = None,\
-                                    isi = None,\
-                                    out_file=None):# -> pd.DataFrame:
+def calculate_LTP_measures_in_block(block: neo.Block, 
+                                    signal_index_Im, /, 
+                                    signal_index_Vm = None, 
+                                    trigger_signal_index = None,
+                                    testVm = None, 
+                                    epoch = None, 
+                                    stim = None,
+                                    isi = None,
+                                    out_file=None) -> pd.DataFrame:
     """
     Calculates membrane Rin, Rs, and EPSC amplitudes in whole-cell voltage clamp.
     
@@ -985,9 +1062,9 @@ def calculate_LTP_measures_in_block(block: neo.Block, \
     return result
 
 
-def segment_synplast_params_i_clamp(s: neo.Segment, \
-                                       signal_index: int, \
-                                       epoch: typing.Optional[neo.Epoch]=None):# -> np.ndarray:
+def segment_synplast_params_i_clamp(s: neo.Segment, 
+                                       signal_index: int, 
+                                       epoch: typing.Optional[neo.Epoch]=None) -> np.ndarray:
     if epoch is None:
         if len(s.epochs) == 0:
             raise ValueError("Segment has no epochs and no external epoch has been defined")
@@ -1015,14 +1092,14 @@ def segment_synplast_params_i_clamp(s: neo.Segment, \
         return chord_slopes
         
         
-def segment_synplast_params_v_clamp(s: neo.Segment, \
-                                       signal_index_Im: int,\
-                                       signal_index_Vm: typing.Optional[int]=None,\
-                                       trigger_signal_index: typing.Optional[int] = None,\
-                                       testVm: typing.Union[float, pq.Quantity, None]=None,\
-                                       epoch: typing.Optional[neo.Epoch]=None,\
-                                       stim: typing.Optional[TriggerEvent]=None,\
-                                       isi:typing.Union[float, pq.Quantity, None]=None):# -> tuple:
+def segment_synplast_params_v_clamp(s: neo.Segment, 
+                                       signal_index_Im: int,
+                                       signal_index_Vm: typing.Optional[int]=None,
+                                       trigger_signal_index: typing.Optional[int] = None,
+                                       testVm: typing.Union[float, pq.Quantity, None]=None,
+                                       epoch: typing.Optional[neo.Epoch]=None,
+                                       stim: typing.Optional[TriggerEvent]=None,
+                                       isi:typing.Union[float, pq.Quantity, None]=None) -> tuple:
     """
     Calculates several signal measures in a synaptic plasticity experiment.
     
@@ -1407,25 +1484,25 @@ def segment_synplast_params_v_clamp(s: neo.Segment, \
     return (Idc, Rs, Rin, EPSC0, EPSC1, PPR, ISI)
 
                  
-def analyse_LTP_in_pathway(baseline_block: neo.Block, \
-                           chase_block: neo.Block, \
-                           signal_index_Im: typing.Union[int, str], \
-                           path_index: int,\
-                           /, \
-                           baseline_range=range(-5,-1),\
-                           signal_index_Vm: typing.Union[int, str]=None, \
-                           trigger_signal_index: typing.Union[int, str, None]=None,\
-                           baseline_epoch:typing.Optional[neo.Epoch]=None, \
-                           chase_epoch:typing.Optional[neo.Epoch] = None,\
-                           testVm:typing.Optional[typing.Union[float, pq.Quantity]] = None,\
-                           stim:typing.Optional[TriggerEvent] = None,\
-                           isi:typing.Optional[typing.Union[float, pq.Quantity]] = None,\
-                           basename:str=None, \
-                           normalize:bool=False,\
-                           field:bool=False,\
-                           is_test:bool = False,\
-                           v_clamp:bool = True,\
-                           out_file:typing.Optional[str]=None):# -> pd.DataFrame:
+def analyse_LTP_in_pathway(baseline_block: neo.Block, 
+                           chase_block: neo.Block, 
+                           signal_index_Im: typing.Union[int, str], 
+                           path_index: int,
+                           /, 
+                           baseline_range=range(-5,-1),
+                           signal_index_Vm: typing.Union[int, str]=None, 
+                           trigger_signal_index: typing.Union[int, str, None]=None,
+                           baseline_epoch:typing.Optional[neo.Epoch]=None, 
+                           chase_epoch:typing.Optional[neo.Epoch] = None,
+                           testVm:typing.Optional[typing.Union[float, pq.Quantity]] = None,
+                           stim:typing.Optional[TriggerEvent] = None,
+                           isi:typing.Optional[typing.Union[float, pq.Quantity]] = None,
+                           basename:str=None, 
+                           normalize:bool=False,
+                           field:bool=False,
+                           is_test:bool = False,
+                           v_clamp:bool = True,
+                           out_file:typing.Optional[str]=None) -> pd.DataFrame:
     """
     Parameters:
     -----------
@@ -1538,7 +1615,8 @@ def analyse_LTP_in_pathway(baseline_block: neo.Block, \
 #     """
 #     pass
     
-def LTP_analysis(mean_average_dict, current_signal, vm_command, /, LTPOptions=None, results_basename=None, normalize=False):
+def LTP_analysis(mean_average_dict, current_signal, vm_command, /, LTPOptions=None, 
+                 results_basename=None, normalize=False):
     """
     LTP analysis for voltage-clamp experiments with paired-pulse stimulation
     interleaved on two pathways.
@@ -1606,7 +1684,8 @@ def LTP_analysis(mean_average_dict, current_signal, vm_command, /, LTPOptions=No
 
 
 #"def" plotAverageLTPPathways(data, state, viewer0, viewer1, keepCursors=True, **kwargs):
-def plotAverageLTPPathways(data, state, viewer0=None, viewer1=None, keepCursors=True, **kwargs):
+def plotAverageLTPPathways(data, state, viewer0=None, viewer1=None,
+                           keepCursors=True, **kwargs):
     """Plots averaged LTP pathway data in two SignalViewer windows
     
     Arguments:
@@ -1753,7 +1832,9 @@ def setupLTPCursors(viewer, LTPOptions, pathway, axis=None):
                         xwindow = LTPOptions["Cursors"]["Windows"],
                         labels = LTPOptions["Cursors"]["Labels"])
         
-def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx, control_base_segments_ndx, control_chase_segments_ndx, t0, t1):
+def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx, 
+                         control_base_segments_ndx, control_chase_segments_ndx, 
+                         t0, t1):
     """
     data: dict; an LTP data dict
     

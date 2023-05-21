@@ -3571,7 +3571,7 @@ def normalized_sample_index(data:np.ndarray, axis: typing.Union[int, str, vigra.
     
     Parameters:
     ----------
-    data: numpy.ndarray or a derivative (e.g. neo.AnalogSgnal, vigra.VigraArray)
+    data: numpy.ndarray or a derivative (e.g. neo.AnalogSignal, vigra.VigraArray)
     
     axis: int, str, vigra.AxisInfo. The array axis along which the index is normalized.
     

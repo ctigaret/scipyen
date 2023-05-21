@@ -148,15 +148,24 @@ class BaseDescriptorValidator(ABC):
 class ImmutableDescriptor(BaseDescriptorValidator):
     """
         Crude implementation of a read-only descriptor.
+        
+        Useful for implementing 'dataclass' classes that are not frozen, but 
+        have read-only attributes.
+        
+        Usage in a 'dataclass' definition:
+        
+        @dataclass
+        class SomeClass:
+            a: int = 0
+            b: ImmutableDescriptor = ImmutableDescriptor(default="abc")
+        
+        c = SomeClass()
+        c.a = 20 # <- OK
+        c.b = "31" # <- no effectk
+        
     """
     def __init__(self, *, default):
         self._default = default
-        
-    # def __set_name__(self, owner, name:str) -> None:
-    #     """Call this in the implementation's __init__
-    #     """
-    #     self.private_name = f"_{name}_"
-    #     self.public_name = name
         
     def __get__(self, obj, objtype=None) -> object:
         if obj is None:
@@ -166,7 +175,6 @@ class ImmutableDescriptor(BaseDescriptorValidator):
      
     def __set__(self, obj, value):
         pass
-        # warnings.warn(f"{self.public_name} attribute is immutable")
     
     def validate(self, value):
         return value == self._default
@@ -800,8 +808,8 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
 def deprecation(msg):
     warnings.warn(msg, DeprecationWarning, stacklevel=2)
     
-def iter_attribute(iterable:typing.Iterable, \
-                   attribute:str, \
+def iter_attribute(iterable:typing.Iterable, 
+                   attribute:str, 
                    silentfail:bool=True):
     """Iterator accessing the specified attribute of the elements in 'iterable'.
     Elements lacking the specified attribute yield None, unless 'silentfail' is 
@@ -848,11 +856,11 @@ def filterfalse_type(iterable:typing.Iterable, klass:typing.Type):
     """
     return filter(lambda x: not isinstance(x, klass), iterable)
 
-def filter_attr(iterable:typing.Iterable, \
-                op:typing.Callable[[typing.Any, typing.Any], bool] = operator.and_, \
-                indices:bool = False, \
-                indices_only:bool = False, \
-                exclude:bool = False,\
+def filter_attr(iterable:typing.Iterable, 
+                op:typing.Callable[[typing.Any, typing.Any], bool] = operator.and_, 
+                indices:bool = False, 
+                indices_only:bool = False, 
+                exclude:bool = False,
                 **kwargs):
     """Filter an iterable using predicates applied to attributes of its elements.
     

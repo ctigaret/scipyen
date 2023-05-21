@@ -876,8 +876,6 @@ def inspect_members(obj, predicate=None):
     
     specials = ("fb_", "f_", "co_", "gi_", "cr_", "__")
     
-    # print(f"inspect_members predicate: {predicate}")
-    
     names = tuple(n for n in dir(obj) if n not in skips and all(not n.startswith(s) for s in specials))
     
     mb = tuple((n, getattr(obj, n, None)) for n in names)
@@ -885,21 +883,8 @@ def inspect_members(obj, predicate=None):
     if inspect.isfunction(predicate):
         mb = tuple(filter(lambda x: predicate(x[1]), mb))
         
-    # mb = tuple(map(lambda x: x[:97] + "..." if isinstance(x, (str, bytes)) and len(x)> 100 else x, mb))
-                   
     return dict(mb)
                    
-#     if inspect.isfunction(predicate):
-#         
-#         mb = inspect.getmembers(obj, predicate)
-#     else:
-#         mb = inspect.getmembers(obj)
-#         
-#     
-#     mb = filter(lambda x: x[0] not in skips and all(not x[0].startswith(s) for s in specials), mb)
-#         
-#     return dict(mb)
-        
 @dataclass
 class Episode:
     name:str = ""
