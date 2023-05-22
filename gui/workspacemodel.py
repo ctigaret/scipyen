@@ -61,7 +61,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     varsChanged = pyqtSignal(dict, name="varsChanged")
     varModified = pyqtSignal(object, name="varModified")
     
-    def __init__(self, shell, user_ns_hidden=dict(), parent=None, mpl_figure_close_callback=None, mpl_figure_click_callback=None, mpl_figure_enter_callback=None):
+    def __init__(self, shell, user_ns_hidden=dict(), 
+                 parent=None, 
+                 mpl_figure_close_callback=None, 
+                 mpl_figure_click_callback=None, 
+                 mpl_figure_enter_callback=None):
         super(WorkspaceModel, self).__init__(parent) # make sure parent is passed from ScipyenWindow as an instance of ScipyenWindow
         
         # self.loop = asyncio.get_event_loop()

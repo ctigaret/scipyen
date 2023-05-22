@@ -5,6 +5,8 @@ import os, sys, traceback, inspect, numbers, warnings
 import functools, itertools
 import collections, enum
 import typing, types
+import dataclasses
+from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 
 #### END core python modules
 
@@ -90,6 +92,7 @@ import iolib.pictio as pio
 import ephys.ephys as ephys
 from ephys.ephys import ClampMode, ElectrodeMode
 
+
 LTPOptionsFile = os.path.join(os.path.dirname(__file__), "options", "LTPOptions.pkl")
 optionsDir     = os.path.join(os.path.dirname(__file__), "options")
 
@@ -109,6 +112,24 @@ class PathwayType(TypeEnum):
     Test = 1
     Control = 2
     Other = 3
+    
+    
+@dataclass
+class PathwayEpisodeSpec:
+    name:str
+    _:KW_ONLY
+    blocks:typing.Optional[typing.Sequence[neo.Block]] = None
+    response:typing.Optional[typing.Union[str, int]]=None
+    analogCommand:typing.Union[typing.Union[str, int]] = None
+    digitalCommand:typing.Optional[typing.Union[str, int]] = None
+    segments:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None
+    analogsignals:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None
+    irregularlysampledsignals:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None
+    imagesequences:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None
+    spiketrains:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None
+    epochs:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None
+    events:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None
+    
 
 class SynapticPathway(BaseScipyenData):
     """Encapsulates a logical stimulus-response relationship between signals.
@@ -189,17 +210,22 @@ class SynapticPathway(BaseScipyenData):
 
     @staticmethod
     def fromBlocks(pathName:str, pathwayType:PathwayType=PathwayType.Test, 
-                   response:typing.Optional[typing.Union[str, int]]=None, 
-                   analogCommand:typing.Union[typing.Union[str, int]] = None, 
-                   digitalCommand:typing.Optional[typing.Union[str, int]] = None, 
-                   segments:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None, 
-                   analogsignals:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None, 
-                   irregularlysampledsignals:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None,
-                   imagesequences:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None,
-                   spiketrains:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None, 
-                   epochs:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None, 
-                   events:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None, 
                    **episodeSpecs):
+        """
+        Factory for SynapticPathway.
+        
+        Parameters:
+        ==========
+        pathName:str - name of the pathway
+        pathwayType:PathwayType - the type of the pathway (optional, default is PathwayType.Test)
+        
+        **episodeSpecs:dict mapping as follows:
+        
+            key:str         ↦   value:PayhwayEpisodeSpec instance
+                                            
+        
+        """
+        
         # NOTE: 2023-05-19 17:08:53
         # an episode spec is a mapping of str ↦ sequence of neo Blocks
         # 

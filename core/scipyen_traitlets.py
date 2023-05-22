@@ -17,6 +17,7 @@ in place)
 import sys, typing, dataclasses, traceback
 from warnings import warn, warn_explicit
 from collections import deque
+from collections.abc import MutableMapping
 import enum
 from enum import (EnumMeta, Enum, IntEnum, )
 import numpy as np
@@ -91,6 +92,84 @@ TRAITSMAP = {           # use casting versions
     #type:       (Type,),    # e.g., type(type(None))
     #function:   (Any,)
     }
+
+class _NotifierDict_(dict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._obj_ = None
+        self._trait_name_ = None
+        
+    def init_instance(self, obj:typing.Optional[object]=None, trait_name:typing.Optional[str]=None):
+        self._obj_ = obj
+        self._trait_name_ = trait_name
+        
+    def __setitem__(self, name, value):
+        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
+            old_value = self.copy() # CAUTION may be expensive
+            super().__setattr_(name, value)
+            self._obj_._notify_trait(self._trait_name_, old_value, self)
+        else:
+            super().__setitem__(name, value)
+            
+    def __delitem__(self, key):
+        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
+            old_value = self.copy() # CAUTION may be expensive
+            super().__delitem__(key)
+            self._obj_._notify_trait(self._trait_name_, old_value, self)
+            
+        else:
+            super().__delitem__(key)
+            
+    def __ior__(self, *args, **kwargs):
+        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
+            old_value = self.copy() # CAUTION may be expensive
+            super().__ior__(*args, **kwargs)
+            self._obj_._notify_trait(self._trait_name_, old_value, self)
+            
+        else:
+            super().__ior__(*args, **kwargs)
+            
+            
+    def update(self, *args, **kwargs):
+        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
+            old_value = self.copy() # CAUTION may be expensive
+            super().update(*args, **kwargs)
+            self._obj_._notify_trait(self._trait_name_, old_value, self)
+            
+        else:
+            super().update(*args, **kwargs)
+            
+    def pop(self, *args, **kwargs):
+        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
+            old_value = self.copy() # CAUTION may be expensive
+            val= super().pop(*args, **kwargs)
+            self._obj_._notify_trait(self._trait_name_, old_value, self)
+            return val
+        else:
+            val= super().pop(*args, **kwargs)
+            return val
+        
+    def popitem(self):
+        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
+            old_value = self.copy() # CAUTION may be expensive
+            val = super().popitem()
+            self._obj_._notify_trait(self._trait_name_, old_value, self)
+            return val
+        else:
+            val= super().popitem()
+            return val
+
+    def clear(self):
+        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
+            old_value = self.copy() # CAUTION may be expensive
+            super().clear()
+            self._obj_._notify_trait(self._trait_name_, old_value, self)
+            
+        else:
+            super().clear()
+            
+        
+        
 
 class _NotifierDeque_(deque):
     # TODO: 2022-01-29 23:42:54
@@ -215,7 +294,156 @@ class _NotifierDeque_(deque):
         else:
             super().rotate(n)
             
-class ListTrait(List): # inheritance chain: List <- Container <- Instance
+class DictTrait(Instance):
+    _value_trait_ = None
+    _key_trait_ = None
+    klass = _NotifierDict_
+    _valid_defaults = (dict,)
+     
+    # def __init__(
+    #     self,
+    #     value_trait=None,
+    #     per_key_traits=None,
+    #     key_trait=None,
+    #     default_value=Undefined,
+    #     **kwargs,
+    # ):
+    def __init__(
+        self,
+        value_trait=None,
+        default_value=Undefined,
+        **kwargs,
+    ):
+        trait = kwargs.pop('trait', None)
+        if trait is not None:
+            if value_trait is not None:
+                raise TypeError("Found a value for both `value_trait` and its deprecated alias `trait`.")
+            value_trait = trait
+            warn(
+                "Keyword `trait` is deprecated in traitlets 5.0, use `value_trait` instead",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            
+        if default_value is None and not kwargs.get("allow_none", False):
+            default_value = Undefined
+            
+        if default_value is Undefined and value_trait is not None:
+            if not is_trait(value_trait):
+                default_value = value_trait
+                value_trait = None
+                
+        if default_value is Undefined:
+            default_value = self.klass()
+            #default_value = deque()
+            args = ()
+            
+        elif isinstance(default_value, self._valid_defaults):
+            args = (default_value,)
+            
+        else:
+            raise TypeError(f"default_value expected to be {None} or one of {self._valid_defaults}")
+        
+        if is_trait(value_trait):
+            self._trait = value_trait() if isinstance(value_trait, type) else value_trait
+            
+        elif value_trait is not None:
+            raise TypeError(f"Expecting 'value_trait to be a Trait or None; got {type(value_trait_.__name__)}")
+        
+        super().__init__(klass = self.klass, args=args, **kwargs)
+        
+        # super().__init__(value_trait=value_trait, per_key_traits=per_key_traits,key_trait=key_trait,
+        #                  default_value=default_value, **kwargs)
+        
+    def validate(self, obj, value):
+        if isinstance(value, self.klass):
+            return value
+        
+        elif isinstance(value, self._valid_defaults):
+            return self.klass(value)
+        # return super().validate(obj, value)
+        # value = super().validate(obj, value)
+        # if value is None:
+        #     return value
+        # value = self.validate_elements(obj, value)
+        # return value
+    
+    # def validate_elements(self, obj, value):
+        # length = len(value)
+        # if length < self._minlen or length > self._maxlen:
+        #     self.length_error(obj, value)
+
+        # return super().validate_elements(obj, value)
+
+    def set(self, obj, value):
+        """
+        Additional notifications:
+        • change in dict length (i.e. number of keys)
+        • change in key types
+        • change in value types
+
+        No notifications are issued for changes in the values, as the checks can
+        be too expensive and/or prone to fail.
+        
+        """
+        if isinstance(value, str):
+            new_value = self._validate(obj, {value:None})
+        else:
+            new_value = self._validate(obj, value)
+            
+        silent = True 
+        
+        try:
+            old_value = obj._trait_values[self.name]
+        except KeyError:
+            old_value = self.default_value
+            
+        # print(f"{self.__class__.__name__}.set(...) old_value is {type(old_value)}")
+        # print(f"{self.__class__.__name__}.set(...) new_value is {type(new_value)}")
+
+        try:
+            # old → new:
+            # Sentinel → anything else ⇒ do NOT notify
+            # Sentinel → dict ⇒ notify
+            # dict → anything else ⇒ notify
+            # dict → dict ⇒ notify after further inspection
+            
+            if any(isinstance(o, dict) for o in (old_value, new_value)):
+                if all(isinstance(o, dict) for o in (old_value, new_value)):
+                    silent = len(old_value) == len(new_value)
+                else:
+                    silent = False # ⇒ must notify!
+                    
+            else:
+                # neither are dicts, both are possibly Sentinel objects!!!
+                # ⇒ no need to notify
+                return
+            
+            # print(f"{self.__class__.__name__}.set(...) after type & len check silent = {silent}")
+            
+            if silent:
+                silent &= all(type(x) == type(y) for x, y in zip(old_value.keys(), new_value.keys()))
+                
+                # print(f"{self.__class__.__name__}.set(...) after key type check silent = {silent}")
+            
+            if silent:
+                silent &= all(type(x) == type(y) for x, y in zip(old_value.values(), new_value.values()))
+            
+                # print(f"{self.__class__.__name__}.set(...) after value type check silent = {silent}")
+        except:
+            traceback.print_exc()
+            silent = False
+            # print(f"{self.__class__.__name__}.set(...) after exception raised silent = {silent}")
+            
+        # print(f"{self.__class__.__name__}.set(...) silent = {silent}")
+        
+        obj._trait_values[self.name] = new_value
+        
+        if silent is not True:
+            obj._notify_trait(self.name, old_value, new_value)
+  
+            
+class ListTrait(List):
     """TraitType that ideally should notify:
     a) when a list contents has changed (i.e., gained/lost members)
     b) when an element in the list has changed (either a new value, or a new type)
@@ -308,18 +536,6 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
             if len(vv):
                 validated.append(vv[0])
                     
-#             if k < len(self._traits):
-#                 try:
-#                     v = self._traits[k]._validate(obj, v)
-#                 except TraitError:
-#                     pass
-#                     self.element_error(obj, v, self._traits[k])
-#                 else:
-#                     validated.append(v)
-#                     
-#             else:
-#                 validated.append(v)
-
         return self.klass(validated)
 
     def set(self, obj, value):
@@ -349,8 +565,6 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
             silent = False
             
         if silent is not True:
-            # we explicitly compare silent to True just in case the equality
-            # comparison above returns something other than True/False
             obj._notify_trait(self.name, old_value, new_value)
             
 # class StringTrait(CUnicode):
@@ -1341,7 +1555,7 @@ class DataBagTrait(Instance):
             obj._notify_trait(self.name, old_value, new_value)
 
 class DequeTrait(Instance):
-    info_text = "Traitled for deque"
+    info_text = "Traitlet for deque"
     klass = _NotifierDeque_
     #klass = deque
     _cast_types = (list, tuple)
@@ -1389,7 +1603,7 @@ class DequeTrait(Instance):
         if is_trait(value_trait):
             self._trait = value_trait() if isinstance(value_trait, type) else value_trait
             
-        elif trait is not None:
+        elif value_trait is not None:
             raise TypeError(f"Expecting 'value_trait to be a Trait or None; got {type(value_trait_.__name__)}")
         
         super().__init__(klass = self.klass, args=args, **kwargs)
