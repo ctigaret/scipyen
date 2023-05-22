@@ -5592,7 +5592,7 @@ def average_signals(*args, fun=np.mean):
     
     return ret_signal
 
-def __applyRecDateTime(sgm, blk):
+def __applyRecDateTime__(sgm, blk):
     """Applies the block's rec_datetime to all its contained segments"""
     if sgm.rec_datetime is None:
         sgm.rec_datetime = blk.rec_datetime
@@ -5600,7 +5600,232 @@ def __applyRecDateTime(sgm, blk):
     return sgm
 
 @safeWrapper
-def average_blocks_2(*args, **kwargs):
+def average_blocks_old(*args, **kwargs):
+    """Generates a block containing a list of averaged AnalogSignal data from the *args.
+    FIXME/TODO: revisit this
+    Parameters:
+    -----------
+    
+    args: a comma-separated list of neo.Block objects
+    
+    kwargs: keyword/value pairs:
+    
+        count               how many segments into one average
+        
+        every               how many segments to skip between averages
+        
+        segments            index of segments taken into average: int, range,
+                            slice, or sequence (tuple, list) of int
+        
+        analogsignals       index of signal into each of the segments to be used;
+                            can also be a signal name
+        
+        name                see neo.Block docstring
+        
+        annotation          see neo.Block docstring
+        
+        rec_datetime        see neo.Block docstring
+        
+        file_origin         see neo.Block docstring
+        
+        file_datetime       see neo.Block docstring
+        
+    
+    Returns:
+    --------
+    
+    A new Block containing AnalogSignal data that are averages of the AnalogSignal 
+    object in the *args across the segments, taken n segments at a time, every m segments.
+    
+    Depending on the values of 'n' and 'm', the result may contain several segments,
+    each containing AnalogSignals averaged from the data.
+    
+    NOTE:
+    
+    By contrast to average_blocks_by_segments, this function can result in the 
+    average of ALL segments in a block (or sequence of blocks) in  particular
+    when "count" and "every" are not set (see below).
+    
+    The function only takes AnalogSignal data, and discards IrregularlySampledSignal
+    SpikeTrain, Event and Epoch data that may be present in the blocks specified
+    by *args.
+    
+    This is because, by definition, only AnalogSignal data may be enforced to be 
+    shape-compatible for averaging, and this is what usually one is after, when 
+    averaging multiple electrophysiology record sweeps acquired with the same
+    protocol (sampling, duration, etc).
+    
+    For this reason only analog_index can be specified, to select from the
+    analogsignals list in the segments.
+    
+    Examples of usage:
+    ------------------
+    
+    >>> blocklist = getvars(sel=neo.Block, sort=True, by_name=False, sortkey="rec_datetime")
+    >>> # or:
+    >>> blocklist = getvars(locals(), sel="[\W]*common_data_name*", sort=True, by_name=True)
+    >>> # then:
+    >>> ret = average_blocks(blocklist, segment_index=k, count=n, every=m)
+    
+    ret is a neo.Block with segments where each segment contains the average signals from kth segment
+    for groups of "n" blocks taken every "m" from the list of blocks given as starred argument(s) 
+
+    """
+    def __applyRecDateTime(sgm, blk):
+        if sgm.rec_datetime is None:
+            sgm.rec_datetime = blk.rec_datetime
+            
+        return sgm
+        
+    def __get_blocks_by_name__(*arg):
+        ws = workspacefunctions.user_workspace() 
+        
+        if not all([isinstance(a, str) for a in arg]):
+            raise TypeError("Expecting strings only")
+        
+        if len(arg) == 1:
+            ret_ = workspacefunctions.getvars(arg[0], glob=True, var_type=neo.Block,
+                                                ws=ws)
+            
+        elif len(arg) > 1:
+            ret_ = workspacefunctions.getvars(*arg, glob=True, var_type=neo.Block,
+                                                ws=ws)
+        else:
+            raise ValueError("Expecting at least one string")
+        
+        return ret_
+            
+        
+    if len(args) == 0:
+        return None
+    
+    blocks=list()
+    
+    if len(args) == 1:
+        if isinstance(args[0], str): # glob for variable names
+            blocks = __get_blocks_by_name__(args[0])
+                #cframe = inspect.getouterframes(inspect.currentframe())[1][0]
+                #blocks = workspacefunctions.getvars(args[0], glob=True,
+                                                        #ws=cframe, as_dict=False,
+                                                        #sort=False)
+                
+        elif isinstance(args[0], (tuple, list)):
+            if all([isinstance(a, neo.Block) for a in args[0]]): # list of blocks
+                blocks = args[0] # unpack the tuple
+                
+            elif all([isinstance(a, str) for a in args[0]]): # list of names
+                blocks = __get_blocks_by_name__(*args[0])
+                
+            else:
+                raise ValueError("Invalid argument %s" % args[0])
+                
+            
+    else:
+        if all([isinstance(a, neo.Block) for a in args]):
+            blocks = args
+            
+        elif all([isinstance(a, str) for a in args]):
+            blocks = __get_blocks_by_name__(*args)
+            
+        else:
+            raise ValueError("Invalid argument %s" % args)
+            
+    if len(blocks)==0:
+        return
+            
+    block_names = [b.name for b in blocks]
+            
+    n = None
+    m = None
+    segment_index = None
+    analog_index = None
+    
+    ret = neo.core.block.Block()
+    
+    if len(kwargs) > 0 :
+        for key in kwargs.keys():
+            if key not in ["count", "every", "name", "segment", 
+                           "analog", "annotation", "rec_datetime", 
+                           "file_origin", "file_datetime"]:
+                raise RuntimeError("Unexpected named parameter %s" % key)
+            
+        if "count" in kwargs.keys():
+            n = kwargs["count"]
+            
+        if "every" in kwargs.keys():
+            m = kwargs["every"]
+            
+        if "name" in kwargs.keys():
+            ret.name = kwargs["name"]
+            
+        if "segment" in kwargs.keys():
+            segment_index = kwargs["segment"]
+            
+        if "analog" in kwargs.keys():
+            analog_index = kwargs["analog"]
+            
+        if "annotation" in kwargs.keys():
+            ret.annotation = kwargs["annotation"]
+
+        if "rec_datetime" in kwargs.keys():
+            ret.rec_datetime = kwargs["datetime"]
+            
+        if "file_origin" in kwargs.keys():
+            ret.file_origin = kwargs["file_origin"]
+            
+        if "file_datetime" in kwargs.keys():
+            ret.file_datetime = kwargs["file_datetime"]
+            
+    if analog_index is not None:
+        signal_str = str(analog_index)
+    elif isinstance(analog_index, (tuple, list)):
+        signal_str = f"{analog_index}"
+    else:
+        signal_str = "all"
+        
+    if segment_index is None:
+        segments = [[__applyRecDateTime(sgm, b) for sgm in b.segments] for b in blocks]
+        segment_str = "all"
+        
+    elif isinstance(segment_index, int):
+        segments = [__applyRecDateTime(b.segments[segment_index], b) for b in blocks if segment_index < len(b.segments)]
+        segment_str = str(segment_index)
+        
+#     elif isinstance(segment_index, (tuple, list)) and all(isinstance(ndx, int) for ndx in segment_index):
+#         seg_avg = list()
+#         for k, ndx in enumerate(segment_index):
+#             if any(ndx not in range(len(b.segments)) for b in blocks):
+#                 raise ValueError(f"segment index {ndx} out of range for ")
+#             segments = [[__applyRecDateTime(b.segments[ndx], b) if ndx in range(len(b.segments))] for b in blocks ]
+#             if k == 0:
+#                 seg_avg = average_segments(segments, count=n, every=m, analog_index = analog_index)
+#             else:
+#                 avg_segs = average_segments(segments, count=n, every=m, analog_index = analog_index)
+#                 
+#                 
+#             
+#         segments = [[__applyRecDateTime(b.segments[ndx], b) for ndx in segment_index if ndx in range(len(b.segments))] for b in blocks ]
+#         segment_str = f"{segment_index}"
+        
+    else:
+        # raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or sequence of int, or None")
+        raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or None")
+    
+    ret.segments = average_segments(segments, count=n, every=m, analog_index=analog_index)
+    
+    ret.annotations["Averaged"] = dict()
+    ret.annotations["Averaged"]["Count"] = n
+    ret.annotations["Averaged"]["Every"] = m
+    ret.annotations["Averaged"]["Origin"] = dict()
+    ret.annotations["Averaged"]["Origin"]["Blocks"]   = "; ".join(block_names)
+    ret.annotations["Averaged"]["Origin"]["Segments"] = segment_str
+    ret.annotations["Averaged"]["Origin"]["Signals"]  = signal_str
+    
+    return ret
+
+
+@safeWrapper
+def average_blocks_new(*args, **kwargs):
     """Generates a block containing a list of averaged AnalogSignal data from the *args.
     FIXME/TODO: revisit this 2023-05-22 18:43:31
     
@@ -5876,97 +6101,6 @@ def average_blocks_2(*args, **kwargs):
     
         return ret
     
-def average_blocks_old(*args, **kwargs):
-    if len(args) == 1:
-        if isinstance(args[0], str): # glob for variable names
-            blocks = __get_blocks_by_name__(args[0])
-                #cframe = inspect.getouterframes(inspect.currentframe())[1][0]
-                #blocks = workspacefunctions.getvars(args[0], glob=True,
-                                                        #ws=cframe, as_dict=False,
-                                                        #sort=False)
-                
-        elif isinstance(args[0], (tuple, list)):
-            if all([isinstance(a, neo.Block) for a in args[0]]): # list of blocks
-                blocks = args[0] # unpack the tuple
-                
-            elif all([isinstance(a, str) for a in args[0]]): # list of names
-                blocks = __get_blocks_by_name__(*args[0])
-                
-            else:
-                raise ValueError("Invalid argument %s" % args[0])
-                
-            
-    else:
-        if all([isinstance(a, neo.Block) for a in args]):
-            blocks = args
-            
-        elif all([isinstance(a, str) for a in args]):
-            blocks = __get_blocks_by_name__(*args)
-            
-        else:
-            raise ValueError("Invalid argument %s" % args)
-            
-    if len(blocks)==0:
-        return
-            
-    block_names = [b.name for b in blocks]
-            
-    n = None
-    m = None
-    segment_index = None
-    analog_index = None
-    
-    ret = neo.core.block.Block()
-    
-    if analog_index is not None:
-        signal_str = str(analog_index)
-        
-    elif isinstance(analog_index, (tuple, list)):
-        signal_str = f"{analog_index}"
-        
-    else:
-        signal_str = "all"
-        
-    if segment_index is None:
-        segments = [[__applyRecDateTime(sgm, b) for sgm in b.segments] for b in blocks]
-        segment_str = "all"
-        
-    elif isinstance(segment_index, int):
-        segments = [__applyRecDateTime(b.segments[segment_index], b) for b in blocks if segment_index < len(b.segments)]
-        segment_str = str(segment_index)
-        
-    elif isinstance(segment_index, (tuple, list)) and all(isinstance(ndx, int) for ndx in segment_index):
-        seg_avg = list()
-        for k, ndx in enumerate(segment_index):
-            if any(ndx not in range(len(b.segments)) for b in blocks):
-                raise ValueError(f"segment index {ndx} out of range for ")
-            segments = [[__applyRecDateTime(b.segments[ndx], b) if ndx in range(len(b.segments))] for b in blocks ]
-            if k == 0:
-                seg_avg = average_segments(segments, count=n, every=m, analog_index = analog_index)
-            else:
-                avg_segs = average_segments(segments, count=n, every=m, analog_index = analog_index)
-                
-                
-            
-        segments = [[__applyRecDateTime(b.segments[ndx], b) for ndx in segment_index if ndx in range(len(b.segments))] for b in blocks ]
-        segment_str = f"{segment_index}"
-        
-    else:
-        # raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or sequence of int, or None")
-        raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or None")
-    
-    ret.segments = average_segments(segments, count=n, every=m, analog_index=analog_index)
-    
-    ret.annotations["Averaged"] = dict()
-    ret.annotations["Averaged"]["Count"] = n
-    ret.annotations["Averaged"]["Every"] = m
-    ret.annotations["Averaged"]["Origin"] = dict()
-    ret.annotations["Averaged"]["Origin"]["Blocks"]   = "; ".join(block_names)
-    ret.annotations["Averaged"]["Origin"]["Segments"] = segment_str
-    ret.annotations["Averaged"]["Origin"]["Signals"]  = signal_str
-    
-    return ret
-
 @safeWrapper
 def average_blocks_by_segments(*args, **kwargs):
     """Generates a neo.Block whose segments contains averages of the corresponding
@@ -6021,9 +6155,6 @@ def average_blocks_by_segments(*args, **kwargs):
     # first check all blocks in the list have the same number of segments
     
     nSegs = [len(block.segments) for block in args]
-    
-
-
     
     nSegs = nSegs[0]
     
