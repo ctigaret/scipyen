@@ -5419,6 +5419,47 @@ def irregularsignal2epoch(sig, name=None, labels=None):
     
     return ret
 
+def __resample_to_add__(signal, new_signal):
+    if new_signal.sampling_rate != signal.sampling_rate:
+        ss = resample_poly(new_signal, signal.sampling_rate)
+        
+    else:
+        ss = new_signal
+        
+    # neo.AnalogSignal and DataSignal always have ndim == 2
+    
+    if ss.shape != signal.shape:
+        ss_ = neo.AnalogSignal(np.full_like(signal, np.nan),
+                                            units = signal.units,
+                                            t_start = signal.t_start,
+                                            sampling_rate = signal.sampling_rate,
+                                            name = ss.name,
+                                            description = ss.description,
+                                            **signal.annotations)
+        
+        src_slicing = [slice(k) for k in ss.shape]
+        
+        dest_slicing = [slice(k) for k in ss_.shape]
+        
+        if ss.shape[0] < ss_.shape[0]:
+            dest_slicing[0] = src_slicing[0]
+            
+        else:
+            src_slicing[0]  = dest_slicing[0]
+            
+        if ss.shape[1] < ss_.shape[1]:
+            dest_slicing[1] = src_slicing[1]
+            
+        else:
+            src_slicing[1] = dest_slicing[1]
+            
+        ss_[tuple(dest_slicing)] = ss[tuple(src_slicing)]
+        
+        ss = ss_
+            
+    return ss
+
+
 @safeWrapper
 def aggregate_signals(*args, name_prefix:str, collectSD:bool=True, collectSEM:bool=True):
     """Returns signal mean, SD, SEM, and number of signals in args.
@@ -5551,8 +5592,15 @@ def average_signals(*args, fun=np.mean):
     
     return ret_signal
 
+def __applyRecDateTime(sgm, blk):
+    """Applies the block's rec_datetime to all its contained segments"""
+    if sgm.rec_datetime is None:
+        sgm.rec_datetime = blk.rec_datetime
+        
+    return sgm
+
 @safeWrapper
-def average_blocks(*args, **kwargs):
+def average_blocks_2(*args, **kwargs):
     """Generates a block containing a list of averaged AnalogSignal data from the *args.
     FIXME/TODO: revisit this 2023-05-22 18:43:31
     
@@ -5572,11 +5620,11 @@ def average_blocks(*args, **kwargs):
             2.1) identical time-base (or domain):
                 ∘ same t_start
                 ∘ same duration
-                ∘ same sampling rate
                 ∘ same domain units (or at least scalable to each-other)
             
             2.2) compatible signal units (i.e can be converted to each other) 
                 
+        3) the sampling rate MAY be different - additional signals will be resampled
     
         NOTE: The following data objects are EXCLUDED:
     
@@ -5691,12 +5739,6 @@ def average_blocks(*args, **kwargs):
     for groups of "n" blocks taken every "m" from the list of blocks given as starred argument(s) 
 
     """
-    def __applyRecDateTime(sgm, blk):
-        """Applies the block's rec_datetime to all its contained segments"""
-        if sgm.rec_datetime is None:
-            sgm.rec_datetime = blk.rec_datetime
-            
-        return sgm
         
     if len(args) == 0:
         return None
@@ -5734,24 +5776,12 @@ def average_blocks(*args, **kwargs):
         new_block = copy_with_data_subset(args, **kwargs)
         return new_block
     
-    n = kwargs.get("count", None)
-    m = kwargs.get("every", None)
-    ret_name = kwargs.get("name", "")
-    segment_index = kwargs.get("segments", None)
-    analog_index = kwargs.get("analogsignals", None)
-    ret_annotations = kwargs.get("annotations", None)
-    ret_rec_datetime = kwargs.get("datetime", datetime.datetime.now())
-    ret_file_origin = kwargs.get("file_origin", "")
-    ret_file_datetime = kwargs.get("file_datetime"), datetime.datetime.now()
-    ret_description = kwargs.get("description", "")
-            
-    
-    if len(kwargs) > 0 :
+    if isinstance(args, collections.abc.Sequence) and all(isinstance(a, neo.Block) for a in args):
         indexing_keys = list(kwargs.keys())
         for key in indexing_keys:
             if key not in ["count", "every", "name", "segments", 
-                           "analogsignals", "annotation", "rec_datetime", 
-                           "file_origin", "file_datetime", "description"]:
+                            "analogsignals", "annotation", "rec_datetime", 
+                            "file_origin", "file_datetime", "description"]:
                 kwargs.pop(key, None)
                 
             elif kwargs[key] == MISSING:
@@ -5760,16 +5790,36 @@ def average_blocks(*args, **kwargs):
         for key in ["irregularlysampledsignals", "imagesequences", "spiketrains",
                     "epochs", "events", "groups"]:
             kwargs[key] = MISSING # make sure these are left behind
+                
+        n = kwargs.get("count", None)
+        m = kwargs.get("every", None)
+        ret_name = kwargs.get("name", "")
+        segment_index = kwargs.get("segments", None)
+        analog_index = kwargs.get("analogsignals", None)
+        ret_annotations = kwargs.get("annotations", None)
+        ret_rec_datetime = kwargs.get("datetime", datetime.datetime.now())
+        ret_file_origin = kwargs.get("file_origin", "")
+        ret_file_datetime = kwargs.get("file_datetime"), datetime.datetime.now()
+        ret_description = kwargs.get("description", "")
             
-    if isinstance(args, collections.abc.Sequence) and all(isinstance(a, neo.Block) for a in args):
+    
         # first, copy blocks with data subsets
         bb = sorted(args, key=lambda x: x.rec_datetime)
+        block_names = [b.name for b in bb]
         
-        blocks = [copy_with_data_subset(b, **kwargs) for b in bb]
+        if n is None:
+            n = len(args)
+            m = None
+            
+        if m is None:
+            ranges_avg = [range(0, len(bb))]  # take average of all blocks!
+        else:
+            ranges_avg = [range(k, k+n) for k in range(0, len(bb), m)]
+            
+        if ranges_avg[-1].stop > len(bb):
+            ranges_avg[-1] = range(ranges_avg[-1].start, len(bb))
         
-        block_names = [b.name for b in blocks]
-         
-        nSegs = [len(b.segments) for b in blocks]
+        nSegs = [len(b.segments) for b in bb]
         
         ms = min(nSegs)
         
@@ -5777,127 +5827,135 @@ def average_blocks(*args, **kwargs):
             raise ValueError("The blocks must contain an equal number of segments")
         
         nSegs = nSegs[0]
-         
-        if n is None:
-            n = len(args)
-            m = None
-            
-        if m is None:
-            ranges_avg = [range(0, len(blocks))]  # take average of all blocks!
-        else:
-            ranges_avg = [range(k, k+n) for k in range(0, len(blocks), m)]
-            
+        
+        # copy all segments in separate lists (one per block);
+        # just select analogsignals
+        kw = dict(list(kwargs.items()))
+        kw["segments"] =None
+        
         if segment_index is None:
             segment_index = range(nSegs)
             
-        # average segments with same index, across blocks
-        for seg_ndx in segment_index:
-            seglist = [blocks[k].segments[nseg_ndx] for k in ranges_avg]
-            #TODO
-            
+        new_segments = list()
+        
         ret = neo.core.Block(name=name, description=ret_description, file_origin=ret_file_origin,
                               file_datetime=ret_file_datetime, rec_datetime=ret_rec_datetime, 
                              **ret_annotations)
         
-            # we average segment by segment, of each block
-            
-         
-        new_segments = list()
-         
-        for k, block in enumerate(args):
-            new_block = copy_with_data_subset(arg, **kwargs)
-            # NOTE: 2023-05-22 17:46:34 
-            # propagate time & file stamps to these segments
-            for seg in new_block.segments:
-                seg.rec_datetime = new_block.rec_datetime
-                seg.file_origin = new_block.file_origin
-            
-            new_segments.extend(new_block.segments)
+        for range_avg in ranges_avg:
+            seg = neo.Segment()
+            for bk in range_avg:
+                block = bb[bk]
+                if bk == range_avg.start:
+                    seg.rec_datetime = block.rec_datetime
+                block_segments = [copy_with_data_subset(block.segments[sk], **kw) for sk in segment_index]
+                
+                # average the signals across these segments
+                for sk in range(len(block_segments)):
+                    if sk == 0:
+                        seg.analogsignals[:] = [make_neo_object(s) for s in block_segments[sk].analogsignals]
+                        
+                    else:
+                        for sig_ndx, sig in enumerate(block_segments[sk].analogsignals):
+                            seg.analogsignals[sig_ndx] += make_neo_object(__resample_to_add__(signals[sig_ndx, sig]))
+                        
+                
+                for sig in seg.analogsignals:
+                    sig /= len(range_avg)
+                
+        ret.segments.append(seg)
+        ret.create_relationship()
         
-        # FIXME: 2023-05-22 17:53:42
-        # do NOT average_segments !!!
-        # call average_blocks_by_segments instead !
-        ret.segments = average_segments(new_segments, count=n, every=m, analog_index=analogsignals)
-   
-#     if len(args) == 1:
-#         if isinstance(args[0], str): # glob for variable names
-#             blocks = __get_blocks_by_name__(args[0])
-#                 #cframe = inspect.getouterframes(inspect.currentframe())[1][0]
-#                 #blocks = workspacefunctions.getvars(args[0], glob=True,
-#                                                         #ws=cframe, as_dict=False,
-#                                                         #sort=False)
-#                 
-#         elif isinstance(args[0], (tuple, list)):
-#             if all([isinstance(a, neo.Block) for a in args[0]]): # list of blocks
-#                 blocks = args[0] # unpack the tuple
-#                 
-#             elif all([isinstance(a, str) for a in args[0]]): # list of names
-#                 blocks = __get_blocks_by_name__(*args[0])
-#                 
-#             else:
-#                 raise ValueError("Invalid argument %s" % args[0])
-#                 
-#             
-#     else:
-#         if all([isinstance(a, neo.Block) for a in args]):
-#             blocks = args
-#             
-#         elif all([isinstance(a, str) for a in args]):
-#             blocks = __get_blocks_by_name__(*args)
-#             
-#         else:
-#             raise ValueError("Invalid argument %s" % args)
-#             
-#     if len(blocks)==0:
-#         return
-            
-#     block_names = [b.name for b in blocks]
-#             
-#     n = None
-#     m = None
-#     segment_index = None
-#     analog_index = None
-#     
-#     ret = neo.core.block.Block()
-#     
-#     if analog_index is not None:
-#         signal_str = str(analog_index)
-#         
-#     elif isinstance(analog_index, (tuple, list)):
-#         signal_str = f"{analog_index}"
-#         
-#     else:
-#         signal_str = "all"
-#         
-#     if segment_index is None:
-#         segments = [[__applyRecDateTime(sgm, b) for sgm in b.segments] for b in blocks]
-#         segment_str = "all"
-#         
-#     elif isinstance(segment_index, int):
-#         segments = [__applyRecDateTime(b.segments[segment_index], b) for b in blocks if segment_index < len(b.segments)]
-#         segment_str = str(segment_index)
-        
-#     elif isinstance(segment_index, (tuple, list)) and all(isinstance(ndx, int) for ndx in segment_index):
-#         seg_avg = list()
-#         for k, ndx in enumerate(segment_index):
-#             if any(ndx not in range(len(b.segments)) for b in blocks):
-#                 raise ValueError(f"segment index {ndx} out of range for ")
-#             segments = [[__applyRecDateTime(b.segments[ndx], b) if ndx in range(len(b.segments))] for b in blocks ]
-#             if k == 0:
-#                 seg_avg = average_segments(segments, count=n, every=m, analog_index = analog_index)
-#             else:
-#                 avg_segs = average_segments(segments, count=n, every=m, analog_index = analog_index)
-#                 
-#                 
-#             
-#         segments = [[__applyRecDateTime(b.segments[ndx], b) for ndx in segment_index if ndx in range(len(b.segments))] for b in blocks ]
-#         segment_str = f"{segment_index}"
-        
-    # else:
-    #     # raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or sequence of int, or None")
-    #     raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or None")
+        ret.annotations["Averaged"] = dict()
+        ret.annotations["Averaged"]["Count"] = n
+        ret.annotations["Averaged"]["Every"] = m
+        ret.annotations["Averaged"]["Origin"] = dict()
+        ret.annotations["Averaged"]["Origin"]["Blocks"]   = "; ".join(block_names)
+        # ret.annotations["Averaged"]["Origin"]["Segments"] = segment_str
+        # ret.annotations["Averaged"]["Origin"]["Signals"]  = signal_str
     
-    # ret.segments = average_segments(segments, count=n, every=m, analog_index=analog_index)
+        return ret
+    
+def average_blocks_old(*args, **kwargs):
+    if len(args) == 1:
+        if isinstance(args[0], str): # glob for variable names
+            blocks = __get_blocks_by_name__(args[0])
+                #cframe = inspect.getouterframes(inspect.currentframe())[1][0]
+                #blocks = workspacefunctions.getvars(args[0], glob=True,
+                                                        #ws=cframe, as_dict=False,
+                                                        #sort=False)
+                
+        elif isinstance(args[0], (tuple, list)):
+            if all([isinstance(a, neo.Block) for a in args[0]]): # list of blocks
+                blocks = args[0] # unpack the tuple
+                
+            elif all([isinstance(a, str) for a in args[0]]): # list of names
+                blocks = __get_blocks_by_name__(*args[0])
+                
+            else:
+                raise ValueError("Invalid argument %s" % args[0])
+                
+            
+    else:
+        if all([isinstance(a, neo.Block) for a in args]):
+            blocks = args
+            
+        elif all([isinstance(a, str) for a in args]):
+            blocks = __get_blocks_by_name__(*args)
+            
+        else:
+            raise ValueError("Invalid argument %s" % args)
+            
+    if len(blocks)==0:
+        return
+            
+    block_names = [b.name for b in blocks]
+            
+    n = None
+    m = None
+    segment_index = None
+    analog_index = None
+    
+    ret = neo.core.block.Block()
+    
+    if analog_index is not None:
+        signal_str = str(analog_index)
+        
+    elif isinstance(analog_index, (tuple, list)):
+        signal_str = f"{analog_index}"
+        
+    else:
+        signal_str = "all"
+        
+    if segment_index is None:
+        segments = [[__applyRecDateTime(sgm, b) for sgm in b.segments] for b in blocks]
+        segment_str = "all"
+        
+    elif isinstance(segment_index, int):
+        segments = [__applyRecDateTime(b.segments[segment_index], b) for b in blocks if segment_index < len(b.segments)]
+        segment_str = str(segment_index)
+        
+    elif isinstance(segment_index, (tuple, list)) and all(isinstance(ndx, int) for ndx in segment_index):
+        seg_avg = list()
+        for k, ndx in enumerate(segment_index):
+            if any(ndx not in range(len(b.segments)) for b in blocks):
+                raise ValueError(f"segment index {ndx} out of range for ")
+            segments = [[__applyRecDateTime(b.segments[ndx], b) if ndx in range(len(b.segments))] for b in blocks ]
+            if k == 0:
+                seg_avg = average_segments(segments, count=n, every=m, analog_index = analog_index)
+            else:
+                avg_segs = average_segments(segments, count=n, every=m, analog_index = analog_index)
+                
+                
+            
+        segments = [[__applyRecDateTime(b.segments[ndx], b) for ndx in segment_index if ndx in range(len(b.segments))] for b in blocks ]
+        segment_str = f"{segment_index}"
+        
+    else:
+        # raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or sequence of int, or None")
+        raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or None")
+    
+    ret.segments = average_segments(segments, count=n, every=m, analog_index=analog_index)
     
     ret.annotations["Averaged"] = dict()
     ret.annotations["Averaged"]["Count"] = n
@@ -6129,48 +6187,10 @@ def average_segments(*args, **kwargs):
         every
         analog_index
         
-    
+    TODO: simplify to average all signal with same index across segments
     """
     from core import datatypes as dt
     
-    def __resample_add__(signal, new_signal):
-        if new_signal.sampling_rate != signal.sampling_rate:
-            ss = resample_poly(new_signal, signal.sampling_rate)
-            
-        else:
-            ss = new_signal
-            
-        # neo.AnalogSignal and DataSignal always have ndim == 2
-        
-        if ss.shape != signal.shape:
-            ss_ = neo.AnalogSignal(np.full_like(signal, np.nan),
-                                                units = signal.units,
-                                                t_start = signal.t_start,
-                                                sampling_rate = signal.sampling_rate,
-                                                name = ss.name,
-                                                **signal.annotations)
-            
-            src_slicing = [slice(k) for k in ss.shape]
-            
-            dest_slicing = [slice(k) for k in ss_.shape]
-            
-            if ss.shape[0] < ss_.shape[0]:
-                dest_slicing[0] = src_slicing[0]
-                
-            else:
-                src_slicing[0]  = dest_slicing[0]
-                
-            if ss.shape[1] < ss_.shape[1]:
-                dest_slicing[1] = src_slicing[1]
-                
-            else:
-                src_slicing[1] = dest_slicing[1]
-                
-            ss_[tuple(dest_slicing)] = ss[tuple(src_slicing)]
-            
-            ss = ss_
-                
-        return ss
     
     #print(args)
     
@@ -6247,7 +6267,7 @@ def average_segments(*args, **kwargs):
 
                 elif k < len(args):
                     for (l,s) in enumerate(args[k].analogsignals):
-                        seg.analogsignals[l] += __resample_add__(seg.analogsignals[l], s)
+                        seg.analogsignals[l] += __resample_to_add__(seg.analogsignals[l], s)
 
             for sig in seg.analogsignals:
                 sig /= len(range_avg)
@@ -6267,7 +6287,7 @@ def average_segments(*args, **kwargs):
                 else:
                     s = args[k].analogsignals[get_index_of_named_signal(args[k], analog_index)].copy()
 
-                    seg.analogsignals[0] += __resample_add__(seg.analogsignals[0], s)
+                    seg.analogsignals[0] += __resample_to_add__(seg.analogsignals[0], s)
                     
             seg.analogsignals[0] /= len(range_avg) # there is only ONE signal in this segment!
             
@@ -6287,7 +6307,7 @@ def average_segments(*args, **kwargs):
                 else:
                     s = args[k].analogsignals[analog_index].copy()
                     
-                    seg.analogsignals[0] += __resample_add__(seg.analogsignals[0], s)
+                    seg.analogsignals[0] += __resample_to_add__(seg.analogsignals[0], s)
                     
             seg.analogsignals[0] /= len(range_avg)# there is only ONE signal in this segment!
             
@@ -6316,7 +6336,7 @@ def average_segments(*args, **kwargs):
                             
                         s = args[k].analogsignals[sigNdx].copy()
                         
-                        seg.analogsignals[ds] += __resample_add__(seg.analogsignals[ds], s)
+                        seg.analogsignals[ds] += __resample_to_add__(seg.analogsignals[ds], s)
                         
             for sig in seg.analogsignals:
                 sig /= len(range_avg)
