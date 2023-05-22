@@ -149,6 +149,7 @@ from itertools import chain, filterfalse
 from functools import (partial, reduce, singledispatch)
 from copy import (copy, deepcopy)
 from enum import (Enum, IntEnum,)
+from dataclasses import MISSING
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -2871,32 +2872,59 @@ def copy_with_data_subset(obj, **kwargs):
                     When False, the signal objects will be stored by reference 
                     in the result.
                 
+    Indexing parameters: these are of one of the following types: int, str, range, 
+    slice, typing.Sequence[int], typing.Sequence[str], dataclasses.MISSING_TYPE, or 
+    NoneType (default).
     
-    segments:       int, str, range, slice, typing.Sequence[int] or None (default); 
+        int ⇒ selects only the element with the specified int index
+    
+        str ⇒ selects only the element with the specified name (if it exists)
+    
+        range ⇒ selects the elements with int indices in the specified range
+    
+        slice ⇒ selects the elements within the slice range
+    
+        Sequence[int] ⇒ selects the elements with the specified int indices
+    
+        Sequence[str] ⇒ selects the elements with the specified names
+    
+        MISSING ⇒ select NO elements from the container (return an empty collection)
+    
+        None ⇒ select ALL elements in the container NOTE: this is the default
+    
+        NOTE: this may seem counterintuitive, but this is useful for programming
+        reasons. Think of it in this way:
+    
+        • Whenever an indexing is MISSING, this signifies that we DO NOT want a 
+        selection from that child collection.
+    
+        • When an indexing is None, it means an indexing is NOT specified hence 
+        we take the full child collection.
+    
+    segments:       
                     Indexing of the segments to be retained in the result.
                     
                     This index can be (see normalized_index):
                     int, str (signal name), sequence of int or str, a range,
                     a slice, or a numpy array of int or booleans.
                     
-                    When None, all segments in each block will be retained.
+                    When MISSING, all segments in each block will be retained.
                     
-    groups:         int, str, range, slice, typing.Sequence or None; 
                     Indexing of the segments to be retained in the result.
                     
                     This index can be (see normalized_index):
                     int, str (signal name), sequence of int or str, a range,
                     a slice, or a numpy array of int or booleans.
+    
+    groups:
+                    Indexing of groups.
                     
-                    When None, all groups in each block will be retained.
-                    
-                    NOTE: Ignored when 'segments' is not None, because 
-                    'groups' represent a view of the data organization that
-                    is orthogonal to the organization in segments. 
+                    NOTE: Ignored when 'segments' is not MISSING, because 
+                    'groups' represent a view of the data organization orthogonal
+                    to that of the segments. In this case, ALL groups will be
+                    returned.
                     
     analogsignals:  
-                    int, str, range, slice, typing.Sequence or None (default);
-                    
                     Indexing of analog signal(s) into each of the segments, that
                     will be retained in the concatenated data. These include
                     neo.AnalogSignal and datatypes.DataSignal
@@ -2904,11 +2932,6 @@ def copy_with_data_subset(obj, **kwargs):
                     This index can be (see normalized_index):
                     int, str (signal name), sequence of int or str, a range,
                     a slice, or a numpy array of int or booleans.
-                    
-                    When None, all analogsignals available in each segment
-                    are retained.
-                    
-                    
                     
     irregularlysampledsignals:
                     as analog, for irregularly sampled signals. These 
@@ -2971,22 +2994,12 @@ def _(obj, **kwargs):
     
     for kwarg in kwargs.keys():
         if kwarg not in obj._child_containers:
-            # similars = [s for s in obj._child_containers if s.lower() in kwarg.lower() or kwarg.lower() in s.lower()]
-            # if len(similars):
-            #     warnings.warn(f"Unexpected keyword {kwarg} will be ignored; did you mean one of {similars}?")
-            # else:
-            #     warnings.warn(f"Unexpected keyword {kwarg} will be ignored")
-                
             not_kwargs[kwarg] = kwargs[kwarg]
             
     for kw in not_kwargs.keys():
         kwargs.pop(kw, None)
     
-    # print(f"copy_with_data_subset(Block) kwargs {kwargs}")
-    
     indexing = dict((s, kwargs.pop(s, None)) for s in obj._child_containers)
-    
-    # print(f"copy_with_data_subset(Block) indexing {indexing}")
     
     ret = make_neo_object(obj)
     
@@ -2996,12 +3009,15 @@ def _(obj, **kwargs):
     # groups will likely loose some of their contents;
     # to keep it simple we allow only a selection of segments or groups, but never
     # simultaneously both
+    # NOTE: segments None => get all segments 
+    #       segments MMISSING => get None of them -> cannot have groups either
     if indexing["segments"] is not None:
-        indexing["groups"] = None
+        if indexing["segments"] is MISSING: # i.e.
+            indexing["groups"] = MISSING
+        else:
+            indexing["groups"] = None
         
     keep_segs_ndx = normalized_index(obj.segments, indexing["segments"])
-    
-    # print(f"copy_with_data_subset(Block) indexing segments {indexing['segments']}")
     
     keep_groups_ndx = normalized_index(obj.groups, indexing["groups"])
     
@@ -3120,26 +3136,12 @@ def _(obj, **kwargs):
     toCopy = kwargs.pop("copy", True)
     
     data_child_object_names = [_container_name(s) for s in obj._data_child_objects]
-    # print(f"copy_with_data_subset(Segment) data_child_object_names {data_child_object_names}")
     
     not_kwargs = dict()
     
     # see NOTE: 2023-04-13 09:45:19
     for kw in kwargs.keys():
         if kw not in data_child_object_names:
-#             similar = [s for s in data_child_object_names if similar_strings(kw,s)>0.5]
-#             if len(similar):
-#                 if len(similar)> 1:
-#                     warnings.warn(f"Unexpected keyword '{kw}' will be ignored; did you mean one of {similar}?")
-#                     # raise KeyError(f"Unexpected keyword '{kw}'; did you mean one of {similar}?")
-#                 else:
-#                     warnings.warn(f"Unexpected keyword '{kw}' will be ignored; did you mean '{similar[0]}'?")
-#                     # raise KeyError(f"Unexpected keyword '{kw}'; did you mean '{similar[0]}'?")
-#                 
-#             else:
-#                 warnings.warn(f"Unexpected keyword '{kw}' will be ignored")
-#                 # raise KeyError(f"Unexpected keyword '{kw}'")
-#                 
             not_kwargs[kw] = kwargs[kw]
             
     for k in not_kwargs.keys():
@@ -3147,7 +3149,6 @@ def _(obj, **kwargs):
     
     indexing = dict((_container_name(s), kwargs.pop(_container_name(s), None)) for s in obj._data_child_objects)
         
-    # print(f"copy_with_data_subset(Segment) indexing {indexing}")
     ret = make_neo_object(obj)
     
     for container_name, indices in indexing.items():
@@ -3180,16 +3181,26 @@ def concatenate_blocks(*args, **kwargs):
     in the result in the order they are encountered (i.e. the same order as they
     are passed in *args).
     
-    Optionally a subset of the signals contained in the source data are retained
-    in the concatenated Block.
+    Optionally, only subsets of the segments' data children¹ contained in the 
+    source data are retained in the concatenated Block.
     
-    Events, spike trains and epochs contained in the selected segments will be
-    copied to the concatenated Block.
+    ¹ neo.Segment's data children are attributes with the following names:
+        analogsignals
+        irregularlysampledsignal
+        imagesequences
+        spiketrains
+        epochs
+        events
+    
+    and are lists of neo data objects of corresponding types. 
+
+    In addition, Scipyen's DataSignal and IrregularlySampledDataSignal are stored, 
+    respectively, in the 'analogsignals' and 'irregularlysampledsignals' attributes
+    of a neo.Segment.
     
     Var-positional parameters:
     --------------------------
-    args : a comma-separated list of one or more, neo.core.Block or 
-            neo.core.Segment objects
+    args : a comma-separated list of one or more neo.core.Block objects
     
     Var-keyword parameters:
     -----------------------
@@ -3283,6 +3294,10 @@ def concatenate_blocks(*args, **kwargs):
     will concatenate the first segment (segment_index = 0) from all neo.Block 
     variables having names beginning with 'data_name_prefix' in the user 
     workspace.
+    
+    Changelog:
+    ==========
+    2023-05-22 16:08:31 Only accepts neo.Block or sequence of neo.Block
 
     
     """
@@ -3301,19 +3316,23 @@ def concatenate_blocks(*args, **kwargs):
     if len(args) == 1:
         if isinstance(args[0], (str, type)):
             try:
-                args =  workspacefunctions.getvars(args[0], var_type = (neo.Block, neo.Segment), sort=True, sortkey=lambda x: x.rec_datetime)
+                args =  workspacefunctions.getvars(args[0], var_type = (neo.Block,), sort=True, sortkey=lambda x: x.rec_datetime)
+                # args =  workspacefunctions.getvars(args[0], var_type = (neo.Block, neo.Segment), sort=True, sortkey=lambda x: x.rec_datetime)
                 
             except Exception as e:
-                print("String argument did not resolve to a list of neo.Block or neo.Segment objects")
+                print("String argument did not resolve to a list of neo.Block objects")
+                # print("String argument did not resolve to a list of neo.Block or neo.Segment objects")
                 traceback.print_exc()
                 return
             
         elif isinstance(args[0], collections.abc.Sequence) and all(isinstance(a, (type, str)) for a in args[0]):
             try:
-                args =  workspacefunctions.getvars(*args[0], var_type = (neo.Block, neo.Segment), sort=True, sortkey=lambda x: x.rec_datetime)
+                args =  workspacefunctions.getvars(*args[0], var_type = (neo.Block, ), sort=True, sortkey=lambda x: x.rec_datetime)
+                # args =  workspacefunctions.getvars(*args[0], var_type = (neo.Block, neo.Segment), sort=True, sortkey=lambda x: x.rec_datetime)
                 
             except Exception as e:
-                print("String argument did not resolve to a list of neo.Block or neo.Segment objects")
+                print("String argument did not resolve to a list of neo.Block objects")
+                # print("String argument did not resolve to a list of neo.Block or neo.Segment objects")
                 traceback.print_exc()
                 return
             
@@ -3324,24 +3343,25 @@ def concatenate_blocks(*args, **kwargs):
         new_block = copy_with_data_subset(args, **kwargs)
         return new_block
             
-    if isinstance(args, neo.Segment):
-        # FIXME: 2023-05-19 17:36:25
-        # obviously, here the segment index in the kwargs does NOT help
-        # TODO take this code out into a concatenate_segments() function
-        # make a new Block, append a copied segment
-        ret = neo.core.Block(name=name, description=description, file_origin=file_origin,
-                            file_datetime=file_datetime, rec_datetime=rec_datetime, 
-                            **annotations)
-        ret.segments.append(copy_with_data_subset(args, **kwargs))
-        
-        for k, seg in enumerate(ret.segments):
-            seg.block = ret
-            seg.rec_datetime = rec_datetime
-            seg.name = f"segment_{k}"
+#     if isinstance(args, neo.Segment):
+#         # FIXME: 2023-05-19 17:36:25
+#         # obviously, here the segment index in the kwargs does NOT help
+#         # TODO take this code out into a concatenate_segments() function
+#         # make a new Block, append a copied segment
+#         ret = neo.core.Block(name=name, description=description, file_origin=file_origin,
+#                             file_datetime=file_datetime, rec_datetime=rec_datetime, 
+#                             **annotations)
+#         ret.segments.append(copy_with_data_subset(args, **kwargs))
+#         
+#         for k, seg in enumerate(ret.segments):
+#             seg.block = ret
+#             seg.rec_datetime = rec_datetime
+#             seg.name = f"segment_{k}"
+#             
+#         return ret
             
-        return ret
-            
-    if isinstance(args, collections.abc.Sequence) and all(isinstance(a, (neo.Block, neo.Segment)) for a in args):
+    # if isinstance(args, collections.abc.Sequence) and all(isinstance(a, (neo.Block, neo.Segment)) for a in args):
+    if isinstance(args, collections.abc.Sequence) and all(isinstance(a, neo.Block) for a in args):
         # NOTE: 2021-11-24 09:55:15
         # this branch deals with a sequence of Blocks and/or Segments
         # make a new Block, append segments
@@ -3352,79 +3372,141 @@ def concatenate_blocks(*args, **kwargs):
                             **annotations)
         
         for (k,arg) in enumerate(args):
-            if isinstance(arg, neo.Block):
-                # copy arg to a new block; the **kwargs will take care of 
-                # selective copy of segments and of their contents
-                new_block = copy_with_data_subset(arg, **kwargs)
-                # NOTE: propagate time & file stamps to these segments
-                for seg in new_block.segments:
-                    seg.rec_datetime = new_block.rec_datetime
-                    seg.file_origin = new_block.file_origin
-                ret.segments.extend(new_block.segments)
+            # copy arg to a new block; the **kwargs will take care of 
+            # selective copy of segments and of their contents
+            new_block = copy_with_data_subset(arg, **kwargs)
+            # NOTE: 2023-05-22 17:46:34 
+            # propagate time & file stamps to these segments
+            for seg in new_block.segments:
+                seg.rec_datetime = new_block.rec_datetime
+                seg.file_origin = new_block.file_origin
+            ret.segments.extend(new_block.segments)
 
-                if len(new_block.groups):
-                    for group in new_block.groups:
-                        existing_groups = [g for g in ret.groups if g.name == group.name]
-                        
-                        if len(existing_groups):
-                            existing_group = existing_groups[0]
-                            new_group = None
-                        else:
-                            existing_group = None
-                            new_group = neo.Group(name=group.name, allowed_types = group.allowed_types)
-                        
-                        objects = list()
-                        
-                        for child_class_name, child_container in group._container_lookup.items():
-                            # NOTE 2021-11-24 09:56:33
-                            # see also NOTE: 2021-11-24 09:12:32
-                            if child_class_name != "ChannelView":
-                                data = list(chain(*[s.list_children_by_class(child_class_name) for s in new_block.segments]))
-                                objects.extend([o for o in child_container if any(is_same_as(o, o_) for o_ in data)])
-                        
-                        if len(objects):
-                            # NOTE: 2021-11-24 10:02:28 Below:
-                            # * new_group is a completely new group, NOT added to the new block
-                            # * existing_group if a group that  has been added to the new block in prev iterations
-                            # * target_group is a reference to the new_group or existing_group in the current iteration
-                            # We operate on channel views in the target_group further down.
-                            if isinstance(new_group, neo.Group):
-                                new_group.add(*objects)
-                                ret.groups.append(new_group)
-                                target_group = new_group 
-                            elif isinstance(existing_group,neo.Group):
-                                existing_group.add(*objects)
-                                target_group = existing_group
-                                
-                            # NOTE: 2021-11-24 09:59:42 Now, add channel views
-                            # to the target group (see NOTE: 2021-11-24 10:02:28 for what this means)
-                            if hasattr(group, "channelviews") and len(group.channelviews):
-                                for channelview in group.channelviews:
-                                    if isinstance(channelview.obj, neo.core.basesignal.BaseSignal):
-                                        data = list(chain(*[s.list_children_by_class(type(channelview.obj).__name__) for s in new_block.segments]))
-                                        if any(is_same_as(channelview.obj, o_) for o_ in data):
-                                            new_channelview = neo.ChannelView(channelview.obj,
-                                                                            index = channelview.index, 
-                                                                            name = channelview.name, 
-                                                                            description = channelview.description,
-                                                                            file_origin = channelview.file_origin,
-                                                                            array_annotations = channelview.array_annotations,
-                                                                            **channelview.annotations)
-                                            
-                                            target_group.channelviews.append(newchannel_view)
-                                            
-                
-            elif isinstance(arg, neo.core.Segment):
-                kw = dict((n,v) for n,v in kwargs if n not in ("segments", "groups"))
-                # kw = dict((n,v) for n,v in kwargs if n != "segments")
-                new_seg = copy_with_data_subset(arg, **kw)
-                
-                new_seg.rec_datetime = rec_datetime
-                new_seg.block = ret
-                ret.segments.append(new_seg)
-                
-                # TODO/FIXME: 2021-11-23 22:45:43
-                # what to do with groups, here?
+            if len(new_block.groups):
+                for group in new_block.groups:
+                    existing_groups = [g for g in ret.groups if g.name == group.name]
+                    
+                    if len(existing_groups):
+                        existing_group = existing_groups[0]
+                        new_group = None
+                    else:
+                        existing_group = None
+                        new_group = neo.Group(name=group.name, allowed_types = group.allowed_types)
+                    
+                    objects = list()
+                    
+                    for child_class_name, child_container in group._container_lookup.items():
+                        # NOTE 2021-11-24 09:56:33
+                        # see also NOTE: 2021-11-24 09:12:32
+                        if child_class_name != "ChannelView":
+                            data = list(chain(*[s.list_children_by_class(child_class_name) for s in new_block.segments]))
+                            objects.extend([o for o in child_container if any(is_same_as(o, o_) for o_ in data)])
+                    
+                    if len(objects):
+                        # NOTE: 2021-11-24 10:02:28 Below:
+                        # * new_group is a completely new group, NOT added to the new block
+                        # * existing_group if a group that  has been added to the new block in prev iterations
+                        # * target_group is a reference to the new_group or existing_group in the current iteration
+                        # We operate on channel views in the target_group further down.
+                        if isinstance(new_group, neo.Group):
+                            new_group.add(*objects)
+                            ret.groups.append(new_group)
+                            target_group = new_group 
+                        elif isinstance(existing_group,neo.Group):
+                            existing_group.add(*objects)
+                            target_group = existing_group
+                            
+                        # NOTE: 2021-11-24 09:59:42 Now, add channel views
+                        # to the target group (see NOTE: 2021-11-24 10:02:28 for what this means)
+                        if hasattr(group, "channelviews") and len(group.channelviews):
+                            for channelview in group.channelviews:
+                                if isinstance(channelview.obj, neo.core.basesignal.BaseSignal):
+                                    data = list(chain(*[s.list_children_by_class(type(channelview.obj).__name__) for s in new_block.segments]))
+                                    if any(is_same_as(channelview.obj, o_) for o_ in data):
+                                        new_channelview = neo.ChannelView(channelview.obj,
+                                                                        index = channelview.index, 
+                                                                        name = channelview.name, 
+                                                                        description = channelview.description,
+                                                                        file_origin = channelview.file_origin,
+                                                                        array_annotations = channelview.array_annotations,
+                                                                        **channelview.annotations)
+                                        
+                                        target_group.channelviews.append(newchannel_view)
+                                        
+            
+#             if isinstance(arg, neo.Block):
+#                 # copy arg to a new block; the **kwargs will take care of 
+#                 # selective copy of segments and of their contents
+#                 new_block = copy_with_data_subset(arg, **kwargs)
+#                 # NOTE: propagate time & file stamps to these segments
+#                 for seg in new_block.segments:
+#                     seg.rec_datetime = new_block.rec_datetime
+#                     seg.file_origin = new_block.file_origin
+#                 ret.segments.extend(new_block.segments)
+# 
+#                 if len(new_block.groups):
+#                     for group in new_block.groups:
+#                         existing_groups = [g for g in ret.groups if g.name == group.name]
+#                         
+#                         if len(existing_groups):
+#                             existing_group = existing_groups[0]
+#                             new_group = None
+#                         else:
+#                             existing_group = None
+#                             new_group = neo.Group(name=group.name, allowed_types = group.allowed_types)
+#                         
+#                         objects = list()
+#                         
+#                         for child_class_name, child_container in group._container_lookup.items():
+#                             # NOTE 2021-11-24 09:56:33
+#                             # see also NOTE: 2021-11-24 09:12:32
+#                             if child_class_name != "ChannelView":
+#                                 data = list(chain(*[s.list_children_by_class(child_class_name) for s in new_block.segments]))
+#                                 objects.extend([o for o in child_container if any(is_same_as(o, o_) for o_ in data)])
+#                         
+#                         if len(objects):
+#                             # NOTE: 2021-11-24 10:02:28 Below:
+#                             # * new_group is a completely new group, NOT added to the new block
+#                             # * existing_group if a group that  has been added to the new block in prev iterations
+#                             # * target_group is a reference to the new_group or existing_group in the current iteration
+#                             # We operate on channel views in the target_group further down.
+#                             if isinstance(new_group, neo.Group):
+#                                 new_group.add(*objects)
+#                                 ret.groups.append(new_group)
+#                                 target_group = new_group 
+#                             elif isinstance(existing_group,neo.Group):
+#                                 existing_group.add(*objects)
+#                                 target_group = existing_group
+#                                 
+#                             # NOTE: 2021-11-24 09:59:42 Now, add channel views
+#                             # to the target group (see NOTE: 2021-11-24 10:02:28 for what this means)
+#                             if hasattr(group, "channelviews") and len(group.channelviews):
+#                                 for channelview in group.channelviews:
+#                                     if isinstance(channelview.obj, neo.core.basesignal.BaseSignal):
+#                                         data = list(chain(*[s.list_children_by_class(type(channelview.obj).__name__) for s in new_block.segments]))
+#                                         if any(is_same_as(channelview.obj, o_) for o_ in data):
+#                                             new_channelview = neo.ChannelView(channelview.obj,
+#                                                                             index = channelview.index, 
+#                                                                             name = channelview.name, 
+#                                                                             description = channelview.description,
+#                                                                             file_origin = channelview.file_origin,
+#                                                                             array_annotations = channelview.array_annotations,
+#                                                                             **channelview.annotations)
+#                                             
+#                                             target_group.channelviews.append(newchannel_view)
+#                                             
+#                 
+#             elif isinstance(arg, neo.core.Segment):
+#                 kw = dict((n,v) for n,v in kwargs if n not in ("segments", "groups"))
+#                 # kw = dict((n,v) for n,v in kwargs if n != "segments")
+#                 new_seg = copy_with_data_subset(arg, **kw)
+#                 
+#                 new_seg.rec_datetime = rec_datetime
+#                 new_seg.block = ret
+#                 ret.segments.append(new_seg)
+#                 
+#                 # TODO/FIXME: 2021-11-23 22:45:43
+#                 # what to do with groups, here?
               
     else:
         raise TypeError("Expecting a neo.Block or a sequence of neo.Block objects, got %s instead" % type(args).__name__)
@@ -5472,61 +5554,129 @@ def average_signals(*args, fun=np.mean):
 @safeWrapper
 def average_blocks(*args, **kwargs):
     """Generates a block containing a list of averaged AnalogSignal data from the *args.
-    FIXME/TODO: revisit this
-    Parameters:
-    -----------
+    FIXME/TODO: revisit this 2023-05-22 18:43:31
     
+    Var-positional parameters:
+    --------------------------
     args: a comma-separated list of neo.Block objects
+        The function will calculate the average of segments with the same index
+        in the block, over N = 'count' blocks, skipping M = 'every' blocks.
     
-    kwargs: keyword/value pairs:
     
-        count               how many segments into one average
-        
-        every               how many segments to skip between averages
-        
-        segments            index of segments taken into average: int, range,
-                            slice, or sequence (tuple, list) of int
-        
-        analogsignals       index of signal into each of the segments to be used;
-                            can also be a signal name
-        
-        name                see neo.Block docstring
-        
-        annotation          see neo.Block docstring
-        
-        rec_datetime        see neo.Block docstring
-        
-        file_origin         see neo.Block docstring
-        
-        file_datetime       see neo.Block docstring
+        NOTE: PREREQUISITES:
+
+        1) All neo.Block objects in args must have the same number of sweeps
+        (i.e. neo.Segment objects).
+    
+        2) All neo.AnalogSignal objects in the segments of the blocks MUST have:
+            2.1) identical time-base (or domain):
+                ∘ same t_start
+                ∘ same duration
+                ∘ same sampling rate
+                ∘ same domain units (or at least scalable to each-other)
+            
+            2.2) compatible signal units (i.e can be converted to each other) 
+                
+    
+        NOTE: The following data objects are EXCLUDED:
+    
+        • IrregularlySampledSignal
+            ∘ does not guarantee prerequisite 2.1 
+    
+        • ImageSequence
+            ∘ does not guarantee prerequisite 2.1: the images in a sequence are
+                defined in a space domain (XY); there is no correspondence
+                between one image frame and a signal domain
+            
+        • SpikeTrain, SpikeTrainList, neo.Epoch, DataZone, neo.Event, DataMark
+            ∘ no guarantee of prerequisite 2.1 - all these types collect time or
+                domain stamps and/or time intervals or domain zones.
+    
+            ∘ violate prerequisite 2.2: these types do not encapsulate a "signal"
+                hence there are no signal units (although the underlying data 
+                is a python Quantity with the same units as their domain)
+    
+        NOTE: Side effects:
+        When args contains only one Block, the function returns it unchanged
+        (sort of "no-op")
         
     
+    Var-keyword parameters:
+    -----------------------
+    1. Parameters specifying how to average data:
+    
+    count               how many blocks into one average
+    
+    every               how many blocks to skip between averages
+    
+    2. Parameters that specify new metadata for the newly created Block (see the
+    documentation of the neo.Block):
+    
+    name:str                
+    
+    description:str
+    
+    rec_datetime:datetime.datetime
+    
+    file_origin:str
+    
+    file_datetime:datetime.datetime
+    
+    annotation:dict
+    
+    
+    rename_segments:bool, optional (default True) - segments are renamed to the
+        generic format f"segment_{k}" with 0<= k < len(ret.segments)
+                    
+                    
+    
+    3. Parameters that specify subsets of the Block's contents (these are passed
+        directly to copy_with_data_subset which is called for every block in the 
+        argument sequence `args`)
+    
+    segments: int or None; 
+                when None, all segments in each block will be used;
+                when int then only segments with given index will be used
+                (i.e. only the segment with the given index from each block will 
+                be retained in the concatenated data)
+                    
+    analogsignals: int, str, range, slice, typing.Sequence
+                Indexing of analog signal(s) into each of the segments, that
+                will be retained in the concatenated data. These include
+                neo.AnalogSignal and datatypes.DataSignal
+                
+                This index can be (see neo_use_lookup_index):
+                int, str (signal name), sequence of int or str, a range, a
+                slice, or a numpy array of int or booleans.
+                    
+    copy:       bool, default True;
+    
+                When False, the concatenated block contains a reference to the
+                data in 'args'. 
+    
+                WARNING: this is important, as changes to the attributes of the 
+                concatenated block will alter the original data (e.g., segment
+                names, time bases, etc). As long as the source data is still 
+                'alive', any indirect changes incurred in this fashion will be 
+                also saved to the file (should you decide to save the data again)!
+    
+                However, this link is lost when the result is serialized to a 
+                file, or when the source data is removed from the workspace
+    
+                When True (the default), the results stores a deep copy of the 
+                data in 'args', so that any changes to the concatenated block 
+                will NOT be propagated to the source data. While this uses more
+                resources, it may be considered more safe.
+        
     Returns:
     --------
     
     A new Block containing AnalogSignal data that are averages of the AnalogSignal 
-    object in the *args across the segments, taken n segments at a time, every m segments.
+    object in the *args across the segments, taken N segments at a time, every M segments.
     
-    Depending on the values of 'n' and 'm', the result may contain several segments,
+    Depending on the values of 'N' and 'M', the result may contain several segments,
     each containing AnalogSignals averaged from the data.
     
-    NOTE:
-    
-    By contrast to average_blocks_by_segments, this function can result in the 
-    average of ALL segments in a block (or sequence of blocks) in  particular
-    when "count" and "every" are not set (see below).
-    
-    The function only takes AnalogSignal data, and discards IrregularlySampledSignal
-    SpikeTrain, Event and Epoch data that may be present in the blocks specified
-    by *args.
-    
-    This is because, by definition, only AnalogSignal data may be enforced to be 
-    shape-compatible for averaging, and this is what usually one is after, when 
-    averaging multiple electrophysiology record sweeps acquired with the same
-    protocol (sampling, duration, etc).
-    
-    For this reason only analog_index can be specified, to select from the
-    analogsignals list in the segments.
     
     Examples of usage:
     ------------------
@@ -5542,29 +5692,11 @@ def average_blocks(*args, **kwargs):
 
     """
     def __applyRecDateTime(sgm, blk):
+        """Applies the block's rec_datetime to all its contained segments"""
         if sgm.rec_datetime is None:
             sgm.rec_datetime = blk.rec_datetime
             
         return sgm
-        
-    def __get_blocks_by_name__(*arg):
-        ws = workspacefunctions.user_workspace() 
-        
-        if not all([isinstance(a, str) for a in arg]):
-            raise TypeError("Expecting strings only")
-        
-        if len(arg) == 1:
-            ret_ = workspacefunctions.getvars(arg[0], glob=True, var_type=neo.Block,
-                                                ws=ws)
-            
-        elif len(arg) > 1:
-            ret_ = workspacefunctions.getvars(*arg, glob=True, var_type=neo.Block,
-                                                ws=ws)
-        else:
-            raise ValueError("Expecting at least one string")
-        
-        return ret_
-            
         
     if len(args) == 0:
         return None
@@ -5572,94 +5704,178 @@ def average_blocks(*args, **kwargs):
     blocks=list()
     
     if len(args) == 1:
-        if isinstance(args[0], str): # glob for variable names
-            blocks = __get_blocks_by_name__(args[0])
-                #cframe = inspect.getouterframes(inspect.currentframe())[1][0]
-                #blocks = workspacefunctions.getvars(args[0], glob=True,
-                                                        #ws=cframe, as_dict=False,
-                                                        #sort=False)
+        if isinstance(args[0], (str, type)):
+            try:
+                args =  workspacefunctions.getvars(args[0], var_type = (neo.Block,), sort=True, sortkey=lambda x: x.rec_datetime)
                 
-        elif isinstance(args[0], (tuple, list)):
-            if all([isinstance(a, neo.Block) for a in args[0]]): # list of blocks
-                blocks = args[0] # unpack the tuple
-                
-            elif all([isinstance(a, str) for a in args[0]]): # list of names
-                blocks = __get_blocks_by_name__(*args[0])
-                
-            else:
-                raise ValueError("Invalid argument %s" % args[0])
-                
+            except Exception as e:
+                print("String argument did not resolve to a list of neo.Block objects")
+                traceback.print_exc()
+                return
             
-    else:
-        if all([isinstance(a, neo.Block) for a in args]):
-            blocks = args
-            
-        elif all([isinstance(a, str) for a in args]):
-            blocks = __get_blocks_by_name__(*args)
+        elif isinstance(args[0], collections.abc.Sequence) and all(isinstance(a, (type, str)) for a in args[0]):
+            try:
+                args =  workspacefunctions.getvars(*args[0], var_type = (neo.Block,), sort=True, sortkey=lambda x: x.rec_datetime)
+                
+            except Exception as e:
+                print("String argument did not resolve to a list of neo.Block objects")
+                traceback.print_exc()
+                return
             
         else:
-            raise ValueError("Invalid argument %s" % args)
-            
-    if len(blocks)==0:
-        return
-            
-    block_names = [b.name for b in blocks]
-            
-    n = None
-    m = None
-    segment_index = None
-    analog_index = None
+            args = args[0] # unpack the args tuple
+
+    # NOTE: 2023-05-22 17:30:48
+    # now, args is a neo.Block, or a sequence of neo.Block objects
+
+    if isinstance(args, neo.Block):
+        # NOTE: 2023-05-22 16:04:11
+        # just one block, nothing to average here...
+        new_block = copy_with_data_subset(args, **kwargs)
+        return new_block
     
-    ret = neo.core.block.Block()
+    n = kwargs.get("count", None)
+    m = kwargs.get("every", None)
+    ret_name = kwargs.get("name", "")
+    segment_index = kwargs.get("segments", None)
+    analog_index = kwargs.get("analogsignals", None)
+    ret_annotations = kwargs.get("annotations", None)
+    ret_rec_datetime = kwargs.get("datetime", datetime.datetime.now())
+    ret_file_origin = kwargs.get("file_origin", "")
+    ret_file_datetime = kwargs.get("file_datetime"), datetime.datetime.now()
+    ret_description = kwargs.get("description", "")
+            
     
     if len(kwargs) > 0 :
-        for key in kwargs.keys():
-            if key not in ["count", "every", "name", "segment", 
-                           "analog", "annotation", "rec_datetime", 
-                           "file_origin", "file_datetime"]:
-                raise RuntimeError("Unexpected named parameter %s" % key)
+        indexing_keys = list(kwargs.keys())
+        for key in indexing_keys:
+            if key not in ["count", "every", "name", "segments", 
+                           "analogsignals", "annotation", "rec_datetime", 
+                           "file_origin", "file_datetime", "description"]:
+                kwargs.pop(key, None)
+                
+            elif kwargs[key] == MISSING:
+                kwargs[key] = None # take them all !
+                
+        for key in ["irregularlysampledsignals", "imagesequences", "spiketrains",
+                    "epochs", "events", "groups"]:
+            kwargs[key] = MISSING # make sure these are left behind
             
-        if "count" in kwargs.keys():
-            n = kwargs["count"]
-            
-        if "every" in kwargs.keys():
-            m = kwargs["every"]
-            
-        if "name" in kwargs.keys():
-            ret.name = kwargs["name"]
-            
-        if "segment" in kwargs.keys():
-            segment_index = kwargs["segment"]
-            
-        if "analog" in kwargs.keys():
-            analog_index = kwargs["analog"]
-            
-        if "annotation" in kwargs.keys():
-            ret.annotation = kwargs["annotation"]
-
-        if "rec_datetime" in kwargs.keys():
-            ret.rec_datetime = kwargs["datetime"]
-            
-        if "file_origin" in kwargs.keys():
-            ret.file_origin = kwargs["file_origin"]
-            
-        if "file_datetime" in kwargs.keys():
-            ret.file_datetime = kwargs["file_datetime"]
-            
-    if analog_index is not None:
-        signal_str = str(analog_index)
-    elif isinstance(analog_index, (tuple, list)):
-        signal_str = f"{analog_index}"
-    else:
-        signal_str = "all"
+    if isinstance(args, collections.abc.Sequence) and all(isinstance(a, neo.Block) for a in args):
+        # first, copy blocks with data subsets
+        bb = sorted(args, key=lambda x: x.rec_datetime)
         
-    if segment_index is None:
-        segments = [[__applyRecDateTime(sgm, b) for sgm in b.segments] for b in blocks]
-        segment_str = "all"
+        blocks = [copy_with_data_subset(b, **kwargs) for b in bb]
         
-    elif isinstance(segment_index, int):
-        segments = [__applyRecDateTime(b.segments[segment_index], b) for b in blocks if segment_index < len(b.segments)]
-        segment_str = str(segment_index)
+        block_names = [b.name for b in blocks]
+         
+        nSegs = [len(b.segments) for b in blocks]
+        
+        ms = min(nSegs)
+        
+        if not all(ns==ms for ns in nSegs):
+            raise ValueError("The blocks must contain an equal number of segments")
+        
+        nSegs = nSegs[0]
+         
+        if n is None:
+            n = len(args)
+            m = None
+            
+        if m is None:
+            ranges_avg = [range(0, len(blocks))]  # take average of all blocks!
+        else:
+            ranges_avg = [range(k, k+n) for k in range(0, len(blocks), m)]
+            
+        if segment_index is None:
+            segment_index = range(nSegs)
+            
+        # average segments with same index, across blocks
+        for seg_ndx in segment_index:
+            seglist = [blocks[k].segments[nseg_ndx] for k in ranges_avg]
+            #TODO
+            
+        ret = neo.core.Block(name=name, description=ret_description, file_origin=ret_file_origin,
+                              file_datetime=ret_file_datetime, rec_datetime=ret_rec_datetime, 
+                             **ret_annotations)
+        
+            # we average segment by segment, of each block
+            
+         
+        new_segments = list()
+         
+        for k, block in enumerate(args):
+            new_block = copy_with_data_subset(arg, **kwargs)
+            # NOTE: 2023-05-22 17:46:34 
+            # propagate time & file stamps to these segments
+            for seg in new_block.segments:
+                seg.rec_datetime = new_block.rec_datetime
+                seg.file_origin = new_block.file_origin
+            
+            new_segments.extend(new_block.segments)
+        
+        # FIXME: 2023-05-22 17:53:42
+        # do NOT average_segments !!!
+        # call average_blocks_by_segments instead !
+        ret.segments = average_segments(new_segments, count=n, every=m, analog_index=analogsignals)
+   
+#     if len(args) == 1:
+#         if isinstance(args[0], str): # glob for variable names
+#             blocks = __get_blocks_by_name__(args[0])
+#                 #cframe = inspect.getouterframes(inspect.currentframe())[1][0]
+#                 #blocks = workspacefunctions.getvars(args[0], glob=True,
+#                                                         #ws=cframe, as_dict=False,
+#                                                         #sort=False)
+#                 
+#         elif isinstance(args[0], (tuple, list)):
+#             if all([isinstance(a, neo.Block) for a in args[0]]): # list of blocks
+#                 blocks = args[0] # unpack the tuple
+#                 
+#             elif all([isinstance(a, str) for a in args[0]]): # list of names
+#                 blocks = __get_blocks_by_name__(*args[0])
+#                 
+#             else:
+#                 raise ValueError("Invalid argument %s" % args[0])
+#                 
+#             
+#     else:
+#         if all([isinstance(a, neo.Block) for a in args]):
+#             blocks = args
+#             
+#         elif all([isinstance(a, str) for a in args]):
+#             blocks = __get_blocks_by_name__(*args)
+#             
+#         else:
+#             raise ValueError("Invalid argument %s" % args)
+#             
+#     if len(blocks)==0:
+#         return
+            
+#     block_names = [b.name for b in blocks]
+#             
+#     n = None
+#     m = None
+#     segment_index = None
+#     analog_index = None
+#     
+#     ret = neo.core.block.Block()
+#     
+#     if analog_index is not None:
+#         signal_str = str(analog_index)
+#         
+#     elif isinstance(analog_index, (tuple, list)):
+#         signal_str = f"{analog_index}"
+#         
+#     else:
+#         signal_str = "all"
+#         
+#     if segment_index is None:
+#         segments = [[__applyRecDateTime(sgm, b) for sgm in b.segments] for b in blocks]
+#         segment_str = "all"
+#         
+#     elif isinstance(segment_index, int):
+#         segments = [__applyRecDateTime(b.segments[segment_index], b) for b in blocks if segment_index < len(b.segments)]
+#         segment_str = str(segment_index)
         
 #     elif isinstance(segment_index, (tuple, list)) and all(isinstance(ndx, int) for ndx in segment_index):
 #         seg_avg = list()
@@ -5677,11 +5893,11 @@ def average_blocks(*args, **kwargs):
 #         segments = [[__applyRecDateTime(b.segments[ndx], b) for ndx in segment_index if ndx in range(len(b.segments))] for b in blocks ]
 #         segment_str = f"{segment_index}"
         
-    else:
-        # raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or sequence of int, or None")
-        raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or None")
+    # else:
+    #     # raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or sequence of int, or None")
+    #     raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or None")
     
-    ret.segments = average_segments(segments, count=n, every=m, analog_index=analog_index)
+    # ret.segments = average_segments(segments, count=n, every=m, analog_index=analog_index)
     
     ret.annotations["Averaged"] = dict()
     ret.annotations["Averaged"]["Count"] = n
@@ -5713,7 +5929,7 @@ def average_blocks_by_segments(*args, **kwargs):
     
     **kwargs:
     ========
-    analog: which signal into each of the segments to consider
+    analogsignals: which signal into each of the segments to consider
                   can also be a signal name; optional default is None 
                   (thus taking all signals)
                   
@@ -5738,7 +5954,7 @@ def average_blocks_by_segments(*args, **kwargs):
     
     if len(kwargs) > 0:
         if "analog_index" in kwargs.keys():
-            analog_index = kwargs["analog"]
+            analog_index = kwargs["analogsignals"]
             
         if "name" in kwargs.keys():
             name = kwargs["name"]
@@ -5748,8 +5964,8 @@ def average_blocks_by_segments(*args, **kwargs):
     
     nSegs = [len(block.segments) for block in args]
     
-    if min(nSegs) != max(nSegs):
-        raise ValueError("The blocks must contain equal number of segments")
+
+
     
     nSegs = nSegs[0]
     
@@ -6011,7 +6227,7 @@ def average_segments(*args, **kwargs):
     
     ret_seg = list() #  a LIST of segments, each containing averaged analogsignals!
     
-    if analog_index is None: #we want an average across the Block list for all signals in the segments
+    if analog_index is None: # we want an average across the Block list for all signals in the segments
         if not all([len(arg.analogsignals) == len(args[0].analogsignals) for arg in args[1:]]):
             raise ValueError("All segments must have the same number of analogsignals")
         

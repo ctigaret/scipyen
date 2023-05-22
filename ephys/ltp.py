@@ -108,27 +108,129 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,
 #"def" pairedPulseEPSCs(data_block, Im_signal, Vm_signal, epoch = None):
 
 class PathwayType(TypeEnum):
+    """
+    Synaptic pathway type.
+    """
+    # TODO: 2023-05-22 14:28:53
+    # To emulate a cross-talk - style recording, this should be associated with
+    # a mapping detailing the order of the cross-stimulation
+    
     Null = 0
     Test = 1
     Control = 2
-    Other = 3
+    Type1 = 4
+    Type2 = 8
+    Type3 = 16
+    Type4 = 32
+    Type5 = 64
+    Type6 = 128
+    
+class PathwayEpisode(Episode):
+    """
+    Specification of an episode in a synaptic pathway.
+    
+    An "episode" is a series of sweeps recorded during a specific set of 
+    experimental conditions.
+    
+    All sweeps in the episode have in common the same set of conditions.
+    
+    Examples:
+    =========
+    
+    1) A response baseline recorded without drug, followed by response baseline 
+    recorded in the presence of a drug, then followed by a drug wash-out are 
+    three distinct "episodes".
+    
+    2) Segments recorded while testing for cross-talk between synaptic pathways, 
+    (and therefore, where the paired pulses are crossed between pathways) is a
+    distinct episode from one where each segment contains responses from the 
+    same synaptic pathway
+    
+    The sweeps in PathwayEpisodeSpecification are a sequence of neo.Block 
+    objects where each synaptic pathway has contributed data for a neo.Segment
+    inside the Block.
+    
+    Fields (constructor parameters):
+    ================================
+    • name:str - mandatory, name of the episode
+    • blocks: a sequence of neo.Blocks, where each block has recording sweeps 
+        (i.e., neo.Segment objects) with data from possibily more than one
+        real-world synaptic pathway, and where each pathway provides data for 
+        the same sweep index in the block.
+    
+        When synaptic responses are recorded from more than one pathway (typically
+        two), the pathways are usually interleaved. For example, two pathways
+        where synaptic responses are evoked interlaved would be organized like
+        this:
+    
+            block 0 - segment 0 → pathway 0
+            block 0 - segment 1 → pathway 1
+        
+            block 1 - segment 0 → pathway 0
+            block 1 - segment 1 → pathway 1
+        
+            ⋮
+        
+            etc
     
     
-@dataclass
-class PathwayEpisodeSpec:
-    name:str
-    _:KW_ONLY
-    blocks:typing.Optional[typing.Sequence[neo.Block]] = None
-    response:typing.Optional[typing.Union[str, int]]=None
-    analogCommand:typing.Union[typing.Union[str, int]] = None
-    digitalCommand:typing.Optional[typing.Union[str, int]] = None
-    segments:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None
-    analogsignals:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None
-    irregularlysampledsignals:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None
-    imagesequences:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None
-    spiketrains:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None
-    epochs:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None
-    events:typing.Optional[typing.Union[int, str, range, slice, typing.Sequence]]=None
+    The PathwayEpisodeSpecification only stores references to the data sweeps.
+    
+    The other fields indicate optional indices into the data segments and signals
+    that are used to generate the actual data stored inside a SynapticPathway 
+    object, by concatenating the pathway-specific data components in a new neo.Block:
+    
+    • response : int or str - respectively, the index or the name of the
+        analog signal in each sweep, containing the pathway-specific synaptic
+        response
+        
+    • analogCommand : int or str - index or name of the analog signal containing
+        voltage- or current-clamp command signal (or None); such a signal is 
+        typically recorded - when available - by feeding the secondary output of
+        the amplifier into an ADC input in the acquisition board.
+        
+    • digitalCommand: int or str - index or name of the analog signal containing
+        a recorded version of the triggers for extracellular stimulation.
+        
+        When available, these are triggers sent to stimulus isolation boxes to 
+        elicit an extracellular stimulus.
+        
+        The triggers themselves are typically TTL signals, either taken directly
+        from the acquisition board digital output, or "emulated" by an analog
+        (DAC) output containing a rectangulare wave of 5 V amplitude.
+        
+        In either case, these triggers can be routed into an ADC input of the
+        acquisition board, for recording (e.g., using a BNC "tee" splitter).
+        
+    • segments : an indexing object¹ into each block's sweeps (or segments)
+        belonging to the the same pathway; typically, each pathway contributes 
+        to exactly one segment in each block.
+        
+    • analogsignals, irregularlysampledsignals, imagesequences, spiketrains,
+        epochs, events: indexing objects into the corresponding segments attributes
+        used to select a subset of the data.
+    
+        Although these are optional (with the default being None) it is recommended
+    that at least the analogsignals contain a sequence of the indices given in
+    response, analogCommand and digitalCommand.
+    
+    ---
+    
+    ¹ An indexing object is an int, range, slice, str, sequence of int, or 
+        sequence of str -- see documentation for the normalized_index() function
+        in Scipyen module "utilities".
+    
+    
+    
+    """
+    def __init__(self, name:str, data=None, 
+                 response=None, analogCommand=None, digitalCommand=None,
+                 segments=None, analogsignals=None, irregularlysampledsignals=None,
+                 imagesequences=None, spiketrains=None, epochs=None,events=None):
+        
+        self.name=name
+        if isinstance(data, (tuple, list)) and len(data) and all(isinstance(b, neo.Block) in data):
+            self._data_ = neoutils.concatenate_blocks()
     
 
 class SynapticPathway(BaseScipyenData):
@@ -191,26 +293,9 @@ class SynapticPathway(BaseScipyenData):
         """
         super().__init__(**kwargs)
 
-#         # NOTE: 2023-05-15 09:14:05
-#         # mapping tag ↦ indices, where:
-#         # • tag = str = tag name (e.g. baseline, baseline_drug, etc)
-#         # • indices of baseline segments - can be:
-#         #   ∘ a sequence (tuple, list) of unique int indices
-#         #   ∘ a range
-#         #   ∘ None
-#         self._baseline_ = dict()
-#         
-#         # NOTE: 2023-05-15 09:15:25
-#         # mapping tag ↦ indices, see NOTE: 2023-05-15 09:14:05 for details
-#         self._chase_ = dict()
-#         
-#         # NOTE: 2023-05-15 09:45:08
-#         # mapping tag ↦ indices, see NOTE: 2023-05-15 09:14:05 for details
-#         self._xtalk_ = dict()
-
     @staticmethod
     def fromBlocks(pathName:str, pathwayType:PathwayType=PathwayType.Test, 
-                   **episodeSpecs):
+                   *episodeSpecs:typing.Sequence[PathwayEpisode]):
         """
         Factory for SynapticPathway.
         
@@ -219,12 +304,11 @@ class SynapticPathway(BaseScipyenData):
         pathName:str - name of the pathway
         pathwayType:PathwayType - the type of the pathway (optional, default is PathwayType.Test)
         
-        **episodeSpecs:dict mapping as follows:
-        
-            key:str         ↦   value:PayhwayEpisodeSpec instance
-                                            
+        *episodeSpecs: sequence of PathwayEpisodeSpecifications                       
         
         """
+        
+        
         
         # NOTE: 2023-05-19 17:08:53
         # an episode spec is a mapping of str ↦ sequence of neo Blocks

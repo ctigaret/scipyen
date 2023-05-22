@@ -20,6 +20,7 @@ from itertools import chain
 import collections
 import collections.abc
 from collections import deque, OrderedDict
+from dataclasses import MISSING
 import numpy as np
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
@@ -149,7 +150,9 @@ class SafeComparator(object):
             #print("y:", y)
             return False
         
-def __check_isclose_args__(rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=True):
+def __check_isclose_args__(rtol:typing.Optional[Number]=None, 
+                           atol:typing.Optional[Number]=None, 
+                           use_math:bool=True, equal_nan:bool=True) -> bool:
     
     if not isinstance(rtol, Number):
         rtol = inspect.signature(math.isclose).parameters["rel_tol"].default if use_math else inspect.signature(np.isclose).parameters["rtol"].default
@@ -162,7 +165,8 @@ def __check_isclose_args__(rtol:typing.Optional[Number]=None, atol:typing.Option
     return f_isclose, rtol, atol
         
 @singledispatch
-def is_same_as(x, y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
+def is_same_as(x, y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+               use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     """Compares two objects.
     
     Parameters:
@@ -191,11 +195,13 @@ def is_same_as(x, y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Num
     return operator.eq(x,y)
 
 @is_same_as.register(str)
-def _(x, y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
+def _(x, y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+      use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     return comparator(x,y)
 
 @is_same_as.register(np.ndarray)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+      use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     
     if comparator not in (operator.eq, isclose):
         raise TypeError(f"'comparator' expected one of operator.eq or isclose;; got {comparator} instead")
@@ -220,7 +226,8 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return ret
 
 @is_same_as.register(pq.Quantity)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+      use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     
     if comparator not in (operator.eq, isclose):
         raise TypeError(f"'comparator' expected one of operator.eq or isclose; got {comparator} instead")
@@ -255,7 +262,8 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return ret
 
 @is_same_as.register(collections.abc.Sequence)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
+      use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     
     if comparator is isclose:
         comparator = partial(comparator, 
@@ -270,7 +278,8 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return ret
 
 @is_same_as.register(collections.abc.Mapping)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False, comparator = operator.eq):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+      use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     
     # use for comparisons between mapping values
     simp_fun = partial(is_same_as, rtol=rtol, atol=atol, 
@@ -290,7 +299,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
         
     return ret
 
-def ideq(x,y):
+def ideq(x,y) -> bool:
     return id(x) == id(y)
 
 @singledispatch
@@ -360,7 +369,8 @@ def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarra
     raise NotImplementedError(f"{type(x).__name__} objects are not supported")
 
 @isclose.register(str)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+      use_math:bool=True, equal_nan:bool=False) -> bool:
     # TODO/FIXME: 2023-03-24 15:51:03
     # use difflib.SequenceMatcher
     from difflib import SequenceMatcher
@@ -376,7 +386,8 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     # return x.lower() == y.lower()
 
 @isclose.register(np.ndarray)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+      use_math:bool=True, equal_nan:bool=False) -> bool:
     
     if any(v.size > 1 for v in (x,y)):
         use_math = False
@@ -396,7 +407,8 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return f_isclose(x,y)
 
 @isclose.register(pq.Quantity)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+      use_math:bool=True, equal_nan:bool=False) -> bool:
     
     if any(v.size > 1 for v in (x,y)):
         # use math only on scalars
@@ -428,25 +440,27 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return f_isclose(x,y)
 
 @isclose.register(Number)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+      use_math:bool=True, equal_nan:bool=False) -> bool:
     
     f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
     
     return f_isclose(x,y)
 
 @isclose.register(complex)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+      use_math:bool=True, equal_nan:bool=False) -> bool:
     
     f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
     
     return reduce(operator.and_, (f_isclose(x_, y_) for x_, y_ in ((getattr(x, name), getattr(y, name)) for name in ("real", "imag"))))
 
-def all_or_all_not(*args):
+def all_or_all_not(*args) -> bool:
     """Returns True when elements in args are either all True or all False.
     """
     return all(args) or all(not(arg) for arg in args)
 
-def hashiterable(x:typing.Iterable[typing.Any]):
+def hashiterable(x:typing.Iterable[typing.Any]) -> int:
     """Takes into account the order of the elements.
     
     NOTE: This works when the type of the elements contained in the iterable are
@@ -546,7 +560,7 @@ def hashiterable(x:typing.Iterable[typing.Any]):
     #return ( (hash(type(v)) if isinstance(v, (list, deque, dict)) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
 
 @safeWrapper
-def gethash(x:typing.Any):
+def gethash(x:typing.Any) -> int:
     """Calculates a hash-like figure for objects (including of non-hashable types)
     To be used for object comparisons.
     
@@ -628,7 +642,9 @@ def gethash(x:typing.Any):
     except:
         return hash(type(x))
         
-def get_index_for_seq(index:int, test:typing.Sequence[typing.Any], target:typing.Sequence[typing.Any], mapping:typing.Optional[dict]=None):
+def get_index_for_seq(index:int, test:typing.Sequence[typing.Any], 
+                      target:typing.Sequence[typing.Any], 
+                      mapping:typing.Optional[dict]=None) -> typing.Any:
     """Heuristic for computing an index into the target sequence.
     
     Returns an index into the `target` sequence given `index`:int index into
@@ -807,7 +823,7 @@ def get_index_for_seq(index:int, test:typing.Sequence[typing.Any], target:typing
             else:
                 return min(index, len(test)-1)
             
-def total_size(o, handlers={}, verbose=False):
+def total_size(o, handlers={}, verbose=False) -> int:
     """ Returns the approximate memory footprint an object and all of its contents.
 
     Automatically finds the contents of the following builtin containers and
@@ -839,9 +855,10 @@ def total_size(o, handlers={}, verbose=False):
     seen = set()                      # track which object id's have already been seen
     default_size = getsizeof(0)       # estimate sizeof object without __sizeof__
 
-    def sizeof(o_):
+    def sizeof(o_) -> int:
         if id(o_) in seen:       # do not double count the same object
             return 0
+
         seen.add(id(o_))
         
         s = getsizeof(o_, default_size)
@@ -853,10 +870,6 @@ def total_size(o, handlers={}, verbose=False):
         
         s += sum(map(sizeof, handler(o_)))
 
-        #for typ, handler in all_handlers.items():
-            #if isinstance(o_, typ):
-                #s += sum(map(sizeof, handler(o_)))
-                #break
         return s
 
     return sizeof(o)
@@ -866,19 +879,19 @@ def total_size(o, handlers={}, verbose=False):
 # comparator
 
 @safeWrapper
-def hash_identity_test(x,y):
+def hash_identity_test(x,y) -> bool:
     return gethash(x) == gethash(y)
 
-def similar_strings(a:str, b:str):
+def similar_strings(a:str, b:str) -> bool:
     from difflib import SequenceMatcher
     return SequenceMatcher(None, a, b).ratio()
 
 @safeWrapper
-def safe_identity_test2(x, y):
+def safe_identity_test2(x, y) -> bool:
     return SafeComparator(comp=eq)(x, y)
 
 @safeWrapper
-def safe_identity_test(x, y, idcheck=False):
+def safe_identity_test(x, y, idcheck=False) -> bool:
     ret = True
     
     if all(isinstance(v, type) for v in (x,y)):
@@ -2482,7 +2495,7 @@ class NestedFinder(object):
         #return list(finder._gen_nested_value(data, paths))
         
     
-def reverse_dict(x:dict):
+def reverse_dict(x:dict) -> dict:
     """Returns a reverse mapping (values->keys) from x
     
     Parameters:
@@ -3013,13 +3026,12 @@ def make_file_filter_string(extList, genericName):
     
     return (fileFilterString, individualFilterStrings)
 
-def elements_types(s):
+def elements_types(s) -> typing.Sequence[type]:
     """Returns the unique types in a sequence
     """
     return gen_unique(map(lambda x: type(x).__name__, s))
 
 
-# def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, bracketed:bool = False, ret:bool=False):
 def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, ret:bool=False):
     """Appends a counter suffix to x if x is found in the list of strings
     
@@ -3244,7 +3256,7 @@ def nth(iterable, n, default=None):
     """
     return next(itertools.islice(iterable, n, None), default)
 
-def pairwise(iterable):
+def pairwise(iterable)-> zip:
     """s -> (s0,s1), (s1,s2), (s2, s3), ...
     
     NOTE: Recipe from the documentation for python itertools module.
@@ -3253,14 +3265,14 @@ def pairwise(iterable):
     next(b, None)
     return zip(a, b)
 
-def sort_with_none(iterable, none_last = True):
+def sort_with_none(iterable, none_last = True) -> typing.Sequence:
     import math
     
     noneph = math.inf if none_last else -math.info
     
     return sorted(iterable, key=lambda x: x if x is not None else noneph)
 
-def unique(seq, key=None):
+def unique(seq, key=None) -> typing.Sequence:
     """Returns a sequence of unique elements in the iterable 'seq'.
     Functional version of gen_unique
     Parameters:
@@ -3284,18 +3296,10 @@ def unique(seq, key=None):
     See also gen_unique for a generator version.
     
     """
-    # if not isinstance(seq, collections.abc.Sequence):
     if not hasattr(seq, "__iter__"):
         raise TypeError(f"Expecting an iterable; got {type(seq).__name__} instead")
     
     return tuple(item for item in gen_unique(seq, key=key))
-
-#     if isinstance(seq, tuple):
-#         return tuple((item for item in gen_unique(seq, key=key)))
-#     
-#     else:
-#         return [item for item in gen_unique(seq, key=key)]
-            
 
 def gen_unique(seq, key=None):
     """Iterates through unique elements in seq
@@ -3349,7 +3353,7 @@ def gen_unique(seq, key=None):
         else:
             yield from (x for x in seq if key not in seen and not seen.add(key))
             
-def name_lookup(container: typing.Sequence, name:str, multiple: bool = True):
+def name_lookup(container: typing.Sequence, name:str, multiple: bool = True) -> typing.Optional[typing.Union[int, typing.Sequence[int]]]:
     """Get indices of container elements with attribute 'name' of given value(s).
     """
     
@@ -3369,10 +3373,12 @@ def name_lookup(container: typing.Sequence, name:str, multiple: bool = True):
         
     return names.index(name)
 
-def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series]], index: typing.Optional[typing.Union[str, int, collections.abc.Sequence, np.ndarray, range, slice]] = None, silent:bool=False):
-    """Transform various indexing objects to a range or iterable of int indices.
+def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series]], 
+                     index: typing.Optional[typing.Union[str, int, collections.abc.Sequence, np.ndarray, range, slice, type(MISSING)]] = None, 
+                     silent:bool=False):
+    """Transform various indexing objects to a range or an iterable of int indices.
     
-    Also checks the validity of the index for an iterable of data_len samples.
+    Also checks the validity of the index for an iterable, given its size.
     
     Parameters:
     -----------
@@ -3389,10 +3395,18 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
         When an int, 'data' is the length of a putative Sequence (hence 
         data >= 0)
     
-    index: int, iterable, np.ndarray, range, slice, str, or None (default).
+    index: int, iterable, np.ndarray, range, slice, str, dataclasses.MISSING, or
+        None (default).
     
         When 'index' is None, the function returns range(0, len(data)) with 
             'data' is a Sequence, else range(, data) when 'data' is an int.
+    
+            (i.e., NO index is specified)
+    
+        When index is MISSING, the function returns an empty range:
+            range(0)
+    
+            (i.e., leave everything OUT )
             
         Otherwise, the function behaves as below:
         
@@ -3466,6 +3480,9 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
     
     if index is None:
         return range(data_len)
+    
+    if isinstance(index, type(MISSING)):
+        return range(0)
     
     if isinstance(index, int):
         # NOTE: 2020-03-12 22:40:31
@@ -3719,7 +3736,7 @@ def sp_set_loc(x, index, columns, val):
     
     return x    
 
-def get_least_pwr10(x:typing.Sequence):
+def get_least_pwr10(x:typing.Sequence)-> int:
     if not all(isinstance(v, Number) or (isinstance(v, pq.Quantity) and v.size == 1) for v in x):
         raise TypeError("Expecting a sequence of scalars or scalar Quantity objects")
     
