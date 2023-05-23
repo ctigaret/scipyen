@@ -330,6 +330,12 @@ class MouseEventSink(QtCore.QObject):
         self.selectedColorMap = item.text()
         self.itemSelected.emit(item.text())
         self.close()
+        
+# class ThreadWorker(QtCore.QObject):
+#     def __init__(self, fn):
+#         super(ThreadWorker, self).__init__()
+#         self.fn = fn
+#         self.signals = ProgressWorkerSignals()
 
 class ProgressWorkerThreaded(QtCore.QObject):
     """Calls a worker function in a separate QThread.

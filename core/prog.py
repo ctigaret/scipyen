@@ -1347,16 +1347,19 @@ def no_sip_autoconversion(klass):
 # ### BEGIN Context managers
 
 @contextmanager
-def timeblock(label):
+def timeblock(label, verbose:bool=True):
     """Recipe 14.13 "Profiling and Timing Your Programs" 
         From Python Cookbook 3rd Ed. 2013
     """
-    start = time.perf_counter()
-    try:
+    if verbose:
+        start = time.perf_counter()
+        try:
+            yield
+        finally:
+            end = time.perf_counter()
+            print("{} : {}".format(label, end-start))
+    else:
         yield
-    finally:
-        end = time.perf_counter()
-        print("{} : {}".format(label, end-start))
 
 @contextmanager
 def processtimeblock(label):

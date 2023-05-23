@@ -43,6 +43,8 @@ from core.traitcontainers import DataBag, generic_change_handler
 
 from .guiutils import (get_text_width, get_elided_text)
 
+from gui import pictgui as pgui
+
 class WorkspaceModel(QtGui.QStandardItemModel):
     '''
     The data model for the workspace variable that are displayed in the QTableView 
@@ -78,9 +80,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.user_ns_hidden = dict(user_ns_hidden)
         self.mpl_figs = dict()
         
-        # NOTE: 2023-05-23 16:58:37
-        # temporary cache of notified observer changes
-        self.__change_dict__ = dict()
+        self._updateThread_ = None
+        self._updateWorker_ = None
+        
         
         # NOTE: 2023-01-27 08:57:52 about _pylab_helpers.Gcf:
         # the `figs` attribute if an OrderedDict with:
@@ -594,12 +596,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return True
     
     def var_observer(self, change):
-        # self.__change_dict__ = change
-        # QtCore.QTimer.singleShot(0, self._observe_wrapper_)
         self.varsChanged.emit(change) # connected to self.slot_observe, def'ed below
-        
-    # def _observe_wrapper_(self):
-    #     self.slot_observe(self.__change_dict__)
         
     @pyqtSlot(dict)
     def slot_observe(self, change):
@@ -780,31 +777,56 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     #     if w_name_obj[1] not in self.parent().viewers[type(w_name_obj[1])]:
                     #         self.parent().registerWindow(w_name_obj[1])
         
-        with timeblock("post_execute workspace update"):
-            current_user_varnames = set(self.shell.user_ns.keys())
-            observed_varnames = set(self.observed_vars.keys())
-            del_vars = observed_varnames - current_user_varnames
-            self.observed_vars.remove_members(*list(del_vars))
-            current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
-            self.observed_vars.update(current_vars)
-            # just update the model directly
-            # QtCore.QTimer.singleShot(0, self.update)
-            # FIXME: 2023-05-23 17:57:21
-            # Although this speeds up execution, the workspace viewer does NOT get 
-            # updated
-            # 
-            # timer = QtCore.QTimer()
-            # timer.timeout.connect(self.update)
-            # timer.start(0)
-            
-            # NOTE: 2023-05-23 17:58:06 FIXME:
-            # slow when too many variables, but surely works!
-            # self.update()
+#         self._updateThread_ = QtCore.QThread()
+#         self._updateWorker_ = pgui.ProgressWorkerThreaded(self._post_exec_)
+#         self._updateThread_.finished.connect(self._updateWorker_.deleteLater)
+#         self._updateThread_.finished.connect(self._updateThread_.deleteLater)
+#         
+#         self._updateThread_.start()
+        # timer = QtCore.QTimer()
+        # timer.timeout.connect(self._post_exec_)
+        # timer.start(50)
+        # ### BEGIN 2023-05-23 22:39:22 do not delete
+        current_user_varnames = set(self.shell.user_ns.keys())
+        observed_varnames = set(self.observed_vars.keys())
+        del_vars = observed_varnames - current_user_varnames
+        self.observed_vars.remove_members(*list(del_vars))
+        current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        self.observed_vars.update(current_vars)
+        # ### END 2023-05-23 22:39:22 do not delete
+        
+#         with timeblock("post_execute workspace update"):
+#             current_user_varnames = set(self.shell.user_ns.keys())
+#             observed_varnames = set(self.observed_vars.keys())
+#             del_vars = observed_varnames - current_user_varnames
+#             self.observed_vars.remove_members(*list(del_vars))
+#             current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+#             self.observed_vars.update(current_vars)
+#             # just update the model directly
+#             # QtCore.QTimer.singleShot(0, self.update)
+#             # FIXME: 2023-05-23 17:57:21
+#             # Although this speeds up execution, the workspace viewer does NOT get 
+#             # updated
+#             # 
+#             # timer = QtCore.QTimer()
+#             # timer.timeout.connect(self.update)
+#             # timer.start(0)
+#             
+#             # NOTE: 2023-05-23 17:58:06 FIXME:
+#             # slow when too many variables, but surely works!
+#             # self.update()
         
         current_dir = os.getcwd()
         
         self.workingDir.emit(current_dir)
         
+    def _post_exec_(self):
+        current_user_varnames = set(self.shell.user_ns.keys())
+        observed_varnames = set(self.observed_vars.keys())
+        del_vars = observed_varnames - current_user_varnames
+        self.observed_vars.remove_members(*list(del_vars))
+        current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        self.observed_vars.update(current_vars)
         
     def _gen_item_for_object_(self, propdict:dict, editable:typing.Optional[bool] = False, elidetip:typing.Optional[bool] = False, background:typing.Optional[QtGui.QBrush]=None, foreground:typing.Optional[QtGui.QBrush]=None):
         # print(f"_gen_item_for_object_ propdict = {propdict}")

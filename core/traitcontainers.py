@@ -13,6 +13,7 @@ accessed using attribute syntax.
 import traceback, contextlib
 from inspect import getcallargs, isfunction, ismethod
 from functools import partial
+from dataclasses import MISSING
 from pprint import pformat
 #from traitlets import (HasTraits, TraitType, Eventhandler, Int, Bool, All, 
                        #is_trait, observe,TraitError,)
@@ -56,6 +57,16 @@ class DataBagTraitsObserver(HasTraits):
             print(f"notify_change: event = {event}")
             
         return self._notify_observers(change)
+    
+def add_trait(obj, name, traitobj):
+    cls = obj.__class__
+    attrs = {"__module__": cls.__module__}
+    if hasattr(cls, "__qualname__"):
+        attrs["__qualname__"] = cls.__qualname__
+        
+    attrs[name] = traitobj
+    obj.__class__ = type(cls.__name__, (cls, ), attrs)
+    traitobj.instance_init(obj)
 
 class DataBag(Bunch):
     """Dictionary with semantics for direct attribute reference and attribute change observer.
@@ -395,6 +406,7 @@ class DataBag(Bunch):
                 if type(val) != target_type:
                     if hid["use_casting"]:
                         new_val = target_type(val) # this may fail !
+                        # obs.set_trait(key, new_val)
                         object.__setattr__(obs, key, new_val)
                         
                     elif hid["use_mutable"]:
@@ -402,10 +414,12 @@ class DataBag(Bunch):
                         
                     else:
                         # allow_none takes effect in the call below
-                        object.__setattr__(obs, key, val) # may raise TraitError
+                        obs.set_trait(key, val)
+                        # object.__setattr__(obs, key, val) # may raise TraitError
                         
                 else:
-                    object.__setattr__(obs, key, val)
+                    obs.set_trait(key, val)
+                    # object.__setattr__(obs, key, val)
 
                 super().__setitem__(key, val) # do I need this ?!?
                         
@@ -416,10 +430,14 @@ class DataBag(Bunch):
             # NOTE: 2022-11-03 12:02:34 
             # add a new trait
             if key not in ("__observer__", "__hidden__") and key not in self.__hidden__.keys():
-                trdict = {key: self._make_trait_(val)}
-                obs.add_traits(**trdict)
-                object.__setattr__(obs, key, val)
-                object.__getattribute__(self, "__hidden__").length = len(trdict)
+                traitobj = self._make_trait_(val)
+                add_trait(obs, key, traitobj)
+                # trdict = {key: self._make_trait_(val)}
+                # obs.add_traits(**trdict)
+                obs.set_trait(key, val)
+                # object.__setattr__(obs, key, val)
+                object.__getattribute__(self, "__hidden__").length = len(obs._traits)
+                # object.__getattribute__(self, "__hidden__").length = len(trdict)
                 
             super().__setitem__(key, val)
             
@@ -774,10 +792,102 @@ class DataBag(Bunch):
         # the behaviour depends on whether self accepts mutating or casting type
         # traits
         
+        try:
+            obs = object.__getattribute__(self, "__observer__")
+        except:
+            obs = DataBagTraitsObserver()
+            object.__setattr__(self, "__observer__", obs)
+            
+        try:
+            hid = object.__getattribute__(self, "__hidden__")
+            
+        except:
+            hid = DataBag._make_hidden()
+            object.__setattr__(self, "__hidden__", hid)
+            
+        hid_keys = list(hid.keys())
+        
+        traits = obs._traits
+        
+        trait_keys = list(traits.keys())
+
         if isinstance(other, dict):  # this includes DataBag!
-            with timeblock("DataBag.update"):
-                for key, value in other.items():
-                    self[key] = value
+            if any(not isinstance(key, str) for key in other):
+                raise TypeError("Expecting a str key; got %s instead" % type(key).__name__)
+            
+            for key, value in other.items():
+                self[key] = value
+                
+#             with timeblock("DataBag.update"):
+#                 # k=0
+#                 if any(not isinstance(key, str) for key in other):
+#                     raise TypeError("Expecting a str key; got %s instead" % type(key).__name__)
+#                 
+#                 for key, value in other.items():
+#                     self[key] = value
+#                     
+                    # if not isinstance(key, str):
+                    #     raise TypeError("Expecting a str key; got %s instead" % type(key).__name__)
+                    
+#                     if key in hid_keys:
+#                         hid[key]=value
+#                         
+#                         if key == "use_casting" and hid["use_casting"]:
+#                             hid["use_mutable"] = False
+#                             
+#                         if key == "use_mutable" and hid["use_mutable"]:
+#                             hid["use_casting"] = False
+# 
+#                         return
+                    
+#                     if key in trait_keys:
+#                         old_value = object.__getattribute__(obs, key)
+#                         target_type = type(old_value)
+#                         
+#                         value_type = type(value)
+#                         
+#                         if value_type != target_type:
+#                             if hid["use_casting"]:
+#                                 with timeblock(f"casting existing key {key} {k} new type {value_type.__name__}"):
+#                                     new_val = target_type(value) # this may fail !
+#                                     obs.set_trait(key, new_val)
+#                                     # object.__setattr__(obs, key, new_val)
+#                                 
+#                             elif hid["use_mutable"]:
+#                                 with timeblock(f"mutating existing key {key} {k} new type {value_type.__name__}"):
+#                                     self.__coerce_trait__(obs, key, value)
+#                                 
+#                             else:
+#                                 with timeblock(f"assign to existing key {key} {k} new type {value_type.__name__}"):
+#                                     # allow_none takes effect in the call below
+#                                     obs.set_trait(key, new_val)
+#                                     # object.__setattr__(obs, key, value) # may raise TraitError
+#                                 
+#                         else:
+#                             with timeblock(f"processing existing key {key} {k} same type {value_type.__name__}"):
+#                                 obs.set_trait(key, new_val)
+#                                 # object.__setattr__(obs, key, value)
+# 
+#                         super().__setitem__(key, value) # do I need this ?!?
+#                             
+#                     else: 
+#                         with timeblock(f"processing new key {key} {k}"):
+#                             # NOTE: 2022-11-03 12:02:34 
+#                             # add a new trait
+#                             if key not in ("__observer__", "__hidden__") and key not in self.__hidden__.keys():
+#                                 traitobj = self._make_trait_(value)
+#                                 add_trait(obs, key, traitobj)
+#                                 obs.set_trait(key, value)
+#                                 # trdict = {key: self._make_trait_(value)}
+#                                 # obs.add_traits(**{key: self._make_trait_(value)})
+#                                 
+#                                 # object.__setattr__(obs, key, value)
+#                                 object.__getattribute__(self, "__hidden__").length = len(obs._traits)
+#                                 
+#                             super().__setitem__(key, value)
+#     
+                    # k+=1
+                    # self[key] = value
                 
     def observe(self, handler, names=All, type="change"):
         self.__observer__.observe(handler, names=names, type=type)

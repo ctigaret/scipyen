@@ -51,6 +51,8 @@ from .triggerevent import DataMark, TriggerEvent
 
 from .utilities import (gethash, safe_identity_test)
 
+from .prog import timeblock
+
 # NOTE: DataBagTrait <- Instance <- ClassBasedTraitType <- TraitType <- BaseDescriptor
 
 # NOTE: neo and neo-like types that take 0-argument __init__ (a.k.a default c'tor):
@@ -725,7 +727,7 @@ class NeoBaseNeoTrait(Instance):
         of the traitlet
         """
         # NOTE: 2023-05-23 10:58:16
-        # this is too expensive ⇒ simplified
+        # this is too expensive ⇒ simplify it !
         try:
             # check class
             result = type(new_value) == type(old_value) and isinstance(new_value, self.klass)
@@ -738,10 +740,12 @@ class NeoBaseNeoTrait(Instance):
                 
             # NOTE: 2023-05-23 10:58:42
             # see NOTE: 2023-05-23 10:58:16
-            if result:
-                # check annotations
-                result = new_value.annotations == old_value.annotations
-                # result = safe_identity_test(new_value.annotations, old_value.annotations)
+            # NOTE: 2023-05-23 22:24:41
+            # cann be very expensive
+            # if result:
+            #     # check annotations
+            #     result = new_value.annotations == old_value.annotations
+            #     # result = safe_identity_test(new_value.annotations, old_value.annotations)
             
             
             if result:
@@ -775,6 +779,7 @@ class NeoBaseNeoTrait(Instance):
     def set(self, obj, value):
         """See traitlets.traitlets.TraitType.set for details
         """
+        # with timeblock(f"{type(value).__name__}"):
         # this one simply checks if value is the appropriate class, or None (if allow_none is True)
         new_value = self._validate(obj, value) 
             
