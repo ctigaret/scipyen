@@ -724,7 +724,8 @@ class NeoBaseNeoTrait(Instance):
         Furthermore,this method should be called from inside the `set` method
         of the traitlet
         """
-        
+        # NOTE: 2023-05-23 10:58:16
+        # this is too expensive ⇒ simplified
         try:
             # check class
             result = type(new_value) == type(old_value) and isinstance(new_value, self.klass)
@@ -735,7 +736,8 @@ class NeoBaseNeoTrait(Instance):
                 
                 result = all(self.compare_element(c_new, c_old) for (c_new, c_old) in attrs)
                 
-                
+            # NOTE: 2023-05-23 10:58:42
+            # see NOTE: 2023-05-23 10:58:16
             if result:
                 # check annotations
                 result = new_value.annotations == old_value.annotations
@@ -823,9 +825,11 @@ class NeoContainerTrait(NeoBaseNeoTrait):
                     # check data children count
                     result = len(new_value.data_children_recur) == len(old_value.data_children_recur)
                     
-                    if result:
-                        # check data children
-                        result = all(np.all(c_new == c_old) for (c_new, c_old) in zip(new_value.data_children_recur, old_value.data_children_recur))
+                    # NOTE: 2023-05-23 15:24:45
+                    # potential bottleneck
+                    # if result:
+                    #     # check data children
+                    #     result = all(np.all(c_new == c_old) for (c_new, c_old) in zip(new_value.data_children_recur, old_value.data_children_recur))
         except:
             traceback.print_exc()
             result = False

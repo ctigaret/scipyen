@@ -33,7 +33,7 @@ from matplotlib._pylab_helpers import Gcf as Gcf
 import numpy as np
 import seaborn as sb
 
-from core.prog import (safeWrapper, timefunc, processtimefunc)
+from core.prog import (safeWrapper, timefunc, processtimefunc, timeblock)
 from core.utilities import (summarize_object_properties,
                             standard_obj_summary_headers,
                             safe_identity_test,
@@ -78,6 +78,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.user_ns_hidden = dict(user_ns_hidden)
         self.mpl_figs = dict()
         
+        # NOTE: 2023-05-23 16:58:37
+        # temporary cache of notified observer changes
+        self.__change_dict__ = dict()
+        
         # NOTE: 2023-01-27 08:57:52 about _pylab_helpers.Gcf:
         # the `figs` attribute if an OrderedDict with:
         # int (the figure number) ↦ manager (instance of FigureManager concrete subclass, backend-dependent)
@@ -89,6 +93,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.observed_vars = DataBag(allow_none = True, mutable_types=True)
         self.observed_vars.verbose = True
         self.observed_vars.observe(self.var_observer)
+        # self.observed_vars.observe(self.slot_observe)
         
         # NOTE: 2021-01-28 17:47:36 TODO to complete observables here
         # management of workspaces in external kernels
@@ -589,25 +594,45 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return True
     
     def var_observer(self, change):
+        # self.__change_dict__ = change
+        # QtCore.QTimer.singleShot(0, self._observe_wrapper_)
         self.varsChanged.emit(change) # connected to self.slot_observe, def'ed below
+        
+    # def _observe_wrapper_(self):
+    #     self.slot_observe(self.__change_dict__)
         
     @pyqtSlot(dict)
     def slot_observe(self, change):
         """Connected (and triggered by) self.varsChanged Qt signal"""
         name = change.name
-        displayed_vars_types = self.getDisplayedVariableNames()
-        # displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
+        displayed_var_names = set(self.getDisplayedVariableNames())
+        # user_shell_var_names = set(self.shell.user_ns.keys())
+        # displayed_vars_names_types = self.getDisplayedVariableNamesAndTypes()
         # print(f"WorkspaceModel.slot_observe({change.name}, change.new: {change.new})")
+        
         if name in self.shell.user_ns:
-            if name not in displayed_vars_types:
+            if name not in displayed_var_names:
+                # timer = QtCore.QTimer()
+                # timer.timeout.connect(lambda: self.addRowForVariable(name, self.shell.user_ns[name]))
+                # timer.start(0)
                 self.addRowForVariable(name, self.shell.user_ns[name])
             else:
+                # timer = QtCore.QTimer()
+                # timer.timeout.connect(lambda: self.updateRowForVariable(name, self.shell.user_ns[name]))
+                # timer.shart(0)
                 self.updateRowForVariable(name, self.shell.user_ns[name])
+                # NOTE: 2023-05-23 17:36:36
+                # A scipyen viewer may connect to this to be notified when an object
+                # being displayed has been modified, but be careful to avoid
+                # infinite loops, especially when the modification is acted by the 
+                # viewer itself (i.e. viewer acts like an editor)
                 self.varModified.emit(self.shell.user_ns[name])
                 
-            self.modelContentsChanged.emit()
+            self.modelContentsChanged.emit() # ⇒ in MainWindow this will trigger cosmetic update of the viewer
             
         else:
+            # timer = QtCore.QTimer()
+            # timer.timeout.connect(lambda: self.removeRowForVariable(name))
             self.removeRowForVariable(name) # this actually might never be reached!!!
             
     #@timefunc
@@ -704,6 +729,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             if len(f_names):
                 for n in f_names:
                     self.shell.user_ns.pop(n, None)
+                    if n in self.observed_vars.keys():
+                        self.observed_vars.pop(n, None)
                     
         new_mpl_figs = current_mpl_figs - self.cached_mpl_figs
         
@@ -753,8 +780,26 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     #     if w_name_obj[1] not in self.parent().viewers[type(w_name_obj[1])]:
                     #         self.parent().registerWindow(w_name_obj[1])
         
-        # just update the model directly
-        self.update()
+        with timeblock("post_execute workspace update"):
+            current_user_varnames = set(self.shell.user_ns.keys())
+            observed_varnames = set(self.observed_vars.keys())
+            del_vars = observed_varnames - current_user_varnames
+            self.observed_vars.remove_members(*list(del_vars))
+            current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+            self.observed_vars.update(current_vars)
+            # just update the model directly
+            # QtCore.QTimer.singleShot(0, self.update)
+            # FIXME: 2023-05-23 17:57:21
+            # Although this speeds up execution, the workspace viewer does NOT get 
+            # updated
+            # 
+            # timer = QtCore.QTimer()
+            # timer.timeout.connect(self.update)
+            # timer.start(0)
+            
+            # NOTE: 2023-05-23 17:58:06 FIXME:
+            # slow when too many variables, but surely works!
+            # self.update()
         
         current_dir = os.getcwd()
         
@@ -940,7 +985,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     @pyqtSlot()
     def slot_updateTable(self):
         #print("slot_updateTable")
-        self.update()
+        # QtCore.QTimer.singleShot(0, self.update)
+        timer = QtCore.QTimer()
+        timer.timeout.connect(self.update)
+        timer.start(0)
+        # self.update()
             
     def addRowForVariable(self, dataname, data):
         """CAUTION Only use for data in the internal workspace, not in remote ones.
@@ -963,12 +1012,23 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         """
         
         #print(f"WorkspaceModel.update observed_vars: {list(self.observed_vars.keys())}")
-        del_vars = [name for name in self.observed_vars.keys() if name not in self.shell.user_ns.keys()]
+        
+        # names of variables in user namespace
+        current_user_varnames = set(self.shell.user_ns.keys())
+        
+        # names of variables present in the observed_vars DataBag
+        observed_varnames = set(self.observed_vars.keys())
+        
+        # deleted variable names = names still in observed_vars but not in user namespace anymore
+        
+        del_vars = observed_varnames - current_user_varnames
+        
+        # del_vars = [name for name in self.observed_vars.keys() if name not in self.shell.user_ns.keys()]
 
         # print(f"WorkspaceModel.update: {len(del_vars)} del_vars {del_vars}")
         
         # with self.observed_vars.observer.hold_trait_notifications:
-        self.observed_vars.remove_members(*del_vars)
+        self.observed_vars.remove_members(*list(del_vars))
         
         for vname in del_vars:
             self.removeRowForVariable(vname)

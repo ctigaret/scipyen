@@ -22,7 +22,7 @@ from .traitutils import (traitlets, dynamic_trait, transform_link,
                          HasTraits, TraitType, TraitsObserver, 
                          ContainerTraitsObserver, Int, Bool, All, observe)
 
-from .prog import safeWrapper, timefunc, processtimefunc
+from .prog import safeWrapper, timefunc, processtimefunc, timeblock
 from .strutils import str2symbol
 
 class DataBagTraitsObserver(HasTraits):
@@ -383,7 +383,8 @@ class DataBag(Bunch):
         #### END Deal with the situation where a "hidden attribute" is being set
         
         #### BEGIN Deal with the actual traitlet - assign to an existing one or add a new one
-        if obs.has_trait(key): # NOTE: 2022-11-03 12:02:45 assign new value to existing
+        if obs.has_trait(key): 
+            # NOTE: 2022-11-03 12:02:45 assign new value to existing
             # NOTE 2020-09-05 12:52:39 
             # Below, one could use getattr(obs, key)
             # to achieve the same thing as object.__getattribute__(obs, key)
@@ -406,13 +407,14 @@ class DataBag(Bunch):
                 else:
                     object.__setattr__(obs, key, val)
 
-                super().__setitem__(key, val)
+                super().__setitem__(key, val) # do I need this ?!?
                         
             except:
                 traceback.print_exc()
                 
-        else: # NOTE: 2022-11-03 12:02:34 add a new trait
-            
+        else: 
+            # NOTE: 2022-11-03 12:02:34 
+            # add a new trait
             if key not in ("__observer__", "__hidden__") and key not in self.__hidden__.keys():
                 trdict = {key: self._make_trait_(val)}
                 obs.add_traits(**trdict)
@@ -773,8 +775,9 @@ class DataBag(Bunch):
         # traits
         
         if isinstance(other, dict):  # this includes DataBag!
-            for key, value in other.items():
-                self[key] = value
+            with timeblock("DataBag.update"):
+                for key, value in other.items():
+                    self[key] = value
                 
     def observe(self, handler, names=All, type="change"):
         self.__observer__.observe(handler, names=names, type=type)

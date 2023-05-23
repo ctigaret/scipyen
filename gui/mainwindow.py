@@ -2612,6 +2612,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_updateWorkspaceView(self):
+        """
+        Cosmetic update of the workspace viewer
+        • sorts according to 1st column contents
+        • resizes 1st column to its contents
+        """
         self._sortWorkspaceViewFirstColumn_()
         self._resizeWorkspaceViewFirstColumn_()
         
@@ -2625,7 +2630,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # self.slot_updateWorkspaceView(); in turn this will sort column 0
         # and resize its contents. 
         # This is because workspaceModel doesn't "know" anything about workspaceView.
-        self.workspaceModel.update() # emits WorkspaceModel.modelContentsChanged via var_observer
+        timer = QtCore.QTimer()
+        timer.timeout.connect(self.workspaceModel.update)
+        timer.start(0)
+        # self.workspaceModel.update() # emits WorkspaceModel.modelContentsChanged via var_observer
         
     @pyqtSlot()
     def slot_updateCwd(self):
@@ -5002,6 +5010,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_openSelectedFileItems(self):
+        """Load a batch of files.
+        """
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes() \
                          if item.column() == 0 and not self.fileSystemModel.isDir(item)]# list of QModelIndex
         
@@ -5026,6 +5036,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
         else:
             progressDlg = QtWidgets.QProgressDialog("Loading data...", "Abort", 0, nItems, self)
+            progressDlg.setMinimumDuration(1000)
             
             progressDlg.setWindowModality(QtCore.Qt.WindowModal)
             
@@ -5640,7 +5651,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_openFiles(self):
-        """Allows the opening of several files, as opposed to openFile.
+        """Opening of several files.
         """
         from core.utilities import make_file_filter_string
         
