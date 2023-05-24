@@ -831,6 +831,162 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         self.workingDir.emit(current_dir)
 
+    def post_run_cell(self, result):
+        if result.success:
+            self._update_workspace_(self.shell.user_ns)
+
+    def _update_workspace_(self, ns: dict):
+        # ATTENTION 2023-05-24 17:04:36
+        # the notifications from the variable observer DataBag are used to trigger
+        # GUI updates, they do NOT alter the contents of the 'ns' workspace !!!
+        #
+        print(f"{self.__class__.__name__}._update_workspace_")
+
+        #
+        # 1. deal with any matplotlib figures that may exist
+        #
+
+        # NOTE: 2023-01-29 23:32:44
+        #
+        # 1.1 capture the figures referenced in Gcf
+        #   these should be ALL mpl figures Scipyen knows about, see NOTE: 2023-01-29 23:30:32
+        #
+        current_mpl_figs = set(
+            fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
+
+        #
+        # 1.2 figure out which currently cached reference to matplotlib figures
+        #   were actually removed from Gcf - if they still esixt in the workspace
+        #   we need to remove them ⇒ deleted_mpl_figs
+        #
+        # NOTE: cached_mpl_figs is populated/updated at pre_execute when code is
+        #   called at the console; otherwise, it is the MainWindow's responsibility - TODO/FIXME
+        #
+        deleted_mpl_figs = self.cached_mpl_figs - current_mpl_figs
+
+        #
+        # 1.3 now, remove the figs in the deleted_mpl_figs
+        #
+        for f in deleted_mpl_figs:
+            f_names = list(k for k, v in ns.items() if isinstance(
+                v, mpl.figure.Figure) and v == f and not k.startswith("_"))
+            if len(f_names):
+                for n in f_names:
+                    ns.pop(n, None)
+                    # NOTE: 2023-05-24 16:33:14 - remove them from the DataBag of observed vars
+                    #
+                    if n in self.observed_vars.keys():
+                        # NOTE: the DataBag only deals with user_ns variables
+                        self.observed_vars.pop(n, None)
+
+        #
+        # 1.4 figure out if there are new matplpotlib figures around ⇒ collect in new_mpl_figs
+        #   these are registered with Gcf, but not referenced in the workspace cached ones
+        #
+        new_mpl_figs = current_mpl_figs - self.cached_mpl_figs
+
+        # NOTE: 2023-05-24 16:37:06
+        # in addition, these may have been placed directly in the workspace upon
+        # return by code called at the console - add these to new_mpl_figs as well
+        # CAUTION: we may end up with duplicate references !
+        #
+        for k, v in ns.items():
+            if isinstance(v, mpl.figure.Figure):
+                if v not in self.cached_mpl_figs:
+                    new_mpl_figs.add(v)
+
+        #
+        # 1.5 finally, add these new figures
+        #   • make sure they are managed by pyplot
+        #   • assign variable names avoiding clashes
+        for fig in new_mpl_figs:
+            # NOTE: 2023-01-29 23:34:00 • make sure they are managed by pyplot
+            # (see NOTE: 2023-01-29 23:30:32)
+            # We need to call this early because we need a fig.number to avoid
+            # complicatons in fig variable name management!
+            if getattr(fig.canvas, "manager", None) is None:
+                fig = self.parent()._adopt_mpl_figure(fig)  # , integrate_in_pyplot=False)
+
+            # NOTE: 2023-05-24 16:45:11 • assign variable names avoiding clashes
+            # set up a reasonable variable name
+            fig_var_name = "Figure"
+
+            if fig.canvas.manager is not None and getattr(fig.canvas.manager, "num", None) is not None:
+                fig_var_name = f"Figure{fig.canvas.manager.num}"
+
+            elif getattr(fig, "number", None) is not None:
+                fig_var_name = f"Figure{fig.number}"
+
+            # see if there are any figs in the workspace
+            # cached_figs = [v for v in self.cached_vars.values() if isinstance(v, mpl.figure.Figure)]
+            cached_figs = [v for v in ns.values(
+            ) if isinstance(v, mpl.figure.Figure)]
+
+            # only add the figure if not already present
+            if fig not in cached_figs:
+                # adjust variable name to avoid clashes
+                if fig_var_name in ns:
+                    fig_var_name = validate_varname(fig_var_name, ws=ns)
+                # print(f"\n adding fig_var_name {fig_var_name}")
+                ns[fig_var_name] = fig
+                # this SHOULD notify hence populate the ns
+                self.observed_vars[fig_var_name] = fig
+                # self.shell.user_ns[fig_var_name] = fig
+
+        #
+        # 2. deal with Scipyen viewer windows
+        #
+        if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
+            cached_viewers = [(wname, win) for (wname, win) in self.cached_vars.items() if isinstance(
+                win, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(win))]
+            user_ns_viewers = [v for v in ns.values() if isinstance(
+                v, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(v))]
+            for w_name_obj in cached_viewers:
+                if w_name_obj[1] not in user_ns_viewers:
+                    self.cached_vars.pop(w_name_obj[0], None)
+
+                else:
+                    self.parent().registerWindow(w_name_obj[1])
+
+        #
+        # 3. Deal with everything else
+        #
+        # ### BEGIN 2023-05-23 22:39:22 do not delete
+        #
+        # 3.1. establish which variables have been removed ⇒ del_vars
+        #
+        # current_user_varnames = set(self.shell.user_ns.keys())
+        current_user_varnames = set(ns.keys())
+        observed_varnames = set(self.observed_vars.keys())
+        del_vars = observed_varnames - current_user_varnames
+
+        #
+        # 3.2. now, remove these from the DataBag of observed variables (self.observed_vars)
+        #
+        # NOTE: 2023-05-24 16:18:58
+        # The DataBag will NOW notify any observers, upon the removla of these variables
+        #
+        self.observed_vars.remove_members(*list(del_vars))
+
+        #
+        # 3.3. now, figure out whether there are NEW variables added to the workspace
+        # These are present in the workspace, but ABSENT in the DataBag of observed
+        # variables.
+        #
+
+        # current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        current_vars = dict([item for item in ns.items() if not item[0].startswith(
+            "_") and self.is_user_var(item[0], item[1])])
+
+        # NOTE: 2023-05-24 16:22:58
+        # this SHOULD also notify the observers
+        self.observed_vars.update(current_vars)
+        # ### END 2023-05-23 22:39:22 do not delete
+
+        current_dir = os.getcwd()
+
+        self.workingDir.emit(current_dir)
+
     def _gen_item_for_object_(self, propdict: dict, editable: typing.Optional[bool] = False, elidetip: typing.Optional[bool] = False, background: typing.Optional[QtGui.QBrush] = None, foreground: typing.Optional[QtGui.QBrush] = None):
         # print(f"_gen_item_for_object_ propdict = {propdict}")
         item = QtGui.QStandardItem(propdict["display"])
