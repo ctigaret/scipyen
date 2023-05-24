@@ -15,18 +15,12 @@ event handlers pre_execute() and post_execute().
 # filter/finder in workspace viewer
 #
 
-from .guiutils import (get_text_width, get_elided_text)
-from core.traitcontainers import DataBag, generic_change_handler
-from core.utilities import (summarize_object_properties,
-                            standard_obj_summary_headers,
-                            safe_identity_test,
-                            )
-from core.prog import (safeWrapper, timefunc, processtimefunc, timeblock)
 import seaborn as sb
 import numpy as np
-from matplotlib._pylab_helpers import Gcf as Gcf
+import matplotlib as mpl
 import matplotlib.mlab as mlb
 import matplotlib.pyplot as plt
+from matplotlib._pylab_helpers import Gcf as Gcf
 import traceback
 import typing
 import inspect
@@ -34,16 +28,29 @@ import os
 import asyncio
 import warnings
 from copy import deepcopy
+from functools import partial
 import json
 
+from .guiutils import (get_text_width, get_elided_text)
+from gui import pictgui as pgui
+from core.traitcontainers import DataBag, generic_change_handler
+from core.utilities import (summarize_object_properties,
+                            standard_obj_summary_headers,
+                            safe_identity_test,
+                            )
+from core.prog import (safeWrapper, timefunc, processtimefunc, timeblock)
+from core.datatypes import TypeEnum
 # from jupyter_core.paths import jupyter_runtime_dir
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 
-import matplotlib as mpl
 mpl.use("Qt5Agg")
 
+class WorkspaceVarChange(TypeEnum):
+    New         = 1
+    Modified    = 2
+    Removed     = 4
 
 class WorkspaceModel(QtGui.QStandardItemModel):
     '''
@@ -71,6 +78,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # make sure parent is passed from ScipyenWindow as an instance of ScipyenWindow
         super(WorkspaceModel, self).__init__(parent)
 
+        self.threadpool = QtCore.QThreadPool()
+        
         # self.loop = asyncio.get_event_loop()
         self.shell = shell  # reference to IPython InteractiveShell of the internal console
 
@@ -133,7 +142,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.mpl_figure_click_callback = mpl_figure_click_callback
         self.mpl_figure_enter_callback = mpl_figure_enter_callback
 
-        self.varsChanged.connect(self.slot_observe)
+        self._varChanges_callbacks_ = {WorkspaceVarChange.New:      partial(self.__class__.addRowForVariable2, self, self.shell.user_ns),
+                                       WorkspaceVarChange.Modified: partial(self.__class__.updateRowForVariable2, self, self.shell.user_ns),
+                                       WorkspaceVarChange.Removed:  partial(self.__class__.removeRowForVariable2, self, self.shell.user_ns)}
+        
+        # self.varsChanged.connect(self.slot_observe)
+        self.varsChanged.connect(self.slot_observe_2)
 
     def _foreign_namespaces_count_changed_(self, change):
         # FIXME / TODO 2020-07-30 23:49:13
@@ -647,7 +661,58 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # timer.timeout.connect(lambda: self.removeRowForVariable(name))
             # this actually might never be reached!!!
             self.removeRowForVariable(name)
+            
+    @pyqtSlot(dict)
+    def slot_observe_2(self, change):
+        """Connected (and triggered by) self.varsChanged Qt signal"""
+        name = change.name
+        # print(f"{self.__class__.__name__}.slot_observe change is a {type(change).__name__}, for variable = {name}")
 
+        displayed_var_names = set(self.getDisplayedVariableNames())
+        user_shell_var_names = set(self.shell.user_ns.keys())
+
+        worker = pgui.GuiWorker(self._update_from_observer_, name, displayed_var_names, user_shell_var_names)
+        worker.signals.signal_Result.connect(self._slot_update_model_from_observer_)
+        self.threadpool.start(worker)
+        # v = self._update_from_observer_(name, displayed_var_names, user_shell_var_names)
+        # self._slot_update_model_from_observer_(v)
+        
+    def _update_from_observer_(self, name:str, displayed_var_names:set, user_shell_var_names:set):
+        # displayed_var_names = set(self.getDisplayedVariableNames())
+        # user_shell_var_names = set(self.shell.user_ns.keys())
+        # displayed_vars_names_types = self.getDisplayedVariableNamesAndTypes()
+
+        print(f"{self.__class__.__name__}._update_from_observer_ {name}\n\tin shell: {name in self.shell.user_ns}\n\tdisplayed: {name in displayed_var_names}")
+        
+        if name in user_shell_var_names:
+            if name not in displayed_var_names:
+                alteration = WorkspaceVarChange.New
+            else:
+                alteration = WorkspaceVarChange.Modified
+        else:
+            if name in displayed_var_names:
+                alteration = WorkspaceVarChange.Removed
+                
+            else:
+                alteration = None
+            
+        return (name, alteration)
+    
+    @pyqtSlot(tuple)
+    def _slot_update_model_from_observer_(self, value):
+        name, alteration = value
+        print(f"{self.__class__.__name__}._slot_update_model_from_observer_ {name} {alteration.name}")
+        if isinstance(alteration, WorkspaceVarChange):
+            # print(f"name = {name} alteration = {alteration.name}") #cb = {self._varChanges_callbacks_[alteration]}")
+            
+            self._varChanges_callbacks_[alteration](name)
+        # else:
+            # print(f"name = {name} alteration = {alteration}") #cb = {self._varChanges_callbacks_[alteration]}")
+        
+            self.modelContentsChanged.emit() # ⇒ in MainWindow this will trigger cosmetic update of the viewer
+    
+    
+    
     # @timefunc
     def pre_execute(self):
         """Updates observed_vars DataBag
@@ -656,8 +721,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # ones like the ones used by ipython internally)
         # NOTE: 2023-01-28 13:27:40
         # we take a snapshot of the current user_ns HERE:
-        self.cached_vars = dict([item for item in self.shell.user_ns.items(
-        ) if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        self.cached_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
 
         # NOTE: 2023-01-28 13:27:47
         # we also take a snapshot of the mpl figures
@@ -687,151 +751,152 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 self.observed_vars.pop(var, None)
 
     # @timefunc
-    def post_execute(self):
-        """Updates workspace model AFTER kernel execution.
-        Also takes into account:
-        1) matplotlib figures that have been created by plt commands at the console
-        """
-        # NOTE: 2022-03-15 22:05:21
-        # check if there is a mpl Figure created in the console (but NOT bound to
-        # a user-available identifier)
-
-        # mpl_figs_nums_in_ns = [(f.number, f) for f in self.shell.user_ns.values() if isinstance(f, mpl.figure.Figure)]
-
-        # NOTE: 2023-01-28 22:36:33
-        # • a figure was created using pyplot:
-        #   ∘ by calling plt.figure() ⇒ the new Figure instance will be present
-        #       in user_ns AND will be referenced in Gcf.figs;
-        #       the default identifier in the IPython shell's user_ns is '_'
-        #       (underscore) UNLESS the user binds the return from plt.figure()
-        #       to a specified identifier e..g figX = plt.figure()
-        #   ∘ by calling a plotting function in plt, e.g. plt.plot(x,y) ⇒ a new
-        #       Figure instance will be referenced in Gcf.figs, BUT NOT in user_ns
-        #       (the plt plotting functions return artist(s), but not the figure
-        #       object that renders the artist(s) on screen)
-        #
-        # • a figure was created directly via its c'tor ⇒ the new figure object
-        #   will be resent in user_ns, bound to the default symbol ('_') or to
-        #   a user-specified symbol; in either case,
-        #   the new figure instance will NOT be referenced in Gcf.figs
-
-        # Also, NOTE that figures created via their c'tor do not usually have a
-        # figure manager (i.e. the fig.canvas.manager attribute is None) hence
-        # they also do NOT have a number (in the pyplot sense)
-        #
-        # Hence we need to operate independently of whether there is a number
-        # associated with the figure, or not.
-
-        from core.workspacefunctions import validate_varname
-
-        # print(f"\npost_execute cached figs {self.cached_mpl_figs}")
-
-        # print(f"\npost_execute Gcf figs {Gcf.figs}")
-
-        # NOTE: 2023-01-29 23:32:44
-        # capture the figures referenced in Gcf
-        # these should be ALL mpl figures Scipyen knows about, see NOTE: 2023-01-29 23:30:32
-        #
-        current_mpl_figs = set(
-            fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
-
-        # print(f"\npost_execute current figs {current_mpl_figs}")
-
-        deleted_mpl_figs = self.cached_mpl_figs - current_mpl_figs
-
-        # print(f"\npost_execute deleted_mpl_figs = {deleted_mpl_figs}")
-
-        for f in deleted_mpl_figs:
-            f_names = list(k for k, v in self.shell.user_ns.items() if isinstance(
-                v, mpl.figure.Figure) and v == f and not k.startswith("_"))
-            if len(f_names):
-                for n in f_names:
-                    self.shell.user_ns.pop(n, None)
-                    if n in self.observed_vars.keys():
-                        self.observed_vars.pop(n, None)
-
-        new_mpl_figs = current_mpl_figs - self.cached_mpl_figs
-
-        for k, v in self.shell.user_ns.items():
-            if isinstance(v, mpl.figure.Figure):
-                if v not in self.cached_mpl_figs:
-                    new_mpl_figs.add(v)
-
-        # print(f"\npost_execute new_mpl_figs = {new_mpl_figs}")
-
-        for fig in new_mpl_figs:
-            fig_var_name = "Figure"
-            # NOTE: 2023-01-29 23:34:00
-            # make sure all new figures are managed by pyplot (see NOTE: 2023-01-29 23:30:32)
-            # We need to call this early because we need a fig.number to avoid
-            # complicatons in fig variable name management!
-            if getattr(fig.canvas, "manager", None) is None:
-                fig = self.parent()._adopt_mpl_figure(fig)  # , integrate_in_pyplot=False)
-
-            if fig.canvas.manager is not None and getattr(fig.canvas.manager, "num", None) is not None:
-                fig_var_name = f"Figure{fig.canvas.manager.num}"
-
-            elif getattr(fig, "number", None) is not None:
-                fig_var_name = f"Figure{fig.number}"
-
-            if fig_var_name in self.shell.user_ns:
-                fig_var_name = validate_varname(
-                    fig_var_name, ws=self.shell.user_ns)
-
-            # cached_figs = [v for v in self.cached_vars.values() if isinstance(v, mpl.figure.Figure)]
-            cached_figs = [v for v in self.shell.user_ns.values(
-            ) if isinstance(v, mpl.figure.Figure)]
-            if fig not in cached_figs:
-                # print(f"\n adding fig_var_name {fig_var_name}")
-                self.shell.user_ns[fig_var_name] = fig
-                self.observed_vars[fig_var_name] = fig
-
-        if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
-            cached_viewers = [(wname, win) for (wname, win) in self.cached_vars.items() if isinstance(
-                win, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(win))]
-            user_ns_viewers = [v for v in self.shell.user_ns.values() if isinstance(
-                v, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(v))]
-            for w_name_obj in cached_viewers:
-                if w_name_obj[1] not in user_ns_viewers:
-                    self.cached_vars.pop(w_name_obj[0], None)
-
-                else:
-                    # print(f"win: {w_name_obj[1]}")
-                    self.parent().registerWindow(w_name_obj[1])
-                    # if type(w_name_obj[1]) in self.parent().viewers.keys():
-                    #     if w_name_obj[1] not in self.parent().viewers[type(w_name_obj[1])]:
-                    #         self.parent().registerWindow(w_name_obj[1])
-
-        # with timeblock("post_execute workspace update"):
-        #     # current_user_varnames = set(self.shell.user_ns.keys())
-        #     # observed_varnames = set(self.observed_vars.keys())
-        #     # del_vars = observed_varnames - current_user_varnames
-        #     # self.observed_vars.remove_members(*list(del_vars))
-        #     # current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
-        #     # self.observed_vars.update(current_vars)
-        #     # just update the model directly
-        #     # QtCore.QTimer.singleShot(0, self.update)
-        #     # FIXME: 2023-05-23 17:57:21
-        #     # Although this speeds up execution, the workspace viewer does NOT get
-        #     # updated
-        #     #
-        #     # timer = QtCore.QTimer()
-        #     # timer.timeout.connect(self.update)
-        #     # timer.start(0)
-        #
-        #     # NOTE: 2023-05-23 17:58:06 FIXME:
-        #     # slow when too many variables, but surely works!
-        #     self.update()
-
-        # NOTE: 2023-05-23 17:58:06 FIXME:
-        # UI-blocking and, when too many variables, very slow, but surely works!
-        self.update()
-
-        current_dir = os.getcwd()
-
-        self.workingDir.emit(current_dir)
+    # def post_execute(self):
+    #     """Updates workspace model AFTER kernel execution.
+    #     Also takes into account:
+    #     1) matplotlib figures that have been created by plt commands at the console
+    #     """
+    #     # NOTE: 2022-03-15 22:05:21
+    #     # check if there is a mpl Figure created in the console (but NOT bound to
+    #     # a user-available identifier)
+    # 
+    #     # mpl_figs_nums_in_ns = [(f.number, f) for f in self.shell.user_ns.values() if isinstance(f, mpl.figure.Figure)]
+    # 
+    #     # NOTE: 2023-01-28 22:36:33
+    #     # • a figure was created using pyplot:
+    #     #   ∘ by calling plt.figure() ⇒ the new Figure instance will be present
+    #     #       in user_ns AND will be referenced in Gcf.figs;
+    #     #       the default identifier in the IPython shell's user_ns is '_'
+    #     #       (underscore) UNLESS the user binds the return from plt.figure()
+    #     #       to a specified identifier e..g figX = plt.figure()
+    #     #   ∘ by calling a plotting function in plt, e.g. plt.plot(x,y) ⇒ a new
+    #     #       Figure instance will be referenced in Gcf.figs, BUT NOT in user_ns
+    #     #       (the plt plotting functions return artist(s), but not the figure
+    #     #       object that renders the artist(s) on screen)
+    #     #
+    #     # • a figure was created directly via its c'tor ⇒ the new figure object
+    #     #   will be resent in user_ns, bound to the default symbol ('_') or to
+    #     #   a user-specified symbol; in either case,
+    #     #   the new figure instance will NOT be referenced in Gcf.figs
+    # 
+    #     # Also, NOTE that figures created via their c'tor do not usually have a
+    #     # figure manager (i.e. the fig.canvas.manager attribute is None) hence
+    #     # they also do NOT have a number (in the pyplot sense)
+    #     #
+    #     # Hence we need to operate independently of whether there is a number
+    #     # associated with the figure, or not.
+    # 
+    #     from core.workspacefunctions import validate_varname
+    # 
+    #     # print(f"\npost_execute cached figs {self.cached_mpl_figs}")
+    # 
+    #     # print(f"\npost_execute Gcf figs {Gcf.figs}")
+    # 
+    #     # NOTE: 2023-01-29 23:32:44
+    #     # capture the figures referenced in Gcf
+    #     # these should be ALL mpl figures Scipyen knows about, see NOTE: 2023-01-29 23:30:32
+    #     #
+    #     current_mpl_figs = set(
+    #         fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
+    # 
+    #     # print(f"\npost_execute current figs {current_mpl_figs}")
+    # 
+    #     deleted_mpl_figs = self.cached_mpl_figs - current_mpl_figs
+    # 
+    #     # print(f"\npost_execute deleted_mpl_figs = {deleted_mpl_figs}")
+    # 
+    #     for f in deleted_mpl_figs:
+    #         f_names = list(k for k, v in self.shell.user_ns.items() if isinstance(
+    #             v, mpl.figure.Figure) and v == f and not k.startswith("_"))
+    #         if len(f_names):
+    #             for n in f_names:
+    #                 self.shell.user_ns.pop(n, None)
+    #                 if n in self.observed_vars.keys():
+    #                     self.observed_vars.pop(n, None)
+    # 
+    #     new_mpl_figs = current_mpl_figs - self.cached_mpl_figs
+    # 
+    #     for k, v in self.shell.user_ns.items():
+    #         if isinstance(v, mpl.figure.Figure):
+    #             if v not in self.cached_mpl_figs:
+    #                 new_mpl_figs.add(v)
+    # 
+    #     # print(f"\npost_execute new_mpl_figs = {new_mpl_figs}")
+    # 
+    #     for fig in new_mpl_figs:
+    #         fig_var_name = "Figure"
+    #         # NOTE: 2023-01-29 23:34:00
+    #         # make sure all new figures are managed by pyplot (see NOTE: 2023-01-29 23:30:32)
+    #         # We need to call this early because we need a fig.number to avoid
+    #         # complicatons in fig variable name management!
+    #         if getattr(fig.canvas, "manager", None) is None:
+    #             fig = self.parent()._adopt_mpl_figure(fig)  # , integrate_in_pyplot=False)
+    # 
+    #         if fig.canvas.manager is not None and getattr(fig.canvas.manager, "num", None) is not None:
+    #             fig_var_name = f"Figure{fig.canvas.manager.num}"
+    # 
+    #         elif getattr(fig, "number", None) is not None:
+    #             fig_var_name = f"Figure{fig.number}"
+    # 
+    #         if fig_var_name in self.shell.user_ns:
+    #             fig_var_name = validate_varname(
+    #                 fig_var_name, ws=self.shell.user_ns)
+    # 
+    #         # cached_figs = [v for v in self.cached_vars.values() if isinstance(v, mpl.figure.Figure)]
+    #         cached_figs = [v for v in self.shell.user_ns.values(
+    #         ) if isinstance(v, mpl.figure.Figure)]
+    #         if fig not in cached_figs:
+    #             # print(f"\n adding fig_var_name {fig_var_name}")
+    #             self.shell.user_ns[fig_var_name] = fig
+    #             self.observed_vars[fig_var_name] = fig
+    # 
+    #     if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
+    #         cached_viewers = [(wname, win) for (wname, win) in self.cached_vars.items() if isinstance(
+    #             win, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(win))]
+    #         user_ns_viewers = [v for v in self.shell.user_ns.values() if isinstance(
+    #             v, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(v))]
+    #         for w_name_obj in cached_viewers:
+    #             if w_name_obj[1] not in user_ns_viewers:
+    #                 self.cached_vars.pop(w_name_obj[0], None)
+    # 
+    #             else:
+    #                 # print(f"win: {w_name_obj[1]}")
+    #                 self.parent().registerWindow(w_name_obj[1])
+    #                 # if type(w_name_obj[1]) in self.parent().viewers.keys():
+    #                 #     if w_name_obj[1] not in self.parent().viewers[type(w_name_obj[1])]:
+    #                 #         self.parent().registerWindow(w_name_obj[1])
+    # 
+    #     # with timeblock("post_execute workspace update"):
+    #     #     # current_user_varnames = set(self.shell.user_ns.keys())
+    #     #     # observed_varnames = set(self.observed_vars.keys())
+    #     #     # del_vars = observed_varnames - current_user_varnames
+    #     #     # self.observed_vars.remove_members(*list(del_vars))
+    #     #     # current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+    #     #     # self.observed_vars.update(current_vars)
+    #     #     # just update the model directly
+    #     #     # QtCore.QTimer.singleShot(0, self.update)
+    #     #     # FIXME: 2023-05-23 17:57:21
+    #     #     # Although this speeds up execution, the workspace viewer does NOT get
+    #     #     # updated
+    #     #     #
+    #     #     # timer = QtCore.QTimer()
+    #     #     # timer.timeout.connect(self.update)
+    #     #     # timer.start(0)
+    #     #
+    #     #     # NOTE: 2023-05-23 17:58:06 FIXME:
+    #     #     # slow when too many variables, but surely works!
+    #     #     self.update()
+    # 
+    #     # NOTE: 2023-05-23 17:58:06 FIXME:
+    #     # UI-blocking and, when too many variables, very slow, but surely works!
+    #     self.update()
+    # 
+    #     current_dir = os.getcwd()
+    # 
+    #     self.workingDir.emit(current_dir)
 
     def post_run_cell(self, result):
+        # print(f"{self.__class__.__name__}.post_run_cell result.info.cell = {result.info.raw_cell}")
         if result.success:
             self._update_workspace_(self.shell.user_ns)
 
@@ -840,7 +905,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # the notifications from the variable observer DataBag are used to trigger
         # GUI updates, they do NOT alter the contents of the 'ns' workspace !!!
         #
-        print(f"{self.__class__.__name__}._update_workspace_")
+        # print(f"{self.__class__.__name__}._update_workspace_")
 
         #
         # 1. deal with any matplotlib figures that may exist
@@ -868,8 +933,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # 1.3 now, remove the figs in the deleted_mpl_figs
         #
         for f in deleted_mpl_figs:
-            f_names = list(k for k, v in ns.items() if isinstance(
-                v, mpl.figure.Figure) and v == f and not k.startswith("_"))
+            f_names = list(k for k, v in ns.items() if isinstance(v, mpl.figure.Figure) and v == f and not k.startswith("_"))
             if len(f_names):
                 for n in f_names:
                     ns.pop(n, None)
@@ -919,8 +983,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
             # see if there are any figs in the workspace
             # cached_figs = [v for v in self.cached_vars.values() if isinstance(v, mpl.figure.Figure)]
-            cached_figs = [v for v in ns.values(
-            ) if isinstance(v, mpl.figure.Figure)]
+            cached_figs = [v for v in ns.values() if isinstance(v, mpl.figure.Figure)]
 
             # only add the figure if not already present
             if fig not in cached_figs:
@@ -937,10 +1000,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # 2. deal with Scipyen viewer windows
         #
         if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
-            cached_viewers = [(wname, win) for (wname, win) in self.cached_vars.items() if isinstance(
-                win, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(win))]
-            user_ns_viewers = [v for v in ns.values() if isinstance(
-                v, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(v))]
+            cached_viewers = [(wname, win) for (wname, win) in self.cached_vars.items() if isinstance(win, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(win))]
+            user_ns_viewers = [v for v in ns.values() if isinstance(v, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(v))]
             for w_name_obj in cached_viewers:
                 if w_name_obj[1] not in user_ns_viewers:
                     self.cached_vars.pop(w_name_obj[0], None)
@@ -960,6 +1021,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         observed_varnames = set(self.observed_vars.keys())
         del_vars = observed_varnames - current_user_varnames
 
+        # if len(del_vars):
+            # print(f"{self.__class__.__name__}._update_workspace_ del_vars = {del_vars}")
         #
         # 3.2. now, remove these from the DataBag of observed variables (self.observed_vars)
         #
@@ -975,8 +1038,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #
 
         # current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
-        current_vars = dict([item for item in ns.items() if not item[0].startswith(
-            "_") and self.is_user_var(item[0], item[1])])
+        current_vars = dict([item for item in ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
 
         # NOTE: 2023-05-24 16:22:58
         # this SHOULD also notify the observers
@@ -1085,6 +1147,15 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         v = self.item(index.row(), 0).text()
 
         return v if v in self.shell.user_ns else None  # <- this is the workspace
+    
+    @pyqtSlot()
+    def slot_updateTable(self):
+        # print("slot_updateTable")
+        # QtCore.QTimer.singleShot(0, self.update)
+        timer = QtCore.QTimer()
+        timer.timeout.connect(self.update)
+        timer.start(0)
+        # self.update()
 
     def updateRowForVariable(self, dataname, data, ns=None):
         # CAUTION This is only for internal workspace, but
@@ -1104,6 +1175,44 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # print("updateRowForVariable", dataname, data, ns)
 
         row = self.rowIndexForItemsWithProps(Workspace=ns)
+
+        # print("updateRowForVariable, row:", row)
+
+        items = self.findItems(dataname)
+
+        # print("updateRowForVariable, items", items)
+
+        if len(items) > 0:
+            row = self.indexFromItem(items[0]).row()  # same as below
+            # print("updateRowForVariable, row:", row)
+            # row = items[0].index().row()
+            # generate model view row contents for existing item
+            v_row = self.generateRowContents(dataname, data)
+            self.updateRow(row, v_row)
+
+    def updateRowForVariable2(self, ns:dict, dataname:str, ns_name:typing.Optional[str]=None):
+        # CAUTION This is only for internal workspace, but
+        # TODO 2020-07-30 22:18:35 merge & factor code for both internal and foreign
+        # kernels (make use of the ns parameter)
+        #
+        if dataname not in ns:
+            return
+        
+        data = ns[dataname]
+        
+        if ns_name is None:
+            ns_name = "Internal"
+
+        elif isinstance(ns_name, str):
+            if len(ns_name.strip()) == 0:
+                ns_name = "Internal"
+
+        else:
+            ns_name = "Internal"
+
+        # print("updateRowForVariable", dataname, data, ns)
+
+        row = self.rowIndexForItemsWithProps(Workspace=ns_name)
 
         # print("updateRowForVariable, row:", row)
 
@@ -1165,18 +1274,42 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             self.removeRow(row)
 
-    @pyqtSlot()
-    def slot_updateTable(self):
-        # print("slot_updateTable")
-        # QtCore.QTimer.singleShot(0, self.update)
-        timer = QtCore.QTimer()
-        timer.timeout.connect(self.update)
-        timer.start(0)
-        # self.update()
+    def removeRowForVariable2(self, ns:dict, dataname:str, ns_name:typing.Optional[str]=None):
+        if isinstance(ns_name, str):
+            if len(ns_name.strip()) == 0:
+                ns_name = "Internal"
+
+        else:
+            ns_name = "Internal"
+
+        print(f"{self.__class__.__name__}.removeRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
+        row = self.rowIndexForItemsWithProps(Name=dataname, Workspace=ns_name)
+
+        # print("WorkspaceModel.removeRowForVariable data: %s ns: %s row: %s" % (dataname, ns, row))
+        if row == -1:
+            return
+
+        if isinstance(row, list):
+            for r in row:
+                self.removeRow(r)
+
+        else:
+            self.removeRow(row)
 
     def addRowForVariable(self, dataname, data):
         """CAUTION Only use for data in the internal workspace, not in remote ones.
         """
+        # print("addRowForVariable: ", dataname, data)
+        # generate model view row contents
+        v_row = self.generateRowContents(dataname, data)
+        self.appendRow(v_row)  # append the row to the model
+
+    def addRowForVariable2(self, ns:dict, dataname:str):
+        """CAUTION Only use for data in the internal workspace, not in remote ones.
+        """
+        if dataname not in ns:
+            return
+        data = ns[dataname]
         # print("addRowForVariable: ", dataname, data)
         # generate model view row contents
         v_row = self.generateRowContents(dataname, data)

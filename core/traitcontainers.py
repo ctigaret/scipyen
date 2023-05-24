@@ -42,8 +42,21 @@ class DataBagTraitsObserver(HasTraits):
 
     def remove_traits(self, **traits):
         current_traits = self.traits()
+        
+        valid_traits_to_remove = dict([(k, current_traits[k]) 
+                                       for k in traits if k in current_traits])
+        
         keep_traits = dict([(k, current_traits[k])
-                           for k in current_traits if k not in traits])
+                           for k in current_traits if k not in valid_traits_to_remove])
+        
+        values_to_remove = dict([(k, current_traits[k]) 
+                                 for k in valid_traits_to_remove])
+
+#         keep_traits = dict([(k, current_traits[k])
+#                            for k in current_traits if k not in traits])
+#         
+#         values_to_remove = dict([(k, self._trait_values[k]) 
+#                                  for k in valid_traits_to_remove])
 
         self._trait_values.clear()
 
@@ -52,6 +65,10 @@ class DataBagTraitsObserver(HasTraits):
                               {"remove_traits": self.remove_traits})
 
         self.add_traits(**keep_traits)
+        
+        for traitname, traitvalue in values_to_remove.items():
+            change = Bunch(owner = self, name=traitname, old=traitvalue, new=None, type="change")
+            self.notify_change(change)
 
     def notify_change(self, change):
         """Notify observers of a change event"""
@@ -600,8 +617,7 @@ class DataBag(Bunch):
 
             obs.remove_traits(**traits)
 
-            object.__getattribute__(self, "__hidden__")[
-                "length"] = len(obs.traits())
+            object.__getattribute__(self, "__hidden__")["length"] = len(obs.traits())
 
         except:
             traceback.print_exc()
