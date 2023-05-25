@@ -371,7 +371,7 @@ def dynamic_trait(x, *args, **kwargs):
     from .traitcontainers import DataBag
     import core.scipyen_traitlets as sct
     from .scipyen_traitlets import (DataBagTrait, DequeTrait, QuantityTrait,
-                                    NeoBlockTrait, MetaNotifier)
+                                    NeoBlockTrait)#, MetaNotifier)
     allow_none = kwargs.pop("allow_none", False)
     force_trait = kwargs.pop("force_trait", None)
     set_function = kwargs.pop("set_function", None)

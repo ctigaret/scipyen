@@ -357,7 +357,7 @@ class DataBag(Bunch):
     def __setitem__(self, key, val):
         """Implements indexed (subscript) assignment: obj[key] = val
         """
-        from .scipyen_traitlets import MetaNotifier
+        # from .scipyen_traitlets import MetaNotifier
         # NOTE 2020-07-04 17:32:16 :
         # Unlike an ordinary dict which accepts all sorts of hashable objects as
         # keys, emulating attribute access goes against this philosophy.
@@ -455,6 +455,13 @@ class DataBag(Bunch):
             #   ∘ a dynamically generates object according to the specific 
             #       TypeTrait subclass
             #
+            # Reason for NOT accessing _trait_values directly (as in NOT calling
+            #   obs._trait_values[key] ):
+            #
+            # • the _trait_values is populated typically after calling the Trait
+            #   class' set method (descriptor method); hence _trait_values[key]
+            #   may not exist !!!
+            #
             try:
                 # old_value = object.__getattribute__(obs, key) # -> WRONG -> returns a trait type NOT what you want
                 # old_value = obs._trait_values[key] # -> WRONG: the value may not exist, so this cannot generate it dynamically
@@ -463,8 +470,8 @@ class DataBag(Bunch):
                 # WARNING: 2023-05-25 11:37:41
                 # this may be a notifier wrapper type (e.g. _NotifierDeque_, _NotifierDict_)
                 target_type = type(old_value)
-                if isinstance(target_type, MetaNotifier) and hasattr(target_type, "__wrapped_class__"):
-                    target_type = target_type.__wrapped_class__
+                # if isinstance(target_type, MetaNotifier) and hasattr(target_type, "__wrapped_class__"):
+                #     target_type = target_type.__wrapped_class__
                 # print(f"\told_value is {target_type.__name__} new value is {type(val).__name__}")
 
                 if type(val) != target_type:

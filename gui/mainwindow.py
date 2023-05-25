@@ -3887,6 +3887,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot("QTreeWidgetItem*", int)
     @safeWrapper
     def slot_historyItemSelected(self, item, col):
+        """Triggered by a selcting an item in the Command History list.
+        Typically, this occurs after a single click on the item.
+        """
         # only accept session items here (for now)
         # session items have parent None
 
@@ -3915,6 +3918,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot("QTreeWidgetItem*", int)
     @safeWrapper
     def slot_historyItemActivated(self, item, col):
+        """Triggered by activating an item in the Command History list.
+        Typically, this occurs as a resuld of a double-click on the item.
+        """
+        # NOTE: 2017-03-19 22:54:55#
+        # this DOES NOT re-create the output
+        # NOTE: I guess I can live with this for now...
+
         # print("slot_historyItemActivated")
         parent = item.parent()
         sessionNo = self.currentSessionID
@@ -3955,10 +3965,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.executionCount = self.ipkernel.shell.execution_count
         self._updateHistoryView_(
             self.executionCount-1, self.ipkernel.shell.history_manager.input_hist_raw[-1])
-        self.workspaceModel.update()
-
-        # NOTE: 2017-03-19 22:54:55 also this DOES NOT re-create the output
-        # NOTE: I guess I can live with this for now...
+        
+        # NOTE: 2023-05-25 21:47:27
+        # don't call this anymore - let the workspaceModel deal with it;
+        # otherwise this may generate double entries in the workspace viewer
+        # (some race condition going on?)
+        # self.workspaceModel.update() 
 
     @pyqtSlot()
     def slot_Quit(self):

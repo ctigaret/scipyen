@@ -706,14 +706,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     @pyqtSlot(tuple)
     def _slot_update_model_from_observer_(self, value):
         name, alteration = value
-        # print(f"\n{self.__class__.__name__}._slot_update_model_from_observer_ {name} {alteration.name}")
+        print(f"\n{self.__class__.__name__}._slot_update_model_from_observer_ {name} {alteration.name}")
         if isinstance(alteration, WorkspaceVarChange):
-            # print(f"name = {name} alteration = {alteration.name}") #cb = {self._varChanges_callbacks_[alteration]}")
-
             self._varChanges_callbacks_[alteration](name)
-        # else:
-            # print(f"name = {name} alteration = {alteration}") #cb = {self._varChanges_callbacks_[alteration]}")
-
             # ⇒ in MainWindow this will trigger cosmetic update of the viewer
             self.modelContentsChanged.emit()
 
@@ -1262,6 +1257,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             ns_name = "Internal"
 
+        print(f"{self.__class__.__name__}.updateRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
         # print("updateRowForVariable", dataname, data, ns)
 
         row = self.rowIndexForItemsWithProps(Workspace=ns_name)
@@ -1334,7 +1330,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             ns_name = "Internal"
 
-        # print(f"{self.__class__.__name__}.removeRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
+        print(f"{self.__class__.__name__}.removeRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
         row = self.rowIndexForItemsWithProps(Name=dataname, Workspace=ns_name)
 
         # print("WorkspaceModel.removeRowForVariable data: %s ns: %s row: %s" % (dataname, ns, row))
@@ -1356,12 +1352,21 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         v_row = self.generateRowContents(dataname, data)
         self.appendRow(v_row)  # append the row to the model
 
-    def addRowForVariable2(self, ns: dict, dataname: str):
+    def addRowForVariable2(self, ns: dict, dataname: str, ns_name: typing.Optional[str] = None):
         """CAUTION Only use for data in the internal workspace, not in remote ones.
         """
+        if isinstance(ns_name, str):
+            if len(ns_name.strip()) == 0:
+                ns_name = "Internal"
+
+        else:
+            ns_name = "Internal"
+
         if dataname not in ns:
             return
+        
         data = ns[dataname]
+        print(f"{self.__class__.__name__}.addRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
         # print("addRowForVariable: ", dataname, data)
         # generate model view row contents
         v_row = self.generateRowContents(dataname, data)
