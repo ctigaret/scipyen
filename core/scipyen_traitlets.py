@@ -127,7 +127,8 @@ class MetaNotifier(type):
 
 class _NotifierDict_(dict, metaclass=MetaNotifier):
     """Wraps a dict in order to emit notifications
-        TODO/FIXME none of the intended behaviour really works
+        TODO/FIXME 2023-05-25 18:12:56
+        None of the intended behaviour really works
         and that is OBVIOUSLY because the modifications in the original
         object are NOT going to be "sensed" by the wrapper...
         
@@ -338,23 +339,26 @@ class _NotifierDeque_(deque, metaclass=MetaNotifier):
         else:
             super().rotate(n)
             
-class DictTrait(Instance):
-    _value_trait_ = None
-    _key_trait_ = None
-    klass = _NotifierDict_
+# class DictTrait(Instance):
+class DictTrait(Dict):
+    _value_trait = None
+    _key_trait = None
+    # klass = _NotifierDict_
+    klass = dict
     _valid_defaults = (dict,)
+    default_value = dict()
      
     # def __init__(
     #     self,
     #     value_trait=None,
-    #     per_key_traits=None,
-    #     key_trait=None,
     #     default_value=Undefined,
     #     **kwargs,
     # ):
     def __init__(
         self,
         value_trait=None,
+        per_key_traits=None,
+        key_trait=None,
         default_value=Undefined,
         **kwargs,
     ):
@@ -389,35 +393,57 @@ class DictTrait(Instance):
             raise TypeError(f"default_value expected to be {None} or one of {self._valid_defaults}")
         
         if is_trait(value_trait):
-            self._trait = value_trait() if isinstance(value_trait, type) else value_trait
+            self._value_trait = value_trait() if isinstance(value_trait, type) else value_trait
             
         elif value_trait is not None:
             raise TypeError(f"Expecting 'value_trait to be a Trait or None; got {type(value_trait_.__name__)}")
         
-        super().__init__(klass = self.klass, args=args, **kwargs)
+        if is_trait(key_trait):
+            if isinstance(key_trait, type):
+                warn(
+                    "Traits should be given as instances, not types (for example, `Int()`, not `Int`)"
+                    " Passing types is deprecated in traitlets 4.1.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                key_trait = key_trait()
+            self._key_trait = key_trait
+            
+        elif key_trait is not None:
+            raise TypeError("`key_trait` must be a Trait or None, got %s" % repr_type(key_trait))
+
+        self._per_key_traits = per_key_traits
         
-        # super().__init__(value_trait=value_trait, per_key_traits=per_key_traits,key_trait=key_trait,
-        #                  default_value=default_value, **kwargs)
+        # super(DictTrait, self).__init__(*args, **kwargs)
         
-    def validate(self, obj, value):
-        if isinstance(value, self.klass):
-            return value
+#         super().__init__(klass = self.klass, args=args, **kwargs)
+#         
+        super().__init__(value_trait=value_trait, per_key_traits=per_key_traits,key_trait=key_trait,
+                         default_value=default_value, **kwargs)
         
-        elif isinstance(value, self._valid_defaults):
-            return self.klass(value)
-        # return super().validate(obj, value)
-        # value = super().validate(obj, value)
-        # if value is None:
-        #     return value
-        # value = self.validate_elements(obj, value)
-        # return value
+#     def validate(self, obj, value):
+#         # return super().validate(obj, value)
+#         value = super().validate(obj, value)
+#         if value is None:
+#             return value
+#         value = self.validate_elements(obj, value)
+#         return value
+# 
+# #         if isinstance(value, self.klass):
+# #             return value
+# #         
+# #         elif isinstance(value, self._valid_defaults):
+# #             return self.klass(value)
     
-    # def validate_elements(self, obj, value):
-        # length = len(value)
+    def validate_elements(self, obj, value):
+        value = super(DictTrait, self).validate_elements(obj, value)
+        
+        length = len(value)
+        
         # if length < self._minlen or length > self._maxlen:
         #     self.length_error(obj, value)
 
-        # return super().validate_elements(obj, value)
+        return super().validate_elements(obj, value)
 
     def set(self, obj, value):
         """
@@ -534,7 +560,7 @@ class ListTrait(List):
     
         default_value: list, tuple, set 
         """
-        self._traits = traits # a list of traits, one per element
+        self._traits = traits # a list of traits, one per element - corresponds to per_key_traits in Dict
         self._length = 0
         
         self.hashed = 0

@@ -1091,6 +1091,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # (i.e., either the symbols is bound to a different object reference, or
         # the contents of the object have changed)
         self.observed_vars.update(current_vars)
+        
+        # NOTE 2023-05-25 18:13:46
+        # Changes of object attributes or data the object are NOT detected by this approach 
+        # (see TODO/FIXME 2023-05-25 18:12:56 in core/scipyen_traitlets.py)
         # ### END 2023-05-23 22:39:22 do not delete
 
         current_dir = os.getcwd()
@@ -1330,8 +1334,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             ns_name = "Internal"
 
-        print(
-            f"{self.__class__.__name__}.removeRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
+        # print(f"{self.__class__.__name__}.removeRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
         row = self.rowIndexForItemsWithProps(Name=dataname, Workspace=ns_name)
 
         # print("WorkspaceModel.removeRowForVariable data: %s ns: %s row: %s" % (dataname, ns, row))
