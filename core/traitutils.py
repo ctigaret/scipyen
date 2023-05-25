@@ -32,7 +32,7 @@ from functools import (partial, partialmethod)
 import traitlets
 
 from traitlets.utils.bunch import Bunch as Bunch
-
+from traitlets import (TraitType, HasTraits, Bool, All, observe)
 from traitlets import (HasTraits, MetaHasTraits, TraitType, All, Any, Bool, CBool, Bytes, CBytes, 
     Dict, Enum, Set, Int, CInt, Long, CLong, Integer, Float, CFloat, 
     Complex, CComplex, Unicode, CUnicode, CRegExp, TraitError, Union, Undefined, 
@@ -371,7 +371,7 @@ def dynamic_trait(x, *args, **kwargs):
     from .traitcontainers import DataBag
     import core.scipyen_traitlets as sct
     from .scipyen_traitlets import (DataBagTrait, DequeTrait, QuantityTrait,
-                                    NeoBlockTrait)
+                                    NeoBlockTrait, MetaNotifier)
     allow_none = kwargs.pop("allow_none", False)
     force_trait = kwargs.pop("force_trait", None)
     set_function = kwargs.pop("set_function", None)
@@ -427,12 +427,16 @@ def dynamic_trait(x, *args, **kwargs):
         if any("neo" in c.__module__ for c in getmro(myclass)):
             traitlet_class_name = f"Neo{myclass.__name__}Trait"
             traitlet_class = sct.__dict__.get(traitlet_class_name, None)
-    
+            
     if traitlet_class is not None and (not isinstance(traitlet_class, type) and TraitType not in getmro(traitlet_class)):
         traitlet_class = None
     
+    # print(f"\n\tdynamic_trait {type(x).__name__} ⇒ traitlet_class = {traitlet_class.__class__.__name__}")
+    
     # if myclass == dict:
     #     print(f"traitlet_class {traitlet_class}")
+    
+    # print(f"\n\tdynamic_trait {type(x).__name__} ⇒ traitlet_class = {traitlet_class.__class__.__name__}")
     
     if traitlet_class is None:
         traitlet_classes = [None]
@@ -493,125 +497,125 @@ def dynamic_trait(x, *args, **kwargs):
 #         """
 #         enhanced_traitlet_set(self, obj, value)
         
-class TraitsObserver(HasTraits):
-    """ CAUTION do not use yet
-    """
-    mutable_types = Bool(default=False)
-    use_casting = Bool(default=False)
-    allow_none = Bool(default=False)
-    hidden_traits = ("mutable_types", "use_casting", "allow_none",)
-    
-    def add_traits(self, **traits):
-        # NOTE 2020-07-04 22:43:58
-        # the super's add_traits blows away non-trait attributes
-        # because existing traits are reverted to the default value
-        mutable = object.__getattribute__(self,"mutable_types")
-        use_casting = object.__getattribute__(self, "use_casting")
-        allow_none = object.__getattribute__(self, "allow_none")
-        
-        # NOTE 2020-07-04 22:42:42
-        # __length__ and mutable_types need to be reset to their
-        # current values (see NOTE 2020-07-04 22:43:58)
-        # we do this here in order to avoid triggering a change notification
-        traits.update({"mutable_types":trait_from_type(mutable),
-                       "use_casting": trait_from_type(use_casting),
-                       "allow_none": trait_from_type(allow_none)})
-        
-        super().add_traits(**traits) # this DOES keep __length__ and mutable_types traits but reverts them to the defaults
-        
-        # this also works, but triggers a change notification, which we don't 
-        # need right now
-        #self.__length__ = length
-        #self.mutable_types = mutable
-        
-    def remove_traits(self, **traits):
-        current_traits = self.traits()
-        keep_traits  = dict([(k, current_traits[k]) for k in current_traits if k not in traits])
-        
-        mutable = self.mutable_types
-        use_casting = self.use_casting
-        allow_none = self.allow_none
-        
-        
-        # again, this resets the maintenance traits to their default values, 
-        # so we need to restore them (see NOTE 2020-07-04 22:43:58 and 
-        # NOTE 2020-07-04 22:42:42)
-        keep_traits.update({"mutable_types":trait_from_type(mutable),
-                            "use_casting": trait_from_type(use_casting),
-                            "allow_none": trait_from_type(allow_none==True)})
-        
-        self.__class__ = type(self.__class__.__name__, (HasTraits, ), {"changed":self.changed, "remove_traits":self.remove_traits})
-        
-        self.add_traits(**keep_traits)
-        
-    @observe(All)
-    def changed(self, change):
-        return
-        ## NOTE: 2020-07-05 18:01:01 that's what you can to with these
-        #print("self.changed: change['owner']:\n",change["owner"], "\n")
-        #print("self.changed: change['name']:\n",change["name"], "\n")
-        #print("self.changed: change['old']:\n",change["old"], "\n")
-        #print("self.changed: change['new']:\n",change["new"], "\n")
-
-
-class ContainerTraitsObserver(HasTraits):
-    """ CAUTION do not use yet
-    """
-    __length__ = Int(default_value=0)
-    mutable_types = Bool(default=False)
-    use_casting = Bool(default=False)
-    
-    def add_traits(self, **traits):
-        # NOTE 2020-07-04 22:43:58
-        # the super's add_traits blows away non-trait attributes
-        # because existing traits are reverted to the default value
-        length = object.__getattribute__(self, "__length__")
-        mutable = object.__getattribute__(self,"mutable_types")
-        use_casting = object.__getattribute__(self, "use_casting")
-        
-        # NOTE 2020-07-04 22:42:42
-        # these "maintenance" traits need to be reset to their current values
-        # (see NOTE 2020-07-04 22:43:58)
-        # we do this here in order to avoid triggering a change notification
-        traits.update({"__length__":trait_from_type(length), 
-                       "mutable_types":trait_from_type(mutable),
-                       "use_casting": trait_from_type(use_casting)})
-        
-        super().add_traits(**traits) # this DOES keep __length__ and mutable_types traits but reverts them to the defaults
-        
-        # this also works, but triggers a change notification, which we don't 
-        # need right now
-        #self.__length__ = length
-        #self.mutable_types = mutable
-        
-    def remove_traits(self, **traits):
-        current_traits = self.traits()
-        keep_traits  = dict([(k, current_traits[k]) for k in current_traits if k not in traits])
-        
-        length = self.__length__
-        mutable = self.mutable_types
-        use_casting = self.use_casting
-        
-        
-        # again, this resets the maintenance traits to their default values, 
-        # so we need to restore them (see NOTE 2020-07-04 22:43:58 and 
-        # NOTE 2020-07-04 22:42:42)
-        keep_traits.update({"__length__":trait_from_type(length), 
-                            "mutable_types":trait_from_type(mutable),
-                            "use_casting": trait_from_type(use_casting)})
-        
-        self.__class__ = type(self.__class__.__name__, (HasTraits, ), {"changed":self.changed, "remove_traits":self.remove_traits})
-        
-        self.add_traits(**keep_traits)
-        
-    @observe(All)
-    def changed(self, change):
-        return
-        ## NOTE: 2020-07-05 18:01:01 that's what you can to with these
-        #print("self.changed: change['owner']:\n",change["owner"], "\n")
-        #print("self.changed: change['name']:\n",change["name"], "\n")
-        #print("self.changed: change['old']:\n",change["old"], "\n")
-        #print("self.changed: change['new']:\n",change["new"], "\n")
+# class TraitsObserver(HasTraits):
+#     """ CAUTION do not use yet
+#     """
+#     mutable_types = Bool(default=False)
+#     use_casting = Bool(default=False)
+#     allow_none = Bool(default=False)
+#     hidden_traits = ("mutable_types", "use_casting", "allow_none",)
+#     
+#     def add_traits(self, **traits):
+#         # NOTE 2020-07-04 22:43:58
+#         # the super's add_traits blows away non-trait attributes
+#         # because existing traits are reverted to the default value
+#         mutable = object.__getattribute__(self,"mutable_types")
+#         use_casting = object.__getattribute__(self, "use_casting")
+#         allow_none = object.__getattribute__(self, "allow_none")
+#         
+#         # NOTE 2020-07-04 22:42:42
+#         # __length__ and mutable_types need to be reset to their
+#         # current values (see NOTE 2020-07-04 22:43:58)
+#         # we do this here in order to avoid triggering a change notification
+#         traits.update({"mutable_types":trait_from_type(mutable),
+#                        "use_casting": trait_from_type(use_casting),
+#                        "allow_none": trait_from_type(allow_none)})
+#         
+#         super().add_traits(**traits) # this DOES keep __length__ and mutable_types traits but reverts them to the defaults
+#         
+#         # this also works, but triggers a change notification, which we don't 
+#         # need right now
+#         #self.__length__ = length
+#         #self.mutable_types = mutable
+#         
+#     def remove_traits(self, **traits):
+#         current_traits = self.traits()
+#         keep_traits  = dict([(k, current_traits[k]) for k in current_traits if k not in traits])
+#         
+#         mutable = self.mutable_types
+#         use_casting = self.use_casting
+#         allow_none = self.allow_none
+#         
+#         
+#         # again, this resets the maintenance traits to their default values, 
+#         # so we need to restore them (see NOTE 2020-07-04 22:43:58 and 
+#         # NOTE 2020-07-04 22:42:42)
+#         keep_traits.update({"mutable_types":trait_from_type(mutable),
+#                             "use_casting": trait_from_type(use_casting),
+#                             "allow_none": trait_from_type(allow_none==True)})
+#         
+#         self.__class__ = type(self.__class__.__name__, (HasTraits, ), {"changed":self.changed, "remove_traits":self.remove_traits})
+#         
+#         self.add_traits(**keep_traits)
+#         
+#     @observe(All)
+#     def changed(self, change):
+#         return
+#         ## NOTE: 2020-07-05 18:01:01 that's what you can to with these
+#         #print("self.changed: change['owner']:\n",change["owner"], "\n")
+#         #print("self.changed: change['name']:\n",change["name"], "\n")
+#         #print("self.changed: change['old']:\n",change["old"], "\n")
+#         #print("self.changed: change['new']:\n",change["new"], "\n")
+# 
+# 
+# class ContainerTraitsObserver(HasTraits):
+#     """ CAUTION do not use yet
+#     """
+#     __length__ = Int(default_value=0)
+#     mutable_types = Bool(default=False)
+#     use_casting = Bool(default=False)
+#     
+#     def add_traits(self, **traits):
+#         # NOTE 2020-07-04 22:43:58
+#         # the super's add_traits blows away non-trait attributes
+#         # because existing traits are reverted to the default value
+#         length = object.__getattribute__(self, "__length__")
+#         mutable = object.__getattribute__(self,"mutable_types")
+#         use_casting = object.__getattribute__(self, "use_casting")
+#         
+#         # NOTE 2020-07-04 22:42:42
+#         # these "maintenance" traits need to be reset to their current values
+#         # (see NOTE 2020-07-04 22:43:58)
+#         # we do this here in order to avoid triggering a change notification
+#         traits.update({"__length__":trait_from_type(length), 
+#                        "mutable_types":trait_from_type(mutable),
+#                        "use_casting": trait_from_type(use_casting)})
+#         
+#         super().add_traits(**traits) # this DOES keep __length__ and mutable_types traits but reverts them to the defaults
+#         
+#         # this also works, but triggers a change notification, which we don't 
+#         # need right now
+#         #self.__length__ = length
+#         #self.mutable_types = mutable
+#         
+#     def remove_traits(self, **traits):
+#         current_traits = self.traits()
+#         keep_traits  = dict([(k, current_traits[k]) for k in current_traits if k not in traits])
+#         
+#         length = self.__length__
+#         mutable = self.mutable_types
+#         use_casting = self.use_casting
+#         
+#         
+#         # again, this resets the maintenance traits to their default values, 
+#         # so we need to restore them (see NOTE 2020-07-04 22:43:58 and 
+#         # NOTE 2020-07-04 22:42:42)
+#         keep_traits.update({"__length__":trait_from_type(length), 
+#                             "mutable_types":trait_from_type(mutable),
+#                             "use_casting": trait_from_type(use_casting)})
+#         
+#         self.__class__ = type(self.__class__.__name__, (HasTraits, ), {"changed":self.changed, "remove_traits":self.remove_traits})
+#         
+#         self.add_traits(**keep_traits)
+#         
+#     @observe(All)
+#     def changed(self, change):
+#         return
+#         ## NOTE: 2020-07-05 18:01:01 that's what you can to with these
+#         #print("self.changed: change['owner']:\n",change["owner"], "\n")
+#         #print("self.changed: change['name']:\n",change["name"], "\n")
+#         #print("self.changed: change['old']:\n",change["old"], "\n")
+#         #print("self.changed: change['new']:\n",change["new"], "\n")
 
 class transform_link(traitlets.link):
     """Bi-directional link traits from different objects via optional transforms.

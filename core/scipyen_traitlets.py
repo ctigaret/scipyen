@@ -95,7 +95,46 @@ TRAITSMAP = {           # use casting versions
     #function:   (Any,)
     }
 
-class _NotifierDict_(dict):
+class MetaNotifier(type):
+    """
+    Metaclass to wrap objects in a notifier
+
+    Adds functionality to notify a possible observer on changes to the contents
+    of the instances of a wrapper class
+    """
+    
+    def __new__(mcls, name, bases, classdict):
+        """Injects a '__wrapped_class__' class attribute which references a type"""
+        if "__wrapped_class__" not in classdict:
+            classdict["__wrapped_class__"] = type
+        else:
+            if not isinstance(classdict["__wrapped_class__"], type):
+                v = type(classdict["__wrapped_class__"])
+                classdict["__wrapped_class__"] = v
+                
+        return super().__new__(mcls, name, bases, classdict)
+    
+    def __init__(cls, name, bases, classdict):
+        super().__init__(name, bases, classdict)
+        # cls.setup_class(classdict)
+        
+    @classmethod
+    def __prepare__(cls, name, bases, **kw):
+        return {"__wrapped_class__": bases[0]}
+        # return {}
+        
+    # def setup_class(cls, classdict):
+
+class _NotifierDict_(dict, metaclass=MetaNotifier):
+    """Wraps a dict in order to emit notifications
+        TODO/FIXME none of the intended behaviour really works
+        and that is OBVIOUSLY because the modifications in the original
+        object are NOT going to be "sensed" by the wrapper...
+        
+        ATTENTION: Although ony MAY try to inject some functionality
+        in the wrapped type, this approach is illegal (hence impossible) with
+        immutable types (such as dict, etc)
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._obj_ = None
@@ -108,14 +147,17 @@ class _NotifierDict_(dict):
     def __setitem__(self, name, value):
         if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
             old_value = self.copy() # CAUTION may be expensive
-            super().__setattr_(name, value)
+            super().__setattr__(name, value) # updates self
+            
+            # NOTE: 2023-05-25 09:17:38
+            # this bypasses validation by the owner Trait class !!!
             self._obj_._notify_trait(self._trait_name_, old_value, self)
         else:
             super().__setitem__(name, value)
             
     def __delitem__(self, key):
         if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = self.copy() # CAUTION may be expensive
+            old_value = self #.copy() # CAUTION may be expensive
             super().__delitem__(key)
             self._obj_._notify_trait(self._trait_name_, old_value, self)
             
@@ -173,7 +215,7 @@ class _NotifierDict_(dict):
         
         
 
-class _NotifierDeque_(deque):
+class _NotifierDeque_(deque, metaclass=MetaNotifier):
     # TODO: 2022-01-29 23:42:54
     # wrap and extend relevant deque methods to call obj._notify_trait
     
@@ -400,7 +442,7 @@ class DictTrait(Instance):
         except KeyError:
             old_value = self.default_value
             
-        # print(f"{self.__class__.__name__}.set(...) old_value is {type(old_value)}")
+        # print(f"{self.__class__.__name__}.set(...) old_value {type(old_value).__name__} ↦ new_value {type(new_value).__name__}")
         # print(f"{self.__class__.__name__}.set(...) new_value is {type(new_value)}")
 
         try:
@@ -424,11 +466,13 @@ class DictTrait(Instance):
             # print(f"{self.__class__.__name__}.set(...) after type & len check silent = {silent}")
             
             if silent:
+                # print(f"{self.__class__.__name__}.set(...) check for dict key types")
                 silent &= all(type(x) == type(y) for x, y in zip(old_value.keys(), new_value.keys()))
                 
                 # print(f"{self.__class__.__name__}.set(...) after key type check silent = {silent}")
             
             if silent:
+                # print(f"{self.__class__.__name__}.set(...) check for dict value types")
                 silent &= all(type(x) == type(y) for x, y in zip(old_value.values(), new_value.values()))
             
                 # print(f"{self.__class__.__name__}.set(...) after value type check silent = {silent}")
@@ -442,6 +486,7 @@ class DictTrait(Instance):
         obj._trait_values[self.name] = new_value
         
         if silent is not True:
+            # print(f"{self.__class__.__name__}.set(...) will notify")
             obj._notify_trait(self.name, old_value, new_value)
   
             

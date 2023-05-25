@@ -189,7 +189,8 @@ from core.triggerprotocols import (TriggerProtocol,
 #from core.axisutils import (calibration, axisChannelName)
 import core.traitcontainers
 from core.traitcontainers import DataBag
-from core.traitutils import (TraitsObserver, trait_from_type, )
+from core.traitutils import (trait_from_type, )
+# from core.traitutils import (TraitsObserver, trait_from_type, )
                                   
 
 #### END pict.core modules
