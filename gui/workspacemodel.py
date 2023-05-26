@@ -623,6 +623,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # self.__change_dict__ = change
         # QtCore.QTimer.singleShot(0, self._observe_wrapper_)
         # connected to self.slot_observe, def'ed below
+        # print(f"\n{self.__class__.__name__}.var_observer({change})")
         self.varsChanged.emit(change)
 
     # def _observe_wrapper_(self):
@@ -668,7 +669,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def slot_observe_2(self, change):
         """Connected (and triggered by) self.varsChanged Qt signal"""
         name = change.name
-        # print(f"{self.__class__.__name__}.slot_observe change is a {type(change).__name__}, for variable = {name}")
+        # print(f"\n{self.__class__.__name__}.slot_observe_2({change})")
 
         displayed_var_names = set(self.getDisplayedVariableNames())
         user_shell_var_names = set(self.shell.user_ns.keys())
@@ -706,7 +707,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     @pyqtSlot(tuple)
     def _slot_update_model_from_observer_(self, value):
         name, alteration = value
-        print(f"\n{self.__class__.__name__}._slot_update_model_from_observer_ {name} {alteration.name}")
+        # print(f"\n{self.__class__.__name__}._slot_update_model_from_observer_ {name} {alteration.name}")
         if isinstance(alteration, WorkspaceVarChange):
             self._varChanges_callbacks_[alteration](name)
             # ⇒ in MainWindow this will trigger cosmetic update of the viewer
@@ -1257,8 +1258,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             ns_name = "Internal"
 
-        print(f"{self.__class__.__name__}.updateRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
-        # print("updateRowForVariable", dataname, data, ns)
+        # print(f"{self.__class__.__name__}.updateRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
 
         row = self.rowIndexForItemsWithProps(Workspace=ns_name)
 
@@ -1330,10 +1330,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             ns_name = "Internal"
 
-        print(f"{self.__class__.__name__}.removeRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
+        # print(f"{self.__class__.__name__}.removeRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
         row = self.rowIndexForItemsWithProps(Name=dataname, Workspace=ns_name)
 
-        # print("WorkspaceModel.removeRowForVariable data: %s ns: %s row: %s" % (dataname, ns, row))
         if row == -1:
             return
 
@@ -1366,8 +1365,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             return
         
         data = ns[dataname]
-        print(f"{self.__class__.__name__}.addRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
-        # print("addRowForVariable: ", dataname, data)
+        # print(f"{self.__class__.__name__}.addRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
+        
         # generate model view row contents
         v_row = self.generateRowContents(dataname, data)
         self.appendRow(v_row)  # append the row to the model

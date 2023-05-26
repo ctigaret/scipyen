@@ -595,7 +595,7 @@ class ListTrait(List):
             # if there is an error in comparing, default to notify
             silent = False
             
-        print(f"\n{self.__class__.__name__} object {self.name} .set({obj}, {value}) → old_value = {old_value}; new_value = {new_value}; notify_trait = {not silent}")
+        # print(f"\n{self.__class__.__name__} object {self.name} .set({obj}, {value}) → old_value = {old_value}; new_value = {new_value}; notify_trait = {not silent}")
             
         obj._trait_values[self.name] = new_value
         
@@ -840,7 +840,8 @@ class NeoBaseNeoTrait(Instance):
             # Modifed change triggers updating the row - which scales poorly with 
             # the number of variables in the workspace)
             # silent = self.compare_elements(old_value, new_value)
-            silent = bool(old_value == new_value)
+            if silent:
+                silent &= bool(old_value == new_value)
             
         except:
             traceback.print_exc()
