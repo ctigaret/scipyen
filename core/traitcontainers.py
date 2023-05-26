@@ -46,6 +46,7 @@ class DataBagTraitsObserver(HasTraits):
         
     def add_trait(self, traitname:str, traitobject:TraitType) -> None:
         """Binds a TraitType instance to a new attribute of self.
+        This must be followed by a call to setattr in the caller.
         """
         print(f"\n{self.__class__.__name__}.add_trait({traitname}, {traitobject})")
         cls = self.__class__
@@ -58,6 +59,7 @@ class DataBagTraitsObserver(HasTraits):
             attrs["__qualname__"] = cls.__qualname__
             
         # NOTE: 2023-05-26 12:19:51 NOTE 2023-05-26 12:00:34
+        attrs["add_trait"] = self.add_trait
         attrs["remove_traits"] = self.remove_traits
         attrs["remove_trait"] = self.remove_trait
         
@@ -98,6 +100,7 @@ class DataBagTraitsObserver(HasTraits):
         # NOTE 2023-05-26 12:00:34
         # these MUST be included, because the new class below inherits straight
         # from HasTraits
+        attrs["add_trait"] = self.add_trait
         attrs["remove_traits"] = self.remove_traits
         attrs["remove_trait"] = self.remove_trait
         
@@ -193,7 +196,6 @@ class DataBag(Bunch):
     The following DataBag instance methods are exposed from traitlets.HasTraits:
 
     traits()
-    trait_values()
 
     TODO 2020-07-04 23:44:59
     customize observer handlers
@@ -288,7 +290,6 @@ class DataBag(Bunch):
             raise TypeError(
                 f"Expecting a DataBag or a type derived from DataBag; got {cls.__name__} instead")
 
-        # print(f"DataBag._make_hidden {kwargs}")
         ret = Bunch([(name, kwargs.pop(name, False))
                     for name in list(cls.hidden_traits) + ["mutable_types"]])
         # ret = Bunch([(name, kwargs.pop(name, False)) for name in list(DataBag.hidden_traits) + ["mutable_types"]])
@@ -359,9 +360,13 @@ class DataBag(Bunch):
         use_casting takes precedence over mutable_types.
 
         """
-        self.__observer__ = DataBagTraitsObserver()
+        obs = DataBagTraitsObserver()
+        hid = self.__class__._make_hidden(**kwargs)
+        object.__setattr__(self, "__observer__", obs)
+        object.__setattr__(self, "__hidden__", hid)
+        # self.__observer__ = DataBagTraitsObserver()
         # NOTE: so that derived types can use their OWN hidden_traits
-        self.__hidden__ = self.__class__._make_hidden(**kwargs)
+        # self.__hidden__ = self.__class__._make_hidden(**kwargs)
         self.__observer__.verbose = self.__hidden__.verbose
 
         for name in self.__hidden__.keys():
@@ -498,7 +503,7 @@ class DataBag(Bunch):
 
         # BEGIN Deal with the actual traitlet - assign to an existing one or add a new one
         if obs.has_trait(key): # tis just checks if key is in obj._traits
-            print(f"{self.__class__.__name__}.__setitem__ to modify trait {key}")
+            print(f"\n{self.__class__.__name__}.__setitem__ to modify trait {key}")
             # NOTE: 2022-11-03 12:02:45 assign new value to existing
             # NOTE 2020-09-05 12:52:39
             # Below, one should use getattr(obs, key) instead of 
@@ -568,18 +573,20 @@ class DataBag(Bunch):
             # print(f"{self.__class__.__name__}.__setitem__ trait {key} not found")
             if key not in ("__observer__", "__hidden__") and key not in self.__hidden__.keys():
                 
-                print(f"{self.__class__.__name__}.__setitem__ to add trait {key}")
-                # traitobject = self._make_trait_(val)
-                # obs.add_trait(key, traitobject)
+                print(f"\n{self.__class__.__name__}.__setitem__ to add trait {key}")
+                traitobject = self._make_trait_(val)
+                trdict = {key: traitobject}
+                obs.add_trait(key, traitobject)
+                object.__setattr__(obs, key, val)
                 
                 # NOTE: 2023-05-25 11:01:41
                 # this kind of works, and it is the HasTraits way 
                 # but does not update the _trait_values -- why?
                 # answer: because _trait_values is updated by the traitlet's set method
                 # (a descriptor method)
-                trdict = {key: self._make_trait_(val)}
-                obs.add_traits(**trdict)
-                setattr(obs, key, val)
+                # trdict = {key: self._make_trait_(val)}
+                # obs.add_traits(**trdict)
+                # setattr(obs, key, val)
                 
                 # object.__setattr__(obs, key, val)
                 object.__getattribute__(self, "__hidden__").length = len(trdict)
@@ -612,11 +619,54 @@ class DataBag(Bunch):
         """
         try:
             obs = object.__getattribute__(self, "__observer__")
+        except:
+            obs = DataBagTraitsObserver()
+            object.__setattr__(self, "__observer__", obs)
+            
+        try:
+            # obs = object.__getattribute__(self, "__observer__")
             return getattr(obs, key)
         except AttributeError:
             return object.__getattribute__(self, key)
         except:
             raise
+        
+    def __setattr__(self, key, value):
+        hidden = self.__class__.hidden_traits
+        if key == "__observer__" and isinstance(value, DataBagTraitsObserver):
+            object.__setattr__(self, key, value)
+            return
+        
+        if key == "__hidden__" and isinstance(value, dict):
+            h_keys = list(self.__class__.hidden_traits) + ["mutable_types"]
+            
+            if all(k in h_keys for k in value.keys()):
+                object.__setattr__(self, key, value)
+                return
+        
+        try:
+            obs = object.__getattribute__(self, "__observer__")
+        except:
+            obs = DataBagTraitsObserver()
+            object.__setattr__(self, "__observer__", obs)
+            
+        try:
+            hid = object.__getattribute__(self, "__hidden__")
+        except:
+            hid = DataBag._make_hidden()
+            object.__setattr__(self, "__hidden__", hid)
+            
+    
+        if key in hidden:
+            object.__setattr__(self, key, value)
+        else:
+            if obs.has_trait(key):
+                obs.set_trait(key, value)
+            else:
+                trait = self._make_trait_(value)
+                obs.add_trait(key, trait) # ATTENTION pass a TraitType, not the value!
+                setattr(obs, key, value)
+            
 
     def __getattr__(self, key):
         """Implements obj.key (attribute access, or "dot syntax")
@@ -628,7 +678,7 @@ class DataBag(Bunch):
                 val = getattr(obs, key)
 
             else:
-                # this exposes access to observer's methods
+                # this exposes access to observer's methods when key is "__observer__"
                 val = self.__getitem__(key)
 
             if isinstance(val, TraitType):
@@ -645,7 +695,13 @@ class DataBag(Bunch):
         Overloads super().__iter__(self) to restrict membership test for trait
         values.
         """
-        return (k for k in self.trait_values())
+        try:
+            obs = object.__getattribute__(self, "__observer__")
+        except:
+            traceback.print_exc()
+            return
+        
+        return (k for k in obs._trait_values.keys())
 
     def __iter_full__(self):
         return super().__iter__(self)
@@ -659,7 +715,7 @@ class DataBag(Bunch):
         
         try:
             obs = object.__getattribute__(self, "__observer__")
-            super().__delitem__(key)
+            # super().__delitem__(key)
             # obs.length = self.__len__()
 
             # if obs.has_trait(key):
@@ -668,6 +724,7 @@ class DataBag(Bunch):
                 trait_to_remove = obs.traits()[key]
                 
                 obs.remove_trait(key, trait_to_remove)
+                delattr(self, key)
 
             object.__getattribute__(self, "__hidden__")[
                 "length"] = len(obs.traits())
@@ -750,10 +807,14 @@ class DataBag(Bunch):
         return self.__observer__
 
     def as_dict(self):
-        """Dictionary view - DEPRECATED; use self.trait_values()
-
+        """Dictionary of trait values
         """
-        return self._trait_values
+        try:
+            obs = object.__getattribute__(self, "__observer__")
+        except:
+            return dict()
+        
+        return obs._trait_values
 
     def remove_members(self, *keys):
         # print(f"DataBag.remove_members {keys}")
@@ -895,6 +956,7 @@ class DataBag(Bunch):
         """
         obs = object.__getattribute__(self, "__observer__")
         return obs._trait_values.keys()
+        # return obs._traits.keys()
 
     def values(self):
         """Generates a values 'view'
