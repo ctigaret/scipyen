@@ -73,6 +73,14 @@ from core.prog import safeWrapper
 # e.g. not imported
 # in particular this is the case for traitcontainer.DataBag, TriggerEvent, etc
 
+def traitlet_delete(self_instance, owner_instance):
+    """Fails silently when owner is of wrong type"""
+    if hasattr(owner_instance, "remove_trait") and hasattr(owner_instance, "_trait_values") and hasattr(owner_instance, "traits"):
+        if self_instance.name in owner_instance.traits():
+            trait_to_remove = owner_instance.traits()[self_instance.name]
+            owner_instance.remove_trait(self_instance.name, trait_to_remove)
+            owner_instance._trait_values.pop(self_instance.name, None)
+   
 
 #@timefunc
 def enhanced_traitlet_set(instance, obj, value):
@@ -130,17 +138,12 @@ def standard_traitlet_set(instance, obj, value):
     """Overrides traitlets.TraitType.set to check for special hash.
     This is supposed to also detect changes in the order of elements in sequences.
     """
-    #print("enhanced set for %s" % type(instance).__name__)
-    #print("enhanced set for %s; value %s" % (type(instance).__name__, value))
-    
-    #new_value = instance._validate(obj, value)
     new_value = value
     
     try:
         old_value = obj._trait_values[instance.name]
         
     except KeyError:
-        #print(f"{instance.name} not found")
         old_value = instance.default_value
         
 
@@ -148,40 +151,14 @@ def standard_traitlet_set(instance, obj, value):
     
     obj._notify_trait(instance.name, old_value, new_value)
     
-    #try:
-        ##silent = new_value is old_value
-        #new_hash = gethash(new_value)
-        ##print("\told %s (hash %s)\n\tnew %s (hash %s)" % (old_value, instance.hashed, new_value, new_hash))
-        ##print(instance.name, "old hashed", instance.hashed, "new_hash", new_hash)
-        #silent = (new_hash == instance.hashed)
-        
-        #if not silent:
-            #instance.hashed = new_hash
-            
-        ### NOTE: 2021-08-19 16:17:23
-        ### check for change in contents
-        ##if silent is not False:
-            ##new_hash = gethash(new_value)
-            ##silent = (new_hash == instance.hashed)
-            ##print("%s: silent after hash" % instance.name, silent)
-            ##if not silent:
-                ##instance.hashed = new_hash
-    #except:
-        #traceback.print_exc()
-        ## if there is an error in comparing, default to notify
-        #silent = False
-        
-    #if silent is not True:
-        ## we explicitly compare silent to True just in case the equality
-        ## comparison above returns something other than True/False
-        #obj._notify_trait(instance.name, old_value, new_value)
 
-def _dynatrtyp_exec_body_(ns, setfn = enhanced_traitlet_set):
+def _dynatrtyp_exec_body_(ns, setfn = enhanced_traitlet_set, delfn=traitlet_delete):
     #print("ns:", ns)
     ns["info_text"]="Trait that is sensitive to content change"
     # ns["hashed"] = 0
     ns["hashed"] = -1
     ns["set"] = setfn
+    ns["__delete__"] = delfn
     
 #@safeWrapper
 def adapt_args_kw(x, args, kw, allow_none):

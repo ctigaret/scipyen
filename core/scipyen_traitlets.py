@@ -95,6 +95,15 @@ TRAITSMAP = {           # use casting versions
     #function:   (Any,)
     }
 
+class DeletableTrainTypeMixin:
+    def __delete__(self, obj):
+        """Fails silently when owner is of wrong type"""
+        if hasattr(obj, "remove_trait") and hasattr(obj, "_trait_values") and hasattr(obj, "traits"):
+            if self.name in obj.traits():
+                trait_to_remove = obj.traits()[self.name]
+                obj.remove_trait(self.name, trait_to_remove)
+                obj._trait_values.pop(self.name, None)
+        
 # class MetaNotifier(type):
 #     """
 #     Metaclass to wrap objects in a notifier
@@ -337,7 +346,7 @@ TRAITSMAP = {           # use casting versions
 #             super().rotate(n)
             
 # class DictTrait(Instance):
-class DictTrait(Dict):
+class DictTrait(Dict, DeletableTrainTypeMixin):
     info_text = "Traitlet for mapping types (dict) that is sensitive to content changes"
     default_value = dict() # default value of the Trait instance
     klass = dict
@@ -358,6 +367,7 @@ class DictTrait(Dict):
         #         stacklevel=2,
         #     )
             
+        super(DeletableTrainTypeMixin, self).__init__()
         # NOTE: traitlets.Undefined is an instance of traitlets.Sentinel
         if default_value is None and not kwargs.get("allow_none", False):
             default_value = Undefined
@@ -476,7 +486,7 @@ class DictTrait(Dict):
             obj._notify_trait(self.name, old_value, new_value)
   
             
-class ListTrait(List):
+class ListTrait(List, DeletableTrainTypeMixin):
     """TraitType that ideally should notify:
     a) when a list contents has changed (i.e., gained/lost members)
     b) when an element in the list has changed (either a new value, or a new type)
@@ -516,6 +526,7 @@ class ListTrait(List):
     
         default_value: list, tuple, set 
         """
+        super(DeletableTrainTypeMixin, self).__init__()
         self._traits = traits # a list of traits, one per element - corresponds to per_key_traits in Dict
         self._length = 0
         
@@ -623,13 +634,14 @@ class ListTrait(List):
 #         if bool(old_value != new_value) is not True:
 #             obj._notify_trait(self.name, old_value, new_value)
         
-class NdarrayTrait(Instance):
+class NdarrayTrait(Instance, DeletableTrainTypeMixin):
     info_text = "Trait for numpy arrays"
     default_value = np.array([])
     klass = np.ndarray
     
     def __init__(self, args=None, kw=None, **kwargs):
         # allow 1st argument to be the array instance
+        super(DeletableTrainTypeMixin, self).__init__()
         default_value = kwargs.pop("default_value", None)
         self.allow_none = kwargs.pop("allow_none", False)
         
@@ -663,7 +675,7 @@ class NdarrayTrait(Instance):
     def make_dynamic_default(self):
         return np.array(self.default_value)
  
-class NeoBaseNeoTrait(Instance):
+class NeoBaseNeoTrait(Instance, DeletableTrainTypeMixin):
     """IT IS RECOMMENDED THAT SUBCLASSES OVERRIDE THE `compare_elements` METHOD
     """
     info_text = "Trais for neo.baseneo.BaseNeo"
@@ -673,6 +685,7 @@ class NeoBaseNeoTrait(Instance):
     _valid_defaults = (neo.baseneo.BaseNeo,)
     
     def __init__(self, value_trait=None, default_value = Undefined, **kwargs):
+        super(DeletableTrainTypeMixin, self).__init__()
         trait = kwargs.pop('trait', None)
         if trait is not None:
             if value_trait is not None:
@@ -849,7 +862,7 @@ class NeoBaseNeoTrait(Instance):
             
         #print(f"silent {silent}")
                 
-        print(f"\n{self.__class__.__name__} object {self.name} .set({obj}, {value}) → old_value = {old_value}; new_value = {new_value}; notify_trait = {not silent}")
+        # print(f"\n{self.__class__.__name__} object {self.name} .set({obj}, {value}) → old_value = {old_value}; new_value = {new_value}; notify_trait = {not silent}")
         if silent is not True:
             obj._notify_trait(self.name, old_value, new_value)
         
@@ -1142,7 +1155,7 @@ class NeoArrayDictTrait(NeoBaseNeoTrait):
     _valid_defaults = (klass,)
     
     
-class QuantityTrait(Instance):
+class QuantityTrait(Instance, DeletableTrainTypeMixin):
     info_text = "Traitlet for python quantities"
     default_value = pq.Quantity([]) # array([], dtype=float64) * dimensionless
     klass = pq.Quantity
@@ -1150,6 +1163,7 @@ class QuantityTrait(Instance):
     _valid_defaults = (pq.Quantity,)
     
     def __init__(self, value_trait=None, default_value = Undefined, minlen = 0, maxlen = sys.maxsize, **kwargs):
+        super(DeletableTrainTypeMixin, self).__init__()
         self._minlen = minlen
         self._maxlen = maxlen
         # self.hashed = 0
@@ -1313,7 +1327,7 @@ class IrregularlySampledDataSignal(NeoDataObjectTrait):
         
     
     
-class DataBagTrait(Instance):
+class DataBagTrait(Instance, DeletableTrainTypeMixin):
     """Avoid slicing the DataBag type to dict.
     
     When a DataBag is contained in another DataBag, its corresponding trait type
@@ -1341,6 +1355,8 @@ class DataBagTrait(Instance):
                  mutable_key_value_traits=True, **kwargs):
         """Avoid back-casting DataBag to dict
         """
+        super(DeletableTrainTypeMixin, self).__init__()
+        
         # handle deprecated keywords
         trait = kwargs.pop('trait', None)
         if trait is not None:
@@ -1605,7 +1621,7 @@ class DataBagTrait(Instance):
             # comparison above returns something other than True/False
             obj._notify_trait(self.name, old_value, new_value)
 
-class DequeTrait(Instance):
+class DequeTrait(Instance, DeletableTrainTypeMixin):
     info_text = "Traitlet for deque"
     # klass = _NotifierDeque_
     klass = deque
@@ -1614,6 +1630,7 @@ class DequeTrait(Instance):
     
     def __init__(self, value_trait=None, default_value=Undefined, 
                  minlen=0, maxlen=sys.maxsize, **kwargs):
+        super(DeletableTrainTypeMixin, self).__init__()
         self._minlen = minlen
         self._maxlen = maxlen
         self.hashed = 0

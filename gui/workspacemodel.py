@@ -33,7 +33,7 @@ import json
 
 from .guiutils import (get_text_width, get_elided_text)
 from gui import pictgui as pgui
-from core.traitcontainers import DataBag, generic_change_handler
+from core.traitcontainers import DataBag
 from core.utilities import (summarize_object_properties,
                             standard_obj_summary_headers,
                             safe_identity_test,
