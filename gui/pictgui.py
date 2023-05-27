@@ -364,20 +364,13 @@ class ProgressWorkerThreaded(QtCore.QObject):
         self.pd = None
         self.loopControl = loopControl
         self.kwargs['progressSignal'] = self.signals.signal_Progress
-        self.kwargs["finished"] = self.signals.signal_Finished
+        self.kwargs["finishedSignal"] = self.signals.signal_Finished
+        self.kwargs["resultSignal"] = self.signals.signal_Result
         self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
         self.kwargs["loopControl"] = self.loopControl
         
-        # self.loopControl = {"break":False}
-        # self.poller = QtCore.QTimer(self)
-        # self.refreshTime = refreshTime
-        # self.poller.setInterval(200)
-        # self.poller.timeout.connect(self.progress_poll)
-        
         if isinstance(progressDialog, QtWidgets.QProgressDialog):
             self.setProgressDialog(progressDialog)
-            
-        # print(f"{self.__class__.__name__}.__init__(fn = {fn}, progressDialog = {progressDialog})")
             
     def setProgressDialog(self, progressDialog:QtWidgets.QProgressDialog):
         if isinstance(progressDialog, QtWidgets.QProgressDialog):

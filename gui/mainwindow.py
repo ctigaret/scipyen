@@ -1831,7 +1831,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 m.__dict__["workspace"] = self.workspace
 
         # NOTE: 2021-08-17 12:45:10 TODO
-        # currently used in _run_loop_process_, which at the moment is not used
+        # to be used with _run_loop_process_, which at the moment is not used
         # anywhere - keep available as app-wide threadpool for various sub-apps
         self.threadpool = QtCore.QThreadPool()
 
@@ -4211,8 +4211,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.actionHelp_On_Console.triggered.connect(self._helpOnConsole_)
 
         self.actionOpen.triggered.connect(self.slot_openFiles)
-        # self.actionOpen.triggered.connect(self.openFile)
-        # self.actionOpen_Files.triggered.connect(self.slot_openFiles)
         self.actionView_Data.triggered.connect(self.slot_viewSelectedVar)
         self.actionView_Data_New_Window.triggered.connect(
             self.slot_viewSelectedVarInNewWindow)
@@ -5301,8 +5299,29 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_openSelectedFileItems(self):
-        """Load a batch of files.
+        selectedItems = [self.fileSystemModel.filePath(item) for item in self.fileSystemTreeView.selectedIndexes()
+                         if item.column() == 0 and not self.fileSystemModel.isDir(item)]  # list of QModelIndex
+
+        nItems = len(selectedItems)
+
+        if nItems == 0:
+            return False
+        
+        # NOTE: 2023-05-27 14:48:04
+        # inherited from workspace
+        self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded)
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_openSelectedFileItems_old(self):
         """
+            Triggered by the "Open" action in the File System viewer context menu.
+            Loads the selected file items in the File System viewer.
+        """
+        # NOTE: 2023-05-27 13:26:12 TODO push this in a new thread.
+        # currently, this is running in the main (UI) event loop and is prone to
+        # block the UI when loading a single large file or a large number of files
+        # (batch loading)
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
                          if item.column() == 0 and not self.fileSystemModel.isDir(item)]  # list of QModelIndex
 
@@ -5315,16 +5334,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # prevent user interaction when only one item (which may take a while to
         # load especially if it is a big file)
 
-        if nItems == 1:
-            # QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+        if nItems == 1: 
+            # ⇒ load file directly in the main thread - 
+            # the the file is large this might block the UI
+            # therefore set the cursor to "wait", the restore to the default cursor
             self.setCursor(QtCore.Qt.WaitCursor)
 
             self.loadDiskFile(self.fileSystemModel.filePath(selectedItems[0]))
 
-            # QtWidgets.QApplication.restoreOverrideCursor()
             self.unsetCursor()
 
         else:
+            # higher chances to block the UI here (very many, possibly, large files) ⇒ 
+            # run this in a separate thread to avoid blocking the UI !!!
+            
             progressDlg = QtWidgets.QProgressDialog(
                 "Loading data...", "Abort", 0, nItems, self)
             progressDlg.setMinimumDuration(1000)
@@ -5354,6 +5377,37 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         return True
 
+    @safeWrapper
+    def _openSelectedFileItemsThreaded(self, **kwargs):
+        """
+        Pass this as fileLoaderFn argument to self.loadFiles inherited from WorkspaceGuiMixin.
+        """
+        
+        filePaths = kwargs.pop("filePaths", None)
+        
+        if not isinstance(filePaths, (tuple, list)) or len(filePaths) == 0: 
+            return
+        
+        loopControl = kwargs.pop("loopControl", None)
+        progressSignal = kwargs.pop("progressSignal", None)
+        finishedSignal = kwargs.pop("finishedSignal", None)
+        resultSignal = kwargs.pop("resultSignal", None)
+        
+        addToRecent = len(filePaths) == 1
+        
+        OK = True
+        
+        for k, item in enumerate(filePaths):
+            OK &= self.loadDiskFile(item, addToRecent=addToRecent) # places the loaded data DIRECTLY into self.workspace
+            if OK and isinstance(progressSignal, QtCore.pyqtBoundSignal):
+                progressSignal.emit(k)
+                    
+            if isinstance(loopControl, dict) and loopControl.get("break", None) == True:
+                break
+                
+        if isinstance(resultSignal, QtCore.pyqtBoundSignal):
+            resultsignal.emit(OK)
+            
     @pyqtSlot()
     @safeWrapper
     def slot_showFilesFilter(self):
@@ -5658,12 +5712,24 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @safeWrapper
     def loadDiskFile(self, fName, fileReader=None, addToRecent=True):
-        """Common delegate for reading data from a file.
-
-        Currently only opens image files and axon "ABF files". 
-        TODO: pickle, hdf5, matlab, etc
-
+        """Reads data from a file.
+        Common landing point for local data input from the file system.
         Called by various slots connected to File menu actions. 
+        
+        TODO/FIXME: 2023-05-27 14:35:09
+        Currently, the data objects read from the file are bound to symbols
+        DIRECTLY into the user workspace. This requires a separate call to the 
+        workspaceModel.update(), which is unwieldy. TODO: create a "addItem" and/or
+        "setItem" instance methods for the workspaceModel so that new workspace 
+        variables are automaticaly observed
+        
+        Various file types are handled by the fileReader (see below).
+        Currently, there is support for plain text file, Axon files, pickle, hdf5
+        and various image file formats supported by the Vigra libraries (via the 
+        vigranumpy package)
+        
+        TODO: suport for matlab, CED Signal and CED Spike files, etc
+
 
         Arguments:
 
@@ -5672,23 +5738,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         fileReader -- (optional, default is None) a str that specifies a specialized
             file reader function in the iolib.pictio module
 
-            reader (currently, only "vigra" or "bioformats"), or a 
-            boolean, where a value of False chooses the vigra impex 
-            library, whereas True chooses the bioformats library.
+            When None, this functions uses functions in Scipyen's pictio module 
+            to find a suitable fileReader for the file
 
-            When None, this functions assumes that an image is to be loaded.
-            TODO: Guess file type for other data file types as well.
-
-            The file reader is chosen between vigra and bioformats,
-            according to the file extension. TODO: use other readers as well.
-
-            Other planned readers are hdf5, pickle, matlab, 
-
-            NOTE: For image files, this only reads the image pixels. Currently, image metadata 
-            is only read through the bioformats library (as OME XML document)
-
-            TODO: Supply other possible image readers?
-
+            NOTE: For image files, this only reads the image pixel data. Vigra
+            library has a good capacity parsing pixel types, but not any image
+            metadata (such as OME XML documents, see bioformats).
+        
+            TODO: 2023-05-27 14:32:19
+            Try to use bioformats functionality (requires some kind of java bridge
+            for this) - tried that before but was problematic.
 
         """
 
@@ -5961,10 +6020,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_openFiles(self):
-        """Opening of several files.
+        """Opening of several files. Triggered from the 'File/Open' menu action.
         """
         from core.utilities import make_file_filter_string
 
+        # FIXME: 2023-05-27 14:51:46
+        # the below becomes a threaded version, therefore we need to move the code 
+        # that is coming past it, to the function that processes the result of the 
+        # file loading thread
         if self.slot_openSelectedFileItems():
             return
 
@@ -5998,6 +6061,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def _slot_openNamedFile_(self):
+        """Called by slot_handlePythonTextFile"""
+        # TODO: 2023-05-27 14:43:34
+        # unformization of I/O, inclusion with future breadcrumbs navigation
+        # framework (in progress)
         if isinstance(self._temp_python_filename_, str) and len(self._temp_python_filename_.strip()) and os.path.isfile(self._temp_python_filename_):
             self.loadFile(self._temp_python_filename_)
             self._temp_python_filename_ = None

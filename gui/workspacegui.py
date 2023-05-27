@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import typing, warnings, os, inspect, sys, traceback
+import pathlib
 from pprint import pprint
 #### BEGIN Configurable objects with traitlets.config
 from traitlets import (config, Bunch)
@@ -20,6 +21,7 @@ from core import strutils, sysutils
 from core.strutils import InflectEngine
 import gui.quickdialog as qd
 from gui.itemslistdialog import ItemsListDialog
+import gui.pictgui as pgui
 
 class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
     sig_wm_inspect_done = pyqtSignal(name="sig_wm_inspect_done")
@@ -529,6 +531,14 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None, title="", *args, **kwargs):
         self._scipyenWindow_ = None
         
+        self._fileLoadThread_ = None
+        self._fileLoadWorker_ = None
+        
+        # NOTE: 2023-05-27 13:46:40
+        # mutable control data for the worker loops, to communicate with the
+        # worker thread
+        self.loopControl = {"break":False}
+        
         if isinstance(parent, QtWidgets.QMainWindow) and type(parent).__name__ == "ScipyenWindow":
             self._scipyenWindow_   = parent
             
@@ -819,6 +829,61 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                 if isinstance(configData, dict) and len(configData):
                     for k,v in configData.items():
                         self.set_configurable_attribute(k,v,cfg)
+    @pyqtSlot()
+    def _slot_breakLoop(self):
+        """To be connected to the `canceled` signal of a progress dialog.
+        Modifies the loopControl variable to interrupt a worker loop gracefully.
+        """
+        self.loopControl["break"] = True
         
+        
+    @safeWrapper
+    def loadFiles(self, filePaths:typing.Sequence[typing.Union[str, pathlib.Path]],
+                       fileLoaderFn:typing.Callable): #, postLoadfn:typing.Callable):
+        if len(filePaths) == 0:
+            return
+        
+        nItems = len(filePaths)
+        
+        progressDlg = QtWidgets.QProgressDialog("Loading data...", "Abort", 0, 
+                                                nItems, self)
+        progressDlg.setMinimumDuration(1000)
+        progressDisplay.canceled.connect(self._slot_breakLoop)
+        
+        self._fileLoadThread_ = QtCore.QThread()
+        self._fileLoadWorker_ = pgui.ProgressWorkerThreaded(fileLoaderFn,
+                                                            loopControl = self.loopControl,
+                                                            filePaths = filePaths)
+        
+        self._fileLoadWorker_.signals.signal_Progress.connect(progressDlg.setValue)
+        
+        self._fileLoadWorker_.moveToThread(self._fileLoadThread_)
+        self._fileLoadThread_.started.connect(self._fileLoadWorker_.run)
+        self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadThread_.quit)
+        self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadWorker_.deleteLater)
+        self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadThread_.deleteLater)
+        self._fileLoadWorker_.signals.signal_Finished.connect(lambda : progressDlg.setValue(progressDlg.maximum()))
+        self._fileLoadWorker_.signals.signal_Result.connect(self._slot_fileLoadThread_ready)
+        
+        self._fileLoadThread_.finished.connect(self._fileLoadWorker_.deleteLater)
+        self._fileLoadThread_.finished.connect(self._fileLoadThread_.deleteLater)
+        
+        self._fileLoadThread_.start()
+        
+    @pyqtSlot(object)
+    def _slot_fileLoadThread_ready(self, result:object):
+        self.loopControl["break"] = False
+        try:
+            ok = bool(result==True)
+        except:
+            ok = False
+
+        if ok:
+             # FIXME/TODO 2023-05-27 14:39:53
+             # see TODO/FIXME: 2023-05-27 14:35:09 in mainWindow.loadDiskFile() docstring
+            if hasattr(self, "workspaceModel"):
+                try:
+                    self.workspaceModel.update()
+                except:
+                    traceback.print_exc()
             
-        
