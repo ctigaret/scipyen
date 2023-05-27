@@ -5406,7 +5406,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 break
                 
         if isinstance(resultSignal, QtCore.pyqtBoundSignal):
-            resultsignal.emit(OK)
+            resultSignal.emit(OK)
             
     @pyqtSlot()
     @safeWrapper

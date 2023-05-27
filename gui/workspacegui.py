@@ -848,7 +848,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         progressDlg = QtWidgets.QProgressDialog("Loading data...", "Abort", 0, 
                                                 nItems, self)
         progressDlg.setMinimumDuration(1000)
-        progressDisplay.canceled.connect(self._slot_breakLoop)
+        progressDlg.canceled.connect(self._slot_breakLoop)
         
         self._fileLoadThread_ = QtCore.QThread()
         self._fileLoadWorker_ = pgui.ProgressWorkerThreaded(fileLoaderFn,
