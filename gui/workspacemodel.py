@@ -617,7 +617,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.internalVariablesMonitor.clear()
 
     def isUserVariable(self, name, val):
-        """Checks binding of symbol (name) to a hidden variable.
+        """Check if symbol ↦ value binding is not hidden from the user.
         """
         # see NOTE 2020-11-29 16:29:01
         if name in self.user_ns_hidden:
@@ -680,6 +680,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
     def unbindObjectInNamespace(self, varname:str, 
                                   namespace:typing.Optional[dict] = None) -> typing.Any:
+        """Unbinds an object from its symbol is a specified namespace.
+        WARNING: The object may be still alive, but unaccessible in the namespace
+        via its symbol given by varname, until it will be garbage-collected.
+        """
         if namespace is None:
             namespace = self.shell.user_ns
         
@@ -735,13 +739,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         worker.signals.signal_Result.connect(self._slot_updateModelFromMonitor_)
         
         self.threadpool.start(worker)
-        # v = self._updateFromMonitor_(name, displayed_var_names, user_shell_var_names)
-        # self._slot_updateModelFromMonitor_(v)
 
     def _updateFromMonitor_(self, name: str, displayed_var_names: set, user_shell_var_names: set):
-        # displayed_var_names = set(self.getDisplayedVariableNames())
-        # user_shell_var_names = set(self.shell.user_ns.keys())
-        # displayed_vars_names_types = self.getDisplayedVariableNamesAndTypes()
 
         # print(f"\n{self.__class__.__name__}._updateFromMonitor_ {name}\n\tin shell: {name in self.shell.user_ns}\n\tdisplayed: {name in displayed_var_names}")
 

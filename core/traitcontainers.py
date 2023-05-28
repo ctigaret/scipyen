@@ -739,7 +739,7 @@ class DataBag(Bunch):
                 
                 obs.remove_trait(key, trait_to_remove)
                 # NOTE: 2023-05-26 23:24:48
-                # fore whatever reason, THIS BELOW MUST BE CALLED !!!
+                # THIS BELOW MUST BE CALLED !!!
                 obs._trait_values.pop(key, None)
 
             object.__getattribute__(self, "__hidden__")[
