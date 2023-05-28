@@ -47,7 +47,7 @@
      <x>0</x>
      <y>0</y>
      <width>812</width>
-     <height>30</height>
+     <height>28</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -166,7 +166,20 @@
         <bool>true</bool>
        </property>
        <property name="toolTip">
-        <string>Left click to select; left double click to display; right click for context menu.</string>
+        <string>&lt;html&gt;
+&lt;head/&gt;
+&lt;body&gt;
+&lt;ul&gt;
+&lt;li&gt;Left mouse buttons:
+&lt;ul&gt;
+&lt;li&gt;single click selects&lt;/li&gt;
+&lt;li&gt;double click show variable in the default Scipyen viewer for the variable type&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Right mouse button click for context menu&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;</string>
        </property>
        <property name="statusTip">
         <string>Left click to select; left double click to display; right click for context menu.</string>

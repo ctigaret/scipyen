@@ -350,11 +350,14 @@ class ProgressWorkerThreaded(QtCore.QObject):
         The worker function is called from within the run 
         
     """
-    def __init__(self, fn, /, progressDialog=None, loopControl=None, *args, **kwargs):
+    def __init__(self, fn, /, progressDialog:typing.Optional[QtWidgets.QProgressDialog]=None, 
+                 loopControl:typing.Optional[dict]=None, *args, **kwargs):
         """
         fn: callable
-        progressDialog: QtWidgets.QProgressDialog - REMOVED !!!
-        *args, **kwargs are passed to fn
+        progressDialog: QtWidgets.QProgressDialog
+        loopControl:dict with a single mapping: "break" ↦ bool
+        *args, **kwargs are passed to fn. When 'fn' is a (bound) instance method
+            do not include the owner instance of fn (i.e., 'self') in *args.
         """
         super(ProgressWorkerThreaded, self).__init__()
         self.fn = fn

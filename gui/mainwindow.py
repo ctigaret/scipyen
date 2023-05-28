@@ -686,8 +686,9 @@ class WindowManager(__QMainWindow__):
             workspace_win_varname = strutils.str2symbol(win_title)
 
         self.registerWindow(win)  # required !
-        self.workspace[workspace_win_varname] = win
-        self.workspaceModel.update()
+        # self.workspace[workspace_win_varname] = win
+        # self.workspaceModel.update()
+        self.workspaceModel.bindObjectInNamespace(workspace_win_varname, win)
 
         return win
 
@@ -1317,6 +1318,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     # is QtWidgets.QMainWindow
     workspaceChanged = pyqtSignal()
     startPluginLoad = pyqtSignal()
+    sig_refreshRecentFilesMenu = pyqtSignal()
 
     _instance = None
 
@@ -1526,10 +1528,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                             if type(ret) in (tuple, list):
                                 for k in range(len(ret)):
                                     var_name = d.returnWidgets[k].text()
-                                    self.workspace[var_name] = ret[k]
+                                    # self.workspace[var_name] = ret[k]
+                                    self.workspaceModel.bindObjectInNamespace(var_name, ret[k])
                             else:
                                 var_name = d.returnWidgets[0].text()
-                                self.workspace[var_name] = ret
+                                # self.workspace[var_name] = ret
+                                self.workspaceModel.bindObjectInNamespace(var_name, ret)
 
                         # NOTE: 2016-04-17 22:18:05
                         # do this always: functions that do not return but take mutable arguments
@@ -1537,7 +1541,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         # we'd like this to be seen in the workspace table
                         #
                         # and do it from within inner_f
-                        self.workspaceModel.update()
+                        # self.workspaceModel.update()
                         # NOTE: 2016-04-17 16:26:33
                         # inner_f does not need to return anything
 
@@ -1565,10 +1569,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                             if type(ret) in (tuple, list):
                                 for k in range(len(ret)):
                                     var_name = d.returnWidgets[k].text()
-                                    self.workspace[var_name] = ret[k]
+                                    # self.workspace[var_name] = ret[k]
+                                    self.workspaceModel.bindObjectInNamespace(var_name, ret[k])
                             else:
                                 var_name = d.returnWidgets[0].text()
-                                self.workspace[var_name] = ret
+                                # self.workspace[var_name] = ret
+                                self.workspaceModel.bindObjectInNamespace(var_name, ret)
 
                         # NOTE: 2016-04-17 22:18:05
                         # do this always: functions that do not return but take mutable arguments
@@ -1576,7 +1582,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         # we'd like this to be seen
                         #
                         # and do it from within inner_f
-                        self.workspaceModel.update()
+                        # self.workspaceModel.update()
 
                         # NOTE: 2016-04-17 16:27:01
                         # inner_f does not need to return anything
@@ -1644,7 +1650,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         parent: QtWidgets.QWidget or None (default).
         """
-        super().__init__(parent)  # 2016-08-04 17:39:06 NOTE: QMainWindow python3 way
+        super().__init__(parent)
 
         # NOTE: 2023-01-08 16:14:26 - set this early !
         # this below is the same as:
@@ -1679,7 +1685,34 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.navPrevDir = collections.deque()
         self.navNextDir = collections.deque()
         self.currentDir = None
-        self.workspace = dict()
+        
+        # NOTE: 2023-05-27 22:00:37
+        # self._init_QtConsole_ will asign to self.workspace a reference to the 
+        # user's shell namespace that the user has direct access to, inside the 
+        # Console.
+        #
+        # The contents of the workspace are "observed" by the workspaceModel so
+        # that the addition/removal or modification of objects in the workspace
+        # are reflected in the workspace viewer.
+        # 
+        # To ensure that the workspace viewer is automatically updated when an 
+        # object is added to/modified/removed from the user workspace, call
+        # 'workspaceModel.bindObjectInNamespace(...)' - see the docstring of that
+        # method for details.
+        #
+        # Unless an object in the workspace is 'hidden' to the viewer, it is 
+        # monitored by the workspace model and changes usually reflected in the 
+        # workspace viewer.
+        #
+        # EXCEPTIONS to this 'rule' are the cases of objects that do not need to
+        # be monitored and do not need to be shown in the workspace viewer
+        #
+        # One can bypass this rule as there is no reinforcement implemented.
+        #
+        # The above rule applies to code run inside the GUI (i.e., NOT executed
+        # in the console), where this interception is not implemented.
+        self.workspace = dict() 
+        
         self._nonInteractiveVars_ = dict()
         self.console = None
         self.ipkernel = None
@@ -1762,8 +1795,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                                              mpl_figure_close_callback=self.handle_mpl_figure_close,
                                              mpl_figure_click_callback=self.handle_mpl_figure_click,
                                              mpl_figure_enter_callback=self.handle_mpl_figure_enter)
-        self.workspaceModel.workingDir.connect(
-            self._slot_workdirChangedInConsole)
+        
+        self.workspaceModel.workingDir.connect(self._slot_workdirChangedInConsole)
+        
         # signal inherited from WindowManager
         self.sig_windowRemoved.connect(self.slot_windowRemoved)
 
@@ -1816,7 +1850,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         # finally, inject references to self and the workspace into relevant
         # NOTE: 2022-12-25 22:48:32
-        # soo ot be deprecated in favour of plugins mechanism
+        # soon to be deprecated in favour of plugins mechanism
         ws_aware_modules = (ltp, ivramp, membrane,
                             CaTanalysis, pgui, sigp, imgp, crvf, plots)
 
@@ -1851,7 +1885,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @scipyenSettings.setter
     def scipyenSettings(self, value):
         self._scipyen_settings_ = value
-        self.workspace["scipyen_settings"] = self._scipyen_settings_
+        # self.workspace["scipyen_settings"] = self._scipyen_settings_
+        self.workspaceModel.bindObjectInNamespace("scipyen_settings", self._scipyen_settings_,
+                                    hidden=True)
 
     @property
     def consoleDocked(self):
@@ -1956,7 +1992,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             self._recentFiles = collections.OrderedDict()
 
-        self._refreshRecentFilesMenu_()
+        self._slot_refreshRecentFilesMenu_()
 
     @property
     def recentDirectories(self):
@@ -2288,9 +2324,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 # this will automatically start a (remote) IPython kernel
                 self.external_console = consoles.ExternalIPython.launch()
 
-            self.workspace["external_console"] = self.external_console
-            self.workspaceModel.user_ns_hidden.update(
-                {"external_console": self.external_console})
+            # self.workspace["external_console"] = self.external_console
+            # self.workspaceModel.user_ns_hidden.update(
+            #     {"external_console": self.external_console})
+            self.workspaceModel.bindObjectInNamespace("external_console", self.external_console,
+                                        hidden=True)
             # self.external_console.window.sig_kernel_count_changed[int].connect(self._slot_remote_kernel_count_changed)
 
             # NOTE: 2021-01-15 14:46:07
@@ -2441,17 +2479,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
 
         The console, the shell and the kernel are accessbile directly from the 
-        command line as the "console", "shell" and "ipkernel" symbols, and as 
-        Scipyen's main window attributes with the same names ("mainWindow.shell",
+        command line, respectively, as the "console", "shell" and "ipkernel" 
+        symbols, and as Scipyen's main window attributes with the same names 
+        (hence, accessible in the console as "mainWindow.shell", 
         "mainWindow.console" and "mainwindow.ipkernel").
-
-
-        . These are
-        references to the console,
-
-        The shell and the kernel are bound, respetively to the "shell" and 
-        "ipkernel" attributes of Scipyen's main window ("mainWindow" object in 
-        the shell's namespace). 
 
         The Scipyen's user workspace is the same as the shell's namespace
         (self.ipkernel.shell.user_ns)
@@ -2565,19 +2596,26 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # connect signals emitted by the console when processing a drop event
             self.console.historyItemsDropped.connect(
                 self.slot_pasteHistorySelection)
+            
             self.console.workspaceItemsDropped.connect(
                 self.slot_pasteWorkspaceSelection)
+            
             self.console.fileSystemItemsDropped.connect(
                 self.slot_openSelectedFileItems)
+            
             self.console.loadUrls[object, bool, QtCore.QPoint].connect(
                 self.slot_loadDroppedURLs)
+            
             self.console.pythonFileReceived[str, QtCore.QPoint].connect(
                 self.slot_handlePythonTextFile)
+            
             # self.console.sig_shell_msg_received[object].connect(self._slot_int_krn_shell_chnl_msg_recvd)
 
             self.historyTreeWidget.insertTopLevelItems(0, items)
+            
             self.historyTreeWidget.scrollToItem(
                 self.currentSessionTreeWidgetItem)
+            
             self.historyTreeWidget.setCurrentItem(
                 self.currentSessionTreeWidgetItem)
 
@@ -2597,13 +2635,24 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # in the ipkernel environment
             # __module_file_name__ is "pict" so we take all its contents into the kernel
             # namespace (they're just references to those objects)
+            #
+            # see NOTE: 2023-05-27 22:00:37 about manipulating variables in the 
+            # workspace and updating the workspace model automatically
             self.workspace = self.ipkernel.shell.user_ns
 
-            # NOTE: 2022-12-25 22:58:41
-            # code below now done by plugin loader
-            # populate workspace with the gui viewer classes, for convenience
-            # for viewer in gui_viewers:
-            #     self.workspace[viewer.__name__] = viewer
+            # NOTE: 2023-05-27 22:19:46
+            # The assignments below are meant to bypass the variable observer in 
+            # the workspace model; hence these objects are bound directly to
+            # symbols in the workspace
+            #
+            # Of course one could have achieved the same thing by calling
+            # 
+            # 'self workspaceModel.bindObjectInNamespace(name, obj, hidden=True)'
+            #
+            # instead of the direct assignment 'self.workspace[name] = obj' as
+            # below
+            #
+
 
             # NOTE: 2020-11-12 12:51:36
             # used by %scipyen_debug line magic
@@ -2785,73 +2834,73 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if mustUpdateSessionID:
             self.currentSessionID = self.historyAccessor.get_last_session_id()
 
-    # NOTE: 2016-03-25 09:43:58
-    # inspired from stock IPython/core/magic/namespaces.py
-    # @classmethod
-    def _listWorkspaceVars_(self, param_s=None):
-        '''Prepares a list of variable names to be displayed in the workspace widget.
-        The optional param_s argument is a str containing space-separated type names
-        to indicate what variable type(s) should be displayed.
-        DEPRECATED - functionality taken over by workspacemodel module
-
-        '''
-        # NOTE: 2017-08-24 15:50:46
-        # special case when "_" variables are matplotlib.figure.Figure instances
-        # created with plt commands (functions) but NOT assigned to unbound variables
-        # I'm relying on pyplot's own figure manager: no two figures can have the same number
-        hidden_mpl_figure_names = [i for i in self.workspace.keys() if i.startswith(
-            "_") and isinstance(self.workspace[i], mpl.figure.Figure)]
-
-        # print(hidden_mpl_figure_names)
-
-        if len(hidden_mpl_figure_names) > 0:
-            for n in hidden_mpl_figure_names:
-                if hasattr(self.workspace[n], "number"):
-                    newVarName = "Figure%d" % (self.workspace[n].number)
-                else:
-                    p = self.workspace[n].canvas.parent()
-                    parents = list()
-                    while p is not None:
-                        parents.append(p)
-                        p = p.parent()
-
-                    wtitle = parents[-1].windowTitle()
-
-                    if wtitle is None or len(wtitle) == 0:
-                        suffix = n
-                    else:
-                        suffix = "_%s" % wtitle
-
-                    newVarName = "figure%s" % suffix
-
-                self.workspace[newVarName] = self.workspace[n]
-                self.workspace.pop(n, None)
-
-                # cmd = "".join([newVarName, "=", n, "; del(", n, ")"])
-                # self.console.execute(cmd, hidden=True)
-
-        varnames = [i for i in self.workspace
-                    if (not i.startswith('_') and i not in self._nonInteractiveVars_.keys() and type(i) is not types.ModuleType)]
-
-        # NOTE: 2016-04-16 00:12:26
-        # why does the above NOT prevent the display of a module created at the console
-        # (e.g. after a call like m = types.ModuleType(), m is listed there, when
-        # it really shouldn't)
-
-        # if not varnames:
-        # return None
-
-        if len(varnames) > 0 and param_s is not None:
-            typelist = param_s.split()
-            if typelist:
-                typeset = set(typelist)
-                varnames = [i for i in varnames if type(
-                    self.workspace[i]).__name__ in typeset]
-
-        # if not varnames:
-            # return None
-
-        return varnames
+    # # NOTE: 2016-03-25 09:43:58
+    # # inspired from stock IPython/core/magic/namespaces.py
+    # # @classmethod
+    # def _listWorkspaceVars_(self, param_s=None):
+    #     '''Prepares a list of variable names to be displayed in the workspace widget.
+    #     The optional param_s argument is a str containing space-separated type names
+    #     to indicate what variable type(s) should be displayed.
+    #     DEPRECATED - functionality taken over by workspacemodel module
+    # 
+    #     '''
+    #     # NOTE: 2017-08-24 15:50:46
+    #     # special case when "_" variables are matplotlib.figure.Figure instances
+    #     # created with plt commands (functions) but NOT assigned to unbound variables
+    #     # I'm relying on pyplot's own figure manager: no two figures can have the same number
+    #     hidden_mpl_figure_names = [i for i in self.workspace.keys() if i.startswith(
+    #         "_") and isinstance(self.workspace[i], mpl.figure.Figure)]
+    # 
+    #     # print(hidden_mpl_figure_names)
+    # 
+    #     if len(hidden_mpl_figure_names) > 0:
+    #         for n in hidden_mpl_figure_names:
+    #             if hasattr(self.workspace[n], "number"):
+    #                 newVarName = "Figure%d" % (self.workspace[n].number)
+    #             else:
+    #                 p = self.workspace[n].canvas.parent()
+    #                 parents = list()
+    #                 while p is not None:
+    #                     parents.append(p)
+    #                     p = p.parent()
+    # 
+    #                 wtitle = parents[-1].windowTitle()
+    # 
+    #                 if wtitle is None or len(wtitle) == 0:
+    #                     suffix = n
+    #                 else:
+    #                     suffix = "_%s" % wtitle
+    # 
+    #                 newVarName = "figure%s" % suffix
+    # 
+    #             self.workspace[newVarName] = self.workspace[n]
+    #             self.workspace.pop(n, None)
+    # 
+    #             # cmd = "".join([newVarName, "=", n, "; del(", n, ")"])
+    #             # self.console.execute(cmd, hidden=True)
+    # 
+    #     varnames = [i for i in self.workspace
+    #                 if (not i.startswith('_') and i not in self._nonInteractiveVars_.keys() and type(i) is not types.ModuleType)]
+    # 
+    #     # NOTE: 2016-04-16 00:12:26
+    #     # why does the above NOT prevent the display of a module created at the console
+    #     # (e.g. after a call like m = types.ModuleType(), m is listed there, when
+    #     # it really shouldn't)
+    # 
+    #     # if not varnames:
+    #     # return None
+    # 
+    #     if len(varnames) > 0 and param_s is not None:
+    #         typelist = param_s.split()
+    #         if typelist:
+    #             typeset = set(typelist)
+    #             varnames = [i for i in varnames if type(
+    #                 self.workspace[i]).__name__ in typeset]
+    # 
+    #     # if not varnames:
+    #         # return None
+    # 
+    #     return varnames
 
     def removeWorkspaceSymbol(self, name: str):
         """Remove a binding from the workspace.
@@ -2863,11 +2912,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         Equivalent of removing that binding by calling `del` at the console.
 
         """
-        r = self.workspace.pop(name, None)
-        if r is not None:
-            self.workspaceModel.removeRowForVariable(name)
+        # NOTE: 2023-05-28 00:13:40
+        # With the current workspaceModel implementation since 2023-05-28 this
+        # function appears redundant. However, it is not, as it allows code outside
+        # the main Scipyen window to remove user data from the workspace.
+        self.workspaceModel.unbindObjectInNamespace(name)
+        # r = self.workspace.pop(name, None)
+        # if r is not None:
+        #     self.workspaceModel.removeRowForVariable(name)
 
-    def removeFromWorkspace(self, value: typing.Any, by_name: bool = True, update: bool = True):
+    def removeFromWorkspace(self, value: typing.Any, by_name: bool = True):#, update: bool = True):
         """Removes an object from the workspace via GUI operations.
 
         By default, the object to be removed is specified by the symbol (name)
@@ -2907,9 +2961,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         if isinstance(value, str) and by_name:
             # print(f"---\nScipyenWindow.removeFromWorkspace {value}")
-            r = self.workspace.pop(value, None)
-            if r is not None:
-                self.workspaceModel.removeRowForVariable(value)
+            r = self.workspace.unbindObjectInNamespace(value)
+            # r = self.workspace.pop(value, None)
+            # if r is not None:
+            #     self.workspaceModel.removeRowForVariable(value)
         else:
             # NOTE: 2022-10-13 18:33:44
             # the approach below is WRONG - why remove ALL references (symbol)
@@ -2918,16 +2973,18 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # references to value that exist in the workspace
             objects = [(name, obj)
                        for (name, obj) in self.workspace.items() if obj is value]
+            
             if len(objects):
                 rowIndices = [self.workspaceModel.getRowIndexForVarname(
                     o[0]) for o in objects]
                 for o in objects:
-                    r = self.workspace.pop(o[0], None)
-                    if r is not None:
-                        self.workspaceModel.removeRowForVariable(o[0])
+                    self.workspaceModel.unbindObjectInNamespace(o[0])
+                    # r = self.workspace.pop(o[0], None)
+                    # if r is not None:
+                    #     self.workspaceModel.removeRowForVariable(o[0])
 
-        if update:
-            self.workspaceModel.update()
+        # if update:
+        #     self.workspaceModel.update()
 
         self.workspaceModel.currentItem = None
 
@@ -2966,9 +3023,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         return varname
 
-    def assignToWorkspace(self, name: str, val: object, from_console: bool = False):
-        self.workspace[name] = val
-        self.workspaceModel.update()
+    # def assignToWorkspace(self, name: str, val: object, from_console: bool = False):
+    def assignToWorkspace(self, name: str, val: object):
+        self.workspaceModel.bindObjectInNamespace(name, val)
+        # self.workspace[name] = val
+        # self.workspaceModel.update()
 
     @pyqtSlot()
     @safeWrapper
@@ -3565,7 +3624,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         varNames = list(self.workspace.keys())
 
         if newVarName in self.workspace:
-            obj_ = self.workspace[newVarName]
+            obj_ = self.workspace[newVarName] # what for ?!?
 
         if len(newVarName.strip()) == 0:  # prevent accidental deletion
             self.workspaceModel.itemChanged.disconnect(
@@ -3573,11 +3632,21 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             item.setText(originalVarName)
             self.currentVarItem = item
             self.currentVarItemName = originalVarName
-            # self.workspaceModel.currentItem = item
-            # self.workspaceModel.currentItemName=originalVarName
             self.workspaceModel.itemChanged.connect(
                 self.slot_variableItemNameChanged)
             return
+
+        # if newVarName != originalVarName:
+        #     if any(s in self.workspace for s in (originalVarName, newVarName)):
+        #         data  = self.workspaceModel.unbindObjectInNamespace(originalVarName)
+        #         newVarName = validate_varname(
+        #             newVarName, self.workspace, start_counter=1)
+        #         self.workspace[newVarName] = obj
+        #         item.setText(newVarName)
+        #         self.workspaceModel.update()
+        #         self.currentVarItem = item
+        #         self.currentVarItemName = newVarName
+        #         self.workspaceView.sortByColumn(0, QtCore.Qt.AscendingOrder)
 
         if newVarName != originalVarName:
             if any(s in self.workspace for s in (originalVarName, newVarName)):
@@ -3590,8 +3659,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 self.currentVarItem = item
                 self.currentVarItemName = newVarName
                 self.workspaceView.sortByColumn(0, QtCore.Qt.AscendingOrder)
-                # self.workspaceModel.currentItem = item
-                # self.workspaceModel.currentItemName = newVarName
 
     @pyqtSlot()
     @safeWrapper
@@ -3640,12 +3707,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
             if btn == QtWidgets.QMessageBox.No:
                 return
+        self.workspaceModel.rebindObjectInNamespace(varName, newVarNameOK)
+        # self.workspace[newVarNameOK] = self.workspace[varName]
+        # self.workspace.pop(varName, None)
+        # self.workspaceModel.update()
 
-        self.workspace[newVarNameOK] = self.workspace[varName]
-        self.workspace.pop(varName, None)
-        self.workspaceModel.update()
-
-        self.workspaceView.sortByColumn(0, QtCore.Qt.AscendingOrder)
+        # self.workspaceView.sortByColumn(0, QtCore.Qt.AscendingOrder)
         # NOTE: 2021-08-21 22:27:34 DO NOT DELETE - alternative way
         # cmd = "".join([newVarNameOK, "=", varName, "; del(", varName,")"])
         # self.console.execute(cmd, hidden=True)
@@ -4123,6 +4190,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.actionGUI_Style.triggered.connect(
             self._slot_set_Application_style)
+        
         self.actionAuto_launch_Script_Manager.toggled.connect(
             self._slot_set_scriptManagerAutoLaunch)
         # NOTE: 2016-05-02 14:26:58
@@ -4174,13 +4242,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.actionConsole = QtWidgets.QAction(
             QtGui.QIcon.fromTheme("scriptnew"), "Scipyen Console", self)
+        
         self.actionConsole.triggered.connect(self.slot_initQtConsole)
         self.menuConsoles.addAction(self.actionConsole)
 
         self.actionExternalIPython = QtWidgets.QAction(
             QtGui.QIcon.fromTheme("scriptnew"), "External IPython", self)
+        
         self.actionExternalIPython.triggered.connect(
             self.slot_launchExternalIPython)
+        
         self.menuConsoles.addAction(self.actionExternalIPython)
 
         if has_neuron:
@@ -4192,18 +4263,24 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.menuWith_Running_Kernel = QtWidgets.QMenu(
             "With Running Kernel", self)
+        
         self.menuConsoles.addMenu(self.menuWith_Running_Kernel)
+        
         self.actionRunning_IPython = QtWidgets.QAction(
             QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel ...", self)
+        
         self.actionRunning_IPython.triggered.connect(
             self.slot_launchExternalRunningIPython)
+        
         self.menuWith_Running_Kernel.addAction(self.actionRunning_IPython)
 
         if has_neuron:
             self.actionRunning_IPython_for_Neuron = QtWidgets.QAction(
                 QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel and launch NEURON", self)
+            
             self.actionRunning_IPython_for_Neuron.triggered.connect(
                 self.slot_launchExternalRunningIPythonNeuron)
+            
             self.menuWith_Running_Kernel.addAction(
                 self.actionRunning_IPython_for_Neuron)
 
@@ -4269,6 +4346,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         # NOTE: 2016-05-02 12:22:21 -- refactoring plugin codes
         self.startPluginLoad.connect(self.slot_loadPlugins)
+        
+        self.sig_refreshRecentFilesMenu.connect(self._slot_refreshRecentFilesMenu_)
 
         # BEGIN custom workspace viewer DO NOT DELETE
 
@@ -4627,13 +4706,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             elif self._recentFiles[item] != loader:
                 self._recentFiles[item] = loader
 
-        self._refreshRecentFilesMenu_()
+        # NOTE: 2023-05-27 23:50:19
+        # This function may be called from another thread hence it cannot be
+        # expected to modify the UI in self (which lives in the current thread)
+        # Therefore the actual menu refresh has got to be done asynchronously in
+        # the current thread, as opposed to the running thread which is executing
+        # this function. Hence, I use the signal/slot mechanism.
+        self.sig_refreshRecentFilesMenu.emit()
 
-        # targetDir = os.path.dirname(item)
-
-        # self._setRecentDirectory_(targetDir)
-
-    def _refreshRecentFilesMenu_(self):
+    @pyqtSlot()
+    def _slot_refreshRecentFilesMenu_(self):
         '''Recreates the Recent Files submenu of the File menu; each recent file
         gets a QAction with the 'triggered' slot connected to self.slot_loadRecentFile.
         '''
@@ -4659,7 +4741,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
     def _clearRecentFiles_(self):
         self._recentFiles.clear()
-        self._refreshRecentFilesMenu_()
+        self._slot_refreshRecentFilesMenu_()
 
     def _refreshRecentDirs_(self):
         self._refreshRecentDirectoriesMenu_()
@@ -5089,16 +5171,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_fileSystemItemActivated(self, ndx):
         """ 
         Triggered by double-click on an item in the file system tree view.
-        Connected to the 'activated' signal emited by self.fileSystemTreeView.
+        Double-clicking an item in self.fileSystemTreeView emits the 'activated' 
+        signal which is connected to this slot
         """
-        # print(self.fileSystemModel.filePath(ndx))
         if self.fileSystemModel.isDir(ndx):
             # if this is a directory then chdir to it
             self.slot_changeDirectory(self.fileSystemModel.filePath(ndx))
 
         else:
-            # if this is a regular file then try to load (open) it
-            self.loadFile(self.fileSystemModel.filePath(ndx))
+            self.loadFiles([self.fileSystemModel.filePath(ndx)], self._openSelectedFileItemsThreaded)
+            
 
     @pyqtSlot(str)
     @safeWrapper
@@ -5264,37 +5346,39 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             return
 
         fileNames = [self.fileSystemModel.filePath(i) for i in selectedItems]
+        
+        self.loadFiles(fileNames, self._openSelectedFileItemsThreaded,ioReaderFn = pio.importDataFrame)
 
-        nItems = len(fileNames)
+        # nItems = len(fileNames)
+        # 
+        # if nItems == 1:
+        #     self.loadDiskFile(fileNames[0], pio.importDataFrame)
+        # 
+        # else:
+        #     progressDlg = QtWidgets.QProgressDialog(
+        #         "Loading data...", "Abort", 0, nItems, self)
+        # 
+        #     progressDlg.setWindowModality(QtCore.Qt.WindowModal)
+        # 
+        #     for (k, item) in enumerate(selectedItems):
+        #         if (self.loadDiskFile(self.fileSystemModel.filePath(item)), pio.importDataFrame):
+        #             progressDlg.setValue(k)
+        # 
+        #         else:
+        #             progressDlg.cancel()
+        #             progressDlg.reset()
+        # 
+        #         if progressDlg.wasCanceled():
+        #             break
+        # 
+        #     if progressDlg.value == 0:
+        #         return False
+        # 
+        #     progressDlg.setValue(nItems)
+        # 
+        # self.workspaceModel.update()
 
-        if nItems == 1:
-            self.loadDiskFile(fileNames[0], pio.importDataFrame)
-
-        else:
-            progressDlg = QtWidgets.QProgressDialog(
-                "Loading data...", "Abort", 0, nItems, self)
-
-            progressDlg.setWindowModality(QtCore.Qt.WindowModal)
-
-            for (k, item) in enumerate(selectedItems):
-                if (self.loadDiskFile(self.fileSystemModel.filePath(item)), pio.importDataFrame):
-                    progressDlg.setValue(k)
-
-                else:
-                    progressDlg.cancel()
-                    progressDlg.reset()
-
-                if progressDlg.wasCanceled():
-                    break
-
-            if progressDlg.value == 0:
-                return False
-
-            progressDlg.setValue(nItems)
-
-        self.workspaceModel.update()
-
-        return True
+        # return True
 
     @pyqtSlot()
     @safeWrapper
@@ -5309,80 +5393,79 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         # NOTE: 2023-05-27 14:48:04
         # inherited from workspace
-        self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded)
+        self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded)#, updateUi=False)
         
-    @pyqtSlot()
-    @safeWrapper
-    def slot_openSelectedFileItems_old(self):
-        """
-            Triggered by the "Open" action in the File System viewer context menu.
-            Loads the selected file items in the File System viewer.
-        """
-        # NOTE: 2023-05-27 13:26:12 TODO push this in a new thread.
-        # currently, this is running in the main (UI) event loop and is prone to
-        # block the UI when loading a single large file or a large number of files
-        # (batch loading)
-        selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
-                         if item.column() == 0 and not self.fileSystemModel.isDir(item)]  # list of QModelIndex
-
-        nItems = len(selectedItems)
-
-        if nItems == 0:
-            return False
-
-        # NOTE: 2018-09-27 10:11:49
-        # prevent user interaction when only one item (which may take a while to
-        # load especially if it is a big file)
-
-        if nItems == 1: 
-            # ⇒ load file directly in the main thread - 
-            # the the file is large this might block the UI
-            # therefore set the cursor to "wait", the restore to the default cursor
-            self.setCursor(QtCore.Qt.WaitCursor)
-
-            self.loadDiskFile(self.fileSystemModel.filePath(selectedItems[0]))
-
-            self.unsetCursor()
-
-        else:
-            # higher chances to block the UI here (very many, possibly, large files) ⇒ 
-            # run this in a separate thread to avoid blocking the UI !!!
-            
-            progressDlg = QtWidgets.QProgressDialog(
-                "Loading data...", "Abort", 0, nItems, self)
-            progressDlg.setMinimumDuration(1000)
-
-            progressDlg.setWindowModality(QtCore.Qt.WindowModal)
-
-            for (k, item) in enumerate(selectedItems):
-                # NOTE: 2020-10-27 09:28:35
-                # do not add batch-loaded files to list of recent files - speed
-                # things up
-                if (self.loadDiskFile(self.fileSystemModel.filePath(item), addToRecent=False)):
-                    progressDlg.setValue(k)
-
-                else:
-                    progressDlg.cancel()
-                    progressDlg.reset()
-
-                if progressDlg.wasCanceled():
-                    break
-
-            if progressDlg.value == 0:
-                return False
-
-            progressDlg.setValue(nItems)
-
-        self.workspaceModel.update()
-
-        return True
+#     @pyqtSlot()
+#     @safeWrapper
+#     def slot_openSelectedFileItems_old(self):
+#         """
+#             Triggered by the "Open" action in the File System viewer context menu.
+#             Loads the selected file items in the File System viewer.
+#         """
+#         # NOTE: 2023-05-27 13:26:12 TODO push this in a new thread.
+#         # currently, this is running in the main (UI) event loop and is prone to
+#         # block the UI when loading a single large file or a large number of files
+#         # (batch loading)
+#         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+#                          if item.column() == 0 and not self.fileSystemModel.isDir(item)]  # list of QModelIndex
+# 
+#         nItems = len(selectedItems)
+# 
+#         if nItems == 0:
+#             return False
+# 
+#         # NOTE: 2018-09-27 10:11:49
+#         # prevent user interaction when only one item (which may take a while to
+#         # load especially if it is a big file)
+# 
+#         if nItems == 1: 
+#             # ⇒ load file directly in the main thread - 
+#             # the the file is large this might block the UI
+#             # therefore set the cursor to "wait", the restore to the default cursor
+#             self.setCursor(QtCore.Qt.WaitCursor)
+# 
+#             self.loadDiskFile(self.fileSystemModel.filePath(selectedItems[0]))
+# 
+#             self.unsetCursor()
+# 
+#         else:
+#             # higher chances to block the UI here (very many, possibly, large files) ⇒ 
+#             # run this in a separate thread to avoid blocking the UI !!!
+#             
+#             progressDlg = QtWidgets.QProgressDialog(
+#                 "Loading data...", "Abort", 0, nItems, self)
+#             progressDlg.setMinimumDuration(1000)
+# 
+#             progressDlg.setWindowModality(QtCore.Qt.WindowModal)
+# 
+#             for (k, item) in enumerate(selectedItems):
+#                 # NOTE: 2020-10-27 09:28:35
+#                 # do not add batch-loaded files to list of recent files - speed
+#                 # things up
+#                 if (self.loadDiskFile(self.fileSystemModel.filePath(item), addToRecent=False)):
+#                     progressDlg.setValue(k)
+# 
+#                 else:
+#                     progressDlg.cancel()
+#                     progressDlg.reset()
+# 
+#                 if progressDlg.wasCanceled():
+#                     break
+# 
+#             if progressDlg.value == 0:
+#                 return False
+# 
+#             progressDlg.setValue(nItems)
+# 
+#         self.workspaceModel.update()
+# 
+#         return True
 
     @safeWrapper
     def _openSelectedFileItemsThreaded(self, **kwargs):
         """
         Pass this as fileLoaderFn argument to self.loadFiles inherited from WorkspaceGuiMixin.
         """
-        
         filePaths = kwargs.pop("filePaths", None)
         
         if not isinstance(filePaths, (tuple, list)) or len(filePaths) == 0: 
@@ -5392,13 +5475,21 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         progressSignal = kwargs.pop("progressSignal", None)
         finishedSignal = kwargs.pop("finishedSignal", None)
         resultSignal = kwargs.pop("resultSignal", None)
+        ioReader = kwargs.pop("ioReader", None)
+        separateWorkspaceViewUpdate = kwargs.pop("updateAfter", False) == True
+        updateUi = kwargs.pop("updateUi", True)
+        
+        if not isinstance(ioReader, typing.Callable):
+            ioReader=None
         
         addToRecent = len(filePaths) == 1
         
         OK = True
         
+        self.updateUiWithFileLoad = updateUi # def'ed in WorkspaceGuiMixin
+        
         for k, item in enumerate(filePaths):
-            OK &= self.loadDiskFile(item, addToRecent=addToRecent) # places the loaded data DIRECTLY into self.workspace
+            OK &= self.loadDiskFile(item, fileReader=ioReader, addToRecent=addToRecent, updateUi=updateUi) # places the loaded data DIRECTLY into self.workspace
             if OK and isinstance(progressSignal, QtCore.pyqtBoundSignal):
                 progressSignal.emit(k)
                     
@@ -5658,16 +5749,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         """ Entrypoint into the file reading system, for calls from file system tree view
         Called by: 
             self.slot_fileSystemItemActivated
-
+    
         Delegates to self.loadDiskFile(file_name, fileReader)
         """
-        if self.loadDiskFile(fName):
-            # self._addRecentFile_(fName, fileReader) # done inside loadDiskFile
-            self.workspaceModel.update()
-
-    # @safeWrapper
-    # def saveVariables(self):
-        # pass
+        self.loadDiskFile(fName)
+            # # self._addRecentFile_(fName, fileReader) # done inside loadDiskFile
+            # self.workspaceModel.update()
 
     @pyqtSlot()
     @safeWrapper
@@ -5685,8 +5772,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             fName = str(action.text()).replace('&', '')
             fileReader = self.recentFiles[fName]
 
-            if self.loadDiskFile(fName, fileReader):
-                self.workspaceModel.update()
+            self.loadDiskFile(fName, fileReader)
+                # self.workspaceModel.update()
 
     @pyqtSlot(str)
     @safeWrapper
@@ -5711,17 +5798,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.slot_changeDirectory(dirName)
 
     @safeWrapper
-    def loadDiskFile(self, fName, fileReader=None, addToRecent=True):
+    def loadDiskFile(self, fName:str, fileReader:typing.Optional[typing.Callable]=None, 
+                     addToRecent:bool=True, updateUi:bool=True):
         """Reads data from a file.
         Common landing point for local data input from the file system.
         Called by various slots connected to File menu actions. 
-        
-        TODO/FIXME: 2023-05-27 14:35:09
-        Currently, the data objects read from the file are bound to symbols
-        DIRECTLY into the user workspace. This requires a separate call to the 
-        workspaceModel.update(), which is unwieldy. TODO: create a "addItem" and/or
-        "setItem" instance methods for the workspaceModel so that new workspace 
-        variables are automaticaly observed
         
         Various file types are handled by the fileReader (see below).
         Currently, there is support for plain text file, Axon files, pickle, hdf5
@@ -5748,6 +5829,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             TODO: 2023-05-27 14:32:19
             Try to use bioformats functionality (requires some kind of java bridge
             for this) - tried that before but was problematic.
+        
+        addToRecent:bool, default is True
+            When True, add the fName to the list of recently open files
+            WARNING: Should be set to False when loading a large batch of files
+        
+        updateUi:bool, default is True
+            When True, the workspace viewer will be updated immediately.
+        
+            WARNING: May be set to False when loading a large batch of files,
+            but the workspace viewer will be updated in a second stage and this
+            currently blocks the UI during the workspace.
+        
+            CAUTION: When False, one should call self.workspaceModel.update()
+        
 
         """
 
@@ -5768,16 +5863,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if fileReader is None:
                 fileReader = pio.getLoaderForFile(fName)
 
-            # print("fileReader", fileReader)
-
             if fileReader is None:
                 return False
 
             try:
                 data = fileReader(fName)
-                # self.workspace[bName] = data
                 if data is not None:
-                    self.workspace[bName] = data
+                    if updateUi:
+                        # the line below updates workspaceViewer ui
+                        self.workspaceModel.bindObjectInNamespace(bName, data)
+                    else:
+                        self.workspace[bName] = data
             except:
                 return False
 
@@ -6056,7 +6152,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     if not self.loadDiskFile(fileName):
                         return
 
-            self.workspaceModel.update()
+            # self.workspaceModel.update()
 
     @pyqtSlot()
     @safeWrapper
@@ -7085,12 +7181,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def slot_loop_process_result(self, obj, name=""):
         if isinstance(name, str) and len(name.strip()):
-            self.workspace[name] = obj
+            self.workspaceModel.bindObjectInNamespace(name, obj)
+            # self.workspace[name] = obj
 
         else:
-            self.workspace["result"] = obj
+            self.workspaceModel.bindObjectInNamespace("result", obj)
+            # self.workspace["result"] = obj
 
-        self.workspaceModel.update()
+        # self.workspaceModel.update()
         # self.workspaceModel.update(from_console=False)
 
         self.workspaceChanged.emit()
@@ -7240,7 +7338,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: 2016-04-03 00:25:00 - do NOT delete - keep for future reference
         # (i.e., don't make this mistake again...)
         # calling this seems to make the qt app close -- why?
-        # NOTE: FIXED 2016-04-03 01:03:53 -- we call this asynchrnously,
+        # NOTE: FIXED 2016-04-03 01:03:53 -- we call this asynchronously,
         # via Qt signal/slot mechanism (main window emits startPluginLoad)
         # dw = os.walk(path)
 
@@ -7583,8 +7681,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: 2022-12-25 21:43:43
         # the check if this is a ScipyenViewer descendant is done in _is_scipyen_viewer_class_
         # gui_viewers.add(x)
-        self.user_ns_hidden[name] = x
-        self.workspace[name] = x
+        self.workspaceModel.bindObjectInNamespace(name, x, hidden=True)
+        # self.user_ns_hidden[name] = x
+        # self.workspace[name] = x
         self.viewers[x] = list()
         self.currentViewers[x] = None
         # NOTE: 2022-12-25 23:17:47

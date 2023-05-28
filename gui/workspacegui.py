@@ -538,6 +538,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         # mutable control data for the worker loops, to communicate with the
         # worker thread
         self.loopControl = {"break":False}
+        self.updateUiWithFileLoad = True
         
         if isinstance(parent, QtWidgets.QMainWindow) and type(parent).__name__ == "ScipyenWindow":
             self._scipyenWindow_   = parent
@@ -839,7 +840,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         
     @safeWrapper
     def loadFiles(self, filePaths:typing.Sequence[typing.Union[str, pathlib.Path]],
-                       fileLoaderFn:typing.Callable): #, postLoadfn:typing.Callable):
+                       fileLoaderFn:typing.Callable, 
+                       ioReaderFn:typing.Optional[typing.Callable]=None,
+                       updateUi:bool=True): #, postLoadfn:typing.Callable):
         if len(filePaths) == 0:
             return
         
@@ -853,7 +856,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         self._fileLoadThread_ = QtCore.QThread()
         self._fileLoadWorker_ = pgui.ProgressWorkerThreaded(fileLoaderFn,
                                                             loopControl = self.loopControl,
-                                                            filePaths = filePaths)
+                                                            filePaths = filePaths,
+                                                            ioReader=ioReaderFn,
+                                                            updateUi = updateUi)
         
         self._fileLoadWorker_.signals.signal_Progress.connect(progressDlg.setValue)
         
@@ -878,12 +883,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         except:
             ok = False
 
-        if ok:
-             # FIXME/TODO 2023-05-27 14:39:53
-             # see TODO/FIXME: 2023-05-27 14:35:09 in mainWindow.loadDiskFile() docstring
-            if hasattr(self, "workspaceModel"):
-                try:
-                    self.workspaceModel.update()
-                except:
-                    traceback.print_exc()
+        if ok and not self.updateUiWithFileLoad and hasattr(self, "workspaceModel"):
+            try:
+                self.workspaceModel.update()
+            except:
+                traceback.print_exc()
             
