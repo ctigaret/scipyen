@@ -1253,47 +1253,47 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         return v if v in self.shell.user_ns else None  # <- this is the workspace
 
-    @pyqtSlot()
-    def slot_updateTable(self):
-        # print("slot_updateTable")
-        # QtCore.QTimer.singleShot(0, self.update)
-        timer = QtCore.QTimer()
-        timer.timeout.connect(self.update)
-        timer.start(0)
-        # self.update()
+    # @pyqtSlot()
+    # def slot_updateTable(self):
+    #     # print("slot_updateTable")
+    #     # QtCore.QTimer.singleShot(0, self.update)
+    #     timer = QtCore.QTimer()
+    #     timer.timeout.connect(self.update)
+    #     timer.start(0)
+    #     # self.update()
 
-    def updateRowForVariable(self, dataname, data, ns=None):
-        # CAUTION This is only for internal workspace, but
-        # TODO 2020-07-30 22:18:35 merge & factor code for both internal and foreign
-        # kernels (make use of the ns parameter)
-        #
-        if ns is None:
-            ns = "Internal"
-
-        elif isinstance(ns, str):
-            if len(ns.strip()) == 0:
-                ns = "Internal"
-
-        else:
-            ns = "Internal"
-
-        # print("updateRowForVariable", dataname, data, ns)
-
-        row = self.rowIndexForItemsWithProps(Workspace=ns)
-
-        # print("updateRowForVariable, row:", row)
-
-        items = self.findItems(dataname)
-
-        # print("updateRowForVariable, items", items)
-
-        if len(items) > 0:
-            row = self.indexFromItem(items[0]).row()  # same as below
-            # print("updateRowForVariable, row:", row)
-            # row = items[0].index().row()
-            # generate model view row contents for existing item
-            v_row = self.generateRowContents(dataname, data)
-            self.updateRow(row, v_row)
+    # def updateRowForVariable(self, dataname, data, ns=None):
+    #     # CAUTION This is only for internal workspace, but
+    #     # TODO 2020-07-30 22:18:35 merge & factor code for both internal and foreign
+    #     # kernels (make use of the ns parameter)
+    #     #
+    #     if ns is None:
+    #         ns = "Internal"
+    # 
+    #     elif isinstance(ns, str):
+    #         if len(ns.strip()) == 0:
+    #             ns = "Internal"
+    # 
+    #     else:
+    #         ns = "Internal"
+    # 
+    #     # print("updateRowForVariable", dataname, data, ns)
+    # 
+    #     row = self.rowIndexForItemsWithProps(Workspace=ns)
+    # 
+    #     # print("updateRowForVariable, row:", row)
+    # 
+    #     items = self.findItems(dataname)
+    # 
+    #     # print("updateRowForVariable, items", items)
+    # 
+    #     if len(items) > 0:
+    #         row = self.indexFromItem(items[0]).row()  # same as below
+    #         # print("updateRowForVariable, row:", row)
+    #         # row = items[0].index().row()
+    #         # generate model view row contents for existing item
+    #         v_row = self.generateRowContents(dataname, data)
+    #         self.updateRow(row, v_row)
 
     def updateRowForVariable2(self, ns: dict, dataname: str, ns_name: typing.Optional[str] = None):
         # CAUTION This is only for internal workspace, but
@@ -1358,26 +1358,26 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 # code for displayed name change
                 self.setItem(rowindex, col, newrowdata[col])
 
-    def removeRowForVariable(self, dataname, ns=None):
-        if isinstance(ns, str):
-            if len(ns.strip()) == 0:
-                ns = "Internal"
-
-        else:
-            ns = "Internal"
-
-        row = self.rowIndexForItemsWithProps(Name=dataname, Workspace=ns)
-
-        # print("WorkspaceModel.removeRowForVariable data: %s ns: %s row: %s" % (dataname, ns, row))
-        if row == -1:
-            return
-
-        if isinstance(row, list):
-            for r in row:
-                self.removeRow(r)
-
-        else:
-            self.removeRow(row)
+    # def removeRowForVariable(self, dataname, ns=None):
+    #     if isinstance(ns, str):
+    #         if len(ns.strip()) == 0:
+    #             ns = "Internal"
+    # 
+    #     else:
+    #         ns = "Internal"
+    # 
+    #     row = self.rowIndexForItemsWithProps(Name=dataname, Workspace=ns)
+    # 
+    #     # print("WorkspaceModel.removeRowForVariable data: %s ns: %s row: %s" % (dataname, ns, row))
+    #     if row == -1:
+    #         return
+    # 
+    #     if isinstance(row, list):
+    #         for r in row:
+    #             self.removeRow(r)
+    # 
+    #     else:
+    #         self.removeRow(row)
 
     def removeRowForVariable2(self, ns: dict, dataname: str, ns_name: typing.Optional[str] = None):
         if isinstance(ns_name, str):
@@ -1400,13 +1400,13 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             self.removeRow(row)
 
-    def addRowForVariable(self, dataname, data):
-        """CAUTION Only use for data in the internal workspace, not in remote ones.
-        """
-        # print("addRowForVariable: ", dataname, data)
-        # generate model view row contents
-        v_row = self.generateRowContents(dataname, data)
-        self.appendRow(v_row)  # append the row to the model
+    # def addRowForVariable(self, dataname, data):
+    #     """CAUTION Only use for data in the internal workspace, not in remote ones.
+    #     """
+    #     # print("addRowForVariable: ", dataname, data)
+    #     # generate model view row contents
+    #     v_row = self.generateRowContents(dataname, data)
+    #     self.appendRow(v_row)  # append the row to the model
 
     def addRowForVariable2(self, ns: dict, dataname: str, ns_name: typing.Optional[str] = None):
         """CAUTION Only use for data in the internal workspace, not in remote ones.

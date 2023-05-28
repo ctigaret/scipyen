@@ -729,10 +729,7 @@ class DataBag(Bunch):
         """
         try:
             obs = object.__getattribute__(self, "__observer__")
-            # super().__delitem__(key)
-            # obs.length = self.__len__()
 
-            # if obs.has_trait(key):
             if key in obs.traits():
                 # print(f"{self.__class__.__name__}.__delitem__ to remove trait {key}")
                 trait_to_remove = obs.traits()[key]
@@ -745,8 +742,6 @@ class DataBag(Bunch):
             object.__getattribute__(self, "__hidden__")[
                 "length"] = len(obs.traits())
 
-            # print(f"{key} lurking in self: {key in dir(self)}")
-            
         except:
             raise  # KeyError("%s" % key)
         
