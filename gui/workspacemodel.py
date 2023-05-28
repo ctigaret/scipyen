@@ -14,7 +14,7 @@ event handlers preExecute() and post_execute().
 # TODO bring here the code for finding variables by name, link to the variable name
 # filter/finder in workspace viewer
 #
-
+import contextlib
 import seaborn as sb
 import numpy as np
 import matplotlib as mpl
@@ -73,6 +73,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     workingDir = pyqtSignal(str, name="workingDir")
     internalVariableChanged = pyqtSignal(dict, name="internalVariableChanged")
     varModified = pyqtSignal(object, name="varModified")
+    # sig_updateInternal = pyqtSignal(name="sig_updateInternal")
 
     def __init__(self, shell, user_ns_hidden=dict(),
                  parent=None,
@@ -100,7 +101,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         # NOTE: 2023-05-23 16:58:37
         # temporary cache of notified observer changes
-        self.__change_dict__ = dict()
+        self.__changes__:typing.Dict[str, WorkspaceVarChange] = dict()
 
         # NOTE: 2023-01-27 08:57:52 about _pylab_helpers.Gcf:
         # the `figs` attribute if an OrderedDict with:
@@ -122,7 +123,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         self.foreign_namespaces = DataBag(allow_none=True, mutable_types=True)
         # FIXME: 2021-08-19 21:45:17
-        # self.foreign_namespaces.observe(self._foreign_namespaces_count_changed_, names="length")
+        # self.foreign_namespaces.observe(self._foreignNamespacesCountChanged_, names="length")
 
         # TODO/FIXME 2020-07-31 00:07:29
         # low priority: choose pallette in a clever way to take into account the
@@ -157,7 +158,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # self.internalVariableChanged.connect(self.slot_internalVariableChanged)
         self.internalVariableChanged.connect(self.slot_internalVariableChanged)
 
-    def _foreign_namespaces_count_changed_(self, change):
+    def _foreignNamespacesCountChanged_(self, change):
         # FIXME / TODO 2020-07-30 23:49:13
         # this assumes the GUI has the default (light coloured) palette e.g. Breeze
         # or such like. What if the system uses a dark-ish palette?
@@ -583,7 +584,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # (thus keeping the whole excercise of updating the workspace table
             # less demanding)
 
-            # will trigger _foreign_namespaces_count_changed_ which at the
+            # will trigger _foreignNamespacesCountChanged_ which at the
             # moment, does nothing
             self.foreign_namespaces[ns_name] = {"current": current,
                                                 "initial": initial,
@@ -733,28 +734,35 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         displayed_var_names = set(self.getDisplayedVariableNames())
         user_shell_var_names = set(self.shell.user_ns.keys())
 
+        # NOTE: 2023-05-28 22:15:54
+        # GuiWorker is a QRunnable
         worker = pgui.GuiWorker(self._updateFromMonitor_, name, 
-                                displayed_var_names, user_shell_var_names)
+                                displayed_var_names, user_shell_var_names,
+                                change.type)
         
         worker.signals.signal_Result.connect(self._slot_updateModelFromMonitor_)
         
         self.threadpool.start(worker)
 
-    def _updateFromMonitor_(self, name: str, displayed_var_names: set, user_shell_var_names: set):
+    def _updateFromMonitor_(self, name: str, 
+                            displayed_var_names: set, user_shell_var_names: set,
+                            change_type:str):
 
         # print(f"\n{self.__class__.__name__}._updateFromMonitor_ {name}\n\tin shell: {name in self.shell.user_ns}\n\tdisplayed: {name in displayed_var_names}")
-
-        if name in user_shell_var_names:
-            if name not in displayed_var_names:
-                alteration = WorkspaceVarChange.New
-            else:
-                alteration = WorkspaceVarChange.Modified
+        if change_type == "remove":
+            alteration = WorkspaceVarChange.Removed
         else:
-            if name in displayed_var_names:
-                alteration = WorkspaceVarChange.Removed
-
+            if name in user_shell_var_names:
+                if name not in displayed_var_names:
+                    alteration = WorkspaceVarChange.New
+                else:
+                    alteration = WorkspaceVarChange.Modified
             else:
-                alteration = None
+                if name in displayed_var_names:
+                    alteration = WorkspaceVarChange.Removed
+
+                else:
+                    alteration = None
 
         return (name, alteration)
 
@@ -1154,8 +1162,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         current_dir = os.getcwd()
         self.workingDir.emit(current_dir)
 
-    def _gen_item_for_object_(self, propdict: dict, editable: typing.Optional[bool] = False, elidetip: typing.Optional[bool] = False, background: typing.Optional[QtGui.QBrush] = None, foreground: typing.Optional[QtGui.QBrush] = None):
-        # print(f"_gen_item_for_object_ propdict = {propdict}")
+    def _generateModelItemForObject_(self, propdict: dict, editable: typing.Optional[bool] = False, elidetip: typing.Optional[bool] = False, background: typing.Optional[QtGui.QBrush] = None, foreground: typing.Optional[QtGui.QBrush] = None):
+        # print(f"_generateModelItemForObject_ propdict = {propdict}")
         item = QtGui.QStandardItem(propdict["display"])
 
         ttip = propdict["tooltip"]
@@ -1193,7 +1201,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         """Returns a row of QStandardItems
         """
         # print(f"genRowFromPropDict obj_props = {obj_props}")
-        return [self._gen_item_for_object_(obj_props[key],
+        return [self._generateModelItemForObject_(obj_props[key],
                 editable=(key == "Name"),
                 elidetip=(key == "Name"),
                 background=background,
@@ -1431,10 +1439,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def clearTable(self):
         self.removeRows(0, self.rowCount())
 
-    def update2(self):
-        self.preExecute()
-        self.postRunCell(Bunch(success=True))
-
     def update(self):
         """Updates workspace model.
         To be called by code that adds/remove/modifies/renames variables 
@@ -1462,10 +1466,113 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         self.internalVariablesMonitor.remove_members(*list(del_vars))
 
-        # as of 2023-05-28 00:47:20, this is probably redundant
-        # for vname in del_vars:
-        #     self.removeRowForVariable(vname)
         self.internalVariablesMonitor.update(current_vars)
+        
+    def update2(self):
+        """Updates workspace model.
+        To be called by code that adds/remove/modifies/renames variables 
+        in the Scipyen's namespace in order to update the workspace viewer.
+        
+        WARNING: This function should NOT be used for normal operation: changes
+        in the workspace contents are monitored by the internal variable monitor
+        which triggers Ui updates already.
+
+        """
+        # currently displayed variables in the viewer widget
+        displayed_var_names = set(self.getDisplayedVariableNames())
+        
+        current_vars = dict(filter(lambda x: not x[0].startswith("_") and self.isUserVariable(*x), self.shell.user_ns.items()))
+        
+        # names of variables in user namespace
+        current_user_varnames = set(current_vars.keys())
+        # current_user_varnames = set(self.shell.user_ns.keys())
+
+        # names of variables present in the internalVariablesMonitor DataBag
+        observed_varnames = set(self.internalVariablesMonitor.keys())
+
+        # names still in internalVariablesMonitor but not in user namespace anymore
+        del_vars = observed_varnames - current_user_varnames
+
+        # current variable names in the namespace, which should be available to
+        # # the user - CAUTION this scales with 𝒪n !
+        # current_vars = dict([item for item in self.shell.user_ns.items(
+        # ) if not item[0].startswith("_") and self.isUserVariable(item[0], item[1])])
+        
+        new_vars = dict(filter(lambda x: not x[0] in displayed_var_names, current_vars.items()))
+        
+        mod_vars = dict(filter(lambda x: x[0] in displayed_var_names, current_vars.items()))
+        
+        self.__changes__.update(dict(map(lambda x: (x, WorkspaceVarChange.Removed), del_vars)))
+        
+        self.__changes__.update(dict(map(lambda x: (x, WorkspaceVarChange.New), new_vars.keys())))
+        
+        self.__changes__.update(dict(map(lambda x: (x, WorkspaceVarChange.Modified), mod_vars.keys())))
+        
+        # with self.holdUIUpdate():
+        self.internalVariablesMonitor.remove_members(*list(del_vars))
+        self.internalVariablesMonitor.update(current_vars)
+            
+        
+        # ATTENTION: 2023-05-28 22:42:12
+        # When unobserve/observe will access methods of self from another thread
+        # they will cause a segfault - Do NOT use this.
+        # self.internalVariablesMonitor.unobserve(self.internalVariablesListenerCB)
+        # self.internalVariablesMonitor.remove_members(*list(del_vars))
+        # self.internalVariablesMonitor.update(current_vars)
+        # self.internalVariablesMonitor.observe(self.internalVariablesListenerCB)
+        
+        # NOTE: 2023-05-28 22:26:43
+        # this holds notification until AFTER ALL traits have been set 
+        # (which happens upon call to self.internalVariablesMonitor.update)
+        # but it will still BLOCK the UI!
+        # Furthermore, I think self.internalVariablesMonitor.remove_members still
+        # # notifies?
+        # with self.internalVariablesMonitor.observer.hold_trait_notifications():
+        #     self.internalVariablesMonitor.remove_members(*list(del_vars))
+        #     self.internalVariablesMonitor.update(current_vars)
+
+    @contextlib.contextmanager
+    def holdUIUpdate(self):
+        """Inspired from traitlets.HasTraits.hold_trait_notifications"""
+        # cache = typing.Dict[str, typing.Any] = {}
+        
+        # def compress(past_changes, change):
+        #     """Merges the provided change with the last if possible."""
+        #     if past_changes is None:
+        #         return [change]
+        #     else:
+        #         if past_changes[-1]["type"] == "change" and change.type == "change":
+        #             past_changes[-1]["new"] = change.new
+        #         elif past_changes[-1]["type"] == "remove" and change.type == "remove":
+        #             past_changes[-1]["new"] = Undefined
+        #         else:
+        #             # In case of changes other than 'change', append the notification.
+        #             past_changes.append(change)
+        #         return past_changes
+
+        def hold(change):
+            pass
+            # name = change.name
+            # cache[name] = compress(cache.get(name), change)
+            
+        try:
+            self.internalVariablesListenerCB = hold
+            yield
+        except:
+            traceback.print_exc()
+        finally:
+            del self.internalVariablesListenerCB
+                
+            
+    @pyqtSlot()
+    def _slot_updateModelAsync(self):
+        if len(self.__changes__) == 0:
+            return
+        
+        # TODO: 2023-05-28 23:38:59
+        # launch a pgui.ProgressWorkerThreaded to apply the changes in self.__changes__
+        
+        
 
     def updateFromExternal(self, prop_dicts):
         """prop_dicts: {name: nested properties dict}

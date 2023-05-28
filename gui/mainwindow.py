@@ -5393,7 +5393,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         # NOTE: 2023-05-27 14:48:04
         # inherited from workspace
-        self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded)#, updateUi=False)
+        self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded)
+        
+        # CAUTION: DO NOT USE: still needs work TODO/FIXME
+        # self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded, updateUi=False)
         
 #     @pyqtSlot()
 #     @safeWrapper

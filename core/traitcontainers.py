@@ -16,16 +16,11 @@ import contextlib
 from inspect import getcallargs, isfunction, ismethod
 from functools import partial
 from pprint import pformat
-# from traitlets import (HasTraits, TraitType, Eventhandler, Int, Bool, All,
-# is_trait, observe,TraitError,)
-from traitlets.utils.bunch import Bunch
 import traitlets
-from traitlets import (HasTraits, TraitType, Int, Bool, All, observe)
+from traitlets import (HasTraits, TraitType, Int, Bool, All, observe, Undefined)
+from traitlets.utils.bunch import Bunch
 
 from .traitutils import (dynamic_trait, transform_link)
-# from .traitutils import (traitlets, dynamic_trait, transform_link,
-#                          HasTraits, TraitType, TraitsObserver,
-#                          ContainerTraitsObserver, Int, Bool, All, observe)
 
 from .prog import safeWrapper, timefunc, processtimefunc, timeblock
 from .strutils import str2symbol
@@ -830,7 +825,6 @@ class DataBag(Bunch):
         return obs._trait_values
 
     def remove_members(self, *keys):
-        # print(f"DataBag.remove_members {keys}")
         try:
             obs = object.__getattribute__(self, "__observer__")
 
@@ -841,9 +835,6 @@ class DataBag(Bunch):
             
             current_traits_keys = valid_traits_to_remove.keys()
 
-            # traits = dict([(key, valid_traits_to_remove[key])
-            #               for key in keys if key in current_traits_keys])
-            
             values_to_remove = dict([(k, obs._trait_values[k])
                                     for k in valid_traits_to_remove.keys() if k in obs._trait_values])
 
@@ -854,7 +845,6 @@ class DataBag(Bunch):
                             old=tv, new=None, type="change")
                 obs.notify_change(change)
                 
-
             object.__getattribute__(self, "__hidden__")[
                 "length"] = len(obs.traits())
 

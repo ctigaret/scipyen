@@ -884,8 +884,12 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             ok = False
 
         if ok and not self.updateUiWithFileLoad and hasattr(self, "workspaceModel"):
+            # WARNING: 2023-05-28 23:42:57
+            #  DO NOT USE - STILL NEEDS WORK
             try:
-                self.workspaceModel.update()
+                # self.workspaceModel.update() # CAUTION: this BLOCKS the UI
+                with self.workspaceModel.holdUIUpdate():
+                    self.workspaceModel.update2() # CAUTION: this DOES NOT update the model viewer UI
             except:
                 traceback.print_exc()
             
