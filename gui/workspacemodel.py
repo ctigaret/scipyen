@@ -720,42 +720,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # print(f"\n{self.__class__.__name__}.internalVariablesListenerCB({change})")
         self.internalVariableChanged.emit(change)
 
-    # @pyqtSlot(dict)
-    # def slot_internalVariableChanged_old(self, change):
-    #     """Connected (and triggered by) self.internalVariableChanged Qt signal"""
-    #     name = change.name
-    #     displayed_var_names = set(self.getDisplayedVariableNames())
-    #     # user_shell_var_names = set(self.shell.user_ns.keys())
-    #     # displayed_vars_names_types = self.getDisplayedVariableNamesAndTypes()
-    #     # print(f"WorkspaceModel.slot_internalVariableChanged({change.name}, change.new: {change.new})")
-    # 
-    #     if name in self.shell.user_ns:
-    #         if name not in displayed_var_names:
-    #             # timer = QtCore.QTimer()
-    #             # timer.timeout.connect(lambda: self.addRowForVariable(name, self.shell.user_ns[name]))
-    #             # timer.start(0)
-    #             self.addRowForVariable(name, self.shell.user_ns[name])
-    #         else:
-    #             # timer = QtCore.QTimer()
-    #             # timer.timeout.connect(lambda: self.updateRowForVariable(name, self.shell.user_ns[name]))
-    #             # timer.shart(0)
-    #             self.updateRowForVariable(name, self.shell.user_ns[name])
-    #             # NOTE: 2023-05-23 17:36:36
-    #             # A scipyen viewer may connect to this to be notified when an object
-    #             # being displayed has been modified, but be careful to avoid
-    #             # infinite loops, especially when the modification is acted by the
-    #             # viewer itself (i.e. viewer acts like an editor)
-    #             self.varModified.emit(self.shell.user_ns[name])
-    # 
-    #         # ⇒ in MainWindow this will trigger cosmetic update of the viewer
-    #         self.modelContentsChanged.emit()
-    # 
-    #     else:
-    #         # timer = QtCore.QTimer()
-    #         # timer.timeout.connect(lambda: self.removeRowForVariable(name))
-    #         # this actually might never be reached!!!
-    #         self.removeRowForVariable(name)
-
     @pyqtSlot(dict)
     def slot_internalVariableChanged(self, change):
         """Connected (and triggered by) self.internalVariableChanged Qt signal"""
