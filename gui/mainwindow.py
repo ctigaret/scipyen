@@ -1809,9 +1809,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # the workspace viewer - this includes viewer classes
         self.user_ns_hidden = self.workspaceModel.user_ns_hidden
 
-        self.shell.events.register("pre_execute", self.workspaceModel.pre_execute)
+        self.shell.events.register("pre_execute", self.workspaceModel.preExecute)
         # self.shell.events.register("post_execute", self.workspaceModel.post_execute)
-        self.shell.events.register("post_run_cell", self.workspaceModel.post_run_cell)
+        self.shell.events.register("post_run_cell", self.workspaceModel.postRunCell)
 
         # NOTE: 2021-01-06 17:22:45
         # A lot of things happen up to here which depend on an initialized bare-bones
@@ -2228,9 +2228,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_initQtConsole(self):
         self._init_QtConsole_()
 
-        self.shell.events.register("pre_execute", self.workspaceModel.pre_execute)
+        self.shell.events.register("pre_execute", self.workspaceModel.preExecute)
         # self.shell.events.register("post_execute", self.workspaceModel.post_execute)
-        self.shell.events.register("post_run_cell", self.workspaceModel.post_run_cell)
+        self.shell.events.register("post_run_cell", self.workspaceModel.postRunCell)
 
         self.slot_changeDirectory(self.recentDirectories[0])
 
@@ -2518,7 +2518,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: 2018-10-08 10:48:53
         # About self.console.execute(...) vs self.shell.run_cell(...):
         #
-        # Both will generate pre_execute and post_execute IPython events, HOWEVER:
+        # Both will generate preExecute and post_execute IPython events, HOWEVER:
         #
         # * console.execute(str) always executes the expression in str inside the
         #   console's shell/kernel; code will be echoed to the console UNLESS
@@ -6415,7 +6415,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         # print("\n\t.... ns_name", ns_name, "val", val)
                         if ns_name == msg["workspace_name"]:
                             if isinstance(val, dict):
-                                self.workspaceModel.update_foreign_namespace(
+                                self.workspaceModel.updateForeignNamespace(
                                     ns_name, msg["connection_file"], val)
                                 if ns_name in self.workspaceModel.foreign_namespaces:
                                     for varname in self.workspaceModel.foreign_namespaces[ns_name]["current"]:
@@ -6451,14 +6451,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def _slot_ext_krn_disconnected(self, cdict):
         # print("mainWindow: _slot_ext_krn_disconnected %s" % cdict)
         signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
-        self.workspaceModel.remove_foreign_namespace(cdict)
+        self.workspaceModel.removeForeignNamespace(cdict)
 
     @pyqtSlot(dict)
     @safeWrapper
     def _slot_ext_krn_stop(self, conndict):
         # print("mainWindow: _slot_ext_krn_stop %s" % conndict)
         signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
-        self.workspaceModel.remove_foreign_namespace(conndict)
+        self.workspaceModel.removeForeignNamespace(conndict)
 
     @pyqtSlot(dict)
     @safeWrapper

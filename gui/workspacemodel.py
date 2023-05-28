@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 The workspace model - also used by the internal shell, to which ii provides the
-event handlers pre_execute() and post_execute().
+event handlers preExecute() and post_execute().
 
 """
 # NOTE 2020-10-19 14:53:39
@@ -62,7 +62,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     inside pict main window.
 
     Also implements:
-    * IPython event handlers for the internal console (pre_execute and post_execute)
+    * IPython event handlers for the internal console (preExecute and post_execute)
     * handlers for variable change in the Scipyen workspace by code oustide of
       the internal console's event loop
 
@@ -117,7 +117,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         # NOTE: 2021-01-28 17:47:36 TODO to complete observables here
         # management of workspaces in external kernels
-        # details in self.update_foreign_namespace docstring
+        # details in self.updateForeignNamespace docstring
         self._foreign_workspace_count_ = -1
 
         self.foreign_namespaces = DataBag(allow_none=True, mutable_types=True)
@@ -174,11 +174,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.deleted_vars.clear()
         self.internalVariablesMonitor.clear()
 
-    def remove_foreign_namespace(self, wspace: dict):
+    def removeForeignNamespace(self, wspace: dict):
         # print("workspaceModel to remove %s" % wspace)
-        self.clear_foreign_namespace_display(wspace, remove=True)
+        self.clearForeignNamespaceDisplay(wspace, remove=True)
 
-    def _load_session_cache_(self, connfilename: str):
+    def _loadSessionCache_(self, connfilename: str):
         saved_sessions = dict()
         saved_current = set()
         saved_initial = set()
@@ -207,7 +207,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         return saved_current, saved_initial
 
-    def _merge_session_cache_(self, connfilename: str, symbols: set):
+    def _mergeSessionCache_(self, connfilename: str, symbols: set):
         # NOTE: 2021-01-28 22:15:24:
         # Now, of course, with the remote kernel still alive across
         # Scipyen/ExternalIPython sessions, its namespace contents may have
@@ -239,7 +239,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #   v in saved_initial OR v in saved_current AND
         #       v not in intial_symbols
 
-        saved_current, saved_initial = self._load_session_cache_(connfilename)
+        saved_current, saved_initial = self._loadSessionCache_(connfilename)
 
         if saved_initial is not None and saved_current is not None:
             retained_initial = symbols & saved_initial
@@ -264,7 +264,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         return current, initial
 
-    def _save_session_cache_(self, connfilename: str, nsname: str):
+    def _saveSessionCache_(self, connfilename: str, nsname: str):
         mainWindow = self.shell.user_ns.get("mainWindow", None)
         if mainWindow:
             sessions_filename = os.path.join(os.path.dirname(mainWindow.scipyenSettings.user_config_path()),
@@ -308,7 +308,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 with open(sessions_filename, mode="wt") as file_out:
                     json.dump(saved_sessions, file_out, indent=4)
 
-    def clear_foreign_namespace_display(self, workspace: typing.Union[dict, str], remove: bool = False):
+    def clearForeignNamespaceDisplay(self, workspace: typing.Union[dict, str], remove: bool = False):
         """De-registers a foreign workspace dictionary.
 
         Parameters:
@@ -361,12 +361,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             return
 
-        # print("clear_foreign_namespace_display nsname", nsname, "connection_file", connfilename)
+        # print("clearForeignNamespaceDisplay nsname", nsname, "connection_file", connfilename)
 
         if nsname in self.foreign_namespaces:
             # NOTE: 2021-01-28 17:45:54
             # check if workspace nsname belongs to a remote kernel - see docstring to
-            # self.update_foreign_namespace for details
+            # self.updateForeignNamespace for details
 
             if remove:
                 # kernel is managed externally ==> store the "current" symbols
@@ -378,7 +378,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 # connection dict instead of just the workspace name
                 # print("connfilename", connfilename)
                 if connfilename and os.path.isfile(connfilename) and not is_local:
-                    self._save_session_cache_(connfilename, nsname)
+                    self._saveSessionCache_(connfilename, nsname)
 
                 self.foreign_namespaces.pop(nsname)
 
@@ -407,7 +407,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     except:
                         pass
 
-    def update_foreign_namespace(self, ns_name: str, cfile: str, val: typing.Any):
+    def updateForeignNamespace(self, ns_name: str, cfile: str, val: typing.Any):
         """Symbols in external kernels' namepaces are stored here
 
         Parameters:
@@ -524,8 +524,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             will be masked as it happens now).
 
         """
-        # print("WorkspaceModel.update_foreign_namespace ns_name = ",ns_name, " val =", val)
-        # print("WorkspaceModel.update_foreign_namespace ns_name %s" % ns_name)
+        # print("WorkspaceModel.updateForeignNamespace ns_name = ",ns_name, " val =", val)
+        # print("WorkspaceModel.updateForeignNamespace ns_name %s" % ns_name)
         initial = set()
         current = set()
 
@@ -539,7 +539,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             raise TypeError(
                 "val expected to be a dict or a list; got %s instead" % type(val).__name__)
 
-        # print("WorkspaceModel.update_foreign_namespace symbols", initial)
+        # print("WorkspaceModel.updateForeignNamespace symbols", initial)
 
         # saved_sessions = dict()
         # saved_current = set()
@@ -558,7 +558,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     cdict = externalConsole.window.connections.get(cfile, None)
                     if isinstance(cdict, dict) and "master" in cdict and cdict["master"] is None:
                         # print("found remote connection for %s" % cfile)
-                        current, initial = self._merge_session_cache_(
+                        current, initial = self._mergeSessionCache_(
                             cfile, initial)
 
             # special treatment for objects loaded from NEURON at kernel
@@ -590,7 +590,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                                                 }
 
         else:
-            # print("\tupdate_foreign_namespace: foreign namespaces:", self.foreign_namespaces)
+            # print("\tupdateForeignNamespace: foreign namespaces:", self.foreign_namespaces)
             # print("\tself.foreign_namespaces[ns_name]['current']", self.foreign_namespaces[ns_name]["current"])
 
             removed_symbols = self.foreign_namespaces[ns_name]["current"] - initial
@@ -616,7 +616,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # self.user_ns_hidden.clear()
         self.internalVariablesMonitor.clear()
 
-    def is_user_var(self, name, val):
+    def isUserVariable(self, name, val):
         """Checks binding of symbol (name) to a hidden variable.
         """
         # see NOTE 2020-11-29 16:29:01
@@ -674,9 +674,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         if hidden: 
             self.user_ns_hidden[varname] = data
             
-        self.pre_execute()
+        self.preExecute()
         namespace[varname] = data
-        self.post_run_cell(Bunch(success=True))
+        self.postRunCell(Bunch(success=True))
         
     def unbindObjectInNamespace(self, varname:str, 
                                   namespace:typing.Optional[dict] = None) -> typing.Any:
@@ -689,9 +689,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         if varname in namespace:
             if varname not in self.user_ns_hidden:
-                self.pre_execute()
+                self.preExecute()
                 obj = namespace.pop(varname)
-                self.post_run_cell(Bunch(success=True))
+                self.postRunCell(Bunch(success=True))
                 return obj
             
     def rebindObjectInNamespace(self, old_name:str, new_name:str,
@@ -706,12 +706,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         if old_name in namespace:
             if old_name not in self.user_ns_hidden:
-                self.pre_execute()
+                self.preExecute()
                 obj = namespace.pop(old_name)
-                self.post_run_cell(Bunch(success=True))
-                self.pre_execute()
+                self.postRunCell(Bunch(success=True))
+                self.preExecute()
                 namespace[new_name] = obj
-                self.post_run_cell(Bunch(success=True))
+                self.postRunCell(Bunch(success=True))
             
     def internalVariablesListenerCB(self, change):
         # self.__change_dict__ = change
@@ -806,7 +806,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
     # @timefunc
 
-    def pre_execute(self):
+    def preExecute(self):
         """Updates internalVariablesMonitor DataBag
         """
         # ensure we observe only "user" variables in user_ns (i.e. excluding the "hidden"
@@ -814,7 +814,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # NOTE: 2023-01-28 13:27:40
         # we take a snapshot of the current user_ns HERE:
         self.cached_vars = dict([item for item in self.shell.user_ns.items(
-        ) if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        ) if not item[0].startswith("_") and self.isUserVariable(item[0], item[1])])
 
         # NOTE: 2023-01-28 13:27:47
         # we also take a snapshot of the mpl figures
@@ -832,7 +832,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 # self.cached_mpl_figs is a set so duplicates won't be added
                 self.cached_mpl_figs.add(v)
 
-        # print(f"\npre_execute cached figs {self.cached_mpl_figs}")
+        # print(f"\npreExecute cached figs {self.cached_mpl_figs}")
 
         # need to withhold notifications here
         with self.internalVariablesMonitor.observer.hold_trait_notifications():
@@ -964,7 +964,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     #     #     # observed_varnames = set(self.internalVariablesMonitor.keys())
     #     #     # del_vars = observed_varnames - current_user_varnames
     #     #     # self.internalVariablesMonitor.remove_members(*list(del_vars))
-    #     #     # current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+    #     #     # current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.isUserVariable(item[0], item[1])])
     #     #     # self.internalVariablesMonitor.update(current_vars)
     #     #     # just update the model directly
     #     #     # QtCore.QTimer.singleShot(0, self.update)
@@ -988,12 +988,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     # 
     #     self.workingDir.emit(current_dir)
 
-    def post_run_cell(self, result):
-        # print(f"{self.__class__.__name__}.post_run_cell result.info.cell = {result.info.raw_cell}")
+    def postRunCell(self, result):
+        # print(f"{self.__class__.__name__}.postRunCell result = {result}")
         if hasattr(result, "success") and result.success:
-            self._update_model_(self.shell.user_ns)
+            self._updateModel_(self.shell.user_ns)
 
-    def _update_model_(self, ns: dict):
+    def _updateModel_(self, ns: dict):
         """Determines what workspace variables have been removed/added/modified.
         
         This change may be a consequence of:
@@ -1032,7 +1032,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # GUI updates, they do NOT alter the contents of the 'ns' workspace !!!
         #
         # 
-        # print(f"{self.__class__.__name__}._update_model_")
+        # print(f"{self.__class__.__name__}._updateModel_")
 
         # ###
         # 1. deal with matplotlib figures
@@ -1051,7 +1051,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #   were actually removed from Gcf - if they still esixt in the workspace
         #   we need to remove them ⇒ deleted_mpl_figs
         #
-        # NOTE: cached_mpl_figs is populated/updated at pre_execute when code is
+        # NOTE: cached_mpl_figs is populated/updated at preExecute when code is
         #   called at the console; otherwise, it is the MainWindow's responsibility - TODO/FIXME
         #
         deleted_mpl_figs = self.cached_mpl_figs - current_mpl_figs
@@ -1155,7 +1155,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         del_vars = observed_varnames - current_user_varnames
 
         # if len(del_vars):
-        # print(f"{self.__class__.__name__}._update_model_ del_vars = {del_vars}")
+        # print(f"{self.__class__.__name__}._updateModel_ del_vars = {del_vars}")
         #
         # 3.2. now, remove these from the DataBag of observed variables (self.internalVariablesMonitor)
         #
@@ -1170,9 +1170,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # observed variables.
         #
 
-        # current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        # current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.isUserVariable(item[0], item[1])])
         current_vars = dict([item for item in ns.items() if not item[0].startswith(
-            "_") and self.is_user_var(item[0], item[1])])
+            "_") and self.isUserVariable(item[0], item[1])])
 
         # NOTE: 2023-05-24 16:22:58
         # this SHOULD also notify the observers - Works OK when adding new symbols
@@ -1469,8 +1469,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.removeRows(0, self.rowCount())
 
     def update2(self):
-        self.pre_execute()
-        self.post_run_cell(Bunch(success=True))
+        self.preExecute()
+        self.postRunCell(Bunch(success=True))
 
     def update(self):
         """Updates workspace model.
@@ -1495,7 +1495,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # current variable names in the namespace, which should be available to
         # the user
         current_vars = dict([item for item in self.shell.user_ns.items(
-        ) if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        ) if not item[0].startswith("_") and self.isUserVariable(item[0], item[1])])
 
         self.internalVariablesMonitor.remove_members(*list(del_vars))
 
