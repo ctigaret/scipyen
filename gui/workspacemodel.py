@@ -114,7 +114,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.internalVariablesMonitor = DataBag(allow_none=True, mutable_types=True)
         self.internalVariablesMonitor.verbose = True
         self.internalVariablesMonitor.observe(self.internalVariablesListenerCB)
-        # self.internalVariablesMonitor.observe(self.slot_internalVariableChanged)
+        # self.internalVariablesMonitor.observe(self._slot_internalVariableChanged_)
 
         # NOTE: 2021-01-28 17:47:36 TODO to complete observables here
         # management of workspaces in external kernels
@@ -155,8 +155,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                                        WorkspaceVarChange.Modified: partial(self.__class__.updateRowForVariable2, self, self.shell.user_ns),
                                        WorkspaceVarChange.Removed:  partial(self.__class__.removeRowForVariable2, self, self.shell.user_ns)}
 
-        # self.internalVariableChanged.connect(self.slot_internalVariableChanged)
-        self.internalVariableChanged.connect(self.slot_internalVariableChanged)
+        # self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
+        self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
 
     def _foreignNamespacesCountChanged_(self, change):
         # FIXME / TODO 2020-07-30 23:49:13
@@ -721,12 +721,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def internalVariablesListenerCB(self, change):
         # self.__change_dict__ = change
         # QtCore.QTimer.singleShot(0, self._observe_wrapper_)
-        # connected to self.slot_internalVariableChanged, def'ed below
+        # connected to self._slot_internalVariableChanged_, def'ed below
         # print(f"\n{self.__class__.__name__}.internalVariablesListenerCB({change})")
         self.internalVariableChanged.emit(change)
         
-    @pyqtSlot(dict):
-    def slot_cacheInternalVariableChange(self, change):
+    @pyqtSlot(dict)
+    def _slot_cacheInternalVariableChange_(self, change):
         name = change.name
         change_type = change.type
         if change_type == "remove":
@@ -735,10 +735,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             pass
 
     @pyqtSlot(dict)
-    def slot_internalVariableChanged(self, change):
+    def _slot_internalVariableChanged_(self, change):
         """Connected (and triggered by) self.internalVariableChanged Qt signal"""
         name = change.name
-        # print(f"\n{self.__class__.__name__}.slot_internalVariableChanged({change})")
+        # print(f"\n{self.__class__.__name__}._slot_internalVariableChanged_({change})")
 
         displayed_var_names = set(self.getDisplayedVariableNames())
         user_shell_var_names = set(self.shell.user_ns.keys())
@@ -784,8 +784,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             self._varChanges_callbacks_[alteration](name)
             # ⇒ in MainWindow this will trigger cosmetic update of the viewer
             self.modelContentsChanged.emit()
-
-    # @timefunc
 
     def preExecute(self):
         """Updates internalVariablesMonitor DataBag
@@ -1143,7 +1141,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # NOTE: 2023-05-24 16:18:58
         # The DataBag will NOW notify any observers upon the removal of these variables
         # Works OK
-        self.internalVariablesMonitor.remove_members(*list(del_vars))
+        self.internalVariablesMonitor.delete(*list(del_vars))
+        # self.internalVariablesMonitor.remove_members(*list(del_vars))
 
         #
         # 3.3. now, figure out whether there are NEW variables added to the workspace
@@ -1460,37 +1459,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         """
 
-        # names of variables in user namespace
-        current_user_varnames = set(self.shell.user_ns.keys())
-
-        # names of variables present in the internalVariablesMonitor DataBag
-        observed_varnames = set(self.internalVariablesMonitor.keys())
-
-        # names still in internalVariablesMonitor but not in user namespace anymore
-        del_vars = observed_varnames - current_user_varnames
-
-        # current variable names in the namespace, which should be available to
-        # the user
-        current_vars = dict([item for item in self.shell.user_ns.items(
-        ) if not item[0].startswith("_") and self.isUserVariable(item[0], item[1])])
-
-        self.internalVariablesMonitor.remove_members(*list(del_vars))
-
-        self.internalVariablesMonitor.update(current_vars)
-        
-    def update2(self):
-        """Updates workspace model.
-        To be called by code that adds/remove/modifies/renames variables 
-        in the Scipyen's namespace in order to update the workspace viewer.
-        
-        WARNING: This function should NOT be used for normal operation: changes
-        in the workspace contents are monitored by the internal variable monitor
-        which triggers Ui updates already.
-
-        """
         # currently displayed variables in the viewer widget
         displayed_var_names = set(self.getDisplayedVariableNames())
-        
+
+        # current variable names in the namespace, which should be available to
+        # the user - this ain't faster
         current_vars = dict(filter(lambda x: not x[0].startswith("_") and self.isUserVariable(*x), self.shell.user_ns.items()))
         
         # names of variables in user namespace
@@ -1504,7 +1477,46 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         del_vars = observed_varnames - current_user_varnames
 
         # current variable names in the namespace, which should be available to
-        # # the user - CAUTION this scales with 𝒪n !
+        # the user - CAUTION this scales with 𝒪(n) !
+        # current_vars = dict([item for item in self.shell.user_ns.items(
+        # ) if not item[0].startswith("_") and self.isUserVariable(item[0], item[1])])
+
+        self.internalVariablesMonitor.remove_members(*list(del_vars))
+
+        self.internalVariablesMonitor.update(current_vars)
+        
+    def update2(self):
+        """Updates workspace model - batch version.
+        Used when the namespace contents are modified by code run OUTSIDE the 
+        console (hence, independently of the console's kernel events)
+        
+        WARNING: This function is for batch operations and should NOT be used for
+        normal operation: changes in the workspace contents are monitored by the
+        internal variable monitor which triggers Ui updates already.
+
+        """
+        self.internalVariableChanged.disconnect(self._slot_internalVariableChanged_)
+        self.internalVariableChanged.connect(self._slot_cacheInternalVariableChange_)
+        
+        # currently displayed variables in the viewer widget
+        displayed_var_names = set(self.getDisplayedVariableNames())
+        
+        # current variable names in the namespace, which should be available to
+        # the user - is this faster?
+        current_vars = dict(filter(lambda x: not x[0].startswith("_") and self.isUserVariable(*x), self.shell.user_ns.items()))
+        
+        # names of variables in user namespace
+        current_user_varnames = set(current_vars.keys())
+        # current_user_varnames = set(self.shell.user_ns.keys())
+
+        # names of variables present in the internalVariablesMonitor DataBag
+        observed_varnames = set(self.internalVariablesMonitor.keys())
+
+        # names still in internalVariablesMonitor but not in user namespace anymore
+        del_vars = observed_varnames - current_user_varnames
+
+        # current variable names in the namespace, which should be available to
+        # the user - CAUTION this scales with 𝒪(n) !
         # current_vars = dict([item for item in self.shell.user_ns.items(
         # ) if not item[0].startswith("_") and self.isUserVariable(item[0], item[1])])
         
@@ -1519,8 +1531,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.__changes__.update(dict(map(lambda x: (x, WorkspaceVarChange.Modified), mod_vars.keys())))
         
         # with self.holdUIUpdate():
-        self.internalVariablesMonitor.remove_members(*list(del_vars))
-        self.internalVariablesMonitor.update(current_vars)
+        self.internalVariablesMonitor.delete(*list(del_vars)) # -> WorkspaceVarChange.Removed
+        # self.internalVariablesMonitor.remove_members(*list(del_vars)) # -> WorkspaceVarChange.Removed
+        self.internalVariablesMonitor.update(current_vars) # -> WorkspaceVarChange.New or WorkspaceVarChange.Modified
             
         
         # ATTENTION: 2023-05-28 22:42:12

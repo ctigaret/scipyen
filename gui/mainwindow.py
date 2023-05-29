@@ -5393,7 +5393,27 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         # NOTE: 2023-05-27 14:48:04
         # inherited from workspace
-        self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded)
+        # creates a pgui.ProgressWorkerThreaded to create a file loading loop 
+        # in a separate thread. The actual file loading method that is called 
+        # inside the loop is self._openSelectedFileItemsThreaded. 
+        #
+        # In turn, self._openSelectedFileItemsThreaded calls self.loadDiskFile
+        # which places the loaded file data in the workspace by one of two 
+        # mechanisms, depending on the value passed for 'updateUi' parameter:
+        #
+        # 1) When updateUI == True:
+        #   Data is placed in the workspace via the method 
+        #   workspaceModel.bindObjectInNamespace();
+        #   This will trigger an update of the workspaceModel for each iteration
+        #   of the loop - the PROBLEM is that the iteration speed slows down with
+        #   the number of files (number of iterations)
+        #
+        # 2) When updateUi == False:
+        #   Data is places DIRECTLY in the workspace ⇒ this is faster, BUT 
+        #   requires a separate post-hoc update to the workspaceModel, which
+        #   blocks the UI
+        #
+        self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded, updateUi=True)
         
         # CAUTION: DO NOT USE: still needs work TODO/FIXME
         # self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded, updateUi=False)
