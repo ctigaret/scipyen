@@ -724,6 +724,15 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # connected to self.slot_internalVariableChanged, def'ed below
         # print(f"\n{self.__class__.__name__}.internalVariablesListenerCB({change})")
         self.internalVariableChanged.emit(change)
+        
+    @pyqtSlot(dict):
+    def slot_cacheInternalVariableChange(self, change):
+        name = change.name
+        change_type = change.type
+        if change_type == "remove":
+            self.__changes__[name] = WorkspaceVarChange.Removed
+        else:
+            pass
 
     @pyqtSlot(dict)
     def slot_internalVariableChanged(self, change):
@@ -771,6 +780,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         name, alteration = value
         # print(f"\n{self.__class__.__name__}._slot_updateModelFromMonitor_ {name} {alteration.name}")
         if isinstance(alteration, WorkspaceVarChange):
+            # calls a callback to affect the model ⇒ the viewer UI
             self._varChanges_callbacks_[alteration](name)
             # ⇒ in MainWindow this will trigger cosmetic update of the viewer
             self.modelContentsChanged.emit()
