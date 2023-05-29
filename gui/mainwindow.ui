@@ -7,9 +7,15 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>700</width>
-    <height>585</height>
+    <width>812</width>
+    <height>595</height>
    </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
   </property>
   <property name="acceptDrops">
    <bool>true</bool>
@@ -17,7 +23,17 @@
   <property name="windowTitle">
    <string>Scipyen</string>
   </property>
+  <property name="windowIcon">
+   <iconset theme="python">
+    <normaloff>.</normaloff>.</iconset>
+  </property>
   <widget class="QWidget" name="centralwidget">
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
    <property name="maximumSize">
     <size>
      <width>0</width>
@@ -30,9 +46,15 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>700</width>
-     <height>28</height>
+     <width>812</width>
+     <height>30</height>
     </rect>
+   </property>
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
    </property>
    <widget class="QMenu" name="menuFile">
     <property name="title">
@@ -109,7 +131,7 @@
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QDockWidget" name="dockWidgetWorkspace">
    <property name="sizePolicy">
-    <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+    <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
      <horstretch>0</horstretch>
      <verstretch>0</verstretch>
     </sizepolicy>
@@ -158,9 +180,6 @@ Right button click opens context menu with more actions.
 
 NOTE: you can click anywhere in the row to select</string>
        </property>
-       <property name="sizeAdjustPolicy">
-        <enum>QAbstractScrollArea::AdjustToContents</enum>
-       </property>
        <property name="showDropIndicator" stdset="0">
         <bool>false</bool>
        </property>
@@ -194,6 +213,9 @@ NOTE: you can click anywhere in the row to select</string>
        <attribute name="horizontalHeaderCascadingSectionResizes">
         <bool>true</bool>
        </attribute>
+       <attribute name="horizontalHeaderStretchLastSection">
+        <bool>true</bool>
+       </attribute>
        <attribute name="verticalHeaderVisible">
         <bool>true</bool>
        </attribute>
@@ -205,7 +227,7 @@ NOTE: you can click anywhere in the row to select</string>
      <item>
       <widget class="QComboBox" name="varNameFilterFinderComboBox">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
@@ -229,7 +251,7 @@ NOTE: you can click anywhere in the row to select</string>
   </widget>
   <widget class="QDockWidget" name="dockWidgetHistory">
    <property name="sizePolicy">
-    <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+    <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
      <horstretch>0</horstretch>
      <verstretch>0</verstretch>
     </sizepolicy>
@@ -265,9 +287,6 @@ NOTE: you can click anywhere in the row to select</string>
        </property>
        <property name="horizontalScrollBarPolicy">
         <enum>Qt::ScrollBarAlwaysOn</enum>
-       </property>
-       <property name="sizeAdjustPolicy">
-        <enum>QAbstractScrollArea::AdjustToContents</enum>
        </property>
        <property name="showDropIndicator" stdset="0">
         <bool>false</bool>
@@ -308,6 +327,9 @@ NOTE: you can click anywhere in the row to select</string>
        <attribute name="headerShowSortIndicator" stdset="0">
         <bool>false</bool>
        </attribute>
+       <attribute name="headerStretchLastSection">
+        <bool>true</bool>
+       </attribute>
        <column>
         <property name="text">
          <string notr="true">1</string>
@@ -323,7 +345,7 @@ NOTE: you can click anywhere in the row to select</string>
      <item>
       <widget class="QComboBox" name="commandFinderComboBox">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
@@ -347,7 +369,7 @@ NOTE: you can click anywhere in the row to select</string>
   </widget>
   <widget class="QDockWidget" name="dockWidgetFileSystem">
    <property name="sizePolicy">
-    <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+    <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
      <horstretch>0</horstretch>
      <verstretch>0</verstretch>
     </sizepolicy>
@@ -490,31 +512,44 @@ NOTE: you can click anywhere in the row to select</string>
         </widget>
        </item>
        <item>
-        <widget class="QComboBox" name="directoryComboBox">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
+        <spacer name="horizontalSpacer_2">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
          </property>
-         <property name="acceptDrops">
-          <bool>true</bool>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
          </property>
-         <property name="toolTip">
-          <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
-         </property>
-         <property name="statusTip">
-          <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
-         </property>
-         <property name="whatsThis">
-          <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
-         </property>
-         <property name="editable">
-          <bool>true</bool>
-         </property>
-        </widget>
+        </spacer>
        </item>
       </layout>
+     </item>
+     <item>
+      <widget class="QComboBox" name="directoryComboBox">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="acceptDrops">
+        <bool>true</bool>
+       </property>
+       <property name="toolTip">
+        <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
+       </property>
+       <property name="statusTip">
+        <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
+       </property>
+       <property name="whatsThis">
+        <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
+       </property>
+       <property name="editable">
+        <bool>true</bool>
+       </property>
+      </widget>
      </item>
      <item>
       <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -527,7 +562,7 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QLabel" name="currentDirLabel">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Ignored" vsizetype="Fixed">
+          <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
@@ -540,9 +575,9 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QTreeView" name="fileSystemTreeView">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
+          <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
            <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
+           <verstretch>1</verstretch>
           </sizepolicy>
          </property>
          <property name="contextMenuPolicy">
@@ -550,9 +585,6 @@ NOTE: you can click anywhere in the row to select</string>
          </property>
          <property name="acceptDrops">
           <bool>false</bool>
-         </property>
-         <property name="sizeAdjustPolicy">
-          <enum>QAbstractScrollArea::AdjustToContentsOnFirstShow</enum>
          </property>
          <property name="editTriggers">
           <set>QAbstractItemView::DoubleClicked</set>
@@ -665,6 +697,12 @@ NOTE: you can click anywhere in the row to select</string>
           </item>
           <item>
            <widget class="QLabel" name="filesFilterLabel">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="text">
              <string>Filter:</string>
             </property>
@@ -674,9 +712,25 @@ NOTE: you can click anywhere in the row to select</string>
            </widget>
           </item>
           <item>
+           <spacer name="horizontalSpacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeType">
+             <enum>QSizePolicy::Maximum</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>10</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
            <widget class="QComboBox" name="fileSystemFilter">
             <property name="sizePolicy">
-             <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
               <horstretch>0</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>
@@ -707,6 +761,12 @@ NOTE: you can click anywhere in the row to select</string>
    </widget>
   </widget>
   <widget class="QToolBar" name="toolBar">
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
    <property name="windowTitle">
     <string>toolBar</string>
    </property>

@@ -1071,7 +1071,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
     WARNING: Do NOT use for recordings that do not contain a useful injected 
     current signal - either because it was not recorded or because the telegraph
     and/or scaling information was messed up during the recording!.
-    In such cases, use neoutils.getABFProtocolEpochs to manually extract the 
+    In such cases, use getABFProtocolEpochs (from core.pyabfbridge) to manually extract the 
     parameters of the current injection steps i.e. Iinj_0, delta_I, Istart and 
     Istop and pass those to analyse_AP_step_injection_series()
     

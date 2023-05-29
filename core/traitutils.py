@@ -416,7 +416,8 @@ def dynamic_trait(x, *args, **kwargs):
     traitlet_class_name = myclass.__name__
     
     if traitlet_class_name[0].islower():
-        traitlet_class_name = traitlet_class_name[0].upper() + traitlet_class_name[1:]
+        traitlet_class_name = traitlet_class_name.capitalize()
+        # traitlet_class_name = traitlet_class_name[0].upper() + traitlet_class_name[1:]
         
     traitlet_class_name = f"{traitlet_class_name}Trait"
     
@@ -429,6 +430,9 @@ def dynamic_trait(x, *args, **kwargs):
     
     if traitlet_class is not None and (not isinstance(traitlet_class, type) and TraitType not in getmro(traitlet_class)):
         traitlet_class = None
+    
+    # if myclass == dict:
+    #     print(f"traitlet_class {traitlet_class}")
     
     if traitlet_class is None:
         traitlet_classes = [None]

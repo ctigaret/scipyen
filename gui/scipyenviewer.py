@@ -12,8 +12,9 @@ from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 
 from core.utilities import safeWrapper
 # from core import workspacefunctions as wfunc
-from .workspacegui import (WorkspaceGuiMixin, _X11WMBridge_, 
-                           saveWindowSettings, loadWindowSettings)
+# from .workspacegui import (WorkspaceGuiMixin, _X11WMBridge_, 
+#                            saveWindowSettings, loadWindowSettings)
+from .workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 from gui.widgets.spinboxslider import SpinBoxSlider
 from core import sysutils
 from iolib import pictio as pio

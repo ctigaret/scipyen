@@ -11,6 +11,7 @@ Function signatures in ephys.membrane module have changed since this script was
 written - use it as a guide, and NOT verbatim !
 
 """
+from core import pyabfbridge
 # using replcate data (option 1)
 AP_analysis_0000 = membrane.analyse_AP_step_series_replicate(trains_0000, 
 thr=20, name="AP_analysis_0000")
@@ -53,7 +54,7 @@ for n in ('trains_0001',
 # NOTE: 2022-03-08 22:45:02
 #### BEGIN
 # alternatively, when Im signal is not available/usable:
-protocols = neoutils.getABFProtocolEpochs(d)
+protocols = pyabfbridge.getABFProtocolEpochs(d)
 # manually inspect protocols then set up i0, delta_i, istart and istop manually:
 i0 = rheo_0000_protocols[0].loc["First Level", "B"]
 di = rheo_0000_protocols[0].loc["Delta Level", "B"]

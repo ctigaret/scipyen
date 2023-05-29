@@ -13,14 +13,16 @@ from __future__ import print_function
 #### BEGIN core python modules
 import collections 
 from collections import deque
+from functools import (singledispatch, singledispatchmethod)
 import datetime
-from enum import (Enum, IntEnum,)
+from enum import (Enum, IntEnum, EnumMeta)
 import inspect
 import numbers
 import math
 import dataclasses
+from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 import sys
-import time
+import time, datetime
 import traceback
 import typing
 import types
@@ -47,7 +49,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 from core import quantities as scq
 from . import xmlutils
 from . import strutils
-from .prog import safeWrapper, is_hashable, is_type_or_subclass
+from .prog import safeWrapper, is_hashable, is_type_or_subclass, ImmutableDescriptor
 
 #### END pict.core.modules
 
@@ -144,6 +146,38 @@ RELATIVE_TOLERANCE = 1e-4
 ABSOLUTE_TOLERANCE = 1e-4
 EQUAL_NAN = True
 
+def default_value(x:type):
+    if not isinstance(x, type):
+        return x
+    try:
+        if x == datetime.datetime:
+            return datetime.datetime.now()
+        elif x == datetime.date:
+            return datetime.date.today()
+        
+        elif is_enum(x):
+            if isinstance(x, TypeEnum):
+                return x.default()
+            else:
+                mk = list(x.__members__.keys())
+                return x[mk[0]]
+        else:
+            ret = x()
+    except:
+        return None
+
+def is_enum(x):
+    if not isinstance(x, type):
+        return False
+    
+    return Enum in inspect.getmro(x)
+
+def is_enum_value(x):
+    if isinstance(x, type):
+        return False
+    
+    return isinstance(type(x), EnumMeta)
+
 def is_routine(x):
     """ Similar to is_callable but excludes classes with __call__ method.
     """
@@ -154,23 +188,9 @@ def is_routine(x):
                       types.CoroutineType, types.MethodDescriptorType,
                       types.ClassMethodDescriptorType)
     
-    # testers = (inspect.isfunction, inspect.ismethod, 
-    #            inspect.isgeneratorfunction, 
-    #            inspect.iscoroutinefunction,
-    #            inspect.isasyncgenfunction,
-    #            inspect.isbuiltin, 
-    #            inspect.isroutine # NOTE: is this redundant? (isfunction or ismethod or isbuiltin)
-    #            )
-    
-    
     return isinstance(x, function_types)
     
 
-#     if not ret:
-#         ret = any(f(x) for f in testers)
-#         
-#     return ret
-    
 def is_callable(x):
     """Brief reminder:
     An object is callable if it is:
@@ -567,6 +587,14 @@ def categorize_data_frame_columns(data, *column_names, inplace=True):
 class TypeEnum(IntEnum):
     """Common ancestor for enum types used in Scipyen
     """
+    
+    @classmethod
+    def default(cls):
+        """Aways returns the first member of the enum class
+        """
+        names = list(cls.names())
+        return cls[names[0]]
+    
     @classmethod
     def names(cls):
         """Iterate through the names in TypeEnum enumeration.
@@ -848,8 +876,6 @@ def inspect_members(obj, predicate=None):
     
     specials = ("fb_", "f_", "co_", "gi_", "cr_", "__")
     
-    # print(f"inspect_members predicate: {predicate}")
-    
     names = tuple(n for n in dir(obj) if n not in skips and all(not n.startswith(s) for s in specials))
     
     mb = tuple((n, getattr(obj, n, None)) for n in names)
@@ -857,18 +883,122 @@ def inspect_members(obj, predicate=None):
     if inspect.isfunction(predicate):
         mb = tuple(filter(lambda x: predicate(x[1]), mb))
         
-    # mb = tuple(map(lambda x: x[:97] + "..." if isinstance(x, (str, bytes)) and len(x)> 100 else x, mb))
-                   
     return dict(mb)
                    
-#     if inspect.isfunction(predicate):
-#         
-#         mb = inspect.getmembers(obj, predicate)
-#     else:
-#         mb = inspect.getmembers(obj)
-#         
-#     
-#     mb = filter(lambda x: x[0] not in skips and all(not x[0].startswith(s) for s in specials), mb)
-#         
-#     return dict(mb)
+@dataclass
+class Episode:
+    name:str = ""
+    _:KW_ONLY
+    begin:datetime.datetime = datetime.datetime.now()
+    end:datetime.datetime = datetime.datetime.now()
+    startFrame:int = 0
+    endFrame:int = 1
+    
+@dataclass
+class Schedule:
+    name:str = ""
+    _:KW_ONLY
+    episodes:typing.Sequence[Episode] = field(default_factory = lambda : [Episode()])
+    
+    @singledispatchmethod
+    def episode(self, ndx):
+        pass
+    
+    @episode.register(int)
+    def _(self, ndx:int):
+        if ndx < 0 or ndx >= len(self.episodes):
+            raise IndexError(f"Invalid episode index {ndx} for {len(self.episodes)}")
+        
+        return self.episodes[ndx]
+    
+    @episode.register(str)
+    def _(self, name:str):
+        episodes = [e for e in self.episodes if e.name == name]
+        if len(episodes):
+            return episodes[0]
+        else:
+            raise IndexError(f"Episode name {name} does not exist")
+        
+    def episodeNames(self):
+        return [e.name for e in self.episodes]
+    
+    def addEpisode(self, episode:Episode):
+        if episode not in self.episodes:
+            self.episodes.append(episode)
+            
+    def addEpisodes(self, episodes:typing.Sequence[Episode]):
+        self.episodes.extend([e for e in episodes if e not in self.episodes])
+        
+    def removeEpisode(self, episode):
+        if episode in self.episodes:
+            self.episodes.remove(episode)
+    
+class ProcedureType(TypeEnum):
+    null = 0
+    treatment = 1
+    surgery = 2
+    behaviour = 4 # to include navigation in real or virtual environment, rotarod, inclined plane, licking etc # TODO to refine
+    biopsy = 8
+    tagging = 16
+    mating = 128
+    cull = 255
+    
+class AdministrationRoute(TypeEnum):
+    null = 0
+    intraperitoneal = 1
+    intramuscular = 2
+    intravenous = 4
+    intraarterial = 8
+    intracerebral = 16
+    intraventricular = 32
+    intracerebroventricular = intracerebral | intraventricular # 48
+    intracardiac = 64
+    subcutaneous = 128
+    transcutaneous = 256
+    peros = 512 # e.g. gavage
+    inhalation = 1024
+    intranasal = 2048
+    intraorbital = 4096
+    food_water = 8192
+    other = 8192
+    
+    # aliases
+    ip = intraperitoneal
+    iv = intravenous
+    ia = intraarterial
+    im = intramuscular
+    icb = intracerebral
+    icv = intracerebroventricular
+    ic = intracardiac
+    ins = intranasal # 'in' is a reserved keyword
+    ih = inhalation
+    io = intraorbital
+    sc = subcutaneous
+    tc = transcutaneous
+    gavage = peros
+    
+@dataclass
+class Procedure:
+    name:str = ""
+    _:KW_ONLY
+    procedureType:ProcedureType = ProcedureType.null
+    schedule:Schedule = Schedule()
+    
+@dataclass
+class TreatmentProcedure(Procedure):
+    _:KW_ONLY
+    dose:pq.Quantity = field(default_factory=lambda : math.nan * pq.g)
+    route:AdministrationRoute = AdministrationRoute.null
+    procedureType:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
+    
+    def __post_init__(self):
+        super().__init__(name=self.name, episodes = self.episodes)
+        # super().__init__(name=self.name, procedureType = ProcedureType.treatment, episodes = self.episodes)
+        
+        unitFamily = scq.getUnitFamily(self.dose)
+    
+        acceptableUnitFamilies = ("Mass", "Volume", "Substance", "Concentration", "Flow")
+    
+        if unitFamily not in acceptableUnitFamilies:
+            raise ValueError(f"'dose' has wrong units; the units should be units of {acceptableUnitFamilies}")
         

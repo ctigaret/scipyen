@@ -17,6 +17,10 @@ from core.prog import (ArgumentError, OneOf,
                        parse_descriptor_specification, WithDescriptors,
                        setup_descriptor)
 
+from core.datatypes import (Episode, Schedule, ProcedureType, AdministrationRoute, 
+                            Procedure, TreatmentProcedure, TypeEnum,
+                            )
+
 class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
     """Simple repository for the minimally-required, common attributes.
     
@@ -51,7 +55,7 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
             
     procedure: dict; optional, default is None
         When a dict it may contain:
-            'type' -> str e.g., "treatment", "surgery", "rotarod", etc informative
+            'type' -> datatypes.ProcedureType or str e.g., "treatment", "surgery", "rotarod", etc informative
                 enough to allow data classification later
                 
             'name' -> str e.g., the name of the drug, or of the procedure
@@ -99,6 +103,7 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
                             ("age",                 (0*pq.s, "NA")),
                             ("biometric_weight",    (0*pq.g, "NA")), 
                             ("biometric_height",    (0*pq.m, "NA")),
+                            ("procedure",           Procedure),
                             ("procedure_type",      "NA"),
                             ("procedure_name",      "NA"),
                             ("procedure_dose",      (0*pq.g, "NA")),
@@ -124,11 +129,42 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
         super().__init__(name=name, description=description, file_origin=file_origin, **kwargs)
         
     def __attr_str__(self):
+        result = list()
         for a in self._descriptor_attributes_:
-            result.append(f"{a[0]}: {getattr(self, a[0], None)}")
+            attr = getattr(self, a[0], None)
+            attr_str = type(attr).__name__
             
-        return "\n".join(result)
+            if isinstance(attr, neo.Block):
+                attr_str += f" with {len(attr.segments)} segments"
+                
+            elif isinstance(attr, np.ndarray):
+                attr_str += f" with shape {attr.shape}"
+                
+            else:
+                attr_str = f"{attr}"
+                
+            result.append(f"{a[0]}: {attr_str}")
+            
+        return result
+        # return "\n".join(result)
     
+    def _repr_pretty_(self, p, cycle):
+        name = self.name if isinstance(self.name, str) else ""
+        
+        if cycle:
+            p.text(f"{self.__class__.__name__} {name}")
+        else:
+            p.text(f"{self.__class__.__name__} {name}")
+            p.breakable()
+            attr_repr = self.__attr_str__()
+            with p.group(4 ,"(",")"):
+                for t in attr_repr:
+                    p.text(t)
+                    p.breakable()
+                p.text("\n")
+                
+            p.breakable()
+            
     @property
     def mandatory_descriptors(self):
         return dict((a[0], getattr(self, a[0], None)) for a in self._descriptor_attributes_)

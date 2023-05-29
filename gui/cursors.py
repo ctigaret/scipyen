@@ -86,6 +86,10 @@ class CursorLine(pg.InfiniteLine):
     def _init__(self, **kwargs):
         super().__init__(**kwargs)
         
+    # NOTE: 2023-04-26 09:03:25
+    # do not delete -- I may have to revisit this
+    # TODO: 2023-04-26 09:03:46
+    # capture click events on the lines to pop up cursor editor dialog
     # def mouseClickevent(self, evt):
     #     self.sigClicked.emit(self, ev)
     #     if self.moving and ev.button() == QtCore.Qt.MouseButton.RightButton:
@@ -478,14 +482,14 @@ class SignalCursor(QtCore.QObject):
             # return self._get_plotitem_data_bounds_(host)
         
         elif isinstance(host, pg.GraphicsScene):
-            # host is a graphics scene when the cursor is intended to span
             # NOTE 2019-02-07 17:14:27
+            # host is a graphics scene when the cursor is intended to span
             # several axes.
             # In this case, I cannot rely on data bounds (viewRange()[1]) 
             # because each data in the plot can have different scales;
             # so I have to rely on the plotitems' bounding rects
             # 
-            # for best pracice, pre-determine the bounds in the caller, according
+            # for best practice, pre-determine the bounds in the caller, according
             # to the plot items layout, data boundaries and type of cursor
             # (vertical, horizontal or crosshair)
             pIs = [i for i in host.items() if isinstance(i, pg.PlotItem)]
@@ -1105,7 +1109,6 @@ class SignalCursor(QtCore.QObject):
         
         scene = self.hostScene
         
-        
         self._interpret_scene_mouse_events_(scene)
         
         if self._dragging_ and self._cursor_type_ == SignalCursorTypes.crosshair:
@@ -1156,9 +1159,11 @@ class SignalCursor(QtCore.QObject):
         # CAUTION
         # when activated by the scene sigMouseMoved signal, this carries the
         # mouse event's scenePos(); what if pos is NOT this but a point in 
-        # other coordinate system?
+        # another coordinate system?
         
         if isinstance(self._host_graphics_item_, pg.PlotItem):
+            # NOTE: 2023-04-26 08:47:35
+            # this branch is for single-axis cursors
             self._current_plot_item_ = self._host_graphics_item_
             
             if self._host_graphics_item_.sceneBoundingRect().contains(pos):
@@ -1185,12 +1190,16 @@ class SignalCursor(QtCore.QObject):
                 self.sig_reportPosition.emit(self.ID)
                 
         elif isinstance(self._host_graphics_item_, pg.GraphicsScene):
+            # NOTE: 2023-04-26 08:47:51
+            # this branch is for multi-axis cursors
             if self._hl_:
-                self._hl_.setPos(pos.y())
+                pos0 = self._hl_.pos()
+                self._hl_.setPos((pos0.x(),pos.y()))
                 self._y_ = pos.y()
                 
             if self._vl_:
-                self._vl_.setPos(pos.x())
+                pos0 = self._vl_.pos()
+                self._vl_.setPos((pos.x(), pos0.y()))
                 self._x_ = pos.x()
                 
             self.sig_reportPosition.emit(self.ID)

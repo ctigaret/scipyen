@@ -180,6 +180,7 @@ from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventTyp
 from core.triggerprotocols import TriggerProtocol
 
 from core import datatypes as dt
+from core.datatypes import TypeEnum
 from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities
@@ -197,14 +198,24 @@ from gui.cursors import (SignalCursor, SignalCursorTypes)
 
 #### END pict.core modules
 
-# class SignalCursor:
-#     # dummy
-#     pass
 
 if __debug__:
     global __debug_count__
 
     __debug_count__ = 0
+    
+class ClampMode(TypeEnum):
+    NoClamp=1
+    VoltageClamp=2
+    CurrentClamp=4
+    
+    
+class ElectrodeMode(TypeEnum):
+    Field=1
+    WholeCellPatch=2
+    ExcisedPatch=4
+    Sharp=8
+    
     
 def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], start:int = 0, span:int=1, isISI:bool=False):
     """Calculates the reciprocal of an inter-event interval.
@@ -1798,8 +1809,9 @@ class ElectrophysiologyProtocol(object):
     Intended to provide a common denominator for data acquired with various 
         electrophysiology software vendors. 
         
-    WARNING API under development (i.e. unstable) TODO
+    WARNING DO NOT USE YET - API under development (i.e. unstable) TODO
     """
+    # TODO/FIXME see if pyabf can be used
     def __init__(self):
         # possible values for self._data_source_:
         # "Axon", "CEDSignal", "CEDSpike", "Ephus", "NA", "unknown"
@@ -1829,6 +1841,9 @@ class ElectrophysiologyProtocol(object):
         self._n_sweeps_ = data_protocol.get("lEpisodesPerRun",1)
         self._alternative_digital_outputs_ = data_protocol.get("nAlternativeDigitalOutputState", 0) == 1
         self._alternative_DAC_command_output_ = data_protocol.get("nAlternativeDACOutputState", 0) == 1
+        
+    def _parse_ced_data_(self, data:object):
+        pass
 
 def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs):
     """Generates a signal containing a synthetic waveform, as a column vector.

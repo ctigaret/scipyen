@@ -1421,7 +1421,7 @@
     <string>Plot all events</string>
    </property>
    <property name="toolTip">
-    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Plot all detected events in the data.&lt;/p&gt;&lt;p&gt;Normally therse are only the accepted events, unless &amp;quot;All waves to result&amp;quot; is checked.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Plot all detected events in the data - if &amp;quot;All waves to result&amp;quot; is unchecked, plots accepted waveforms only.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="actionAll_waves_to_result">

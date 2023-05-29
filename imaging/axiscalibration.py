@@ -1182,8 +1182,8 @@ class AxisCalibrationData(CalibrationData):
             self._data_.key = axisTypeSymbol(val)
             
     @property
-    def channels(self) -> list:
-        """Returns a list of tuples with (name, ChannelCalibrationData) 
+    def channels(self):
+        """Returns a tuple of tuples with (name, ChannelCalibrationData) 
         
         WARNING: Excludes calibration data for virtual channel.
         
@@ -1222,7 +1222,7 @@ class AxisCalibrationData(CalibrationData):
             
         The setter has no effect for a NonChannel axis
         """
-        return list((k,v) for k,v in self._data_.items() if isinstance(v, ChannelCalibrationData))
+        return tuple((k,v) for k,v in self._data_.items() if isinstance(v, ChannelCalibrationData))
         
     @channels.setter
     def channels(self, val:typing.Sequence[typing.Tuple[str, typing.Union[ChannelCalibrationData, dict]]]):
@@ -1253,13 +1253,13 @@ class AxisCalibrationData(CalibrationData):
         as for the `channels` property setter (it actualy delegates to the
         latter).
         """
-        ret = [(k,v) for k, v in self._data_.items() if isinstance(v, ChannelCalibrationData)]
+        ret = tuple((k,v) for k, v in self._data_.items() if isinstance(v, ChannelCalibrationData))
         #ret = list((k,v) for v in self._data_.items() if isinstance(v, ChannelCalibrationData))
         
         if len(ret) == 0 and self.type == vigra.AxisType.Channels:
             cal = ChannelCalibrationData()
             cal.name = "virtual_channel_0"
-            return [cal.name, cal]
+            return (cal.name, cal)
         
         return ret
         
@@ -1272,23 +1272,23 @@ class AxisCalibrationData(CalibrationData):
         
     @property
     def channelNames(self):
-        """A list of channel names, from their calibration data.
+        """A tuple of channel names, from their calibration data.
         These include the virtual channel (if it exists).
         
         This list is empty if the AxisCalibrationData corresponds to a 
         non-Channels axis.
         """
-        return list(ch[1].name for ch in self.channelCalibrations)
+        return tuple(ch[1].name for ch in self.channelCalibrations)
         
     @property
     def channelIndices(self):
-        """A list of channel indices, from their calibration data.
+        """A tuple of channel indices, from their calibration data.
         These include the virtual channel (if it exists).
         
         This list is empty if the AxisCalibrationData corresponds to a 
         non-Channels axis.
         """
-        return list(ch[1].index for ch in self.channelCalibrations)
+        return tuple(ch[1].index for ch in self.channelCalibrations)
         
     @property
     def nChannels(self) -> int:

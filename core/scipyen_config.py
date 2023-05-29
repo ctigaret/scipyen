@@ -604,7 +604,7 @@ def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]):
         
     return gname, pfx
 
-#@safeWrapper
+@safeWrapper
 def saveQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, val:typing.Any):
     if len(gname.strip()) == 0:
         gname = "General"
@@ -614,13 +614,14 @@ def saveQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, val:typin
     qsettings.setValue(key_name, val)
     qsettings.endGroup()
     
-#@safeWrapper
+@safeWrapper
 def loadQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, default:typing.Any):
     if len(gname.strip()) == 0:
         gname = "General"
     key_name = "%s%s" % (pfx, key)
     
     qsettings.beginGroup(gname)
+    # print(f"loadQSettingsKey group: {gname}, key: {key})")
     ret = qsettings.value(key_name, default)
     qsettings.endGroup()
     # print(f"loadQSettingsKey group: {gname}, key: {key}, value: {ret} ({type(ret).__name__})")
@@ -1420,20 +1421,6 @@ class ScipyenConfigurable(object):
                     except Exception as e:
                         traceback.print_exc()
                         continue
-#                     getset = cfg.get(k, {})
-#                     gettername = getset.get("getter", None)
-#                     
-#                     if not isinstance(gettername, str) or len(gettername.strip())==0:
-#                         continue
-#                     
-#                     getter = inspect.getattr_static(self, gettername, None)
-#                     
-#                     if isinstance(getter, property):
-#                         val = getattr(self, gettername)
-#                         
-#                     elif getter is not None:
-#                         getter = getattr(self, gettername)
-#                         val  = getter()
 
                     #### BEGIN debug - comment out when done
                     # if self.__class__.__name__ == "EventAnalysis":

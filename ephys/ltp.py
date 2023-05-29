@@ -1,609 +1,12 @@
 # -*- coding: utf-8 -*-
-"""
-The first aim in Scipyen's LTP analysis is to store minute-average synaptic 
-responses recorded before ("baseline") and after conditioning ("chase"), separately 
-for each of the pathways used in the experiment (see "Case 1" below).
-
-To achieve this, LTP generates two neo.Block objects - baseline and chase - 
-for each pathway. These blocks contain neo.Segments with minute-averaged data
-(analog signals). The steps required to construct these blocks depend on how the 
-data was acquired in Clampex, as explained below.
-
-Clampex saves the data as a collection of ABF files. Each file contains signals
-recorded for one trial, and upon loading in Scipyen yields a single neo.Block
-object.
-
-The Trial may contain a single Run. In this case, the neo.Block holds the data 
-recorded during that Run. 
-
-When a Trial is defined as having several Runs, Clampex averaged the run data so 
-that the neo.Block holds the average data from several Runs per Trial.
-
-Clampex Trial => one ABF file => neo.Block:
-        single Run      => neo.Block contains the Run data
-        several Runs    => neo.Block containes the data averaged across the Runs
-                            of the Trial
-                            
-Clampex Runs contain at least one sweep. In Scipyen, a sweep corresponds to one
-neo.Segment, and several Segments are collected in the Block's "segments" attribute
-(a list)
-    
-Clampex Sweep => neo.Segment contained in the Block's "segments" attribute.
-    
-The signals recorded in a sweep are stored as neo.AnalogSignal objects which are
-collected in the Segment's "analgosignals" attribute (a list).
-        
-The possible scenarios when using Clampex for recording are described here
-(see also Clampex Lab Bench example at the end of this documentation for signal 
-names and roles).
-
-Case 1. 
-======
-Recording of two independent synaptic pathways converging on the same
-post-synaptic cell (whole-cell recording) or in the same slice (field recording). 
-
-Synaptic responses are recorded through the same ANALOG IN channel, and can be
-EPSCs (in whole-cell voltage clamp) EPSPs (in whole-cell current clamp) or
-fEPSPs (in field recording).
-
-For whole-cell recordings, the same ANALOG OUT (corresponding to the same recording
-channel of the amplifier) is used to send command signals in order to:
-    - set the holding Vm (in voltage clampe) or Im (in current clamp)
-    - deliver depolarizing test pulses used to calculate Rs and Rin (in voltage clamp)
-        or hyperpolarizing current pulses used to calculate Rin (in current clamp)
-
-Test stimuli are delivered ALTERNATIVELY to each pathway, usually at low frequency
-(0.1 Hz, i.e., 1 test stimulus every 10 s on a given pathway). 
-
-To help distinguish between pathway-specific responses while placing an equal
-stimulation burden to both pathways, the test stimuli are interleaved, such that
-they are delivered to the tissue at equal intervals.
-
-This generates the following stimulation scheme, applied before and after
-conditioning:
-
-Stimulus        0                   1                   2   etc...
-
-Time (s)        0         5         10        15        20  NOTE: __ = 1s = one "sweep"
-
-Path 0          |___________________|___________________|_  NOTE: |_ = test stimulus; this can be a paired pulse stimultion (e.g. two sitmuli 25 ms apart, etc)
-
-Path 1          __________|___________________|___________
-
-
-This can be achieved in Clampex in three ways:
-
-Case 1.1
---------
-Ideal protocol: each pathway is alternatively stimulated in interleaved
-sweeps => minute-averaged responses are saved on disk.
-
-Protocol file: AltStim2PathwaysAvgTwoChannels.pro - see Example Protocol below.
-
-Protocol defines ONE trial, to be run from a sequencer key which calls itself 
-with 10 s delay, in an infinite loop.
-
-In the acquisition toolbar turn Repeat mode OFF, otherwise trials will start 
-right after the end of the previous one.
-
-The Trial contains 6 runs (which automatically enables averaging of data from
-corresponding sweeps in 6 consecutive runs). There is a start-to-start interval
-of 10 s between runs in the same trial
-
-Each Run contains 2 sweeps (one per pathway) with alternative digital outputs.
-
-Data is saved as trial averages (each trial generates an average of 6 runs) => the
-disk files (*.abf) contain minute-by-minute average data, each with two sweeps:
-
-sweep 0  = the average of sweep 0 in all 6 runs/trial;
-sweep 1  = the average of sweep 1 in all 6 runs/trial.
-
-Upon loading in Scipyen, these files yield neo.Block objects (one from each file)
-with two segments each (corresponding to the sweeps described above). 
-
-These blocks need to be concatenated such that for each path there are two final 
-blocks: the "baseline" and the "chase" block (four final blocks in total).
-
-These blocks have sweeps from the same pathway, with each sweep holding
-minute-average data.
-
-Case 1.2
--------- 
-Pathway stimulation in interleaved sweeps => sweep data is saved directly without
-averaging.
-
-The Protocol defines ONE Trial, to be run in an infinite loop from a sequenceer 
-key.
-
-The Trial contains a single run consisting of two sweeps as above. 
-
-Each ABF file contains un-averaged synaptic reponse data, and there should be 6 
-consecutive files per minute
-
-Loading these files in Scipyen yields a sequence of neo.Block objects with two
-segments each (containing individual pathway-specific responses as described 
-above).
-
-These need to be averaged using count=6 every=6, separately for baseline and 
-chase.
-
-Cases 1.1 and 1.2 cannot be distinguished based on the content of the ABF files.
-The distinction must be made in the LTP GUI dialog.
-
-
-Case 1.3
---------
-Separate protocols for each  pathway; each pathway is alternatively stimulated,
-and responses are recorded as individual sweeps (1 sweep per file) without 
-averaging.
-
-The protocols are interleaved in an infinite loop using the sequencer (assign a 
-key to each protocol, then set the key for the first protocol to call the second
-procotol after a 5 s delay, and vice-versa).
-
-Each protocol defines a Trial with one Run containing one Sweep that stimulates 
-a specific pathway.
-
-Upon loading in Scipyen, the ABF files yield neo.Block objects each containing 
-one segment.
-
-In Scipyen, these blocks need to be assigned to a pathway, then averaged using 
-count=6, every=6, to generate one baseline and one chase block per pathway.
-
-
-To help in assigning the responses to their corresponding stimulated pathway, it
-is useful to record the digital outputs as well. This can be done by tee-ing the 
-digital OUT signal for each patwhay and feeding onto separate analog inputs of 
-the digitizer, then including these inputs in the protocol (make sure they are 
-defined in the lab bench, see signals 'Stim_0' and 'Stim_1' in the example Lab Bench
-configuration given below).
-
-
-NOTE: Minute-averaged data in each pathway could in principle, be also recorded 
-using consecutive trials of 6 runs for each pathwa in turny (ie., one minute for
-path 0, then next minute for path 1, then back to path 0, etc ). However, this 
-will stimulate the two paths unequally.
-
-
-NOTE TODO use the metadata stored in the ABF file to distinguish / "guess" which 
-of the Cases 1.1, 1.2. 1.3 are used, and to determine to which pathway the 
-signals belong.
-
-### BEGIN Boilerplate analysis code
-====================================
-
-1) Generate baseline and chase blocks for each pathway
-
-1.1) Case 1.1 - minute-averaged data is already saved => just concatenate the 
-blocks:
-
-path_0_baseline = neoutils.concatenate_blocks(getvars("base_avg_*"), segment=0, analog = [2,3,4])
-path_0_chase = neoutils.concatenate_blocks(getvars("chase_avg_*"), segment=0, analog = [2,3,4])
-
-path_1_baseline = neoutils.concatenate_blocks(getvars("base_avg_*"), segment=1, analog = [2,3,5])
-path_1_chase = neoutils.concatenate_blocks(getvars("chase_avg_*"), segment=1, analog = [2,3,5])
-
-
-
-1.2) Case 1.2 - pair of alternate sweeps (path 0 then path 1) saved per trial; 
-expecting 6 trials per minute (each with two sweeps); need to average the blocks
-(count = 6, every = 6) assuming that first segment in each block refers to the 
-same pathway (and the second one, to the other pathway).
-
-path_0_baseline = ephys.average_blocks("baseline_*", segment=0, count=6, every=6,
-                                        analog=[2,3], 
-                                        name="c03_3123_17b13_baseline_path_0")
-
-path_0_chase = ephys.average_blocks("chase_*", segment=0, count=6, every=6, 
-                                        analog=[2,3], 
-                                        name="c03_3123_17b13_chase_path_0")
-
-path_1_baseline = ephys.average_blocks("baseline_*", segment=1, count=6, every=6,
-                                        analog=[2,3], 
-                                        name="c03_3123_17b13_baseline_path_1")
-
-path_1_chase = ephys.average_blocks("chase_*", segment=1, count=6, every=6, 
-                                        analog=[2,3], 
-                                        name="c03_3123_17b13_chase_path_1")
-
-1.3) Case 1.3 - each ABF file is a block with a single segment corresponding to
-one pathway.
-
-2) Set up the parameters for constructing cursors
-
-cursors_0 = [0.05, 0.066, 0.15, 0.26, 0.275, 0.31, 0.325]
-labels = ["Rbase", "Rs", "Rin", "EPSC0Base", "EPSC0Peak", "EPSC1Base", "EPSC1Peak"]
-xwindow=0.005
-
-2.1) For Cases 1.1 and 1.2 the runs have two sweeps; the second sweep of each
-runs start 5 s later (see the Example Protocol below); therefore we create a 
-second collection of cursor times:
-
-NOTE: this may be circumvented by setting all signals to start at 0 in the 
-concatenated block (case 1.1) or averaged block (case 1.2), once they have been
-created, e.g. by calling neoutils.set_relative_time_start()
-
-cursors_1 = [c + 5 for c in cursors_0] # call this ONLY it NOT calling set_relative_time_start()
-
-3) Display the block with the baseline or control data from one pathway in a 
-Signlaviewer
-
-4) Add cursors to SignalViewer window that displays the baseline or chase block
-for one pathway (pathway 0)
-
-4.1) Make sure no other cursors exist in the window: they may not be visible if
-outside the time base of the currently displayed segment (sweep).
-
-    * use the SignalViewer Menu "Cursors/Remove cursors/Remove all cursors"
-    
-    * or, in Scipyen's console, call:
-    
-        SignalViewer_0.removeCursors()
-    
-4.2) Call:
-
-SignalViewer_0.addCursors("v", *cursors_0, labels=labels, xwindow=xwindow)
-
-    NOTE: make sure the asterisk is there before cursors_0
-
-4.3) Use these cursors to create an Epoch named "LTP" and embedded in the 
-block's segments:
-
-4.3.1) Optionally, navigate through segments and adjust cursor positions.
-
-NOTE The cursor's X position cannot be set on a per-segment basis. Therefore,
-choose the optimal cursor position, allowing for some jitter in the synaptic
-responses.
-
-
-4.3.2) Use SignalViewer menu Cursors/Make Epochs in Data/From all cursors, OR
-in Scipiyen's console, call:
-    
-SignalViewer_0.cursorsToEpoch(name="LTP", embed=True, overwrite=True)
-
-Alternatively, to obtain a prompt for Epoch's name, call:
-    SignalViewer_0.slot_cursorsToEpochInData()
-
-    CAUTION: For LTP analysis the Epoch MUST be named "LTP".
-    
-    In the prompt dialog box:
-
-        * Name the epoch as "LTP"
-
-        * Un-check to option to embed in current segment only
-
-        * Check the option to remove all epochs
-
-5) proceed with the other pathway (pathway 1)
-    CAUTION: in experiments where data was acquired according to Case 1.1 or 1.2
-    the start time in every 2nd sweep in the run starts after the inter-sweep 
-    delay (e.g  5s) 
-    
-    See point (2.1) above
-    
-    In this case go to (4.1)
-
-ATTENTION: repeat the call in (4.2) but with cursors_1 if needed
-
-SignalViewer_0.addCursors("v", *cursors_1, labels=labels, xwindow=xwindow)
-
-In the experiments where all sweeps start at the same time in both pathways, you
-may use the set of LTP cursors that already exists in the SignalWindow
-
-6) Run the LTP analysis - this measures Rs, Rin , and the EPSC amplitudes;
-optionally, and when the test stimulus is a paired-pulse, also measures the 
-amplitude of the second EPSC and calculates paired-pulse ratio (PPR) - a 
-measure of paired pulse facilitation.
-
-c01_20i15_path_0 = ltp.analyse_LTP_in_pathway(path_0_base, path_0_chase, 0, 0,
-                                              is_test=True, signal_index_Vm=1, 
-                                              trigger_signal_index=2, 
-                                              basename="c01_20i15", 
-                                              normalize=True)
-                                              
-c01_20i15_path_1 = ltp.analyse_LTP_in_pathway(path_1_base, path_1_chase,1,0,is_test=True, signal_index_Vm=1, trigger_signal_index=2, basename="c01_20i15", normalize=True)
-c01_20i15_path_1 = ltp.analyse_LTP_in_pathway(path_1_base, path_1_chase,0,1,is_test=True, signal_index_Vm=1, trigger_signal_index=2, basename="c01_20i15", normalize=True)
-
-
-7) Obtain 5-min average EPSC waveforms, and plot to SVG:
-7.1) sweep averages
-
-E.g. considering the sweeps contain minute-average records:
-
-7.1.a) to average last 5 sweeps of pre-conditioning, the segment_index must be range(-1, -5, -1):
-
-path_0_baseline_averaged = ephys.average_segments_in_block(path_0_baseline, segment_index = range(-1, -5, -1))
-
-7.1.b) to average 30-35 min of sweeps of pos-conditioning, set the segment_index to
-range(30,36)
-
-path_1_chase_averaged = ephys.average_segments_in_block(path_1_chase, segment_index = range(30, 36))
-
-7.2) time slice holding the synaptic responses
-
-epscs = neoutils.get_time_slice(path_X_Y_average, t0, t1,analog_index=0)
-
-where:
-    t0 = 0.25 * pq.s, t1 = 0.4 * pq.s OR
-    t0 = 5.25 * pq.s, t1 = 5.4 * pq.s depending on which pathway is used (see 
-    point (2.1) above)
-
-epsc_0_base = neoutils.get_time_slice(path_0_baseline_averaged, 0.25*pq.s, 0.4*pq.s, analog_index = 0)
-epsc_0_chase = neoutils.get_time_slice(path_0_chase_averaged, 0.25*pq.s, 0.4*pq.s, analog_index = 0)
-epsc_1_base = neoutils.get_time_slice(path_1_baseline_averaged, 5.25*pq.s, 5.4*pq.s, analog_index = 0)
-epsc_1_chase = neoutils.get_time_slice(path_1_chase_averaged, 5.25*pq.s, 5.4*pq.s, analog_index = 0)
-
-7.3) remove the DC component (or at least bring signals to similar baseline)
-
-epsc_0_base.segments[0].analogsignals[0] -= epsc_0_base.segments[0].analogsignals[0].max()
-epsc_0_chase.segments[0].analogsignals[0] -= epsc_0_chase.segments[0].analogsignals[0].max()
-epsc_1_base.segments[0].analogsignals[0] -= epsc_1_base.segments[0].analogsignals[0].max()
-epsc_1_chase.segments[0].analogsignals[0] -= epsc_1_chase.segments[0].analogsignals[0].max()
-
-TODO: can do better than the example above: instead of offsetting the signals by their max(),
-offset them by the mean of a time slice BEFORE the stim artifact, e.g. the first 10 ms:
-
-epsc_0_base.segments[0].analogsignals[0] -= epsc_0_base.segments[0].analogsignals[0].time_slice(0.25*pq.s, 0.26*pq.s).mean()
-epsc_0_chase.segments[0].analogsignals[0] -= epsc_0_chase.segments[0].analogsignals[0].time_slice(0.25*pq.s, 0.26*pq.s).mean()
-epsc_1_base.segments[0].analogsignals[0] -= epsc_1_base.segments[0].analogsignals[0].time_slice(5.25*pq.s, 5.26*pq.s).mean()
-epsc_1_chase.segments[0].analogsignals[0] -= epsc_1_chase.segments[0].analogsignals[0].time_slice(5.25*pq.s, 5.26*pq.s).mean()
-
-
-7.4) plot with matplotlib
-
-x = epscs.segments[0].analogsignals[0].times
-y = epscs.segments[0].analogsignals[0].magnitude
-
-plt.plot(x,y)
-
-or, better (make sure the correct title is assigned ot Test or Control pathways)
-
-plots.plotNeoSignal(epsc_0_base.segments[0].analogsignals[0], label = "Pre-conditioning", ylabel="Membrane current (%s)" % epsc_0_base.segments[0].analogsignals[0].dimensionality, fig=Figure1, newPlot=True, color="black")
-plots.plotNeoSignal(epsc_0_chase.segments[0].analogsignals[0], label = "Post-conditioning", ylabel="Membrane current (%s)" % epsc_0_chase.segments[0].analogsignals[0].dimensionality, fig=Figure1, newPlot=False, color="#DD0000", panel_size = (2.5,1.5), title="Control")
-
-
-
-
-### END Boilerplate analysis code
-
-### BEGIN Example Clampex Lab Bench 
-### Lab Bench: ###
-Input Signals:
-=============
-    Digitizer channels      Signals(1)(2)   Signal units(3) Amplifier(4)        Use:
-    -----------------------------------------------------------------------------------------
-    Analog IN #0:           Im_prim_0       pA              Channel 0 Primary   V-clamp
-                            Vm_prim_0       mV                                  I-clamp
-                            IN 0
-                            
-    Analog IN #1:           Vm_sec_0        mV              Channel 0 Secondary V-clamp
-                            Im_sec_0        pA                                  I-clamp
-                            IN 1
-                            
-    Analog IN #2:           Im_prim_1       pA                                  V-clamp
-                            Vm_prim_1       mV                                  I-clamp
-                            IN 2
-                            
-    Analog IN #3:           Vm_sec_1        mV                                  V-clamp
-                            Im_sec_1        pA                                  I-clamp
-                            IN 3
-
-    Analog IN #5:           Stim_0                                              From digitizer DIG OUT 0
-    Analog IN #6:           Stim_1                                              From digitizer DIG OUT 1
-    
-Output Signals:
-===============
-    Digitizer channels      Signals                         Amplifier           Use:
-    ---------------------------------------------------------------------------------
-    Analog OUT #0           V_clamp_0       mV              Command in          V-clamp
-                            I_clamp_0       pA                                  I-clamp              
-                            OUT 0
-                            Cmd 0
-                            
-    Analog OUT #1           V_clamp_1                                           V-clamp
-                            I_clamp_1                                           I-clamp
-                            OUT 1
-                            Cmd 1
-                            
-    Analog OUT #2           OUT 2
-                            Cmd 2
-                            
-    Analog OUT #3           OUT 3   
-                            Cmd 3
-                            
-    Digital OUT channels
-    --------------------
-    set in the protocol
-    
-    
-    
-
-
-NOTE:
-(1) These are just labels; you may choose the appropriate one to understand the
-role that the corresponding digitizer channel has, in the protocol.
-
-
-(3) The scale should be set via telegraph, with the amplfier in the APPROPRIATE MODE
-    i.e., V-clamp OR I-clamp !!!
-    
-(4) the actual analog signal send to the digitizer channel depends on the configuration
-of the amplifier outputs, in the MultiClamp commander software
-
-The primary and secondary outputs are usually configured to feed analogsignals
-to the digitizer input(s) to which they are connected:
-
-Amplifier Channel 0
-    Voltage clamp:
-        Primary   output => membrane current   -> to digitizer Analog IN #0
-        Secondary output => membrane potential -> to digitizer Analog IN #1
-        
-        Command input <= command potential <- from digitizer Analog OUT #0
-        
-    Current clamp:
-        Primary   output => membrane potential -> to digitizer Analog IN #0
-        Secondary output => membrane current   -> to digitizer Analog IN #1
-        
-        Command input <= command current <- from digitizer Analog OUT #0
-
-Amplifier Channel 1
-    Voltage clamp:
-        Primary   output => membrane current   -> to digitizer Analog IN #2
-        Secondary output => membrane potential -> to digitizer Analog IN #3
-        
-        Command input <= command potential <- from digitizer Analog OUT #1
-        
-    Current clamp:
-        Primary   output => membrane potential -> to digitizer Analog IN #2
-        Secondary output => membrane current   -> to digitizer Analog IN #3
-        
-        Command input <= command current <- from digitizer Analog OUT #1
-
-### END Example Clampex Lab Bench
-
-### BEGIN Example protocol for case 1.1
-
-Protocol parameters (Edit Protocol dialog):
-
-Mode/rate:
-==========
-    Acquisition mode: episodic stimulation
-    ----------------
-
-    Trial hierarchy:
-    ----------------
-        Trial delay: 0 s
-        Runs/Trial: 6, with 10 s start-to-start interval between runs
-        Sweeps/run: 2, with  5 s start-to-start interva between sweeps
-        Each sweep:
-            1 s duration (50 k samples, for fast rate of 50 kHz)
-    
-Inputs: (Analog IN channels) - Digidata 1550 series supports 16 analog IN channels
-=======
-    ON  Channel #0: Im_prim_0
-    ON  Channel #1: Vm_sec_0
-    ON  Channel #2: Im_prim_1
-    ON  Channel #3: Vm_sec_1
-    OFF Channel #4: IN 4
-    ON  Channel #5: Stim_0
-    ON  Channel #6: Stim_1
-
-    ... all other channels from #7 to #15 are OFF
-
-Outputs: (Analog OUT channels) - Digidata 1550 series supports 4 analog OUT channels
-========
-    Channel #0: V_clamp_0 - all holding level 0 mV
-    Channel #1: V_clamp_1
-    Channel #2: Cmd 2
-    Channel #3: Cmd 3
-
-    Digital OUT holding pattern: 7 - 0 all unchecked 
-
-Trigger:
-=======
-    Start trial with: Immediate 
-    Trigger source: internal timer
-
-    Scope trigger: OFF
-
-    External Tags: OFF
-
-Statistics: 
-===========
-    Shape Statistics: OFF
-
-Comments: 
-=========
-    Comments: OFF
-
-Math: 
-=====
-Math Signal: OFF
-
-Waveform:
-========
-    Channel #0:
-    ----------
-        Waveform Analog OUT: V_clamp_0
-        
-        Analog Waveform: ON
-            Epochs
-            Intersweep holding level: Use holding
-            
-        Digital outputs: ON
-            Active high logic for digital trains: ON
-            Intersweep bit patters: Use holding.
-            
-        Epoch Table
-            Description                 A       B       C       D   
-            Type                        Step    Pulse   Step    Step
-            First level (mV)            0       5       0       0
-            Delta level (mV)            0       0       0       0
-            First duration (ms)         50      100     100     100
-            Delta duration (ms)         0       0       0       0
-            Digital bit pattern (#3-0)  0000    0000    0000    000*
-            Digital bit pattern (#7-4)  0000    0000    0000    0000
-            Train rate (Hz)                     20              20
-            Pulse width (ms)                    50              1
-                                                                Pulse count 2
-    Channel #1:
-    ===========
-        Waveform Analog OUT: V_clamp_1
-        Analog Waveform: ON
-            Epochs
-            Intersweep holding level: Use holding
-            
-        Digital outputs: OFF ("enabled on Channel #0.")
-        
-        Epoch Table
-            Description                 A       B       C       D   
-            Type                        Step    Pulse   Step    Step
-            First level (mV)            0       5       0       0
-            Delta level (mV)            0       0       0       0
-            First duration (ms)         50      100     100     100
-            Delta duration (ms)         0       0       0       0
-            Digital bit pattern (#3-0)  0000    0000    0000    00*0
-            Digital bit pattern (#7-4)  0000    0000    0000    0000
-            Train rate (Hz)                     20              20
-            Pulse width (ms)                    50              1
-                                                                Pulse count 2
-                                                                
-    Number of sweeps: 2 - Allocated time: 381.24 of 1000 ms
-    Alternate Waveforms: OFF
-    Alternate digital outputs: ON
-
-### END example protocol for case 1.1
-
-TODO 2020-10-20 21:45:35
-
-1) finalize ephys.ElectrophysiologyProtocol, to "guess" the Clampex protocol
-configuration from the ABF files (this metadata is stored in the "annotations"
-attribute of the neo.Block objects)
-2) GUI for LTP experiments - with fields to modify these parameters
-    This should generate the baseline and chase blocks, for the LTP experiments.
-    Choose between single- or dual pathway experiments.
-    Parse (and then adjust) conditioning protocol.
-    Prompt for cursor times
-    Perform the analysis of LTP parameters :
-    for V-clamp: Rs, Rin, EPSC0 amplitude, and optionally EPSC1 amplitude and PPR
-    for I-clamps: Rin, EPSP0 slope, and optionally EPSP1 slope & PPR
-    for field recordings: fEPSP0 slope, fibre volley amplitude, pop spike; 
-        optionally, the same for second fEPSP, and PPR
-        
-        
-    Adapt for data acquired using CED Signal 5.
-    
-    
-"""
-
 
 #### BEGIN core python modules
-import sys, traceback, inspect, numbers
-import warnings
-import os, pickle
-import collections
-import itertools
+import os, sys, traceback, inspect, numbers, warnings
+import functools, itertools
+import collections, enum
 import typing, types
+import dataclasses
+from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 
 #### END core python modules
 
@@ -627,15 +30,47 @@ import core.workspacefunctions as wf
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.datatypes as dt
+from core.datatypes import (Episode, Schedule, TypeEnum)
 from core.quantities import units_convertible
 import plots.plots as plots
 import core.models as models
 import core.neoutils as neoutils
-import core.triggerprotocols as tp
-from core.triggerevent import (TriggerEvent, TriggerEventType,)
 
-#from core.patchneo import neo
-from core.utilities import safeWrapper
+from core.neoutils import (clear_events, get_index_of_named_signal, is_empty, 
+                           concatenate_blocks, concatenate_signals,
+                           average_segments)
+
+import core.triggerprotocols as tp
+from core.triggerprotocols import (TriggerProtocol,
+                                   embed_trigger_protocol, 
+                                   embed_trigger_event,
+                                   parse_trigger_protocols,
+                                   remove_trigger_protocol,)
+
+from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType,)
+
+from core import (prog, traitcontainers, strutils, neoutils, models,)
+from core.prog import (safeWrapper, AttributeAdapter)
+from core.basescipyen import BaseScipyenData
+from core.traitcontainers import DataBag
+from core import quantities as cq
+from core.quantities import(arbitrary_unit, 
+                            pixel_unit, 
+                            channel_unit,
+                            space_frequency_unit,
+                            angle_frequency_unit,
+                            day_in_vitro,
+                            week_in_vitro, postnatal_day, postnatal_month,
+                            embryonic_day, embryonic_week, embryonic_month,
+                            unit_quantity_from_name_or_symbol,
+                            check_time_units)
+
+from core.utilities import (safeWrapper, 
+                            reverse_mapping_lookup, 
+                            get_index_for_seq, 
+                            sp_set_loc,
+                            normalized_index)
+
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
@@ -655,6 +90,8 @@ import iolib.pictio as pio
 #### END pict.iolib modules
 
 import ephys.ephys as ephys
+from ephys.ephys import ClampMode, ElectrodeMode
+
 
 LTPOptionsFile = os.path.join(os.path.dirname(__file__), "options", "LTPOptions.pkl")
 optionsDir     = os.path.join(os.path.dirname(__file__), "options")
@@ -667,825 +104,327 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,
                                                    import_from="gui") #  so that resources can be imported too
 
 
-"""
-NOTE: 2020-02-14 16:54:19 LTP options revamp
-NOTATIONS: Im = membrane current; Vm = membrane potential
-
-Configurations for synaptic plasticity experiments (ex vivo slice) = dictionary with the following fields:
-
-A synaptic plasticity experiment takes place in three stages:
-        1. pre-conditioning ("baseline") test synaptic responses
-        2. conditioning (plasticity induction protocol)
-        3. post-conditioning ("chase") test synaptic responses
-        
-Test synaptic responses are evoked at low frequency (< 1 Hz) by stimulations of 
-presynaptic axons. Because of normal fluctuations in the synaptic response, the 
-average synaptic response during each minute is usually more relevant: for 0.1 Hz 
-stimulation this is the average of six consecutive responses.
-
-Averaging can be performed "on-line" during the experiment, and the minute-average
-responses are recorded directly (Signal2 from CED, and Clampex from Axon/MolecularDevices
-can do this). Alternatively, the averaging can be performed off-line, using the saved
-data.
-
-The synaptic responses can be recorded as:
-    * evoked post-synaptic currents or potentials, using in whole-cell patch clamp 
-        or with intracellular (sharp) electrodes, in current clamp;
-        
-    * evoked field potentials, using in extracellular field recordings.
-        
-Conditioning consists of a sequence of stimulations delivered to presynaptic axons,
-optionally combined with depolarization of the postsynaptic cell(s). 
-
-Postsynaptic cell depolarization:
---------------------------------
-Postsynaptic current injections are used to elicit postsynaptic action potentials
-(with intracellular sharp electrodes or whole-cell patch clamp), or tonic 
-depolarization (whole-cell patch clamp with Na+ channel blockers in the intracellular 
-solution). Antidromic stimulation of the efferent axons using extracellulal electrodes
-can also be used to elicit postsynaptic action potentials in extracellular field 
-recordings.
-
-1. Single pathway experiments:
---------------------------------
-A single stimulation electrode is used to stimulate a single pathway (bundle of 
-presynaptic axons), and the evoked responses are recorded. 
-
-Synaptic plasticity is determined by comparing the magnitude of the average 
-synaptic response some time after conditioning, to that of the average synaptic 
-response during the baseline immediately prior conditioning.
-
-2. Dual-pathway experiments. 
---------------------------------
-Synaptic responses are recorded, ideally, from two  pathways: 
-* a conditioned ("Test") pathway - the pathway ot which the conditioning protocol
-    is applied
-    
-* a non-conditioned ("Control") pathway which is left unperturbed (not stimulated)
-    during conditioning.
-
-The occurrence of synaptic plasticity is determined by comparing the averaged
-synaptic responses some time after conditioning, to the averaged synaptic responses
-during the baseline immediately before conditioning, in each pathway. 
-
-Homosynaptic plasticity is indicated by a persistent change in synaptic response
-magnitude in the Test pathway, and no change in the Control pathway.
-
-3 Single recording electrode
---------------------------------
-In dual-pathway experiments, the two pathways converge and make synapses on the 
-same cell (in whole-cell recording) or within the same cell population (in 
-extracellular field recording), and a single electrode is used to record the evoked
-synaptic responses from both pathways. The Control pathway serves as a "reference" 
-(or "internal control") for the stability of synaptic responses in the absence of
-conditioning. 
-
-To distinguish between the pathway source of synaptic responses, the experiment
-records intervealed sweeps, with each pathway stimulated alternatively.
-
-4 Two recording electrodes
-------------------------------
-Two recording electrodes may be used to combine whole-cell recording with 
-extracellular field recording (e.g., Zalutsky & Nicoll, 1990).
-
-This can be used in single- or dual-pathway configurations.
-
-Configuration ("LTP_options") -- dictionary
--------------------------------------------
-
-"paths": dictionary of path specifications, with each key being a path "name"
-
-Must contain at least one key: "Test", mapped to the specification of the "test"
-    pathway
-    
-Members (keys) of a pathway specification dictionary:
-"sweep_index"
-    
-
-
-Configuration fields:
-        
-"paths": collection of one or two path dictionaries
-
-    Test synaptic responses from each path are recorded in interleaved sweeps.
-    
-    For Clampex, this means the experiment is recorded in runs containing 
-        
-    The test responses during (or typically at the end of) the chase are compared
-    to the average baseline test response, on a specific measure, e.g. the amplitude
-    of the EPSC or EPSP, or the slope of the (field) EPSP, to determine whether
-    synaptic plasticity has been induced.
-        
-    There is no prescribed duration of the baseline or chase stages - these
-    depend on the protocol, recording mode and what it is sought by the
-    experiment. 
-    
-    Very short baselines (less than 5 min) are not considered reliable. 
-    Long baselines (15 min or more) while not commonly used in LTP experiments
-    with whole-cell recordings in order to avoid "LTP wash-out", unless the 
-    perforated patch technique is used. On the other hand, long baselines are 
-    recommended for when using field potential recordings and for LTD 
-    experiments with whole-cell recordings (wash-out is thought not to be an
-    issue).
-        
-    When only a path dictionary is present, this is implied to represent the 
-        conditioned (test) pathway.
-    
-    For two pathways, the conditioned pathway is indicated by the name 
-        "Test". The other pathways can have any unique name, but the one that is
-        used as a control should be distinguished by its name (e.g. "Control")
-        
-    Key/value pairs in the path dictionary:
-        name: str, possible vales: "Test", "Control", or any name
-        index: the index of the sweep that contains data recorded from this path
-        
-    
-"mode":str, one of ["VC", "IC", "fEPSP"]
-
-
-
-"paired":bool. When True, test stimulation is paired-pulse; this applies to all 
-    paths in the experiment (see below)
-
-"isi":[float, pq.quantity] - interval between stimuli in paired-pulse stimulation
-    when a pq.quantity, it must be in time units compatible with the data
-    when a float, the time units of the data are implicit
-    
-
-"paths":dict with keys "Test" and "Control", or empty
-    paths["Test"]:int
-    paths["Control"]:[int, NoneType]
-    
-    When present and non-empty, indicates that this is a dual pathway experiment
-    where one is the test pathway and the other, the control pathway.
-    
-    The values of the "Test" pathway is the integer index of the sweep corresponding 
-    to the test pathway, in each "Run" stored as an *.abf file
-    
-    Similarly, the value of "Control" is the integer index of the sweep containing
-    data recorded on the control pathway, in each run stored in the *.abf file
-    
-    Although the paths key is used primarily when importing abf files into an
-    experiment, it is also used during analysis, to signal that the experiment is
-    a dual-pathway experiment.
-    
-    An Exception is raised when:
-        a) both "Test" and "Control" have the same value, or
-        b) any of "Test" and "Control" have values < 0 or > max number of sweeps
-        in the run (NOTE: a run is stored internally as a neo.Block; hence the 
-        number of sweeps in the run equals the number of segments in the Block)
-    
-    The experiment is implicitly considered to be single-pathway when:
-    a) "paths" is absent
-    b) "paths" is None or an empty dictionary
-    c) "paths" only contains one pathway specification (any name, any value)
-    d) "paths" contains both "Test", and "Control" fields but Control is either
-        None, or has a negative value
-        
-"xtalk": dictionary with configuration parameters for testing cross-talk between
-    pathways
-    Ignored when "dual" is False.
-    
-
-
-1) allow for one or two pathways experiment
-
-2) allow for single or paired-pulse stimulation (must be the same in both pathways)
-
-3) allow for the following recording modes:
-3.a) whole-cell patch clamp:
-3.a.1) mode="VC": voltage clamp mode => measures series and input resistances,
-    and the peak amplitude of EPSC (one or two, if paire-pulse is True
-    
-    field: "Rm": 
-        defines the baseline region for series and input resistance calculation
-            
-        subfields:
-        
-        "Rbase" either:
-            tuple(position:[float, pq.quantity], window:[float, pq.quantity], name:str)
-            
-            of sequence of two tuples as above
-            
-            each tuple defines a cursor;
-                when a single cursor is defined, its window defines the baseline
-                region
-                
-                when two cursors are defined, their positions delimit the baseline region
-            
-            
-        
-            sets up the cursor Rbase - for Rs and Rin calculations
-            type: vertical, position, window, name = Rbase
-            
-            placed manually before the depolarizing Vm square waveform
-            for the membrane resistance test 
-        
-        field: "Rs":
-        
-        tuple(position:[float, pq.quantity], window:[float, pq.quantity], name:str)
-        
-            sets up the second cursors for the calculation of Rs:
-            this can be
-        
-        * Rs: 
-            required LTP options fields:
-                cursor 1 for resistance test baseline 
-                        
-                cursor 2 for peak of capacitance transient
-                    type: vertical, position, window, name = Rs
-                    
-                    placed manually
-                        either on the peak of the 1st capacitance transient at the
-                        onset of the positive Vm step waveform for the membrane
-                        resistance test
-                        
-                        or after this peak, to use with positive peak detection
-                    
-                value of Vm step (mV)
-                
-                name of the Im signal
-                
-                use peak detection: bool, default False
-            
-            calculation of Rs:
-                Irs = Im_Rs - Im_Rbase where:
-                    Im_Rs = average Im across the window of Rs cursor
-                    Im_Rbase = averae Im across the window of the Rbase cursor
-                
-            Rs = Vm_step/Irs in megaohm
-            
-            
-        * Rin:
-            required LTP options fields:
-                cursor 1 for steady-state Im during the positive (i.e. depolarizing)
-                    VM step waveform
-                    
-                    type: vertical, position, window, name=Rin
-                    
-                    placed manualy towards the end of the Vm step waveform BEFORE repolarization
-                    
-            calculated as :
-                Irin = Im_Rin - Im_Rbase, where:
-                    Im_Rin = average Im acros the window of the Rin cursor
-                    Im_Rbase -- see Rs
-                    
-                Rin = Vm_step/Irin
-                
-        * EPSC0: peak amplitude of 1st EPSC
-            required LTP options fields:
-                cursor for baseline before stimulus artifact
-                type: vertical; position, window, name=EPSC0_base
-                manually placed before stimuus artifact for 1st EPSC
-                
-                cursor for peak of EPSC0
-                type: vertical, position, window, name=EPSC0
-                placed either manually, or use inward peak detection between
-                    two cursors
-                
-                
-        if paired-pulse stimulation: 
-            peak amplitude of 2nd EPSC
-            ratio 2nd EPSC peak amplitude / 1st EPSC peak amplitude
-            
-        EPSC amplitudes measurements:
-            - at cursor placed at EPSC peak (manually) or by peak-finding
-            - relative to baseline cursor before stimulus artifact
-            - value = average of data within cursor's WINDOW
-            
-            
-"""
 
 #"def" pairedPulseEPSCs(data_block, Im_signal, Vm_signal, epoch = None):
 
-class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
-    def __init__(self, **kwargs):
+class PathwayType(TypeEnum):
+    """
+    Synaptic pathway type.
+    """
+    # TODO: 2023-05-22 14:28:53
+    # To emulate a cross-talk - style recording, this should be associated with
+    # a mapping detailing the order of the cross-stimulation
+    
+    Null = 0
+    Test = 1
+    Control = 2
+    Type1 = 4
+    Type2 = 8
+    Type3 = 16
+    Type4 = 32
+    Type5 = 64
+    Type6 = 128
+    
+class PathwayEpisode(Episode):
+    """
+    Specification of an episode in a synaptic pathway.
+    
+    An "episode" is a series of sweeps recorded during a specific set of 
+    experimental conditions.
+    
+    All sweeps in the episode have in common the same set of conditions.
+    
+    Examples:
+    =========
+    
+    1) A response baseline recorded without drug, followed by response baseline 
+    recorded in the presence of a drug, then followed by a drug wash-out are 
+    three distinct "episodes".
+    
+    2) Segments recorded while testing for cross-talk between synaptic pathways, 
+    (and therefore, where the paired pulses are crossed between pathways) is a
+    distinct episode from one where each segment contains responses from the 
+    same synaptic pathway
+    
+    The sweeps in PathwayEpisodeSpecification are a sequence of neo.Block 
+    objects where each synaptic pathway has contributed data for a neo.Segment
+    inside the Block.
+    
+    Fields (constructor parameters):
+    ================================
+    • name:str - mandatory, name of the episode
+    • blocks: a sequence of neo.Blocks, where each block has recording sweeps 
+        (i.e., neo.Segment objects) with data from possibily more than one
+        real-world synaptic pathway, and where each pathway provides data for 
+        the same sweep index in the block.
+    
+        When synaptic responses are recorded from more than one pathway (typically
+        two), the pathways are usually interleaved. For example, two pathways
+        where synaptic responses are evoked interlaved would be organized like
+        this:
+    
+            block 0 - segment 0 → pathway 0
+            block 0 - segment 1 → pathway 1
+        
+            block 1 - segment 0 → pathway 0
+            block 1 - segment 1 → pathway 1
+        
+            ⋮
+        
+            etc
+    
+    
+    The PathwayEpisodeSpecification only stores references to the data sweeps.
+    
+    The other fields indicate optional indices into the data segments and signals
+    that are used to generate the actual data stored inside a SynapticPathway 
+    object, by concatenating the pathway-specific data components in a new neo.Block:
+    
+    • response : int or str - respectively, the index or the name of the
+        analog signal in each sweep, containing the pathway-specific synaptic
+        response
+        
+    • analogCommand : int or str - index or name of the analog signal containing
+        voltage- or current-clamp command signal (or None); such a signal is 
+        typically recorded - when available - by feeding the secondary output of
+        the amplifier into an ADC input in the acquisition board.
+        
+    • digitalCommand: int or str - index or name of the analog signal containing
+        a recorded version of the triggers for extracellular stimulation.
+        
+        When available, these are triggers sent to stimulus isolation boxes to 
+        elicit an extracellular stimulus.
+        
+        The triggers themselves are typically TTL signals, either taken directly
+        from the acquisition board digital output, or "emulated" by an analog
+        (DAC) output containing a rectangulare wave of 5 V amplitude.
+        
+        In either case, these triggers can be routed into an ADC input of the
+        acquisition board, for recording (e.g., using a BNC "tee" splitter).
+        
+    • segments : an indexing object¹ into each block's sweeps (or segments)
+        belonging to the the same pathway; typically, each pathway contributes 
+        to exactly one segment in each block.
+        
+    • analogsignals, irregularlysampledsignals, imagesequences, spiketrains,
+        epochs, events: indexing objects into the corresponding segments attributes
+        used to select a subset of the data.
+    
+        Although these are optional (with the default being None) it is recommended
+    that at least the analogsignals contain a sequence of the indices given in
+    response, analogCommand and digitalCommand.
+    
+    ---
+    
+    ¹ An indexing object is an int, range, slice, str, sequence of int, or 
+        sequence of str -- see documentation for the normalized_index() function
+        in Scipyen module "utilities".
+    
+    
+    
+    """
+    def __init__(self, name:str, data=None, 
+                 response=None, analogCommand=None, digitalCommand=None,
+                 segments=None, analogsignals=None, irregularlysampledsignals=None,
+                 imagesequences=None, spiketrains=None, epochs=None,events=None):
+        
+        self.name=name
+        if isinstance(data, (tuple, list)) and len(data) and all(isinstance(b, neo.Block) in data):
+            self._data_ = neoutils.concatenate_blocks()
+    
+
+class SynapticPathway(BaseScipyenData):
+    """Encapsulates a logical stimulus-response relationship between signals.
+
+    Signals are identified by name or their index in the collection of a sweep's
+    analogsignals (the `analgosignals` attribute of a neo.Segment object).
+
+    The signals are:
+    • response (analog, regularly sampled)
+    • analogCommand (analog signal) - command waveform
+    • digitalCommand - TTL waveform
+
+    In most circumstances, the command signals are, respectively, records of the
+    command signal from the amplifier and of the TTL signal sent out by the 
+    DAC/ADC board, and fed back into the ADC board's auxiliary inupt ports.
+
+    In addition, the synaptic pathway has a pathwayType attribute which specifies
+    the pathway's role in a synaptic plasticity experiment.
+    
+    """
+    _data_children_ = (
+        ("data", neo.Block(name="Data")),
+        )
+    
+    _data_attributes_ = (
+        ("pathwayType", PathwayType, PathwayType.Test),
+        ("responseSignal", (str, int), 0),
+        ("analogCommandSignal", (str, int), 1),
+        ("digitalCommandSignal", (str, int), 2),
+        ("schedule", Schedule, Schedule()),
+        )
+    
+    _descriptor_attributes_ = _data_children_ + _data_attributes_ + BaseScipyenData._descriptor_attributes_
+    
+    def __init__(self, data:neo.Block=neo.Block(), pathwayType:PathwayType = PathwayType.Test, 
+                 name:typing.Optional[str]=None, 
+                 response:typing.Optional[typing.Union[str, int]]=None, 
+                 analogCommand:typing.Union[typing.Union[str, int]] = None, 
+                 digitalCommand:typing.Optional[typing.Union[str, int]] = None, 
+                 schedule:typing.Optional[Schedule] = None, **kwargs):
+        """
+        Named parameters:
+        ----------------
+        data: recorded sweeps belonging to the pathway (neo.Block) or None
+    
+        pathwayType: the role of the pathway in a synaptic plasticity experiment
+                        (Test, Control, Other)
+    
+        name: name of the pathway (by default is the name of the pathwayType)
+    
+        response: name or index¹ of the analog signal containing the synaptic response
+    
+        analogCommand: name or index¹ of the analog signal containing the analog
+                command signal
+    
+        digitalCommand: name or index¹ of the analog signal containing the digital
+                command signal
+        
+        """
+        super().__init__(**kwargs)
+
+    @staticmethod
+    def fromBlocks(pathName:str, pathwayType:PathwayType=PathwayType.Test, 
+                   *episodeSpecs:typing.Sequence[PathwayEpisode]):
+        """
+        Factory for SynapticPathway.
+        
+        Parameters:
+        ==========
+        pathName:str - name of the pathway
+        pathwayType:PathwayType - the type of the pathway (optional, default is PathwayType.Test)
+        
+        *episodeSpecs: sequence of PathwayEpisodeSpecifications                       
+        
+        """
+        
+        
+        
+        # NOTE: 2023-05-19 17:08:53
+        # an episode spec is a mapping of str ↦ sequence of neo Blocks
+        # 
+        # The blocks in the sequence are ordered here by their rec_datetime
+        # WARNING/TODO: check argument types
+        #
+        
+        epiNameSet = set(episodeSpecs.keys())
+        
+        if len(epiNameSet) != len(episodeSpecs):
+            dupl_ = [k for k in episodeSpecs.keys() if k not in epiNameSet]
+            raise ValueError(f"Duplicate episode names were specified: {dupl_}")
+        
+        nBlocks = sum(len(bl) for bl in episodeSpecs.values())
+        
+        segments = list()
+        
+        episodes = list()
+        episodeBlocks = list() # temporary store of episode blocks
+                            # will be concatenated to generate final data for the
+                            # pathway
+                            
+        # NOTE: 2023-05-20 11:06:02
+        # Because we want to concatenate all segments in a single neo.Block for
+        # this pathway (associated with the 'data' field) we store references
+        # to the start frame & end frame in the episode
+        startFrame = 0
+        
+        for episodeName, blocks, in episodeSpecs.items():
+            bb = sorted(blocks, key = lambda x: x.rec_datetime)
+            
+            for k, b in enumerate(bb):
+                try:
+                    _ = normalized_index(b.segments, segments) 
+                except:
+                    raise ValueError(f"Invaid segment index {segments} for block {k} ({b.name}) in episode {episodeName}")
+            
+            datetime_start = bb[0].rec_datetime
+            datetime_end = bb[-1].rec_datetime
+            
+            # TODO/FIXME: 2023-05-21 23:41:45
+            # copy segments directly with data subset, here
+            # fullBlockList.extend(bb)
+            
+            # episodeBlock = concatenate_blocks(*bb, segments=segments,
+            #                                   analogsignals=analogsignals,
+            #                                   irregularlysampledsignals=irregularlysampledsignals,
+            #                                   imagesequences=imagesequences,
+            #                                   spiketrains=spiketrains,
+            #                                   epochs=epochs,event=events)
+
+            
+
+            episodes.append(Episode(episodeName, 
+                              begin=datetime_start,
+                              end=datetime_end,
+                              startFrame=startFrame,
+                              endFrame=startFrame + sum(len(b.segments) for b in bb)-1))
+            
+            # episodeBlocks.append(episodeBlock)
+            
+            startFrame += len(episodeBlock.segments)
+            
+        data = concatenate_blocks(*episodeBlocks) # no data subset selection here
+        
+        schedule = Schedule(episodes)
+        
+        return SynapticPathway(data=data, name=pathName,
+                               pathwayType=pathwayType,
+                               response=response,
+                               analogCommand=analogCommand,
+                               digitalCommand=digitalCommand,
+                               schedule=schedule)
+        
+        
+class SynapticPlasticityData(BaseScipyenData):
+    _data_children_ = (
+        ("pathways", (list, tuple), SynapticPathway),
+        )
+    
+    _derived_data_children_ = (
+        ("Rs", neo.IrregularlySampledSignal, neo.IrregularlySampledSignal([], [], units=pq.Mohm, time_units=pq.s, name="Rs")),
+        ("Rin", neo.IrregularlySampledSignal, neo.IrregularlySampledSignal([], [], units=pq.Mohm, time_units=pq.s, name="Rin")),
+        ("SynapticResponse", list, neo.IrregularlySampledSignal, neo.IrregularlySampledSignal([], [], units=pq.dimensionless, time_units=pq.s, name="")) # one per pathway
+        )
+    
+    
+    _result_data_ = (
+        ("result", pd.DataFrame),
+        )
+    
+    _graphics_attributes_ = (
+        ("dataCursors", dict),
+        ("epochs", dict)
+        )
+    
+    _data_attributes_ = (
+        ("clampMode", ClampMode, ClampMode.VoltageClamp),
+        ("electrodeModel", ElectrodeMode, ElectrodeMode.WholeCellPatch),
+        ("baselineReference", range),
+        )
+    
+    _option_attributes_ = ()
+    
+    _descriptor_attributes_ = _data_children_ + _derived_data_children_ + _result_data_ + _data_attributes_ + _graphics_attributes_ + BaseScipyenData._descriptor_attributes_
+        
+    def __init__(self, pathways:typing.Optional[typing.Sequence[SynapticPathway]]=None, **kwargs):
         super().__init__(**kwargs)
         
-        self.qsettings = QtCore.QSettings()
-        self.threadpool = QtCore.QThreadPool()
-        
-        self._data_ = dict()
-        self._data_["Baseline"] = dict()
-        self._data_["Baseline"]["Test"] = None
-        self._data_["Baseline"]["Control"] = None
-        self._data_["Chase"] = dict()
-        self._data_["Chase"]["Test"] = None
-        self._data_["Chase"]["Control"] = None
-        
-        self._viewers_ = dict()
-        
-        self._viewers_["baseline_source"] = None
-        self._viewers_["conditioning_source"] = None
-        self._viewers_["chase_source"] = None
-        
-        self._viewers_["pathways"] = dict()
-        
-        
-        # NOTE: 2020-02-23 11:10:20
-        # During conditioning the "Control" synaptic pathway is unperturbed but
-        # it is possible to stimulate additional synaptic pathways for other
-        # purposes: 
-        # for NST+SWR experiments, a separate synmaptic pathway is used to
-        # simulated sharp wave/ripple events
-        # during cooperative LTP experiments, an additional "strong" pathway is 
-        # stimulated concomitently with the "Test" (or "weak") pathway so that
-        # LTP is induced in the weak pathway - without the strong pathway 
-        # stimulation there would be no LTP on the weak ("Test") pathway.
-        self._data_["Conditioning"] = dict()
-        self._data_["Conditioning"]["Test"] = None
-        
-        
-        # raw data: collections of neo.Blocks, sources from software 
-        # vendor-specific data files. These can be:
-        # a) axon (ABF v2) files (generated with Clampex)
-        # 
-        #    Each block contains data from a single trial.
-        #
-        #    In turn, each trial contains data ither from a single run, 
-        #    or averaged data from several runs per trial (the timgins of 
-        #    sweeps/run and run/trial should bve set so that they result
-        #    in minute-by-minute averages). In the first case (single run per 
-        #    trial) the data shuold be averaged offline, either manually or 
-        #    using LTPWindow API.
-        #
-        # b) CFS files (generated with CED Signal) -- TODO
-        #    there is usually a single file generated for the entire experiment
-        #    but, depending on the script used for the acquisition, it may be
-        #    accompanied by two other cfs files, each with pathway-specific 
-        #    minute-by-minute average signals.
-        #
-        #    Notably, the "pulse" information is NOT saved with the file 
-        #    unless extra ADC inputs are used to piggyback the digital output 
-        #    signals (tee-ed out). Also, the sampling configuration allows
-        #    several "pulse" protocols which can be selected / sequenced
-        #    and do nto necessarily result in separate baseline and chase
-        #    data.
-        #
-        self._baseline_source_data_ = list()
-        self._chase_source_data_ = list()
-        self._conditioning_source_data_ = list()
-        self._path_xtalk_source_data_ = list()
-        
-        self._data_var_name_ = None
-        
-        self._ltpOptions_ = dict()
-        
-    def _configureUI_(self):
-        self.setupUi(self)
-        
-        self.actionOpenExperimentFile.triggered.connect(self.slot_openExperimentFile)
-        self.actionOPenBaselineSourceFiles.triggered.connect(self.slot_openBaselineSourceFiles)
-        self.actionOpenChaseSourceFiles.triggered.connect(self.slot_openChaseSourceFiles)
-        self.actionOpenConditioningSourceFiles.triggered.connect(self.slot_openConditioningSourceFiles)
-        self.actionOpenPathwayCrosstalkSourceFiles.triggered.connect(self.slot_openPathwaysXTalkSourceFiles)
-        
-        #self.dataIsMinuteAvegaredCheckBox.stateChanged[int].connect(self._slot_averaged_checkbox_state_changed_)
-        
-        self.actionOpenOptions.triggered.connect(self.slot_openOptionsFile)
-        self.actionImportOptions.triggered.connect(self.slot_importOptions)
-        
-        self.actionSaveOptions.triggered.connect(self.slot_saveOptionsFile)
-        self.actionExportOptions.triggered.connect(self.slot_exportOptions)
-        
-        self.pushButtonBaselineSources.clicked.connect(self.slot_viewBaselineSourceData)
-        
-        
-    @pyqtSlot()
-    @safeWrapper
-    def slot_openOptionsFile(self):
-        pass
+    # def __reduce__(self): # TODO
+    #     pass
     
-    @pyqtSlot()
-    @safeWrapper
-    def slot_importOptions(self):
-        pass
-    
-    @pyqtSlot()
-    @safeWrapper
-    def slot_saveOptionsFile(self):
-        pass
-    
-    @pyqtSlot()
-    @safeWrapper
-    def slot_exportOptions(self):
-        pass
-        
-    @pyqtSlot()
-    @safeWrapper
-    def slot_viewBaselineSourceData(self):
-        if len(self._baseline_source_data_) == 0:
-            return
-
-        data = None
-        
-        if not isinstance(self._viewers_["baseline_source"], sv.SignalViewer):
-            self._viewers_["baseline_source"] = sv.SignalViewer()
-            
-        viewer = self._viewers_["baseline_source"]
-            
-        if len(self._baseline_source_data_) == 1:
-            data = self._baseline_source_data_[0]
-            
-        else:
-            nameList = [b.name for b in self._baseline_source_data_]
-            choiceDialog = ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
-            
-            ans = choiceDialog.exec()
-            
-            if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
-                data_index = nameList.index(choiceDialog.selectedItemsText[0])
-                data = self._baseline_source_data_[data_index]
-
-
-        if isinstance(data, neo.Block):
-            viewer.view(data)
-            
-    @pyqtSlot()
-    @safeWrapper
-    def slot_viewChaseSourceData(self):
-        if len(self._chase_source_data_) == 0:
-            return
-
-        data = None
-        
-        if not isinstance(self._viewers_["conditioning_source"], sv.SignalViewer):
-            self._viewers_["conditioning_source"] = sv.SignalViewer()
-            
-        viewer = self._viewers_["conditioning_source"]
-            
-        if len(self._chase_source_data_) == 1:
-            data = self._chase_source_data_[0]
-            
-        else:
-            nameList = [b.name for b in self._chase_source_data_]
-            choiceDialog = ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
-            
-            ans = choiceDialog.exec()
-            
-            if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
-                data_index = nameList.index(choiceDialog.selectedItemsText[0])
-                data = self._chase_source_data_[data_index]
-
-
-        if isinstance(data, neo.Block):
-            viewer.view(data)
-            
-            
-    @pyqtSlot()
-    @safeWrapper
-    def slot_viewConditioningSourceData(self):
-        if len(self._conditioning_source_data_) == 0:
-            return
-
-        data = None
-        
-        if not isinstance(self._viewers_["conditioning_source"], sv.SignalViewer):
-            self._viewers_["conditioning_source"] = sv.SignalViewer()
-            
-        viewer = self._viewers_["conditioning_source"]
-            
-        if len(self._conditioning_source_data_) == 1:
-            data = self._conditioning_source_data_[0]
-            
-        else:
-            nameList = [b.name for b in self._conditioning_source_data_]
-            choiceDialog = ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
-            
-            ans = choiceDialog.exec()
-            
-            if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
-                data_index = nameList.index(choiceDialog.selectedItemsText[0])
-                data = self._conditioning_source_data_[data_index]
-
-
-        if isinstance(data, neo.Block):
-            viewer.view(data)
-            
-    @pyqtSlot()
-    @safeWrapper
-    def slot_viewCrossTalkSourceData(self):
-        if len(self._path_xtalk_source_data_) == 0:
-            return
-
-        data = None
-        
-        if not isinstance(self._viewers_["conditioning_source"], sv.SignalViewer):
-            self._viewers_["conditioning_source"] = sv.SignalViewer()
-            
-        viewer = self._viewers_["conditioning_source"]
-            
-        if len(self._path_xtalk_source_data_) == 1:
-            data = self._path_xtalk_source_data_[0]
-            
-        else:
-            nameList = [b.name for b in self._path_xtalk_source_data_]
-            choiceDialog = ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
-            
-            ans = choiceDialog.exec()
-            
-            if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
-                data_index = nameList.index(choiceDialog.selectedItemsText[0])
-                data = self._path_xtalk_source_data_[data_index]
-
-
-        if isinstance(data, neo.Block):
-            viewer.view(data)
-            
-            
-    #@pyqtSlot(int)
-    #@safeWrapper
-    #def _slot_averaged_checkbox_state_changed_(self, val):
-        #checked = val == QtCore.Qt.Checked
-        
-        #self.sweepAverageGroupBox.setEnabled(not checked)
-    
-    
-    def _parsedata_(self, newdata=None, varname=None):
-        # TODO parse options
-        if isinstance(newdata, (dict, type(None))):
-            self._data_ = newdata
-            
-    @safeWrapper
-    def _parse_clampex_trial_(self, trial:neo.Block):
-        """TODO unfinished business
-        """
-        ret = dict()
-        ret["interleaved_stimulation"] = False
-        ret["averaged_sweeps"] = False
-        ret["averaged_interval"] = 0*pq.s
-        
-        protocol = trial.annotations.get("protocol", None)
-        
-        if not isinstance(protocol, dict):
-            return ret
-        
-        # by now the fields below should always be present
-        nEpisodes = protocol["lEpisodesPerRun"]
-        
-        if nEpisodes != len(trial.segments):
-            raise RuntimeError("Mismatch between protocol Episodes Per Run (%d) and number of sweeps in trial (%d)" % (nEpisodes, len(trial.segments)))
-        
-        runs_per_trial = protocol["lRunsPerTrial"]
-        
-        inter_trial_interval = protocol["fTrialStartToStart"] * pq.s
-        inter_run_interval = protocol["fRunStartToStart"] * pq.s
-        inter_sweep_interval = protocol["fEpisodeStartToStart"] * pq.s
-        
-        trial_duration = inter_run_interval * runs_per_trial
-        if trial_duration == 0 * pq.s:
-            raise RuntimeError("Trial metadata indicates trial duration of %s" % trial_duration )
-        
-        
-        trials_per_minute = int((trial_duration + inter_trial_interval) / (60*pq.s))
-        
-        alternate_pathway_stimulation = protocol["nAlternateDigitalOutputState"] == 1
-        
-        alternate_command_ouptut = protocol["nAlternateDACOutputState"] == 1
-        
-        if alternate_pathway_stimulation:
-            ret["interleaved_stimulation"] = True
-            
-        else:
-            ret["interleaved_stimulation"] = False
-            
-            
-        if runs_per_trial > 1:
-            ret["averaged_sweeps"] = True
-            if trials_per_minute == 1:
-                ret["averaged_interval"] = 60*pq.s
-                    
-        # NOTE: 2020-02-23 14:46:57
-        # find out if there is a protocol epoch for membrane test (whole-cell)
-        
-        protocol_epochs = trial.annotations["EpochInfo"]
-        
-        if len(protocol_epochs):
-            if alternate_command_ouptut:
-                # DAC0 and DAC1 commands are sent alternatively with each sweep
-                # first sweep is DAC0;
-                pass
-        
-        return ret
-            
-        
-    @pyqtSlot()
-    @safeWrapper
-    def slot_openExperimentFile(self):
-        import mimetypes, io
-        targetDir = self._scipyenWindow_.currentDir
-        
-        pickleFileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
-                                                                  caption="Open Experiment file",
-                                                                  filter="Pickle Files (*.pkl)",
-                                                                  directory=targetDir)
-    
-    
-        if len(pickleFileName) == 0:
-            return
-        
-        data = pio.loadPickleFile(pickleFileName)
-        
-        if not self._check_for_linescan_data_(data):
-            QtWidgets.QMessageBox.critical(self, "Open ScanData file", "Chosen file does not contain a valid ScanData object")
-            return
-        
-        _data_var_name_ = os.path.splitext(os.path.basename(pickleFileName))[0]
-        
-        self._parsedata_(data, _data_var_name_)
-        
-        self._scipyenWindow_.assignToWorkspace(_data_var_name_, data)
-        
-    @pyqtSlot()
-    @safeWrapper
-    def slot_openBaselineSourceFiles(self):
-        """Opens vendor-specific record files with trials for the baseline responses.
-        
-        Currently only ABF v2 files are supported.
-        
-        TODO add support for CED Signal files, etc.
-        
-        TODO Parse electrophysiology records meta information into a vendor-agnostic
-        data structure -- see core.ephys module.
-        """
-        # list of neo.Blocks, each with a baseline trial
-        # these may already contain minute-averages
-        self._baseline_source_data_ = self.openDataAcquisitionFiles()
-        
-        #### BEGIN code to parse the record and interpret the protocol - DO NOT DELETE
-        
-        ## we need to figure out:
-        ##
-        ## 1) if the data contains averaged sweeps and if so, whether these are
-        ##       minute averages
-        ##
-        ## 2) how many stimulation pathways are involved
-        ##
-        ## 3) what is the test stimulus: 
-        ##       single or paired-pulse
-        ##       stimulus onset (in each pathway)
-        ##       if paired-pulse, what is the inter-stimulus interval
-        
-        #trial_infos = [self._parse_clampex_trial_(trial) for trial in self._baseline_source_data_]
-        
-        #for k, ti in enumerate(trial_infos[1:]):
-            #for key in ti:
-                #if ti[key] != trial_infos[0][key]:
-                    #raise RuntimeError("Mismatch in %s betweenn first and %dth trial" % (key, k+1))
-                
-        
-        
-        
-        #if trial_infos[0]["averaged_sweeps"]:
-            #if trial_infos[0]["averaged_interval"] != 60*pq.s:
-                #raise ValueError("Expecting sweeps averaged over one minute interval; got %s instead" % trial_infos[0]["averaged_interval"])
-            
-            #signalBlockers = [QtCore.QSignalBlocker(w) for w in [self.dataIsMinuteAvegaredCheckBox]]
-            
-            #self.dataIsMinuteAvegaredCheckBox.setCheckState(True)
-            
-            #self.sweepAverageGroupBox.setEnabled(False)
-            
-        #else:
-            #self.dataIsMinuteAvegaredCheckBox.setCheckState(False)
-            
-            #self.sweepAverageGroupBox.setEnabled(True)
-            
-        #### END code to parse the record and interpret the protocol
-            
-    @pyqtSlot()
-    @safeWrapper
-    def slot_openChaseSourceFiles(self):
-        self._chase_source_data_ = self.openDataAcquisitionFiles()
-        
-    @pyqtSlot()
-    @safeWrapper
-    def slot_openConditioningSourceFiles(self):
-        self._conditioning_source_data_ = self.openDataAcquisitionFiles()
-        
-    @pyqtSlot()
-    @safeWrapper
-    def slot_openPathwaysXTalkSourceFiles(self):
-        self._path_xtalk_source_data_ = self.openDataAcquisitionFiles()
-        
-    @safeWrapper
-    def openDataAcquisitionFiles(self):
-        """Opens electrophysiology data acquisition files.
-        
-        Currently supports the following electrphysiology acquisition software:
-        pClamp(Axon binary files version 2 (*.abf) and axon text files, *.atf
-        
-        TODO: support for:
-            CED Signal CED Filing System files (*.cfs)
-            CED Spike2 files (SON library)
-            Ephus (matlab files?)
-        
-        """
-        import mimetypes, io
-        targetDir = self._scipyenWindow_.currentDir
-        
-        # TODO: 2020-02-17 17:44:55 
-        # 1) write code for CED Signal files (*.cfs)
-        # 2) write code for Axon Text files
-        # 3) write code for pickle files
-        # 4) Allow all files then pick up the appropriate loader for each file.
-        #
-        # Although it may seem convenient for the user, cases 1-4 above complicate 
-        # the code for the following reasons:
-        # case 1: we need to actually write the CFS file reading logic :-)
-        # case 2: the need to make sure that each text file resoves to an appropriate
-        # neo.Block (adapt from the code for binary files?)
-        # case 3: the pickle file may contain already concatenated records, so we 
-        # need a way to distinguish that (adapt from the code for binary files?)
-        # case 4: compounds all of the above PLUS resolve the file loader for each
-        # file in the list
-        # 
-        # To keep it simple, we avoid the "All Files" case (for now)
-        
-        # TODO 2020-02-17 17:49:46
-        # how to process axon text files?
-        # Again, avoid this case also
-        #file_filters = ";; ".join( ["Axon Binary Files (*.abf)",
-                                    #"Axon Text Files (*.atf)",
-                                    #"CED Signal Files (*.cfs)",
-                                    #"Python Pickle Files (*.pkl)",
-                                    #"All Files (*.*)"])
-        
-        file_filters = ";; ".join( ["Axon Binary Files (*.abf)"])
-        
-        
-        
-        
-        # fileNames: list of fully qualified file names
-        # fileFilter: the actual file filter used in the dialog
-        fileNames, fileFilter = QtWidgets.QFileDialog.getOpenFileNames(mainWindow, 
-                                                                       filter=file_filters)
-
-        if len(fileNames) == 0:
-            return
-        
-        if "Axon Binary" in fileFilter:
-            record_data = [pio.loadAxonFile(f) for f in fileNames]
-            
-        else:
-            raise RuntimeError("%s are not supported" % fileFilter)
-        
-        # NOTE: 2020-02-17 17:51:32
-        #### BEGIN DO NOT DELETE - TO BE REVISITED
-        #elif "Axon Text" in fileFilter:
-            #axon_data = [pio.loadAxonTextFile(f) for f in fileNames]
-            #data = [a[0] for a in axon_data]
-            ## CAUTION 2020-02-17 17:40:17 test this !
-            #metadata = [a[1] for a in axon_data]
-            
-        #elif "Pickle" in fileFilter:
-            ## ATTENTION: 2020-02-17 17:41:58 keep fingers crossed
-            #data = [pio.loadPickleFile(f) for f in fileNames]
-            
-        #elif "CED" in fileFilter:
-            #warnings.warn("CED Signal Files not  yet supported")
-        #### END DO NOT DELETE
-            
-        return record_data
-    
-            
 def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     """Constructs a dict with options for synaptic plasticity experiments.
     
-    The options specify synaptic pathways, analysis cursors and optional 
-    minute-by-minute averaging of data from synaptic plasticity experiments.
-    
-    All synaptic plasticity experiments have a stimulation pathway 
-    ("test pathway") where synaptic responses are monitored before and after 
-    a conditioning protocol is applied. Homo-synaptic plasticity is considered
-    to occur when the conditioning protocol induces changes in the magnitude
-    of the synaptic response in the conditioned pathway.
-    
-    The "test" pathway is assigned index 0 by default, unless specified 
-    otherwise.
-    
-    Ideally, synaptic responses are also monitored on a "control" pathway, which 
-    is unperturbed during the conditioning, in order to distinguish the changes
-    in synaptic responses in the conditioned ("test") pathway, from changes 
-    induced by other causes conditioned (test) pathway.
-    
-    When a "control" pathway is present, the data from the two pathways is
-    expected to have been recorded in alternative, interleaved sweeps.
-    
-    NOTE: These options are adapted for off-line analysis of data acquired with
-    custom protocols in Clampex.
-    
-    TODO: 
-    1. Accommodate data acquired in Clampex using the built-in LTP protocol
-    2. Accommodate data acquired with CED Signal (v5 and later).
-    3. Allow for single pathway experiments (i.e. test pathway only)
-    4. Allow for monitoring extra synaptic pathways (e.g., cooperative LTP as in
-       Golding et al, Nature 2002)
-    5. Use in acquisition; on-line analysis.
-    6. Heuristic for cursors set up (single or paired pulse?); voltage clamp,
-        current clamp,, or field recordings (we calculate Rs Rin only for voltage-clamp)
-        
-        
     Positional parameters:
     ======================
     npathways: int - the number of pathways recorded from - must be >= 1
@@ -1494,6 +433,26 @@ def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     
     Var-keyword parameters:
     =======================
+    "pathways": dict with pathway designation, mapping a str (pathway type)
+        to int (pathway index)
+        
+        e.g. {"test":0, "control":1, "ripples": 2, etc}
+        
+        default is {"test":0, "control":1}
+        
+        The keys must contain at least "test".
+        
+        The indices must be valid given the number of pathways in npathways
+        
+    "cursors": dict with vertical cursor coordinates for each pathway where 
+        measurements are made, this must contain the following key-value pairs
+        (default values are show below):
+        
+        "Labels" = ["Rbase", "Rs", "Rin", "EPSC0Base", "EPSC0Peak", "EPSC1Base", "EPSC1Peak"]
+        "Windows" = [0.01, 0.003, 0.01, 0.01, 0.005, 0.01, 0.005]
+        "Pathways" = [
+                        [0.06, 0.066, 0.16, 0.26, 0.28, 0.31, 0.33],
+                        [5.06, 5.066, 5.16, 5.26, 5.28, 5.31, 5.33]]
     
     "average":int = number of consecutive single-run trials to average 
         off-line (default: 6).
@@ -1548,7 +507,8 @@ def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
                 represented by their parameter tuple (time, window) which can be
                 stored on disk, and used to generate a cursor at runtime.
                 
-            "channel": (optional) if present, it must contain an int
+            "channel": (optional) if present, it must contain an int, which is
+                the index of the signal where the cursors are used
             
             "pathway": int, the index of the pathway where the measurement is
                 performed, or None (applied to both pathways)
@@ -1569,28 +529,6 @@ def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
             Examples:
             ephys.epoch_average
         
-    "test":int , default = 0 index of the "test" pathway; for dual pathway
-        interleaved experiments, this is either 0 or 1, and the control payhway
-        is implied.
-        
-        For data acquired using Clampex with a custom LTP protocol, this 
-        represents the index of the test pathway sweep within each run.
-        The sampling protocol is expected to record data alternatively
-        from the test and control pathway. 
-        
-        Trials with a single run will be saved to disk as files contains two 
-        sweeps, one for each pathway. 
-        
-        When the protocol specifies several runs per trial, the saved file will
-        also contain two sweeps, with data for the corresponding pathway being 
-        averaged acrosss the runs.
-    
-    "control":int, or None (default).
-        NOTE: when there are more than one pathway, the control is implied from 
-        the value of the test pathway, which is OK for two pathway experiments.
-        For more than two pathways this SHOULD be specified, and MUST be different
-        from the index of the test pathway.
-        
     "Im": str, int: name or index of the signal carrying synaptic responses (epscs, for
         voltage-clamp experiments) or command current (for current-clamp experiments)
         
@@ -1605,11 +543,49 @@ def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
         
         NOTE: This signal must be present in all sweeps!
         
-    "triggers": list of signal names or indices containing the digital triggers 
+    "stim": list of signal names or indices containing the digital triggers 
         for the recorded pathways (e.g. 1st is for pathway 0, etc)
     
         Default is [2]
     
+    Description
+    ============
+        
+    The function constructs an options dict specifying synaptic pathways, 
+    analysis cursors and optional minute-by-minute averaging of data from 
+    synaptic plasticity experiments.
+    
+    All synaptic plasticity experiments have a stimulation pathway 
+    ("test pathway") where synaptic responses are monitored before and after 
+    a conditioning protocol is applied. Homo-synaptic plasticity is considered
+    to occur when the conditioning protocol induces changes in the magnitude
+    of the synaptic response in the conditioned pathway.
+    
+    The "test" pathway is assigned index 0 by default, unless specified 
+    otherwise.
+    
+    Ideally, synaptic responses are also monitored on a "control" pathway, which 
+    is unperturbed during the conditioning, in order to distinguish the changes
+    in synaptic responses in the conditioned ("test") pathway, from changes 
+    induced by other causes conditioned (test) pathway.
+    
+    When a "control" pathway is present, the data from the two pathways is
+    expected to have been recorded in alternative, interleaved sweeps.
+    
+    NOTE: These options are adapted for off-line analysis of data acquired with
+    custom protocols in Clampex.
+    
+    TODO: 
+    1. Accommodate data acquired in Clampex using the built-in LTP protocol
+    2. Accommodate data acquired with CED Signal (v5 and later).
+    3. Allow for single pathway experiments (i.e. test pathway only)
+    4. Allow for monitoring extra synaptic pathways (e.g., cooperative LTP as in
+       Golding et al, Nature 2002)
+    5. Use in acquisition; on-line analysis.
+    6. Heuristic for cursors set up (single or paired pulse?); voltage clamp,
+        current clamp,, or field recordings (we calculate Rs Rin only for voltage-clamp)
+        
+        
     """
     
     recording_types = {1:"voltage",2:"current", 3:"field"}
@@ -1631,21 +607,21 @@ def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
         raise TypeError(f"Invalid mode type; expecting a str or int; got {type(mode).__name__} instead")
     
     # field = kwargs.pop("field", False)
-    
-    test_path = kwargs.pop("test", 0)
-    
-    if test_path < 0 or test_path >= npathways:
-        raise ValueError(f"Invalid test path index {test_path}; expecting a value between 0 and {npathways-1}")
-    
-    control_path = kwargs.pop("control", None)
-    
-    if npathways >= 2:
-        if control_path is None:
-            control_path = 1 if test_path == 0 else 0
-        elif control_path == test_path:
-            raise ValueError(f"control path cannot have the same index ({control_path}) as the test path index ({test_path})")
-    else:
-        control_path = None
+#     
+#     test_pathway_index = kwargs.pop("test", 0)
+#     
+#     if test_pathway_index < 0 or test_pathway_index >= npathways:
+#         raise ValueError(f"Invalid test path index {test_pathway_index}; expecting a value between 0 and {npathways-1}")
+#     
+#     control_pathway_index = kwargs.pop("control", None)
+#     
+#     if npathways >= 2:
+#         if control_path is None:
+#             control_path = 1 if test_path == 0 else 0
+#         elif control_path == test_path:
+#             raise ValueError(f"control path cannot have the same index ({control_path}) as the test path index ({test_path})")
+#     else:
+#         control_path = None
         
 #     if isinstance(control_path, int):
 #         if control_path < 0 or control_path > 1:
@@ -1666,52 +642,55 @@ def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     default_cursors_dict["Labels"] = ["Rbase", "Rs", "Rin", "EPSC0Base", "EPSC0Peak", "EPSC1Base", "EPSC1Peak"]
     default_cursors_dict["Windows"] = [0.01, 0.003, 0.01, 0.01, 0.005, 0.01, 0.005]
     default_cursors_dict["Pathways"] = list()
-    default_cursors_dict["Pathways"][0] = [0.06, 0.066, 0.16, 0.26, 0.28, 0.31, 0.33]
-    default_cursors_dict["Pathways"][1] = [c + 5 for c in default_cursors_dict["Pathways"][0]]
+    default_cursors_dict["Pathways"].append([0.06, 0.066, 0.16, 0.26, 0.28, 0.31, 0.33])
+    default_cursors_dict["Pathways"].append([c + 5 for c in default_cursors_dict["Pathways"][0]])
     
     cursors = kwargs.pop("cursors", default_cursors_dict)
-    
     if len(cursors) == 0:
         raise ValueError(f"cursors must be specified")
     
+    default_pathways = {"test":0}
+    if npathways > 1:
+        default_pathways["control"] = 1
+    
+    pathways = kwargs.pop("pathways", default_pathways)
+    
+    if "test" not in pathways.keys():
+        raise ValueError("The index of the test pathway must be specified")
+
+    if max(pathways.values()) >= npathways:
+        raise ValueError(f"Invalid pathway value {max(pathways.values())} for {npathways} pathways")
+    
     Im = kwargs.pop("Im", 0)
     Vm = kwargs.pop("Vm", 1)
-    triggers = kwargs.pop("triggers", None)
+    stim = kwargs.pop("stim", list())
     
-    if isinstance(triggers, (tuple, list)):
-        if len(triggers) == 0:
-            triggers = None
-            
-        elif len(triggers) > npathways:
-            raise ValueError(f"When specified, triggers must have the same length as the number of pathways or less")
+    if len(stim) > npathways:
+        raise ValueError(f"When specified, triggers must have the same length as the number of pathways or less")
     
-    pathways = list()
+    pathways_conf = list()
 
     for k in range(npathways):
         path = {"Im":Im, "Vm": Vm}
-        path["test"] = k==test_path
         
-        if k < len(triggers):
-            path["triggers"] = triggers[k]
+        if k < len(stim):
+            path["stim"] = stim[k]
             
         if k < len(cursors["Pathways"]):
             path["cursors"] = cursors["Pathways"][k]
             
-        pathways.append(path)
-    
+        path["assignment"] = reverse_mapping_lookup(pathways, k)
+        
+        pathways_conf.append(path)
 
     signals = [Im, Vm]
-    signals.extend(triggers)
+    signals.extend(stim)
     
     LTPopts = dict()
     
     LTPopts["Average"] = {'Count': average, 'Every': average_every}
-    LTPopts["Pathways"] = pathways
-    LTPopts["Pathways"]["Test"] = test_path
-    
-    if isinstance(control_path, int):
-        LTPopts["Pathways"]["Control"] = control_path
-        
+    LTPopts["Pathways"] = pathways_conf
+
     LTPopts["Reference"] = reference
     
     LTPopts["Signals"] = signals
@@ -1747,7 +726,7 @@ def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     
     return LTPopts
     
-def generate_LTP_options(cursors, signal_names, path0, path1, baseline_minutes, \
+def generate_LTP_options(cursors, signal_names, path0, path1, baseline_minutes, 
                         average_count, average_every):
     """Save LTP options for Voltage-clamp experiments
     
@@ -1866,7 +845,8 @@ def save_LTP_options(val):
         pickle.dump(val, fileDest, pickle.HIGHEST_PROTOCOL)
     
 @safeWrapper
-def load_synaptic_plasticity_options(LTPOptionsFile:[str, type(None)]=None, **kwargs):
+def load_synaptic_plasticity_options(LTPOptionsFile:[str, type(None)]=None, 
+                                     **kwargs):
     """Loads LTP options from a file or generates one from arguments.
     
     Parameters:
@@ -1906,7 +886,8 @@ def load_synaptic_plasticity_options(LTPOptionsFile:[str, type(None)]=None, **kw
     return LTPopts
 
 @safeWrapper
-def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptions, test_pathway_index, result_name_prefix):
+def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, 
+                                         LTPOptions, test_pathway_index, result_name_prefix):
     """
     basenames : two-element tuple with regexp strings, respectively for the variable names of 
                 the baseline and chase Blocks
@@ -2003,10 +984,10 @@ def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptio
 
     return ret
 
-def calculate_fEPSP(block:neo.Block,\
-                    signal_index:[int, str],\
-                    epoch:[neo.Epoch, type(None)]=None,\
-                    out_file:[str, type(None)]=None):# -> dict:
+def calculate_fEPSP(block:neo.Block,
+                    signal_index:[int, str],
+                    epoch:[neo.Epoch, type(None)]=None,
+                    out_file:[str, type(None)]=None) -> dict:
     """
     Calculates the slope of field EPSPs. TODO
     
@@ -2052,15 +1033,15 @@ def calculate_fEPSP(block:neo.Block,\
     for k, seg in enumerate(block.segments):
         pass
     
-def calculate_LTP_measures_in_block(block: neo.Block, \
-                                    signal_index_Im, /, \
-                                    signal_index_Vm = None, \
-                                    trigger_signal_index = None,\
-                                    testVm = None, \
-                                    epoch = None, \
-                                    stim = None,\
-                                    isi = None,\
-                                    out_file=None):# -> pd.DataFrame:
+def calculate_LTP_measures_in_block(block: neo.Block, 
+                                    signal_index_Im, /, 
+                                    signal_index_Vm = None, 
+                                    trigger_signal_index = None,
+                                    testVm = None, 
+                                    epoch = None, 
+                                    stim = None,
+                                    isi = None,
+                                    out_file=None) -> pd.DataFrame:
     """
     Calculates membrane Rin, Rs, and EPSC amplitudes in whole-cell voltage clamp.
     
@@ -2191,9 +1172,9 @@ def calculate_LTP_measures_in_block(block: neo.Block, \
     return result
 
 
-def segment_synplast_params_i_clamp(s: neo.Segment, \
-                                       signal_index: int, \
-                                       epoch: typing.Optional[neo.Epoch]=None):# -> np.ndarray:
+def segment_synplast_params_i_clamp(s: neo.Segment, 
+                                       signal_index: int, 
+                                       epoch: typing.Optional[neo.Epoch]=None) -> np.ndarray:
     if epoch is None:
         if len(s.epochs) == 0:
             raise ValueError("Segment has no epochs and no external epoch has been defined")
@@ -2221,14 +1202,14 @@ def segment_synplast_params_i_clamp(s: neo.Segment, \
         return chord_slopes
         
         
-def segment_synplast_params_v_clamp(s: neo.Segment, \
-                                       signal_index_Im: int,\
-                                       signal_index_Vm: typing.Optional[int]=None,\
-                                       trigger_signal_index: typing.Optional[int] = None,\
-                                       testVm: typing.Union[float, pq.Quantity, None]=None,\
-                                       epoch: typing.Optional[neo.Epoch]=None,\
-                                       stim: typing.Optional[TriggerEvent]=None,\
-                                       isi:typing.Union[float, pq.Quantity, None]=None):# -> tuple:
+def segment_synplast_params_v_clamp(s: neo.Segment, 
+                                       signal_index_Im: int,
+                                       signal_index_Vm: typing.Optional[int]=None,
+                                       trigger_signal_index: typing.Optional[int] = None,
+                                       testVm: typing.Union[float, pq.Quantity, None]=None,
+                                       epoch: typing.Optional[neo.Epoch]=None,
+                                       stim: typing.Optional[TriggerEvent]=None,
+                                       isi:typing.Union[float, pq.Quantity, None]=None) -> tuple:
     """
     Calculates several signal measures in a synaptic plasticity experiment.
     
@@ -2613,25 +1594,25 @@ def segment_synplast_params_v_clamp(s: neo.Segment, \
     return (Idc, Rs, Rin, EPSC0, EPSC1, PPR, ISI)
 
                  
-def analyse_LTP_in_pathway(baseline_block: neo.Block, \
-                           chase_block: neo.Block, \
-                           signal_index_Im: typing.Union[int, str], \
-                           path_index: int,\
-                           /, \
-                           baseline_range=range(-5,-1),\
-                           signal_index_Vm: typing.Union[int, str]=None, \
-                           trigger_signal_index: typing.Union[int, str, None]=None,\
-                           baseline_epoch:typing.Optional[neo.Epoch]=None, \
-                           chase_epoch:typing.Optional[neo.Epoch] = None,\
-                           testVm:typing.Optional[typing.Union[float, pq.Quantity]] = None,\
-                           stim:typing.Optional[TriggerEvent] = None,\
-                           isi:typing.Optional[typing.Union[float, pq.Quantity]] = None,\
-                           basename:str=None, \
-                           normalize:bool=False,\
-                           field:bool=False,\
-                           is_test:bool = False,\
-                           v_clamp:bool = True,\
-                           out_file:typing.Optional[str]=None):# -> pd.DataFrame:
+def analyse_LTP_in_pathway(baseline_block: neo.Block, 
+                           chase_block: neo.Block, 
+                           signal_index_Im: typing.Union[int, str], 
+                           path_index: int,
+                           /, 
+                           baseline_range=range(-5,-1),
+                           signal_index_Vm: typing.Union[int, str]=None, 
+                           trigger_signal_index: typing.Union[int, str, None]=None,
+                           baseline_epoch:typing.Optional[neo.Epoch]=None, 
+                           chase_epoch:typing.Optional[neo.Epoch] = None,
+                           testVm:typing.Optional[typing.Union[float, pq.Quantity]] = None,
+                           stim:typing.Optional[TriggerEvent] = None,
+                           isi:typing.Optional[typing.Union[float, pq.Quantity]] = None,
+                           basename:str=None, 
+                           normalize:bool=False,
+                           field:bool=False,
+                           is_test:bool = False,
+                           v_clamp:bool = True,
+                           out_file:typing.Optional[str]=None) -> pd.DataFrame:
     """
     Parameters:
     -----------
@@ -2744,7 +1725,8 @@ def analyse_LTP_in_pathway(baseline_block: neo.Block, \
 #     """
 #     pass
     
-def LTP_analysis(mean_average_dict, current_signal, vm_command, /, LTPOptions=None, results_basename=None, normalize=False):
+def LTP_analysis(mean_average_dict, current_signal, vm_command, /, LTPOptions=None, 
+                 results_basename=None, normalize=False):
     """
     LTP analysis for voltage-clamp experiments with paired-pulse stimulation
     interleaved on two pathways.
@@ -2812,7 +1794,8 @@ def LTP_analysis(mean_average_dict, current_signal, vm_command, /, LTPOptions=No
 
 
 #"def" plotAverageLTPPathways(data, state, viewer0, viewer1, keepCursors=True, **kwargs):
-def plotAverageLTPPathways(data, state, viewer0=None, viewer1=None, keepCursors=True, **kwargs):
+def plotAverageLTPPathways(data, state, viewer0=None, viewer1=None,
+                           keepCursors=True, **kwargs):
     """Plots averaged LTP pathway data in two SignalViewer windows
     
     Arguments:
@@ -2959,7 +1942,9 @@ def setupLTPCursors(viewer, LTPOptions, pathway, axis=None):
                         xwindow = LTPOptions["Cursors"]["Windows"],
                         labels = LTPOptions["Cursors"]["Labels"])
         
-def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx, control_base_segments_ndx, control_chase_segments_ndx, t0, t1):
+def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx, 
+                         control_base_segments_ndx, control_chase_segments_ndx, 
+                         t0, t1):
     """
     data: dict; an LTP data dict
     

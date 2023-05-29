@@ -146,6 +146,14 @@ from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 from PyQt5.uic import loadUiType
 #### END PyQt5 modules
 
+#### BEGIN pyqtdarktheme - recommended for Windows
+hasQDarkTheme = False
+try:
+    import qdarktheme
+    hasQDarkTheme = True
+except:
+    pass
+#### END pyqtdarktheme
 #from IPython.lib.deepreload import reload as dreload
 
 from IPython.core.history import HistoryAccessor
@@ -1817,6 +1825,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.app.setStyle(QtWidgets.QApplication.style())
         elif val == "Dark Style" and has_qdarkstyle_for_win:
             self.app.setStyleSheet(qdarkstyle.load_stylesheet())
+        elif val.startswith("PyQtDarkTheme_") and hasQDarkTheme:
+            theme = val.replace("PyQtDarkTheme_", "")
+            qdarktheme.set_theme(theme)
         else:
             self.app.setStyle(val)
             
@@ -2601,6 +2612,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_updateWorkspaceView(self):
+        """
+        Cosmetic update of the workspace viewer
+        • sorts according to 1st column contents
+        • resizes 1st column to its contents
+        """
         self._sortWorkspaceViewFirstColumn_()
         self._resizeWorkspaceViewFirstColumn_()
         
@@ -2614,7 +2630,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # self.slot_updateWorkspaceView(); in turn this will sort column 0
         # and resize its contents. 
         # This is because workspaceModel doesn't "know" anything about workspaceView.
-        self.workspaceModel.update() # emits WorkspaceModel.modelContentsChanged via var_observer
+        timer = QtCore.QTimer()
+        timer.timeout.connect(self.workspaceModel.update)
+        timer.start(0)
+        # self.workspaceModel.update() # emits WorkspaceModel.modelContentsChanged via var_observer
         
     @pyqtSlot()
     def slot_updateCwd(self):
@@ -2622,8 +2641,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.cwd = os.getcwd()
             self._setRecentDirectory_(self.cwd)
             self._updateFileSystemView_(self.cwd, False)
-            #self.fileSystemTreeView.scrollTo(self.fileSystemModel.index(self.cwd))
-            #self.fileSystemTreeView.setCurrentIndex(self.fileSystemModel.index(self.cwd))
             self._resizeFileColumn_()
             self._refreshRecentDirsComboBox_()
             
@@ -3664,11 +3681,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def slot_pasteWorkspaceSelection(self):
         self.slot_copyWorkspaceSelection()
-        #if quoted:
-            #self.slot_copyWorkspaceSelectionQuoted()
-        #else:
-            #self.slot_copyWorkspaceSelection()
-            
         self.console.paste()
        
 #     @pyqtSlot()
@@ -3901,6 +3913,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         ''' Collect file menu actions & submenus that are built in the UI file. This should be 
             done before loading the plugins.
         '''
+        self.setDockNestingEnabled(True)
         
         # NOTE: 2021-04-15 10:12:33 TODO
         # allow user to choose app style interactively -- 
@@ -4791,8 +4804,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot(QtCore.QModelIndex)
     @safeWrapper
     def slot_fileSystemItemActivated(self, ndx):
-        """ Signal activated from self.fileSystemTreeView is connected to this.
+        """ 
         Triggered by double-click on an item in the file system tree view.
+        Connected to the 'activated' signal emited by self.fileSystemTreeView.
         """
         #print(self.fileSystemModel.filePath(ndx))
         if self.fileSystemModel.isDir(ndx):
@@ -4996,6 +5010,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_openSelectedFileItems(self):
+        """Load a batch of files.
+        """
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes() \
                          if item.column() == 0 and not self.fileSystemModel.isDir(item)]# list of QModelIndex
         
@@ -5020,6 +5036,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
         else:
             progressDlg = QtWidgets.QProgressDialog("Loading data...", "Abort", 0, nItems, self)
+            progressDlg.setMinimumDuration(1000)
             
             progressDlg.setWindowModality(QtCore.Qt.WindowModal)
             
@@ -5634,7 +5651,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_openFiles(self):
-        """Allows the opening of several files, as opposed to openFile.
+        """Opening of several files.
         """
         from core.utilities import make_file_filter_string
         
@@ -6130,6 +6147,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     
         self.statusbar.showMessage("Done!")
         
+    @pyqtSlot(bool)
+    def _slot_setAutoRemoveViewers(self, value):
+        self.autoRemoveViewers = value == True
+            
     @pyqtSlot(str)
     @safeWrapper
     def _slot_test_gui_style(self, val:str):
@@ -6139,17 +6160,24 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.app.setStyle(QtWidgets.QApplication.style())
             self._current_GUI_style_name = "Default"
         else:
-            self.app.setStyle(val)
+            if hasQDarkTheme and val.startswith("PyQtDarkTheme_"):
+                theme = val.replace("PyQtDarkTheme_", "")
+                qdarktheme.set_theme(theme)
+            else:
+                self.app.setStyle(val)
+                
             self._current_GUI_style_name = val
-            
-    @pyqtSlot(bool)
-    def _slot_setAutoRemoveViewers(self, value):
-        self.autoRemoveViewers = value == True
             
     @pyqtSlot()
     @safeWrapper
     def _slot_set_Application_style(self):
         from .itemslistdialog import ItemsListDialog
+        themeslist = ["Default"] + self._available_Qt_style_names_
+        if hasQDarkTheme:
+            qdarkthemes = [f"PyQtDarkTheme_{t}" for t in qdarktheme.get_themes()]
+            
+            themeslist.extend(qdarkthemes)
+            
         d = ItemsListDialog(self, itemsList = ["Default"] + self._available_Qt_style_names_,
                             title="Choose Application GUI Style",
                             preSelected = self._current_GUI_style_name)
@@ -6668,13 +6696,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if type(parentMenuOrMenuBar).__name__ == "QMenu": 
                 if parentMenuOrMenuBar.title() != "Plugins":
                     self._removeMenu_(parentMenuOrMenuBar)
-        # if len(menu.actions()) > 0:
-        #     parentMenuOrMenuBar = menu.parent()
-        #     if parentMenuOrMenuBar is not None: # parent should never be None, but let's check anyway
-        #         parentMenuOrMenuBar.removeAction(menu.menuAction())
-        #         if type(parentMenuOrMenuBar).__name__ == "QMenu": 
-        #             if parentMenuOrMenuBar.title() != "Plugins":
-        #                 self._removeMenu_(parentMenuOrMenuBar)
             
     @pyqtSlot()
     @safeWrapper
@@ -6704,23 +6725,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 
             self.plugins.clear()
             scipyen_plugin_loader.loaded_plugins.clear()  # need to clear this, too              
-        # pass
-    
-#         if len(self.pluginActions) > 0:
-#             for action in self.pluginActions:
-#                 parentMenuOrMenuBar = action.parent()
-#                 if parentMenuOrMenuBar is not None: # parent should never be None, but let's check anyway
-#                     parentMenuOrMenuBar.removeAction(action)
-#                     if type(parentMenuOrMenuBar).__name__ == "QMenu":
-#                         if parentMenuOrMenuBar.title() != "Plugins": # check if menu left empy, chances are it is created by the plugin => remove it
-#                             self._removeMenu_(parentMenuOrMenuBar)
-# 
-#         plugins_members = self.plugins.__dict__.keys()
-#         
-#         for m in plugins_members:
-#             if isinstance(self.plugins.__dict__[m], types.ModuleType):
-#                 del(self.plugins.__dict__[m])
-
 
     @pyqtSlot()
     @safeWrapper

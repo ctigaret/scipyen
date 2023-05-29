@@ -1,4 +1,4 @@
-import inspect, typing
+import inspect, typing, traceback
 from math import (log, inf, nan)
 from pandas import NA
 from numpy import log10
@@ -35,7 +35,37 @@ BinaryPrefixes = dict((k,v) for k,v in AllPrefixes.items() if v["mantissa"] == 2
 BinaryPowers = dict((v["exponent"], {("name", k), ("symbol", v["symbol"])}) for k,v in BinaryPrefixes.items())
 
 
-def make_scaled_unit_quantity(quantity:pq.Quantity, power:typing.Union[int, str], base:int=10):
+def make_scaled_unit_quantity(quantity:pq.Quantity, power:typing.Optional[typing.Union[int, str]]=None, base:int=10, scale:typing.Union[int, float] = 1., symbol:typing.Optional[str]=None, name:typing.Optional[str] = None):
+    """Create custom quantity as a scaled version of an existing quantity
+    
+    The function generates a new quantity, scaled by base^power * scale.
+    
+    When power is specified, a pre-defined prefix is appended to the unit
+    
+    Parameters:
+    ==========
+    
+    quantity: an existing Quantity, to be scaled
+    
+    power: the power of the prefix (optional); when given, it represents the 
+            power of the prefix (e.g. 'kilo', 'mega', 'micro', 'nano', etc)
+            NOTE: these are powers of base (see below)
+            
+            When None (the default) a power prefix will not be applied
+            
+    base: 10 (default) or 2 (only makes sense for scaled binary quantities e.g. 'kibi', etc)
+    
+    scale: a scaling factor that will multiply the original quantity to obtain the new one
+        default is 1.0
+        
+    symbol: optional, default is None; the symbol of the new unit
+        When power is specified, this parameter should be left as default.
+        
+    name: optional default is None
+        Recommended when power is None
+    
+    """
+                                  
     if base not in (2, 10):
         raise ValueError(f"Incorrect base {base}; expecting 2 or 10")
     
@@ -51,64 +81,115 @@ def make_scaled_unit_quantity(quantity:pq.Quantity, power:typing.Union[int, str]
     if not isinstance(quantity, pq.Quantity):
         raise TypeError("base_quantity expected to be a Quantity; got %s instead" % type(base_quantity).__name__)
     
-    if isinstance(power, str):
-        if power not in prefixes.keys():
-            raise ValueError(f"Power {power} is invalid")
-        
-        name = "%s%s" % (power, quantity.units.dimensionality)
-        symbol = "%s%s" % (prefixes[power]["symbol"], quantity.units.dimensionality)
-        power = prefixes[power]["exponent"]
-        
-    elif isinstance(power, int):
-        if power not in powers.keys():
-            raise ValueError(f"Power {power} is invalid")
-        
-        name = "%s%s" % (powers[power]["name"], quantity.units.dimensionality)
-        symbol = "%s%s" % (powers[power]["symbol"], quantity.units.dimensionality)
+    if power is not None:
+        if isinstance(power, str):
+            if power not in prefixes.keys():
+                raise ValueError(f"Power {power} is invalid")
+            
+            name = "%s%s" % (power, quantity.units.dimensionality)
+            if not isinstance(symbol, str) or len(symbol.strip())==0:
+                symbol = "%s%s" % (prefixes[power]["symbol"], quantity.units.dimensionality)
+            power = prefixes[power]["exponent"]
+            
+        elif isinstance(power, int):
+            if power not in powers.keys():
+                raise ValueError(f"Power {power} is invalid")
+            
+            name = "%s%s" % (powers[power]["name"], quantity.units.dimensionality)
+            if not isinstance(symbol, str) or len(symbol.strip())==0:
+                symbol = "%s%s" % (powers[power]["symbol"], quantity.units.dimensionality)
+            
+        else:
+            raise TypeError(f"power expected to be a str or an int; got {type(power).__name__} instead")
+    
+        factor = pow(base, power)
         
     else:
-        raise TypeError(f"power expected to be a str or an int; got {type(power).__name__} instead")
-    
-    factor = pow(base, power)
-    
-    return pq.UnitQuantity(name, factor * quantity, symbol=symbol)
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            name = str(quantity.units.dimensionality)
+        factor = 1.0
+        
+    if not isinstance(symbol, str) or len(symbol.strip())==0:
+        symbol = name
+        
+    return pq.UnitQuantity(name, factor * scale * quantity, symbol=symbol)
 
 #NOTE: do not confuse with pq.au which is one astronomical unit !!!
 arbitrary_unit = arbitraryUnit = ArbitraryUnit = a_u = pq.UnitQuantity('arbitrary unit', 1. * pq.dimensionless, symbol='a.u.')
 
 pixel_unit = pixelUnit = PixelUnit = pixel = pu = pix = px = pq.UnitQuantity('pixel', 1. * pq.dimensionless, symbol='pixel')
 
-day_in_vitro = div = DiV = pq.UnitTime("day in vitro", 1 * pq.day, symbol = "div")
-week_in_vitro = wiv = WiV = pq.UnitTime("week in vitro", 1 * pq.week, symbol = "wiv")
+day_in_vitro = div = DiV = make_scaled_unit_quantity(pq.day, symbol = "div", name = "day_in_vitro")
+postnatal_day = pnd = PnD = make_scaled_unit_quantity(pq.day, symbol = "pnf", name = "postnatal_day")
+embryonic_day = emd = EmD = make_scaled_unit_quantity(pq.day, symbol = "emd", name = "embryonic_day")
+week_in_vitro = wiv = WiV = make_scaled_unit_quantity(pq.week, symbol = "wiv", name = "week_in_vitro")
+postnatal_week = pnw = PnW = make_scaled_unit_quantity(pq.week, symbol = "pnw", name = "postnatal_week")
+embryonic_week = emw = EmW = make_scaled_unit_quantity(pq.day, symbol = "emw", name = "embryonic_week")
+postnatal_month = pnm = PnM = make_scaled_unit_quantity(pq.month, symbol = "pnm", name = "postnatal_month")
+embryonic_month = emm = EmM = make_scaled_unit_quantity(pq.month, symbol = "emm", name = "embryonic_month")
+# week_in_vitro = wiv = WiV = pq.UnitTime("week in vitro", 1 * pq.week, symbol = "wiv")
 
-postnatal_day = pnd = PnD = pq.UnitTime("postnatal day", 1 * pq.day, symbol = "pnd")
-postnatal_week = pnw = PnW = pq.UnitTime("postnatal week", 1 * pq.week, symbol = "pnw")
-postnatal_month = pnm = PnM = pq.UnitTime("postnatal month", 1 * pq.month, symbol = "pnm")
+# postnatal_day = pnd = PnD = pq.UnitTime("postnatal day", 1 * pq.day, symbol = "pnd")
+# postnatal_week = pnw = PnW = pq.UnitTime("postnatal week", 1 * pq.week, symbol = "pnw")
+# postnatal_month = pnm = PnM = pq.UnitTime("postnatal month", 1 * pq.month, symbol = "pnm")
 
-embryonic_day = emd = EmD = pq.UnitTime("embryonic day", 1 * pq.day, symbol = "emd")
-embryonic_week = emw = EmW = pq.UnitTime("embryonic week", 1 * pq.week, symbol = "emw")
-embryonic_month = emm = EmM = pq.UnitTime("embryonic month", 1 * pq.month, symbol = "emm")
+# embryonic_day = emd = EmD = pq.UnitTime("embryonic day", 1 * pq.day, symbol = "emd")
+# embryonic_week = emw = EmW = pq.UnitTime("embryonic week", 1 * pq.week, symbol = "emw")
+# embryonic_month = emm = EmM = pq.UnitTime("embryonic month", 1 * pq.month, symbol = "emm")
 
 # NOTE: 2017-07-21 16:05:38
 # a dimensionless unit for channel axis (when there are more than one channel in the data)
 # NOTE: NOT TO BE CONFUSED WITH THE UNITS OF THE DATA ITSELF!
 channel_unit = channelUnit = ChannelUnit = channel = cu = pq.UnitQuantity("channel", 1. * pq.dimensionless, symbol="channel")
 
-space_frequency_unit = spaceFrequencyUnit = sfu = sf = pq.UnitQuantity('space frequency unit', 1/pq.m, symbol='1/m')
+# NOTE: 2023-05-18 14:20:01 ATTENTION
+# defined as one cycle per unit length
+space_frequency_unit = spaceFrequencyUnit = sfu = sf = make_scaled_unit_quantity(1/pq.m, name='space_frequency_unit', symbol='1/m')
+# space_frequency_unit = spaceFrequencyUnit = sfu = sf = pq.UnitQuantity('space frequency unit', 1/pq.m, symbol='1/m')
 
-# NOTE: 2021-10-22 21:54:33
-# angle_frequency_unit is not to be confused with angular frequency which is 
+# NOTE: 2021-10-22 21:54:33 ATTENTION:
+# "angle_frequency_unit" is not to be confused with "angular frequency" (ω) which is 
 # radian/s (or Hz, if you consider radian to be dimensionless)
-# thus 1 angle frequency unit equals one cycle per radian -- another form of 
-# space frequency; here 'cycle' is distinct from the pq.cycle which is derived
-# form radians
-angle_frequency_unit = angleFrequencyUnit = afu = af = pq.UnitQuantity('angle frequency unit', 1/pq.rad, symbol='1/rad')
+#
+# Here, 1 angle frequency unit is defined as one cycle per radian -- another form of 
+# space frequency; here 'cycle' is distinct from "pq.cycle" which is derived
+# from radians
+angle_frequency_unit = angleFrequencyUnit = afu = af = make_scaled_unit_quantity(1/pq.rad, name='angle_frequency_unit', symbol='1/rad')
+# angle_frequency_unit = angleFrequencyUnit = afu = af = pq.UnitQuantity('angle frequency unit', 1/pq.rad, symbol='1/rad')
 
 # these are too useful to leave out
 kiloohm = kohm = make_scaled_unit_quantity(pq.ohm, "kilo")
 megaohm = Mohm = make_scaled_unit_quantity(pq.ohm, "mega")
 gigaohm = Gohm = make_scaled_unit_quantity(pq.ohm, "giga")
 
+# NOTE: the string argument refers to the prefix to be prepended to the original
+# unit string
+
+# TODO some other useful units TODO
+# NOTE: 2023-05-18 16:17:59
+# if you want to add new custom quantities, write the code between the BEGIN / END 
+# lines below
+# ### BEGIN custom units
+Φₑ = radiant_flux_unit = rfu = make_scaled_unit_quantity(pq.W, name = "radiant_flux_unit", symbol='W')
+radiant_flux_density_unit = flux_density_unit = rfdu = fdu = make_scaled_unit_quantity(pq.W/(pq.m**2), name="radiant_flux_density_unit",symbol='W⋅m⁻²')
+Φₑν = spectral_flux_frequency_unit = sffu = make_scaled_unit_quantity(pq.W*(pq.Hz**(-1)), name="spectral_flux_frequency_unit",symbol='W⋅Hz⁻¹')
+Φₑλ = spectral_flux_wavelength_unit = sfwu = make_scaled_unit_quantity(pq.W*(pq.m**(-1)), name="spectral_flux_wavelength_unit",symbol='W⋅m⁻¹')
+ΦE = electric_flux_unit = efu = make_scaled_unit_quantity(pq.V * pq.m, name = "electric_flux_unit", symbol="V⋅m")
+flow_unit = flow = f_u = make_scaled_unit_quantity((pq.m**3)/pq.s, name="flow unit", symbol="m³⋅s⁻¹")
+# NOTE: 2023-05-18 16:17:50
+# testing currency units
+Pound_Sterling = pq.UnitCurrency("Pound_Sterling", symbol="£")
+US_Dollar = pq.UnitCurrency("US_Dollar", symbol="$")
+Euro = pq.UnitCurrency("Euro", symbol = "€")
+# ### END custom units
+
+
+
+# ** DON'T FORGET to add their symbol to the custom_unit_symbols dict AND to the
+# appropriate sets BELOW **
+#
+# NOTE: 2023-05-18 12:36:23
+# necessary to register new quantities with pq
 custom_unit_symbols = dict()
 custom_unit_symbols[arbitrary_unit.symbol] = arbitrary_unit
 custom_unit_symbols[pixel_unit.symbol] = pixel_unit
@@ -126,30 +207,87 @@ custom_unit_symbols[emm.symbol] = emm
 custom_unit_symbols[kohm.symbol] = kohm
 custom_unit_symbols[Mohm.symbol] = Mohm
 custom_unit_symbols[Gohm.symbol] = Gohm
+custom_unit_symbols[radiant_flux_unit.symbol] = radiant_flux_unit
+custom_unit_symbols[radiant_flux_density_unit.symbol] = radiant_flux_density_unit
+custom_unit_symbols[spectral_flux_frequency_unit.symbol] = spectral_flux_frequency_unit
+custom_unit_symbols[spectral_flux_wavelength_unit.symbol] = spectral_flux_wavelength_unit
+custom_unit_symbols[electric_flux_unit.symbol] = electric_flux_unit
+custom_unit_symbols[flow_unit.symbol] = flow_unit
+custom_unit_symbols[Euro.symbol] = Euro
+custom_unit_symbols[Pound_Sterling.symbol] = Pound_Sterling
+custom_unit_symbols[US_Dollar.symbol] = US_Dollar
 
-# NOTE: the string argument refers to the prefix to be prepended to the original
-# unit string
+# Family sets for custom quantities defined above
 
-# TODO some other useful units TODO
+custom_unit_families = dict()
+custom_unit_families["time"] = {"irreducible": set(),
+                                "derived": {day_in_vitro, embryonic_day, postnatal_day, week_in_vitro, embryonic_week, postnatal_week, embryonic_month, postnatal_month}}
+custom_unit_families["frequency"] = {"irreducible": set(),
+                                     "derived": {space_frequency_unit, angle_frequency_unit}}
+custom_unit_families["energy"] = {"irreducible": set(),
+                                  "derived": {radiant_flux_unit, spectral_flux_frequency_unit}}
+custom_unit_families["electromagnetism"] = {"irreducible": set(),
+                                            "derived": {spectral_flux_wavelength_unit, electric_flux_unit}}
+custom_unit_families["flow"] = {"irreducible": set(),
+                                "derived": {flow_unit}}
+custom_unit_families["currency"] = {"irreducible": {Euro, Pound_Sterling, US_Dollar},
+                                    "derived": set()}
 
-custom_quantities = ((mb, eval(mb)) for mb in dir() if isinstance(eval(mb), pq.Quantity))
 
-for cq in custom_quantities:
+# NOTE: 2023-05-18 12:46:33
+# The units in the Quantities package are implicitly orrganized in families by
+# modules. This leaves no straightforward way in which custom quantities can be 
+# added to these specific quantities, unless the custom quantity is a generated
+# using make_scaled_unit_quantity()
+
+# grab the custom quantities def'ed above, so far
+__custom_quantities__ = list((mb, eval(mb)) for mb in dir() if isinstance(eval(mb), pq.Quantity))
+
+for cq in __custom_quantities__:
     if cq[1].symbol not in custom_unit_symbols:
         custom_unit_symbols[cq[1].symbol] = cq[1]
     pq.unit_registry[cq[0]] = cq[1]
     setattr(pq, cq[0], cq[1])
 
-del(custom_quantities, cq, _pqpfx)
+del(cq, _pqpfx) # better keep __custom_quantities__
+# del(__custom_quantities__, cq, _pqpfx)
+
+def testme():
+    print(__file__, __name__)
+    
+def get_constants():
+    ret = dict()
+    
+    modules = [(k,v) for (k,v) in pq.constants.__dict__.items() if inspect.ismodule(v) and k not in ("_codata", "_utils")]
+    
+    for (modname, module) in modules:
+        ret[modname] = set([v for v in module.__dict__.values() if isinstance(v, pq.UnitConstant)])
+        
+    return ret
 
 def get_units():
-    """Returns all units definitions in the Python Quantities package, augmented.
+    """Collects all units definitions in the Python Quantities package, augmented.
+    This is typically called AFTER importing this module, therefore it SHOULD
+    contain custom units defined at the top of this module.
     
+    Returns:
+    ========
+    
+    unit_dict: mapping family name ↦ mapping irreducible ↦ set, derived ↦ set
+    irreducible: mapping UnitQuantity ↦ family name
+    derived: mapping UnitQuantity ↦ family name
     """
-    ret = dict()
-    unitsmodules = [(k,v) for (k,v) in pq.units.__dict__.items() if inspect.ismodule(v)]
     
-    _upriority = ("length", "time", "temperature", "mass", "substance", "information", "other")
+    unitsmodules = [(k,v) for (k,v) in pq.units.__dict__.items() if inspect.ismodule(v)] # + [pq.unitquantity]
+    
+    # _upriority = ("length", "time", "temperature", "mass", "substance", "information", "other")
+    
+    # get the main families of unit quantities:
+    uq = [(k,v) for (k,v) in pq.unitquantity.__dict__.items() if isinstance(v, type) and issubclass(v, pq.UnitQuantity)]
+    
+    main_families = sorted([u[1].__name__.replace("Unit", "") for u in uq if u[1].__name__.startswith("Unit") and not any(u[1].__name__.endswith(s) for s in ("Constant", "Quantity", "LuminousIntensity"))])
+    
+    ret = dict((k, {"irreducible":set(), "derived":set()}) for k in main_families)
     
     for module in unitsmodules:
         # check for all quantities
@@ -162,49 +300,204 @@ def get_units():
         # hence they can be used as dict keys
         
         if len(module_units):
-            ugroup = module[0].capitalize()
+            ufamily = module[0].capitalize()
             units = set(u[1] for u in module_units)
-            ir_units = set(u[1] for u in module_units if isinstance(u[1], pq.unitquantity.IrreducibleUnit) and type(u[1]).__name__.replace("Unit","") == ugroup)
-            der_units = units - ir_units
-            ret[ugroup]=dict()
-            ret[ugroup]["irreducibles"] = ir_units
-            ret[ugroup]["derived"] = der_units
-            if ugroup.lower() == "time":
-                ret[ugroup]["derived"] = ret[ugroup]["derived"] | {day_in_vitro, week_in_vitro, postnatal_day, postnatal_month, postnatal_week, embryonic_day, embryonic_month, embryonic_week}
-            elif ugroup.lower() == "frequency":
-                ret[ugroup]["derived"] = ret[ugroup]["derived"] | {angle_frequency_unit, space_frequency_unit}
-            elif ugroup == "electromagnetism":
-                ret[ugroup]["derived"] = ret[ugroup]["derived"] | {kiloohm, megaohm, gigaohm}
+            
+            imported = [u[1] for u in module_units if type(u[1]).__name__.replace("Unit", "") not in (ufamily, "Quantity")]
+            
+            for u in imported:
+                _fam = type(u).__name__.replace("Unit", "")
                 
-            
-        # reverse-locate irreducibles
-        
-        irreducibles = dict()
-        for k, v in ret.items():
-            if len(v["irreducibles"]):
-                for i in v["irreducibles"]:
-                    if i not in irreducibles:
-                        irreducibles[i] = set()
-                    irreducibles[i].add(k)
+                if _fam == "LuminousIntensity":
+                    _fam = "Electromagnetism"
+                
+                if _fam not in ret:
+                    ret[_fam] = {"irreducible":set(), "derived":set()}
                     
-        derived = dict()
-        for k, v in ret.items():
-            if len(v["derived"]):
-                for i in v["derived"]:
-                    if i not in derived:
-                        derived[i] = set()
-                    derived[i].add(k)
+                if isinstance(u, pq.unitquantity.IrreducibleUnit):
+                    ret[_fam]["irreducible"].add(u)
+                else:
+                    ret[_fam]["derived"].add(u)
                     
-    ret["other"]={"irreducibles": {arbitrary_unit, pixel_unit, channel_unit},
-                  "derived": set()}
+            local = units - set(imported)
+                    
+            ir_units = set(u for u in local if isinstance(u, pq.unitquantity.IrreducibleUnit) ) # and type(u[1]).__name__.replace("Unit","") == ufamily)
             
-    return ret, irreducibles, derived
+            der_units = local - ir_units
+            
+            if ufamily not in ret:
+                ret[ufamily]={"irreducible":set(), "derived":set()}
+            
+            ret[ufamily]["irreducible"] |= ir_units
+            ret[ufamily]["derived"] |= der_units
+
+    # add the custom quantities
+    for family in custom_unit_families:
+        f = family.capitalize()
+        if f in ret:
+            if "derived" not in ret[f]:
+                ret[f]["derived"] = set()
+                
+            for u in custom_unit_families[family]["derived"]:
+                ret[f]["derived"].add(u)
+                
+            if "irreducible" not in ret[f]:
+                ret[f]["irreducible"] = set()
+                
+            for u in custom_unit_families[family]["irreducible"]:
+                ret[f]["irreducible"].add(u)
+        else:
+            ret[f] = custom_unit_families[family]
+                    
+    ret["Other"]={"irreducible": {arbitrary_unit, pixel_unit, channel_unit, pq.dimensionless},
+                  "derived": set()} 
+    
+    result = dict(sorted([(k,v) for (k,v) in ret.items()]))
+    
+    for v in result.values():
+        v["irreducible"] = set(sorted(list(v["irreducible"]), key = lambda x: x.name))
+        v["derived"] = set(sorted(list(v["derived"]), key = lambda x: x.name))
+    
+    # reverse-locate irreducible
+    irreducible = dict()
+    for k, v in result.items():
+        if len(v["irreducible"]):
+            for i in v["irreducible"]:
+                if i not in irreducible:
+                    irreducible[i] = set()
+                irreducible[i].add(k)
+                
+    # similarly, grab the derived ones
+    derived = dict()
+    for k, v in result.items():
+        if len(v["derived"]):
+            for i in v["derived"]:
+                if i not in derived:
+                    derived[i] = set()
+                derived[i].add(k)
+                
+    return result, irreducible, derived
 
 UNITS_DICT, IRREDUCIBLES, DERIVED = get_units()
-        
-def unitFamilies():
-    return [k for k in UNITS_DICT]
 
+CONSTANTS = get_constants()
+        
+def constantsFamilies():
+    return list(CONSTANTS.keys())
+
+def getUnitConstantFamily(c:pq.UnitConstant):
+    if not isinstance(c, pq.UnitConstant):
+        raise TypeError(f"Expecting a UnitConstant; instead, got {type(c).__name__}")
+    
+    families = [f for f, v in CONSTANTS.items() if c in v]
+    
+    if len(families) > 1:
+        return set(families)
+    
+    elif len(families) == 1:
+        return families[0]
+    
+def familyConstants(family:str):
+    if family not in CONSTANTS:
+        raise ValueError(f"Family {family} is not a family of constants; valid families are {constantsFamlies()}")
+    
+    return CONSTANTS[family]
+
+def unitFamilies():
+    return list(UNITS_DICT.keys())
+
+def isCompound(x:pq.Quantity | pq.UnitQuantity):
+    if len(x.dimensionality) == 0:
+        return False
+    elif len(x.dimensionality) == 1:
+         base = list(x.dimensionality.keys())[0]
+         return isCompound(base.definition)
+     
+    else:
+         return True
+         
+def getBaseUnitQuantities(x:pq.Quantity | pq.UnitQuantity):
+    xdim = x.dimensionality
+    ret = list()
+    if len(xdim) == 1:
+        base = list(xdim.keys())[0]
+        if isinstance(base, pq.UnitQuantity):
+            if base._reference.dimensionality == base.dimensionality:
+                ret.append(base)
+                
+            else:
+                bdef = base.definition
+                if not isinstance(bdef, pq.UnitQuantity) or isCompound(bdef):
+                    bases = getBaseUnitQuantities(bdef)
+                    if isinstance(bases, list):
+                        ret.extend(bases)
+                    else:
+                        ret.append(bases)
+                else:
+                    ret.append(base)
+        else:
+            bases = getBaseUnitQuantities(base.definition)
+            if isinstance(bases, list):
+                ret.extend(bases)
+            else:
+                ret.append(bases)
+        
+    else:
+        for base in xdim.keys():
+            bbase = getBaseUnitQuantities(base)
+            if isinstance(bbase, list):
+                ret.extend(bbase)
+            else:
+                ret.append(bbase)
+    return ret
+            
+def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity]):
+    """
+    Retrieves the family of units for this quantity
+    """
+    families = list()
+    u = unit.dimensionality
+    
+    for family in UNITS_DICT:
+        uset = UNITS_DICT[family]["irreducible"] | UNITS_DICT[family]["derived"]
+        udims = [u.dimensionality for u in uset]
+        
+        if u in udims:
+            families.append(family)
+
+        else: # see if the reference unit is in one of the reference units in the family
+            urefs = [u_._reference.units for u_ in uset]
+            uref = unit._reference.units
+            if uref in urefs:
+                families.append(family)
+            
+    if len(families) == 1:
+        return families[0]
+    
+    elif len(families) > 1:
+        return sorted(list(set(families)))
+        
+    
+def familyUnits(family:str, kind:typing.Optional[str]=None):
+    if family not in UNITS_DICT:
+        raise ValueError(f"{family} is not a valid UnitQuantity family; valid families are {list(UNITS_DICT.keys())}")
+    
+    if kind is None:
+        return UNITS_DICT[family]["irreducible"] | UNITS_DICT[family]["derived"]
+    
+    elif isinstance(kind, str):
+        if kind == "irreducible":
+            return UNITS_DICT[family]["irreducible"]
+        
+        elif kind == "derived":
+            return UNITS_DICT[family]["derived"]
+        else:
+            raise ValueError(f"Invalid UnitQuantity kind : {kind}; expecting one of 'irreducible' or 'derived'")
+        
+    else:
+        raise TypeError(f"UnitQuantity kind expected to be None or a str; instead, got {type(kind).__name__}")
+    
+    
 def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]):
     """
     """
@@ -481,6 +774,16 @@ def name_from_unit(u, as_key:bool=False):
 
         else:
             return f"Compound Quantity {u.dimensionality.string}" if not as_key else "?"
+        
+def check_dosage_units(value):
+    if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
+        raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)
+    
+    # test if this is a Mass, Volume¹, Concentration, Compound, or Substance unit
+    #
+    # ¹ a dosing based exclusively on volume is theoretically possible, although
+    # impractical
+    families = ["Mass"]
             
 def check_time_units(value):
     if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):

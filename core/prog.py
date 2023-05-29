@@ -56,11 +56,11 @@ class BaseDescriptorValidator(ABC):
     """
     @staticmethod
     def get_private_name(name:str) -> str:
-        """Find out what private name thus would operate on
+        """Find out what private name this would operate on
         """
         return f"_{name}_"
     
-    def __set_name__(self, name:str) -> None:
+    def __set_name__(self, owner, name:str) -> None:
         """Call this in the implementation's __init__
         """
         self.private_name = f"_{name}_"
@@ -145,6 +145,40 @@ class BaseDescriptorValidator(ABC):
     def validate(self, value):
         pass
     
+class ImmutableDescriptor(BaseDescriptorValidator):
+    """
+        Crude implementation of a read-only descriptor.
+        
+        Useful for implementing 'dataclass' classes that are not frozen, but 
+        have read-only attributes.
+        
+        Usage in a 'dataclass' definition:
+        
+        @dataclass
+        class SomeClass:
+            a: int = 0
+            b: ImmutableDescriptor = ImmutableDescriptor(default="abc")
+        
+        c = SomeClass()
+        c.a = 20 # <- OK
+        c.b = "31" # <- no effectk
+        
+    """
+    def __init__(self, *, default):
+        self._default = default
+        
+    def __get__(self, obj, objtype=None) -> object:
+        if obj is None:
+            return self._default
+        
+        return getattr(obj, self.private_name, self._default)
+     
+    def __set__(self, obj, value):
+        pass
+    
+    def validate(self, value):
+        return value == self._default
+        
 class OneOf(BaseDescriptorValidator):
     def __init__(self, name:str, /, *options):
         self.options = set(options)
@@ -774,8 +808,8 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
 def deprecation(msg):
     warnings.warn(msg, DeprecationWarning, stacklevel=2)
     
-def iter_attribute(iterable:typing.Iterable, \
-                   attribute:str, \
+def iter_attribute(iterable:typing.Iterable, 
+                   attribute:str, 
                    silentfail:bool=True):
     """Iterator accessing the specified attribute of the elements in 'iterable'.
     Elements lacking the specified attribute yield None, unless 'silentfail' is 
@@ -822,11 +856,11 @@ def filterfalse_type(iterable:typing.Iterable, klass:typing.Type):
     """
     return filter(lambda x: not isinstance(x, klass), iterable)
 
-def filter_attr(iterable:typing.Iterable, \
-                op:typing.Callable[[typing.Any, typing.Any], bool] = operator.and_, \
-                indices:bool = False, \
-                indices_only:bool = False, \
-                exclude:bool = False,\
+def filter_attr(iterable:typing.Iterable, 
+                op:typing.Callable[[typing.Any, typing.Any], bool] = operator.and_, 
+                indices:bool = False, 
+                indices_only:bool = False, 
+                exclude:bool = False,
                 **kwargs):
     """Filter an iterable using predicates applied to attributes of its elements.
     
@@ -1313,16 +1347,19 @@ def no_sip_autoconversion(klass):
 # ### BEGIN Context managers
 
 @contextmanager
-def timeblock(label):
+def timeblock(label, verbose:bool=True):
     """Recipe 14.13 "Profiling and Timing Your Programs" 
         From Python Cookbook 3rd Ed. 2013
     """
-    start = time.perf_counter()
-    try:
+    if verbose:
+        start = time.perf_counter()
+        try:
+            yield
+        finally:
+            end = time.perf_counter()
+            print("{} : {}".format(label, end-start))
+    else:
         yield
-    finally:
-        end = time.perf_counter()
-        print("{} : {}".format(label, end-start))
 
 @contextmanager
 def processtimeblock(label):
@@ -1355,16 +1392,109 @@ def is_type_or_subclass(x, y):
     
     return isinstance(x, y)
 
-def parse_descriptor_specification(x:tuple) -> dict:
+def __check_array_attribute__(rt, param):
+    from core.quantities import units_convertible
+    # print(f"rt = {rt}; param = {param}")
+    if rt["default_value"] is not None:
+        if not isinstance(rt["default_value"], np.ndarray):
+            raise ValueError(f"Type of the default value type {type(rt['default_value']).__name__} is not a numpy ndarray")
+        
+    if isinstance(param, collections.abc.Sequence):
+        if all(isinstance(x_, np.dtype) for x_ in param):
+            if rt["default_value_dtype"] is None:
+                if isinstance(rt["default_value"], np.ndarray):
+                    if rt["default_value"].dtype not in tuple(param):
+                        raise ValueError(f"dtype of the default value type ({type(rt['default_value']).dtype}) is not in {param}")
+                        
+                rt["default_value_dtype"] = tuple(param)
+
+        elif all(isinstance(x_, int) for x_ in param):
+            if rt["default_value_shape"] is None or rt["default_value_ndim"] is None:
+                if isinstance(rt["default_value"], np.ndarray):
+                    if rt["default_value"].shape != tuple(param):
+                        raise ValueError(f"Default value has wrong shape ({rt['default_value'].shape}); expecting {param}")
+
+            rt["default_value_shape"] = tuple(param)
+            rt["default_value_ndim"] = len( rt["default_value_shape"])
+            
+    elif isinstance(param, np.dtype):
+        if rt["default_value_dtype"] is None:
+            if isinstance(rt["default_value"], np.ndarray):
+                if rt["default_value"].dtype != param and rt["default_value"].dtype.kind != param.kind:
+                    raise ValueError(f"Wrong dtype of the default value ({rt['default_value'].dtype}); expecting {param}")
+            rt["default_value_dtype"] = param
+
+    elif isinstance(param, int):
+        if rt["default_value_ndim"] is None:
+            if isinstance(rt["default_value"], np.ndarray):
+                if rt["default_value"].ndim != param:
+                    raise ValueError(f"Wrong dimensions for the default value ({rt['default_value'].ndim}); expecting {param}")
+            
+            rt["default_value_ndim"] = param
+
+    if issubclass(rt["default_value_type"], vigra.VigraArray):
+        if rt["default_value"] is not None and not isinstance(rt["default_value"], vigra.VigraArray):
+            raise TypeError(f"Wrong default value type ({type(rt['default_value']).__name__}; expecting a vigra.VigraArray")
+                            
+        if isinstance(param, str):
+            if rt["default_array_order"] is None:
+                if isinstance(rt["default_value"], vigra.VigraArray):
+                    if rt["default_value"].order != param:
+                        raise ValueError(f"Default value has wrong array order ({rt['default_value'].order}); expecting {param} ")
+                    
+                rt["default_array_order"] = param
+                                    
+        elif isinstance(param, vigra.AxisTags):
+            if rt["default_axistags"] is None:
+                if isinstance(rt["default_value"], vigra.VigraArray):
+                    if rt["default_value"].axistags != param:
+                        raise ValueError(f"Default value has wrong axistags ({rt['default_value'].axistags}); expecting {param} ")
+                    
+                rt["default_axistags"] = param
+            
+    if issubclass(rt["default_value_type"], pq.Quantity):
+        if rt["default_value"] is not None and not isinstance(rt["default_value"], pq.Quantity):
+            raise TypeError(f"Wrong default value type ({type(rt['default_value']).__name__}; expecting a Python Quantity")
+                        
+        if isinstance(param, pq.Quantity):
+            if rt["default_value_ndim"] is None:
+                if isinstance(rt["default_value"], pq.Quantity) and not units_convertible(rt["default_value"].units, param.units):
+                    raise ValueError(f"Default value has wrong units ({rt['default_value'].units}); expecting {param} ")
+                
+            rt["default_value_units"] = param
+            
+
+def __check_type__(attr_type, specs):
+    if isinstance(specs, type):
+        specs = (specs,)
+        
+    elif not isinstance(specs, collections.abc.Sequence) or not all(isinstance(v_, type, ) for v_ in specs if v_ is not None ):
+        raise TypeError("__check_type__ expecting a type or sequence of types as second parameter")
+    
+    else:
+        specs = tuple(s for s in specs if s is not None)
+    
+    if isinstance(attr_type, collections.abc.Sequence):
+        return all(isinstance(v_, type) and issubclass(v_, specs) for v_ in attr_type if v_ is not None )
+    
+    return isinstance(attr_type, type) and issubclass(attr_type, specs)
+                
+def parse_descriptor_specification(x:tuple):
     """
-    x: tuple with 1 to 6 elements:
+    x: tuple with 1 to 6 elements.
+    
+        In the most general case (terms in angle brackets are optional):
+    
+        (str, instance, type or tuple of types, <default value(s)>, )
+    
+    
         x[0]: str, name of the attribute
         
         x[1]: str, type, tuple of types or anyhing else
             when a :str: is if first tested for a dotted type name ; if this is
                 a dotted type name then it is interpreted as the type of the 
-                attribute's value; otherwise it is taken as the default value 
-                of a str-type attribute;
+                attribute's value (type name qualified by module); 
+                otherwise the attribute type is a str and its default value is x[1];
                 
             when a type: this is the default value type of the attribute, and 
                 the default value is the default constructor if it takes no 
@@ -1374,7 +1504,7 @@ def parse_descriptor_specification(x:tuple) -> dict:
                 this can be a tuple of types, or a tuple of instances; 
                 * tuple of types: these are the acceptable types of the attribute
                 
-                    - when the first element is a dict, this indicated that the 
+                    - when the first element is a dict, this indicates that the 
                     attribute is a dict; the rest of the type objects in the
                     tuple indicate acceptable types for the dict's values
                 
@@ -1382,7 +1512,7 @@ def parse_descriptor_specification(x:tuple) -> dict:
                 attribute; their types indicate acceptable types of the attribute
                 
             antyhing else: this is the default value of the attribute, and its
-                type is the acceptable type of the attribute
+                type is the type of the attribute
                 
             NOTE: x[1] is meant to specify the attribute type and/or its 
             acceptable default value(s). 
@@ -1400,24 +1530,23 @@ def parse_descriptor_specification(x:tuple) -> dict:
             These initialization failures are ignored, and the "default" 
             attribute value will NOT be set (i.e. it is left as it is, which is 
             None by default).
-            
+    
             This may impact on attribute validators (see prog.BaseDescriptorValidator and 
             derived subclasses) used to build dynamic descriptors, UNLESS the
             validator's property 'allow_none' is set to True.
                 
+            NOTE: 2023-05-18 08:40:56
+            The default value type is now determined in core.datatypes.default_value()
+            and MAY return an actual instance of the specified type, or None
+            
         x[2]: type or tuple of types
             a) When a type or tuple of types, this is either:
-                a.1) the explicit type(s) expected for the attribute, when the
-                expected type of the attributs had not been determined yet, 
-                from x[1].
+                a.1) the explicit type(s) expected for the attribute. 
+                WARNING: this may overwrite the default value type determined
+                    from x[1]
                 
-                a.2) the explicit type(s) of elements of a sequence or set 
-                elements when the attribute type determined from x[1] is a
-                sequence (e.g., tuple, list, or deque) or a set.
+                a.2) the explicit type(s) of elements of a collection-type attribute
                 
-                a.3) the explicit type(s) of the values of a dict, when the 
-                attribute type determined from x[1] is a dict.
-        
             b) When attribute type as determined from x[1] is a numpy ndarray, 
             or a subclass of numpy array (e.g., Python Quantity, VigraArray, 
             neo DataObect) x[2] may also be:
@@ -1458,110 +1587,34 @@ def parse_descriptor_specification(x:tuple) -> dict:
         
     Returns:
     --------
-    dict with the following key/values:
+    The following key ↦ value mapping:
     
-        name:str,
-        default_value: Python object, or tuple of objects
-        default_value_type: Python type or tuple of types
-        default_value_ndim: int or None,
-        default_value_dtype: numpy dtype object or None,
-        default_value_units: Python Quantity object or None
+    Key:                  Value type                  Semantic:
+    ============================================================================
+    name                  ↦ str                       Attribute name
+    default_value         ↦ object or tuple           Default attribute  value
+    default_value_type    ↦ type or tuple of types    Default attribute type
+    default_element_types ↦ type of tuple of types    For sequence or set attributes
+    default_item_types    ↦ type or tuple of types    For mapping-type attribute
+    default_value_ndim    ↦ int or None               Only for ndarray attributes
+    default_value_dtype   ↦ dtype or None             Only for ndarray attributes
+    default_value_units   ↦ Quantity or None          Only for Python quantities.Quantity
         
     NOTE: 
     default_value is None when either:
-        * it was specified as None (in x[1])
+        * it was specified as None (in x[1]) and was NOT overwritten in x[2]
         * default_value_type is a type that cannot be instantiated without 
             arguments
         * default_value_type is a tuple of types
     """
     from core.quantities import units_convertible
-    def __check_attr_type__(attr_type, specs):
-        if isinstance(specs, type):
-            specs = (specs,)
-            
-        elif not isinstance(specs, collections.abc.Sequence) or not all(isinstance(v_, type, ) for v_ in specs if v_ is not None ):
-            raise TypeError("__check_attr_type__ expecting a type or sequence of types as second parameter")
-        
-        else:
-            specs = tuple(s for s in specs if s is not None)
-        
-        if isinstance(attr_type, collections.abc.Sequence):
-            return all(isinstance(v_, type) and issubclass(v_, specs) for v_ in attr_type if v_ is not None )
-        
-        return isinstance(attr_type, type) and issubclass(attr_type, specs)
-                
+    from core.datatypes import (TypeEnum, is_enum, is_enum_value, default_value)
+    if not isinstance(x, tuple):
+        raise TypeError(f"Expecting a tuple, got {type(x).__name__} instead")
+    # print(f"parse_descriptor_specification {x}")
                 
     
-    def __check_array_attribute__(rt, param):
-        if rt["default_value"] is not None:
-            if not isinstance(rt["default_value"], np.ndarray):
-                raise ValueError(f"Type of the default value type {type(rt['default_value']).__name__} is not a numpy ndarray")
-            
-        if isinstance(param, collections.abc.Sequence):
-            if all(isinstance(x_, np.dtype) for x_ in param):
-                if rt["default_value_dtype"] is None:
-                    if isinstance(rt["default_value"], np.ndarray):
-                        if rt["default_value"].dtype not in tuple(param):
-                            raise ValueError(f"dtype of the default value type ({type(rt['default_value']).dtype}) is not in {param}")
-                            
-                    rt["default_value_dtype"] = tuple(param)
     
-            elif all(isinstance(x_, int) for x_ in param):
-                if rt["default_value_shape"] is None or rt["default_value_ndim"] is None:
-                    if isinstance(rt["default_value"], np.ndarray):
-                        if rt["default_value"].shape != tuple(param):
-                            raise ValueError(f"Default value has wrong shape ({rt['default_value'].shape}); expecting {param}")
-
-                rt["default_value_shape"] = tuple(param)
-                rt["default_value_ndim"] = len( rt["default_value_shape"])
-                
-        elif isinstance(param, np.dtype):
-            if rt["default_value_dtype"] is None:
-                if isinstance(rt["default_value"], np.ndarray):
-                    if rt["default_value"].dtype != param and rt["default_value"].dtype.kind != param.kind:
-                        raise ValueError(f"Wrong dtype of the default value ({rt['default_value'].dtype}); expecting {param}")
-                rt["default_value_dtype"] = param
-    
-        elif isinstance(param, int):
-            if rt["default_value_ndim"] is None:
-                if isinstance(rt["default_value"], np.ndarray):
-                    if rt["default_value"].ndim != param:
-                        raise ValueError(f"Wrong dimensions for the default value ({rt['default_value'].ndim}); expecting {param}")
-                
-                rt["default_value_ndim"] = param
-
-        if issubclass(rt["default_value_type"], vigra.VigraArray):
-            if rt["default_value"] is not None and not isinstance(rt["default_value"], vigra.VigraArray):
-                raise TypeError(f"Wrong default value type ({type(rt['default_value']).__name__}; expecting a vigra.VigraArray")
-                                
-            if isinstance(param, str):
-                if rt["default_array_order"] is None:
-                    if isinstance(rt["default_value"], vigra.VigraArray):
-                        if rt["default_value"].order != param:
-                            raise ValueError(f"Default value has wrong array order ({rt['default_value'].order}); expecting {param} ")
-                        
-                    rt["default_array_order"] = param
-                                        
-            elif isinstance(param, vigra.AxisTags):
-                if rt["default_axistags"] is None:
-                    if isinstance(rt["default_value"], vigra.VigraArray):
-                        if rt["default_value"].axistags != param:
-                            raise ValueError(f"Default value has wrong axistags ({rt['default_value'].axistags}); expecting {param} ")
-                        
-                    rt["default_axistags"] = param
-                
-        if issubclass(rt["default_value_type"], pq.Quantity):
-            if rt["default_value"] is not None and not isinstance(rt["default_value"], pq.Quantity):
-                raise TypeError(f"Wrong default value type ({type(rt['default_value']).__name__}; expecting a Python Quantity")
-                            
-            if isinstance(param, pq.Quantity):
-                if rt["default_value_ndim"] is None:
-                    if not units_convertible(rt["default_value"].units, param.units):
-                        raise ValueError(f"Default value has wrong units ({rt['default_value'].units}); expecting {param} ")
-                    
-                rt["default_value_units"] = param
-                
-        
     # (name, value or type, type or ndims, ndims or units, units)
     ret = dict(
         name = None,
@@ -1579,44 +1632,63 @@ def parse_descriptor_specification(x:tuple) -> dict:
         )
     
     if len(x):
+        # set the attribute name
+        if not isinstance(x[0], str):
+            raise TypeError(f"First element of a descriptor specification must be a str; got {type(x[0]).__name__} instead")
+        
         ret["name"] = x[0]
         
     if len(x) > 1:
+        # set the attribute's default value and default value type
+        #
         if isinstance(x[1], str):
             try:
-                val_type = import_item(x[1])
+                val_type = import_item(x[1]) # NOTE: import_item() def'ed in traitlets.utils.importstring
             except:
                 ret["default_value"] = x[1]
                 ret["default_value_type"] = str
                 
         elif isinstance(x[1], type):
             ret["default_value_type"] = x[1]
-            try:
-                ret["default_value"] = x[1]()
-            except:
-                pass
+            val = default_value(x[1]) # NOTE: default_value() def'ed in core.datatypes
+            ret["default_value"] = val
                 
         elif isinstance(x[1], tuple):
-            if all(isinstance(x_, type) for x_ in x[1]):
-                ret["default_value_type"] = x[1]
+            if all(isinstance(x_, type) for x_ in x[1]): 
+                # NOTE: x[1] is a tuple of types
+                # this leaves ret["default_value"] as None
+                ret["default_value_type"] = x[1] # any of the types in x[1]
             else:
+                # NOTE: x[1] is a tuple of instances
                 ret["default_value_type"] = tuple(type(x_) for x_ in x[1])
                 ret["default_value"] = x[1]
-                #ret["default_value"] = x[0]
             
         else:
+            # x[1] is an instance
             ret["default_value"] = x[1]
             ret["default_value_type"] = type(x[1])
+            
+    # print(f"parse_descriptor_specification default_value = {ret['default_value']}, default_value_type = {ret['default_value_type']}")
             
     if len(x) > 2: 
         # by now, the expected type of the attribute should be established,
         # whether it is None, type(None), or anything else
-        
-        if __check_attr_type__(ret["default_value_type"], (None, type(None))) or not __check_attr_type__(ret["default_value_type"], np.ndarray):
+        #
+        # x[1]
+        if __check_type__(ret["default_value_type"], (None, type(None))) or not __check_type__(ret["default_value_type"], np.ndarray):
+             # NOTE: 2023-05-17 18:30:44
+             # This branch executed when ret["default_value_type"] is None, NoneType, or IS NOT a np.ndarray subclass
             if isinstance(x[2], collections.abc.Sequence):
+                # x[2] is a sequence (tuple, list, deque)
                 if all(isinstance(x_, type) for x_ in x[2]):
-                    if __check_attr_type__(ret["default_value_type"], (collections.abc.Sequence, collections.abc.Set)):
+                    # all elements in x[2] are types
+                    if __check_type__(ret["default_value_type"], (collections.abc.Sequence, collections.abc.Set)):
+                        # The default attribute value type has been set as sequence or set:
+                        #   ⇒ x[2] specifies acceptable element types
                         ret["default_element_types"] = tuple(x[2])
+                        
+                        # Now, check that the default attribute value (if given) 
+                        #   conforms with the acceptable element types
                         if ret["default_value"] is not None:
                             if not isinstance(ret["default_value"], ret["default_value_type"]):
                                 raise ValueError(f"Default value expected to be a {type(ret['default_value_type'].__name__)}; got {type(ret['default_value']).__name__} instead")
@@ -1624,8 +1696,14 @@ def parse_descriptor_specification(x:tuple) -> dict:
                             if not all(isinstance(v_, tuple(x[2])) for v_ in ret["default_value"]):
                                 raise ValueError(f"Default value expected to be contain {x[2]} elements; got {set((type(v_).__name__ for v_ in ret['default_value']))} instead")
                         
-                    elif __check_attr_type__(ret["default_value_type"], collections.abc.Mapping):
+                    elif __check_type__(ret["default_value_type"], collections.abc.Mapping):
+                        # The default attribute value type has been set as a mapping
+                        # ⇒ x[2] specifies acceptable types for the values of the mapping
+                        #   i.e., default item types
                         ret["default_item_types"] = tuple(x[2])
+                        
+                        # Now, check that the default value (if given) conforms
+                        #   with the acceptable item types
                         if ret["default_value"] is not None:
                             if not isinstance(ret["default_value"], collections.abc.Mapping):
                                 raise ValueError(f"Default value expected to be a mapping; got {type(ret['default_value']).__name__} instead")
@@ -1634,26 +1712,47 @@ def parse_descriptor_specification(x:tuple) -> dict:
                                 raise ValueError(f"Default value expected to be contain {x[2]} items; got {set((type(v_).__name__ for v_ in ret['default_value'].values()))} instead")
                         
                     else:
+                        # Here, the default value type is neither a sequnce or set, nor a mapping.
+                        # Check that the default value (if given) conforms - i.e., 
+                        # has any of the types specified in x[2]
+                        
                         if ret["default_value"] is not None:
                             if not isinstance(ret["default_value"], tuple(set(x[2]))):
                                 raise ValueError(f"Type of the default value type {type(ret['default_value']).__name__} is different from the specified default value type {x[2]}")
                         
+                        # Finally, overwrite the default attribute value type
                         ret["default_value_type"] = tuple(set(x[2])) # make it unique
                     
             elif isinstance(x[2], type):
-                if __check_attr_type__(ret["default_value_type"], (collections.abc.Sequence, collections.abc.Set)):
+                # x[2] specifies a single type
+                if __check_type__(ret["default_value_type"], (collections.abc.Sequence, collections.abc.Set)):
+                    # If attribute value type is set as a sequence or set, then 
+                    # x[2] is considered to specify the element type in the sequence or set
+                    #
+                    # Verify that the default value (if given) conforms (i.e., is a sequence or set)
+                    # but allow for the default value to be empty, or None !
                     if isinstance(ret["default_value"], ret["default_value_type"]):
+                        # if default value is NOT empty, check its elements are of
+                        # the type specified in x[2]
                         if len(ret["default_value"]) > 0:
                             if not all(isinstance(v_, x[2]) for v_ in ret["default_value"]):
                                 raise TypeError(f"Default value was expected to have {x[2].__name__} elements; got {(type(v_).__name__ for v_ in ret['default_value'])} instead")
                             
                     elif ret["default_value"] is not None or (isinstance(ret["default_value"], type) and not issubclass(ret["default_value"], type(None))):
                         raise TypeError(f"Default value was expected to be a sequence or None; got {type(ret['default-value']).__name__} instead")
-                        
+                     
+                    # Finally, set up the element types
+                    # TODO: 2023-05-18 09:26:08
+                    # might not need to check if it's None. just overwrite it...
                     if ret["default_element_types"] is None:
                         ret["default_element_types"] = x[2]
                         
-                elif __check_attr_type__(ret["default_value_type"], collections.abc.Mapping):
+                elif __check_type__(ret["default_value_type"], collections.abc.Mapping):
+                    # Attribute value type is set to be a mapping ⇒ x[2] is
+                    # considered to specify the type of the values in the mapping
+                    #
+                    # Verify that the default value conforms, but allow it to be 
+                    # an empty mapping or None
                     if isinstance(ret["default_value"], collections.abc.Mapping):
                         if len(ret["default_value"]) > 0:
                             if not all(isinstance(v_, x[2]) for v_ in ret["default_value"].values()):
@@ -1662,15 +1761,28 @@ def parse_descriptor_specification(x:tuple) -> dict:
                     elif ret["default_value"] is not None or (isinstance(ret["default_value"], type) and not issubclass(ret["default_value"], type(None))):
                         raise TypeError(f"Default value was expected to be a mapping or None; got {type(ret['default-value']).__name__} instead")
                         
+                    # Finally, set up the item types
+                    # TODO: 2023-05-18 09:26:08
+                    # might not need to check if it's None. just overwrite it...
                     if ret["default_item_types"] is None:
                         ret["default_item_types"] = x[2]
                         
-                else:
-                    if ret["default_value"] is not None:
-                        if not isinstance(ret["default_value"], x[2]):
-                            raise ValueError(f"Type of the default value type {type(ret['default_value']).__name__} is different from the specified default value type {x[2]}")
+                else: # NOTE: 2023-05-17 18:29:25 x[2] is a type !!!
+                    # Default attribute value type is NOT a collection
+                    print(f"parse_descriptor_specification {x}")
+                    if not isinstance(ret["default_value_type"], x[2]):
+                        raise ValueError(f"Type of the default value type {ret['default_value_type']} is different from the specified default value type {x[2]}")
+                    # if not isinstance(x[2], (ret["default_value_type"], type(None))):
+                    #     raise ValueError(f"Type of the default value type {type(x[2]).__name__} is different from the specified default value type {ret['default_value_type']}")
 
                     ret["default_value_type"] = x[2]
+                    
+            else:
+                if not isinstance(x[2], (type(None), ret["default_value_type"])):
+                    raise TypeError(f"Default value expected to be None or {ret['default_value_type']}; instead, got {x[2]}")
+                
+                ret["default_value"] = x[2]
+                
                 
         else:
             __check_array_attribute__(ret, x[2])
@@ -1743,7 +1855,7 @@ class WithDescriptors(object):
     elements, where:
     
     1) the first element is always a str: the public name of the descriptor, 
-        i.e. the name under which the user accesses the underlying data as if an 
+        i.e. the name under which the user accesses the underlying data as an 
         instance attribute)
         
     2) an object (the default value, type specification, validation parameters,
@@ -1752,8 +1864,8 @@ class WithDescriptors(object):
         concrete examples)
     
     Together with the validator classes (Python descriptors) defined in this
-    module, and with AttributeAdapter, this provides framework implementing the
-    Python's descriptors protocol, useful for code factoring.
+    module, and with AttributeAdapter, this provides a framework that implements
+    the Python's descriptors protocol, useful for code factoring.
     
     In addition, derived :classes: wishing to execute additional code either 
     immediately before, or after a value is set to a descriptor, also need to
@@ -2179,12 +2291,5 @@ def is_class_defined_in_module(x:typing.Any, m:types.ModuleType):
     
 def show_caller_stack(stack):
     for s in stack:
-        # print(f"\tcaller\t {s.function} at line {s.lineno} in context: {pprint.pformat(s.code_context)}")
         print(f"\tcaller\t {s.function} at line {s.lineno} in {s.filename}")
-        # fcn = s.function
-        # if inspect.ismethod(fcn):
-        #     ftxt = f"{s.function.__self__.__class__.__name__}.{s.function} in {s.function.__module__} at line {s.lineno}"
-        # else:
-        #     ftxt = f"{s.function} in {s.function.__module__} at line {s.lineno}"
-        # print(f"\tcaller\t {ftxt}")
     

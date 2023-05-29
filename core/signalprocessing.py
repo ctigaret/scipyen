@@ -302,8 +302,8 @@ def is_positive_waveform(x:np.ndarray):
     return len(xPos) > len(xNeg)
 
 def scale_waveform(x:np.ndarray, α, β):
-    """Scales waveform by a rational factor (α/β) in place.
-    Returns a reference to x.
+    """Scales waveform by a rational factor (α/β).
+    Returns a reference to x, which is modified in place.
     
     Parameters:
     ==========
@@ -594,7 +594,7 @@ def shorth_estimator(x:np.ndarray):
         IEEE Standard for Transitions, Pulses, and Related Waveforms
         Section 5.2.2
     """
-    #TODO
+    # TODO 2023-05-17 11:50:52
     from scipy import cluster
     cbook, dist = cluster.vq.kmeans(x, 2) # get the two state occurrences
     
@@ -755,39 +755,32 @@ def state_levels(x:np.ndarray, **kwargs):
             
     levels: float or sequence of floats
             
-            The fractional reference levels; allowed values: [0..1]
-            
-            (see "f" argument to split_histogram() function in this module); 
-            
-            default is 0.5
+            The fractional reference levels; allowed values are in the interval 
+            [0,1] (see "f" argument to split_histogram() function in this module); 
+            default is 0.5.
             
     moment: str
             The statistical moment used to calculate the state level:
             "mean" or "mode" or a function that takes a 1D sequence of numbers
-            and returns a scalar; 
-            
-            default is "mean"
+            and returns a scalar; default is "mean"
     
-    axis:   int or None 
-            The axis of the array (when x.ndim > 1); default is None
+    axis:   int
+            The axis of the array (when x.ndim > 1); default is 0
             
     Returns:
     ========
-    A list of reference levels, corresponding to the fractional reference 
-    levels specified in "levels" argument.
+    sLevels: A list of reference levels, corresponding to the fractional reference 
+                levels specified in "levels" argument.
+    counts: histogram counts
+    edges: histogram edges
+    ranges: ranges of count values for the two levels
+    
 
     """
     from scipy import where
     
     if not isinstance(x, np.ndarray):
         raise TypeError(f"Numpy array expected; instead, got a {type(x).__name__}")
-    
-    if x.ndim > 1:
-        if x.shape[1] > 1:
-            raise ValueError(f"1D data expected; got data with shape {x.shape}")
-        
-        else:
-            x = np.squeeze(x)
     
     bins     = kwargs.get("bins", None)
     bw       = kwargs.get("bw", None)
@@ -796,7 +789,19 @@ def state_levels(x:np.ndarray, **kwargs):
     adcscale = kwargs.get("adcscale", None)
     levels   = kwargs.get("levels", 0.5)
     moment   = kwargs.get("moment", "mean")
-    axis     = kwargs.pop("axis", None)
+    axis     = kwargs.pop("axis", 0)
+    
+    if axis < 0 or axis >= x.ndim:
+        raise ValueError(f"Bad axis index {axis} for an array of {x.ndim} dimensions")
+    
+    # TODO/FIXME 2023-05-17 11:58:40
+    # allow data with ndim == 2
+    if x.ndim > 1:
+        if x.shape[1] > 1:
+            raise ValueError(f"1D data expected; got data with shape {x.shape}")
+        
+        else:
+            x = np.squeeze(x)
     
     # TODO/FIXME: 2022-10-23 16:54:42
     # might want to preserve their shape, because as of now, we use the `axis`

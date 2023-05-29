@@ -39,7 +39,7 @@ from core.utilities import (reverse_mapping_lookup, unique,)
 
 from core import quantities as cq
 from core.quantities import (space_frequency_unit, 
-                                    angle_frequency_unit, 
+                            angle_frequency_unit, 
                                     channel_unit, 
                                     arbitrary_unit,
                                     pixel_unit,

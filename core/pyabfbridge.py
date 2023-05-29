@@ -2,20 +2,18 @@
 
 Requires pyabf.
 
-NOTE: PyABF (https://swharden.com/pyabf/) is not currently used to load 
-Axon ABF files - Scipyen uses neo package instead (https://neo.readthedocs.io/en/stable/)
+PyABF (https://swharden.com/pyabf/) is not currently used to load Axon ABF files.
+Scipyen uses the neo package (https://neo.readthedocs.io/en/stable/) to represent
 
-This is because all electorprhyiology signals are represented in Scipyen as
-objects of types defined in the neo framework. 
+This is because all electrophysiology signals are represented in Scipyen as
+objects of the types defined in the neo framework. 
 
-However, pyABF does offer functionality that neo lacks, in particular, for the
-inspection of acquisition protocol data embedded in an axon file.
+However, pyABF does offer complementary functionality to neo package, allowing
+the inspection of acquisition protocol data embedded in an axon file.
 
-Such functionality comes in handy when one needs to inspect the acquisition
-protocol post hoc.
-
-To use the functions in this module you need to load the ABF file as a pyabf.ABF
-object (see https://swharden.com/pyabf/tutorial/ and https://swharden.com/pyabf/)
+See also 
+• https://swharden.com/pyabf/tutorial/ 
+• https://swharden.com/pyabf/
 
 
 """
@@ -25,9 +23,27 @@ import pandas as pd
 import quantities as pq
 
 from core import quantities as spq
-import pyabf
+from iolib.pictio import getABF
 
-def getEpochTables(x:object, as_dataFrame:bool=False, allTables:bool=False):
+try:
+    import pyabf
+    hasPyABF = True
+except:
+    hasPyABF = False
+
+# import pyabf
+
+def getABFProtocolEpochs(obj):
+    if not hasPyABF:
+        warning.warn("getABF requires pyabf package")
+        return
+    
+    abf = getABF(obj)
+    
+    if abf:
+        return getABFEpochsTable(abf, as_dataFrame=True)
+    
+def getABFEpochsTable(x:pyabf.ABF, as_dataFrame:bool=False, allTables:bool=False):
     if not isinstance(x, pyabf.ABF):
         raise TypeError(f"Expecting a pyabf.ABF object; got {type(x).__name__} instead")
     
@@ -45,7 +61,7 @@ def getEpochTables(x:object, as_dataFrame:bool=False, allTables:bool=False):
     return etables
     # return [e for e in etables if len(e.epochs)]
 
-def epochTable2DF(x:object, abf:typing.Optional[pyabf.ABF] = None):
+def epochTable2DF(x:pyabf.ABF, abf:typing.Optional[pyabf.ABF] = None):
     """Returns a pandas.DataFrame with the data from the epoch table 'x'
     """
     if not isinstance(x, pyabf.waveform.EpochTable):
@@ -101,7 +117,3 @@ def epochTable2DF(x:object, abf:typing.Optional[pyabf.ABF] = None):
         
         return pd.DataFrame(epochData, index = rowIndex)
     
-    
-    
-    
-

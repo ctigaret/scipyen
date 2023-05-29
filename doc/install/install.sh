@@ -33,13 +33,22 @@ function show_help ()
     echo -e "--with_neuron\t\tInstall binary neuron python distribution from PyPI\n"
     echo -e "--build_neuron\t\tBuild neuron python locally\n"
     echo -e "--with_coreneuron\tWhen '--build_neuron' is passed, build local neuron with coreneuron; by default coreneuron is not used.\n"
+    echo -e "--refresh_repos\t When '--refresh_repos' is passed, local repository clones will be refreshed before rebuilding\n"
+    echo -e "\tNOTE: This applies to vigra and to local neuron build only\n"
     echo -e "--jobs=N\t\tNumber of parallel tasks during building PyQt5 and neuron; default is 4; set to 0 to disable parallel build\n"
-    echo -e "--reinstall=NAME\t\t\tRe-install/re-building NAME, where NAME is one of pips, pyqt5, vigra, or neuron; can be passed more than once\n"
+    echo -e "--reinstall=NAME\t\t\tRe-install/re-building NAME, where NAME is one of pips, pyqt5, vigra, neuron, or desktopentry; can be passed more than once\n"
     echo -e "--about\t\t\tDisplay Install.md at the console (requires the program 'glow')\n"
     echo -e "-h | -? | --help \tShow this help message and quit\n"
     echo -e "\nFor details, execute install.sh --about\n"
-    
+    echo -e "\n"
+    echo -e "When run with the virtual Pythob environment already activated,\n"
+    echo -e "the script will use the current virtual environment to perform \n"
+    echo -e "(re)installations. WARNING: Make sure you activate the appropriate\n"
+    echo -e "Python environment for this !\n"
+   
 }
+
+
 function findqmake ()
 {
     qmake_binary=`which qmake`
@@ -133,12 +142,12 @@ function installpipreqs ()
         # by setting up the environment variable below
         # For details please see https://pypi.org/project/sklearn/
         export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
-#        if [[ $for_msys -eq 1 ]] ; then
-#            python3 -m pip install -r "$installscriptdir"/pip_requirements_msys.txt
-#        else
-#            python3 -m pip install -r "$installscriptdir"/pip_requirements.txt
-#        fi
-#NOTE: commented out previous to prevent a bug with installation
+        #        if [[ $for_msys -eq 1 ]] ; then
+        #            python3 -m pip install -r "$installscriptdir"/pip_requirements_msys.txt
+        #        else
+        #            python3 -m pip install -r "$installscriptdir"/pip_requirements.txt
+        #        fi
+        #NOTE: commented out previous to prevent a bug with installation
         python3 -m pip install -r "$installscriptdir"/pip_requirements.txt
         
         if [[ $? -ne 0 ]] ; then
@@ -196,10 +205,15 @@ function dopyqt5 ()
         
         # NOTE: good practice is to create an out-of-source build tree, » ...
         pyqt5_build_dir="PyQt5-build"
+        
+        # NOTE: clear build dir if it exists -- best to start fresh
+        if [ -d ${pyqt5_build_dir} ] ; then
+            rm -fr ${pyqt5_build_dir}
+        fi
         mkdir -p ${pyqt5_build_dir}
         
         # NOTE: » ... but run the build process INSIDE the expanded sdist dir
-        # is because sip-wheel will get extra options from there :)
+        # this is because sip-wheel will get extra options from there :)
         cd ${pyqt5_src_dir}
         
         echo "Generating PyQt5 wheel in "$(pwd)"..."
@@ -228,7 +242,7 @@ function dopyqt5 ()
             echo -e "No wheel file found in "$(pwd)" - goodbye!\n"
             exit 1
         else
-            python -m pip install ${wheel_file}
+            python -m pip install --force-reinstall ${wheel_file}
             
             if [[ $? -ne 0 ]] ; then
                 echo -e "Cannot install the PyQt5 wheel; check console output. Goodbye!\n"
@@ -249,11 +263,37 @@ function dovigra ()
     fi
     
     if [ ! -r ${VIRTUAL_ENV}/.vigradone ] || [[ $reinstall_vigra -gt 0 ]]; then
-        cd $VIRTUAL_ENV/src
+        mkdir -p ${VIRTUAL_ENV}/src && cd $VIRTUAL_ENV/src
         
         findcmake
         
-        git clone https://github.com/ukoethe/vigra.git && mkdir -p vigra-build && cd vigra-build
+        vigra_src=$VIRTUAL_ENV/src/vigra
+        vigra_build=$VIRTUAL_ENV/src/vigra-build
+        
+        if [ ! -r ${vigra_src} ] ; then
+            echo -e "Cloning vigra git repository...\n"
+            git clone https://github.com/ukoethe/vigra.git
+            if [[ $? -ne 0 ]] ; then
+                echo -e "Cannot clone vigra git repository. Goodbye!\n"
+                exit 1
+            fi
+            
+        else
+            # refresh the gir repo...
+            if [[ $refresh_git_repos -gt 0 ]] ; then
+                echo -e "Refreshing vigra git repository...\n"
+                cd ${vigra_src}
+                git pull
+                cd ..
+            fi
+        fi
+          
+        if [ -d ${vigra_build} ] ; then
+            rm -fr ${vigra_build}
+        fi
+        
+        echo -e "Creating vigra build tree outside the source tree\n"
+        mkdir -p vigra-build && cd vigra-build
         
         $cmake_binary -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
         
@@ -269,6 +309,49 @@ function dovigra ()
     fi
     
     
+}
+
+function make_desktop_entry ()
+{
+if [ ! -r ${VIRTUAL_ENV}/.desktopdone ] || [[ $reinstall_desktop -gt 0 ]] ; then
+tmpfiledir=$(mktemp -d)
+tmpfile=${tmpfiledir}/cezartigaret-Scipyen.desktop
+cat<<END > ${tmpfile}
+[Desktop Entry]
+Type=Application
+Name[en_GB]=Scipyen
+Name=Scipyen
+Comment[en_GB]=Scientific Python Environment for Neurophysiology
+Comment=Scientific Python Environment for Neurophysiology
+GenericName[en_GB]=Scientific Python Environment for Neurophysiology
+GenericName=Scientific Python Environment for Neurophysiology
+Icon=pythonbackend
+Categories=Science;Utilities;
+Exec=${scipyendir}/scipyen
+MimeType=
+Path=
+StartupNotify=true
+Terminal=true
+TerminalOptions=\s
+X-DBUS-ServiceName=
+X-DBUS-StartupType=
+X-KDE-SubstituteUID=false
+X-KDE-Username=
+END
+xdg-desktop-menu install ${tmpfile}
+if [[ $? -ne 0 ]] ; then
+echo -e "Installation of Scipyen Desktop file failed\n"
+exit 1
+fi
+# NOTE: 2023-05-02 15:25:50 this below installs an Icon on the desktop
+xdg-desktop-icon install ${tmpfile}
+if [[ $? -ne 0 ]] ; then
+echo -e "Installation of Scipyen Desktop file failed\n"
+exit 1
+fi
+echo "Scipyen Desktop file has been installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.desktopdone
+echo -e "Scipyen Desktop file has been installed \n"
+fi
 }
 
 function doneuron ()
@@ -311,9 +394,18 @@ function doneuron ()
             
             findcmake
             
+            nrn_build=${VIRTUAL_ENV}/src/nrn-build
+            
             if [ ! -d ${VIRTUAL_ENV}/src/nrn ] ; then
                 echo -e "Cloning nrn repository"
                 git clone https://github.com/neuronsimulator/nrn
+            else
+                if [[ $refresh_git_repos -gt 0 ]] ; then
+                    echo -e "Refreshing nrn repository"
+                    cd ${VIRTUAL_ENV}/src/nrn
+                    git pull
+                    cd ..
+                fi
             fi
             
             mkdir -p ${VIRTUAL_ENV}/src/nrn-build && cd ${VIRTUAL_ENV}/src/nrn-build
@@ -458,6 +550,8 @@ function linkscripts ()
         mv ${HOME}/bin/scipyen ${HOME}/bin/scipyen.$dt
     fi
     ln -s ${scipyendir}/scipyen ${HOME}/bin/scipyen
+    
+    echo -e "Link to scipyen startup script created in ${HOME}/bin \n"
 }
 
 #### Execution starts here ###
@@ -492,6 +586,8 @@ reinstall_pyqt5=0
 reinstall_vigra=0
 reinstall_neuron=0
 reinstall_pips=0
+reinstall_desktop=0
+refresh_git_repos=0
 # for_msys=0
 
 # if [ -n $MSYSTEM_PREFIX ] ; then
@@ -518,6 +614,10 @@ for i in "$@" ; do
         ve_path="${i#*=}"
         shift
         ;;
+        --refresh_repos)
+        refresh_git_repos=1
+        shift
+        ;;
         --jobs=*)
         njobs="${i#*=}"
         shift
@@ -541,6 +641,9 @@ for i in "$@" ; do
             ;;    
             pips)
             reinstall_pips=1
+            ;;
+            desktopentry)
+            reinstall_desktop=1
             ;;
             *)
             ;;
@@ -572,7 +675,9 @@ for i in "$@" ; do
 done
 
 # makes a virtual environment and activates it
+if ! [ -v VIRTUAL_ENV ] ; then
 upgrade_virtualenv && makevirtenv
+fi
 
 if [[ $? -ne 0 ]] ; then
     echo -e "\nCould not create and/or activate a virtual environment. Goodbye!\n"
@@ -610,12 +715,13 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     fi
     
     # make scripts
-    make_scipyenrc && update_bashrc && linkscripts
+    make_scipyenrc && update_bashrc
+    
+    linkscripts
+    
+    make_desktop_entry
     
 fi
-
-# stop_time=`date +%s`
-# echo Execution time was `expr $stop_time - $start_time` seconds.
 
 t=$SECONDS
 
