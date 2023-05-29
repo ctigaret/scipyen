@@ -189,7 +189,8 @@ from core.triggerprotocols import (TriggerProtocol,
 #from core.axisutils import (calibration, axisChannelName)
 import core.traitcontainers
 from core.traitcontainers import DataBag
-from core.traitutils import (TraitsObserver, trait_from_type, )
+# from core.traitutils import (trait_from_type, )
+# from core.traitutils import (TraitsObserver, trait_from_type, )
                                   
 
 #### END pict.core modules
@@ -7221,7 +7222,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 if len(report) > 0:
                     report_varname = "%s_result" % lsdata.name
                     self._scipyenWindow_.assignToWorkspace(report_varname, report)
-                    #self._scipyenWindow_.assignToWorkspace("%s_report" % report_varname, report_txt)
                     
         except Exception as e:
             traceback.print_exc()
@@ -7446,10 +7446,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self._scipyenWindow_.assignToWorkspace(report_varname, report)
         
-        #if len(filename):
-            #result.to_csv(filename, na_rep="NA")
-            
-        #self._scipyenWindow_.assignToWorkspace("%s_report" % report_varname, report_txt)
         self.statusBar().showMessage("Done!")
         
     @safeWrapper
@@ -12309,9 +12305,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if any([v is self for v in self.appWindow.workspace.values()]):
                 self.appWindow.deRegisterWindow(self) # this will also save settings and close the viewer window
                 self.appWindow.removeFromWorkspace(self, by_name=False)
-                #self.appWindow.removeFromWorkspace(self, from_console=False, by_name=False)
-                self.appWindow.slot_updateWorkspaceModel()
-                #self.appWindow.slot_updateWorkspaceModel(False)
+                # self.appWindow.slot_updateWorkspaceModel()
 
         #print("%s.closeEvent %s Call super().closeEvent" % (self.__class__.__name__, self.winTitle))
         # NOTE: 2021-07-08 15:59:47

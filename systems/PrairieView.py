@@ -2953,7 +2953,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
                 self._scandata_.triggers = self.triggerProtocols
                 
             if self.auto_export:
-                self._scipyenWindow_.assignToWorkspace(self.scanDataVarName, self.scanData, from_console=False)
+                self._scipyenWindow_.assignToWorkspace(self.scanDataVarName, self.scanData)
             
     def updateProtocolEditor(self):
         self.protocolEditorDialog.triggerProtocols = self.triggerProtocols

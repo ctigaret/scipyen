@@ -1246,7 +1246,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         loopControl = kwargs.pop("loopControl", None)
         progressSignal = kwargs.pop("progressSignal", None)
-        finished = kwargs.pop("finished", None)
+        finishedSignal = kwargs.pop("finishedSignal", None)
+        resultSignal = kwargs.pop("resultSignal", None)
         threaded = kwargs.pop("threaded", False)
         trains = kwargs.pop("trains", None)
         
@@ -2464,7 +2465,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             segment_index = self.currentFrame
             
         
-    def _detect_all_(self, waveform:typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]=None, **kwargs):
+    def _detect_all_(self, 
+                     waveform:typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]=None, 
+                     **kwargs) -> None:
         """Detects events in all sweeps
         
         Parameters:
@@ -2490,10 +2493,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         clear_prev_detection = kwargs.pop("clearLastDetection", True)
         loopControl = kwargs.pop("loopControl", None)
         progressSignal = kwargs.pop("progressSignal", None)
-        finished = kwargs.pop("finished", None)
-        # setMaxSignal = kwargs.pop("setMaxSignal", None)
-        # canceled = kwargs.pop("canceled", None)
-        # progressUI = kwargs.pop("progressDialog", None)
+        finishedSignal = kwargs.pop("finishedSignal", None)
+        resultSignal = kwargs.pop("resultSignal", None)
         
         if waveform is None:
             waveform  = self._get_event_template_or_waveform_()
@@ -3483,13 +3484,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._detectWorker_.signals.signal_Finished.connect(lambda : progressDisplay.setValue(progressDisplay.maximum()))
         self._detectWorker_.signals.signal_Result[object].connect(self._slot_detectThread_ready)
         
-        # self._detectWorker_.signals.signal_Canceled.connect(self._detectThread_.quit)
-        # self._detectWorker_.signals.signal_Canceled.connect(self._detectWorker_.deleteLater)
-        
         self._detectThread_.finished.connect(self._detectWorker_.deleteLater)
         self._detectThread_.finished.connect(self._detectThread_.deleteLater)
-        
-        # progressDisplay.setValue(0) # causes the progres dialog to show imemdiately
         
         self._enable_widgets(self.actionDetect,
                              self.actionUndo,
