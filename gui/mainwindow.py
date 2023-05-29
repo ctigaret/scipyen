@@ -5392,7 +5392,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             return False
         
         # NOTE: 2023-05-27 14:48:04
-        # inherited from workspace
+        # self.loadFiles is inherited from workspace
         # creates a pgui.ProgressWorkerThreaded to create a file loading loop 
         # in a separate thread. The actual file loading method that is called 
         # inside the loop is self._openSelectedFileItemsThreaded. 
