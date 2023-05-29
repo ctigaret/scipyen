@@ -104,14 +104,6 @@ def traitlet_set(instance, obj, value):
         silent = False
         change_type = "new"
     
-#     try:
-#         old_value = obj._trait_values[instance.name]
-#         
-#     except KeyError:
-#         old_value = instance.default_value
-        
-    # print(f"old_value {old_value} new_value {new_value}")
-    
     obj._trait_values[instance.name] = new_value
     
     try:
@@ -120,19 +112,11 @@ def traitlet_set(instance, obj, value):
             new_hash = gethash(new_value)
             #print("\told %s (hash %s)\n\tnew %s (hash %s)" % (old_value, instance.hashed, new_value, new_hash))
             #print(instance.name, "old hashed", instance.hashed, "new_hash", new_hash)
-            silent &= bool(new_hash == instance.hashed)
+            silent = bool(new_hash == instance.hashed)
             
             if not silent:
                 instance.hashed = new_hash
             
-        ## NOTE: 2021-08-19 16:17:23
-        ## check for change in contents
-        #if silent is not False:
-            #new_hash = gethash(new_value)
-            #silent = (new_hash == instance.hashed)
-            #print("%s: silent after hash" % instance.name, silent)
-            #if not silent:
-                #instance.hashed = new_hash
     except:
         traceback.print_exc()
         # if there is an error in comparing, default to notify
@@ -145,37 +129,11 @@ def traitlet_set(instance, obj, value):
         obj._notify_trait(instance.name, old_value, new_value, 
                           change_type = change_type)
 
-#@timefunc
-# def standard_traitlet_set(instance, obj, value):
-#     """Overrides traitlets.TraitType.set to check for special hash.
-#     This is supposed to also detect changes in the order of elements in sequences.
-#     """
-#     new_value = value
-#     
-#     silent = True
-#     
-#     if instance.name and instance.name in obj._trait_values and instance.name in obj.traits():
-#         old_value = obj._trait_values[instance.name]
-#     else:
-#         old_value = instance.default_value
-# #     
-# #     try:
-# #         old_value = obj._trait_values[instance.name]
-# #         
-# #     except KeyError:
-# #         old_value = instance.default_value
-#         
-# 
-#     obj._trait_values[instance.name] = new_value
-#     
-#     obj._notify_trait(instance.name, old_value, new_value)
-    
-
 def _dynatrtyp_exec_body_(ns, setfn = traitlet_set, delfn=traitlet_delete):
     #print("ns:", ns)
     ns["info_text"]="Trait that is sensitive to content change"
-    # ns["hashed"] = 0
-    ns["hashed"] = -1
+    ns["hashed"] = 0
+    # ns["hashed"] = -1
     ns["set"] = setfn
     ns["__delete__"] = delfn
     

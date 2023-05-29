@@ -5413,10 +5413,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #   requires a separate post-hoc update to the workspaceModel, which
         #   blocks the UI
         #
-        self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded, updateUi=True)
+        # self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded, updateUi=True)
         
         # CAUTION: DO NOT USE: still needs work TODO/FIXME
-        # self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded, updateUi=False)
+        self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded, updateUi=False)
         
 #     @pyqtSlot()
 #     @safeWrapper

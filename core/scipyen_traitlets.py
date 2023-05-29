@@ -93,7 +93,7 @@ TRAITSMAP = {           # use casting versions
     #function:   (Any,)
     }
 
-class DeletableTrainTypeMixin:
+class ScipyenTraitTypeMixin:
     def __delete__(self, obj):
         """Fails silently when owner is of wrong type"""
         if hasattr(obj, "remove_trait") and hasattr(obj, "_trait_values") and hasattr(obj, "traits"):
@@ -103,9 +103,44 @@ class DeletableTrainTypeMixin:
                 old_value = obj._trait_values.pop(self.name, None)
                 obj._notify_trait(self.name, old_value, Undefined,
                                   change_type="removed")
+                
+#     def get(self, obj, cls=None):
+#         """My get"""
+#         print(f"{self.__class__.__name__}.get: {self.name}")
+#         try:
+#             value = obj._trait_values[self.name]
+#         except KeyError:
+#             default = obj.trait_defaults(self.name)
+#             # if default is Undefined:
+#             #     return
+#             _cross_validation_lock = obj._cross_validation_lock
+#             try:
+#                 obj._cross_validation_lock = True
+#                 value = self._validate(obj, default)
+#             finally:
+#                 obj._cross_validation_lock = _cross_validation_lock
+#                 
+#             obj._trait_values[self.name] = value
+#             obj._notify_observers(
+#                 Bunch(
+#                     name=self.name,
+#                     value=value,
+#                     owner=obj,
+#                     type="default",
+#                 )
+#             )
+#             print(f"{self.__class__.__name__}.get: id(validated from default) = {id(value)}")
+#             return value
+#         
+#         except Exception as e:
+#             # This should never be reached.
+#             raise TraitError("Unexpected error in TraitType: default value not set properly") from e
+#         else:
+#             print(f"{self.__class__.__name__}.get: id(value) = {id(value)}")
+#             return value
         
 # class DictTrait(Instance):
-class DictTrait(Dict, DeletableTrainTypeMixin):
+class DictTrait(Dict, ScipyenTraitTypeMixin):
     info_text = "Traitlet for mapping types (dict) that is sensitive to content changes"
     default_value = dict() # default value of the Trait instance
     klass = dict
@@ -115,19 +150,10 @@ class DictTrait(Dict, DeletableTrainTypeMixin):
      
     def __init__(self, value_trait=None, per_key_traits=None, key_trait=None,
                  default_value=Undefined, **kwargs):
-        # trait = kwargs.pop('trait', None)
-        # if trait is not None:
-        #     if value_trait is not None:
-        #         raise TypeError("Found a value for both `value_trait` and its deprecated alias `trait`.")
-        #     value_trait = trait
-        #     warn(
-        #         "Keyword `trait` is deprecated in traitlets 5.0, use `value_trait` instead",
-        #         DeprecationWarning,
-        #         stacklevel=2,
-        #     )
+        super(ScipyenTraitTypeMixin, self).__init__()
             
-        super(DeletableTrainTypeMixin, self).__init__()
         # NOTE: traitlets.Undefined is an instance of traitlets.Sentinel
+        self.hashed = 0
         if default_value is None and not kwargs.get("allow_none", False):
             default_value = Undefined
             
@@ -169,10 +195,6 @@ class DictTrait(Dict, DeletableTrainTypeMixin):
 
         self._per_key_traits = per_key_traits
         
-        # super(DictTrait, self).__init__(*args, **kwargs)
-        
-#         super().__init__(klass = self.klass, args=args, **kwargs)
-#         
         super().__init__(value_trait=value_trait, per_key_traits=per_key_traits,key_trait=key_trait,
                          default_value=default_value, **kwargs)
         
@@ -222,29 +244,22 @@ class DictTrait(Dict, DeletableTrainTypeMixin):
             silent=False
             change_type="new"
         
-        # try:
-        #     old_value = obj._trait_values[self.name]
-        # except KeyError:
-        #     silent=False    # this will be the first time the observed sees us
-        #     old_value = self.default_value
-            
         try:
             if silent:
-                silent &= bool(old_value == new_value)
-                # silent = bool(old_value == new_value)
+                silent = bool(old_value == new_value)
             
             # NOTE: 2021-08-19 16:17:23
             # check for change in contents
             if silent:
                 new_hash = gethash(new_value)
-                silent &= (new_hash == self.hashed)
-                # silent = (new_hash == self.hashed)
+                silent = (new_hash == self.hashed)
                 if not silent:
                     self.hashed = new_hash
         except:
             # if there is an error in comparing, default to notify
             silent = False
             
+        # print(f"{self.__class__.__name__}.set: silent {silent}, hashed {self.hashed}")
         obj._trait_values[self.name] = new_value
         
         # print(f"\n{self.__class__.__name__} object {self.name} .set({obj}, {value}) → old_value = {old_value}; new_value = {new_value}; notify_trait = {not silent}")
@@ -256,7 +271,7 @@ class DictTrait(Dict, DeletableTrainTypeMixin):
                               change_type=change_type)
   
             
-class ListTrait(List, DeletableTrainTypeMixin):
+class ListTrait(List, ScipyenTraitTypeMixin):
     """TraitType that ideally should notify:
     a) when a list contents has changed (i.e., gained/lost members)
     b) when an element in the list has changed (either a new value, or a new type)
@@ -296,7 +311,7 @@ class ListTrait(List, DeletableTrainTypeMixin):
     
         default_value: list, tuple, set 
         """
-        super(DeletableTrainTypeMixin, self).__init__()
+        super(ScipyenTraitTypeMixin, self).__init__()
         self._traits = traits # a list of traits, one per element - corresponds to per_key_traits in Dict
         self._length = 0
         
@@ -364,27 +379,24 @@ class ListTrait(List, DeletableTrainTypeMixin):
             silent=False
             change_type="new"
 
-        # try:
-        #     old_value = obj._trait_values[self.name]
-        # except KeyError:
-        #     silent = False
-        #     old_value = self.default_value
-
         try:
+            # print(f"{self.__class__.__name__}.set: old_value = {old_value}, new_value = {new_value}")
             if silent:
-                silent &= bool(old_value == new_value)
-                # silent = bool(old_value == new_value)
+                silent = bool(old_value == new_value)
+                # print(f"{self.__class__.__name__}.set: old_value == new_value => silent {silent}")
+            
             
             # NOTE: 2021-08-19 16:17:23
             # check for change in contents
-            if silent is not False:
+            if silent:
                 new_hash = gethash(new_value)
-                silent &= (new_hash == self.hashed)
-                # silent = (new_hash == self.hashed)
+                silent = (new_hash == self.hashed)
+                # print(f"{self.__class__.__name__}.set: new_hash == self.hashed => silent {silent}")
                 
                 if not silent:
                     self.hashed = new_hash
         except:
+            traceback.print_exc()
             # if there is an error in comparing, default to notify
             silent = False
             
@@ -392,19 +404,21 @@ class ListTrait(List, DeletableTrainTypeMixin):
             
         obj._trait_values[self.name] = new_value
         
-        if silent is not True:
+        # print(f"{self.__class__.__name__}.set: silent {silent}, hashed {self.hashed}")
+        
+        if not silent:
             # obj._notify_trait(self.name, old_value, new_value)
             obj._notify_trait(self.name, old_value, new_value,
                               change_type=change_type)
             
-class NdarrayTrait(Instance, DeletableTrainTypeMixin):
+class NdarrayTrait(Instance, ScipyenTraitTypeMixin):
     info_text = "Trait for numpy arrays"
     default_value = np.array([])
     klass = np.ndarray
     
     def __init__(self, args=None, kw=None, **kwargs):
         # allow 1st argument to be the array instance
-        super(DeletableTrainTypeMixin, self).__init__()
+        super(ScipyenTraitTypeMixin, self).__init__()
         default_value = kwargs.pop("default_value", None)
         self.allow_none = kwargs.pop("allow_none", False)
         
@@ -438,7 +452,7 @@ class NdarrayTrait(Instance, DeletableTrainTypeMixin):
     def make_dynamic_default(self):
         return np.array(self.default_value)
  
-class NeoBaseNeoTrait(Instance, DeletableTrainTypeMixin):
+class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
     """IT IS RECOMMENDED THAT SUBCLASSES OVERRIDE THE `compare_elements` METHOD
     """
     info_text = "Trais for neo.baseneo.BaseNeo"
@@ -448,7 +462,7 @@ class NeoBaseNeoTrait(Instance, DeletableTrainTypeMixin):
     _valid_defaults = (neo.baseneo.BaseNeo,)
     
     def __init__(self, value_trait=None, default_value = Undefined, **kwargs):
-        super(DeletableTrainTypeMixin, self).__init__()
+        super(ScipyenTraitTypeMixin, self).__init__()
         trait = kwargs.pop('trait', None)
         if trait is not None:
             if value_trait is not None:
@@ -628,7 +642,7 @@ class NeoBaseNeoTrait(Instance, DeletableTrainTypeMixin):
             # the number of variables in the workspace)
             # silent = self.compare_elements(old_value, new_value)
             if silent:
-                silent &= bool(old_value == new_value)
+                silent = bool(old_value == new_value)
             
         except:
             traceback.print_exc()
@@ -931,7 +945,7 @@ class NeoArrayDictTrait(NeoBaseNeoTrait):
     _valid_defaults = (klass,)
     
     
-class QuantityTrait(Instance, DeletableTrainTypeMixin):
+class QuantityTrait(Instance, ScipyenTraitTypeMixin):
     info_text = "Traitlet for python quantities"
     default_value = pq.Quantity([]) # array([], dtype=float64) * dimensionless
     klass = pq.Quantity
@@ -939,10 +953,10 @@ class QuantityTrait(Instance, DeletableTrainTypeMixin):
     _valid_defaults = (pq.Quantity,)
     
     def __init__(self, value_trait=None, default_value = Undefined, minlen = 0, maxlen = sys.maxsize, **kwargs):
-        super(DeletableTrainTypeMixin, self).__init__()
+        super(ScipyenTraitTypeMixin, self).__init__()
         self._minlen = minlen
         self._maxlen = maxlen
-        # self.hashed = 0
+        self.hashed = 0
     
         trait = kwargs.pop('trait', None)
         if trait is not None:
@@ -1039,7 +1053,7 @@ class QuantityTrait(Instance, DeletableTrainTypeMixin):
                 # so far silent is True when the observed knows about us
                 # check it we changed and notify
                 # silent = (new_hash == self.hashed)
-                silent &= new_value == old_value
+                silent = new_value == old_value
             
         except:
             traceback.print_exc()
@@ -1114,7 +1128,7 @@ class IrregularlySampledDataSignal(NeoDataObjectTrait):
         
     
     
-class DataBagTrait(Instance, DeletableTrainTypeMixin):
+class DataBagTrait(Instance, ScipyenTraitTypeMixin):
     """Avoid slicing the DataBag type to dict.
     
     When a DataBag is contained in another DataBag, its corresponding trait type
@@ -1142,7 +1156,7 @@ class DataBagTrait(Instance, DeletableTrainTypeMixin):
                  mutable_key_value_traits=True, **kwargs):
         """Avoid back-casting DataBag to dict
         """
-        super(DeletableTrainTypeMixin, self).__init__()
+        super(ScipyenTraitTypeMixin, self).__init__()
         
         # handle deprecated keywords
         trait = kwargs.pop('trait', None)
@@ -1403,7 +1417,7 @@ class DataBagTrait(Instance, DeletableTrainTypeMixin):
                 new_hash = gethash(new_value.as_dict())
                 #print("\told %s (hash %s)\n\tnew %s (hash %s)" % (old_value, instance.hashed, new_value, new_hash))
                 #print(instance.name, "old hashed", instance.hashed, "new_hash", new_hash)
-                silent &= (new_hash == self.hashed)
+                silent = (new_hash == self.hashed)
             
                 if not silent:
                     self.hashed = new_hash
@@ -1420,7 +1434,7 @@ class DataBagTrait(Instance, DeletableTrainTypeMixin):
             obj._notify_trait(self.name, old_value, new_value,
                               change_type=change_type)
 
-class DequeTrait(Instance, DeletableTrainTypeMixin):
+class DequeTrait(Instance, ScipyenTraitTypeMixin):
     info_text = "Traitlet for deque"
     # klass = _NotifierDeque_
     klass = deque
@@ -1429,7 +1443,7 @@ class DequeTrait(Instance, DeletableTrainTypeMixin):
     
     def __init__(self, value_trait=None, default_value=Undefined, 
                  minlen=0, maxlen=sys.maxsize, **kwargs):
-        super(DeletableTrainTypeMixin, self).__init__()
+        super(ScipyenTraitTypeMixin, self).__init__()
         self._minlen = minlen
         self._maxlen = maxlen
         self.hashed = 0
@@ -1508,24 +1522,17 @@ class DequeTrait(Instance, DeletableTrainTypeMixin):
             silent=False
             change_type="new"
         
-#         try:
-#             old_value = obj._trait_values[self.name]
-#         except KeyError:
-#             silent=False    # this will be the first time the observed sees us
-#                             # therefore forcibly notify it
-#             old_value = self.default_value
-#             
         obj._trait_values[self.name] = new_value
         
         try:
             if silent:
-                silent &= bool(old_value == new_value)
+                silent = bool(old_value == new_value)
 
             if silent:
                 # so far silent is True when the observed knows about us
                 # check it we changed and notify
                 new_hash = gethash(new_value)
-                silent &= (new_hash == self.hashed)
+                silent = (new_hash == self.hashed)
             
                 if not silent:
                     self.hashed = new_hash

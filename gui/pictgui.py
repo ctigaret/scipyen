@@ -382,16 +382,6 @@ class ProgressWorkerThreaded(QtCore.QObject):
             self.signals.signal_Progress.connect(self.pd.setValue)
             self.signals.signal_setMaximum.connect(self.pd.setMaximum)
             self.signals.signal_Finished.connect(self.pd.reset)
-            # self.kwargs['progressSignal'] = self.signals.signal_Progress
-            # self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
-            # self.kwargs["finished"] = self.signals.signal_Finished
-            # self.kwargs["loopControl"] = self.loopControl
-            
-            # self.kwargs["progressUI"] = self.pd
-            # self.kwargs["canceled"] = self.signals.signal_Canceled
-            # self.kwargs["poller"] = self.poller
-            # slot_canceled emits signal_Canceled
-            # self.pd.canceled.connect(self.slot_canceled)
         else:
             self.pd is None
             

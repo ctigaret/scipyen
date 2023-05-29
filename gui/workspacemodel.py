@@ -73,7 +73,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     workingDir = pyqtSignal(str, name="workingDir")
     internalVariableChanged = pyqtSignal(dict, name="internalVariableChanged")
     varModified = pyqtSignal(object, name="varModified")
-    # sig_updateInternal = pyqtSignal(name="sig_updateInternal")
+    sig_startAsyncUpdate = pyqtSignal(dict, name="sig_startAsyncUpdate")
 
     def __init__(self, shell, user_ns_hidden=dict(),
                  parent=None,
@@ -157,6 +157,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         # self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
         self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
+        self.sig_startAsyncUpdate.connect(self._slot_updateModelAsync_, QtCore.Qt.QueuedConnection)
 
     def _foreignNamespacesCountChanged_(self, change):
         # FIXME / TODO 2020-07-30 23:49:13
@@ -728,11 +729,17 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     @pyqtSlot(dict)
     def _slot_cacheInternalVariableChange_(self, change):
         name = change.name
-        change_type = change.type
-        if change_type == "remove":
+        change_type = change.get("change_type", change.type)
+        
+        if change_type in ("remove", "removed"):
             self.__changes__[name] = WorkspaceVarChange.Removed
-        else:
-            pass
+        elif change_type == "new":
+            self.__changes__[name] = WorkspaceVarChange.New
+        elif change_type == "modified":
+            self.__changes__[name] = WorkspaceVarChange.Modified
+        else:   # for legacy (traitlets.TraitType-style) notifications
+                # that lack 'change_type' attribute
+            self.__changes__[name] = WorkspaceVarChange.Modified
 
     @pyqtSlot(dict)
     def _slot_internalVariableChanged_(self, change):
@@ -745,9 +752,15 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         # NOTE: 2023-05-28 22:15:54
         # GuiWorker is a QRunnable
+        # worker = pgui.GuiWorker(self._updateFromMonitor_, name, 
+        #                         displayed_var_names, user_shell_var_names,
+        #                         change.type)
+        
+        change_type = change.get("change_type", change.type)
+        
         worker = pgui.GuiWorker(self._updateFromMonitor_, name, 
                                 displayed_var_names, user_shell_var_names,
-                                change.type)
+                                change_type)
         
         worker.signals.signal_Result.connect(self._slot_updateModelFromMonitor_)
         
@@ -758,9 +771,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                             change_type:str):
 
         # print(f"\n{self.__class__.__name__}._updateFromMonitor_ {name}\n\tin shell: {name in self.shell.user_ns}\n\tdisplayed: {name in displayed_var_names}")
-        if change_type == "remove":
+        if change_type in ("remove", "removed"):
             alteration = WorkspaceVarChange.Removed
-        else:
+        elif change_type == "new": # name in user_shell_var_names:
+            alteration = WorkspaceVarChange.New
+        elif change_type == "modified":
+            alteration = WorkspaceVarChange.Modified
+        else:   # for legacy (traitlets.TraitType-style) notifications
+                # lacking a 'change_type' attribute
             if name in user_shell_var_names:
                 if name not in displayed_var_names:
                     alteration = WorkspaceVarChange.New
@@ -769,10 +787,27 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             else:
                 if name in displayed_var_names:
                     alteration = WorkspaceVarChange.Removed
-
+        
                 else:
                     alteration = None
-
+                
+#             if change_type == "new": # name in user_shell_var_names:
+#                 alteration = WorkspaceVarChange.New
+#             elif change_type == "modified":
+#                 alteration = WorkspaceVarChange.Modified
+#             else: # for legacy (traitlets.TraitType-style) notifications
+#                 if name in user_shell_var_names:
+#                     if name not in displayed_var_names:
+#                         alteration = WorkspaceVarChange.New
+#                     else:
+#                         alteration = WorkspaceVarChange.Modified
+#                 else:
+#                     if name in displayed_var_names:
+#                         alteration = WorkspaceVarChange.Removed
+#             
+#                     else:
+#                         alteration = None
+#                     
         return (name, alteration)
 
     @pyqtSlot(tuple)
@@ -1481,7 +1516,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # current_vars = dict([item for item in self.shell.user_ns.items(
         # ) if not item[0].startswith("_") and self.isUserVariable(item[0], item[1])])
 
-        self.internalVariablesMonitor.remove_members(*list(del_vars))
+        self.internalVariablesMonitor.delete(*list(del_vars))
 
         self.internalVariablesMonitor.update(current_vars)
         
@@ -1524,17 +1559,13 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         mod_vars = dict(filter(lambda x: x[0] in displayed_var_names, current_vars.items()))
         
-        self.__changes__.update(dict(map(lambda x: (x, WorkspaceVarChange.Removed), del_vars)))
-        
-        self.__changes__.update(dict(map(lambda x: (x, WorkspaceVarChange.New), new_vars.keys())))
-        
-        self.__changes__.update(dict(map(lambda x: (x, WorkspaceVarChange.Modified), mod_vars.keys())))
-        
-        # with self.holdUIUpdate():
         self.internalVariablesMonitor.delete(*list(del_vars)) # -> WorkspaceVarChange.Removed
-        # self.internalVariablesMonitor.remove_members(*list(del_vars)) # -> WorkspaceVarChange.Removed
         self.internalVariablesMonitor.update(current_vars) # -> WorkspaceVarChange.New or WorkspaceVarChange.Modified
             
+        self.internalVariableChanged.disconnect(self._slot_cacheInternalVariableChange_)
+        self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
+        
+        self.sig_startAsyncUpdate.emit(self.shell.user_ns)
         
         # ATTENTION: 2023-05-28 22:42:12
         # When unobserve/observe will access methods of self from another thread
@@ -1587,15 +1618,27 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             del self.internalVariablesListenerCB
                 
             
-    @pyqtSlot()
-    def _slot_updateModelAsync(self):
+    @pyqtSlot(dict)
+    def _slot_updateModelAsync_(self, namespace:dict):
+        """Triggered by self.sig_startAsyncUpdate emitted by self.update2()
+        """
         if len(self.__changes__) == 0:
             return
         
-        # TODO: 2023-05-28 23:38:59
-        # launch a pgui.ProgressWorkerThreaded to apply the changes in self.__changes__
+        removals = filter(lambda x: x[1] == WorkspaceVarChange.Removed, self.__changes__.items())
+        additions = filter(lambda x: x[1] == WorkspaceVarChange.New, self.__changes__.items())
+        modifications = filter(lambda x: x[1] == WorkspaceVarChange.Modified, self.__changes__.items())
         
+        for item in removals:
+            self._varChanges_callbacks_[item[1]](item[0])
         
+        for item in additions:
+            self._varChanges_callbacks_[item[1]](item[0])
+        
+        for item in modifications:
+            self._varChanges_callbacks_[item[1]](item[0])
+        
+        self.modelContentsChanged.emit()
 
     def updateFromExternal(self, prop_dicts):
         """prop_dicts: {name: nested properties dict}
