@@ -5409,80 +5409,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #   the number of files (number of iterations)
         #
         # 2) When updateUi == False:
-        #   Data is places DIRECTLY in the workspace ⇒ this is faster, BUT 
-        #   requires a separate post-hoc update to the workspaceModel, which
-        #   blocks the UI
+        #   Data is placed DIRECTLY in the workspace ⇒ this is faster, BUT 
+        #   requires a separate post-hoc update to the workspaceModel; 
+        #   NOTE: as of 2023-05-29 23:12:25 this does NOT blocm the UI anymore
+        #   and the whole process is now more swift
         #
         # self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded, updateUi=True)
         
-        # CAUTION: DO NOT USE: still needs work TODO/FIXME
+        # NOTE: 2023-05-29 23:11:05 NOW, WORKS LIKE A CHARM!
         self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded, updateUi=False)
         
-#     @pyqtSlot()
-#     @safeWrapper
-#     def slot_openSelectedFileItems_old(self):
-#         """
-#             Triggered by the "Open" action in the File System viewer context menu.
-#             Loads the selected file items in the File System viewer.
-#         """
-#         # NOTE: 2023-05-27 13:26:12 TODO push this in a new thread.
-#         # currently, this is running in the main (UI) event loop and is prone to
-#         # block the UI when loading a single large file or a large number of files
-#         # (batch loading)
-#         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
-#                          if item.column() == 0 and not self.fileSystemModel.isDir(item)]  # list of QModelIndex
-# 
-#         nItems = len(selectedItems)
-# 
-#         if nItems == 0:
-#             return False
-# 
-#         # NOTE: 2018-09-27 10:11:49
-#         # prevent user interaction when only one item (which may take a while to
-#         # load especially if it is a big file)
-# 
-#         if nItems == 1: 
-#             # ⇒ load file directly in the main thread - 
-#             # the the file is large this might block the UI
-#             # therefore set the cursor to "wait", the restore to the default cursor
-#             self.setCursor(QtCore.Qt.WaitCursor)
-# 
-#             self.loadDiskFile(self.fileSystemModel.filePath(selectedItems[0]))
-# 
-#             self.unsetCursor()
-# 
-#         else:
-#             # higher chances to block the UI here (very many, possibly, large files) ⇒ 
-#             # run this in a separate thread to avoid blocking the UI !!!
-#             
-#             progressDlg = QtWidgets.QProgressDialog(
-#                 "Loading data...", "Abort", 0, nItems, self)
-#             progressDlg.setMinimumDuration(1000)
-# 
-#             progressDlg.setWindowModality(QtCore.Qt.WindowModal)
-# 
-#             for (k, item) in enumerate(selectedItems):
-#                 # NOTE: 2020-10-27 09:28:35
-#                 # do not add batch-loaded files to list of recent files - speed
-#                 # things up
-#                 if (self.loadDiskFile(self.fileSystemModel.filePath(item), addToRecent=False)):
-#                     progressDlg.setValue(k)
-# 
-#                 else:
-#                     progressDlg.cancel()
-#                     progressDlg.reset()
-# 
-#                 if progressDlg.wasCanceled():
-#                     break
-# 
-#             if progressDlg.value == 0:
-#                 return False
-# 
-#             progressDlg.setValue(nItems)
-# 
-#         self.workspaceModel.update()
-# 
-#         return True
 
     @safeWrapper
     def _openSelectedFileItemsThreaded(self, **kwargs):
