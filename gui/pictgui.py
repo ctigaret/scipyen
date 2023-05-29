@@ -350,11 +350,14 @@ class ProgressWorkerThreaded(QtCore.QObject):
         The worker function is called from within the run 
         
     """
-    def __init__(self, fn, /, progressDialog=None, loopControl=None, *args, **kwargs):
+    def __init__(self, fn, /, progressDialog:typing.Optional[QtWidgets.QProgressDialog]=None, 
+                 loopControl:typing.Optional[dict]=None, *args, **kwargs):
         """
         fn: callable
-        progressDialog: QtWidgets.QProgressDialog - REMOVED !!!
-        *args, **kwargs are passed to fn
+        progressDialog: QtWidgets.QProgressDialog
+        loopControl:dict with a single mapping: "break" ↦ bool
+        *args, **kwargs are passed to fn. When 'fn' is a (bound) instance method
+            do not include the owner instance of fn (i.e., 'self') in *args.
         """
         super(ProgressWorkerThreaded, self).__init__()
         self.fn = fn
@@ -364,20 +367,13 @@ class ProgressWorkerThreaded(QtCore.QObject):
         self.pd = None
         self.loopControl = loopControl
         self.kwargs['progressSignal'] = self.signals.signal_Progress
-        self.kwargs["finished"] = self.signals.signal_Finished
+        self.kwargs["finishedSignal"] = self.signals.signal_Finished
+        self.kwargs["resultSignal"] = self.signals.signal_Result
         self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
         self.kwargs["loopControl"] = self.loopControl
         
-        # self.loopControl = {"break":False}
-        # self.poller = QtCore.QTimer(self)
-        # self.refreshTime = refreshTime
-        # self.poller.setInterval(200)
-        # self.poller.timeout.connect(self.progress_poll)
-        
         if isinstance(progressDialog, QtWidgets.QProgressDialog):
             self.setProgressDialog(progressDialog)
-            
-        # print(f"{self.__class__.__name__}.__init__(fn = {fn}, progressDialog = {progressDialog})")
             
     def setProgressDialog(self, progressDialog:QtWidgets.QProgressDialog):
         if isinstance(progressDialog, QtWidgets.QProgressDialog):
@@ -386,16 +382,6 @@ class ProgressWorkerThreaded(QtCore.QObject):
             self.signals.signal_Progress.connect(self.pd.setValue)
             self.signals.signal_setMaximum.connect(self.pd.setMaximum)
             self.signals.signal_Finished.connect(self.pd.reset)
-            # self.kwargs['progressSignal'] = self.signals.signal_Progress
-            # self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
-            # self.kwargs["finished"] = self.signals.signal_Finished
-            # self.kwargs["loopControl"] = self.loopControl
-            
-            # self.kwargs["progressUI"] = self.pd
-            # self.kwargs["canceled"] = self.signals.signal_Canceled
-            # self.kwargs["poller"] = self.poller
-            # slot_canceled emits signal_Canceled
-            # self.pd.canceled.connect(self.slot_canceled)
         else:
             self.pd is None
             

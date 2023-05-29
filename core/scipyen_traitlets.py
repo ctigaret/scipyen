@@ -46,8 +46,6 @@ from .traitcontainers import DataBag
 from .datasignal import DataSignal, IrregularlySampledDataSignal
 from .datazone import DataZone
 from .triggerevent import DataMark, TriggerEvent
-# import core.triggerprotocols import TriggerProtocol # circular import !
-#from .traitutils import (enhanced_traitlet_set, standard_traitlet_set)
 
 from .utilities import (gethash, safe_identity_test)
 
@@ -95,241 +93,71 @@ TRAITSMAP = {           # use casting versions
     #function:   (Any,)
     }
 
-class _NotifierDict_(dict):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._obj_ = None
-        self._trait_name_ = None
+class ScipyenTraitTypeMixin:
+    def __delete__(self, obj):
+        """Fails silently when owner is of wrong type"""
+        if hasattr(obj, "remove_trait") and hasattr(obj, "_trait_values") and hasattr(obj, "traits"):
+            if self.name in obj.traits():
+                trait_to_remove = obj.traits()[self.name]
+                obj.remove_trait(self.name, trait_to_remove)
+                old_value = obj._trait_values.pop(self.name, None)
+                obj._notify_trait(self.name, old_value, Undefined,
+                                  change_type="removed")
+                
+#     def get(self, obj, cls=None):
+#         """My get"""
+#         print(f"{self.__class__.__name__}.get: {self.name}")
+#         try:
+#             value = obj._trait_values[self.name]
+#         except KeyError:
+#             default = obj.trait_defaults(self.name)
+#             # if default is Undefined:
+#             #     return
+#             _cross_validation_lock = obj._cross_validation_lock
+#             try:
+#                 obj._cross_validation_lock = True
+#                 value = self._validate(obj, default)
+#             finally:
+#                 obj._cross_validation_lock = _cross_validation_lock
+#                 
+#             obj._trait_values[self.name] = value
+#             obj._notify_observers(
+#                 Bunch(
+#                     name=self.name,
+#                     value=value,
+#                     owner=obj,
+#                     type="default",
+#                 )
+#             )
+#             print(f"{self.__class__.__name__}.get: id(validated from default) = {id(value)}")
+#             return value
+#         
+#         except Exception as e:
+#             # This should never be reached.
+#             raise TraitError("Unexpected error in TraitType: default value not set properly") from e
+#         else:
+#             print(f"{self.__class__.__name__}.get: id(value) = {id(value)}")
+#             return value
         
-    def init_instance(self, obj:typing.Optional[object]=None, trait_name:typing.Optional[str]=None):
-        self._obj_ = obj
-        self._trait_name_ = trait_name
-        
-    def __setitem__(self, name, value):
-        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = self.copy() # CAUTION may be expensive
-            super().__setattr_(name, value)
-            self._obj_._notify_trait(self._trait_name_, old_value, self)
-        else:
-            super().__setitem__(name, value)
-            
-    def __delitem__(self, key):
-        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = self.copy() # CAUTION may be expensive
-            super().__delitem__(key)
-            self._obj_._notify_trait(self._trait_name_, old_value, self)
-            
-        else:
-            super().__delitem__(key)
-            
-    def __ior__(self, *args, **kwargs):
-        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = self.copy() # CAUTION may be expensive
-            super().__ior__(*args, **kwargs)
-            self._obj_._notify_trait(self._trait_name_, old_value, self)
-            
-        else:
-            super().__ior__(*args, **kwargs)
-            
-            
-    def update(self, *args, **kwargs):
-        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = self.copy() # CAUTION may be expensive
-            super().update(*args, **kwargs)
-            self._obj_._notify_trait(self._trait_name_, old_value, self)
-            
-        else:
-            super().update(*args, **kwargs)
-            
-    def pop(self, *args, **kwargs):
-        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = self.copy() # CAUTION may be expensive
-            val= super().pop(*args, **kwargs)
-            self._obj_._notify_trait(self._trait_name_, old_value, self)
-            return val
-        else:
-            val= super().pop(*args, **kwargs)
-            return val
-        
-    def popitem(self):
-        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = self.copy() # CAUTION may be expensive
-            val = super().popitem()
-            self._obj_._notify_trait(self._trait_name_, old_value, self)
-            return val
-        else:
-            val= super().popitem()
-            return val
-
-    def clear(self):
-        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = self.copy() # CAUTION may be expensive
-            super().clear()
-            self._obj_._notify_trait(self._trait_name_, old_value, self)
-            
-        else:
-            super().clear()
-            
-        
-        
-
-class _NotifierDeque_(deque):
-    # TODO: 2022-01-29 23:42:54
-    # wrap and extend relevant deque methods to call obj._notify_trait
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._obj_ = None
-        self._trait_name_ = None
-        
-    def init_instance(self, obj:typing.Optional[object]=None, trait_name:typing.Optional[str]=None):
-        self._obj_ = obj
-        self._trait_name_ = trait_name
-        
-    def append(self, x):
-        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
-                                                 # because this may be expensive we only do this
-                                                 # when self is part of a traitlets.TraitType class
-            super().append(x)
-            new_value = deque(self)
-            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
-            
-        else:
-            super().append(x)
-        
-    def appendleft(self, x):
-        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
-                                                 # because this may be expensive we only do this
-                                                 # when self is part of a traitlets.TraitType class
-            super().appendleft(x)
-            new_value = deque(self)
-            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
-            
-        else:
-            super().appendleft(x)
-            
-        
-    def clear(self):
-        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
-                                                 # because this may be expensive we only do this
-                                                 # when self is part of a traitlets.TraitType class
-            super().clear()
-            new_value = deque(self)
-            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
-            
-        else:
-            super().clear()
-            
-    def extend(self, x):
-        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
-                                                 # because this may be expensive we only do this
-                                                 # when self is part of a traitlets.TraitType class
-            super().extend(x)
-            new_value = deque(self)
-            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
-            
-        else:
-            super().extend(x)
-            
-    def extendleft(self, x):
-        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
-                                                 # because this may be expensive we only do this
-                                                 # when self is part of a traitlets.TraitType class
-            super().extendleft(x)
-            new_value = deque(self)
-            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
-            
-        else:
-            super().extendleft(x)
-            
-    def insert(self, i, x):
-        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
-                                                 # because this may be expensive we only do this
-                                                 # when self is part of a traitlets.TraitType class
-            super().insert(i,x)
-            new_value = deque(self)
-            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
-            
-        else:
-            super().insert(i,x)
-            
-    def pop(self):
-        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
-                                                 # because this may be expensive we only do this
-                                                 # when self is part of a traitlets.TraitType class
-            val = super().pop()
-            new_value = deque(self)
-            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
-            return val
-            
-        else:
-            return super().pop()
-            
-    def reverse(self):
-        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
-                                                 # because this may be expensive we only do this
-                                                 # when self is part of a traitlets.TraitType class
-            super().reverse()
-            new_value = deque(self)
-            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
-            
-        else:
-            super().reverse()
-        
-    def rotate(self, n=1):
-        if self._obj_ and self._trait_name_ and hasattr(self._obj_, "_notify_trait"):
-            old_value = deque([v for v in self]) # make a NEW deque, don't just reference it'
-                                                 # because this may be expensive we only do this
-                                                 # when self is part of a traitlets.TraitType class
-            super().rotate(n)
-            new_value = deque(self)
-            self._obj_._notify_trait(self._trait_name_, old_value, new_value)
-            
-        else:
-            super().rotate(n)
-            
-class DictTrait(Instance):
-    _value_trait_ = None
-    _key_trait_ = None
-    klass = _NotifierDict_
+# class DictTrait(Instance):
+class DictTrait(Dict, ScipyenTraitTypeMixin):
+    info_text = "Traitlet for mapping types (dict) that is sensitive to content changes"
+    default_value = dict() # default value of the Trait instance
+    klass = dict
+    _value_trait = None # type of mapping values - could be None
+    _key_trait = None # type of key values (typically a Hashable) - can be None in which case no validation happens
     _valid_defaults = (dict,)
      
-    # def __init__(
-    #     self,
-    #     value_trait=None,
-    #     per_key_traits=None,
-    #     key_trait=None,
-    #     default_value=Undefined,
-    #     **kwargs,
-    # ):
-    def __init__(
-        self,
-        value_trait=None,
-        default_value=Undefined,
-        **kwargs,
-    ):
-        trait = kwargs.pop('trait', None)
-        if trait is not None:
-            if value_trait is not None:
-                raise TypeError("Found a value for both `value_trait` and its deprecated alias `trait`.")
-            value_trait = trait
-            warn(
-                "Keyword `trait` is deprecated in traitlets 5.0, use `value_trait` instead",
-                DeprecationWarning,
-                stacklevel=2,
-            )
+    def __init__(self, value_trait=None, per_key_traits=None, key_trait=None,
+                 default_value=Undefined, **kwargs):
+        super(ScipyenTraitTypeMixin, self).__init__()
             
+        # NOTE: traitlets.Undefined is an instance of traitlets.Sentinel
+        self.hashed = 0
         if default_value is None and not kwargs.get("allow_none", False):
             default_value = Undefined
             
+        # when value_trait is given, but no default_value was given
         if default_value is Undefined and value_trait is not None:
             if not is_trait(value_trait):
                 default_value = value_trait
@@ -337,7 +165,6 @@ class DictTrait(Instance):
                 
         if default_value is Undefined:
             default_value = self.klass()
-            #default_value = deque()
             args = ()
             
         elif isinstance(default_value, self._valid_defaults):
@@ -347,35 +174,53 @@ class DictTrait(Instance):
             raise TypeError(f"default_value expected to be {None} or one of {self._valid_defaults}")
         
         if is_trait(value_trait):
-            self._trait = value_trait() if isinstance(value_trait, type) else value_trait
+            self._value_trait = value_trait() if isinstance(value_trait, type) else value_trait
             
         elif value_trait is not None:
             raise TypeError(f"Expecting 'value_trait to be a Trait or None; got {type(value_trait_.__name__)}")
         
-        super().__init__(klass = self.klass, args=args, **kwargs)
+        if is_trait(key_trait):
+            if isinstance(key_trait, type):
+                warn(
+                    "Traits should be given as instances, not types (for example, `Int()`, not `Int`)"
+                    " Passing types is deprecated in traitlets 4.1.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                key_trait = key_trait()
+            self._key_trait = key_trait
+            
+        elif key_trait is not None:
+            raise TypeError("`key_trait` must be a Trait or None, got %s" % repr_type(key_trait))
+
+        self._per_key_traits = per_key_traits
         
-        # super().__init__(value_trait=value_trait, per_key_traits=per_key_traits,key_trait=key_trait,
-        #                  default_value=default_value, **kwargs)
+        super().__init__(value_trait=value_trait, per_key_traits=per_key_traits,key_trait=key_trait,
+                         default_value=default_value, **kwargs)
         
-    def validate(self, obj, value):
-        if isinstance(value, self.klass):
-            return value
-        
-        elif isinstance(value, self._valid_defaults):
-            return self.klass(value)
-        # return super().validate(obj, value)
-        # value = super().validate(obj, value)
-        # if value is None:
-        #     return value
-        # value = self.validate_elements(obj, value)
-        # return value
+#     def validate(self, obj, value):
+#         # return super().validate(obj, value)
+#         value = super().validate(obj, value)
+#         if value is None:
+#             return value
+#         value = self.validate_elements(obj, value)
+#         return value
+# 
+# #         if isinstance(value, self.klass):
+# #             return value
+# #         
+# #         elif isinstance(value, self._valid_defaults):
+# #             return self.klass(value)
     
-    # def validate_elements(self, obj, value):
-        # length = len(value)
+    def validate_elements(self, obj, value):
+        value = super(DictTrait, self).validate_elements(obj, value)
+        
+        length = len(value)
+        
         # if length < self._minlen or length > self._maxlen:
         #     self.length_error(obj, value)
 
-        # return super().validate_elements(obj, value)
+        return super().validate_elements(obj, value)
 
     def set(self, obj, value):
         """
@@ -388,79 +233,56 @@ class DictTrait(Instance):
         be too expensive and/or prone to fail.
         
         """
-        if isinstance(value, str):
-            new_value = self._validate(obj, {value:None})
-        else:
-            new_value = self._validate(obj, value)
-            
+        new_value = self._validate(obj, value)
         silent = True 
+        change_type = "modified"
         
-        try:
+        if self.name and self.name in obj._trait_values and self.name in obj.traits():
             old_value = obj._trait_values[self.name]
-        except KeyError:
+        else:
             old_value = self.default_value
-            
-        # print(f"{self.__class__.__name__}.set(...) old_value is {type(old_value)}")
-        # print(f"{self.__class__.__name__}.set(...) new_value is {type(new_value)}")
-
-        try:
-            # old → new:
-            # Sentinel → anything else ⇒ do NOT notify
-            # Sentinel → dict ⇒ notify
-            # dict → anything else ⇒ notify
-            # dict → dict ⇒ notify after further inspection
-            
-            if any(isinstance(o, dict) for o in (old_value, new_value)):
-                if all(isinstance(o, dict) for o in (old_value, new_value)):
-                    silent = len(old_value) == len(new_value)
-                else:
-                    silent = False # ⇒ must notify!
-                    
-            else:
-                # neither are dicts, both are possibly Sentinel objects!!!
-                # ⇒ no need to notify
-                return
-            
-            # print(f"{self.__class__.__name__}.set(...) after type & len check silent = {silent}")
-            
-            if silent:
-                silent &= all(type(x) == type(y) for x, y in zip(old_value.keys(), new_value.keys()))
-                
-                # print(f"{self.__class__.__name__}.set(...) after key type check silent = {silent}")
-            
-            if silent:
-                silent &= all(type(x) == type(y) for x, y in zip(old_value.values(), new_value.values()))
-            
-                # print(f"{self.__class__.__name__}.set(...) after value type check silent = {silent}")
-        except:
-            traceback.print_exc()
-            silent = False
-            # print(f"{self.__class__.__name__}.set(...) after exception raised silent = {silent}")
-            
-        # print(f"{self.__class__.__name__}.set(...) silent = {silent}")
+            silent=False
+            change_type="new"
         
+        try:
+            if silent:
+                silent = bool(old_value == new_value)
+            
+            # NOTE: 2021-08-19 16:17:23
+            # check for change in contents
+            if silent:
+                new_hash = gethash(new_value)
+                silent = (new_hash == self.hashed)
+                if not silent:
+                    self.hashed = new_hash
+        except:
+            # if there is an error in comparing, default to notify
+            silent = False
+            
+        # print(f"{self.__class__.__name__}.set: silent {silent}, hashed {self.hashed}")
         obj._trait_values[self.name] = new_value
         
+        # print(f"\n{self.__class__.__name__} object {self.name} .set({obj}, {value}) → old_value = {old_value}; new_value = {new_value}; notify_trait = {not silent}")
+
         if silent is not True:
-            obj._notify_trait(self.name, old_value, new_value)
+            # print(f"{self.__class__.__name__}.set(...) will notify")
+            # obj._notify_trait(self.name, old_value, new_value)
+            obj._notify_trait(self.name, old_value, new_value, 
+                              change_type=change_type)
   
             
-class ListTrait(List):
+class ListTrait(List, ScipyenTraitTypeMixin):
     """TraitType that ideally should notify:
     a) when a list contents has changed (i.e., gained/lost members)
     b) when an element in the list has changed (either a new value, or a new type)
     c) when the order of the elements has changed
-    FIXME: 2022-01-29 15:22:27
-    This doesn't do what is promised above?
-    TODO: Revisit this.
-    See also FIXME/TODO:2022-01-29 13:29:19 in scipyen_traitlets module.
     """
-    _trait = None
+    info_text = "Traitlet for lists that is sensitive to content changes"
     default_value = []
     klass = list
+    _trait = None
     _valid_defaults = (list,tuple)
     
-    info_text = "Trait for lists that is sensitive to changes in content"
     
     def __init__(self, trait=None, traits=None, default_value=Undefined, **kwargs):
         """
@@ -489,7 +311,8 @@ class ListTrait(List):
     
         default_value: list, tuple, set 
         """
-        self._traits = traits # a list of traits, one per element
+        super(ScipyenTraitTypeMixin, self).__init__()
+        self._traits = traits # a list of traits, one per element - corresponds to per_key_traits in Dict
         self._length = 0
         
         self.hashed = 0
@@ -545,58 +368,57 @@ class ListTrait(List):
         This is supposed to also detect changes in the order of elements.
         """
         new_value = self._validate(obj, value)
-        try:
-            old_value = obj._trait_values[self.name]
-        except KeyError:
-            old_value = self.default_value
-
-        obj._trait_values[self.name] = new_value
+        silent = True
+        change_type = "modified"
         
+        # if self.name in obj._trait_values:
+        if self.name and self.name in obj._trait_values and self.name in obj.traits():
+            old_value = obj._trait_values[self.name]
+        else:
+            old_value = self.default_value
+            silent=False
+            change_type="new"
+
         try:
-            silent = bool(old_value == new_value)
+            # print(f"{self.__class__.__name__}.set: old_value = {old_value}, new_value = {new_value}")
+            if silent:
+                silent = bool(old_value == new_value)
+                # print(f"{self.__class__.__name__}.set: old_value == new_value => silent {silent}")
+            
             
             # NOTE: 2021-08-19 16:17:23
             # check for change in contents
-            if silent is not False:
+            if silent:
                 new_hash = gethash(new_value)
                 silent = (new_hash == self.hashed)
+                # print(f"{self.__class__.__name__}.set: new_hash == self.hashed => silent {silent}")
+                
                 if not silent:
                     self.hashed = new_hash
         except:
+            traceback.print_exc()
             # if there is an error in comparing, default to notify
             silent = False
             
-        if silent is not True:
-            obj._notify_trait(self.name, old_value, new_value)
+        # print(f"\n{self.__class__.__name__} object {self.name} .set({obj}, {value}) → old_value = {old_value}; new_value = {new_value}; notify_trait = {not silent}")
             
-# class StringTrait(CUnicode):
-#     def __init__(self, default_value=Undefined, allow_none=True, read_only=None,help=None,config=None, **kwargs):
-#         super(StringTrait, self).__init__(default_value=default_value,
-#                                           allow_none=allow_none,
-#                                           read_only=read_only,
-#                                           help=help,
-#                                           config=config,
-#                                           **kwargs)
-#         
-#     def set(self, obj, value):
-#         new_value = self._validate(obj, value)
-#         try:
-#             old_value = obj._trait_values[self.name]
-#         except KeyError:
-#             old_value = self.default_value
-# 
-#         obj._trait_values[self.name] = new_value
-#         
-#         if bool(old_value != new_value) is not True:
-#             obj._notify_trait(self.name, old_value, new_value)
+        obj._trait_values[self.name] = new_value
         
-class NdarrayTrait(Instance):
+        # print(f"{self.__class__.__name__}.set: silent {silent}, hashed {self.hashed}")
+        
+        if not silent:
+            # obj._notify_trait(self.name, old_value, new_value)
+            obj._notify_trait(self.name, old_value, new_value,
+                              change_type=change_type)
+            
+class NdarrayTrait(Instance, ScipyenTraitTypeMixin):
     info_text = "Trait for numpy arrays"
     default_value = np.array([])
     klass = np.ndarray
     
     def __init__(self, args=None, kw=None, **kwargs):
         # allow 1st argument to be the array instance
+        super(ScipyenTraitTypeMixin, self).__init__()
         default_value = kwargs.pop("default_value", None)
         self.allow_none = kwargs.pop("allow_none", False)
         
@@ -630,7 +452,7 @@ class NdarrayTrait(Instance):
     def make_dynamic_default(self):
         return np.array(self.default_value)
  
-class NeoBaseNeoTrait(Instance):
+class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
     """IT IS RECOMMENDED THAT SUBCLASSES OVERRIDE THE `compare_elements` METHOD
     """
     info_text = "Trais for neo.baseneo.BaseNeo"
@@ -640,6 +462,7 @@ class NeoBaseNeoTrait(Instance):
     _valid_defaults = (neo.baseneo.BaseNeo,)
     
     def __init__(self, value_trait=None, default_value = Undefined, **kwargs):
+        super(ScipyenTraitTypeMixin, self).__init__()
         trait = kwargs.pop('trait', None)
         if trait is not None:
             if value_trait is not None:
@@ -786,21 +609,40 @@ class NeoBaseNeoTrait(Instance):
         # NOTE: 82021-10-20 09:13:51
         # to also flag addition of this trait:
         # when DataBag is empty, its hashed value will be 0 thus not different 
-        # from the default; therefore when and old_value of this trait does not
+        # from the default; therefore when an old_value of this trait does not
         # exist we should be notifying the observer
         silent = True 
         
-        try:
+        change_type = "modified"
+        
+        # if self.name in obj._trait_values:
+        if self.name and self.name in obj._trait_values and self.name in obj.traits():
+
             old_value = obj._trait_values[self.name]
-        except KeyError:
-            silent=False    # this will be the first time the observed sees us
-                            # therefore forcibly notify it
+        else:
             old_value = self.default_value
+            silent=False
+            change_type="new"
+        
+        # try:
+        #     old_value = obj._trait_values[self.name]
+        # except KeyError:
+        #     silent=False    # this will be the first time the observed sees us
+        #                     # therefore forcibly notify it
+        #     old_value = self.default_value
             
         obj._trait_values[self.name] = new_value
         
         try:
-            silent = self.compare_elements(old_value, new_value)
+            # FIXME/TODO: 2023-05-25 22:37:35
+            # there should be a better way than this;
+            # othwerise, this keeps notifying a change when it shouldn't, and 
+            # this can cause bottleneck downstream (e.g. in workspace model a 
+            # Modifed change triggers updating the row - which scales poorly with 
+            # the number of variables in the workspace)
+            # silent = self.compare_elements(old_value, new_value)
+            if silent:
+                silent = bool(old_value == new_value)
             
         except:
             traceback.print_exc()
@@ -808,8 +650,11 @@ class NeoBaseNeoTrait(Instance):
             
         #print(f"silent {silent}")
                 
+        # print(f"\n{self.__class__.__name__} object {self.name} .set({obj}, {value}) → old_value = {old_value}; new_value = {new_value}; notify_trait = {not silent}")
         if silent is not True:
-            obj._notify_trait(self.name, old_value, new_value)
+            # obj._notify_trait(self.name, old_value, new_value)
+            obj._notify_trait(self.name, old_value, new_value,
+                              change_type=change_type)
         
 class NeoContainerTrait(NeoBaseNeoTrait):
     klass = neo.container.Container
@@ -1100,7 +945,7 @@ class NeoArrayDictTrait(NeoBaseNeoTrait):
     _valid_defaults = (klass,)
     
     
-class QuantityTrait(Instance):
+class QuantityTrait(Instance, ScipyenTraitTypeMixin):
     info_text = "Traitlet for python quantities"
     default_value = pq.Quantity([]) # array([], dtype=float64) * dimensionless
     klass = pq.Quantity
@@ -1108,9 +953,10 @@ class QuantityTrait(Instance):
     _valid_defaults = (pq.Quantity,)
     
     def __init__(self, value_trait=None, default_value = Undefined, minlen = 0, maxlen = sys.maxsize, **kwargs):
+        super(ScipyenTraitTypeMixin, self).__init__()
         self._minlen = minlen
         self._maxlen = maxlen
-        # self.hashed = 0
+        self.hashed = 0
     
         trait = kwargs.pop('trait', None)
         if trait is not None:
@@ -1178,21 +1024,30 @@ class QuantityTrait(Instance):
         # exist we should be notifying the observer
         silent = True 
         
-        try:
+        change_type="modified"
+
+        if self.name and self.name in obj._trait_values and self.name in obj.traits():
             old_value = obj._trait_values[self.name]
-        except KeyError:
-            silent=False    # this will be the first time the observed sees us
-                            # therefore forcibly notify it
+        else:
             old_value = self.default_value
+            silent=False
+            change_type="new"
+        
+        # try:
+        #     old_value = obj._trait_values[self.name]
+        # except KeyError:
+        #     silent=False    # this will be the first time the observed sees us
+        #                     # therefore forcibly notify it
+        #     old_value = self.default_value
             
         obj._trait_values[self.name] = new_value
         
         try:
             # new_hash = gethash(new_value)
-            old_units = getattr(old_value, "units", pq.dimensionless)
-            new_units = getattr(new_value, "units", pq.dimensionless)
-            old_magnitude = getattr(old_value, "magnitude", np.nan)
-            new_magnitude = getattr(new_value, "magnitude", np.nan)
+            # old_units = getattr(old_value, "units", pq.dimensionless)
+            # new_units = getattr(new_value, "units", pq.dimensionless)
+            # old_magnitude = getattr(old_value, "magnitude", np.nan)
+            # new_magnitude = getattr(new_value, "magnitude", np.nan)
             
             if silent:
                 # so far silent is True when the observed knows about us
@@ -1207,7 +1062,9 @@ class QuantityTrait(Instance):
         #print(f"silent {silent}")
                 
         if silent is not True:
-            obj._notify_trait(self.name, old_value, new_value)
+            # obj._notify_trait(self.name, old_value, new_value)
+            obj._notify_trait(self.name, old_value, new_value,
+                              change_type=change_type)
         
     def info(self):
         if isinstance(self.klass, six.string_types):
@@ -1271,7 +1128,7 @@ class IrregularlySampledDataSignal(NeoDataObjectTrait):
         
     
     
-class DataBagTrait(Instance):
+class DataBagTrait(Instance, ScipyenTraitTypeMixin):
     """Avoid slicing the DataBag type to dict.
     
     When a DataBag is contained in another DataBag, its corresponding trait type
@@ -1299,6 +1156,8 @@ class DataBagTrait(Instance):
                  mutable_key_value_traits=True, **kwargs):
         """Avoid back-casting DataBag to dict
         """
+        super(ScipyenTraitTypeMixin, self).__init__()
+        
         # handle deprecated keywords
         trait = kwargs.pop('trait', None)
         if trait is not None:
@@ -1540,18 +1399,28 @@ class DataBagTrait(Instance):
         # When mutable_key_value_traits is False, next line will throw exception if
         # new value is a different trait from old_value
         new_value = self._validate(obj, value) 
+        silent=True
         
+        change_type = "modified"
         
+        if self.name and self.name in obj._trait_values and self.name in obj.traits():
+            old_value = obj._trait_values[self.name]
+        else:
+            old_value = self.default_value
+            silent=False
+            change_type="new"
+            
         obj._trait_values[self.name] = new_value
         
         try:
-            new_hash = gethash(new_value.as_dict())
-            #print("\told %s (hash %s)\n\tnew %s (hash %s)" % (old_value, instance.hashed, new_value, new_hash))
-            #print(instance.name, "old hashed", instance.hashed, "new_hash", new_hash)
-            silent = (new_hash == self.hashed)
+            if silent:
+                new_hash = gethash(new_value.as_dict())
+                #print("\told %s (hash %s)\n\tnew %s (hash %s)" % (old_value, instance.hashed, new_value, new_hash))
+                #print(instance.name, "old hashed", instance.hashed, "new_hash", new_hash)
+                silent = (new_hash == self.hashed)
             
-            if not silent:
-                self.hashed = new_hash
+                if not silent:
+                    self.hashed = new_hash
                 
         except:
             traceback.print_exc()
@@ -1561,20 +1430,20 @@ class DataBagTrait(Instance):
         if silent is not True:
             # we explicitly compare silent to True just in case the equality
             # comparison above returns something other than True/False
-            obj._notify_trait(self.name, old_value, new_value)
+            # obj._notify_trait(self.name, old_value, new_value)
+            obj._notify_trait(self.name, old_value, new_value,
+                              change_type=change_type)
 
-class DequeTrait(Instance):
+class DequeTrait(Instance, ScipyenTraitTypeMixin):
     info_text = "Traitlet for deque"
-    klass = _NotifierDeque_
-    #klass = deque
+    # klass = _NotifierDeque_
+    klass = deque
     _cast_types = (list, tuple)
-    _valid_defaults = (deque, list, tuple, set, frozenset)
+    _valid_defaults = (deque, list, tuple, set, frozenset) # -- why ?!?
     
-    def __init__(self, value_trait=None,
-                 default_value=Undefined,
-                 minlen=0,
-                 maxlen=sys.maxsize,
-                 **kwargs):
+    def __init__(self, value_trait=None, default_value=Undefined, 
+                 minlen=0, maxlen=sys.maxsize, **kwargs):
+        super(ScipyenTraitTypeMixin, self).__init__()
         self._minlen = minlen
         self._maxlen = maxlen
         self.hashed = 0
@@ -1630,10 +1499,12 @@ class DequeTrait(Instance):
         return super().validate_elements(obj, value)
 
     def set(self, obj, value):
-        if isinstance(value, str):
-            new_value = self._validate(obj, [value])
-        else:
-            new_value = self._validate(obj, value)
+        # if isinstance(value, str):
+        #     new_value = self._validate(obj, [value])
+        # else:
+        #     new_value = self._validate(obj, value)
+        
+        new_value = self._validate(obj, value)
             
         # NOTE: 82021-10-20 09:13:51
         # to also flag addition of this trait:
@@ -1642,25 +1513,29 @@ class DequeTrait(Instance):
         # exist we should be notifying the observer
         silent = True 
         
-        try:
+        change_type="modified"
+        
+        if self.name and self.name in obj._trait_values and self.name in obj.traits():
             old_value = obj._trait_values[self.name]
-            
-        except KeyError:
-            silent=False    # this will be the first time the observed sees us
-                            # therefore forcibly notify it
+        else:
             old_value = self.default_value
-            
+            silent=False
+            change_type="new"
+        
         obj._trait_values[self.name] = new_value
         
         try:
-            new_hash = gethash(new_value)
+            if silent:
+                silent = bool(old_value == new_value)
+
             if silent:
                 # so far silent is True when the observed knows about us
                 # check it we changed and notify
+                new_hash = gethash(new_value)
                 silent = (new_hash == self.hashed)
             
-            if not silent:
-                self.hashed = new_hash
+                if not silent:
+                    self.hashed = new_hash
                 
         except:
             traceback.print_exc()
@@ -1669,5 +1544,7 @@ class DequeTrait(Instance):
         #print(f"silent {silent}")
                 
         if silent is not True:
-            obj._notify_trait(self.name, old_value, new_value)
+            # obj._notify_trait(self.name, old_value, new_value)
+            obj._notify_trait(self.name, old_value, new_value,
+                              change_type=change_type)
         

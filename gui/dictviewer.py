@@ -777,11 +777,11 @@ class DataViewer(ScipyenViewer):
                 # FIXME 2021-10-03 22:17:29 this is really buggy!
                 #newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
                 
-                self._scipyenWindow_.assignToWorkspace(newVarName, objects[0], from_console=False)
+                self._scipyenWindow_.assignToWorkspace(newVarName, objects[0])
                 
         else:
             for name, obj in zip(names, objects):
-                self._scipyenWindow_.assignToWorkspace(name, obj, from_console=False)
+                self._scipyenWindow_.assignToWorkspace(name, obj)
 
     def _collapse_expand_Recursive(self, item, expand=False, current=True):
         if expand:
