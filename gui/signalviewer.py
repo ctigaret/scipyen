@@ -6180,6 +6180,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #     stack = inspect.stack()
         #     for s in stack:
         #         print(f"\tcaller {s.function}")
+        print(f"{self.__class__.__name__}._set_data_(x={type(x).__name__}, y={type(y).__name__})")
         self.plot_start = None
         self.plot_stop = None
         
@@ -6219,7 +6220,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                         separateChannelsIn = separateChannelsIn,
                                         singleFrame=singleFrame)
             
-            # print(f"self._set_data_ dataOK = {dataOK}")
+            print(f"self._set_data_ dataOK = {dataOK}")
             
             if dataOK:
                 # remove gremlins from previous plot
@@ -6253,10 +6254,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if self._current_frame_index_ not in self.frameIndex:
                         self._current_frame_index_ = self.frameIndex[-1]
                         
-                if plotStyle is not None and isinstance(plotStyle, str):
+                if isinstance(plotStyle, str):
                     self.plotStyle = plotStyle
                     
-                elif style is not None and isinstance(style, str):
+                elif isinstance(style, str):
                     self.plotStyle = style
                     
                 self._frames_spinBoxSlider_.range = range(self._number_of_frames_)
@@ -6485,6 +6486,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         signals in the signal collection.
         
         """ 
+        
+        print(f"{self.__class__.__name__}.setData(x={type(x).__name__}, y={type(y).__name__})")
         
         # NOTE: 2022-01-18 08:39:13
         # Intuitively, one would pass both 'x' (the data domain) and y (the data
@@ -7069,7 +7072,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #     for s in stack:
         #         print(f"\tcaller {s.function} in {s.filename}")
         
+        print(f"{self.__class__.__name__}.displayFrame()")
+        
         if self._yData_ is None:
+            print(f"{self.__class__.__name__} self._yData_ is None")
             self.clear()
             return
         
@@ -7656,6 +7662,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # select a segment then delegate to _plotSegment_()
         # Segment selection is based on self.frameIndex, or on self.channelIndex
         # NOTE 2021-10-03 12:59:10 ChannelIndex is no more
+        
+        print(f"{self.__class__.__name__}._plot_data_({type(self._yData_).__name__})")
         if len(obj.segments) == 0:
             return
         
@@ -7665,7 +7673,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         segmentNdx = self.frameIndex[self._current_frame_index_]
         
         if segmentNdx >= len(self._yData_.segments):
-            print("no plot")
+            # print(f"{self.__class__.__name__}._plot_data_({type(self._yData_).__name__}) no plot")
             return
         
         segment = obj.segments[segmentNdx]
@@ -9293,6 +9301,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         #self.viewerWidget.clear() # both mpl.Figure and pg.GraphicsLayoutWidget have this method
         #print("SignalViewer.clear() %s" % self.windowTitle())
+        print(f"{self.__class__.__name__}.clear()")
         self._selected_plot_item_ = None
         self._selected_plot_item_index_ = -1
         self._hovered_plot_item_ = None

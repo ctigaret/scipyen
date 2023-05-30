@@ -534,396 +534,398 @@ class WorkspaceViewer(QtWidgets.QTableView):
 # class WindowManager(ConfigurableQMainWindowMeta):
 
 
-class WindowManager(__QMainWindow__):
-    sig_windowRemoved = pyqtSignal(tuple, name="sig_windowRemoved")
-
-    # def __init__(self, config=None, parent=None, *args, **kwargs):
-    def __init__(self, parent=None, *args, **kwargs):
-        super().__init__(parent)
-
-        # gui_viewers defined in gui package (see gui/__init__.py)
-        # self.viewers = dict(map(lambda x: (x, list()), gui_viewers))
-        # for matplotlib figures
-        # self.viewers[mpl.figure.Figure] = list()
-
-        self.viewers = {mpl.figure.Figure: list()}
-
-        # self.currentViewers = dict(map(lambda x: (x, None), gui_viewers))
-        # self.currentViewers[mpl.figure.Figure] = None
-
-        self.currentViewers = {mpl.figure.Figure: None}
-
-    @pyqtSlot(object)
-    @safeWrapper
-    def slot_windowActivated(self, obj):
-        """Not used, but keep it
-        """
-        if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
-            self.setCurrentWindow(obj)
-
-    @pyqtSlot(int)
-    @safeWrapper
-    def slot_windowVariableDeleted(self, wid):
-        # TODO
-        viewer = self.sender()
-        if not isinstance(viewer, QtWidgets.QMainWindow):
-            return
-
-        assert viewer.ID == wid
-
-    @safeWrapper
-    def handle_mpl_figure_click(self, evt):
-        self.raiseWindow(evt.canvas.figure)
-
-    @safeWrapper
-    def handle_mpl_figure_enter(self, evt):
-        """ DEPRECATED """
-        pass
-        # self.setCurrentWindow(evt.canvas.figure)
-
-    @safeWrapper
-    def handle_mpl_figure_close(self, evt):
-        """Removes the figure from the workspace and updates the workspace table.
-        """
-        fig_number = evt.canvas.figure.number
-        # fig_varname = "Figure%d" % fig_number
-        fig_varname = f"Figure{fig_number}"
-        plt.close(evt.canvas.figure)
-        # NOTE: 2020-02-05 00:53:51
-        # this also closes the figure window and removes it from self.currentViewers
-        # NOTE: 2023-01-27 13:46:51
-        # but only if autoRemoveViewers is True
-        if self.autoRemoveViewers:
-            # does not remove symbol from workspace
-            self.deRegisterWindow(evt.canvas.figure)
-
-            # NOTE: now remove the figure variable name from user workspace
-            ns_fig_names_objs = [x for x in self.shell.user_ns.items() if isinstance(
-                x[1], mpl.figure.Figure) and x[1] is evt.canvas.figure]
-
-            for ns_fig in ns_fig_names_objs:
-                self.sig_windowRemoved.emit(ns_fig)
-
-    @safeWrapper
-    def newViewer(self, winClass, *args, **kwargs):
-        """Factory method for a GUI Viewer or matplotlib figure.
-
-        Parameters:
-        -----------
-
-        winClass : str, type, or sip.wrappertype
-            The only acceptable type is mpl.figure.Figure (where mpl is an alias to matplotlib)
-
-            The only acceptable sip.wrappertype objects are the ones loaded by 
-            slot_loadPlugins:
-
-            DataViewer, MatrixViewer, ImageViewer, SignalViewer, TableEditor, 
-            TextViewer, XMLViewer.
-
-            When a str the ony acceptable ones are the string verison of the 
-            above (i.e. the value of their __name__ attribute).
-
-        *args, **kwargs: passed directly to the constructor (__init__ function)
-            of the winClass
-
-
-        """
-        # NOTE: 2021-07-08 14:52:44
-        # called by ScipyenWindow.slot_newViewerMenuAction
-
-        # print(f"{self.__class__.__name__}.newViewer winClass = {winClass} (arg type = {type(winClass).__name__})")
-        # print("WindowManager.newViewer **kwargs", **kwargs)
-        if isinstance(winClass, str) and len(winClass.replace("&", "").strip()):
-            wClass = winClass.replace("&", "")
-
-            if wClass not in list(v.__name__ for v in self.viewers):
-                raise ValueError("Unexpected viewer class name %s" % wClass)
-
-            win_classes = list(
-                filter(lambda x: x.__name__ == wClass, self.viewers))
-
-            if len(win_classes):
-                winClass = win_classes[0]
-
-            else:
-                raise ValueError("Unexpected viewer class name %s" % wClass)
-
-        elif not isinstance(winClass, (type, sip.wrappertype)):
-            raise TypeError(
-                "Expecting a type or sip.wrappertype; got %s instead" % type(winClass).__name__)
-
-        else:
-            if winClass not in self.viewers:
-                raise ValueError("Unexpected viewer class %s" %
-                                 winClass.__name__)
-
-        win_title = kwargs.pop("win_title", winClass.__name__)
-        win_title, counter_suffix = validate_varname(
-            win_title, self.workspace, return_counter=True)
-
-        # print(f"{self.__class__.__name__} win_title = {win_title}, counter_suffix = {counter_suffix}")
-
-        kwargs["win_title"] = win_title
-
-        if "parent" not in kwargs:
-            kwargs["parent"] = self
-
-        if winClass is mpl.figure.Figure:
-            fig_kwargs = dict()
-            fig_init_params = inspect.signature(mpl.figure.Figure).parameters
-
-            for key, val in kwargs.items():
-                if key in fig_init_params:
-                    fig_kwargs[key] = val
-
-            win = plt.figure(*args, **fig_kwargs)
-
-            workspace_win_varname = f"Figure{win.number}"
-
-        else:
-            win = winClass(*args, **kwargs)
-            win.ID = counter_suffix
-            workspace_win_varname = strutils.str2symbol(win_title)
-
-        self.registerWindow(win)  # required !
-        # self.workspace[workspace_win_varname] = win
-        # self.workspaceModel.update()
-        self.workspaceModel.bindObjectInNamespace(workspace_win_varname, win)
-
-        return win
-
-    # , integrate_in_pyplot:bool=True):
-    def _adopt_mpl_figure(self, fig: mpl.figure.Figure):
-        """Gives a FigureCanvasQTAgg to fig.
-        To be used only with mpl Figure created directly from their c'tor.
-        """
-        # NOTE: 2023-01-29 16:14:04
-        # for mpl figures created manually
-        # add a manager backend to the figure - we FORCE the use of the
-        # qt5agg backend throughout
-        # -- code from matplotlib.pyplot.switch_backend
-        #
-        import matplotlib.cbook as cbook
-        backend_mod = importlib.import_module(
-            cbook._backend_module_name("Qt5Agg"))
-        new_figure_manager = getattr(backend_mod, "new_figure_manager", None)
-
-        class backend_mod(mpl.backend_bases._Backend):
-            locals().update(vars(backend_mod))
-
-        if new_figure_manager is None:
-            # only try to get the canvas class if have opted into the new scheme
-            canvas_class = backend_mod.FigureCanvas
-
-            def new_figure_manager_given_figure(num, figure):
-                return canvas_class.new_manager(figure, num)
-
-            def new_figure_manager(num, *args, FigureClass=Figure, **kwargs):
-                fig = FigureClass(*args, **kwargs)
-                return new_figure_manager_given_figure(num, fig)
-
-            def draw_if_interactive():
-                if matplotlib.is_interactive():
-                    manager = _pylab_helpers.Gcf.get_active()
-                    if manager:
-                        manager.canvas.draw_idle()
-
-            backend_mod.new_figure_manager_given_figure = new_figure_manager_given_figure
-            backend_mod.new_figure_manager = new_figure_manager
-            backend_mod.draw_if_interactive = draw_if_interactive
-
-        # fig.set_canvas(backend_mod.FigureCanvasQTAgg())
-        plt_fig_nums = list(Gcf.figs.keys())
-        num = 1
-        if len(plt_fig_nums) > 0:
-            missing_ndx = set(k for k in range(max(plt_fig_nums))
-                              if k not in plt_fig_nums and k > 0)
-            if len(missing_ndx):
-                num = min(missing_ndx)
-            else:
-                num = max(plt_fig_nums) + 1
-
-        fig.canvas.manager = backend_mod.new_figure_manager_given_figure(
-            num, fig)
-        Gcf._set_new_active_manager(fig.canvas.manager)
-        # fig.canvas.manager = fig.canvas.new_manager(fig, num)
-        # fig.canvas.manager.number = num
-        fig.number = num
-        Gcf.figs[num] = fig.canvas.manager
-
-        # if integrate_in_pyplot:
-
-        return fig
-
-    def registerWindow(self, win):
-        if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
-            return
-
-        winClass = type(win)
-
-        if winClass is mpl.figure.Figure:
-            if win.canvas.manager is None:
-                # , integrate_in_pyplot=True)
-                win = self._adopt_mpl_figure(win)
-
-            win.canvas.mpl_connect("button_press_event",
-                                   self.handle_mpl_figure_click)
-            win.canvas.mpl_connect("figure_enter_event",
-                                   self.handle_mpl_figure_enter)
-
-            win.canvas.mpl_connect("close_event", self.handle_mpl_figure_close)
-
-            # NOTE: 2023-01-27 22:43:23
-            # install and event filter on the mpl figure's window - assumes Qt5 backend
-            # this will capture activation & ficus events to set this figure instance
-            # as the current one in Scipyen's window manager, AND ALSO in pylab
-            #
-            # this has the same effect as
-            evtFilter = WindowEventFilter(win, parent=self)
-            # NOTE: 2023-01-29 16:28:50
-            # We assume matplotlib Qt5Agg backend is used throughout Scipyen;
-            # there may be figures created via the constructor, that will not
-            # have a manager
-            win.canvas.manager.window.installEventFilter(evtFilter)
-            # else:
-
-        else:
-            if isinstance(getattr(win, "sig_activated", None), QtCore.pyqtBoundSignal):
-                win.sig_activated[int].connect(self.slot_setCurrentViewer)
-            else:
-                winEvtFilter = WindowEventFilter(win, parent=self)
-                win.installEventFilter(winEvtFilter)
-
-            if getattr(win, "appWindow", None) is not self:
-                win.setParent(self)
-
-        if winClass not in self.viewers:
-            self.viewers[winClass] = list()
-
-        if win not in self.viewers[winClass]:
-            self.viewers[winClass].append(win)
-            
-        self.currentViewers[winClass] = win
-
-    @safeWrapper
-    def deRegisterWindow(self, win):
-        """Removes references to the viewer window 'win' from the manager.
-
-        Parameters:
-        -----------
-
-        win: a QMainWindow or matplotlib.figure.Figure instance
-
-        ATTENTION: This function neither removes the viewer object from the 
-        workspace, nor unbinds it from its symbol in the workspace!!!
-        """
-        if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
-            return
-        
-        print(f"{self.__class__.__name__}.deRegisterWindow: {win}")
-
-        viewer_type = type(win)
-
-        old_viewer_index = None
-
-        if viewer_type in self.viewers.keys():
-            print(f"{self.__class__.__name__}.deRegisterWindow: {viewer_type.__name__} in self.viewers.keys()")
-            if win in self.viewers[viewer_type]:
-                print(f"{self.__class__.__name__}.deRegisterWindow: {win} in self.viewers[{viewer_type.__name__}]")
-                old_viewer_index = self.viewers[viewer_type].index(win)
-                print(f"{self.__class__.__name__}.deRegisterWindow: old_viewer_index = {old_viewer_index}")
-                self.viewers[viewer_type].remove(win)
-
-        print(f"{self.__class__.__name__}.deRegisterWindow: viewers left: {self.viewers[viewer_type]}")
-
-        if viewer_type in self.currentViewers:
-            print(f"{self.__class__.__name__}.deRegisterWindow: {viewer_type.__name__} in self.currentViewers")
-            if len(self.viewers[viewer_type]) == 0:
-                print(f"\tno viewers")
-                self.currentViewers[viewer_type] = None
-
-            elif self.currentViewers[viewer_type] is win:
-                if isinstance(old_viewer_index, int):
-                    if old_viewer_index >= len(self.viewers[viewer_type]):
-                        viewer_index = len(self.viewers[viewer_type]) - 1
-
-                    elif old_viewer_index <= 0:
-                        viewer_index = 0
-
-                    else:
-                        viewer_index = old_viewer_index
-
-                    print(f"\tselecting an existing view or type {viewer_type.__name__} with index {viewer_index}")
-                    self.currentViewers[viewer_type] = self.viewers[viewer_type][viewer_index]
-
-    def raiseWindow(self, obj):
-        """Sets obj to be the current window and raises it.
-        Steals focus.
-        """
-        if not isinstance(obj, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
-            return
-
-        self.setCurrentWindow(obj)
-
-        if isinstance(obj, mpl.figure.Figure):
-            # if not isinstance()
-            if obj.canvas.manager is not None:
-                if getattr(obj, "number", None) is not None:
-                    plt.figure(obj.number)
-                plt.get_current_fig_manager().canvas.activateWindow()  # steals focus!
-                plt.get_current_fig_manager().canvas.update()
-                plt.get_current_fig_manager().canvas.draw_idle()
-                obj.show()  # steals focus!
-
-        else:
-            obj.activateWindow()
-            obj.raise_()
-            obj.setVisible(True)
-
-    def setCurrentWindow(self, obj):
-        """Sets obj to be the current window without raising or focus stealing.
-        Handles both QMainWindow and matplotlib Figure objects
-        """
-        if not isinstance(obj, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
-            return
-
-        if type(obj) not in self.viewers.keys():
-            self.viewers[type(obj)] = list()
-
-        if obj not in self.viewers[type(obj)]:
-            self.viewers[type(obj)].append(obj)
-
-        if isinstance(obj, mpl.figure.Figure):
-            if hasattr(obj, "number"):
-                plt.figure(obj.number)
-
-        self.currentViewers[type(obj)] = obj
-
-    @property
-    def matplotlib_figures(self):
-        """A list of figures managed by matplotlib.
-        """
-        return [plt.figure(i) for i in plt.get_fignums()]
-
-    @property
-    def managed_matplotlib_figures(self):
-        """A list of figures managed by both matplotlib and self.
-        """
-        return [fig for fig in self.matplotlib_figures if fig in self.viewers[mpl.figure.Figure]]
-
-    @pyqtSlot(int)
-    @safeWrapper
-    def slot_setCurrentViewer(self, wId):
-        """ Delegates to self.setCurrentWindow 
-            Only meant for QMainWindow instances
-        """
-        viewer = self.sender()
-        viewer_type_name = type(viewer).__name__
-
-        if not isinstance(viewer, QtWidgets.QMainWindow):
-            return
-
-        self.setCurrentWindow(viewer)
+# class WindowManager(__QMainWindow__):
+#     sig_windowRemoved = pyqtSignal(tuple, name="sig_windowRemoved")
+# 
+#     # def __init__(self, config=None, parent=None, *args, **kwargs):
+#     def __init__(self, parent=None, *args, **kwargs):
+#         super().__init__(parent)
+# 
+#         # gui_viewers defined in gui package (see gui/__init__.py)
+#         # self.viewers = dict(map(lambda x: (x, list()), gui_viewers))
+#         # for matplotlib figures
+#         # self.viewers[mpl.figure.Figure] = list()
+# 
+#         self.viewers = {mpl.figure.Figure: list()}
+# 
+#         # self.currentViewers = dict(map(lambda x: (x, None), gui_viewers))
+#         # self.currentViewers[mpl.figure.Figure] = None
+# 
+#         self.currentViewers = {mpl.figure.Figure: None}
+# 
+#     @pyqtSlot(object)
+#     @safeWrapper
+#     def slot_windowActivated(self, obj):
+#         """Not used, but keep it
+#         """
+#         if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+#             self.setCurrentWindow(obj)
+# 
+#     @pyqtSlot(int)
+#     @safeWrapper
+#     def slot_windowVariableDeleted(self, wid):
+#         # TODO
+#         viewer = self.sender()
+#         if not isinstance(viewer, QtWidgets.QMainWindow):
+#             return
+# 
+#         assert viewer.ID == wid
+# 
+#     @safeWrapper
+#     def handle_mpl_figure_click(self, evt):
+#         self.raiseWindow(evt.canvas.figure)
+# 
+#     @safeWrapper
+#     def handle_mpl_figure_enter(self, evt):
+#         """ DEPRECATED """
+#         pass
+#         # self.setCurrentWindow(evt.canvas.figure)
+# 
+#     @safeWrapper
+#     def handle_mpl_figure_close(self, evt):
+#         """Removes the figure from the workspace and updates the workspace table.
+#         """
+#         fig_number = evt.canvas.figure.number
+#         # fig_varname = "Figure%d" % fig_number
+#         fig_varname = f"Figure{fig_number}"
+#         plt.close(evt.canvas.figure)
+#         # NOTE: 2020-02-05 00:53:51
+#         # this also closes the figure window and removes it from self.currentViewers
+#         # NOTE: 2023-01-27 13:46:51
+#         # but only if autoRemoveViewers is True
+#         if self.autoRemoveViewers:
+#             # does not remove symbol from workspace
+#             # self.deRegisterWindow(evt.canvas.figure)
+#             super().deRegisterWindow(evt.canvas.figure)
+# 
+#             # NOTE: now remove the figure variable name from user workspace
+#             ns_fig_names_objs = [x for x in self.shell.user_ns.items() if isinstance(
+#                 x[1], mpl.figure.Figure) and x[1] is evt.canvas.figure]
+# 
+#             for ns_fig in ns_fig_names_objs:
+#                 self.sig_windowRemoved.emit(ns_fig)
+# 
+#     @safeWrapper
+#     def newViewer(self, winClass, *args, **kwargs):
+#         """Factory method for a GUI Viewer or matplotlib figure.
+# 
+#         Parameters:
+#         -----------
+# 
+#         winClass : str, type, or sip.wrappertype
+#             The only acceptable type is mpl.figure.Figure (where mpl is an alias to matplotlib)
+# 
+#             The only acceptable sip.wrappertype objects are the ones loaded by 
+#             slot_loadPlugins:
+# 
+#             DataViewer, MatrixViewer, ImageViewer, SignalViewer, TableEditor, 
+#             TextViewer, XMLViewer.
+# 
+#             When a str the ony acceptable ones are the string verison of the 
+#             above (i.e. the value of their __name__ attribute).
+# 
+#         *args, **kwargs: passed directly to the constructor (__init__ function)
+#             of the winClass
+# 
+# 
+#         """
+#         # NOTE: 2021-07-08 14:52:44
+#         # called by ScipyenWindow.slot_newViewerMenuAction
+# 
+#         # print(f"{self.__class__.__name__}.newViewer winClass = {winClass} (arg type = {type(winClass).__name__})")
+#         # print("WindowManager.newViewer **kwargs", **kwargs)
+#         if isinstance(winClass, str) and len(winClass.replace("&", "").strip()):
+#             wClass = winClass.replace("&", "")
+# 
+#             if wClass not in list(v.__name__ for v in self.viewers):
+#                 raise ValueError("Unexpected viewer class name %s" % wClass)
+# 
+#             win_classes = list(
+#                 filter(lambda x: x.__name__ == wClass, self.viewers))
+# 
+#             if len(win_classes):
+#                 winClass = win_classes[0]
+# 
+#             else:
+#                 raise ValueError("Unexpected viewer class name %s" % wClass)
+# 
+#         elif not isinstance(winClass, (type, sip.wrappertype)):
+#             raise TypeError(
+#                 "Expecting a type or sip.wrappertype; got %s instead" % type(winClass).__name__)
+# 
+#         else:
+#             if winClass not in self.viewers:
+#                 raise ValueError("Unexpected viewer class %s" %
+#                                  winClass.__name__)
+# 
+#         win_title = kwargs.pop("win_title", winClass.__name__)
+#         win_title, counter_suffix = validate_varname(
+#             win_title, self.workspace, return_counter=True)
+# 
+#         # print(f"{self.__class__.__name__} win_title = {win_title}, counter_suffix = {counter_suffix}")
+# 
+#         kwargs["win_title"] = win_title
+# 
+#         if "parent" not in kwargs:
+#             kwargs["parent"] = self
+# 
+#         if winClass is mpl.figure.Figure:
+#             fig_kwargs = dict()
+#             fig_init_params = inspect.signature(mpl.figure.Figure).parameters
+# 
+#             for key, val in kwargs.items():
+#                 if key in fig_init_params:
+#                     fig_kwargs[key] = val
+# 
+#             win = plt.figure(*args, **fig_kwargs)
+# 
+#             workspace_win_varname = f"Figure{win.number}"
+# 
+#         else:
+#             win = winClass(*args, **kwargs)
+#             win.ID = counter_suffix
+#             workspace_win_varname = strutils.str2symbol(win_title)
+# 
+#         self.registerWindow(win)  # required !
+#         # self.workspace[workspace_win_varname] = win
+#         # self.workspaceModel.update()
+#         self.workspaceModel.bindObjectInNamespace(workspace_win_varname, win)
+# 
+#         return win
+# 
+#     # , integrate_in_pyplot:bool=True):
+#     def _adopt_mpl_figure(self, fig: mpl.figure.Figure):
+#         """Gives a FigureCanvasQTAgg to fig.
+#         To be used only with mpl Figure created directly from their c'tor.
+#         """
+#         # NOTE: 2023-01-29 16:14:04
+#         # for mpl figures created manually
+#         # add a manager backend to the figure - we FORCE the use of the
+#         # qt5agg backend throughout
+#         # -- code from matplotlib.pyplot.switch_backend
+#         #
+#         import matplotlib.cbook as cbook
+#         backend_mod = importlib.import_module(
+#             cbook._backend_module_name("Qt5Agg"))
+#         new_figure_manager = getattr(backend_mod, "new_figure_manager", None)
+# 
+#         class backend_mod(mpl.backend_bases._Backend):
+#             locals().update(vars(backend_mod))
+# 
+#         if new_figure_manager is None:
+#             # only try to get the canvas class if have opted into the new scheme
+#             canvas_class = backend_mod.FigureCanvas
+# 
+#             def new_figure_manager_given_figure(num, figure):
+#                 return canvas_class.new_manager(figure, num)
+# 
+#             def new_figure_manager(num, *args, FigureClass=Figure, **kwargs):
+#                 fig = FigureClass(*args, **kwargs)
+#                 return new_figure_manager_given_figure(num, fig)
+# 
+#             def draw_if_interactive():
+#                 if matplotlib.is_interactive():
+#                     manager = _pylab_helpers.Gcf.get_active()
+#                     if manager:
+#                         manager.canvas.draw_idle()
+# 
+#             backend_mod.new_figure_manager_given_figure = new_figure_manager_given_figure
+#             backend_mod.new_figure_manager = new_figure_manager
+#             backend_mod.draw_if_interactive = draw_if_interactive
+# 
+#         # fig.set_canvas(backend_mod.FigureCanvasQTAgg())
+#         plt_fig_nums = list(Gcf.figs.keys())
+#         num = 1
+#         if len(plt_fig_nums) > 0:
+#             missing_ndx = set(k for k in range(max(plt_fig_nums))
+#                               if k not in plt_fig_nums and k > 0)
+#             if len(missing_ndx):
+#                 num = min(missing_ndx)
+#             else:
+#                 num = max(plt_fig_nums) + 1
+# 
+#         fig.canvas.manager = backend_mod.new_figure_manager_given_figure(
+#             num, fig)
+#         Gcf._set_new_active_manager(fig.canvas.manager)
+#         # fig.canvas.manager = fig.canvas.new_manager(fig, num)
+#         # fig.canvas.manager.number = num
+#         fig.number = num
+#         Gcf.figs[num] = fig.canvas.manager
+# 
+#         # if integrate_in_pyplot:
+# 
+#         return fig
+# 
+#     def registerWindow(self, win):
+#         if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+#             return
+# 
+#         winClass = type(win)
+# 
+#         if winClass is mpl.figure.Figure:
+#             if win.canvas.manager is None:
+#                 # , integrate_in_pyplot=True)
+#                 win = self._adopt_mpl_figure(win)
+# 
+#             win.canvas.mpl_connect("button_press_event",
+#                                    self.handle_mpl_figure_click)
+#             win.canvas.mpl_connect("figure_enter_event",
+#                                    self.handle_mpl_figure_enter)
+# 
+#             win.canvas.mpl_connect("close_event", self.handle_mpl_figure_close)
+# 
+#             # NOTE: 2023-01-27 22:43:23
+#             # install and event filter on the mpl figure's window - assumes Qt5 backend
+#             # this will capture activation & ficus events to set this figure instance
+#             # as the current one in Scipyen's window manager, AND ALSO in pylab
+#             #
+#             # this has the same effect as
+#             evtFilter = WindowEventFilter(win, parent=self)
+#             # NOTE: 2023-01-29 16:28:50
+#             # We assume matplotlib Qt5Agg backend is used throughout Scipyen;
+#             # there may be figures created via the constructor, that will not
+#             # have a manager
+#             win.canvas.manager.window.installEventFilter(evtFilter)
+#             # else:
+# 
+#         else:
+#             if isinstance(getattr(win, "sig_activated", None), QtCore.pyqtBoundSignal):
+#                 win.sig_activated[int].connect(self.slot_setCurrentViewer)
+#             else:
+#                 winEvtFilter = WindowEventFilter(win, parent=self)
+#                 win.installEventFilter(winEvtFilter)
+# 
+#             if getattr(win, "appWindow", None) is not self:
+#                 win.setParent(self)
+# 
+#         if winClass not in self.viewers:
+#             self.viewers[winClass] = list()
+# 
+#         if win not in self.viewers[winClass]:
+#             self.viewers[winClass].append(win)
+#             
+#         self.currentViewers[winClass] = win
+# 
+#     @safeWrapper
+#     def deRegisterWindow(self, win):
+#         """Removes references to the viewer window 'win' from the manager.
+# 
+#         Parameters:
+#         -----------
+# 
+#         win: a QMainWindow or matplotlib.figure.Figure instance
+# 
+#         ATTENTION: This function neither removes the viewer object from the 
+#         workspace, nor unbinds it from its symbol in the workspace!!!
+#         """
+#         print(f"{self.__class__.__name__}.deRegisterWindow({type(win).__name__})")
+#         if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+#             return
+#         
+#         print(f"{self.__class__.__name__}.deRegisterWindow: {win}")
+# 
+#         viewer_type = type(win)
+# 
+#         old_viewer_index = None
+# 
+#         if viewer_type in self.viewers.keys():
+#             print(f"{self.__class__.__name__}.deRegisterWindow: {viewer_type.__name__} in self.viewers.keys()")
+#             if win in self.viewers[viewer_type]:
+#                 print(f"{self.__class__.__name__}.deRegisterWindow: {win} in self.viewers[{viewer_type.__name__}]")
+#                 old_viewer_index = self.viewers[viewer_type].index(win)
+#                 print(f"{self.__class__.__name__}.deRegisterWindow: old_viewer_index = {old_viewer_index}")
+#                 self.viewers[viewer_type].remove(win)
+# 
+#         print(f"{self.__class__.__name__}.deRegisterWindow: viewers left: {self.viewers[viewer_type]}")
+# 
+#         if viewer_type in self.currentViewers:
+#             print(f"{self.__class__.__name__}.deRegisterWindow: {viewer_type.__name__} in self.currentViewers")
+#             if len(self.viewers[viewer_type]) == 0:
+#                 print(f"\tno viewers")
+#                 self.currentViewers[viewer_type] = None
+# 
+#             elif self.currentViewers[viewer_type] is win:
+#                 if isinstance(old_viewer_index, int):
+#                     if old_viewer_index >= len(self.viewers[viewer_type]):
+#                         viewer_index = len(self.viewers[viewer_type]) - 1
+# 
+#                     elif old_viewer_index <= 0:
+#                         viewer_index = 0
+# 
+#                     else:
+#                         viewer_index = old_viewer_index
+# 
+#                     print(f"\tselecting an existing view or type {viewer_type.__name__} with index {viewer_index}")
+#                     self.currentViewers[viewer_type] = self.viewers[viewer_type][viewer_index]
+# 
+#     def raiseWindow(self, obj):
+#         """Sets obj to be the current window and raises it.
+#         Steals focus.
+#         """
+#         if not isinstance(obj, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
+#             return
+# 
+#         self.setCurrentWindow(obj)
+# 
+#         if isinstance(obj, mpl.figure.Figure):
+#             # if not isinstance()
+#             if obj.canvas.manager is not None:
+#                 if getattr(obj, "number", None) is not None:
+#                     plt.figure(obj.number)
+#                 plt.get_current_fig_manager().canvas.activateWindow()  # steals focus!
+#                 plt.get_current_fig_manager().canvas.update()
+#                 plt.get_current_fig_manager().canvas.draw_idle()
+#                 obj.show()  # steals focus!
+# 
+#         else:
+#             obj.activateWindow()
+#             obj.raise_()
+#             obj.setVisible(True)
+# 
+#     def setCurrentWindow(self, obj):
+#         """Sets obj to be the current window without raising or focus stealing.
+#         Handles both QMainWindow and matplotlib Figure objects
+#         """
+#         if not isinstance(obj, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
+#             return
+# 
+#         if type(obj) not in self.viewers.keys():
+#             self.viewers[type(obj)] = list()
+# 
+#         if obj not in self.viewers[type(obj)]:
+#             self.viewers[type(obj)].append(obj)
+# 
+#         if isinstance(obj, mpl.figure.Figure):
+#             if hasattr(obj, "number"):
+#                 plt.figure(obj.number)
+# 
+#         self.currentViewers[type(obj)] = obj
+# 
+#     @property
+#     def matplotlib_figures(self):
+#         """A list of figures managed by matplotlib.
+#         """
+#         return [plt.figure(i) for i in plt.get_fignums()]
+# 
+#     @property
+#     def managed_matplotlib_figures(self):
+#         """A list of figures managed by both matplotlib and self.
+#         """
+#         return [fig for fig in self.matplotlib_figures if fig in self.viewers[mpl.figure.Figure]]
+# 
+#     @pyqtSlot(int)
+#     @safeWrapper
+#     def slot_setCurrentViewer(self, wId):
+#         """ Delegates to self.setCurrentWindow 
+#             Only meant for QMainWindow instances
+#         """
+#         viewer = self.sender()
+#         viewer_type_name = type(viewer).__name__
+# 
+#         if not isinstance(viewer, QtWidgets.QMainWindow):
+#             return
+# 
+#         self.setCurrentWindow(viewer)
 
 
 class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, WorkspaceGuiMixin):
@@ -1322,7 +1324,7 @@ class VTH(object):
                 VTH.default_handlers[viewerClass])
 
 
-class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
+class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
     # NOTE: 2021-08-23 10:36:14 WindowManager inherits from __QMainWindow__ which
@@ -1330,6 +1332,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     workspaceChanged = pyqtSignal()
     startPluginLoad = pyqtSignal()
     sig_refreshRecentFilesMenu = pyqtSignal()
+    sig_windowRemoved = pyqtSignal(tuple, name="sig_windowRemoved")
 
     _instance = None
 
@@ -1661,7 +1664,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         parent: QtWidgets.QWidget or None (default).
         """
+        # WindowManager.__init__(self, parent)
         super().__init__(parent)
+
+        # gui_viewers defined in gui package (see gui/__init__.py)
+        # self.viewers = dict(map(lambda x: (x, list()), gui_viewers))
+        # for matplotlib figures
+        # self.viewers[mpl.figure.Figure] = list()
+
+        self.viewers = {mpl.figure.Figure: list()}
+
+        # self.currentViewers = dict(map(lambda x: (x, None), gui_viewers))
+        # self.currentViewers[mpl.figure.Figure] = None
+
+        self.currentViewers = {mpl.figure.Figure: None}
 
         # NOTE: 2023-01-08 16:14:26 - set this early !
         # this below is the same as:
@@ -2198,6 +2214,372 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._refreshRecentScriptsMenu_()
 
     # END   Properties
+    
+    @pyqtSlot(object)
+    @safeWrapper
+    def slot_windowActivated(self, obj):
+        """Not used, but keep it
+        """
+        if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+            self.setCurrentWindow(obj)
+
+    @pyqtSlot(int)
+    @safeWrapper
+    def slot_windowVariableDeleted(self, wid):
+        # TODO
+        viewer = self.sender()
+        if not isinstance(viewer, QtWidgets.QMainWindow):
+            return
+
+        assert viewer.ID == wid
+
+    @safeWrapper
+    def handle_mpl_figure_click(self, evt):
+        self.raiseWindow(evt.canvas.figure)
+
+    @safeWrapper
+    def handle_mpl_figure_enter(self, evt):
+        """ DEPRECATED """
+        pass
+        # self.setCurrentWindow(evt.canvas.figure)
+
+    @safeWrapper
+    def handle_mpl_figure_close(self, evt):
+        """Removes the figure from the workspace and updates the workspace table.
+        """
+        fig_number = evt.canvas.figure.number
+        # fig_varname = "Figure%d" % fig_number
+        fig_varname = f"Figure{fig_number}"
+        plt.close(evt.canvas.figure)
+        # NOTE: 2020-02-05 00:53:51
+        # this also closes the figure window and removes it from self.currentViewers
+        # NOTE: 2023-01-27 13:46:51
+        # but only if autoRemoveViewers is True
+        if self.autoRemoveViewers:
+            # does not remove symbol from workspace
+            self.deRegisterWindow(evt.canvas.figure)
+            # super().deRegisterWindow(evt.canvas.figure)
+
+            # NOTE: now remove the figure variable name from user workspace
+            ns_fig_names_objs = [x for x in self.shell.user_ns.items() if isinstance(
+                x[1], mpl.figure.Figure) and x[1] is evt.canvas.figure]
+
+            for ns_fig in ns_fig_names_objs:
+                self.sig_windowRemoved.emit(ns_fig)
+
+    @safeWrapper
+    def newViewer(self, winClass, *args, **kwargs):
+        """Factory method for a GUI Viewer or matplotlib figure.
+
+        Parameters:
+        -----------
+
+        winClass : str, type, or sip.wrappertype
+            The only acceptable type is mpl.figure.Figure (where mpl is an alias to matplotlib)
+
+            The only acceptable sip.wrappertype objects are the ones loaded by 
+            slot_loadPlugins:
+
+            DataViewer, MatrixViewer, ImageViewer, SignalViewer, TableEditor, 
+            TextViewer, XMLViewer.
+
+            When a str the ony acceptable ones are the string verison of the 
+            above (i.e. the value of their __name__ attribute).
+
+        *args, **kwargs: passed directly to the constructor (__init__ function)
+            of the winClass
+
+
+        """
+        # NOTE: 2021-07-08 14:52:44
+        # called by ScipyenWindow.slot_newViewerMenuAction
+
+        # print(f"{self.__class__.__name__}.newViewer winClass = {winClass} (arg type = {type(winClass).__name__})")
+        # print("WindowManager.newViewer **kwargs", **kwargs)
+        if isinstance(winClass, str) and len(winClass.replace("&", "").strip()):
+            wClass = winClass.replace("&", "")
+
+            if wClass not in list(v.__name__ for v in self.viewers):
+                raise ValueError("Unexpected viewer class name %s" % wClass)
+
+            win_classes = list(
+                filter(lambda x: x.__name__ == wClass, self.viewers))
+
+            if len(win_classes):
+                winClass = win_classes[0]
+
+            else:
+                raise ValueError("Unexpected viewer class name %s" % wClass)
+
+        elif not isinstance(winClass, (type, sip.wrappertype)):
+            raise TypeError(
+                "Expecting a type or sip.wrappertype; got %s instead" % type(winClass).__name__)
+
+        else:
+            if winClass not in self.viewers:
+                raise ValueError("Unexpected viewer class %s" %
+                                 winClass.__name__)
+
+        win_title = kwargs.pop("win_title", winClass.__name__)
+        win_title, counter_suffix = validate_varname(
+            win_title, self.workspace, return_counter=True)
+
+        # print(f"{self.__class__.__name__} win_title = {win_title}, counter_suffix = {counter_suffix}")
+
+        kwargs["win_title"] = win_title
+
+        if "parent" not in kwargs:
+            kwargs["parent"] = self
+
+        if winClass is mpl.figure.Figure:
+            fig_kwargs = dict()
+            fig_init_params = inspect.signature(mpl.figure.Figure).parameters
+
+            for key, val in kwargs.items():
+                if key in fig_init_params:
+                    fig_kwargs[key] = val
+
+            win = plt.figure(*args, **fig_kwargs)
+
+            workspace_win_varname = f"Figure{win.number}"
+
+        else:
+            win = winClass(*args, **kwargs)
+            win.ID = counter_suffix
+            workspace_win_varname = strutils.str2symbol(win_title)
+
+        self.registerWindow(win)  # required !
+        # self.workspace[workspace_win_varname] = win
+        # self.workspaceModel.update()
+        self.workspaceModel.bindObjectInNamespace(workspace_win_varname, win)
+
+        return win
+
+    # , integrate_in_pyplot:bool=True):
+    def _adopt_mpl_figure(self, fig: mpl.figure.Figure):
+        """Gives a FigureCanvasQTAgg to fig.
+        To be used only with mpl Figure created directly from their c'tor.
+        """
+        # NOTE: 2023-01-29 16:14:04
+        # for mpl figures created manually
+        # add a manager backend to the figure - we FORCE the use of the
+        # qt5agg backend throughout
+        # -- code from matplotlib.pyplot.switch_backend
+        #
+        import matplotlib.cbook as cbook
+        backend_mod = importlib.import_module(
+            cbook._backend_module_name("Qt5Agg"))
+        new_figure_manager = getattr(backend_mod, "new_figure_manager", None)
+
+        class backend_mod(mpl.backend_bases._Backend):
+            locals().update(vars(backend_mod))
+
+        if new_figure_manager is None:
+            # only try to get the canvas class if have opted into the new scheme
+            canvas_class = backend_mod.FigureCanvas
+
+            def new_figure_manager_given_figure(num, figure):
+                return canvas_class.new_manager(figure, num)
+
+            def new_figure_manager(num, *args, FigureClass=Figure, **kwargs):
+                fig = FigureClass(*args, **kwargs)
+                return new_figure_manager_given_figure(num, fig)
+
+            def draw_if_interactive():
+                if matplotlib.is_interactive():
+                    manager = _pylab_helpers.Gcf.get_active()
+                    if manager:
+                        manager.canvas.draw_idle()
+
+            backend_mod.new_figure_manager_given_figure = new_figure_manager_given_figure
+            backend_mod.new_figure_manager = new_figure_manager
+            backend_mod.draw_if_interactive = draw_if_interactive
+
+        # fig.set_canvas(backend_mod.FigureCanvasQTAgg())
+        plt_fig_nums = list(Gcf.figs.keys())
+        num = 1
+        if len(plt_fig_nums) > 0:
+            missing_ndx = set(k for k in range(max(plt_fig_nums))
+                              if k not in plt_fig_nums and k > 0)
+            if len(missing_ndx):
+                num = min(missing_ndx)
+            else:
+                num = max(plt_fig_nums) + 1
+
+        fig.canvas.manager = backend_mod.new_figure_manager_given_figure(
+            num, fig)
+        Gcf._set_new_active_manager(fig.canvas.manager)
+        # fig.canvas.manager = fig.canvas.new_manager(fig, num)
+        # fig.canvas.manager.number = num
+        fig.number = num
+        Gcf.figs[num] = fig.canvas.manager
+
+        # if integrate_in_pyplot:
+
+        return fig
+
+    def registerWindow(self, win):
+        if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+            return
+
+        winClass = type(win)
+
+        if winClass is mpl.figure.Figure:
+            if win.canvas.manager is None:
+                # , integrate_in_pyplot=True)
+                win = self._adopt_mpl_figure(win)
+
+            win.canvas.mpl_connect("button_press_event",
+                                   self.handle_mpl_figure_click)
+            win.canvas.mpl_connect("figure_enter_event",
+                                   self.handle_mpl_figure_enter)
+
+            win.canvas.mpl_connect("close_event", self.handle_mpl_figure_close)
+
+            # NOTE: 2023-01-27 22:43:23
+            # install and event filter on the mpl figure's window - assumes Qt5 backend
+            # this will capture activation & ficus events to set this figure instance
+            # as the current one in Scipyen's window manager, AND ALSO in pylab
+            #
+            # this has the same effect as
+            evtFilter = WindowEventFilter(win, parent=self)
+            # NOTE: 2023-01-29 16:28:50
+            # We assume matplotlib Qt5Agg backend is used throughout Scipyen;
+            # there may be figures created via the constructor, that will not
+            # have a manager
+            win.canvas.manager.window.installEventFilter(evtFilter)
+            # else:
+
+        else:
+            if isinstance(getattr(win, "sig_activated", None), QtCore.pyqtBoundSignal):
+                win.sig_activated[int].connect(self.slot_setCurrentViewer)
+            else:
+                winEvtFilter = WindowEventFilter(win, parent=self)
+                win.installEventFilter(winEvtFilter)
+
+            if getattr(win, "appWindow", None) is not self:
+                win.setParent(self)
+
+        if winClass not in self.viewers:
+            self.viewers[winClass] = list()
+
+        if win not in self.viewers[winClass]:
+            self.viewers[winClass].append(win)
+            
+        self.currentViewers[winClass] = win
+
+    @safeWrapper
+    def deRegisterWindow(self, win):
+        """Removes references to the viewer window 'win' from the manager.
+
+        Parameters:
+        -----------
+
+        win: a QMainWindow or matplotlib.figure.Figure instance
+
+        ATTENTION: This function neither removes the viewer object from the 
+        workspace, nor unbinds it from its symbol in the workspace!!!
+        """
+        # print(f"\n***\n{self.__class__.__name__}.deRegisterWindow({type(win).__name__})")
+        if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+            return
+        
+        # print(f"{self.__class__.__name__}.deRegisterWindow: {win}")
+
+        viewer_type = type(win)
+
+        old_viewer_index = None
+
+        if viewer_type in self.viewers.keys():
+            # print(f"{self.__class__.__name__}.deRegisterWindow: {viewer_type.__name__} found in self.viewers.keys()")
+            if win in self.viewers[viewer_type]:
+                # print(f"{self.__class__.__name__}.deRegisterWindow: {win} found in self.viewers[{viewer_type.__name__}]")
+                old_viewer_index = self.viewers[viewer_type].index(win)
+                # print(f"{self.__class__.__name__}.deRegisterWindow: old_viewer_index = {old_viewer_index}")
+                # del self.viewers[viewer_type][old_viewer_index]
+                self.viewers[viewer_type].remove(win)
+
+        # print(f"{self.__class__.__name__}.deRegisterWindow: viewers left: {len(self.viewers[viewer_type])}")
+        
+
+        if viewer_type in self.currentViewers:
+            # print(f"{self.__class__.__name__}.deRegisterWindow: currentViewers[{viewer_type.__name__}]  = {self.currentViewers[viewer_type]}")
+            # print(f"{self.__class__.__name__}.deRegisterWindow: {viewer_type.__name__} found in self.currentViewers")
+            
+            if self.currentViewers[viewer_type] is win:
+                self.currentViewers[viewer_type] = None
+                
+            if len(self.viewers[viewer_type]):
+                self.currentViewers[viewer_type] = self.viewers[viewer_type][-1]
+            
+    def raiseWindow(self, obj):
+        """Sets obj to be the current window and raises it.
+        Steals focus.
+        """
+        if not isinstance(obj, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
+            return
+
+        self.setCurrentWindow(obj)
+
+        if isinstance(obj, mpl.figure.Figure):
+            # if not isinstance()
+            if obj.canvas.manager is not None:
+                if getattr(obj, "number", None) is not None:
+                    plt.figure(obj.number)
+                plt.get_current_fig_manager().canvas.activateWindow()  # steals focus!
+                plt.get_current_fig_manager().canvas.update()
+                plt.get_current_fig_manager().canvas.draw_idle()
+                obj.show()  # steals focus!
+
+        else:
+            obj.activateWindow()
+            obj.raise_()
+            obj.setVisible(True)
+
+    def setCurrentWindow(self, obj):
+        """Sets obj to be the current window without raising or focus stealing.
+        Handles both QMainWindow and matplotlib Figure objects
+        """
+        if not isinstance(obj, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
+            return
+
+        if type(obj) not in self.viewers.keys():
+            self.viewers[type(obj)] = list()
+
+        if obj not in self.viewers[type(obj)]:
+            self.viewers[type(obj)].append(obj)
+
+        if isinstance(obj, mpl.figure.Figure):
+            if hasattr(obj, "number"):
+                plt.figure(obj.number)
+
+        self.currentViewers[type(obj)] = obj
+
+    @property
+    def matplotlib_figures(self):
+        """A list of figures managed by matplotlib.
+        """
+        return [plt.figure(i) for i in plt.get_fignums()]
+
+    @property
+    def managed_matplotlib_figures(self):
+        """A list of figures managed by both matplotlib and self.
+        """
+        return [fig for fig in self.matplotlib_figures if fig in self.viewers[mpl.figure.Figure]]
+
+    @pyqtSlot(int)
+    @safeWrapper
+    def slot_setCurrentViewer(self, wId):
+        """ Delegates to self.setCurrentWindow 
+            Only meant for QMainWindow instances
+        """
+        viewer = self.sender()
+        viewer_type_name = type(viewer).__name__
+
+        if not isinstance(viewer, QtWidgets.QMainWindow):
+            return
+
+        self.setCurrentWindow(viewer)
 
     # BEGIN PyQt slots
 
@@ -2967,6 +3349,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         """
         # if isinstance(value, str) and by_name:
+        # print(f"{self.__class__.__name__}.removeFromWorkspace")
         if by_name:
             if isinstance(value, str):
                 r = self.workspace.unbindObjectInNamespace(value) # one-shot
@@ -3361,7 +3744,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 delVars.setToolTip("Delete selected variables")
                 delVars.setStatusTip("Delete selected variables")
                 delVars.setWhatsThis("Delete selected variables")
-                delVars.triggered.connect(self.slot_deleteSelectedVars)
+                delVars.triggered.connect(self.slot_deleteSelectedWorkspaceObjects)
                 delVars.hovered.connect(self._slot_showActionStatusMessage_)
                 cm.addSeparator()
                 clearWs = cm.addAction("Clear Workspace")
@@ -3371,7 +3754,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     "Remove all variables from the internal workspace")
                 clearWs.setWhatsThis(
                     "Remove all variables from the internal workspace")
-                clearWs.triggered.connect(self._slot_clear_internal_workspace)
+                clearWs.triggered.connect(self._slot_clearInternalWorkspace)
                 clearWs.hovered.connect(self._slot_showActionStatusMessage_)
                 return
 
@@ -3468,7 +3851,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         delVars.setToolTip("Delete selected variables")
         delVars.setStatusTip("Delete selected variables")
         delVars.setWhatsThis("Delete selected variables")
-        delVars.triggered.connect(self.slot_deleteSelectedVars)
+        delVars.triggered.connect(self.slot_deleteSelectedWorkspaceObjects)
         delVars.hovered.connect(self._slot_showActionStatusMessage_)
 
         if len(self.workspaceModel.foreign_namespaces) > 0 and self.external_console is not None:
@@ -3493,7 +3876,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             "Remove all variables from the internal workspace")
         clearWs.setWhatsThis(
             "Remove all variables from the internal workspace")
-        clearWs.triggered.connect(self._slot_clear_internal_workspace)
+        clearWs.triggered.connect(self._slot_clearInternalWorkspace)
         clearWs.hovered.connect(self._slot_showActionStatusMessage_)
 
     @pyqtSlot("QPoint")
@@ -3514,7 +3897,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 "Remove all variables from the internal workspace")
             clearWs.setWhatsThis(
                 "Remove all variables from the internal workspace")
-            clearWs.triggered.connect(self._slot_clear_internal_workspace)
+            clearWs.triggered.connect(self._slot_clearInternalWorkspace)
             clearWs.hovered.connect(self._slot_showActionStatusMessage_)
 
             cm.popup(self.workspaceView.mapToGlobal(point))
@@ -3784,16 +4167,22 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @pyqtSlot()
     @safeWrapper
-    def slot_deleteSelectedVars(self):
-        """Batch-removes variables from the workspace.
+    def slot_deleteSelectedWorkspaceObjects(self):
+        """Removes objects from the workspace.
+        Triggered by:
+        • workspace viewer context menu Delete action.
+        • keyvboard Delete shortcut (key sequence 'Delete')
 
         Variables are selected by their workspace names (symbols) using the 
         Workspace viewer GUI.
         """
+        # print(f"{self.__class__.__name__}.slot_deleteSelectedWorkspaceObjects")
         indexList = self.workspaceView.selectedIndexes()
 
         if len(indexList) == 0:
             return
+        
+        # print(f"{self.__class__.__name__}.slot_deleteSelectedWorkspaceObjects {indexList}")
         
         msgBox = QtWidgets.QMessageBox()
         
@@ -3823,9 +4212,22 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if ret == QtWidgets.QMessageBox.No:
                 return
 
-            # FIXME: 2022-10-13 18:40:01
-            # this is still too slow and cumbersome - possibly overheads in
-            # WorkspaceModel
+            # NOTE: 2023-05-30 18:08:26
+            # remove stuff and update workspace model/viewer asynchronously: 
+            # instead of calling workspaceModel.unbindObjectInNamespace, we:
+            # 1) first, "remove" objects directly from the workspace (in reality
+            # this unbinds the 'varName' symbol from the object it is bound to,
+            # in the workspace; the objects still exist on the heapm but will hbe
+            # garbage-collected when their reference count drops to zero);
+            # 2) the call workspaceMode.update to reflect the changes in the 
+            # workspace viewer; the unbound objects will be referenced in the
+            # loop below (to check if they're GUI components) and possibly 
+            # somewhere else; the reference(s) below go out of scope when this
+            # function returns; when no other references exist (including somewhere
+            # else) the arbage collector will destroy them
+            #
+            # It is important to check of the symbol of the o
+            #
             for n in varNames:
                 obj = self.workspace[n]
                 if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
@@ -3837,7 +4239,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         obj.close()
 
                     # does not remove its symbol for workspace - this has already been removed by delete action
-                    super().deRegisterWindow(obj)
+                    self.deRegisterWindow(obj)
+                    # super().deRegisterWindow(obj)
 
                 self.removeWorkspaceSymbol(n)
 
@@ -3864,6 +4267,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if ret == QtWidgets.QMessageBox.No:
                 return
             
+            obj = self.workspace[varName]
+            
+            if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+                if isinstance(obj, mpl.figure.Figure):
+                    # also removes obj.number from plt.get_fignums()
+                    plt.close(obj)
+
+                else:
+                    obj.close()
+
+                # does not remove its symbol for workspace - this has already been removed by delete action
+                self.deRegisterWindow(obj)
+                # super().deRegisterWindow(obj)
+        
             self.workspaceModel.unbindObjectInNamespace(varName) # single shot
 
 
@@ -4223,21 +4640,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.applicationsMenu.setToolTipsVisible(True)
         self.menubar.insertMenu(
             self.menuHelp.menuAction(), self.applicationsMenu)
-
-        # TODO: 2022-11-20 13:18:01
-        # make applications as "plugins" and let this menu populate itself at
-        # session start
-        # self.CaTAnalysisAction = QtWidgets.QAction("LSCaT (CaT Analysis)", self)
-        # self.CaTAnalysisAction.triggered.connect(self.slot_launchCaTAnalysis)
-        # self.applicationsMenu.addAction(self.CaTAnalysisAction)
-
-        # self.EventAnalysisAction = QtWidgets.QAction("Events Detection", self)
-        # self.EventAnalysisAction.triggered.connect(self.slot_launchEventDetection)
-        # self.applicationsMenu.addAction(self.EventAnalysisAction)
-
-        # self.analyseAPtrainsAction = QtWidgets.QAction("test", self)
-        # self.analyseAPtrainsAction.triggered.connect(self.slot_launchTest)
-        # self.applicationsMenu.addAction(self.analyseAPtrainsAction)
 
         self.whatsThisAction = QtWidgets.QWhatsThis.createAction(self)
 
@@ -4639,7 +5041,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def slot_keyDeleteStuff(self):
         if self.workspaceView.hasFocus():
-            self.slot_deleteSelectedVars()
+            self.slot_deleteSelectedWorkspaceObjects()
 
     @pyqtSlot()
     @safeWrapper
@@ -6466,7 +6868,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._slot_registerPythonSource_()
 
     @pyqtSlot()
-    def _slot_clear_internal_workspace(self):
+    def _slot_clearInternalWorkspace(self):
         varNames = self.workspaceModel.getDisplayedVariableNames()
         prompt = "Remove all variables from the workspace?"
         wintitle = "Delete variables"
@@ -6487,7 +6889,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         for n in varNames:
             obj = self.workspace[n]
             if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
-                # print("%s.slot_deleteSelectedVars %s: %s" % (self.__class__.__name__, n, obj.__class__.__name__))
+                # print("%s.slot_deleteSelectedWorkspaceObjects %s: %s" % (self.__class__.__name__, n, obj.__class__.__name__))
                 if isinstance(obj, mpl.figure.Figure):
                     # also removes obj.number from plt.get_fignums()
                     plt.close(obj)
@@ -6497,6 +6899,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 # does not remove its symbol for workspace - this has already been removed by delete action
                 self.deRegisterWindow(obj)
+                # super().deRegisterWindow(obj)
 
             # self.removeWorkspaceSymbol(n)
             self.workspace.pop(n, None)
@@ -7079,12 +7482,29 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         else:
             return False
+        
+        # print(f"{self.__class__.__name__}.viewObject winType = {winType.__name__}")
 
         if len(self.viewers[winType]) == 0 or newWindow:
+            # print(f"{self.__class__.__name__}.viewObject make new")
+            
             win = self.newViewer(winType)
-
         else:
             win = self.currentViewers[winType]
+
+            # is this win shown in the workspace viewer?
+            listedVarNames = self.workspaceModel.getDisplayedVariableNames()
+            
+            listedWindows = [self.workspace[n] for n in listedVarNames if type(self.workspace[n]) == winType]
+            
+            # if len(listedWindows) and win not in listedWindows:
+            if len(listedWindows) == 0 or win not in listedWindows:
+                # create a binding in the workspace
+                win_title = winType.__name__
+                win_title, counter_suffix = validate_varname(win_title, self.workspace, return_counter=True)
+                self.workspace[win_title] = win
+                self.workspaceModel.update()
+                
 
         if win is None:
             return False
@@ -7249,7 +7669,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 # Do this independently of installing self advertised menus (see
                 # below)
                 viewerClasses = list(filter(lambda x: inspect.isclass(x[1]) and prog.is_class_defined_in_module(
-                    x[1], module) and self._is_scipyen_viewer_class_(x[1]), inspect.getmembers(module)))
+                    x[1], module) and self._isScipyenViewerClass_(x[1]), inspect.getmembers(module)))
                 # print(f"viewer classes {viewerClasses} in module {module}")
                 for viewerClass in viewerClasses:
                     self._register_viewer_class_(*viewerClass)
@@ -7642,7 +8062,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             for (menuAction, pluginFunction) in pluginMenuActions:
                 self.plugins[pluginModule][pluginFunction] = menuAction
 
-    def _is_scipyen_viewer_class_(self, x: typing.Type):
+    def _isScipyenViewerClass_(self, x: typing.Type):
         if not inspect.isclass(x):
             warnings.warn(f"Expecting a class; got {type(x).__name__} instead")
             return False
@@ -7654,7 +8074,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             return False
 
         # NOTE: 2022-12-25 21:43:43
-        # the check if this is a ScipyenViewer descendant is done in _is_scipyen_viewer_class_
+        # the check if this is a ScipyenViewer descendant is done in _isScipyenViewerClass_
         # gui_viewers.add(x)
         self.workspaceModel.bindObjectInNamespace(name, x, hidden=True)
         # self.user_ns_hidden[name] = x

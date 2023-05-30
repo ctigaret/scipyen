@@ -621,7 +621,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def isUserVariable(self, name, val):
         """Check if symbol ↦ value binding is not hidden from the user.
         """
-        # see NOTE 2020-11-29 16:29:01
         if name in self.user_ns_hidden:
             return val is not self.user_ns_hidden[name]
         else:
@@ -961,9 +960,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     # 
     #     if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
     #         cached_viewers = [(wname, win) for (wname, win) in self.cached_vars.items() if isinstance(
-    #             win, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(win))]
+    #             win, QtWidgets.QMainWindow) and self.parent()._isScipyenViewerClass_(type(win))]
     #         user_ns_viewers = [v for v in self.shell.user_ns.values() if isinstance(
-    #             v, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(v))]
+    #             v, QtWidgets.QMainWindow) and self.parent()._isScipyenViewerClass_(type(v))]
     #         for w_name_obj in cached_viewers:
     #             if w_name_obj[1] not in user_ns_viewers:
     #                 self.cached_vars.pop(w_name_obj[0], None)
@@ -1146,17 +1145,19 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # ###
         # 2. deal with Scipyen viewer windows
         #
-        if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
-            cached_viewers = [(wname, win) for (wname, win) in self.cached_vars.items() if isinstance(
-                win, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(win))]
-            user_ns_viewers = [v for v in ns.values() if isinstance(
-                v, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(v))]
-            for w_name_obj in cached_viewers:
-                if w_name_obj[1] not in user_ns_viewers:
-                    self.cached_vars.pop(w_name_obj[0], None)
-
-                else:
-                    self.parent().registerWindow(w_name_obj[1])
+        # if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
+        #     # cached_viewers = [(wname, win) for (wname, win) in self.shell.user_ns.items() if isinstance(
+        #     #     win, QtWidgets.QMainWindow) and self.parent()._isScipyenViewerClass_(type(win))]
+        #     cached_viewers = [(wname, win) for (wname, win) in self.cached_vars.items() if isinstance(
+        #         win, QtWidgets.QMainWindow) and self.parent()._isScipyenViewerClass_(type(win))]
+        #     user_ns_viewers = [v for v in ns.values() if isinstance(
+        #         v, QtWidgets.QMainWindow) and self.parent()._isScipyenViewerClass_(type(v))]
+        #     for w_name_obj in cached_viewers:
+        #         if w_name_obj[1] not in user_ns_viewers:
+        #             self.cached_vars.pop(w_name_obj[0], None)
+        # 
+        #         else:
+        #             self.parent().registerWindow(w_name_obj[1])
 
         # ###
         # 3. now, deal with everything else
@@ -1179,7 +1180,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # The DataBag will NOW notify any observers upon the removal of these variables
         # Works OK
         self.internalVariablesMonitor.delete(*list(del_vars))
-        # self.internalVariablesMonitor.remove_members(*list(del_vars))
 
         #
         # 3.3. now, figure out whether there are NEW variables added to the workspace
