@@ -802,6 +802,7 @@ class WindowManager(__QMainWindow__):
 
         if win not in self.viewers[winClass]:
             self.viewers[winClass].append(win)
+            
         self.currentViewers[winClass] = win
 
     @safeWrapper
@@ -818,18 +819,27 @@ class WindowManager(__QMainWindow__):
         """
         if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             return
+        
+        print(f"{self.__class__.__name__}.deRegisterWindow: {win}")
 
         viewer_type = type(win)
 
         old_viewer_index = None
 
         if viewer_type in self.viewers.keys():
+            print(f"{self.__class__.__name__}.deRegisterWindow: {viewer_type.__name__} in self.viewers.keys()")
             if win in self.viewers[viewer_type]:
+                print(f"{self.__class__.__name__}.deRegisterWindow: {win} in self.viewers[{viewer_type.__name__}]")
                 old_viewer_index = self.viewers[viewer_type].index(win)
+                print(f"{self.__class__.__name__}.deRegisterWindow: old_viewer_index = {old_viewer_index}")
                 self.viewers[viewer_type].remove(win)
 
+        print(f"{self.__class__.__name__}.deRegisterWindow: viewers left: {self.viewers[viewer_type]}")
+
         if viewer_type in self.currentViewers:
+            print(f"{self.__class__.__name__}.deRegisterWindow: {viewer_type.__name__} in self.currentViewers")
             if len(self.viewers[viewer_type]) == 0:
+                print(f"\tno viewers")
                 self.currentViewers[viewer_type] = None
 
             elif self.currentViewers[viewer_type] is win:
@@ -837,12 +847,13 @@ class WindowManager(__QMainWindow__):
                     if old_viewer_index >= len(self.viewers[viewer_type]):
                         viewer_index = len(self.viewers[viewer_type]) - 1
 
-                    elif old_viewer_index == 0:
+                    elif old_viewer_index <= 0:
                         viewer_index = 0
 
                     else:
                         viewer_index = old_viewer_index
 
+                    print(f"\tselecting an existing view or type {viewer_type.__name__} with index {viewer_index}")
                     self.currentViewers[viewer_type] = self.viewers[viewer_type][viewer_index]
 
     def raiseWindow(self, obj):
@@ -2789,7 +2800,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         timer = QtCore.QTimer()
         timer.timeout.connect(self.workspaceModel.update)
         timer.start(0)
-        # self.workspaceModel.update() # emits WorkspaceModel.modelContentsChanged via var_observer
 
     @pyqtSlot()
     def slot_updateCwd(self):
@@ -2916,13 +2926,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # With the current workspaceModel implementation since 2023-05-28 this
         # function appears redundant. However, it is not, as it allows code outside
         # the main Scipyen window to remove user data from the workspace.
-        self.workspaceModel.unbindObjectInNamespace(name)
-        # r = self.workspace.pop(name, None)
-        # if r is not None:
-        #     self.workspaceModel.removeRowForVariable(name)
+        self.workspaceModel.unbindObjectInNamespace(name) # single-shot
 
     def removeFromWorkspace(self, value: typing.Any, by_name: bool = True):#, update: bool = True):
-        """Removes an object from the workspace via GUI operations.
+        """Removes an object from the workspace via Context menu Delete action.
 
         By default, the object to be removed is specified by the symbol (name)
         to which the object is bound in the workspace. 
@@ -2959,9 +2966,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             expensive updates of the workspace viewer after each variable.
 
         """
-        if isinstance(value, str) and by_name:
-            # print(f"---\nScipyenWindow.removeFromWorkspace {value}")
-            r = self.workspace.unbindObjectInNamespace(value)
+        # if isinstance(value, str) and by_name:
+        if by_name:
+            if isinstance(value, str):
+                r = self.workspace.unbindObjectInNamespace(value) # one-shot
             # r = self.workspace.pop(value, None)
             # if r is not None:
             #     self.workspaceModel.removeRowForVariable(value)
@@ -2975,8 +2983,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                        for (name, obj) in self.workspace.items() if obj is value]
             
             if len(objects):
-                rowIndices = [self.workspaceModel.getRowIndexForVarname(
-                    o[0]) for o in objects]
+                # rowIndices = [self.workspaceModel.getRowIndexForVarname(
+                #     o[0]) for o in objects]
+#                 for o in objects:
+#                     self.workspace.pop(o[0], None)
+#                 
+#                 self.workspaceModel.update()
+                
                 for o in objects:
                     self.workspaceModel.unbindObjectInNamespace(o[0])
                     # r = self.workspace.pop(o[0], None)
@@ -2994,24 +3007,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                           QtCore.QSignalBlocker(self.workspaceModel),
                           QtCore.QSignalBlocker(self.workspaceView.selectionModel())]
 
-        # varname = self.workspaceModel.currentItemName
         varname = self.currentVarItemName
-        # print(f"varname {varname}")
-
-        # # test; comment out
-        # vname = self.workspaceModel.getCurrentVarName()
-        # print(f"vname {vname}")
 
         if varname is None:
             indexList = self.workspaceView.selectedIndexes()
 
-            # if len(indexList) == 0:
             if len(indexList) != 1:
                 return
 
             item, varname = self._getWorkspaceVarItemAndName_(indexList[0])
-
-            # varname = self.workspaceModel.item(indexList[0].row(),0).text()
 
             if varname is None or isinstance(varname, str) and len(varname.strip()) == 0:
                 return
@@ -3019,11 +3023,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if varname not in self.workspace.keys():
                 return
 
-        # print("MainWindow.getCurrentVarName", varname)
-
         return varname
 
-    # def assignToWorkspace(self, name: str, val: object, from_console: bool = False):
     def assignToWorkspace(self, name: str, val: object):
         self.workspaceModel.bindObjectInNamespace(name, val)
         # self.workspace[name] = val
@@ -3209,15 +3210,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot(QtCore.QModelIndex)
     @safeWrapper
     def slot_variableItemPressed(self, ndx):
-        # print("ScipyenWindow.slot_variableItemPressed %s", ndx)
-        # self.workspaceModel.currentItem = self.workspaceModel.item(ndx.row(),0)
-        # self.workspaceModel.currentItemName = self.workspaceModel.item(ndx.row(),0).text()
         self.currentVarItem, self.currentVarItemName = self._getWorkspaceVarItemAndName_(
             ndx)
-        # obj = self.workspace[self.workspaceModel.currentItemName]
-        obj = self.workspace[self.currentVarItemName]
-        if isinstance(obj, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
-            self.setCurrentWindow(obj)
+        try:
+            obj = self.workspace[self.currentVarItemName]
+            if isinstance(obj, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
+                self.setCurrentWindow(obj)
+        except:
+            pass
 
     @pyqtSlot(QtCore.QModelIndex)
     @safeWrapper
@@ -3231,34 +3231,33 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # TODO separate menu for variables in remote namespaces
             return
 
-        # self.workspaceModel.currentItem = self.workspaceModel.item(ndx.row(),0)
-        # self.workspaceModel.currentItemName = self.workspaceModel.item(ndx.row(),0).text()
         self.currentVarItem, self.currentVarItemName = self._getWorkspaceVarItemAndName_(
             ndx)
 
-        # item = self.workspace[self.workspaceModel.currentItemName]
-        obj = self.workspace[self.currentVarItemName]
+        try:
+            obj = self.workspace[self.currentVarItemName]
 
-        if QtWidgets.QWidget in inspect.getmro(type(obj)):
-            if isinstance(obj, QtWidgets.QMainWindow) and obj.isMinimized():
-                obj.showNormal()
+            if QtWidgets.QWidget in inspect.getmro(type(obj)):
+                if isinstance(obj, QtWidgets.QMainWindow) and obj.isMinimized():
+                    obj.showNormal()
+                else:
+                    obj.show()
+
+            if isinstance(obj, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
+                self.raiseWindow(obj)
+
             else:
-                obj.show()
+                askForParams = bool(
+                    QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+                newWindow = bool(
+                    QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
 
-        if isinstance(obj, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
-            self.raiseWindow(obj)
-
-        else:
-            askForParams = bool(
-                QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
-            newWindow = bool(
-                QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
-
-            # if not self.viewVar(self.workspaceModel.currentItemName, newWindow=newWindow):
-            if not self.viewVar(self.currentVarItemName, newWindow=newWindow, askForParams=askForParams):
-                # view (display) object in console is no handler exists
-                # self.console.execute(self.workspaceModel.currentItemName)
-                self.console.execute(self.currentVarItemName)
+                if not self.viewVar(self.currentVarItemName, newWindow=newWindow, askForParams=askForParams):
+                    # if no handler exists, then view (display) object in console
+                    self.console.execute(self.currentVarItemName)
+                    
+        except:
+            pass
 
     def _getWorkspaceVarItemAndName_(self, index: QtCore.QModelIndex):
         if index.column() == 0:
@@ -3795,63 +3794,78 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         if len(indexList) == 0:
             return
-
-        varNames = list()
-
-        varSet = set((self.workspaceModel.getVarName(i) for i in indexList))
-
-        # for i in indexList:
-        # varSet.add(self.workspaceModel.item(i.row(),0).text())
-
-        varNames = sorted(varSet)
-
+        
         msgBox = QtWidgets.QMessageBox()
+        
+        if len(indexList) > 1:
+            varNames = list()
 
-        if len(indexList) == 1:
-            prompt = "Delete '%s'?" % varNames[0]
-            wintitle = "Delete variable"
+            varSet = set((self.workspaceModel.getVarName(i) for i in indexList))
 
-        else:
+            varNames = sorted(varSet)
+
+            # msgBox = QtWidgets.QMessageBox()
+
             prompt = "Delete %d selected variables?" % len(varSet)
             wintitle = "Delete variables"
             msgBox.setDetailedText("\n".join(varNames))
+            
+            msgBox.setWindowTitle(wintitle)
+            msgBox.setIcon(QtWidgets.QMessageBox.Warning)
+            msgBox.setText(prompt)
+            msgBox.setInformativeText("This operation cannot be undone!")
+            msgBox.setStandardButtons(
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+            msgBox.setDefaultButton(QtWidgets.QMessageBox.No)
 
-        msgBox.setWindowTitle(wintitle)
-        msgBox.setIcon(QtWidgets.QMessageBox.Warning)
-        msgBox.setText(prompt)
-        msgBox.setInformativeText("This operation cannot be undone!")
-        msgBox.setStandardButtons(
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-        msgBox.setDefaultButton(QtWidgets.QMessageBox.No)
+            ret = msgBox.exec()
 
-        ret = msgBox.exec()
+            if ret == QtWidgets.QMessageBox.No:
+                return
 
-        if ret == QtWidgets.QMessageBox.No:
-            return
+            # FIXME: 2022-10-13 18:40:01
+            # this is still too slow and cumbersome - possibly overheads in
+            # WorkspaceModel
+            for n in varNames:
+                obj = self.workspace[n]
+                if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+                    if isinstance(obj, mpl.figure.Figure):
+                        # also removes obj.number from plt.get_fignums()
+                        plt.close(obj)
 
-        # FIXME: 2022-10-13 18:40:01
-        # this is still too slow and cumbersome - possibly overheads in
-        # WorkspaceModel
-        for n in varNames:
-            obj = self.workspace[n]
-            if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
-                if isinstance(obj, mpl.figure.Figure):
-                    # also removes obj.number from plt.get_fignums()
-                    plt.close(obj)
+                    else:
+                        obj.close()
 
-                else:
-                    obj.close()
+                    # does not remove its symbol for workspace - this has already been removed by delete action
+                    super().deRegisterWindow(obj)
 
-                # does not remove its symbol for workspace - this has already been removed by delete action
-                self.deRegisterWindow(obj)
+                self.removeWorkspaceSymbol(n)
 
-            self.removeWorkspaceSymbol(n)
+            # self.workspaceModel.currentItem = None
+            self.currentVarItem = None
+            self.currentVarItemName = None
 
-        # self.workspaceModel.currentItem = None
-        self.currentVarItem = None
-        self.currentVarItemName = None
+            self.workspaceModel.update()
+        else:
+            varName = self.workspaceModel.getVarName(indexList[0])
 
-        self.workspaceModel.update()
+            prompt = "Delete '%s'?" % varName
+            wintitle = "Delete variable"
+            msgBox.setWindowTitle(wintitle)
+            msgBox.setIcon(QtWidgets.QMessageBox.Warning)
+            msgBox.setText(prompt)
+            msgBox.setInformativeText("This operation cannot be undone!")
+            msgBox.setStandardButtons(
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+            msgBox.setDefaultButton(QtWidgets.QMessageBox.No)
+
+            ret = msgBox.exec()
+
+            if ret == QtWidgets.QMessageBox.No:
+                return
+            
+            self.workspaceModel.unbindObjectInNamespace(varName) # single shot
+
 
     @pyqtSlot(bool)
     @safeWrapper
@@ -4407,6 +4421,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.workspaceModel.itemChanged.connect(
             self.slot_variableItemNameChanged)
+        
         self.workspaceModel.modelContentsChanged.connect(
             self.slot_updateWorkspaceView)
         # END workspace view
@@ -6483,7 +6498,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 # does not remove its symbol for workspace - this has already been removed by delete action
                 self.deRegisterWindow(obj)
 
-            self.removeWorkspaceSymbol(n)
+            # self.removeWorkspaceSymbol(n)
+            self.workspace.pop(n, None)
 
         # self.workspaceModel.currentItem = None
         self.currentVarItem = None
