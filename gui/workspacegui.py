@@ -887,9 +887,10 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             # WARNING: 2023-05-28 23:42:57
             #  DO NOT USE - STILL NEEDS WORK
             try:
-                # self.workspaceModel.update() # CAUTION: this BLOCKS the UI
-                with self.workspaceModel.holdUIUpdate():
-                    self.workspaceModel.update2() # CAUTION: this DOES NOT update the model viewer UI
+                self.workspaceModel.update() 
+                # self.workspaceModel.update() 
+                # with self.workspaceModel.holdUIUpdate():
+                #     self.workspaceModel.update2()
             except:
                 traceback.print_exc()
             

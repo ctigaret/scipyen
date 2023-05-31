@@ -621,9 +621,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def isUserVariable(self, name, val):
         """Check if symbol ↦ value binding is not hidden from the user.
         """
-        # see NOTE 2020-11-29 16:29:01
         if name in self.user_ns_hidden:
             return val is not self.user_ns_hidden[name]
+        else:
+            return not name.startswith("_")
 
         return True
     
@@ -959,9 +960,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     # 
     #     if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
     #         cached_viewers = [(wname, win) for (wname, win) in self.cached_vars.items() if isinstance(
-    #             win, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(win))]
+    #             win, QtWidgets.QMainWindow) and self.parent()._isScipyenViewerClass_(type(win))]
     #         user_ns_viewers = [v for v in self.shell.user_ns.values() if isinstance(
-    #             v, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(v))]
+    #             v, QtWidgets.QMainWindow) and self.parent()._isScipyenViewerClass_(type(v))]
     #         for w_name_obj in cached_viewers:
     #             if w_name_obj[1] not in user_ns_viewers:
     #                 self.cached_vars.pop(w_name_obj[0], None)
@@ -1144,17 +1145,19 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # ###
         # 2. deal with Scipyen viewer windows
         #
-        if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
-            cached_viewers = [(wname, win) for (wname, win) in self.cached_vars.items() if isinstance(
-                win, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(win))]
-            user_ns_viewers = [v for v in ns.values() if isinstance(
-                v, QtWidgets.QMainWindow) and self.parent()._is_scipyen_viewer_class_(type(v))]
-            for w_name_obj in cached_viewers:
-                if w_name_obj[1] not in user_ns_viewers:
-                    self.cached_vars.pop(w_name_obj[0], None)
-
-                else:
-                    self.parent().registerWindow(w_name_obj[1])
+        # if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
+        #     # cached_viewers = [(wname, win) for (wname, win) in self.shell.user_ns.items() if isinstance(
+        #     #     win, QtWidgets.QMainWindow) and self.parent()._isScipyenViewerClass_(type(win))]
+        #     cached_viewers = [(wname, win) for (wname, win) in self.cached_vars.items() if isinstance(
+        #         win, QtWidgets.QMainWindow) and self.parent()._isScipyenViewerClass_(type(win))]
+        #     user_ns_viewers = [v for v in ns.values() if isinstance(
+        #         v, QtWidgets.QMainWindow) and self.parent()._isScipyenViewerClass_(type(v))]
+        #     for w_name_obj in cached_viewers:
+        #         if w_name_obj[1] not in user_ns_viewers:
+        #             self.cached_vars.pop(w_name_obj[0], None)
+        # 
+        #         else:
+        #             self.parent().registerWindow(w_name_obj[1])
 
         # ###
         # 3. now, deal with everything else
@@ -1177,7 +1180,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # The DataBag will NOW notify any observers upon the removal of these variables
         # Works OK
         self.internalVariablesMonitor.delete(*list(del_vars))
-        # self.internalVariablesMonitor.remove_members(*list(del_vars))
 
         #
         # 3.3. now, figure out whether there are NEW variables added to the workspace
@@ -1483,7 +1485,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def clearTable(self):
         self.removeRows(0, self.rowCount())
 
-    def update(self):
+    def update_old(self):
         """Updates workspace model.
         To be called by code that adds/remove/modifies/renames variables 
         in the Scipyen's namespace in order to update the workspace viewer.
@@ -1520,7 +1522,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         self.internalVariablesMonitor.update(current_vars)
         
-    def update2(self):
+    def update(self):
         """Updates workspace model - batch version.
         Used when the namespace contents are modified by code run OUTSIDE the 
         console (hence, independently of the console's kernel events)
@@ -1585,37 +1587,37 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #     self.internalVariablesMonitor.remove_members(*list(del_vars))
         #     self.internalVariablesMonitor.update(current_vars)
 
-    @contextlib.contextmanager
-    def holdUIUpdate(self):
-        """Inspired from traitlets.HasTraits.hold_trait_notifications"""
-        # cache = typing.Dict[str, typing.Any] = {}
-        
-        # def compress(past_changes, change):
-        #     """Merges the provided change with the last if possible."""
-        #     if past_changes is None:
-        #         return [change]
-        #     else:
-        #         if past_changes[-1]["type"] == "change" and change.type == "change":
-        #             past_changes[-1]["new"] = change.new
-        #         elif past_changes[-1]["type"] == "remove" and change.type == "remove":
-        #             past_changes[-1]["new"] = Undefined
-        #         else:
-        #             # In case of changes other than 'change', append the notification.
-        #             past_changes.append(change)
-        #         return past_changes
-
-        def hold(change):
-            pass
-            # name = change.name
-            # cache[name] = compress(cache.get(name), change)
-            
-        try:
-            self.internalVariablesListenerCB = hold
-            yield
-        except:
-            traceback.print_exc()
-        finally:
-            del self.internalVariablesListenerCB
+#     @contextlib.contextmanager
+#     def holdUIUpdate(self):
+#         """Inspired from traitlets.HasTraits.hold_trait_notifications"""
+#         # cache = typing.Dict[str, typing.Any] = {}
+#         
+#         # def compress(past_changes, change):
+#         #     """Merges the provided change with the last if possible."""
+#         #     if past_changes is None:
+#         #         return [change]
+#         #     else:
+#         #         if past_changes[-1]["type"] == "change" and change.type == "change":
+#         #             past_changes[-1]["new"] = change.new
+#         #         elif past_changes[-1]["type"] == "remove" and change.type == "remove":
+#         #             past_changes[-1]["new"] = Undefined
+#         #         else:
+#         #             # In case of changes other than 'change', append the notification.
+#         #             past_changes.append(change)
+#         #         return past_changes
+# 
+#         def hold(change):
+#             pass
+#             # name = change.name
+#             # cache[name] = compress(cache.get(name), change)
+#             
+#         try:
+#             self.internalVariablesListenerCB = hold
+#             yield
+#         except:
+#             traceback.print_exc()
+#         finally:
+#             del self.internalVariablesListenerCB
                 
             
     @pyqtSlot(dict)
@@ -1629,6 +1631,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         additions = filter(lambda x: x[1] == WorkspaceVarChange.New, self.__changes__.items())
         modifications = filter(lambda x: x[1] == WorkspaceVarChange.Modified, self.__changes__.items())
         
+        
         for item in removals:
             self._varChanges_callbacks_[item[1]](item[0])
         
@@ -1637,6 +1640,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         for item in modifications:
             self._varChanges_callbacks_[item[1]](item[0])
+
+        self.__changes__.clear()
         
         self.modelContentsChanged.emit()
 
