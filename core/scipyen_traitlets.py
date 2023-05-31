@@ -346,6 +346,9 @@ class ListTrait(List, ScipyenTraitTypeMixin):
         default_to = (self._trait or Any())
         validated = []
         
+#         if isinstance(value, self.klass):
+#             self.length = len(value)
+#         
         if not use_list and isinstance(default_to, Any):
             return value
         
@@ -453,7 +456,7 @@ class NdarrayTrait(Instance, ScipyenTraitTypeMixin):
         return np.array(self.default_value)
  
 class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
-    """IT IS RECOMMENDED THAT SUBCLASSES OVERRIDE THE `compare_elements` METHOD
+    """Traitlet for BaseNeo objects
     """
     info_text = "Trais for neo.baseneo.BaseNeo"
     default_value = neo.baseneo.BaseNeo()
@@ -462,7 +465,9 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
     _valid_defaults = (neo.baseneo.BaseNeo,)
     
     def __init__(self, value_trait=None, default_value = Undefined, **kwargs):
+        # print(f"{self.__class__.__name__}.__init__")
         super(ScipyenTraitTypeMixin, self).__init__()
+        self.hashed = 0
         trait = kwargs.pop('trait', None)
         if trait is not None:
             if value_trait is not None:
@@ -498,7 +503,7 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
         elif trait is not None:
             raise TypeError(f"Expecting 'value_trait to be a Trait or None; got {type(value_trait_.__name__)}")
         
-        super().__init__(klass = self.klass, args=args, **kwargs)
+        super().__init__(klass = self.klass, args=args, **kwargs) # init the Instance
     
     def info(self):
         if isinstance(self.klass, six.string_types):
@@ -566,17 +571,18 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
             # NOTE: 2023-05-23 22:24:41
             # cann be very expensive
             # if result:
-            #     # check annotations
-            #     result = new_value.annotations == old_value.annotations
-            #     # result = safe_identity_test(new_value.annotations, old_value.annotations)
+            # #     # check annotations
+            # #     result = new_value.annotations == old_value.annotations
+            #     result = safe_identity_test(new_value.annotations, old_value.annotations)
             
             
-            if result:
-                # so far silent is True when the observed knows about us
-                # check it we changed and notify
-                # silent = (new_hash == self.hashed)
-                result = new_value == old_value
-                # result = safe_identity_test(new_value, old_value)
+            # if result:
+            #     # so far silent is True when the observed knows about us
+            #     # check it we changed and notify
+            #     new_hash = gethash(new_value)
+            #     silent = (new_hash == self.hashed)
+            #     # result = new_value == old_value
+            #     # result = safe_identity_test(new_value, old_value)
         except:
             traceback.print_exc()
             result = False
@@ -615,23 +621,15 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
         
         change_type = "modified"
         
-        # if self.name in obj._trait_values:
         if self.name and self.name in obj._trait_values and self.name in obj.traits():
-
             old_value = obj._trait_values[self.name]
         else:
             old_value = self.default_value
+            self.hashed = gethash(old_value)
             silent=False
             change_type="new"
         
-        # try:
-        #     old_value = obj._trait_values[self.name]
-        # except KeyError:
-        #     silent=False    # this will be the first time the observed sees us
-        #                     # therefore forcibly notify it
-        #     old_value = self.default_value
-            
-        obj._trait_values[self.name] = new_value
+        # print(f"\n{self.__class__.__name__} <for object {self.name}>.set(...) → first test silent = {silent}")
         
         try:
             # FIXME/TODO: 2023-05-25 22:37:35
@@ -640,16 +638,28 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
             # this can cause bottleneck downstream (e.g. in workspace model a 
             # Modifed change triggers updating the row - which scales poorly with 
             # the number of variables in the workspace)
-            # silent = self.compare_elements(old_value, new_value)
+            silent = self.compare_elements(old_value, new_value)
+            # print(f"\n\t after compare_elements → silent = {silent}")
             if silent:
-                silent = bool(old_value == new_value)
+                silent = bool(old_value == new_value) and bool(id(old_value) == id(new_value))
+                
+            if silent:
+                new_hash = gethash(new_value)
+                silent = (new_hash == self.hashed)
+                # print(f"{self.__class__.__name__}.set: new_hash == self.hashed => silent {silent}")
+                
+                if not silent:
+                    self.hashed = new_hash
             
         except:
             traceback.print_exc()
             silent = False
             
         #print(f"silent {silent}")
+        # print(f"\n{self.__class__.__name__} <for object {self.name}>.set({value}) → notify_trait = {not silent}")
                 
+        obj._trait_values[self.name] = new_value
+        
         # print(f"\n{self.__class__.__name__} object {self.name} .set({obj}, {value}) → old_value = {old_value}; new_value = {new_value}; notify_trait = {not silent}")
         if silent is not True:
             # obj._notify_trait(self.name, old_value, new_value)
@@ -662,6 +672,10 @@ class NeoContainerTrait(NeoBaseNeoTrait):
     default_value = klass()
     _cast_types = tuple()
     _valid_defaults = (klass,)
+    
+    # def __init__(self, value_trait=None, default_value = Undefined, **kwargs):
+    #     print(f"{self.__class__.__name__}<NeoContainerTrait>.__init__")
+    #     super().__init__(value_trait=value_trait, default_value=default_value, **kwargs)
     
     def compare_elements(self, old_value, new_value):
         try:
@@ -684,6 +698,8 @@ class NeoContainerTrait(NeoBaseNeoTrait):
             traceback.print_exc()
             result = False
             
+        print(f"{self.__class__.__name__}<NeoContainerTrait>.compare_elements → {result}")
+        
         return result
     
 class NeoBlockTrait(NeoContainerTrait):
@@ -692,6 +708,19 @@ class NeoBlockTrait(NeoContainerTrait):
     default_value = klass()
     _cast_types = tuple()
     _valid_defaults = (klass,)
+    
+    def compare_elements(self, old_value, new_value):
+        result = super(NeoContainerTrait, self).compare_elements(old_value, new_value)
+        
+        if result and all(hasattr(o, "_container_child_containers") for o in (old_value, new_value)) :
+            # for container_child_container in old_value._container_child_containers:
+            #     print(f"{container_child_container}: new_value → {len(getattr(new_value, container_child_container))}; old_value → {len(getattr(old_value, container_child_container))}")
+                
+            result = all(len(getattr(new_value, attr, [])) == len(getattr(old_value, attr, [])) for attr in old_value._container_child_containers)
+            
+        # print(f"{self.__class__.__name__} <for object {self.name}>.compare_elements → {result}")
+        return result
+    
     
 class NeoGroupTrait(NeoContainerTrait):
     klass = neo.Group
@@ -706,6 +735,13 @@ class NeoSegmentTrait(NeoContainerTrait):
     default_value = klass()
     _cast_types = tuple()
     _valid_defaults = (klass,)
+    
+#     def compare_elements(self, old_value, new_value):
+#         result = super().compare_elements(old_value, new_value)
+#         
+#         if result and hasattr(self, "_container_child_containers"):
+#             result = all(len(getattr(new_value, attr, [])) == len(getattr(old_value, attr, [])) for attr in self._container_child_containers)
+#             return result
     
 class NeoChannelViewTrait(NeoBaseNeoTrait):
     klass = neo.view.ChannelView

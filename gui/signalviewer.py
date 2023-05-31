@@ -3146,7 +3146,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     # ### END PyQt slots
     
     def var_observer(self, change):
-        # print(f"{self.__class__.__name__}_{self.windowTitle()}.var_observer change = {change}")
+        print(f"{self.__class__.__name__}_{self.windowTitle()}.var_observer change = {change}")
         # old = change["old"]
         # if isinstance(old, neo.Block):
         #     print(f"old: name = {old.name}\n\t with segments = {old.segments}")
