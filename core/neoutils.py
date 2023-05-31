@@ -2901,20 +2901,19 @@ def copy_with_data_subset(obj, **kwargs):
         • When an indexing is None, it means an indexing is NOT specified hence 
         we take the full child collection.
     
-    segments:       
-                    Indexing of the segments to be retained in the result.
+    segments: Indexing of the segments to be retained in the result.      
                     
-                    This index can be (see normalized_index):
-                    int, str (signal name), sequence of int or str, a range,
-                    a slice, or a numpy array of int or booleans.
-                    
-                    When MISSING, all segments in each block will be retained.
-                    
-                    Indexing of the segments to be retained in the result.
-                    
-                    This index can be (see normalized_index):
-                    int, str (signal name), sequence of int or str, a range,
-                    a slice, or a numpy array of int or booleans.
+        This index can be (see normalized_index):
+        int, str (signal name), sequence of int or str, a range,
+        a slice, or a numpy array of int or booleans.
+        
+        When MISSING, all segments in each block will be retained.
+        
+        Indexing of the segments to be retained in the result.
+        
+        This index can be (see normalized_index):
+        int, str (signal name), sequence of int or str, a range,
+        a slice, or a numpy array of int or booleans.
     
     groups:
                     Indexing of groups.
@@ -3014,8 +3013,11 @@ def _(obj, **kwargs):
         kwargs.pop(kw, None)
     
     indexing = dict((s, kwargs.pop(s, None)) for s in obj._child_containers)
-    
-    ret = make_neo_object(obj)
+
+    if toCopy:
+        ret = make_neo_object(obj)
+    else:
+        ret = obj # CAREFUL !
     
     # NOTE: 2021-11-23 14:56:56
     # groups organize data orthogonally to the segments;
