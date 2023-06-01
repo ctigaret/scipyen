@@ -163,10 +163,10 @@ def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_ty
                     vlist = [k for k in var_names_filter] 
                     
                     if isinstance(var_type, type) or (isinstance(var_type, (tuple, list)) and all([isinstance(v, type) for v in var_type])):
-                        ret.expand([s for s in vlist if isinstance(ws[s], var_type)])
+                        ret.extend([s for s in vlist if isinstance(ws[s], var_type)])
                         
                     else:
-                        ret.expand(vlist) # return a list of variable names
+                        ret.extend(vlist) # return a list of variable names
                     
                 #if len(ret) == 0:
                     #return ws.keys()
@@ -210,7 +210,12 @@ def getvarsbytype(vartype, ws=None):
     
     #return dict(lst)
         
-def getvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None, as_dict:bool=False, sort:bool= False, sortkey:object=None, reverse:bool = False):
+def getvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, 
+            var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None, 
+            as_dict:bool=False, 
+            sort:bool= False, 
+            sortkey:object=None, 
+            reverse:bool = False):
     """Collects a subset of variabes from a workspace or a dictionary.
 
     Returns a (possibly sorted) list of the variables if found, or an empty list.
@@ -348,9 +353,16 @@ def getvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_t
             
         #else:
             #lst = [(n, ws[n]) for n in var_names]
+            
+        if not sort:
+            if sortkey is not None:
+                sort = True
         
         if sort and sortkey is not None:
             lst.sort(key=sortkey)
+            
+        if reverse is True:
+            lst.reverse()
         
         ret = OrderedDict(lst)
         

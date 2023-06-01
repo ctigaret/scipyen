@@ -14,6 +14,7 @@ from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 import numpy as np
 import pandas as pd
 import quantities as pq
+from quantities.decorators import with_doc
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import neo
@@ -31,7 +32,6 @@ import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.datatypes as dt
 from core.datatypes import (Episode, Schedule, TypeEnum)
-from core.quantities import units_convertible
 import plots.plots as plots
 import core.models as models
 import core.neoutils as neoutils
@@ -63,7 +63,8 @@ from core.quantities import(arbitrary_unit,
                             week_in_vitro, postnatal_day, postnatal_month,
                             embryonic_day, embryonic_week, embryonic_month,
                             unit_quantity_from_name_or_symbol,
-                            check_time_units)
+                            check_time_units,
+                            units_convertible)
 
 from core.utilities import (safeWrapper, 
                             reverse_mapping_lookup, 
@@ -140,7 +141,7 @@ class PathwayEpisode(Episode):
     segments (a.k.a sweeps) of a neo.Block object containing the data.
     
     It can be used to create a new such Block object from source neo.Blocks - 
-    i.e., passing it to the neoutils.concatenate_blocks(...) function
+    i.e., passing it to the neoutils.concatenate_blocks(...) function.
     
     
     Examples:
@@ -164,10 +165,10 @@ class PathwayEpisode(Episode):
     • name:str - mandatory, name of the episode
     
     The PathwayEpisode only stores arguments needed to (re)create a new neo.Block
-    by concatenating 
+    by concatenating several source neo.Block data.
     
     The other fields indicate optional indices into the data segments and signals
-    inside the actual data stored inside a SynapticPathway object:
+    of the source data.
     
     • response : int or str - respectively, the index or the name of the
         analog signal in each sweep, containing the pathway-specific synaptic
@@ -203,6 +204,13 @@ class PathwayEpisode(Episode):
     that at least the analogsignals contain a sequence of the indices given in
     response, analogCommand and digitalCommand.
     
+    
+    See also:
+    ========
+    • datatypes.Episode
+    
+    • neoutils.concatenate_blocks
+    
     ---
     
     ¹ An indexing object is an int, range, slice, str, sequence of int, or 
@@ -212,12 +220,22 @@ class PathwayEpisode(Episode):
     
     
     """
-    def __init__(self, name:str, data=None, 
+    def __init__(self, name:str,
                  response=None, analogCommand=None, digitalCommand=None,
                  segments=None, analogsignals=None, irregularlysampledsignals=None,
                  imagesequences=None, spiketrains=None, epochs=None,events=None):
         
         self.name=name
+        self.response=response
+        self.analogCommand = analogCommand
+        self.digitalCommand = digitalCommand
+        self.segments = segments
+        self.analogSignals = analogSignals
+        self.irregularlysampledsignals = irregularlysampledsignals
+        self.imagesequences = imagesequences
+        self.spiketrains = spiketrains
+        self.epochs = epochs
+        self.events = events
     
 
 class SynapticPathway(BaseScipyenData):

@@ -3192,12 +3192,15 @@ def _(obj, **kwargs):
 
 @safeWrapper
 def concatenate_blocks(*args, **kwargs):
-    """Concatenates the segments in the neo.Block objects in *args.
-    Generates a new neo.Block object.
+    """Concatenates neo.Block source objects generating a new neo.Block object.
     
-    Copies of neo.Segment objects in the source data (*args) are appended to the
-    in the result in the order they are encountered (i.e. the same order as they
-    are passed in *args).
+    The new neo.Block object contains the segments of the source blocks subject
+    to selector indiced as detailed below.
+    
+    Copies of neo.Segment objects in the source data (*args) are by default,
+    appended to the result in the order they are encountered (i.e. the same order
+    as they are passed in *args). this can be changed using the optional keyword
+    parameters 'sortby' and 'ascending'
     
     Optionally, only subsets of the segments' data children¹ contained in the 
     source data are retained in the concatenated Block.
@@ -3227,31 +3230,56 @@ def concatenate_blocks(*args, **kwargs):
 
     Var-positional parameters:
     --------------------------
-    args : a comma-separated list of one or more neo.core.Block objects
+    args : The data source: a comma-separated objects
     
+        When *args contains several objects, there are all expected to be 
+        neo.Block objects.
+    
+        When args contains a single object, this can be:
+    
+        • a neo.Block (the function will return it, subject to selection as below)
+
+        • a str: the function will search for symbols in the workspace, that are
+            bound to neo.Block objects, using a glob search
+
+        • a sequence of neo.Block objects - these will be used for concatenation
+
+        • a sequence of str: these are workspace symbols bound to the neo.Block
+            objects used as data source
+    
+        NOTE: The order in which the neo.Block objects are passed will be preserved
+        UNLESS the keyword parameters 'sortby' and 'ascending' are passed (see below)
+    
+        The only exception to this rule is when the source data is specified as 
+        a single str or a sequence of str. In this case, the source neo.Block
+        objects will ALWAYS be sorted:
+        • by the attribute specified by 'sortby' or their rec_datetime attribute
+            if 'sortby' is not given
+        • in ascending order unless 'ascending' is False
+            
     Var-keyword parameters:
     -----------------------
     
     These fall in two groups:
     
     1. Parameters that specify new metadata for the newly created Block (see the
-    documentation of the neo.Block):
-    
-    name:str            
-    
-    description:str
-    
-    rec_datetime:datetime.datetime
-    
-    file_origin:str
-    
-    file_datetime:datetime.datetime
-    
-    annotation:dict
+        documentation of the neo.Block):
+        
+        name:str            
+        
+        description:str
+        
+        rec_datetime:datetime.datetime
+        
+        file_origin:str
+        
+        file_datetime:datetime.datetime
+        
+        annotation:dict
     
     2. Parameters for choosing subsets of the Block's contents:
     
-    segments: int or None; 
+        segments: int or None; 
                 When None, all segments in each block will be used.
                 When int then only segments with specified index in each Block
                 will be used in the concatenated result.
@@ -3259,7 +3287,7 @@ def concatenate_blocks(*args, **kwargs):
                 NOTE: This is the way to specify segments (or sweeps) containing
                 data from the same synaptic pathway.
                     
-    analogsignals: int, str, range, slice, typing.Sequence
+        analogsignals: int, str, range, slice, typing.Sequence
                 Indexing into each of the segments' 'analosignals' attribute
                 specifying which signals will be retained in the concatenated data. 
     
@@ -3303,19 +3331,19 @@ def concatenate_blocks(*args, **kwargs):
     
                 See neo_lookup() for details.
                     
-    irregularlysampledsignals:  indexing for irregularly sampled signals, same
-                specification as for 'analogsignals' parameter
+        irregularlysampledsignals:  indexing for irregularly sampled signals
+                (as for 'analogsignals' parameter)
     
-    imagesequences: indexing for ImageSequence objects; same as 'analogsignals'
-                (WARNING: use onlyl for neo version >= 0.8.0 onwards)
+        imagesequences: indexing for ImageSequence objects; same as 'analogsignals'
+                (WARNING: use only for neo version >= 0.8.0 onwards)
                 
-    spiketrains: indexing of spike trains, see 'analosignals' for details
+        spiketrains: indexing of spike trains, see 'analosignals' for details
                 
-    epochs:      as above, for Epoch objects
+        epochs:      as above, for Epoch objects
     
-    events:      as above, for Event objects
+        events:      as above, for Event objects
     
-    copy:        bool, default True;
+        copy:        bool, default True;
     
                 When False, the concatenated block contains a reference to the
                 data in 'args'². 
@@ -3338,13 +3366,28 @@ def concatenate_blocks(*args, **kwargs):
                 epoch-like and event-like); their containers (block, segments)
                 are newly created for the concatenated data.
         
-    rename_segments:bool, optional (default True) - segments are renamed to the
-        generic format f"segment_{k}" with 0 <= k < number_of_segments in the result
+        sortby: str or None
+            When None, source blocks will be iterated in the same order in which
+                they are passed to this function, in the '*args' parameter. If  
+                *args contains a single str or a sequence of str , the neo.Block 
+                objects will be sorted according to their 'rec-datetime' attribute.
+    
+            When a str, this specifies the attribute name of each block to be 
+                used for sorting them.
+    
+            WARNING: This attribute must resolve to an object that supports 
+            ordering (e.g., a numeric scalar, datetime.datetime object, or str)
+    
+        ascending:bool, default is True; only used when sortby is not None
+    
+        rename_segments:bool, optional (default True) - segments are renamed to 
+            the generic format f"segment_{k}" with 0 <= k < N where
+            N is the number of segmnents in the result
                     
                     
     Returns:
     -------
-    a new neo.Block object
+    A new neo.Block object
     
     NOTE: this is different from what neo.core.container.Container.merge()
     achieves. `merge` is inherited by Block, Segment, and Group) and basically
@@ -3373,15 +3416,32 @@ def concatenate_blocks(*args, **kwargs):
     file_datetime = kwargs.get("file_datetime", None)
     rec_datetime = kwargs.get("datetime", datetime.datetime.now())
     annotations = kwargs.get("annotations", dict())
+    sortby = kwargs.pop("sortby", None)
+    ascending = kwargs.pop("ascending", True)
+    
+    if not bool(ascending):
+        ascending = False
+    
+    reverse = not ascending
     
     if len(args) == 0:
         return None
     
     if len(args) == 1:
-        if isinstance(args[0], (str, type)):
+        # if isinstance(args[0], (str, type)):
+        if isinstance(args[0], str):
             try:
-                args =  workspacefunctions.getvars(args[0], var_type = (neo.Block,), sort=True, sortkey=lambda x: x.rec_datetime)
-                # args =  workspacefunctions.getvars(args[0], var_type = (neo.Block, neo.Segment), sort=True, sortkey=lambda x: x.rec_datetime)
+                if isinstance(sortby, str):
+                    args =  workspacefunctions.getvars(args[0], var_type = (neo.Block,), 
+                                                       sort=True, 
+                                                       sortkey=lambda x: getattr(x, sortby),
+                                                       reverse=reverse)
+                else:
+                    args =  workspacefunctions.getvars(args[0], var_type = (neo.Block,), 
+                                                       sort=True, 
+                                                       sortkey=lambda x: x.rec_datetime,
+                                                       reverse=reverse)
+                
                 
             except Exception as e:
                 print("String argument did not resolve to a list of neo.Block objects")
@@ -3389,14 +3449,22 @@ def concatenate_blocks(*args, **kwargs):
                 traceback.print_exc()
                 return
             
-        elif isinstance(args[0], collections.abc.Sequence) and all(isinstance(a, (type, str)) for a in args[0]):
+        # elif isinstance(args[0], collections.abc.Sequence) and all(isinstance(a, (type, str)) for a in args[0]):
+        elif isinstance(args[0], collections.abc.Sequence) and all(isinstance(a, str) for a in args[0]):
             try:
-                args =  workspacefunctions.getvars(*args[0], var_type = (neo.Block, ), sort=True, sortkey=lambda x: x.rec_datetime)
-                # args =  workspacefunctions.getvars(*args[0], var_type = (neo.Block, neo.Segment), sort=True, sortkey=lambda x: x.rec_datetime)
+                if isinstance(sortby, str):
+                    args =  workspacefunctions.getvars(*args[0], var_type = (neo.Block, ), 
+                                                       sort=True, 
+                                                       sortkey=lambda x: getattr(x, sortby),
+                                                       reverse=reverse)
+                else:
+                    args =  workspacefunctions.getvars(*args[0], var_type = (neo.Block, ), 
+                                                       sort=True, 
+                                                       sortkey=lambda x: x.rec_datetime,
+                                                       reverse = reverse)
                 
             except Exception as e:
                 print("String argument did not resolve to a list of neo.Block objects")
-                # print("String argument did not resolve to a list of neo.Block or neo.Segment objects")
                 traceback.print_exc()
                 return
             
@@ -3407,8 +3475,17 @@ def concatenate_blocks(*args, **kwargs):
         # nothing to here: return the source, or a copy of it
         return copy_with_data_subset(args, **kwargs)
             
-    # if isinstance(args, collections.abc.Sequence) and all(isinstance(a, (neo.Block, neo.Segment)) for a in args):
     if isinstance(args, collections.abc.Sequence) and all(isinstance(a, neo.Block) for a in args):
+        if isinstance(sortby, str):
+            try:
+                args = sorted(args, key = lambda x: getattr(x, sortby))
+                if reverse:
+                    args.reverse()
+                    
+            except:
+                traceback.print_exc()
+                return
+            
         # NOTE: 2021-11-24 09:55:15
         # this branch deals with a sequence of Blocks:
         # make a new Block, append segments
@@ -3481,80 +3558,6 @@ def concatenate_blocks(*args, **kwargs):
                                         target_group.channelviews.append(newchannel_view)
                                         
             
-#             if isinstance(arg, neo.Block):
-#                 # copy arg to a new block; the **kwargs will take care of 
-#                 # selective copy of segments and of their contents
-#                 new_block = copy_with_data_subset(arg, **kwargs)
-#                 # NOTE: propagate time & file stamps to these segments
-#                 for seg in new_block.segments:
-#                     seg.rec_datetime = new_block.rec_datetime
-#                     seg.file_origin = new_block.file_origin
-#                 ret.segments.extend(new_block.segments)
-# 
-#                 if len(new_block.groups):
-#                     for group in new_block.groups:
-#                         existing_groups = [g for g in ret.groups if g.name == group.name]
-#                         
-#                         if len(existing_groups):
-#                             existing_group = existing_groups[0]
-#                             new_group = None
-#                         else:
-#                             existing_group = None
-#                             new_group = neo.Group(name=group.name, allowed_types = group.allowed_types)
-#                         
-#                         objects = list()
-#                         
-#                         for child_class_name, child_container in group._container_lookup.items():
-#                             # NOTE 2021-11-24 09:56:33
-#                             # see also NOTE: 2021-11-24 09:12:32
-#                             if child_class_name != "ChannelView":
-#                                 data = list(chain(*[s.list_children_by_class(child_class_name) for s in new_block.segments]))
-#                                 objects.extend([o for o in child_container if any(is_same_as(o, o_) for o_ in data)])
-#                         
-#                         if len(objects):
-#                             # NOTE: 2021-11-24 10:02:28 Below:
-#                             # * new_group is a completely new group, NOT added to the new block
-#                             # * existing_group if a group that  has been added to the new block in prev iterations
-#                             # * target_group is a reference to the new_group or existing_group in the current iteration
-#                             # We operate on channel views in the target_group further down.
-#                             if isinstance(new_group, neo.Group):
-#                                 new_group.add(*objects)
-#                                 ret.groups.append(new_group)
-#                                 target_group = new_group 
-#                             elif isinstance(existing_group,neo.Group):
-#                                 existing_group.add(*objects)
-#                                 target_group = existing_group
-#                                 
-#                             # NOTE: 2021-11-24 09:59:42 Now, add channel views
-#                             # to the target group (see NOTE: 2021-11-24 10:02:28 for what this means)
-#                             if hasattr(group, "channelviews") and len(group.channelviews):
-#                                 for channelview in group.channelviews:
-#                                     if isinstance(channelview.obj, neo.core.basesignal.BaseSignal):
-#                                         data = list(chain(*[s.list_children_by_class(type(channelview.obj).__name__) for s in new_block.segments]))
-#                                         if any(is_same_as(channelview.obj, o_) for o_ in data):
-#                                             new_channelview = neo.ChannelView(channelview.obj,
-#                                                                             index = channelview.index, 
-#                                                                             name = channelview.name, 
-#                                                                             description = channelview.description,
-#                                                                             file_origin = channelview.file_origin,
-#                                                                             array_annotations = channelview.array_annotations,
-#                                                                             **channelview.annotations)
-#                                             
-#                                             target_group.channelviews.append(newchannel_view)
-#                                             
-#                 
-#             elif isinstance(arg, neo.core.Segment):
-#                 kw = dict((n,v) for n,v in kwargs if n not in ("segments", "groups"))
-#                 # kw = dict((n,v) for n,v in kwargs if n != "segments")
-#                 new_seg = copy_with_data_subset(arg, **kw)
-#                 
-#                 new_seg.rec_datetime = rec_datetime
-#                 new_seg.block = ret
-#                 ret.segments.append(new_seg)
-#                 
-#                 # TODO/FIXME: 2021-11-23 22:45:43
-#                 # what to do with groups, here?
-              
     else:
         raise TypeError("Expecting a neo.Block or a sequence of neo.Block objects, got %s instead" % type(args).__name__)
 
