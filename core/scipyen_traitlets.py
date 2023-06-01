@@ -537,8 +537,8 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
             # can be very expensive
             if result:
                 # check annotations
-                result = new_value.annotations == old_value.annotations
-                # result = safe_identity_test(new_value.annotations, old_value.annotations)
+                # result = new_value.annotations == old_value.annotations
+                result = safe_identity_test(new_value.annotations, old_value.annotations)
             
             
             # if result:
