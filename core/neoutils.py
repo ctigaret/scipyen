@@ -157,6 +157,7 @@ from IPython.lib.pretty import pprint as prp
 import numpy as np
 import scipy
 import quantities as pq
+# from quantities.decorators import with_doc
 import neo
 # from neo.core.baseneo import (MergeError, merge_annotations, intersect_annotations,
 #                               _reference_name, _container_name)
@@ -168,14 +169,6 @@ from neo.core.baseneo import (MergeError, _reference_name, _container_name)
 from neo.core.dataobject import (DataObject, ArrayDict)
 import matplotlib as mpl
 
-# import pyqtgraph as pg
-
-# try:
-#     import pyabf
-#     hasPyABF = True
-# except:
-#     hasPyABF = False
-# 
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -184,6 +177,7 @@ from .prog import (safeWrapper, deprecation,
                    filter_attr, filterfalse_attr,
                    filter_type, filterfalse_type,
                    iter_attribute, signature2Dict, 
+                   with_doc,
                    )#SignatureDict)
 
 from .datatypes import (is_string, is_vector,
@@ -199,6 +193,8 @@ from . import signalprocessing as sigp
 from . import utilities
 from core.utilities import (normalized_index, name_lookup,
                             elements_types, index_of, isclose, similar_strings)
+
+from core.strutils import InflectEngine
 
 # from iolib.pictio import getABF
 # from core.pyabfbridge import getABFProtocolEpochs
@@ -695,32 +691,32 @@ def invert_time_ranges(time_ranges):
         
     return new_ranges
     
-def get_member_collections(container:typing.Union[type, neo.core.container.Container], 
-                           membertype:typing.Union[type, tuple, list]):
-    if isinstance(container, type):
-        if not neo.core.container.Container in inspect.getmro(container):
-            raise TypeError("Cannot handle %s" % container)
-        
-        if container not in type_to_container_member_name.keys():
-            raise TypeError("Cannot handle %s" % container)
-        
-        cont_type = container
-        
-    else:
-        cont_type = type(container)
-        
-        if not neo.core.container.Container in inspect.getmro(cont_type):
-            raise TypeError("Cannot handle container with type" % cont_type)
-        
-        if cont_type not in type_to_container_member_name.keys():
-            raise TypeError("Cannot handle container with type" % cont_type)
-        
-    cont_dict = type_to_container_member_name[cont_type]
-    
-    if isinstance(membertype, (tuple, list)) and all([isinstance(t, type) and t in cont_dict.keys() for t in membertype]):
-        attrnames = [cont_dict[t] for t in membertype]
-        
-    #elif isinstance(membertype, type) and membertype in 
+# def get_member_collections(container:typing.Union[type, neo.core.container.Container], 
+#                            membertype:typing.Union[type, tuple, list]):
+#     if isinstance(container, type):
+#         if not neo.core.container.Container in inspect.getmro(container):
+#             raise TypeError("Cannot handle %s" % container)
+#         
+#         if container not in type_to_container_member_name.keys():
+#             raise TypeError("Cannot handle %s" % container)
+#         
+#         cont_type = container
+#         
+#     else:
+#         cont_type = type(container)
+#         
+#         if not neo.core.container.Container in inspect.getmro(cont_type):
+#             raise TypeError("Cannot handle container with type" % cont_type)
+#         
+#         if cont_type not in type_to_container_member_name.keys():
+#             raise TypeError("Cannot handle container with type" % cont_type)
+#         
+#     cont_dict = type_to_container_member_name[cont_type]
+#     
+#     if isinstance(membertype, (tuple, list)) and all([isinstance(t, type) and t in cont_dict.keys() for t in membertype]):
+#         attrnames = [cont_dict[t] for t in membertype]
+#         
+#     #elif isinstance(membertype, type) and membertype in 
 
 def get_neo_version():
     """
@@ -2814,6 +2810,7 @@ def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_
                 
 
 @singledispatch
+@with_doc(normalized_index, use_header=True)
 def copy_with_data_subset(obj, **kwargs):
     """Copy data from a source neo container to a new container of the same type.
     
@@ -2866,88 +2863,47 @@ def copy_with_data_subset(obj, **kwargs):
     Var-keyword parameters:
     ----------------------
     
-    copy: bool: When True (the default) the children objects of 'obj' will be
-                copied deeply
+    These are indexing parameters, with properties as explained in the 
+    documentation for the 'index' parameter to the 'normalize_index' function, 
+    below.
     
-                When False, the signal objects will be stored by reference in
-                the result -- WARNING any alterations to the result will be 
-                relected in the original object! 
-                Most likely this is NOT what you want...
-                
-    Indexing parameters: these are of one of the following types: int, str, range, 
-    slice, typing.Sequence[int], typing.Sequence[str], dataclasses.MISSING_TYPE, or 
-    NoneType (default).
-    
-        int ⇒ selects only the element with the specified int index
-    
-        str ⇒ selects only the element with the specified name (if it exists)
-    
-        range ⇒ selects the elements with int indices in the specified range
-    
-        slice ⇒ selects the elements within the slice range
-    
-        Sequence[int] ⇒ selects the elements with the specified int indices
-    
-        Sequence[str] ⇒ selects the elements with the specified names
-    
-        MISSING ⇒ select NO elements from the container (return an empty collection)
-    
-        None ⇒ select ALL elements in the container NOTE: this is the default
-    
-        NOTE: this may seem counterintuitive, but this is useful for programming
-        reasons. Think of it in this way:
-    
-        • Whenever an indexing is MISSING, this signifies that we DO NOT want a 
-        selection from that child collection.
-    
-        • When an indexing is None, it means an indexing is NOT specified hence 
-        we take the full child collection.
-    
-    segments: Indexing of the segments to be retained in the result.      
+    segments:   
+        Indexing of the segments to be retained in the result.      
                     
-        This index can be (see normalized_index):
-        int, str (signal name), sequence of int or str, a range,
-        a slice, or a numpy array of int or booleans.
-        
-        When MISSING, all segments in each block will be retained.
-        
-        Indexing of the segments to be retained in the result.
-        
-        This index can be (see normalized_index):
-        int, str (signal name), sequence of int or str, a range,
-        a slice, or a numpy array of int or booleans.
-    
     groups:
-                    Indexing of groups.
-                    
-                    NOTE: Ignored when 'segments' is not MISSING, because 
-                    'groups' represent a view of the data organization orthogonal
-                    to that of the segments. In this case, ALL groups will be
-                    returned.
+        Indexing of groups.
+            
+        NOTE: Ignored when 'segments' is not MISSING, because 
+        'groups' represent a view of the data organization orthogonal
+        to that of the segments. In this case, ALL groups will be
+        returned.
                     
     analogsignals:  
-                    Indexing of analog signal(s) into each of the segments, that
-                    will be retained in the concatenated data. These include
-                    neo.AnalogSignal and datatypes.DataSignal
-                
-                    This index can be (see normalized_index):
-                    int, str (signal name), sequence of int or str, a range,
-                    a slice, or a numpy array of int or booleans.
+        Indexing of analog signal(s) into each of the segments, that
+        will be retained in the concatenated data. These include
+        neo.AnalogSignal and datatypes.DataSignal
+    
+        This index can be (see normalized_index):
+        int, str (signal name), sequence of int or str, a range,
+        a slice, or a numpy array of int or booleans.
                     
     irregularlysampledsignals:
-                    as analog, for irregularly sampled signals. These 
-                    include neo.IrregularlySampledSignal and 
-                    datatypes.IrregularlySampledDataSignal
+        as analogsignals, for irregularly sampled signals. These 
+        include neo.IrregularlySampledSignal and 
+        datatypes.IrregularlySampledDataSignal
     
     imagesequences:
-                    as analogsignals, for neo.ImageSequence objects (for neo version
-                    from 0.8.0 onwards)
+        as analogsignals, for neo.ImageSequence objects (for neo version
+        from 0.8.0 onwards)
                 
-    spiketrains:    as analogsignals, for the spiketrains in the block's segments
+    spiketrains:
+        as analogsignals, for the spiketrains in the block's segments
     
-    epochs:         as above for Epoch objects
+    epochs:
+        as above, for Epoch objects
     
-    events:         as above for Event objects
+    events:
+        as above, for Event objects
     
     """
     raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
@@ -2998,7 +2954,7 @@ def _(obj, **kwargs):
             sourceMetaData["annotations"] = dict()
     # ### END
     
-    toCopy = kwargs.pop("copy", True)
+    # toCopy = kwargs.pop("copy", True)
     
     # NOTE: 2023-04-13 09:45:19
     # some kwargs are not suitable for a Block, but they may be suitable for 
@@ -3016,10 +2972,7 @@ def _(obj, **kwargs):
     
     indexing = dict((s, kwargs.pop(s, None)) for s in obj._child_containers)
 
-    if toCopy:
-        ret = make_neo_object(obj)
-    else:
-        ret = obj # CAREFUL !
+    ret = make_neo_object(obj)
     
     # NOTE: 2021-11-23 14:56:56
     # groups organize data orthogonally to the segments;
@@ -3028,7 +2981,7 @@ def _(obj, **kwargs):
     # to keep it simple we allow only a selection of segments or groups, but never
     # simultaneously both
     # NOTE: segments None => get all segments 
-    #       segments MMISSING => get None of them -> cannot have groups either
+    #       segments MISSING => get None of them -> cannot have groups either
     if indexing["segments"] is not None:
         if indexing["segments"] is MISSING: # i.e.
             indexing["groups"] = MISSING
@@ -3044,7 +2997,6 @@ def _(obj, **kwargs):
     # as they may be useful for copy_with_data_subset on the child (in this case, 
     # the Segment)
     kwargs.update(not_kwargs)
-    kwargs["copy"] = toCopy
     
     new_segments = list(copy_with_data_subset(obj.segments[k], **kwargs) 
                         for k in keep_segs_ndx)
@@ -3190,44 +3142,22 @@ def _(obj, **kwargs):
     
     return ret
 
+@with_doc(copy_with_data_subset, use_header=True)
 @safeWrapper
 def concatenate_blocks(*args, **kwargs):
-    """Concatenates neo.Block source objects generating a new neo.Block object.
+    """Concatenates segments from neo.Block objects into a new neo.Block object.
     
-    The new neo.Block object contains the segments of the source blocks subject
-    to selector indiced as detailed below.
+    Optionally, only a subset of the data children¹ in the source segments is
+    included in the result.
     
-    Copies of neo.Segment objects in the source data (*args) are by default,
-    appended to the result in the order they are encountered (i.e. the same order
-    as they are passed in *args). this can be changed using the optional keyword
-    parameters 'sortby' and 'ascending'
+    The source neo.Blocks can be passed directly, or indirectly, by passing the
+    name(s) of the symbol(s) to which they are bound in the workspace -- see the
+    documentation of the 'args' parameter, below.
     
-    Optionally, only subsets of the segments' data children¹ contained in the 
-    source data are retained in the concatenated Block.
     
-    ¹ neo.Segment's data children are neo.Segment instance attributes containing
-    collections of neo data objects, as follows:
+    By default, the source neo.Block objects are used in the order they are 
+    passed inside the 'args' parameter, but this can be customized (see below).
     
-    Attribute name:type                             Element type:
-    ======================================================================
-    analogsignals:list                              neo.AnalogSignal
-                                                    Scipyen's DataSignal
-
-    irregularlysampledsignal:list                   neo.IrregularlySampledSignal
-                                                    Scipyen's IrregularlySampledDataSignal
-
-    imagesequences:list                             neo.ImageSequence
-
-    spiketrains:neo.spiketrainlist.SpikeTrainList   neo.SpikeTrain
-
-    epochs:list                                     neo.Epoch,
-                                                    Scipyen's DataZone
-
-    events:list                                     neo.Event,
-                                                    Scipyen's DataMarker and
-                                                    TriggerEvent
-
-
     Var-positional parameters:
     --------------------------
     args : The data source: a comma-separated objects
@@ -3237,7 +3167,7 @@ def concatenate_blocks(*args, **kwargs):
     
         When args contains a single object, this can be:
     
-        • a neo.Block (the function will return it, subject to selection as below)
+        • a neo.Block
 
         • a str: the function will search for symbols in the workspace, that are
             bound to neo.Block objects, using a glob search
@@ -3253,8 +3183,10 @@ def concatenate_blocks(*args, **kwargs):
         The only exception to this rule is when the source data is specified as 
         a single str or a sequence of str. In this case, the source neo.Block
         objects will ALWAYS be sorted:
+    
         • by the attribute specified by 'sortby' or their rec_datetime attribute
             if 'sortby' is not given
+    
         • in ascending order unless 'ascending' is False
             
     Var-keyword parameters:
@@ -3277,65 +3209,78 @@ def concatenate_blocks(*args, **kwargs):
         
         annotation:dict
     
-    2. Parameters for choosing subsets of the Block's contents:
+    2. Parameters for choosing subsets of the Block's contents (WARNING: no 
+        checks are performed on these parameters; if they are wrong, exceptions
+        will be raised by the call chain starting with this function, especially
+        in "copy_with_data_subset" function which is used behind the scenes):
     
         segments: int or None; 
-                When None, all segments in each block will be used.
-                When int then only segments with specified index in each Block
-                will be used in the concatenated result.
-    
-                NOTE: This is the way to specify segments (or sweeps) containing
-                data from the same synaptic pathway.
+            When None, all segments in each block will be used.
+            When int then only segments with specified index in each Block
+            will be used in the concatenated result.
+
+            NOTE: This is the way to specify segments (or sweeps) containing
+            data from the same synaptic pathway.
                     
         analogsignals: int, str, range, slice, typing.Sequence
-                Indexing into each of the segments' 'analosignals' attribute
-                specifying which signals will be retained in the concatenated data. 
-    
-                • an int specifies the index of the only analog signal to be 
-                retained from each segment in the source data;
-                    WARNING: all segments in the source data must contain at 
-                    least this index + 1 analog signals!
-    
-                • a str specifies the name of the analog signal to be retained 
-                from each segment in the source data;
-                    WARNING: within each source segment, analogsignals must have 
-                    unique names; moreover, all source segments must contain an
-                    analog signal with this name.
-                    
-                • a sequence of int: indices of the analogsignals to be retained 
-                from each segment in the source data;
-                    WARNING: all segments in the source data must contain a number
-                    of analog signals that is at least 1 + the highest index value
-    
-                • a sequence of str: names of the analogsignals to be retained
-                from each segment in the source data;
-                    WARNING: within each source segment, analogsignals must have 
-                    unique names; moreover, all specified names must be valid
-                    signal names in all source segments.
-    
-                • a range;
-                    WARNING: the range must be appropriate for the size of the 
-                    'analogsignals' in all source segments.
-    
-                • a slice;
-                    WARNING: the slice must be appropriate for the size of the 
-                    'analogsignals' in all source segments.
-    
-                • a 1D numpy array of int (signal indices) or bool elements (for
-                    logical indexing)
-                    WARNING: 
-                    ∘ the indices if an int array must be valid for the
-                    'analogsignals' attribute of all surce segments;
-                    ∘ when this is a boolan array, its length must equal the size 
-                    of the 'analogsignals' attribute in all source segments.
-    
+            Indexing into each of the segments' 'analogsignals' attribute,
+            specifying which signals will be retained in the result. 
+
+            • an int (>=0) specifies the index of the only analog signal to 
+            be retained from each segment in the source data;
+                Prerequisites: 
+                ∘ the number of analogsignals in each source segment must be at
+                    least 1 + the value of this parameter
+
+            • a str specifies the name of the analog signal to be retained 
+            from each segment in the source data;
+                Prerequisites: 
+                ∘ within each source segment, the analog signals must have 
+                    unique names
+                ∘ all source segments must contain an analog signal with the 
+                    'name' attribute equal to the value of this parameter
+                
+            • a sequence of int: indices of the analogsignals to be retained 
+            from each segment in the source data;
+                Prerequisites: 
+                ∘ the number of analogsignals in each source segment must be at
+                    least 1+ the highest value in this parameter
+
+            • a sequence of str: names of the analogsignals to be retained
+            from each segment in the source data;
+                Prerequisites: 
+                ∘ within each source segment, all analog signals must have a
+                    unique name
+                ∘ all names specified by this parameter must resolve to signals
+                    in all source segments.
+
+            • a range;
+                Prerequisites: 
+                ∘ the range must be appropriate for the number of analog signals
+                    in all source segments.
+
+            • a slice;
+                Prerequisites: 
+                ∘ the slice must be appropriate for the number of analog signals
+                    in all source segments.
+
+            • a 1D numpy array of int (signal indices) or bool elements (for
+                logical indexing)
+                Prerequisites: 
+                ∘ if an int array, its values must be valid indices for the 
+                    analog signals in all source segments
+                
+                ∘ if a boolan array, its length must equal the size 
+                of the 'analogsignals' attribute in all source segments.
+
                 See neo_lookup() for details.
                     
         irregularlysampledsignals:  indexing for irregularly sampled signals
-                (as for 'analogsignals' parameter)
+            Types and prerequites are as for the 'analogsignals' parameter.
     
         imagesequences: indexing for ImageSequence objects; same as 'analogsignals'
-                (WARNING: use only for neo version >= 0.8.0 onwards)
+            Types and prerequites are as for the 'analogsignals' parameter.
+            (WARNING: this parameter only works with neo version >= 0.8.0)
                 
         spiketrains: indexing of spike trains, see 'analosignals' for details
                 
@@ -3343,29 +3288,6 @@ def concatenate_blocks(*args, **kwargs):
     
         events:      as above, for Event objects
     
-        copy:        bool, default True;
-    
-                When False, the concatenated block contains a reference to the
-                data in 'args'². 
-    
-                WARNING: this is important, as changes to the attributes of the 
-                concatenated block will alter the original data (e.g., segment
-                names, time bases, etc). As long as the source data is still 
-                'alive', any indirect changes incurred in this fashion will be 
-                also saved to the file (should you decide to save the data again)!
-    
-                However, this link is lost when the result is serialized to a 
-                file, or when the source data is removed from the workspace
-    
-                When True (the default), the results stores a deep copy of the 
-                data in 'args', so that any changes to the concatenated block 
-                will NOT be propagated to the source data. While this uses more
-                resources, it may be considered more safe.
-    
-                ² NOTE: only the data objects are copied (signals, spike trains
-                epoch-like and event-like); their containers (block, segments)
-                are newly created for the concatenated data.
-        
         sortby: str or None
             When None, source blocks will be iterated in the same order in which
                 they are passed to this function, in the '*args' parameter. If  
@@ -3378,16 +3300,17 @@ def concatenate_blocks(*args, **kwargs):
             WARNING: This attribute must resolve to an object that supports 
             ordering (e.g., a numeric scalar, datetime.datetime object, or str)
     
-        ascending:bool, default is True; only used when sortby is not None
+        ascending:bool, default is True; only used when 'sortby' is not None
     
         rename_segments:bool, optional (default True) - segments are renamed to 
             the generic format f"segment_{k}" with 0 <= k < N where
-            N is the number of segmnents in the result
+            N is the number of segments in the result
                     
                     
     Returns:
     -------
-    A new neo.Block object
+    A new neo.Block object, optionally containing a subset of the segments and 
+    signal-like objects as specified by the 
     
     NOTE: this is different from what neo.core.container.Container.merge()
     achieves. `merge` is inherited by Block, Segment, and Group) and basically
@@ -3395,8 +3318,11 @@ def concatenate_blocks(*args, **kwargs):
     (hence requiring identical time bases)
     
     Example:
+    =======
     
-    block = concatenate_blocks(getvars("data_name_prefix*"), segment_index=0)
+    1) concatenate neo.Blocks present in the workspace, selected by a glob search
+        on their bound symbols
+    block = concatenate_blocks("data_name_prefix*", segment_index=0)
     
     will concatenate the first segment (segment_index = 0) from all neo.Block 
     variables having names beginning with 'data_name_prefix' in the user 
@@ -3405,8 +3331,33 @@ def concatenate_blocks(*args, **kwargs):
     Changelog:
     ==========
     2023-05-22 16:08:31 Only accepts neo.Block or sequence of neo.Block
-
     
+    NOTES:
+    ======
+    
+    ¹The data children of a neo.Segment object are attributes referring to
+        collections of neo data objects, as follows:
+    
+    Attribute name:type                             Element type:
+    ======================================================================
+    analogsignals:list                              neo.AnalogSignal
+                                                    Scipyen's DataSignal
+
+    irregularlysampledsignal:list                   neo.IrregularlySampledSignal
+                                                    Scipyen's IrregularlySampledDataSignal
+
+    imagesequences:list                             neo.ImageSequence
+
+    spiketrains:neo.spiketrainlist.SpikeTrainList   neo.SpikeTrain
+
+    epochs:list                                     neo.Epoch,
+                                                    Scipyen's DataZone
+
+    events:list                                     neo.Event,
+                                                    Scipyen's DataMarker and
+                                                    TriggerEvent
+
+
     """
     from neo.core.spiketrainlist import SpikeTrainList
     

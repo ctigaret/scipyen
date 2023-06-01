@@ -30,6 +30,7 @@ import neo, vigra
 import quantities as pq
 from . import workspacefunctions
 from .workspacefunctions import debug_scipyen
+from .strutils import InflectEngine
 
 CALLABLE_TYPES = (types.FunctionType, types.MethodType,
                   types.WrapperDescriptorType, types.MethodWrapperType,
@@ -2293,3 +2294,95 @@ def show_caller_stack(stack):
     for s in stack:
         print(f"\tcaller\t {s.function} at line {s.lineno} in {s.filename}")
     
+class with_doc:
+    """
+    This decorator combines the docstrings of the provided and decorated objects
+    to produce the final docstring for the decorated object.
+    
+    Modified version of python quantities.decorators.with_doc
+    
+    """
+
+    def __init__(self, method, use_header=True, header_str:typing.Optional[str] = None):
+        self.method = method
+        if isinstance(method, (tuple, list)) and all(isinstance(v, typing.Callable) for v in method):
+            self.method = tuple(method)
+        elif isinstance(method, typing.Callable):
+            self.method = (method,)
+        else: 
+            self.method = None
+            
+        if not isinstance(header_str, str) or len(header_str.strip()) == 0:
+            if len(self.method):
+                header_str = f"Calls the {InflectEngine.plural('function', len(self.method))}:"
+            else:
+                header_str = "Notes:"
+        
+        if use_header:
+            hdr = [header_str, "-" * len(header_str)]
+            self.header = "\n".join(hdr)
+    #         self.header = \
+    # """
+    # 
+    # Notes:
+    # ------
+    # """
+        else:
+            self.header = ''
+
+    def __call__(self, new_method):
+        original_doc = new_method.__doc__
+        header = self.header
+        # header = new_method.__name__ + " " + self.header
+        if len(self.method):
+            if len(self.method) > 1:
+                if original_doc:
+                    docs = [original_doc, header ]
+                else:
+                    docs = [header]
+                docs += [f"{k}) {m.__name__}: \n{m.__doc__}" if m__doc__ else f"{m.__name__}:" for k, m in enumerate(self.methods)]
+                # docs += [f"{m.__name__}: \n{m.__doc__}" for m in self.methods if m.__doc__]
+                new_doc =  "\n".join(docs)
+                
+                new_method.__doc__ = new_doc
+                
+            else:
+                m_doc = self.method[0].__doc__
+                if original_doc:
+                    docs = [original_doc, header ]
+                else:
+                    docs = [header]
+                    
+                if m_doc:
+                    docs += [f"{self.method[0].__name__}: \n{m_doc}"]
+                    
+                new_doc = "\n".join(docs)
+                new_method.__doc__ = new_doc
+            #         new_method.__doc__ = """
+            # {}
+            # {}
+            # {}
+            #     """.format(original_doc, header, new_doc)
+
+                # elif new_doc:
+                #     new_method.__doc__ = new_doc
+
+
+        return new_method
+    
+#     def __call__(self, new_method):
+#         new_doc = new_method.__doc__
+#         original_doc = self.method.__doc__
+#         header = self.header
+#     
+#         if original_doc and new_doc:
+#             new_method.__doc__ = """
+#     {}
+#     {}
+#     {}
+#         """.format(original_doc, header, new_doc)
+#     
+#         elif original_doc:
+#             new_method.__doc__ = original_doc
+#     
+#         return new_method

@@ -221,21 +221,12 @@ class PathwayEpisode(Episode):
     
     """
     def __init__(self, name:str,
-                 response=None, analogCommand=None, digitalCommand=None,
-                 segments=None, analogsignals=None, irregularlysampledsignals=None,
-                 imagesequences=None, spiketrains=None, epochs=None,events=None):
-        
+                 response=None, analogCommand=None, digitalCommand=None, **kwargs):
+        super().__init__(name, **kwargs)
         self.name=name
         self.response=response
         self.analogCommand = analogCommand
         self.digitalCommand = digitalCommand
-        self.segments = segments
-        self.analogSignals = analogSignals
-        self.irregularlysampledsignals = irregularlysampledsignals
-        self.imagesequences = imagesequences
-        self.spiketrains = spiketrains
-        self.epochs = epochs
-        self.events = events
     
 
 class SynapticPathway(BaseScipyenData):

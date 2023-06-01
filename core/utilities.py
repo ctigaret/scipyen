@@ -36,7 +36,7 @@ import pyqtgraph # for their own eq operator
 #     from operator import eq
 
 from core import prog
-from .prog import safeWrapper, deprecation
+from .prog import safeWrapper, deprecation, with_doc
 
 from .strutils import get_int_sfx
 from .quantities import units_convertible
@@ -3388,6 +3388,7 @@ def name_lookup(container: typing.Sequence, name:str, multiple: bool = True) -> 
         
     return names.index(name)
 
+@with_doc(prog.filter_attr, use_header = True, header_str = "See also:")
 def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series]], 
                      index: typing.Optional[typing.Union[str, int, collections.abc.Sequence, np.ndarray, range, slice, type(MISSING)]] = None, 
                      silent:bool=False):
@@ -3410,53 +3411,46 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
         When an int, 'data' is the length of a putative Sequence (hence 
         data >= 0)
     
-    index: int, iterable, np.ndarray, range, slice, str, dataclasses.MISSING, or
-        None (default).
+    index: one of:
     
-        When 'index' is None, the function returns range(0, len(data)) with 
+        int → selects only the element with the specified int index
+    
+        str → selects only the element having 'name' attribute with the value
+    
+        range → selects the elements with int indices in the specified range
+    
+        slice → selects the elements within the slice range
+    
+        collections.abc.Sequence[int] → selects the elements with the specified 
+                int indices
+    
+        collections.abc.Sequence[str] → selects the elements having a 'name'
+                attribute with value in this parameter
+    
+        1D np.ndarray with integer dtype (i.e., np.dtype(int)) →  Returns a list 
+            of the array's values (after validation for the 'data' parameter)
+            Prerequisite: 'index' must satisfy:
+            len(index) == len(data) (with 'data' a Sequence)
+            len(index) == data (whith 'data' an int)
+    
+        
+        
+        1D np.ndarray with logical dtype  (i.e., np.dtype(bool)) → Used as a 
+            'mask': returns the indices of the True values 
+            Prerequisite: 'index' must satisfy:
+            len(index) == len(data) (with 'data' a Sequence)
+            len(index) == data (whith 'data' an int)
+    
+        MISSING ⇒ select NO elements from the data (returns an empty range)
+    
+        None (default) ⇒ select ALL elements in the data
+    
+        When 'index' is None, the function returns range(0, len(data)) when 
             'data' is a Sequence, else range(, data) when 'data' is an int.
-    
-            (i.e., NO index is specified)
     
         When index is MISSING, the function returns an empty range:
             range(0)
-    
-            (i.e., leave everything OUT )
             
-        Otherwise, the function behaves as below:
-        
-        Index type 
-        -----------
-        range                       It is returned, provided max(index) < len(data)
-                                    (or max(index) < data when 'data' is an int)
-        
-        slice                       Returns slice.indices(len(data))
-                                    (or slice.indices(data) when 'data' is an int)
-        
-        collections.abc.Sequence    Each element must be in range(-len(data), len(data))
-        with int elements           (or range(-data, data) when 'data' is an int)
-        
-                                    Returns 'index'
-                                    
-        str                         'data' must be a Sequence containing elements 
-                                    that MAY have an attribute named 'name' (those
-                                    without a 'name' attribute are ignored and 
-                                    their indices in the Sequence will be skipped).
-                                    
-        collections.abc.Sequence    'data' must be a Sequence, as above;
-        with str elements           
-                                    Returns the indices of those elements in 'data'
-                                    having 'name' attribute with value in index.
-                                    
-        1D np.ndarray with
-        integer dtype               Returns a list of array's values (after validation)
-        (e.g. np.dtype(int))
-        
-        logical dtype               Used as a 'mask': returns the indices of the 
-        (e.g., np.dtype(bool))      True values; 'index' must satisfy:
-                                    len(index) == len(data) (with 'data' a Sequence)
-                                    len(index) == data (whith 'data' an int)
-        
         CAUTION: negative integral indices are valid and perform the reverse 
             indexing (going "backwards" in the iterable).
             
@@ -3466,10 +3460,6 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
         used in list comprehensions using 'data' (when 'data' is a Sequence) or
         any sequence with same length as 'data' (when 'data' is an int).
         
-    See also:
-    
-    prog.filter_attr
-    
     """
     from core.datatypes import is_vector
     
@@ -3506,7 +3496,7 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
         if index not in range(-data_len,data_len):
             if silent:
                 return None
-            raise ValueError("Index %s is invalid for %d elements" % (index, len(data)))
+            raise ValueError(f"Index {index} is invalid for {len(data)} elements")
         
         if isinstance(data, pd.core.indexes.base.Index):
             return (data[index], )
@@ -3556,7 +3546,7 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
         if max(index) >= data_len:
             if silent:
                 return None
-            raise IndexError("Index %s out of range for %d elements" % (index, data_len))
+            raise IndexError(f"Index {index} out of range for {data_len} elements")
         
         return index # -> index IS a range
     
@@ -3566,23 +3556,23 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
         if len(ndx) == 0:
             if silent:
                 return None
-            raise IndexError("Indexing %s results in an empty indexing list" % index)
+            raise IndexError(f"Indexing {index} results in an empty indexing list")
         
         if max(ndx) >= data_len:
             if silent:
                 return None
-            raise IndexError("Index %s out of range for %d elements" % (index, data_len))
+            raise IndexError(f"Index {index} out of range for {data_len} elements")
         
         if min(ndx) < -data_len:
             if silent:
                 return None
-            raise IndexError("Index %s out of range for %d elements" % (index, data_len))
+            raise IndexError(f"Index {index} out of range for {data_len} elements")
         
         return ndx # -> ndx IS a tuple
     
     elif isinstance(index, np.ndarray):
         if not is_vector(index):
-            raise TypeError("Indexing array must be a vector; instead its shape is %s" % index.shape)
+            raise TypeError(f"Indexing array must be a vector; instead its shape is %s" % index.shape)
             
         if index.dtype.kind == "i": # index is an array of int
             return tuple(index)
