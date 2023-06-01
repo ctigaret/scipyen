@@ -721,6 +721,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 self.postRunCell(Bunch(success=True))
             
     def internalVariablesListenerCB(self, change):
+        """Callback for notifications from the workspace monitor.
+        Emits self.internalVariableChanged signal
+        """
         # self.__change_dict__ = change
         # QtCore.QTimer.singleShot(0, self._observe_wrapper_)
         # connected to self._slot_internalVariableChanged_, def'ed below
@@ -744,19 +747,16 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
     @pyqtSlot(dict)
     def _slot_internalVariableChanged_(self, change):
-        """Connected (and triggered by) self.internalVariableChanged Qt signal"""
+        """Connected (and triggered by) self.internalVariableChanged Qt signal.
+        Launches ann UI update for each workspace model in a loop, which is
+        executed asynchronously inside a QRunnable.
+        """
         name = change.name
-        # print(f"\n{self.__class__.__name__}._slot_internalVariableChanged_({change})")
+        # print(f"\n{self.__class__.__name__}._slot_internalVariableChanged_({change.name}: {change.change_type})")
 
         displayed_var_names = set(self.getDisplayedVariableNames())
         user_shell_var_names = set(self.shell.user_ns.keys())
 
-        # NOTE: 2023-05-28 22:15:54
-        # GuiWorker is a QRunnable
-        # worker = pgui.GuiWorker(self._updateFromMonitor_, name, 
-        #                         displayed_var_names, user_shell_var_names,
-        #                         change.type)
-        
         change_type = change.get("change_type", change.type)
         
         worker = pgui.GuiWorker(self._updateFromMonitor_, name, 
@@ -771,7 +771,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                             displayed_var_names: set, user_shell_var_names: set,
                             change_type:str):
 
-        # print(f"\n{self.__class__.__name__}._updateFromMonitor_ {name}\n\tin shell: {name in self.shell.user_ns}\n\tdisplayed: {name in displayed_var_names}")
         if change_type in ("remove", "removed"):
             alteration = WorkspaceVarChange.Removed
         elif change_type == "new": # name in user_shell_var_names:
@@ -792,23 +791,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 else:
                     alteration = None
                 
-#             if change_type == "new": # name in user_shell_var_names:
-#                 alteration = WorkspaceVarChange.New
-#             elif change_type == "modified":
-#                 alteration = WorkspaceVarChange.Modified
-#             else: # for legacy (traitlets.TraitType-style) notifications
-#                 if name in user_shell_var_names:
-#                     if name not in displayed_var_names:
-#                         alteration = WorkspaceVarChange.New
-#                     else:
-#                         alteration = WorkspaceVarChange.Modified
-#                 else:
-#                     if name in displayed_var_names:
-#                         alteration = WorkspaceVarChange.Removed
-#             
-#                     else:
-#                         alteration = None
-#                     
         return (name, alteration)
 
     @pyqtSlot(tuple)
@@ -1016,6 +998,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         • code run outside of console, but which adds/removes/modifies objects in
             the workspace
         
+        The changes will then be propagated to the internalVariablesMonitor 
+        which will notify the observer self.internalVariablesListenerCB for it,
+        in turn, to trigger the UI update.
+        
         Parameters:
         ===========
         ns: a mapping key:str ↦ value:Any
@@ -1039,6 +1025,17 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         in order to be able to manage them more consistently.
         
         """
+        
+        # NOTE: 2023-06-01 08:14:33 - see also NOTE: 2023-06-01 08:14:33
+        # still slow for many variables that have been modified and which are
+        # reported as having been modified
+        #
+        # try this:
+        
+        self.internalVariableChanged.disconnect(self._slot_internalVariableChanged_)
+        self.internalVariableChanged.connect(self._slot_cacheInternalVariableChange_)
+        
+        
         # ATTENTION 2023-05-24 17:04:36
         #
         # I assume all changes to the workspace have already taken place.
@@ -1166,14 +1163,13 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #
         # 3.1. establish which variables have been removed ⇒ del_vars
         #
-        # current_user_varnames = set(self.shell.user_ns.keys())
+        # symbols presend in the namespace
         current_user_varnames = set(ns.keys())
+        # varnames that are currently monitored
         observed_varnames = set(self.internalVariablesMonitor.keys())
+        # varnames that have been removed 
         del_vars = observed_varnames - current_user_varnames
 
-        # if len(del_vars):
-        # print(f"{self.__class__.__name__}._updateModel_ del_vars = {del_vars}")
-        #
         # 3.2. now, remove these from the DataBag of observed variables (self.internalVariablesMonitor)
         #
         # NOTE: 2023-05-24 16:18:58
@@ -1202,6 +1198,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # Changes of object attributes or data the object are NOT detected by this approach 
         # (see TODO/FIXME 2023-05-25 18:12:56 in core/scipyen_traitlets.py)
         # ### END 2023-05-23 22:39:22 do not delete
+        
+        # NOTE: 2023-06-01 08:16:13
+        # see NOTE: 2023-06-01 08:14:33
+        self.internalVariableChanged.disconnect(self._slot_cacheInternalVariableChange_)
+        self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
+        
+        self.sig_startAsyncUpdate.emit(self.shell.user_ns)
+        
 
         # NOTE: 2023-05-28 01:31:53
         # the next two signal a change directory command issued at the console

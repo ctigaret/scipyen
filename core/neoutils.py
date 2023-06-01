@@ -2901,20 +2901,19 @@ def copy_with_data_subset(obj, **kwargs):
         • When an indexing is None, it means an indexing is NOT specified hence 
         we take the full child collection.
     
-    segments:       
-                    Indexing of the segments to be retained in the result.
+    segments: Indexing of the segments to be retained in the result.      
                     
-                    This index can be (see normalized_index):
-                    int, str (signal name), sequence of int or str, a range,
-                    a slice, or a numpy array of int or booleans.
-                    
-                    When MISSING, all segments in each block will be retained.
-                    
-                    Indexing of the segments to be retained in the result.
-                    
-                    This index can be (see normalized_index):
-                    int, str (signal name), sequence of int or str, a range,
-                    a slice, or a numpy array of int or booleans.
+        This index can be (see normalized_index):
+        int, str (signal name), sequence of int or str, a range,
+        a slice, or a numpy array of int or booleans.
+        
+        When MISSING, all segments in each block will be retained.
+        
+        Indexing of the segments to be retained in the result.
+        
+        This index can be (see normalized_index):
+        int, str (signal name), sequence of int or str, a range,
+        a slice, or a numpy array of int or booleans.
     
     groups:
                     Indexing of groups.
@@ -2959,26 +2958,40 @@ def _(obj, **kwargs):
     # ### BEGIN allow overwriting these here, 
     # and store the orignals in the new annotations of the new object;
     sourceMetaData = dict()
+    
     name = kwargs.pop("name", obj.name)
+    
     if name != obj.name:
         sourceMetaData["name"] = obj.name
+        
     description = kwargs.pop("description", obj.description)
+    
     if description != obj.description:
         sourceMetaData["description"] = obj.description
+        
     file_origin = kwargs.pop("file_origin", obj.file_origin)
+    
     if file_origin != obj.file_origin:
         sourceMetaData["file_origin"] = obj.file_origin
+        
     file_datetime = kwargs.pop("file_datetime", obj.file_datetime)
+    
     if file_datetime != obj.file_datetime:
         sourceMetaData["file_datetime"] = obj.file_datetime
+        
     rec_datetime = kwargs.pop("rec_datetime", obj.rec_datetime)
+    
     if rec_datetime != obj.rec_datetime:
         sourceMetaData["rec_datetime"] = obj.rec_datetime
+        
     annotations = kwargs.pop("annotations", obj.annotations)
+    
     if annotations is None:
         annotations = dict()
+        
     if annotations != obj.annotations:
         sourceMetaData["annotations"] = obj.annotations
+        
         if sourceMetaData["annotations"] is None:
             sourceMetaData["annotations"] = dict()
     # ### END
@@ -3000,8 +3013,11 @@ def _(obj, **kwargs):
         kwargs.pop(kw, None)
     
     indexing = dict((s, kwargs.pop(s, None)) for s in obj._child_containers)
-    
-    ret = make_neo_object(obj)
+
+    if toCopy:
+        ret = make_neo_object(obj)
+    else:
+        ret = obj # CAREFUL !
     
     # NOTE: 2021-11-23 14:56:56
     # groups organize data orthogonally to the segments;
@@ -3174,8 +3190,8 @@ def _(obj, **kwargs):
 
 @safeWrapper
 def concatenate_blocks(*args, **kwargs):
-    """Concatenates the segments in the neo.Blocks supplied in *args.
-    Generates a new Block.
+    """Concatenates the segments in the neo.Block objects in *args.
+    Generates a new neo.Block object.
     
     Copies of neo.Segment objects in the source data (*args) are appended to the
     in the result in the order they are encountered (i.e. the same order as they
@@ -3184,26 +3200,37 @@ def concatenate_blocks(*args, **kwargs):
     Optionally, only subsets of the segments' data children¹ contained in the 
     source data are retained in the concatenated Block.
     
-    ¹ neo.Segment's data children are attributes with the following names:
-        analogsignals
-        irregularlysampledsignal
-        imagesequences
-        spiketrains
-        epochs
-        events
+    ¹ neo.Segment's data children are neo.Segment instance attributes containing
+    collections of neo data objects, as follows:
     
-    and are lists of neo data objects of corresponding types. 
+    Attribute name:type                             Element type:
+    ======================================================================
+    analogsignals:list                              neo.AnalogSignal
+                                                    Scipyen's DataSignal
 
-    In addition, Scipyen's DataSignal and IrregularlySampledDataSignal are stored, 
-    respectively, in the 'analogsignals' and 'irregularlysampledsignals' attributes
-    of a neo.Segment.
-    
+    irregularlysampledsignal:list                   neo.IrregularlySampledSignal
+                                                    Scipyen's IrregularlySampledDataSignal
+
+    imagesequences:list                             neo.ImageSequence
+
+    spiketrains:neo.spiketrainlist.SpikeTrainList   neo.SpikeTrain
+
+    epochs:list                                     neo.Epoch,
+                                                    Scipyen's DataZone
+
+    events:list                                     neo.Event,
+                                                    Scipyen's DataMarker and
+                                                    TriggerEvent
+
+
     Var-positional parameters:
     --------------------------
     args : a comma-separated list of one or more neo.core.Block objects
     
     Var-keyword parameters:
     -----------------------
+    
+    These fall in two groups:
     
     1. Parameters that specify new metadata for the newly created Block (see the
     documentation of the neo.Block):
@@ -3220,49 +3247,76 @@ def concatenate_blocks(*args, **kwargs):
     
     annotation:dict
     
-    rename_segments:bool, optional (default True) - segments are renamed to the
-        generic format f"segment_{k}" with 0<= k < len(ret.segments)
-                    
-                    
-    
-    2. Parameters that specify subsets of the Block's contents (these are passed
-        directly to copy_with_data_subset which is called for every block in the 
-        argument sequence `args`)
+    2. Parameters for choosing subsets of the Block's contents:
     
     segments: int or None; 
-                when None, all segments in each block will be used;
-                when int then only segments with given index will be used
-                (i.e. only the segment with the given index from each block will 
-                be retained in the concatenated data)
+                When None, all segments in each block will be used.
+                When int then only segments with specified index in each Block
+                will be used in the concatenated result.
+    
+                NOTE: This is the way to specify segments (or sweeps) containing
+                data from the same synaptic pathway.
                     
     analogsignals: int, str, range, slice, typing.Sequence
-                Indexing of analog signal(s) into each of the segments, that
-                will be retained in the concatenated data. These include
-                neo.AnalogSignal and datatypes.DataSignal
-                
-                This index can be (see neo_use_lookup_index):
-                int, str (signal name), sequence of int or str, a range, a
-                slice, or a numpy array of int or booleans.
+                Indexing into each of the segments' 'analosignals' attribute
+                specifying which signals will be retained in the concatenated data. 
+    
+                • an int specifies the index of the only analog signal to be 
+                retained from each segment in the source data;
+                    WARNING: all segments in the source data must contain at 
+                    least this index + 1 analog signals!
+    
+                • a str specifies the name of the analog signal to be retained 
+                from each segment in the source data;
+                    WARNING: within each source segment, analogsignals must have 
+                    unique names; moreover, all source segments must contain an
+                    analog signal with this name.
                     
-    irregularlysampledsignals:  as analog, for irregularly sampled signals. 
-                These include neo.IrregularlySampledSignal and 
-                IrregularlySampledDataSignal
+                • a sequence of int: indices of the analogsignals to be retained 
+                from each segment in the source data;
+                    WARNING: all segments in the source data must contain a number
+                    of analog signals that is at least 1 + the highest index value
     
-    imagesequences: 
-                as analog, for neo.ImageSequence objects (for neo version
-                from 0.8.0 onwards)
+                • a sequence of str: names of the analogsignals to be retained
+                from each segment in the source data;
+                    WARNING: within each source segment, analogsignals must have 
+                    unique names; moreover, all specified names must be valid
+                    signal names in all source segments.
+    
+                • a range;
+                    WARNING: the range must be appropriate for the size of the 
+                    'analogsignals' in all source segments.
+    
+                • a slice;
+                    WARNING: the slice must be appropriate for the size of the 
+                    'analogsignals' in all source segments.
+    
+                • a 1D numpy array of int (signal indices) or bool elements (for
+                    logical indexing)
+                    WARNING: 
+                    ∘ the indices if an int array must be valid for the
+                    'analogsignals' attribute of all surce segments;
+                    ∘ when this is a boolan array, its length must equal the size 
+                    of the 'analogsignals' attribute in all source segments.
+    
+                See neo_lookup() for details.
+                    
+    irregularlysampledsignals:  indexing for irregularly sampled signals, same
+                specification as for 'analogsignals' parameter
+    
+    imagesequences: indexing for ImageSequence objects; same as 'analogsignals'
+                (WARNING: use onlyl for neo version >= 0.8.0 onwards)
                 
-    spiketrains: 
-                as analog, for the spiketrains in the block's segments
+    spiketrains: indexing of spike trains, see 'analosignals' for details
                 
-    epochs:     as above for Epoch objects
+    epochs:      as above, for Epoch objects
     
-    events:     as above for Event objects
+    events:      as above, for Event objects
     
-    copy:       bool, default True;
+    copy:        bool, default True;
     
                 When False, the concatenated block contains a reference to the
-                data in 'args'. 
+                data in 'args'². 
     
                 WARNING: this is important, as changes to the attributes of the 
                 concatenated block will alter the original data (e.g., segment
@@ -3277,7 +3331,15 @@ def concatenate_blocks(*args, **kwargs):
                 data in 'args', so that any changes to the concatenated block 
                 will NOT be propagated to the source data. While this uses more
                 resources, it may be considered more safe.
+    
+                ² NOTE: only the data objects are copied (signals, spike trains
+                epoch-like and event-like); their containers (block, segments)
+                are newly created for the concatenated data.
         
+    rename_segments:bool, optional (default True) - segments are renamed to the
+        generic format f"segment_{k}" with 0 <= k < number_of_segments in the result
+                    
+                    
     Returns:
     -------
     a new neo.Block object
@@ -3340,8 +3402,8 @@ def concatenate_blocks(*args, **kwargs):
             args = args[0] # unpack the args tuple
 
     if isinstance(args, neo.Block):
-        new_block = copy_with_data_subset(args, **kwargs)
-        return new_block
+        # nothing to here: return the source, or a copy of it
+        return copy_with_data_subset(args, **kwargs)
             
 #     if isinstance(args, neo.Segment):
 #         # FIXME: 2023-05-19 17:36:25
@@ -3363,7 +3425,7 @@ def concatenate_blocks(*args, **kwargs):
     # if isinstance(args, collections.abc.Sequence) and all(isinstance(a, (neo.Block, neo.Segment)) for a in args):
     if isinstance(args, collections.abc.Sequence) and all(isinstance(a, neo.Block) for a in args):
         # NOTE: 2021-11-24 09:55:15
-        # this branch deals with a sequence of Blocks and/or Segments
+        # this branch deals with a sequence of Blocks:
         # make a new Block, append segments
         # when Blocks, we need to take into account the existence of Groups and
         # ChannelViews
