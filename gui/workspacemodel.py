@@ -752,7 +752,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         executed asynchronously inside a QRunnable.
         """
         name = change.name
-        print(f"\n{self.__class__.__name__}._slot_internalVariableChanged_({change.name}: {change.change_type})")
+        # print(f"\n{self.__class__.__name__}._slot_internalVariableChanged_({change.name}: {change.change_type})")
 
         displayed_var_names = set(self.getDisplayedVariableNames())
         user_shell_var_names = set(self.shell.user_ns.keys())
@@ -1025,6 +1025,17 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         in order to be able to manage them more consistently.
         
         """
+        
+        # NOTE: 2023-06-01 08:14:33 - see also NOTE: 2023-06-01 08:14:33
+        # still slow for many variables that have been modified and which are
+        # reported as having been modified
+        #
+        # try this:
+        
+        self.internalVariableChanged.disconnect(self._slot_internalVariableChanged_)
+        self.internalVariableChanged.connect(self._slot_cacheInternalVariableChange_)
+        
+        
         # ATTENTION 2023-05-24 17:04:36
         #
         # I assume all changes to the workspace have already taken place.
@@ -1187,6 +1198,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # Changes of object attributes or data the object are NOT detected by this approach 
         # (see TODO/FIXME 2023-05-25 18:12:56 in core/scipyen_traitlets.py)
         # ### END 2023-05-23 22:39:22 do not delete
+        
+        # NOTE: 2023-06-01 08:16:13
+        # see NOTE: 2023-06-01 08:14:33
+        self.internalVariableChanged.disconnect(self._slot_cacheInternalVariableChange_)
+        self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
+        
+        self.sig_startAsyncUpdate.emit(self.shell.user_ns)
+        
 
         # NOTE: 2023-05-28 01:31:53
         # the next two signal a change directory command issued at the console

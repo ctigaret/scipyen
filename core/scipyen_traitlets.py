@@ -709,6 +709,12 @@ class NeoBlockTrait(NeoContainerTrait):
     _cast_types = tuple()
     _valid_defaults = (klass,)
     
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        self.nsegments = 0
+        self.ngroups = 0
+    
     def compare_elements(self, old_value, new_value):
         result = super(NeoContainerTrait, self).compare_elements(old_value, new_value)
         
@@ -721,7 +727,50 @@ class NeoBlockTrait(NeoContainerTrait):
         # print(f"{self.__class__.__name__} <for object {self.name}>.compare_elements → {result}")
         return result
     
-    
+    def set(self, obj, value):
+        new_value = self._validate(obj, value) 
+        silent = True
+        change_type = "modified"
+        
+        if self.name and self.name in obj._trait_values and self.name in obj.traits():
+            old_value = obj._trait_values[self.name]
+        else:
+            old_value = self.default_value
+            self.hashed = gethash(old_value)
+            if isinstance(old_value, self.klass):
+                self.nsegments = len(old_value.segments)
+                self.ngroups = len(old_value.groups)
+            else:
+                self.nsegments = 0
+                self.ngroups = 0
+            silent=False
+            change_type="new"
+            
+        try:
+            silent = self.compare_elements(old_value, new_value)
+            
+            if silent:
+                new_ngroups = len(new_value.groups)
+                new_nsegments = len(new_value.segments)
+                
+                silent = new_nsegments == self.nsegments and new_ngroups == self.ngroups
+                
+                if new_nsegments != self.nsegments:
+                    self.nsegments = new_nsegments
+                    
+                if new_ngroups != self.ngroups:
+                    self.ngroups = new_ngroups
+                    
+        except:
+            traceback.print_exc()
+            silent = False
+            
+        obj._trait_values[self.name] = new_value
+        
+        if silent is not True:
+            obj._notify_trait(self.name, old_value, new_value,
+                              change_type = change_type)
+        
 class NeoGroupTrait(NeoContainerTrait):
     klass = neo.Group
     info_text = f"Traitlet for {klass}"
