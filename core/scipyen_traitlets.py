@@ -104,42 +104,6 @@ class ScipyenTraitTypeMixin:
                 obj._notify_trait(self.name, old_value, Undefined,
                                   change_type="removed")
                 
-#     def get(self, obj, cls=None):
-#         """My get"""
-#         print(f"{self.__class__.__name__}.get: {self.name}")
-#         try:
-#             value = obj._trait_values[self.name]
-#         except KeyError:
-#             default = obj.trait_defaults(self.name)
-#             # if default is Undefined:
-#             #     return
-#             _cross_validation_lock = obj._cross_validation_lock
-#             try:
-#                 obj._cross_validation_lock = True
-#                 value = self._validate(obj, default)
-#             finally:
-#                 obj._cross_validation_lock = _cross_validation_lock
-#                 
-#             obj._trait_values[self.name] = value
-#             obj._notify_observers(
-#                 Bunch(
-#                     name=self.name,
-#                     value=value,
-#                     owner=obj,
-#                     type="default",
-#                 )
-#             )
-#             print(f"{self.__class__.__name__}.get: id(validated from default) = {id(value)}")
-#             return value
-#         
-#         except Exception as e:
-#             # This should never be reached.
-#             raise TraitError("Unexpected error in TraitType: default value not set properly") from e
-#         else:
-#             print(f"{self.__class__.__name__}.get: id(value) = {id(value)}")
-#             return value
-        
-# class DictTrait(Instance):
 class DictTrait(Dict, ScipyenTraitTypeMixin):
     info_text = "Traitlet for mapping types (dict) that is sensitive to content changes"
     default_value = dict() # default value of the Trait instance
@@ -463,6 +427,7 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
     klass = neo.baseneo.BaseNeo
     _cast_types = tuple()
     _valid_defaults = (neo.baseneo.BaseNeo,)
+    _characteristic_attrs_ = tuple() # only needed for container-like objects to trap changs to inner containers
     
     def __init__(self, value_trait=None, default_value = Undefined, **kwargs):
         # print(f"{self.__class__.__name__}.__init__")
@@ -569,11 +534,11 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
             # NOTE: 2023-05-23 10:58:42
             # see NOTE: 2023-05-23 10:58:16
             # NOTE: 2023-05-23 22:24:41
-            # cann be very expensive
-            # if result:
-            # #     # check annotations
-            # #     result = new_value.annotations == old_value.annotations
-            #     result = safe_identity_test(new_value.annotations, old_value.annotations)
+            # can be very expensive
+            if result:
+                # check annotations
+                result = new_value.annotations == old_value.annotations
+                # result = safe_identity_test(new_value.annotations, old_value.annotations)
             
             
             # if result:
@@ -611,6 +576,7 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
         # with timeblock(f"{type(value).__name__}"):
         # this one simply checks if value is the appropriate class, or None (if allow_none is True)
         new_value = self._validate(obj, value) 
+        new_hash = gethash(new_value)
             
         # NOTE: 82021-10-20 09:13:51
         # to also flag addition of this trait:
@@ -638,30 +604,37 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
             # this can cause bottleneck downstream (e.g. in workspace model a 
             # Modifed change triggers updating the row - which scales poorly with 
             # the number of variables in the workspace)
-            silent = self.compare_elements(old_value, new_value)
-            # print(f"\n\t after compare_elements → silent = {silent}")
             if silent:
-                silent = bool(old_value == new_value) and bool(id(old_value) == id(new_value))
+                silent = self.compare_elements(old_value, new_value)
+                
+            # print(f"\n{self.__class__.__name__}<NeoBaseNeoTrait>[{self.name}] after compare_elements → silent = {silent}")
+            if silent:
+                silent = bool(id(old_value) == id(new_value))
                 
             if silent:
-                new_hash = gethash(new_value)
+                silent = bool(old_value == new_value) # this must be overwritten for signal traits !
+                
+            if silent:
                 silent = (new_hash == self.hashed)
                 # print(f"{self.__class__.__name__}.set: new_hash == self.hashed => silent {silent}")
                 
-                if not silent:
-                    self.hashed = new_hash
-            
+#                 if not silent:
+#                     self.hashed = new_hash
+#             
         except:
             traceback.print_exc()
             silent = False
             
-        #print(f"silent {silent}")
         # print(f"\n{self.__class__.__name__} <for object {self.name}>.set({value}) → notify_trait = {not silent}")
                 
         obj._trait_values[self.name] = new_value
         
+        if not silent:
+            self.hashed = new_hash
+    
         # print(f"\n{self.__class__.__name__} object {self.name} .set({obj}, {value}) → old_value = {old_value}; new_value = {new_value}; notify_trait = {not silent}")
         if silent is not True:
+            # print(f"\n{self.__class__.__name__}<NeoBaseNeoTrait>[{self.name}] to notify {change_type}")
             # obj._notify_trait(self.name, old_value, new_value)
             obj._notify_trait(self.name, old_value, new_value,
                               change_type=change_type)
@@ -672,10 +645,44 @@ class NeoContainerTrait(NeoBaseNeoTrait):
     default_value = klass()
     _cast_types = tuple()
     _valid_defaults = (klass,)
+    _characteristic_attrs_ = ("_container_child_containers", "_data_child_containers")
     
-    # def __init__(self, value_trait=None, default_value = Undefined, **kwargs):
-    #     print(f"{self.__class__.__name__}<NeoContainerTrait>.__init__")
-    #     super().__init__(value_trait=value_trait, default_value=default_value, **kwargs)
+    
+    def __init__(self, value_trait=None, default_value = Undefined, **kwargs):
+        # print(f"{self.__class__.__name__}<NeoContainerTrait>.__init__")
+        super().__init__(value_trait=value_trait, default_value=default_value, **kwargs)
+
+        # NOTE: 2023-06-01 09:39:20
+        # try this
+        obj = self.default()
+        self.characterisics = self.get_characteristics(obj)
+        # self.container_child_containers_lenghts, self.data_child_containers_lenghts = self.get_container_lengths(obj)
+        
+    def get_characteristics(self, obj):
+        characteristics = {}
+        
+        for c in self._characteristic_attrs_:
+            if hasattr(obj, c):
+                ccc = dict(map(lambda x: (x, getattr(obj, x, None)), getattr(obj, c) ))
+                characteristics[c] = dict((c, len(v) if hasattr(v, "__iter__") else -1) for c,v in ccc.items())
+                
+        return characteristics
+                
+            
+#     def get_container_lengths(self, obj):
+#         if hasattr(obj, "_container_child_containers"):
+#             ccc = dict(map(lambda c: (c, getattr(obj, c, None)), obj._container_child_containers))
+#             container_child_containers_lenghts = dict((c, len(v) if hasattr(v, "__iter__") else -1) for c,v in ccc.items())
+#         else:
+#             container_child_containers_lenghts = {}
+#             
+#         if hasattr(obj, "_data_child_containers"):
+#             ccc = dict(map(lambda c: (c, getattr(obj, c, None)), obj._data_child_containers))
+#             data_child_containers_lenghts = dict((c, len(v) if hasattr(v, "__iter__") else -1) for c,v in ccc.items())
+#         else:
+#             data_child_containers_lenghts = {}
+#             
+#         return container_child_containers_lenghts, data_child_containers_lenghts
     
     def compare_elements(self, old_value, new_value):
         try:
@@ -698,9 +705,69 @@ class NeoContainerTrait(NeoBaseNeoTrait):
             traceback.print_exc()
             result = False
             
-        print(f"{self.__class__.__name__}<NeoContainerTrait>.compare_elements → {result}")
         
         return result
+    
+    def set(self, obj, value):
+        new_value = self._validate(obj,value)
+        new_characteristics = self.get_characteristics(new_value)
+        # new_container_child_container_lengths, new_data_child_container_lengths = self.get_container_lengths(new_value)
+        silent = True
+        change_type = "modified"
+        
+        if self.name and self.name in obj._trait_values and self.name in obj.traits():
+            old_value = obj._trait_values[self.name]
+        else:
+            # print(f"\n{self.__class__.__name__}<NeoContainerTrait>[{self.name}].set() for the first time")
+            old_value = self.default_value
+            # self.hashed = gethash(old_value)
+            self.characteristics = self.get_characteristics(obj)
+            # print(f"\n\told characteristics:\n\t{self.characteristics}")
+                
+            silent=False
+            change_type="new"
+            
+        try:
+            if silent:
+                silent = self.compare_elements(old_value, new_value)
+                # print(f"\n{self.__class__.__name__}<NeoContainerTrait>[{self.name}].set(): compare_elements → {silent}")
+                
+            if silent:
+#                 print(f"\n{self.__class__.__name__}<NeoContainerTrait>[{self.name}]:")
+#                 print(f"\n\tcontainer children container lengths new:\n\t{new_container_child_container_lengths}")
+#                 print(f"\n\tcontainer children container lengths old:\n\t{self.container_child_containers_lenghts}")
+#         
+#                 print(f"\n\tdata children container lengths new:\n\t{new_data_child_container_lengths}")
+#                 print(f"\n\tdata children container lengths old:\n\t{self.data_child_containers_lenghts}")
+        
+                
+                silent = new_characteristics == self.characteristics
+                # print(f"\n{self.__class__.__name__}<NeoContainerTrait>[{self.name}].set(): compare characteristics → {silent}")
+                # silent = new_container_child_container_lengths == self.container_child_containers_lenghts and new_data_child_container_lengths == self.data_child_containers_lenghts
+                # print(f"\n{self.__class__.__name__}<NeoContainerTrait>[{self.name}].set(): compare container lengths → {silent}")
+                
+                # if not silent:
+                #     self.container_child_containers_lenghts = new_container_child_container_lengths
+                #     self.data_child_containers_lenghts = new_data_child_container_lengths
+                
+        except:
+            traceback.print_exc()
+            silent = False
+                
+        obj._trait_values[self.name] = new_value
+        
+        if not silent:
+            self.characteristics = new_characteristics
+            # self.container_child_containers_lenghts = new_container_child_container_lengths
+            # self.data_child_containers_lenghts = new_data_child_container_lengths
+        
+        if silent is not True:
+            # print(f"\n{self.__class__.__name__}<NeoContainerTrait>[{self.name}].set(): to notify {change_type}")
+            # obj._notify_trait(self.name, old_value, new_value)
+            obj._notify_trait(self.name, old_value, new_value,
+                              change_type=change_type)
+        
+        
     
 class NeoBlockTrait(NeoContainerTrait):
     klass = neo.Block
@@ -709,68 +776,6 @@ class NeoBlockTrait(NeoContainerTrait):
     _cast_types = tuple()
     _valid_defaults = (klass,)
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        
-        self.nsegments = 0
-        self.ngroups = 0
-    
-    def compare_elements(self, old_value, new_value):
-        result = super(NeoContainerTrait, self).compare_elements(old_value, new_value)
-        
-        if result and all(hasattr(o, "_container_child_containers") for o in (old_value, new_value)) :
-            # for container_child_container in old_value._container_child_containers:
-            #     print(f"{container_child_container}: new_value → {len(getattr(new_value, container_child_container))}; old_value → {len(getattr(old_value, container_child_container))}")
-                
-            result = all(len(getattr(new_value, attr, [])) == len(getattr(old_value, attr, [])) for attr in old_value._container_child_containers)
-            
-        # print(f"{self.__class__.__name__} <for object {self.name}>.compare_elements → {result}")
-        return result
-    
-    def set(self, obj, value):
-        new_value = self._validate(obj, value) 
-        silent = True
-        change_type = "modified"
-        
-        if self.name and self.name in obj._trait_values and self.name in obj.traits():
-            old_value = obj._trait_values[self.name]
-        else:
-            old_value = self.default_value
-            self.hashed = gethash(old_value)
-            if isinstance(old_value, self.klass):
-                self.nsegments = len(old_value.segments)
-                self.ngroups = len(old_value.groups)
-            else:
-                self.nsegments = 0
-                self.ngroups = 0
-            silent=False
-            change_type="new"
-            
-        try:
-            silent = self.compare_elements(old_value, new_value)
-            
-            if silent:
-                new_ngroups = len(new_value.groups)
-                new_nsegments = len(new_value.segments)
-                
-                silent = new_nsegments == self.nsegments and new_ngroups == self.ngroups
-                
-                if new_nsegments != self.nsegments:
-                    self.nsegments = new_nsegments
-                    
-                if new_ngroups != self.ngroups:
-                    self.ngroups = new_ngroups
-                    
-        except:
-            traceback.print_exc()
-            silent = False
-            
-        obj._trait_values[self.name] = new_value
-        
-        if silent is not True:
-            obj._notify_trait(self.name, old_value, new_value,
-                              change_type = change_type)
-        
 class NeoGroupTrait(NeoContainerTrait):
     klass = neo.Group
     info_text = f"Traitlet for {klass}"
@@ -784,13 +789,6 @@ class NeoSegmentTrait(NeoContainerTrait):
     default_value = klass()
     _cast_types = tuple()
     _valid_defaults = (klass,)
-    
-#     def compare_elements(self, old_value, new_value):
-#         result = super().compare_elements(old_value, new_value)
-#         
-#         if result and hasattr(self, "_container_child_containers"):
-#             result = all(len(getattr(new_value, attr, [])) == len(getattr(old_value, attr, [])) for attr in self._container_child_containers)
-#             return result
     
 class NeoChannelViewTrait(NeoBaseNeoTrait):
     klass = neo.view.ChannelView
@@ -818,6 +816,38 @@ class NeoDataObjectTrait(NeoBaseNeoTrait):
             
         return result
     
+    def set(self, obj, value):
+        new_value = self._validate(obj, value) 
+        silent = True
+        change_type = "modified"
+        
+        if self.name and self.name in obj._trait_values and self.name in obj.traits():
+            old_value = obj._trait_values[self.name]
+        else:
+            old_value = self.default_value
+            # self.hashed = gethash(old_value)
+            silent=False
+            change_type="new"
+            
+        try:
+            if silent:
+                silent = self.compare_elements(old_value, new_value)
+                
+            # print(f"\n{self.__class__.__name__}<NeoDataObjectTrait>[{self.name}] compare_elements → {silent}")
+                
+            # if silent:
+        except:
+            traceback.print_exc()
+            silent = False
+            
+        obj._trait_values[self.name] = new_value
+        
+        if not silent:
+            # print(f"\n{self.__class__.__name__}<NeoDataObjectTrait>[{self.name}] to notify {change_type}")
+            obj._notify_trait(self.name, old_value, new_value,
+                              change_type=change_type)
+            
+                
 class NeoAnalogSignalTrait(NeoDataObjectTrait):
     klass = neo.AnalogSignal
     info_text = f"Traitlet for {klass}"
@@ -1080,15 +1110,18 @@ class QuantityTrait(Instance, ScipyenTraitTypeMixin):
         
         super().__init__(klass = self.klass, args=args, **kwargs)
         
-    def length_error(self, obj, value):
-        e = "The '%s' trait of %s instance must be of length %i <= L <= %i, but a value of %s was specified." \
-            % (self.name, class_of(obj), self._minlen, self._maxlen, value)
-        raise TraitError(e)
+    # def length_error(self, obj, value):
+    #     e = "The '%s' trait of %s instance must be of length %i <= L <= %i, but a value of %s was specified." \
+    #         % (self.name, class_of(obj), self._minlen, self._maxlen, value)
+    #     raise TraitError(e)
 
     def validate_elements(self, obj, value):
-        length = len(value)
-        if length < self._minlen or length > self._maxlen:
-            self.length_error(obj, value)
+        # TODO/FIXME 2023-06-01 11:46:27
+        # what's this for ?!? get rid of length malarkey
+        
+        # length = len(value)
+        # if length < self._minlen or length > self._maxlen:
+        #     self.length_error(obj, value)
 
         return super().validate_elements(obj, value)
 
@@ -1118,22 +1151,7 @@ class QuantityTrait(Instance, ScipyenTraitTypeMixin):
             silent=False
             change_type="new"
         
-        # try:
-        #     old_value = obj._trait_values[self.name]
-        # except KeyError:
-        #     silent=False    # this will be the first time the observed sees us
-        #                     # therefore forcibly notify it
-        #     old_value = self.default_value
-            
-        obj._trait_values[self.name] = new_value
-        
         try:
-            # new_hash = gethash(new_value)
-            # old_units = getattr(old_value, "units", pq.dimensionless)
-            # new_units = getattr(new_value, "units", pq.dimensionless)
-            # old_magnitude = getattr(old_value, "magnitude", np.nan)
-            # new_magnitude = getattr(new_value, "magnitude", np.nan)
-            
             if silent:
                 # so far silent is True when the observed knows about us
                 # check it we changed and notify
@@ -1146,6 +1164,8 @@ class QuantityTrait(Instance, ScipyenTraitTypeMixin):
             
         #print(f"silent {silent}")
                 
+        obj._trait_values[self.name] = new_value
+        
         if silent is not True:
             # obj._notify_trait(self.name, old_value, new_value)
             obj._notify_trait(self.name, old_value, new_value,
@@ -1201,7 +1221,7 @@ class DataSignalTrait(NeoDataObjectTrait):
     def make_dynamic_default(self):
         return self.klass([0.], units=pq.dimensionless, sampling_rate=1*pq.dimensionless)
         
-class IrregularlySampledDataSignal(NeoDataObjectTrait):
+class IrregularlySampledDataSignalTrait(NeoDataObjectTrait):
     klass = IrregularlySampledDataSignal
     info_text = f"Traitlet for {klass}"
     default_value = Undefined
