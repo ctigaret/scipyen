@@ -894,6 +894,9 @@ def safe_identity_test2(x, y) -> bool:
 def safe_identity_test(x, y, idcheck=False) -> bool:
     ret = True
     
+    if x is y:
+        return True
+    
     if all(isinstance(v, type) for v in (x,y)):
         return x==y
     
@@ -913,23 +916,35 @@ def safe_identity_test(x, y, idcheck=False) -> bool:
     if isinstance(x, partial):
         return x.func == y.func and x.args == y.args and x.keywords == y.keywords
         
-    if hasattr(x, "size"):
+    if hasattr(x, "size"): # np arrays and subtypes
         ret &= x.size == y.size
 
         if not ret:
             return ret
     
-    elif hasattr(x, "__len__") or hasattr(x, "__iter__"):
+    elif hasattr(x, "__len__") or hasattr(x, "__iter__"): # any ContainerABC
         ret &= len(x) == len(y)
-
+        
         if not ret:
             return ret
         
         if all(isinstance(v, dict) for v in (x,y)):
+            # ret &= list(x.keys()) == list(y.keys())
+            # if not ret:
+            #     return ret
+            
+#             x_items = list(filter(lambda x_: x_[1] not in (x,y), x.items()))
+#             y_items = list(filter(lambda x_: x_[1] not in (x,y), y.items()))
+#             
+#             ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x_items, y_items)))
+            # FIXME: 2023-06-01 13:37:10
+            # prone to infinite recursion when either dict is among either x.values() or y.values()
             ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x.items(), y.items())))
             if not ret:
                 return ret
         else:
+            # FIXME: 2023-06-01 13:43:34
+            # prone to infinite recursion when either element is in x or y
             ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
         
         if not ret:
