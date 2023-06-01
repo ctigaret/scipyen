@@ -2866,11 +2866,13 @@ def copy_with_data_subset(obj, **kwargs):
     Var-keyword parameters:
     ----------------------
     
-    copy:           bool: When True (the default) the signal objects stored in
-                    the data will be copied.
+    copy: bool: When True (the default) the children objects of 'obj' will be
+                copied deeply
     
-                    When False, the signal objects will be stored by reference 
-                    in the result.
+                When False, the signal objects will be stored by reference in
+                the result -- WARNING any alterations to the result will be 
+                relected in the original object! 
+                Most likely this is NOT what you want...
                 
     Indexing parameters: these are of one of the following types: int, str, range, 
     slice, typing.Sequence[int], typing.Sequence[str], dataclasses.MISSING_TYPE, or 
@@ -3404,23 +3406,6 @@ def concatenate_blocks(*args, **kwargs):
     if isinstance(args, neo.Block):
         # nothing to here: return the source, or a copy of it
         return copy_with_data_subset(args, **kwargs)
-            
-#     if isinstance(args, neo.Segment):
-#         # FIXME: 2023-05-19 17:36:25
-#         # obviously, here the segment index in the kwargs does NOT help
-#         # TODO take this code out into a concatenate_segments() function
-#         # make a new Block, append a copied segment
-#         ret = neo.core.Block(name=name, description=description, file_origin=file_origin,
-#                             file_datetime=file_datetime, rec_datetime=rec_datetime, 
-#                             **annotations)
-#         ret.segments.append(copy_with_data_subset(args, **kwargs))
-#         
-#         for k, seg in enumerate(ret.segments):
-#             seg.block = ret
-#             seg.rec_datetime = rec_datetime
-#             seg.name = f"segment_{k}"
-#             
-#         return ret
             
     # if isinstance(args, collections.abc.Sequence) and all(isinstance(a, (neo.Block, neo.Segment)) for a in args):
     if isinstance(args, collections.abc.Sequence) and all(isinstance(a, neo.Block) for a in args):
