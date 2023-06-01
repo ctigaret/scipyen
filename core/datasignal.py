@@ -135,6 +135,12 @@ class DataSignal(BaseSignal):
             call_args = dict((name, getattr(signal, name, None)) for name in call_arg_names)
             call_args["copy"] = copy
             segment = signal.segment
+        elif isinstance(signal, (tuple, list)):
+            signal = np.atleast_2d(np.array(signal))
+            call_args = {"copy": copy}
+            # call_args = dict((name, getattr(signal, name, None)) for name in call_arg_names)
+            # call_args["copy"] = copy
+            # segment = signal.segment
         else:    
             call_args = dict()
         
@@ -220,6 +226,12 @@ class DataSignal(BaseSignal):
             call_args = dict((name, getattr(signal, name, None)) for name in call_arg_names)
             call_args["copy"] = True 
             call_args["domain_units"] = getattr(signal, "t_start", 0.*pq.s).units
+            
+        elif isinstance(signal, (tuple, list)):
+            signal = np.atleast_2d(np.array(signal))
+            call_args = dict((name, getattr(signal, name, None)) for name in call_arg_names)
+            call_args["copy"] = True 
+            call_args["domain_units"] = getattr(signal, "t_start", 0.*pq.s).units
         else:    
             call_args = dict()
         
@@ -298,7 +310,7 @@ class DataSignal(BaseSignal):
         # print(f"{self.__class__.__name__}.__init__ call_args {call_args}\n")
         # print(f"{self.__class__.__name__}.__init__ strings {strings}\n")
         # print(f"{self.__class__.__name__}.__init__ quants {quants}\n")
-        # print(f"{self.__class__.__name__}.__init__ domainargs {domainargs}\n")
+        print(f"{self.__class__.__name__}.__init__ domainargs {domainargs}\n")
         # print(f"{self.__class__.__name__}.__init__ annots {annots}\n")
         
         if isinstance(domainargs["sampling_period"], pq.Quantity):
@@ -306,11 +318,20 @@ class DataSignal(BaseSignal):
             if units_convertible(1/domainargs["sampling_period"], quants["domain_units"]):
                 domainargs["sampling_rate"] = domainargs["sampling_period"]
                 domainargs["sampling_period"] = 1/domainargs["sampling_period"]
+        else:
+            if not isinstance(domainargs["t_start"], pq.Quantity):
+                domainargs["t_start"] = 0*pq.dimensionless
+
+            domainargs["sampling_period"] = 1 * domainargs["t_start"].units
+                
+        # else:
+        #     sp = domainargs["sampling_period"]
+            
                 
         if isinstance(domainargs["sampling_rate"], pq.Quantity):
             if units_convertible(domainargs["sampling_rate"], quants["domain_units"]):
                 domainargs["sampling_period"] = 1/domainargs["sampling_rate"]
-                
+            
         if all(isinstance(d, pq.Quantity) for d in (domainargs["t_start"], domainargs["sampling_period"])) :
             if domainargs["t_start"] == 1/domainargs["sampling_period"]:
                 sr = domainargs["sampling_period"]
@@ -322,6 +343,8 @@ class DataSignal(BaseSignal):
             if domainargs["t_start"] == 1/domainargs["sampling_rate"]:
                 domainargs["sampling_period"] = domainargs["t_start"]
                 domainargs["t_start"] = 0 * quants["domain_units"]
+                
+        
 
         DataObject.__init__(self, name=strings["name"], 
                             file_origin=strings["file_origin"], 
@@ -336,7 +359,7 @@ class DataSignal(BaseSignal):
         if not isinstance(self._domain_name_, str) or len(self._domain_name_.strip()) == 0:
             self._domain_name_ = name_from_unit(self._origin)
         
-        if not isinstance(self._name_, str) or len(self._name_.strip()) == 0:
+        if not hasattr(self, "_name_") or not isinstance(self._name_, str) or len(self._name_.strip()) == 0:
             self._name_ = name_from_unit(self.units)
     
     def __array_finalize__(self, obj):

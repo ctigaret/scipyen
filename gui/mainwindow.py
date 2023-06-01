@@ -5426,7 +5426,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded, updateUi=True)
         
         # NOTE: 2023-05-29 23:11:05 NOW, WORKS LIKE A CHARM!
-        self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded, updateUi=False)
+        self.loadFiles(selectedItems, 
+                       self._openSelectedFileItemsThreaded, updateUi=False)
         
 
     @safeWrapper
@@ -5457,6 +5458,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.updateUiWithFileLoad = updateUi # def'ed in WorkspaceGuiMixin
         
         for k, item in enumerate(filePaths):
+            # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded ({k}, {item})")
             OK &= self.loadDiskFile(item, fileReader=ioReader, addToRecent=addToRecent, updateUi=updateUi) # places the loaded data DIRECTLY into self.workspace
             if OK and isinstance(progressSignal, QtCore.pyqtBoundSignal):
                 progressSignal.emit(k)
