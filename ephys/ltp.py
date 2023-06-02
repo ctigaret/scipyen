@@ -186,99 +186,153 @@ class PathwayType(TypeEnum):
     Type3 = 32
     Type4 = 64
     Type5 = 128
+    CrossTalk = 65536
     
 @with_doc(Episode, use_header=True, header_str = "Inherits from:")
 class PathwayEpisode(Episode):
     """
-    Specification of an episode in a synaptic pathway.
+Specification of an episode in a synaptic pathway.
+
+An "episode" is a series of sweeps recorded during a specific set of 
+experimental conditions -- possibly, a subset of a larger experiment where
+several conditions were applied in sequence.
+
+All sweeps in the episode must have been recorded during the same conditions.
+
+NOTE: A Pathway Episode does NOT store any data; it only stores indices into
+segments (a.k.a sweeps) of a neo.Block object containing the data.
+
+It can be used to create a new such Block object from source neo.Blocks - 
+i.e., passing it to the neoutils.concatenate_blocks(...) function.
+
+
+Examples:
+=========
+
+1) A response recorded without drug, followed by a response recorded in the 
+presence of a drug, then followed by a drug wash-out are all three distinct 
+"episodes".
+
+2) Segments recorded while testing for cross-talk between synaptic pathways, 
+(and therefore, where the paired pulses are crossed between pathways) is a
+distinct episode from one where each segment contains responses from the 
+same synaptic pathway
+
+The sweeps in PathwayEpisode are a sequence of neo.Segment objects, where 
+objects where each synaptic pathway has contributed data for a neo.Segment
+inside the Block.
+
+Fields (constructor parameters):
+================================
+• name:str - mandatory, name of the episode
+
+The PathwayEpisode only stores arguments needed to (re)create a new neo.Block
+by concatenating several source neo.Block data.
+
+The other fields indicate optional indices into the data segments and signals
+of the source data.
+
+• response : int or str - respectively, the index or the name of the
+    analog signal in each sweep, containing the pathway-specific synaptic
+    response
     
-    An "episode" is a series of sweeps recorded during a specific set of 
-    experimental conditions -- possibly, a subset of a larger experiment where
-    several conditions were applied in sequence.
+• analogCommand : int or str - index or name of the analog signal containing
+    voltage- or current-clamp command signal (or None); such a signal is 
+    typically recorded - when available - by feeding the secondary output of
+    the amplifier into an ADC input in the acquisition board.
     
-    All sweeps in the episode must have been recorded during the same conditions.
+• digitalCommand: int or str - index or name of the analog signal containing
+    a recorded version of the triggers for extracellular stimulation.
     
-    NOTE: A Pathway Episode does NOT store any data; it only stores indices into
-    segments (a.k.a sweeps) of a neo.Block object containing the data.
+    When available, these are triggers sent to stimulus isolation boxes to 
+    elicit an extracellular stimulus.
     
-    It can be used to create a new such Block object from source neo.Blocks - 
-    i.e., passing it to the neoutils.concatenate_blocks(...) function.
+    The triggers themselves are typically TTL signals, either taken directly
+    from the acquisition board digital output, or "emulated" by an analog
+    (DAC) output containing a rectangulare wave of 5 V amplitude.
     
+    In either case, these triggers can be routed into an ADC input of the
+    acquisition board, for recording (e.g., using a BNC "tee" splitter).
     
-    Examples:
-    =========
+•   electrodeMode: ephys.ElectrodeMode (default is ElectrodeMode.Field)
     
-    1) A response recorded without drug, followed by a response recorded in the 
-    presence of a drug, then followed by a drug wash-out are all three distinct 
-    "episodes".
-    
-    2) Segments recorded while testing for cross-talk between synaptic pathways, 
-    (and therefore, where the paired pulses are crossed between pathways) is a
-    distinct episode from one where each segment contains responses from the 
-    same synaptic pathway
-    
-    The sweeps in PathwayEpisode are a sequence of neo.Segment objects, where 
-    objects where each synaptic pathway has contributed data for a neo.Segment
-    inside the Block.
-    
-    Fields (constructor parameters):
-    ================================
-    • name:str - mandatory, name of the episode
-    
-    The PathwayEpisode only stores arguments needed to (re)create a new neo.Block
-    by concatenating several source neo.Block data.
-    
-    The other fields indicate optional indices into the data segments and signals
-    of the source data.
-    
-    • response : int or str - respectively, the index or the name of the
-        analog signal in each sweep, containing the pathway-specific synaptic
-        response
-        
-    • analogCommand : int or str - index or name of the analog signal containing
-        voltage- or current-clamp command signal (or None); such a signal is 
-        typically recorded - when available - by feeding the secondary output of
-        the amplifier into an ADC input in the acquisition board.
-        
-    • digitalCommand: int or str - index or name of the analog signal containing
-        a recorded version of the triggers for extracellular stimulation.
-        
-        When available, these are triggers sent to stimulus isolation boxes to 
-        elicit an extracellular stimulus.
-        
-        The triggers themselves are typically TTL signals, either taken directly
-        from the acquisition board digital output, or "emulated" by an analog
-        (DAC) output containing a rectangulare wave of 5 V amplitude.
-        
-        In either case, these triggers can be routed into an ADC input of the
-        acquisition board, for recording (e.g., using a BNC "tee" splitter).
-        
-    • **kwargs ⇒ passed directly to the superclass datatypes.Episode
-    See also:
-    ========
-    • datatypes.Episode
-    
-    • neoutils.concatenate_blocks
-    
-    ---
-    
-    ¹ An indexing object is an int, range, slice, str, sequence of int, or 
-        sequence of str -- see documentation for the normalized_index() function
-        in Scipyen module "utilities".
+    NOTE: With exceptions¹, the responses in a synaptic pathway are recorded
+    using the same electrode during an experiment (i.e. either Field, *Patch, or
+    or Sharp). 
+
+    This attribute allows for episodes with distinct electrode 'mode' for the 
+    same pathway.
     
     
+• clampMode: ephys.ClampMode (default is ClampMode.NoClamp)
+    The recording "mode" - no clamping, voltage clamp or current clamp.
     
-    """
+    NOTE: Even though a pathway may have been recorded with the same electrode 
+    mode throughout an experiment, one may switch between different clamping modes, 
+    where it makes sense, e.g., voltage clamp during tracking and current clamp 
+    during conditioning.
+    
+    This attribute helps distinguish episodes with different clamping modes.
+    
+• xtalk: optional, a list of SynapticPathways or None (default); can also be an 
+    empty list (same as if it was None)
+    
+    Only used for 'virtual' synaptic pathways where the recording tests for
+    the cross-talk between two 'real' pathways using paired-pulse stimulation.
+    
+    Indicates the order in which each pathway was stimulated during the 
+    paired-pulse.
+    
+• pathways: optional, a list of SynapticPathways or None (default); can also be 
+    an empty list (same as if it was None).
+    
+    Indicates the SynapticPathways to which this episode applies. Typically,
+    an episode applied to a single pathway. However, there are situations where 
+    an episode involving more pathways is meaningful, e.g., where additional
+    pathways are stimulated and recorded simultaneously (e.g., in a cross-talk
+    test, or during conditioning in order to test for 'associativity')
+    
+    
+• **kwargs ⇒ passed directly to the superclass datatypes.Episode
+
+See also:
+========
+• datatypes.Episode
+
+• neoutils.concatenate_blocks
+    
+---
+
+¹Exceptions are possible:
+    ∘ 'repatching' the cell (e.g. in order to dialyse with a drug, etc) see, e.g.
+        Oren et al, (2009) J. Neurosci 29(4):939
+        Maier et al, (2011) Neuron, DOI 10.1016/j.neuron.2011.08.016
+    ∘ switch between field recording and patch clamp or sharp electrode recordings
+     (theoretically possible, but then one may also think of this as being two 
+    distinct pathways)
+    
+"""
     def __init__(self, name:str,
                  response:typing.Optional[typing.Union[str, int]] = None, 
                  analogCommand:typing.Optional[typing.Union[str, int]] = None, 
                  digitalCommand:typing.Optional[typing.Union[str, int]] = None, 
+                 electrodeMode:ElectrodeMode = ElectrodeMode.Field,
+                 clampMode:ClampMode = ClampMode.NoClamp,
+                 xtalk:typing.Optional[typing.List[SynapticPathway]] = None,
+                 pathways:typing.Optional[typing.List[SynapticPathway]] = None,
                  **kwargs):
+        """
+    See the class documentation.
+    """
         super().__init__(name, **kwargs)
-        self.name=name
+        # self.name=name
         self.response=response
         self.analogCommand = analogCommand
         self.digitalCommand = digitalCommand
+        self.electrodeMode = electrodeMode
+        self.clampMode = clampMode
+        self.xtalk = xtalk
+        self.pathways = pathways
     
 
 class SynapticPathway(BaseScipyenData):
@@ -309,7 +363,7 @@ class SynapticPathway(BaseScipyenData):
         ("responseSignal", (str, int), 0),
         ("analogCommandSignal", (str, int), 1),
         ("digitalCommandSignal", (str, int), 2),
-        ("schedule", Schedule, Schedule()),
+        ("schedule", Schedule, Schedule()),         # one or more PathwayEpisode objects
         )
     
     _descriptor_attributes_ = _data_children_ + _data_attributes_ + BaseScipyenData._descriptor_attributes_

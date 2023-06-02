@@ -205,16 +205,20 @@ if __debug__:
     __debug_count__ = 0
     
 class ClampMode(TypeEnum):
-    NoClamp=1
-    VoltageClamp=2
-    CurrentClamp=4
+    NoClamp=1           # i.e., voltage follower (I=0) e.g., ElectrodeMode.Field,
+                        # but OK with other ElectrodeMode
+    VoltageClamp=2      # these two should be
+    CurrentClamp=4      # self-explanatory
     
     
 class ElectrodeMode(TypeEnum):
-    Field=1
-    WholeCellPatch=2
-    ExcisedPatch=4
-    Sharp=8
+    Field=1             # typically, associated with ClampMode.NoClamp; other ClampModes don't make sense
+    WholeCellPatch=2    # can associate any ClampMode
+    ExcisedPatch=4      # can associate any ClampMode although ClampMode.VoltageClamp makes more sense
+    Sharp=8             # can associate any ClampMode although ClampMode.CurrentClamp makes more sense
+    Tetrode=16          # these are really for 
+    LinearArray=32      # local field potentials etc
+    MultiElectrodeArray=64 # MEAs on a culture/slice?
     
     
 def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], start:int = 0, span:int=1, isISI:bool=False):
