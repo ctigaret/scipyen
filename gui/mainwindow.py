@@ -35,6 +35,8 @@ CHANGELOG:
 # ipykernel/inprocess/ipkernel.py for InProcessInteractiveshell
 #
 # TODO breadcrumbs navigation for the file system model & tree.
+# TODO enable drag&drop from history to outside of the Scipyen (e.g.
+# a text editor, desktop file manager etc)
 
 # NOTE: 2021-10-21 13:24:24
 # all things imported below will be available in the user workspace
@@ -505,7 +507,7 @@ class WorkspaceViewer(QtWidgets.QTableView):
         # print("WorkspaceViewer.mouseMoveEvent")
         # NOTE: 2019-08-10 00:24:01
         # create QDrag objects for each dragged item
-        # ignore the DropEvenmt mimeData in the console ()
+        # ignore the DropEvent mimeData in the console ()
         if event.buttons() & QtCore.Qt.LeftButton:
             if (event.pos() - self.dragStartPosition).manhattanLength() >= QtWidgets.QApplication.startDragDistance():
                 indexList = [i for i in self.selectedIndexes()
@@ -3068,6 +3070,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             selectionList = [magic]
 
         if len(selectedItems) == 0:
+            
+            hhs = self.historyAccessor.search('*')
+            
+            codes = [inline for (session, line, inline) in hhs]
+            
+            ret = self.questionMessage("Save history", f"Save the entire history ({len(codes)} lines of code)?")
+            
+            if ret != QtWidgets.QMessageBox.Yes:
+                return cmd 
+            
+            if magic is None:
+                cmd = "\n".join(codes) + "\n"
+            else:
+                cmd = " ".join(codes) + " "
+            
             return cmd
 
         # BEGIN do not delete -- revisit this

@@ -14,7 +14,7 @@ from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 import numpy as np
 import pandas as pd
 import quantities as pq
-from quantities.decorators import with_doc
+# from quantities.decorators import with_doc
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import neo
@@ -50,7 +50,7 @@ from core.triggerprotocols import (TriggerProtocol,
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType,)
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
-from core.prog import (safeWrapper, AttributeAdapter)
+from core.prog import (safeWrapper, AttributeAdapter, with_doc)
 from core.basescipyen import BaseScipyenData
 from core.traitcontainers import DataBag
 from core import quantities as cq
@@ -118,15 +118,76 @@ class PathwayType(TypeEnum):
     # a mapping detailing the order of the cross-stimulation
     
     Null = 0
-    Test = 1
-    Control = 2
-    Type1 = 4
-    Type2 = 8
-    Type3 = 16
-    Type4 = 32
-    Type5 = 64
-    Type6 = 128
+    # NOTE: 2023-06-02 15:41:59 
+    # In synaptic plasticity experiments, Tracing and Induction pathways are
+    #   recorded FROM THE SAME CELL, in SEPARATE SWEEPS, ONE PER PATHWAY.
+    #
+    #   Each sweep contains an instance of synaptic response on the corresponding
+    #   pathway.
+    #
+    #   When more than one pathway is recorded, tracking the synaptic responses 
+    #   must use the same pattern of activity in all pathways. This ensures
+    #   equal treament of all pathways. The only exception to this rule is during 
+    #   plasticity induction, where only a subset of pathways are exposed to the
+    #   induction protocol (the "Test" pathways), whereas the others ("Control"
+    #   pathways) are left unperturbed.
+    #
+    # Theoretically, this can be achieved either:
+    #
+    # • in INTERLEAVED mode (typical) ⇒ the number of neo.Segment objects 
+    #   (a.k.a 'sweeps') in the neo.Block (a.k.a, the 'trial') is expected to be
+    #   an integer multiple of the TOTAL number of pathways; THE ORDER of the 
+    #   pathway-specific sweeps IS THE SAME IN ALL trials.
+    #
+    #   NOTE: in Clampex, a 'trial' may consist of:
+    #   ∘ several 'runs', meaning that the stored trial data contains AN AVERAGE
+    #       of the corresponding individual sweeps across several runs in the trial.
+    #       The result is like a "running" average across as many runs that were 
+    #       recorded per total duration of the trial - see Clampex protocol editor
+    #       for details. 
+    #
+    #       In the most typical scenario (for two pathways):
+    #       ⋆ 'trials' are repeated every minute
+    #       ⋆ each 'trial' contains six 'runs' repeated every 10 s
+    #       ⋆ each 'run' contains two sweeps, at 5 s delay (so that the pathway 
+    #       responses are evoked with similar delays) and sweeps last 1 s
+    #
+    #           In these conditions, Clampex records a synaptic response from
+    #       each pathway every 10 s for six times, then saves their (minute)
+    #       average on disk.
+    #
+    #   ∘ a single 'run' ⇒ there is no distinction between 'run' and 'trial'. 
+    #       However, a single 'run' per 'trial' means that each 'sweep' in the 
+    #       save file contains just one instance of the synaptic response, NOT an
+    #       average! As we are usually interested in the minute-averaged responses
+    #       the 'runs' are executed several times per minute at a fixed interval
+    #       (e.g, six runs per minute every 10 s). Data will need to be averaged
+    #       off-line.
+    #
+    #
+    # • in contiguous mode (atypical)
+    #       A 'trial' contains responses recorded from a single pathway; when
+    #       there are more pathways, responses on distinct pathways are recorded
+    #       in distinct 'trials' or 'runs' - this is unwieldy, and may result in 
+    #       patterns of activity that are distinct between pathways
+    #
     
+    Tracking = 1 # used for tracking synaptic responses
+    Control = Tracking # alias; this is the "normal" case where no induction is applied 
+    Induction = 2 # used for induction of plasicity (i.e. application of the induction protocol)
+    Test = Tracking | Induction # the Tracking pathway where Induction was applied
+    # auxiliary pathways can be:
+    # • present along the tracking pathway, during tracking only
+    # • present along the induction pathway, during induction only
+    # • present throughout
+    Auxiliary = 4 # e.g. ripple, etc
+    Type1 = 8
+    Type2 = 16
+    Type3 = 32
+    Type4 = 64
+    Type5 = 128
+    
+@with_doc(Episode, use_header=True, header_str = "Inherits from:")
 class PathwayEpisode(Episode):
     """
     Specification of an episode in a synaptic pathway.
@@ -192,19 +253,7 @@ class PathwayEpisode(Episode):
         In either case, these triggers can be routed into an ADC input of the
         acquisition board, for recording (e.g., using a BNC "tee" splitter).
         
-    • segments : an indexing object¹ into each block's sweeps (or segments)
-        belonging to the the same pathway; typically, each pathway contributes 
-        to exactly one segment in each block.
-        
-    • analogsignals, irregularlysampledsignals, imagesequences, spiketrains,
-        epochs, events: indexing objects into the corresponding segments attributes
-        used to select a subset of the data.
-    
-        Although these are optional (with the default being None) it is recommended
-    that at least the analogsignals contain a sequence of the indices given in
-    response, analogCommand and digitalCommand.
-    
-    
+    • **kwargs ⇒ passed directly to the superclass datatypes.Episode
     See also:
     ========
     • datatypes.Episode
@@ -221,7 +270,10 @@ class PathwayEpisode(Episode):
     
     """
     def __init__(self, name:str,
-                 response=None, analogCommand=None, digitalCommand=None, **kwargs):
+                 response:typing.Optional[typing.Union[str, int]] = None, 
+                 analogCommand:typing.Optional[typing.Union[str, int]] = None, 
+                 digitalCommand:typing.Optional[typing.Union[str, int]] = None, 
+                 **kwargs):
         super().__init__(name, **kwargs)
         self.name=name
         self.response=response

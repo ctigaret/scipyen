@@ -1289,18 +1289,20 @@ def processtimefunc(func):
         return r
     return wrapper
 
-def with_doc_after(f):
-    """TODO/FIXME
-    see for example vigra.arraytypes._preserve_doc decorator
-    """
-    def wrap(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            func.__doc__ = "\n".join([func.__doc__, f.__doc__])
-            print(func.__doc__)
-            return func
-        return wrapper
-    return wrap
+# NOTE: 2023-06-02 13:11:28
+# this below deprecated in favour of our own with_doc class (see above)
+# def with_doc_after(f):
+#     """TODO/FIXME
+#     see for example vigra.arraytypes._preserve_doc decorator
+#     """
+#     def wrap(func):
+#         @wraps(func)
+#         def wrapper(*args, **kwargs):
+#             func.__doc__ = "\n".join([func.__doc__, f.__doc__])
+#             print(func.__doc__)
+#             return func
+#         return wrapper
+#     return wrap
     
 
 def no_sip_autoconversion(klass):
@@ -2303,7 +2305,10 @@ class with_doc:
     
     """
 
-    def __init__(self, method, use_header=True, header_str:typing.Optional[str] = None):
+    def __init__(self, method, use_header=True, 
+                 header_str:typing.Optional[str] = None,
+                 indent:str = "   ",
+                 timesfactor:int = 1):
         self.method = method
         if isinstance(method, (tuple, list)) and all(isinstance(v, typing.Callable) for v in method):
             self.method = tuple(method)
@@ -2317,31 +2322,42 @@ class with_doc:
                 header_str = f"Calls the {InflectEngine.plural('function', len(self.method))}:"
             else:
                 header_str = "Notes:"
+                
+        self.use_header = use_header
         
         if use_header:
-            hdr = [header_str, "-" * len(header_str)]
-            self.header = "\n".join(hdr)
-    #         self.header = \
-    # """
-    # 
-    # Notes:
-    # ------
-    # """
+            self.header = [header_str, "-" * len(header_str)]
         else:
-            self.header = ''
+            self.header = []
+            
+        self.indent = indent
+        self.factor = timesfactor
 
     def __call__(self, new_method):
         original_doc = new_method.__doc__
-        header = self.header
-        # header = new_method.__name__ + " " + self.header
+        new_method_name = new_method.__name__
+        
+        if self.use_header:
+            if new_method_name:
+                header = [new_method.__name__ + " " + self.header[0]]
+                header.append("-" * len(header[0]))
+                
+            else:
+                header = self.header
+                
+        else:
+            header = self.header # empty list
+            
         if len(self.method):
             if len(self.method) > 1:
                 if original_doc:
-                    docs = [original_doc, header ]
+                    docs = [original_doc]
+                    docs.extend(header)
                 else:
-                    docs = [header]
-                docs += [f"{k}) {m.__name__}: \n{m.__doc__}" if m__doc__ else f"{m.__name__}:" for k, m in enumerate(self.methods)]
-                # docs += [f"{m.__name__}: \n{m.__doc__}" for m in self.methods if m.__doc__]
+                    docs = header
+                    
+                docs += [self.indent_lines(f"{k}) {m.__name__}: \n{m.__doc__}" if m.__doc__ else f"{m.__name__}:") for k, m in enumerate(self.method)]
+                # docs += [f"{k}) {self.indent_lines(m.__name__, k)}: \n{self.indent_lines(m.__doc__, k)}" if m.__doc__ else f"{self.indent_lines(m.__name__, k)}:" for k, m in enumerate(self.method)]
                 new_doc =  "\n".join(docs)
                 
                 new_method.__doc__ = new_doc
@@ -2349,40 +2365,23 @@ class with_doc:
             else:
                 m_doc = self.method[0].__doc__
                 if original_doc:
-                    docs = [original_doc, header ]
+                    docs = [original_doc]
+                    docs.extend(header)
                 else:
-                    docs = [header]
+                    docs = header
                     
                 if m_doc:
-                    docs += [f"{self.method[0].__name__}: \n{m_doc}"]
+                    docs += [self.indent_lines(f"{self.method[0].__name__}: \n{m_doc}")]
                     
                 new_doc = "\n".join(docs)
                 new_method.__doc__ = new_doc
-            #         new_method.__doc__ = """
-            # {}
-            # {}
-            # {}
-            #     """.format(original_doc, header, new_doc)
-
-                # elif new_doc:
-                #     new_method.__doc__ = new_doc
-
 
         return new_method
     
-#     def __call__(self, new_method):
-#         new_doc = new_method.__doc__
-#         original_doc = self.method.__doc__
-#         header = self.header
-#     
-#         if original_doc and new_doc:
-#             new_method.__doc__ = """
-#     {}
-#     {}
-#     {}
-#         """.format(original_doc, header, new_doc)
-#     
-#         elif original_doc:
-#             new_method.__doc__ = original_doc
-#     
-#         return new_method
+    def indent_lines(self, docstr:str, times:int=1):
+        doclines = docstr.split("\n")
+        
+        indlines = list(map(lambda x: f"{self.indent * self.factor * times}{x}", doclines))
+        
+        return "\n".join(indlines)
+        

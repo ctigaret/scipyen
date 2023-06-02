@@ -3288,17 +3288,22 @@ def concatenate_blocks(*args, **kwargs):
     
         events:      as above, for Event objects
     
-        sortby: str or None
+        sortby: str or callable, or None (default)
             When None, source blocks will be iterated in the same order in which
                 they are passed to this function, in the '*args' parameter. If  
                 *args contains a single str or a sequence of str , the neo.Block 
                 objects will be sorted according to their 'rec-datetime' attribute.
     
             When a str, this specifies the attribute name of each block to be 
-                used for sorting them.
+                used for sorting them. The attribute must resolve to an object
+                that supports ordering (a number, a str, a datetime, etc)
     
-            WARNING: This attribute must resolve to an object that supports 
-            ordering (e.g., a numeric scalar, datetime.datetime object, or str)
+            When a callable, this must be a function that takes a single argument
+                and return an object that supports ordering. This allows more
+                refined ordering, e.g. such as using a scalar attribute of the
+                first signal in the first segment:
+                
+                lambda x: x.segments[0].analogsignals[0].t_start
     
         ascending:bool, default is True; only used when 'sortby' is not None
     
@@ -3387,6 +3392,13 @@ def concatenate_blocks(*args, **kwargs):
                                                        sort=True, 
                                                        sortkey=lambda x: getattr(x, sortby),
                                                        reverse=reverse)
+                    
+                elif isinstance(sortby, typing.Callable):
+                    args =  workspacefunctions.getvars(args[0], var_type = (neo.Block,), 
+                                                       sort=True, 
+                                                       sortkey=sortby,
+                                                       reverse=reverse)
+                
                 else:
                     args =  workspacefunctions.getvars(args[0], var_type = (neo.Block,), 
                                                        sort=True, 
@@ -3408,6 +3420,13 @@ def concatenate_blocks(*args, **kwargs):
                                                        sort=True, 
                                                        sortkey=lambda x: getattr(x, sortby),
                                                        reverse=reverse)
+                    
+                elif isinstance(sortby, typing.Callable):
+                    args =  workspacefunctions.getvars(*args[0], var_type = (neo.Block, ), 
+                                                       sort=True, 
+                                                       sortkey=sortby,
+                                                       reverse=reverse)
+                    
                 else:
                     args =  workspacefunctions.getvars(*args[0], var_type = (neo.Block, ), 
                                                        sort=True, 
@@ -3429,7 +3448,12 @@ def concatenate_blocks(*args, **kwargs):
     if isinstance(args, collections.abc.Sequence) and all(isinstance(a, neo.Block) for a in args):
         if isinstance(sortby, str):
             try:
-                args = sorted(args, key = lambda x: getattr(x, sortby))
+                if isinstance(sortby, str):
+                    args = sorted(args, key = lambda x: getattr(x, sortby))
+                    
+                elif isinstance(sortby, typing.Callable):
+                    args = sorted(args, key = sortby)
+                    
                 if reverse:
                     args.reverse()
                     
