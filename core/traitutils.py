@@ -104,7 +104,8 @@ def traitlet_set(instance, obj, value):
         silent = False
         change_type = "new"
     
-    obj._trait_values[instance.name] = new_value
+    if new_value is None and old_value is None:
+        return
     
     try:
         #silent = new_value is old_value
@@ -122,6 +123,8 @@ def traitlet_set(instance, obj, value):
         # if there is an error in comparing, default to notify
         silent = False
         
+    obj._trait_values[instance.name] = new_value
+    
     if silent is not True:
         # we explicitly compare silent to True just in case the equality
         # comparison above returns something other than True/False

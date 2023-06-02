@@ -485,6 +485,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._xData_ = None
         self._yData_ = None
         
+        self._var_notified_ = False
+        
         self._cached_title = None
         
         self._show_legends_ = False
@@ -3146,7 +3148,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     # ### END PyQt slots
     
     def var_observer(self, change):
-        print(f"{self.__class__.__name__}_{self.windowTitle()}.var_observer change = {change}")
+        # print(f"\n{self.__class__.__name__}[{self.windowTitle()}].var_observer change = {change}")
 #         if isinstance(newObj, neo.Block):
 #             print(f"new: {newObj} name = {newObj.name}\n\t with segments = {newObj.segments}")
         
@@ -3162,6 +3164,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.displayFrame()
             self._new_frame_ = False
         
+        self._var_notified_ = True
 
     def linkCursors(self, id1, *ids):
         """ Bidirectionally links cursors of the same type.
@@ -6225,6 +6228,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
                 self.observed_vars["xData"] = self._xData_
                 self.observed_vars["yData"] = self._yData_
+                
+                if not self._var_notified_:
+                    self._new_frame_ = True
+                    self.displayFrame()
+                    self._new_frame_ = False
+                else:
+                    self._var_notified_ = False
+                
 #                 if not safe_identity_test (self.observed_vars.get("xData", None), self._xData_):
 #                     self.observed_vars["xData"] = self._xData_
 #                     
@@ -7007,7 +7018,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @safeWrapper
     def refresh(self):
         """
-        Simply calls displayFrame().
+        Refresh the display
         """
         for axis in self.axes:
             axis.update(axis.boundingRect())
@@ -7064,7 +7075,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #     for s in stack:
         #         print(f"\tcaller {s.function} in {s.filename}")
         
-        print(f"{self.__class__.__name__}.displayFrame()")
+        # print(f"\n{self.__class__.__name__}[{self.windowTitle()}].displayFrame()")
         
         if self._yData_ is None:
             # print(f"{self.__class__.__name__} self._yData_ is None")
