@@ -1952,6 +1952,13 @@ def get_sample_at_time(data, t):
         
     return ret
 
+def get_workspace_neo_blocks(*args, sortby:typing.Optional[str]=None,
+                             ascending:bool=False):
+    if len(args) == 1:
+        if isinstance(args[0], str):
+            pass
+            
+
 def get_domain_index(data, t):
     """Returns the sample index nearest to the domain scalar value `t`
     """

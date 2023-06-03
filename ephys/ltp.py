@@ -108,6 +108,8 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,
 
 #"def" pairedPulseEPSCs(data_block, Im_signal, Vm_signal, epoch = None):
 
+class SynapticPathway: pass # forward declaration for PathwayEpisode; redefined below
+
 class PathwayType(TypeEnum):
     """
     Synaptic pathway type.
@@ -236,6 +238,12 @@ of the source data.
     analog signal in each sweep, containing the pathway-specific synaptic
     response
     
+    NOTE: During an experiment, the recording may switch between episodes with
+    different clamping modes, or electrode modes (see below). This results in 
+    episodes with different response and command signals. Therefore we attach
+    this information here, instead of the SynapticPathway instance to which this
+    episode belongs to.`
+    
 • analogCommand : int or str - index or name of the analog signal containing
     voltage- or current-clamp command signal (or None); such a signal is 
     typically recorded - when available - by feeding the secondary output of
@@ -262,7 +270,6 @@ of the source data.
 
     This attribute allows for episodes with distinct electrode 'mode' for the 
     same pathway.
-    
     
 • clampMode: ephys.ClampMode (default is ClampMode.NoClamp)
     The recording "mode" - no clamping, voltage clamp or current clamp.
@@ -292,15 +299,6 @@ of the source data.
     pathways are stimulated and recorded simultaneously (e.g., in a cross-talk
     test, or during conditioning in order to test for 'associativity')
     
-    
-• **kwargs ⇒ passed directly to the superclass datatypes.Episode
-
-See also:
-========
-• datatypes.Episode
-
-• neoutils.concatenate_blocks
-    
 ---
 
 ¹Exceptions are possible:
@@ -312,7 +310,8 @@ See also:
     distinct pathways)
     
 """
-    def __init__(self, name:str,
+    @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
+    def __init__(self, name:str, /, *args,
                  response:typing.Optional[typing.Union[str, int]] = None, 
                  analogCommand:typing.Optional[typing.Union[str, int]] = None, 
                  digitalCommand:typing.Optional[typing.Union[str, int]] = None, 
@@ -320,10 +319,43 @@ See also:
                  clampMode:ClampMode = ClampMode.NoClamp,
                  xtalk:typing.Optional[typing.List[SynapticPathway]] = None,
                  pathways:typing.Optional[typing.List[SynapticPathway]] = None,
+                 sortby:typing.Optional[typing.Union[str, typing.Callable]] = None,
+                 ascending:typing.Optional[bool] = None,
                  **kwargs):
-        """
+        """Constructor for PathwayEpisode.
+Mandatory parameters:
+--------------------
+name:str - the name of this episode
+
+Var-positional parameters (args):
+--------------------------------
+neo.Blocks, or a sequence of neo.Blocks, a str, or a sequence of str
+    When a str or a sequence of str, these are (a) symbol(s) in the workspace,
+    bound to neo.Blocks
+
+    When a str, if it contains the '*' character then the str is interpreted as 
+    a global search string (a 'glob').
+
+    NOTE: args represent the source data to which this episode applies to, but
+is NOT stored in the PathwayEpisode instance. The only use of the data is to
+assign values to the 'begin', 'end', 'beginFrame', 'endFrame' attributes of the 
+episode.
+
+Named parameters:
+------------------
+These are the attributes of the instance (see the class documentation), PLUS
+the parameters 'sortby' and 'ascending' with the same roles as in the function
+neoutils.concatenate_blocks().
+NOTE: Data is NOT concatenated here
+
+Var-keyword parameters (kwargs) are passed directly to the datatypes.Episode superclass
+
+
+The var-positional parameters (args)
     See the class documentation.
     """
+        if not isinstance(name, str):
+            name = ""
         super().__init__(name, **kwargs)
         # self.name=name
         self.response=response
@@ -331,9 +363,49 @@ See also:
         self.digitalCommand = digitalCommand
         self.electrodeMode = electrodeMode
         self.clampMode = clampMode
-        self.xtalk = xtalk
         self.pathways = pathways
+        self.xtalk = xtalk
     
+    def _repr_pretty_(self, p, cycle):
+        supertxt = super().__repr__() + " with :"
+    
+        if cycle:
+            p.text(supertxt)
+        else:
+            p.text(supertxt)
+            p.breakable()
+            attr_repr = [" "]
+            attr_repr += [f"{a}: {getattr(self,a).__repr__()}" for a in ("response", "analogCommand",
+                                                         "digitalCommand",
+                                                         "electrodeMode",
+                                                         "clampMode")]
+            
+            with p.group(4 ,"(",")"):
+                for t in attr_repr:
+                    p.text(t)
+                    p.breakable()
+                p.text("\n")
+                
+            p.text("\n")
+                
+            p.text("Pathways:")
+            p.breakable()
+            
+            if isinstance(self.pathways, (tuple, list)) and len(self.pathways):
+                with p.group(4, "(",")"):
+                    for pth in self.pathways:
+                        p.text(pth.name)
+                        p.breakable()
+                    p.text("\n")
+                
+            if isinstance(self.xtalk, (tuple, list)) and len(self.xtalk):
+                link = " \u2192 "
+                p.text(f"Test for independence: {link.join([pth.name for pth in self.xtalk])}")
+                p.breakable()
+                p.text("\n")
+                
+            p.breakable()
+        
 
 class SynapticPathway(BaseScipyenData):
     """Encapsulates a logical stimulus-response relationship between signals.
@@ -368,7 +440,8 @@ class SynapticPathway(BaseScipyenData):
     
     _descriptor_attributes_ = _data_children_ + _data_attributes_ + BaseScipyenData._descriptor_attributes_
     
-    def __init__(self, data:neo.Block=neo.Block(), pathwayType:PathwayType = PathwayType.Test, 
+    def __init__(self, data:neo.Block=neo.Block(), 
+                 pathwayType:PathwayType = PathwayType.Test, 
                  name:typing.Optional[str]=None, 
                  response:typing.Optional[typing.Union[str, int]]=None, 
                  analogCommand:typing.Union[typing.Union[str, int]] = None, 
@@ -439,7 +512,7 @@ class SynapticPathway(BaseScipyenData):
         # Because we want to concatenate all segments in a single neo.Block for
         # this pathway (associated with the 'data' field) we store references
         # to the start frame & end frame in the episode
-        startFrame = 0
+        beginFrame = 0
         
         for episodeName, blocks, in episodeSpecs.items():
             bb = sorted(blocks, key = lambda x: x.rec_datetime)
@@ -469,12 +542,12 @@ class SynapticPathway(BaseScipyenData):
             episodes.append(Episode(episodeName, 
                               begin=datetime_start,
                               end=datetime_end,
-                              startFrame=startFrame,
-                              endFrame=startFrame + sum(len(b.segments) for b in bb)-1))
+                              beginFrame=beginFrame,
+                              endFrame=beginFrame + sum(len(b.segments) for b in bb)-1))
             
             # episodeBlocks.append(episodeBlock)
             
-            startFrame += len(episodeBlock.segments)
+            beginFrame += len(episodeBlock.segments)
             
         data = concatenate_blocks(*episodeBlocks) # no data subset selection here
         
@@ -524,6 +597,95 @@ class SynapticPlasticityData(BaseScipyenData):
         
     # def __reduce__(self): # TODO
     #     pass
+    
+def makePathwayEpisode(*args, **kwargs) -> PathwayEpisode:
+    """Helper function for the SynapticPathway factory function
+    args: list of neo.Blocks
+    name: str, default is ""
+    pathways: list of SynapticPathways, default is []
+    xtalk: list of SynapticPathways, default is []
+    
+"""
+    name = kwargs.pop("name", "")
+    
+    if not isinstance(name, str):
+        name = ""
+        
+    ret = PathwayEpisode(name)
+    
+    if len(args): 
+        if all(isinstance(v, neo.Block) for v in args):
+            source = args
+            
+        elif len(args) == 1 and isinstance(args[0], (tuple, list)) and all(isinstance(v, neo.Block) for v in args[0]):
+            source = args[0]
+            
+        else:
+            raise TypeError(f"Bad source arguments")
+    else:
+        source = []
+    
+    pathways = kwargs.pop("pathways", [])
+    if isinstance(pathways, (tuple, list)):
+        if len(pathways):
+            if not all(isinstance(v, SynapticPathway) for v in pathways):
+                raise TypeError(f"'pathways' must contain only SynapticPatwhay instances")
+        ret.pathways = pathways
+    else:
+        ret.pathways = []
+        
+    xtalk = kwargs.pop("xtalk", [])
+    
+    if isinstance(xtalk, (tuple, list)):
+        if len(xtalk):
+            if not all(isinstance(v, SynapticPathway) for v in xtalk):
+                raise TypeError(f"'xtalk' must contain only SynapticPatwhay instances")
+            
+            ret.xtalk = xtalk
+            
+        else:
+            ret.xtalk = []
+            
+    if len(source):
+        ret.begin = source[0].rec_datetime
+        ret.end = source[-1].rec_datetime
+        nsegs = sum(len(b.segments) for b in source)
+        ret.beginFrame = 0
+        ret.endFrame = nsegs-1 if nsegs > 0 else 0
+        
+    clampMode = kwargs.pop("clampMode", ClampMode.NoClamp)
+    if not isinstance(clampMode, ClampMode):
+        clampMode = ClampMode.NoClamp
+        
+    ret.clampMode = clampMode
+    
+    electrodeMode = kwargs.pop("electrodeMode", ElectrodeMode.Field)
+    if not isinstance(electrodeMode, ElectrodeMode):
+        electrodeMode = ElectrodeMode.Field
+        
+    ret.electrodeMode = electrodeMode
+            
+    return ret
+    
+def makeSynapticPathway(**kwargs):
+    """Factory for a SynapticPathway
+        Var-keyword parameters only:
+        ---------------------------
+        segments
+        response
+        analogCommand
+        digitalCommand
+        pathwayType
+        episodes: list of episodeDicts:
+            name
+            source: list of blocks
+            pathways: list of SynapticPathway or empty
+            xtalk: list of SynapticPathway or empty
+            
+"""
+    name = kwargs.pop("name", "")
+    
+    
     
 def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     """Constructs a dict with options for synaptic plasticity experiments.

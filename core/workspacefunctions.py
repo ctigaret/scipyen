@@ -16,6 +16,9 @@ from operator import attrgetter, itemgetter, methodcaller
 
 from collections import OrderedDict, deque
 
+from core.prog import with_doc
+from core.strutils import (is_glob, is_regexp)
+
 try:
     from reprlib import repr
     
@@ -66,12 +69,17 @@ def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None):
     elif not isinstance(arg, bool):
         raise TypeError("Expecting a str ('on' or 'off'), a bool, or None; got %s instead" % arg)
         
-def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_type:typing.Optional[typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]]=None, sort:bool=False, sortkey:object=None, reverse:bool=False):
+@with_doc((is_regexp, is_glob), use_header = True)
+def lsvars(*args, glob:typing.Optional[bool]=None, ws:typing.Union[dict, type(None)]=None, 
+           var_type:typing.Optional[typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]]=None, 
+           sort:bool=False, 
+           sortkey:object=None, 
+           reverse:bool=False) -> typing.Union[typing.List[str], typing.Generator, typing.KeysView]:
     """List names of variables in a namespace, according to a selection criterion.
     
     Returns a (possibly sorted) list of variable names if found, or an empty list.
     
-    See also: docstring for getvars() for details
+    See also: docstring for getvars().
     
     Var-positional parameters:
     -------------------------
@@ -89,9 +97,12 @@ def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_ty
     Named parameters:
     -----------------
     
-    glob: bool (default is True)
+    glob: bool (optional default is None)
         When True, the strings in args are treated as UNIX shell-style globs; 
-            otherwise, they are treated as regular expression strings.
+        when False, they are treated as regular expression strings.
+    
+        When None, the strings are checked to see if they are regexp-like or 
+        glob-like, using is_regexp() and is_glob().
         
     ws: dict (default None) = the search namespace
     
@@ -114,6 +125,7 @@ def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_ty
     
     if ws is None:
         ws = user_workspace()
+        
     if ws is None:
         raise ValueError("No valid workspace has been specified or found")
         
@@ -127,10 +139,18 @@ def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_ty
             return ws.keys() # no selector: get all variables names in ws
             
         elif isinstance(sel, str): # select by variable name
-            
             if len(sel.strip()) == 0:# empty selector string: get all variables names in ws
                 return ws.keys()
             
+            if glob is None:
+                if is_regexp(sel):
+                    glob = False
+                elif if_glob(sel):
+                    glob = True
+                    
+                else:
+                    glob = True # treat non-globs as a plain regexp
+                    
             p = _re.compile(translate(sel)) if glob else _re.compile(sel)
             
             var_names_filter = filter(p.match, ws.keys())
@@ -155,6 +175,14 @@ def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_ty
         for (sk, sel) in enumerate(args):
             if isinstance(sel, str): # string selector
                 if len(sel.strip()):
+                    if glob is None:
+                        if is_regexp(sel):
+                            glob = False
+                        elif if_glob(sel):
+                            glob = True
+                            
+                        else:
+                            glob = True # treat non-globs as a plain regexp
                     
                     p = _re.compile(translate(sel)) if glob else _re.compile(sel)
                     
@@ -210,7 +238,8 @@ def getvarsbytype(vartype, ws=None):
     
     #return dict(lst)
         
-def getvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, 
+@with_doc(lsvars, use_header=True)
+def getvars(*args, glob:typing.Optional[bool]=None, ws:typing.Union[dict, type(None)]=None, 
             var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None, 
             as_dict:bool=False, 
             sort:bool= False, 
@@ -232,7 +261,7 @@ def getvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None,
             
             "data*" (a shell-type glob) or "^data*" (a regexp string)
             
-            Whether the sele tion string is interpreted as a glob or a regexp
+            Whether the selection string is interpreted as a glob or a regexp
             depends on the value of the "glob" parameter (see below).
         
         2) a type, or an iterable (list, tuple) of types
@@ -241,7 +270,7 @@ def getvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None,
             
     Named parameters:
     =================
-    glob: bool, default is True
+    glob: bool, optional, default is None - see lsvars documentation for details
     
         When True, the selection strings in args are treated these as UNIX 
             shell-type globs.

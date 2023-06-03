@@ -1,113 +1,115 @@
-# 1) select blocks and concatenate them for eack PathwayEpisode
-test_baseline = neoutils.concatenate_blocks(base_0001, base_0002, base_0003, base_0004, base_0005, base_0008, 
-                                            segments=[0], 
-                                            analogsignals = ["Im_prim_0", "Vm_sec_0", "Stim_0"])
-test_chase = neoutils.concatenate_blocks(chase_0000, chase_0001, chase_0002, chase_0003, chase_0004, chase_0005, chase_0006, chase_0007, chase_0008, chase_0009, chase_0010, chase_0011, chase_0012, chase_0013, chase_0014, chase_0015, chase_0016, chase_0017, chase_0018, chase_0019, chase_0020, chase_0021, chase_0022, chase_0023, chase_0024, chase_0025, chase_0026, chase_0027, chase_0028, chase_0029, chase_0030, chase_0031, chase_0032, chase_0033, chase_0034, chase_0035, chase_0036, chase_0037, chase_0038, chase_0039, chase_0040, chase_0041, chase_0042, chase_0043, chase_0044, chase_0045, 
-                                         segments=[0], 
-                                         analogsignals=["Im_prim_0", "Vm_sec_0", "Stim_0"])
-control_baseline = neoutils.concatenate_blocks(base_0001, base_0002, base_0003, base_0004, base_0005, base_0008, 
-                                               segments=[1], analogsignals = ["Im_prim_0", "Vm_sec_0", "Stim_1"])
-control_chase = neoutils.concatenate_blocks(chase_0000, chase_0001, chase_0002, chase_0003, chase_0004, chase_0005, chase_0006, chase_0007, chase_0008, chase_0009, chase_0010, chase_0011, chase_0012, chase_0013, chase_0014, chase_0015, chase_0016, chase_0017, chase_0018, chase_0019, chase_0020, chase_0021, chase_0022, chase_0023, chase_0024, chase_0025, chase_0026, chase_0027, chase_0028, chase_0029, chase_0030, chase_0031, chase_0032, chase_0033, chase_0034, chase_0035, chase_0036, chase_0037, chase_0038, chase_0039, chase_0040, chase_0041, chase_0042, chase_0043, chase_0044, chase_0045, 
-                                            segments=[1], analogsignals=["Im_prim_0", "Vm_sec_0", "Stim_1"])
-
-# for s in test_baseline.segments:
-#     print(s.rec_datetime)
-# for s in test_chase.segments:
-#     print(s.rec_datetime)
-
-# get the rec_datetime for first segments in the new blocks:
-
-# test_baseline_begin = test_baseline.segments[0].rec_datetime
-# test_baseline_end = test_baseline.segments[-1].rec_datetime
-# test_baseline_nsegments = len(test_baseline.segments)
-# test_baseline_startFrame = 0
-# test_baseline_endFrame = len(test_baseline.segments)-1
+# # 1) select blocks and concatenate them for eack PathwayEpisode
+# test_baseline = neoutils.concatenate_blocks(base_0001, base_0002, base_0003, base_0004, base_0005, base_0008, 
+#                                             segments=[0], 
+#                                             analogsignals = ["Im_prim_0", "Vm_sec_0", "Stim_0"])
+# test_chase = neoutils.concatenate_blocks(chase_0000, chase_0001, chase_0002, chase_0003, chase_0004, chase_0005, chase_0006, chase_0007, chase_0008, chase_0009, chase_0010, chase_0011, chase_0012, chase_0013, chase_0014, chase_0015, chase_0016, chase_0017, chase_0018, chase_0019, chase_0020, chase_0021, chase_0022, chase_0023, chase_0024, chase_0025, chase_0026, chase_0027, chase_0028, chase_0029, chase_0030, chase_0031, chase_0032, chase_0033, chase_0034, chase_0035, chase_0036, chase_0037, chase_0038, chase_0039, chase_0040, chase_0041, chase_0042, chase_0043, chase_0044, chase_0045, 
+#                                          segments=[0], 
+#                                          analogsignals=["Im_prim_0", "Vm_sec_0", "Stim_0"])
+# control_baseline = neoutils.concatenate_blocks(base_0001, base_0002, base_0003, base_0004, base_0005, base_0008, 
+#                                                segments=[1], analogsignals = ["Im_prim_0", "Vm_sec_0", "Stim_1"])
+# control_chase = neoutils.concatenate_blocks(chase_0000, chase_0001, chase_0002, chase_0003, chase_0004, chase_0005, chase_0006, chase_0007, chase_0008, chase_0009, chase_0010, chase_0011, chase_0012, chase_0013, chase_0014, chase_0015, chase_0016, chase_0017, chase_0018, chase_0019, chase_0020, chase_0021, chase_0022, chase_0023, chase_0024, chase_0025, chase_0026, chase_0027, chase_0028, chase_0029, chase_0030, chase_0031, chase_0032, chase_0033, chase_0034, chase_0035, chase_0036, chase_0037, chase_0038, chase_0039, chase_0040, chase_0041, chase_0042, chase_0043, chase_0044, chase_0045, 
+#                                             segments=[1], analogsignals=["Im_prim_0", "Vm_sec_0", "Stim_1"])
 # 
-# test_chase_begin = test_chase.segments[0].rec_datetime
-# test_chase_end = test_chase.segments[-1].rec_datetime
-# test_chase_nsegments = len(test_chase.segments)
-# test_chase_startFrame = 0
-# test_chase_endFrame = len(test_chase.segments)-1
-
-
-
-# make episodes, sort, then update their startFrame & endFrame considering
-# the blocks will be further concatenated
-
-test_baseline_episode = ltp.PathwayEpisode("Baseline", response="Im_prim_0", 
-                                           analogCommand="Vm_sec_0", digitalCommand="Stim_0", 
-                                           begin = test_baseline.segments[0].rec_datetime, 
-                                           end=test_baseline.segments[-1].rec_datetime,
-                                           startFrame=0, 
-                                           endFrame = len(test_baseline.segments)-1)
-
-
-
-test_chase_episode = ltp.PathwayEpisode("Chase", response="Im_prim_0", 
-                                           analogCommand="Vm_sec_0", digitalCommand="Stim_0", 
-                                           begin = test_chase.segments[0].rec_datetime, 
-                                           end=test_chase.segments[-1].rec_datetime,
-                                           startFrame=0, 
-                                           endFrame = len(test_chase.segments)-1)
-
-
-nPathways = 2
-pathwaySweepNdx = [0,1]
-pathwayResponse = ["Im_prim_0", "Im_prim_0"]
-pathwayAnalogCommand = ["Vm_sec_0", "Vm_sec_0"]
-pathwayDigitalCommand = ["Stim_0", "Stim_1"]
-
-nEpisodes = 2
-
-# this list MUST be given in the SAME ORDER as that of the lists in the 
-# episodeBlocks, below
-episodeNames = ["Baseline", "Chase"]
-
-# list of lists of episode-specific blocks
-episodeBlocks = [[base_0001, base_0002, base_0003, base_0004, base_0005, base_0008], 
-                 [chase_0000, chase_0001, chase_0002, chase_0003, chase_0004, chase_0005,
-                  chase_0006, chase_0007, chase_0008, chase_0009, chase_0010, chase_0011, 
-                  chase_0012, chase_0013, chase_0014, chase_0015, chase_0016, chase_0017, 
-                  chase_0018, chase_0019, chase_0020, chase_0021, chase_0022, chase_0023, 
-                  chase_0024, chase_0025, chase_0026, chase_0027, chase_0028, chase_0029, 
-                  chase_0030, chase_0031, chase_0032, chase_0033, chase_0034, chase_0035, 
-                  chase_0036, chase_0037, chase_0038, chase_0039, chase_0040, chase_0041, 
-                  chase_0042, chase_0043, chase_0044, chase_0045]]
-                 
-# now, sort the blocks in each list according to the rec_datetime if the blocks
-
-for elist in episodeBlocks:
-    elist.sort(key = lambda x: x.rec_datetime)
-                 
-# 2 x 2 => four intermediate blocks - 
-# for each pathway create two pathwayepisodes using the corresponding
-# intermediate block, sort according to their 1st segment rec_datetime
-# then use the sorted list to concatenate into one full neo.Block per pathway
-# - rememeber to update the pathwayepisode's startFrame and endFrame attributes.
-#
-# you may NOT need the intermediate blocks, just use the block lists above
+# # for s in test_baseline.segments:
+# #     print(s.rec_datetime)
+# # for s in test_chase.segments:
+# #     print(s.rec_datetime)
 # 
-# create initial sorting index:
-ndx = list(range(nPathways))
-
-# create the final sorting index that will be used sort the lists of episode block lists according to the rec_datetime of the
-#   first block in each list → creates a sorted sorting index
-#   
-# epis = reversed(test_baseline_episode, test_chase_episode)
-# epis = reversed((test_baseline_episode, test_chase_episode))
-# epis
-# sortedndx = sorted(ndx, key = lambda x: epis[x].begin)
-# epis = tuple(reversed(test_baseline_episode, test_chase_episode))
-# epis = tuple(reversed((test_baseline_episode, test_chase_episode)))
-# epis
-# sortedndx = sorted(ndx, key = lambda x: epis[x].begin)
-# sortedndx
-# sortedepis = list(map(lambda x: epis[x], sortedndx))
-# sortedepis
+# # get the rec_datetime for first segments in the new blocks:
 # 
+# # test_baseline_begin = test_baseline.segments[0].rec_datetime
+# # test_baseline_end = test_baseline.segments[-1].rec_datetime
+# # test_baseline_nsegments = len(test_baseline.segments)
+# # test_baseline_beginFrame = 0
+# # test_baseline_endFrame = len(test_baseline.segments)-1
+# # 
+# # test_chase_begin = test_chase.segments[0].rec_datetime
+# # test_chase_end = test_chase.segments[-1].rec_datetime
+# # test_chase_nsegments = len(test_chase.segments)
+# # test_chase_beginFrame = 0
+# # test_chase_endFrame = len(test_chase.segments)-1
+# 
+# 
+# 
+# # make episodes, sort, then update their beginFrame & endFrame considering
+# # the blocks will be further concatenated
+# 
+# test_baseline_episode = ltp.PathwayEpisode("Baseline", response="Im_prim_0", 
+#                                            analogCommand="Vm_sec_0", digitalCommand="Stim_0", 
+#                                            begin = test_baseline.segments[0].rec_datetime, 
+#                                            end=test_baseline.segments[-1].rec_datetime,
+#                                            beginFrame=0, 
+#                                            endFrame = len(test_baseline.segments)-1)
+# 
+# 
+# 
+# test_chase_episode = ltp.PathwayEpisode("Chase", response="Im_prim_0", 
+#                                            analogCommand="Vm_sec_0", digitalCommand="Stim_0", 
+#                                            begin = test_chase.segments[0].rec_datetime, 
+#                                            end=test_chase.segments[-1].rec_datetime,
+#                                            beginFrame=0, 
+#                                            endFrame = len(test_chase.segments)-1)
+# 
+# 
+# nPathways = 2
+# pathwaySweepNdx = [0,1]
+# pathwayResponse = ["Im_prim_0", "Im_prim_0"]
+# pathwayAnalogCommand = ["Vm_sec_0", "Vm_sec_0"]
+# pathwayDigitalCommand = ["Stim_0", "Stim_1"]
+# 
+# nEpisodes = 2
+# 
+# # this list MUST be given in the SAME ORDER as that of the lists in the 
+# # episodeBlocks, below
+# episodeNames = ["Baseline", "Chase"]
+# 
+# # list of lists of episode-specific blocks
+# episodeBlocks = [[base_0001, base_0002, base_0003, base_0004, base_0005, base_0008], 
+#                  [chase_0000, chase_0001, chase_0002, chase_0003, chase_0004, chase_0005,
+#                   chase_0006, chase_0007, chase_0008, chase_0009, chase_0010, chase_0011, 
+#                   chase_0012, chase_0013, chase_0014, chase_0015, chase_0016, chase_0017, 
+#                   chase_0018, chase_0019, chase_0020, chase_0021, chase_0022, chase_0023, 
+#                   chase_0024, chase_0025, chase_0026, chase_0027, chase_0028, chase_0029, 
+#                   chase_0030, chase_0031, chase_0032, chase_0033, chase_0034, chase_0035, 
+#                   chase_0036, chase_0037, chase_0038, chase_0039, chase_0040, chase_0041, 
+#                   chase_0042, chase_0043, chase_0044, chase_0045]]
+#                  
+# # now, sort the blocks in each list according to the rec_datetime if the blocks
+# 
+# for elist in episodeBlocks:
+#     elist.sort(key = lambda x: x.rec_datetime)
+#                  
+# # 2 x 2 => four intermediate blocks - 
+# # for each pathway create two pathwayepisodes using the corresponding
+# # intermediate block, sort according to their 1st segment rec_datetime
+# # then use the sorted list to concatenate into one full neo.Block per pathway
+# # - rememeber to update the pathwayepisode's beginFrame and endFrame attributes.
+# #
+# # you may NOT need the intermediate blocks, just use the block lists above
+# # 
+# # create initial sorting index:
+# ndx = list(range(nPathways))
+# 
+# # create the final sorting index that will be used sort the lists of episode block lists according to the rec_datetime of the
+# #   first block in each list → creates a sorted sorting index
+# #   
+# # epis = reversed(test_baseline_episode, test_chase_episode)
+# # epis = reversed((test_baseline_episode, test_chase_episode))
+# # epis
+# # sortedndx = sorted(ndx, key = lambda x: epis[x].begin)
+# # epis = tuple(reversed(test_baseline_episode, test_chase_episode))
+# # epis = tuple(reversed((test_baseline_episode, test_chase_episode)))
+# # epis
+# # sortedndx = sorted(ndx, key = lambda x: epis[x].begin)
+# # sortedndx
+# # sortedepis = list(map(lambda x: epis[x], sortedndx))
+# # sortedepis
+# # 
 
 # ------------
-
+# The idea is to generate a SynapticPathway with at least one PathwayEpisode,
+# given a list of source neo.Blocks (the 'trials')
+#
 # We can also use a dict to specify each pathway, in a list:
 #
 pathwaysDicts = list()

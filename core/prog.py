@@ -28,8 +28,8 @@ from traitlets import Bunch
 import numpy as np
 import neo, vigra
 import quantities as pq
-from . import workspacefunctions
-from .workspacefunctions import debug_scipyen
+# from . import workspacefunctions
+# from .workspacefunctions import debug_scipyen
 from .strutils import InflectEngine
 
 CALLABLE_TYPES = (types.FunctionType, types.MethodType,
