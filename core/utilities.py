@@ -72,6 +72,9 @@ standard_obj_summary_headers = ["Name","Workspace",
                                 "Shape", "Axes", "Array Order", "Memory Size",
                                 ]
 
+GeneralIndexType = typing.Union[str, int, collections.abc.Sequence, np.ndarray, range, slice, type(MISSING)]
+"""Generic index type, used with normalized_indexed and similar functions"""
+
 class SafeComparator(object):
     # NOTE: 2021-07-28 13:42:07
     # pg.eq does NOT work with numpy arrays and pandas objects!
@@ -3388,77 +3391,77 @@ def name_lookup(container: typing.Sequence, name:str, multiple: bool = True) -> 
         
     return names.index(name)
 
-@with_doc(prog.filter_attr, use_header = True, header_str = "See also:")
+@with_doc(prog.filter_attr, use_header = True)
 def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series]], 
-                     index: typing.Optional[typing.Union[str, int, collections.abc.Sequence, np.ndarray, range, slice, type(MISSING)]] = None, 
+                     index: typing.Optional[GeneralIndexType] = None, 
                      silent:bool=False):
     """Transform various indexing objects to a range or an iterable of int indices.
     
-    Also checks the validity of the index for an iterable, given its size.
+Also checks the validity of the index for an iterable, given its size.
+
+Parameters:
+-----------
+data: Sequence or int; 
+    When a Sequence, the index will be verified against len(data).
     
-    Parameters:
-    -----------
-    data: Sequence or int; 
-        When a Sequence, the index will be verified against len(data).
+    When one of the pandas data types:
+        DataFrame, Series: the index will be checked against the object's 
+        'index' attribute
         
-        When one of the pandas data types:
-            DataFrame, Series: the index will be checked against the object's 
-            'index' attribute
-            
-            pandas.core.indexes.base.Index: the index will be cheched against it
-            (useful when passing the columns attribute of a DataFrame)
-            
-        When an int, 'data' is the length of a putative Sequence (hence 
-        data >= 0)
-    
-    index: one of:
-    
-        int → selects only the element with the specified int index
-    
-        str → selects only the element having 'name' attribute with the value
-    
-        range → selects the elements with int indices in the specified range
-    
-        slice → selects the elements within the slice range
-    
-        collections.abc.Sequence[int] → selects the elements with the specified 
-                int indices
-    
-        collections.abc.Sequence[str] → selects the elements having a 'name'
-                attribute with value in this parameter
-    
-        1D np.ndarray with integer dtype (i.e., np.dtype(int)) →  Returns a list 
-            of the array's values (after validation for the 'data' parameter)
-            Prerequisite: 'index' must satisfy:
-            len(index) == len(data) (with 'data' a Sequence)
-            len(index) == data (whith 'data' an int)
-    
+        pandas.core.indexes.base.Index: the index will be cheched against it
+        (useful when passing the columns attribute of a DataFrame)
         
+    When an int, 'data' is the length of a putative Sequence (hence 
+    data >= 0)
+
+index: GeneralIndexType: a typing alias for:
+
+    int → selects only the element with the specified int index
+
+    str → selects only the element having 'name' attribute with the value
+
+    range → selects the elements with int indices in the specified range
+
+    slice → selects the elements within the slice range
+
+    collections.abc.Sequence[int] → selects the elements with the specified 
+            int indices
+
+    collections.abc.Sequence[str] → selects the elements having a 'name'
+            attribute with value in this parameter
+
+    1D np.ndarray with integer dtype (i.e., np.dtype(int)) →  Returns a list 
+        of the array's values (after validation for the 'data' parameter)
+        Prerequisite: 'index' must satisfy:
+        len(index) == len(data) (with 'data' a Sequence)
+        len(index) == data (whith 'data' an int)
+
+    
+    
+    1D np.ndarray with logical dtype  (i.e., np.dtype(bool)) → Used as a 
+        'mask': returns the indices of the True values 
+        Prerequisite: 'index' must satisfy:
+        len(index) == len(data) (with 'data' a Sequence)
+        len(index) == data (whith 'data' an int)
+
+    MISSING ⇒ select NO elements from the data (returns an empty range)
+
+    None (default) ⇒ select ALL elements in the data
+
+    When 'index' is None, the function returns range(0, len(data)) when 
+        'data' is a Sequence, else range(, data) when 'data' is an int.
+
+    When index is MISSING, the function returns an empty range:
+        range(0)
         
-        1D np.ndarray with logical dtype  (i.e., np.dtype(bool)) → Used as a 
-            'mask': returns the indices of the True values 
-            Prerequisite: 'index' must satisfy:
-            len(index) == len(data) (with 'data' a Sequence)
-            len(index) == data (whith 'data' an int)
-    
-        MISSING ⇒ select NO elements from the data (returns an empty range)
-    
-        None (default) ⇒ select ALL elements in the data
-    
-        When 'index' is None, the function returns range(0, len(data)) when 
-            'data' is a Sequence, else range(, data) when 'data' is an int.
-    
-        When index is MISSING, the function returns an empty range:
-            range(0)
-            
-        CAUTION: negative integral indices are valid and perform the reverse 
-            indexing (going "backwards" in the iterable).
-            
-    Returns:
-    --------
-    ret - an iterable object (range, or tuple of integer indices) that can be 
-        used in list comprehensions using 'data' (when 'data' is a Sequence) or
-        any sequence with same length as 'data' (when 'data' is an int).
+    CAUTION: negative integral indices are valid and perform the reverse 
+        indexing (going "backwards" in the iterable).
+        
+Returns:
+--------
+ret - an iterable object (range, or tuple of integer indices) that can be 
+    used in list comprehensions using 'data' (when 'data' is a Sequence) or
+    any sequence with same length as 'data' (when 'data' is an int).
         
     """
     from core.datatypes import is_vector

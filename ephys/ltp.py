@@ -70,7 +70,8 @@ from core.utilities import (safeWrapper,
                             reverse_mapping_lookup, 
                             get_index_for_seq, 
                             sp_set_loc,
-                            normalized_index)
+                            normalized_index,
+                            GeneralIndexType)
 
 #### END pict.core modules
 
@@ -312,6 +313,7 @@ of the source data.
 """
     @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
     def __init__(self, name:str, /, *args,
+                 segments:typing.Optional[GeneralIndexType] = None,
                  response:typing.Optional[typing.Union[str, int]] = None, 
                  analogCommand:typing.Optional[typing.Union[str, int]] = None, 
                  digitalCommand:typing.Optional[typing.Union[str, int]] = None, 
@@ -321,6 +323,7 @@ of the source data.
                  pathways:typing.Optional[typing.List[SynapticPathway]] = None,
                  sortby:typing.Optional[typing.Union[str, typing.Callable]] = None,
                  ascending:typing.Optional[bool] = None,
+                 glob:bool = True,
                  **kwargs):
         """Constructor for PathwayEpisode.
 Mandatory parameters:
@@ -334,7 +337,8 @@ neo.Blocks, or a sequence of neo.Blocks, a str, or a sequence of str
     bound to neo.Blocks
 
     When a str, if it contains the '*' character then the str is interpreted as 
-    a global search string (a 'glob').
+    a global search string (a 'glob'). See neoutils.concatenate_blocks(…) for 
+    details.
 
     NOTE: args represent the source data to which this episode applies to, but
 is NOT stored in the PathwayEpisode instance. The only use of the data is to
@@ -344,28 +348,96 @@ episode.
 Named parameters:
 ------------------
 These are the attributes of the instance (see the class documentation), PLUS
-the parameters 'sortby' and 'ascending' with the same roles as in the function
-neoutils.concatenate_blocks().
-NOTE: Data is NOT concatenated here
+the parameters 'segments', 'glob', 'sortby' and 'ascending' with the same types
+and semantincs as for the function neoutils.concatenate_blocks(…).
 
-Var-keyword parameters (kwargs) are passed directly to the datatypes.Episode superclass
+NOTE: Data is NOT concatenated here, but these two parameers are used for 
+        temporarily ordering the source neo.Block objects in args.
 
+Var-keyword parameters (kwargs)
+-------------------------------
+These are passed directly to the datatypes.Episode superclass (see documentation
+for Episode)
 
-The var-positional parameters (args)
-    See the class documentation.
+See also the class documentation.
     """
         if not isinstance(name, str):
             name = ""
         super().__init__(name, **kwargs)
-        # self.name=name
+        
         self.response=response
         self.analogCommand = analogCommand
         self.digitalCommand = digitalCommand
+        
+        if not isinstance(electrodeMode, ElectrodeMode):
+            electrodeMode = ElectrodeMode.Field
+        
         self.electrodeMode = electrodeMode
+        
+        if not isinstance(clampMode, ClampMode):
+            clampMode = ClampMode.NoClamp
+            
         self.clampMode = clampMode
-        self.pathways = pathways
-        self.xtalk = xtalk
-    
+        
+        if isinstance(pathways, (tuple, list)):
+            if len(pathways):
+                if not all(isinstance(v, SynapticPathway) for v in pathways):
+                    raise TypeError(f"'pathways' must contain only SynapticPatwhay instances")
+            self.pathways = pathways
+        else:
+            self.pathways = []
+        
+        if isinstance(xtalk, (tuple, list)):
+            if len(xtalk):
+                if not all(isinstance(v, SynapticPathway) for v in xtalk):
+                    raise TypeError(f"'xtalk' must contain only SynapticPatwhay instances")
+                
+            self.xtalk = xtalk
+            
+        else:
+            self.xtalk = []
+                
+            
+        # self.pathways = pathways
+        # self.xtalk = xtalk
+        
+        sort = sortby is not None
+        
+        reverse = not ascending
+        
+        if len(args): 
+            if all(isinstance(v, neo.Block) for v in args):
+                source = args
+                
+            elif all(isinstance(v, str) for v in args):
+                source = wf.getvars(*args, var_type = (neo.Block,),
+                               sort=sort, sortkey = sortby, reverse = reverse)
+                
+            elif len(args) == 1:
+                if isinstance(args[0], (tuple, list)) :
+                    if all(isinstance(v, neo.Block) for v in args[0]):
+                        source = args[0]
+                        
+                    elif all(isinstance(v, str) for v in args[0]):
+                        source = wf.getvars(args[0], var_type = (neo.Block,),
+                                          sort=sort, sortkey = sortby, reverse=reverse)
+                
+            else:
+                raise TypeError(f"Bad source arguments")
+        else:
+            source = []
+        
+        if len(source):
+            self.begin = source[0].rec_datetime
+            self.end = source[-1].rec_datetime
+            if segments is not None:
+                seg_ndx = [normalized_index(b.segments, index=segments) for b in source]
+                nsegs = sum(len(n) for n in seg_ndx)
+            else:
+                nsegs = sum(len(b.segments) for b in source)
+            self.beginFrame = 0
+            self.endFrame = nsegs-1 if nsegs > 0 else 0
+        
     def _repr_pretty_(self, p, cycle):
         supertxt = super().__repr__() + " with :"
     
@@ -406,21 +478,30 @@ The var-positional parameters (args)
                 
             p.breakable()
         
-
+@with_doc(BaseScipyenData, use_header=True)
 class SynapticPathway(BaseScipyenData):
     """Encapsulates a logical stimulus-response relationship between signals.
 
     Signals are identified by name or their index in the collection of a sweep's
-    analogsignals (the `analgosignals` attribute of a neo.Segment object).
+    analogsignals (the `analogsignals` attribute of a neo.Segment object).
 
-    The signals are:
-    • response (analog, regularly sampled)
-    • analogCommand (analog signal) - command waveform
-    • digitalCommand - TTL waveform
-
-    In most circumstances, the command signals are, respectively, records of the
-    command signal from the amplifier and of the TTL signal sent out by the 
-    DAC/ADC board, and fed back into the ADC board's auxiliary inupt ports.
+    These signals are and their contents are:
+    • response (analog, regularly sampled): recorded synaptic responses
+    
+    • analogCommand (analog, regularly sampled): command waveform; typically, 
+        this is a record of the secondary output of the amplifier, when available,
+        and carries the amplifier "command", e.g. the voltage command in voltage 
+        clamp, or injected current, in current clamp.
+    
+    • digitalCommand (analog, regularly sampled): the TTL (a.k.a the "digital")
+        output signal from the acquisition board, typically recorded by feeding this 
+        output into an analog input port, when available.
+    
+    Of these, only the first ("response") is required, whereas the others can be
+    None. When present, these command signals are analysed to determine the 
+    protocol used (i.e., the clamping voltage, and the timings of the presynaptic
+    stimulation). Otherwise, these parameters need to be entered manually for 
+    further analysis.
 
     In addition, the synaptic pathway has a pathwayType attribute which specifies
     the pathway's role in a synaptic plasticity experiment.
@@ -440,34 +521,48 @@ class SynapticPathway(BaseScipyenData):
     
     _descriptor_attributes_ = _data_children_ + _data_attributes_ + BaseScipyenData._descriptor_attributes_
     
-    def __init__(self, data:neo.Block=neo.Block(), 
+    @with_doc(concatenate_blocks, use_header = True)
+    def __init__(self, data:typing.Optional[neo.Block] = None, 
                  pathwayType:PathwayType = PathwayType.Test, 
                  name:typing.Optional[str]=None, 
                  response:typing.Optional[typing.Union[str, int]]=None, 
                  analogCommand:typing.Union[typing.Union[str, int]] = None, 
                  digitalCommand:typing.Optional[typing.Union[str, int]] = None, 
-                 schedule:typing.Optional[Schedule] = None, **kwargs):
-        """
-        Named parameters:
-        ----------------
-        data: recorded sweeps belonging to the pathway (neo.Block) or None
+                 schedule:typing.Optional[typing.Union[Schedule, typing.Sequence[PathayEpisode]]] = None, **kwargs):
+        """SynapticPathway constructor.
+Named parameters:
+-----------------
+data: A neo.Block obtained from concatenating several source neo.Blocks (see the
+    function neoutils.concatenate_blocks(…) for details). Optional, default is 
+    None.
     
-        pathwayType: the role of the pathway in a synaptic plasticity experiment
-                        (Test, Control, Other)
-    
-        name: name of the pathway (by default is the name of the pathwayType)
-    
-        response: name or index¹ of the analog signal containing the synaptic response
-    
-        analogCommand: name or index¹ of the analog signal containing the analog
-                command signal
-    
-        digitalCommand: name or index¹ of the analog signal containing the digital
-                command signal
-        
-        """
-        super().__init__(**kwargs)
+pathwayType: the role of the pathway in a synaptic plasticity experiment
+                (Test, Control, Other)
 
+name: name of the pathway (by default is the name of the pathwayType)
+
+response: name or index¹ of the analog signal containing the synaptic response, 
+        or None (default)
+
+analogCommand: name or index¹ of the analog signal containing the analog
+        command signal or None (default)
+
+digitalCommand: name or index¹ of the analog signal containing the digital
+        command signal or None (default)
+    
+schedule: a Schedule, or a sequence (tuple, list) of PathwayEpisodes; 
+        optional, default is None.
+    
+    CAUTION: Currently, the episodes (whether packed in a Schedule or given as a
+    sequence) are NOT checked for consistency with the number and recording time 
+    stamps of the segments in the 'data' parameter.
+    
+Var-keyword parameters (kwargs):
+--------------------------------
+These are passed directly to the superclass constructor (BaseScipyenData).
+    """
+        super().__init__(**kwargs)
+        
     @staticmethod
     def fromBlocks(pathName:str, pathwayType:PathwayType=PathwayType.Test, 
                    *episodeSpecs:typing.Sequence[PathwayEpisode]):

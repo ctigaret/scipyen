@@ -52,7 +52,7 @@ def is_sequence(s:str) -> bool:
             
 def is_glob(s:str) -> bool:
     """Returns True if s is a string containing the '*' character"""
-    return isinstance(s, str) and '*' in s
+    return isinstance(s, str) and any(c in s for c in ('*', '?') )
 
 def is_regexp(s:str) -> bool:
     """Returns True if s is a string containing regexp metacharacters.

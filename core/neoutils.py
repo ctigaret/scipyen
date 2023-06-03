@@ -191,7 +191,7 @@ from .triggerevent import (DataMark, TriggerEvent, TriggerEventType,)
 from . import workspacefunctions
 from . import signalprocessing as sigp
 from . import utilities
-from core.utilities import (normalized_index, name_lookup,
+from core.utilities import (normalized_index, name_lookup, GeneralIndexType,
                             elements_types, index_of, isclose, similar_strings)
 
 from core.strutils import InflectEngine
@@ -1165,200 +1165,200 @@ def neo_lookup(*args: typing.Union[neo.core.container.Container, typing.Sequence
                indices_only:bool = False, exclude: bool = False, **kwargs):
     """Enhanced filtering of child data objects inside neo containers.
     
-    Looks up data objects by type and any combination of data object attributes
-    inside a neo container (i.e., Block, Segment, or a sequence of these), 
-    recursively.
+Looks up data objects by type and any combination of data object attributes
+inside a neo container (i.e., Block, Segment, or a sequence of these), 
+recursively.
+
+CAUTION: Use neo_lookup ONLY for this purpose.
+
+To select signals directly from a regular Python sequence, use prog.filter_attr()
+(poissibly in combination with prog.filter_type()).
+
+For a flat iterator for neo data objects, and when their indices inside the 
+container or sequence are irrelevant, use the
+neo.core.container.Container.filter() method or the 
+neo.core.container.filterdata() function.
+
+Returns a nested dictionary where the leaves are lists of child data objects,
+their indices in the corresponding data object collection, or tuples 
+(index, child data object).
+
+Below a 'sequence' denotes a collections.deque, list, or tuple.
+
+Parameters:
+==========
+
+src: neo container (e.g, Block, Segment, Group) or sequence (collections.deque,
+    list or tuple) of neo containers
     
-    CAUTION: Use neo_lookup ONLY for this purpose.
+data_obj_type: type or sequence of type
+
+Returns:
+========
+
+Nested indexing dictionary of the format:
     
-    To select signals directly from a regular Python sequence, use prog.filter_attr()
-    (poissibly in combination with prog.filter_type()).
-    
-    For a flat iterator for neo data objects, and when their indices inside the 
-    container or sequence are irrelevant, use the
-    neo.core.container.Container.filter() method or the 
-    neo.core.container.filterdata() function.
-    
-    Returns a nested dictionary where the leaves are lists of child data objects,
-    their indices in the corresponding data object collection, or tuples 
-    (index, child data object).
-    
-    Below a 'sequence' denotes a collections.deque, list, or tuple.
-    
-    Parameters:
-    ==========
-    
-    src: neo container (e.g, Block, Segment, Group) or sequence (collections.deque,
-        list or tuple) of neo containers
-        
-    data_obj_type: type or sequence of type
-    
-    Returns:
-    ========
-    
-    Nested indexing dictionary of the format:
-        
-        {container_type_collection_name (str):                      # e.g., 'blocks' or groups
-            {container_type_index_0 (int):                          # e.g., 0, 1, ... index of containers in src
-                {subcontainer_type_collection_name (str):           # either, 'segments', or 'groups'
-                    {subcontainer_type_index_0 (int):               # e.g., 0,1,... index of segment in segmentsi.e., 
-                        {signal_type_0_collection_name (str):       # e.g., 'analogsignals','spiketrains','events'
-                            sequence of data objects, indices, or 
-                            (index, data object) tuples} 
-                    },
-                    {subcontainer_type_index_0 (int):                
-                        {signal_type_0_collection_name (str): 
-                            tuple of objects } 
-                    },
-                    ... as many subcontainers found to contain specified data object type with specified attribute value
-                        (NOTE: if both groups and segments are present, 
-                        the data object will be returned twice!)
+    {container_type_collection_name (str):                      # e.g., 'blocks' or groups
+        {container_type_index_0 (int):                          # e.g., 0, 1, ... index of containers in src
+            {subcontainer_type_collection_name (str):           # either, 'segments', or 'groups'
+                {subcontainer_type_index_0 (int):               # e.g., 0,1,... index of segment in segmentsi.e., 
+                    {signal_type_0_collection_name (str):       # e.g., 'analogsignals','spiketrains','events'
+                        sequence of data objects, indices, or 
+                        (index, data object) tuples} 
                 },
-                            
-                {subcontainer_type_1_collection_name (str):         # max of two subcontainers: 'segments', 'groups'
-                    {subcontainer_type_0_index (int): 
-                        {signal_type_0_collection_name (str): 
-                            tuple of objects } } 
+                {subcontainer_type_index_0 (int):                
+                    {signal_type_0_collection_name (str): 
+                        tuple of objects } 
                 },
-                
-            } ,
+                ... as many subcontainers found to contain specified data object type with specified attribute value
+                    (NOTE: if both groups and segments are present, 
+                    the data object will be returned twice!)
+            },
+                        
+            {subcontainer_type_1_collection_name (str):         # max of two subcontainers: 'segments', 'groups'
+                {subcontainer_type_0_index (int): 
+                    {signal_type_0_collection_name (str): 
+                        tuple of objects } } 
+            },
+            
+        } ,
+
+        {container_index_1 (int): 
+            {subcontainer_collection_name (str): 
+                {subcontainer_index (int): 
+                    {signal_collection_name (str): 
+                        tuple of objects } } } }, 
+                        
+    ... etc ... for as many containers in src, where src is a container sequence
+
+    }
     
-            {container_index_1 (int): 
-                {subcontainer_collection_name (str): 
-                    {subcontainer_index (int): 
-                        {signal_collection_name (str): 
-                            tuple of objects } } } }, 
-                            
-        ... etc ... for as many containers in src, where src is a container sequence
+Example 1: 
+========
+Let ephysdata_src a neo.Block with three segments. We look for the analog 
+signals named "Im_prim2":
 
-        }
-        
-    Example 1: 
-    ========
-    Let ephysdata_src a neo.Block with three segments. We look for the analog 
-    signals named "Im_prim2":
+>>> neoutils.neo_lookup(ephysdata_src, name="Im_prim2")
 
-    >>> neoutils.neo_lookup(ephysdata_src, name="Im_prim2")
-
-    {'blocks': 
-        {0: 
-            {'segments': 
-                {0: 
-                    {'analogsignals': 
-                                        (AnalogSignal with 1 channels of length 40000; units pA; datatype float32 
-                                         name: 'Im_prim2'
-                                         annotations: {'stream_id': '0'}
-                                         sampling rate: 40000.0 Hz
-                                         time: 0.0 s to 1.0 s,)
-                    },
-                 1: 
-                    {'analogsignals': 
-                                        (AnalogSignal with 1 channels of length 40000; units pA; datatype float32 
-                                         name: 'Im_prim2'
-                                         annotations: {'stream_id': '0'}
-                                         sampling rate: 40000.0 Hz
-                                         time: 0.0 s to 1.0 s,)
-                    },
-                 2: 
-                    {'analogsignals': 
-                                        (AnalogSignal with 1 channels of length 40000; units pA; datatype float32 
-                                         name: 'Im_prim2'
-                                         annotations: {'stream_id': '0'}
-                                         sampling rate: 40000.0 Hz
-                                         time: 0.0 s to 1.0 s,)
-                    } 
+{'blocks': 
+    {0: 
+        {'segments': 
+            {0: 
+                {'analogsignals': 
+                                    (AnalogSignal with 1 channels of length 40000; units pA; datatype float32 
+                                        name: 'Im_prim2'
+                                        annotations: {'stream_id': '0'}
+                                        sampling rate: 40000.0 Hz
+                                        time: 0.0 s to 1.0 s,)
+                },
+                1: 
+                {'analogsignals': 
+                                    (AnalogSignal with 1 channels of length 40000; units pA; datatype float32 
+                                        name: 'Im_prim2'
+                                        annotations: {'stream_id': '0'}
+                                        sampling rate: 40000.0 Hz
+                                        time: 0.0 s to 1.0 s,)
+                },
+                2: 
+                {'analogsignals': 
+                                    (AnalogSignal with 1 channels of length 40000; units pA; datatype float32 
+                                        name: 'Im_prim2'
+                                        annotations: {'stream_id': '0'}
+                                        sampling rate: 40000.0 Hz
+                                        time: 0.0 s to 1.0 s,)
                 } 
             } 
         } 
-    }
-        
-    Example 2:
-    ==========
-    As above, but we are interesed in the indices of the analog signals named "Im_prim2":
+    } 
+}
     
-    >>> neoutils.neo_lookup(ephysdata_src, name="Im_prim2", indices_only=True)
-    
-    {'blocks': 
-        {0: 
-            {'segments': 
-                {0: 
-                    {'analogsignals': 
-                        (2,)
-                    },
-                 1: 
-                    {'analogsignals': 
-                        (2,)
-                    },
-                 2: 
-                    {'analogsignals': 
-                        (2,)
-                    } 
+Example 2:
+==========
+As above, but we are interesed in the indices of the analog signals named "Im_prim2":
+
+>>> neoutils.neo_lookup(ephysdata_src, name="Im_prim2", indices_only=True)
+
+{'blocks': 
+    {0: 
+        {'segments': 
+            {0: 
+                {'analogsignals': 
+                    (2,)
+                },
+                1: 
+                {'analogsignals': 
+                    (2,)
+                },
+                2: 
+                {'analogsignals': 
+                    (2,)
                 } 
             } 
         } 
-    }
-    
-    Here, analog signals named "Im_prim2" were found at index 2 in the 
-    'analogsignals' list attributes of segments 0, 1, and 2, in the first (and
-    only) block in the argument list.
-    
-    This index can then be stored and (re)applied to retrieve the signal(s) from 
-    selected blocks, or segments.
+    } 
+}
 
-    In contrast to the neo.core.container.filterdata() module-level function and
-    the neo.core.container.Container.filter() method, which are possibly faster,
-    this function keeps track of the original container where the data object 
-    was found.
-    
-    CAVEATS:
-    ========
-    1. The index can become out of sync with the data source if the contents of 
-    the data source (i.e. of the block/segment/analogsignals list)
-    have changed. 
-    
-    2. When a sequence, src can only contain a mixture of neo container objects
-    (i.e., Block and Segment) OR it can be a sequence of neo data objects
+Here, analog signals named "Im_prim2" were found at index 2 in the 
+'analogsignals' list attributes of segments 0, 1, and 2, in the first (and
+only) block in the argument list.
 
-    NOTE:
-    =====
-    Neo data types hierarchy (as of version 0.10.0):
-    
-    1. Containers:
-    ==============
-    
-    Block   -> container of:
-        Segment         (Block.segments), 
-        Group(*)        (Block.groups)
-        
-    Segment -> container of data objects collected in list attributes named from
-        the data object type name (e.g. 'analogsignals', etc)
-                         
-    2. Data objects:
-    ================
-    2.1 'Regular' data objects:
-    ---------------------------
-    AnalogSignal, IrregularlySampledSignal, SpikeTrain, Event, Epoch, 
-    ImageSequence
-    
-    2.2. Metadata-like objects:
-    ---------------------------
-    ArrayDict
-    
-    RegionOfInterest: 
-        CircularRegionOfInterest, PolygonRegionOfInterest, RectangularRegionOfInterest
-                         
-    3. Object types orthogonal to the hierarchy (*):
-    ================================================
-    Group   -> container of Neo object types (that are allowed at construction):
-        Group           (Group.groups)
-        Segment         (Group.segments)
-        data objects    
-                         
-    ChannelView - virtual grouping of analog signals or irregularly sampled signals
-    
-    SpikeTrainList - virtual grouping of spike trains (not intended for user access)
+This index can then be stored and (re)applied to retrieve the signal(s) from 
+selected blocks, or segments.
 
+In contrast to the neo.core.container.filterdata() module-level function and
+the neo.core.container.Container.filter() method, which are possibly faster,
+this function keeps track of the original container where the data object 
+was found.
+
+CAVEATS:
+========
+1. The index can become out of sync with the data source if the contents of 
+the data source (i.e. of the block/segment/analogsignals list)
+have changed. 
+
+2. When a sequence, src can only contain a mixture of neo container objects
+(i.e., Block and Segment) OR it can be a sequence of neo data objects
+
+NOTE:
+=====
+Neo data types hierarchy (as of version 0.10.0):
+
+1. Containers:
+==============
+
+Block   -> container of:
+    Segment         (Block.segments), 
+    Group(*)        (Block.groups)
     
+Segment -> container of data objects collected in list attributes named from
+    the data object type name (e.g. 'analogsignals', etc)
+                        
+2. Data objects:
+================
+2.1 'Regular' data objects:
+---------------------------
+AnalogSignal, IrregularlySampledSignal, SpikeTrain, Event, Epoch, 
+ImageSequence
+
+2.2. Metadata-like objects:
+---------------------------
+ArrayDict
+
+RegionOfInterest: 
+    CircularRegionOfInterest, PolygonRegionOfInterest, RectangularRegionOfInterest
+                        
+3. Object types orthogonal to the hierarchy (*):
+================================================
+Group   -> container of Neo object types (that are allowed at construction):
+    Group           (Group.groups)
+    Segment         (Group.segments)
+    data objects    
+                        
+ChannelView - virtual grouping of analog signals or irregularly sampled signals
+
+SpikeTrainList - virtual grouping of spike trains (not intended for user access)
+
+
     """
 
     if isinstance(data_obj_type, type):
@@ -1459,7 +1459,7 @@ def neo_lookup(*args: typing.Union[neo.core.container.Container, typing.Sequence
     
 def neo_use_lookup_index(*args: typing.Union[neo.container.Container, typing.Sequence], ndx: dict):
     """Access data objects using an indexing dictionary returned by neo_lookup.
-    neo_lookup must have been called with indices_onlt set to True.
+neo_lookup must have been called with 'indices_only' set to True.
     
     """
     if __debug__:
@@ -2821,96 +2821,96 @@ def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_
 def copy_with_data_subset(obj, **kwargs):
     """Copy data from a source neo container to a new container of the same type.
     
-    It is possible to select specific subsets of the source container children.
-    
-    The container's children (signal-like objects, spike trains, images, 
-    epochs and events) are, by default, copied by creating new instances 
-    (as in 'copy-construction') - see the "copy" parameter, below. 
+It is possible to select specific subsets of the source container children.
 
-    Optionally, the children can be stored as references (CAUTION: in this case,
-    any changes made to these objects as stored in the new object WILL affect
-    their originals)
+The container's children (signal-like objects, spike trains, images, 
+epochs and events) are, by default, copied by creating new instances 
+(as in 'copy-construction') - see the "copy" parameter, below. 
 
-    The function can store a subset of a container's data to another container 
-    having the same type as the source. Typical examples are to store a subset
-    of segments from a block into a new block, where each retained segment
-    possibly containing subsets of child data objects (analogsignals, 
-    irregularlysampledsignals, spiketrains, etc.).
+Optionally, the children can be stored as references (CAUTION: in this case,
+any changes made to these objects as stored in the new object WILL affect
+their originals)
 
-    This is useful in the cases intended to concatenate a selection of block 
-    segments from several blocks, as another (new) block, while retaining a 
-    subset of each segment's data objects.
-    
-    In these cases one cannot simply work on regular (shallow) copies of a
-    container and manipulate its contents later: changes to these shallow copies
-    (e.g, leaving segments out, or leaving analogsignals out from each segment) 
-    will be reflected on the originals as well. 
+The function can store a subset of a container's data to another container 
+having the same type as the source. Typical examples are to store a subset
+of segments from a block into a new block, where each retained segment
+possibly containing subsets of child data objects (analogsignals, 
+irregularlysampledsignals, spiketrains, etc.).
 
-    However, this function allows the creation of new container copies that 
-    include references (shallow copies) of the data objects (signal-like, event,
-    epochs, etc) for reasons of efficiency.
-    
-    Subsets of segments and of child data objects in each segment can be selected
-    either using the neo object's `name` property, or by their indices in the 
-    corresponding 'child' containers of the original container.
-    
-    When selecting child data objects in neo.Segment, the selection indices are
-    applied to all segments in a neo.Block. When selection indices are numeric, 
-    all the segments in a block are expected to contain a similar organization 
-    of their data objects (e.g. the same number of analogsignals in each segment, 
-    etc).
-    
-    This requirement can be bypassed when selecting child data using the value
-    the the `name` property as criterion.
-    
-    Parameters:
-    -----------
-    obj: neo.Block or neo.Segment - the source container.
-    
-    Var-keyword parameters:
-    ----------------------
-    
-    These are indexing parameters, with properties as explained in the 
-    documentation for the 'index' parameter to the 'normalize_index' function, 
-    below.
-    
-    segments:   
-        Indexing of the segments to be retained in the result.      
-                    
-    groups:
-        Indexing of groups.
-            
-        NOTE: Ignored when 'segments' is not MISSING, because 
-        'groups' represent a view of the data organization orthogonal
-        to that of the segments. In this case, ALL groups will be
-        returned.
-                    
-    analogsignals:  
-        Indexing of analog signal(s) into each of the segments, that
-        will be retained in the concatenated data. These include
-        neo.AnalogSignal and datatypes.DataSignal
-    
-        This index can be (see normalized_index):
-        int, str (signal name), sequence of int or str, a range,
-        a slice, or a numpy array of int or booleans.
-                    
-    irregularlysampledsignals:
-        as analogsignals, for irregularly sampled signals. These 
-        include neo.IrregularlySampledSignal and 
-        datatypes.IrregularlySampledDataSignal
-    
-    imagesequences:
-        as analogsignals, for neo.ImageSequence objects (for neo version
-        from 0.8.0 onwards)
+This is useful in the cases intended to concatenate a selection of block 
+segments from several blocks, as another (new) block, while retaining a 
+subset of each segment's data objects.
+
+In these cases one cannot simply work on regular (shallow) copies of a
+container and manipulate its contents later: changes to these shallow copies
+(e.g, leaving segments out, or leaving analogsignals out from each segment) 
+will be reflected on the originals as well. 
+
+However, this function allows the creation of new container copies that 
+include references (shallow copies) of the data objects (signal-like, event,
+epochs, etc) for reasons of efficiency.
+
+Subsets of segments and of child data objects in each segment can be selected
+either using the neo object's `name` property, or by their indices in the 
+corresponding 'child' containers of the original container.
+
+When selecting child data objects in neo.Segment, the selection indices are
+applied to all segments in a neo.Block. When selection indices are numeric, 
+all the segments in a block are expected to contain a similar organization 
+of their data objects (e.g. the same number of analogsignals in each segment, 
+etc).
+
+This requirement can be bypassed when selecting child data using the value
+the the `name` property as criterion.
+
+Parameters:
+-----------
+obj: neo.Block or neo.Segment - the source container.
+
+Var-keyword parameters:
+----------------------
+
+These are indexing parameters, with properties as explained below, in the 
+documentation for the 'index' parameter to the 'normalize_index' function from 
+the core.utilties module.
+
+segments:   
+    Indexing of the segments to be retained in the result.      
                 
-    spiketrains:
-        as analogsignals, for the spiketrains in the block's segments
-    
-    epochs:
-        as above, for Epoch objects
-    
-    events:
-        as above, for Event objects
+groups:
+    Indexing of groups.
+        
+    NOTE: Ignored when 'segments' is not MISSING, because 
+    'groups' represent a view of the data organization orthogonal
+    to that of the segments. In this case, ALL groups will be
+    returned.
+                
+analogsignals:  
+    Indexing of analog signal(s) into each of the segments, that
+    will be retained in the concatenated data. These include
+    neo.AnalogSignal and datatypes.DataSignal
+
+    This index can be (see normalized_index):
+    int, str (signal name), sequence of int or str, a range,
+    a slice, or a numpy array of int or booleans.
+                
+irregularlysampledsignals:
+    as analogsignals, for irregularly sampled signals. These 
+    include neo.IrregularlySampledSignal and 
+    datatypes.IrregularlySampledDataSignal
+
+imagesequences:
+    as analogsignals, for neo.ImageSequence objects (for neo version
+    from 0.8.0 onwards)
+            
+spiketrains:
+    as analogsignals, for the spiketrains in the block's segments
+
+epochs:
+    as above, for Epoch objects
+
+events:
+    as above, for Event objects
     
     """
     raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
@@ -3154,220 +3154,259 @@ def _(obj, **kwargs):
 def concatenate_blocks(*args, **kwargs):
     """Concatenates segments from neo.Block objects into a new neo.Block object.
     
-    Optionally, only a subset of the data children¹ in the source segments is
-    included in the result.
-    
-    The source neo.Blocks can be passed directly, or indirectly, by passing the
-    name(s) of the symbol(s) to which they are bound in the workspace -- see the
-    documentation of the 'args' parameter, below.
-    
-    
-    By default, the source neo.Block objects are used in the order they are 
-    passed inside the 'args' parameter, but this can be customized (see below).
-    
-    Var-positional parameters:
-    --------------------------
-    args : The data source: a comma-separated objects
-    
-        When *args contains several objects, there are all expected to be 
-        neo.Block objects.
-    
-        When args contains a single object, this can be:
-    
-        • a neo.Block
+Optionally, only a subset of the data children¹ in the source segments is
+included in the result.
 
-        • a str: the function will search for symbols in the workspace, that are
-            bound to neo.Block objects, using a glob search
+The source neo.Blocks can be passed directly, or indirectly, by passing the
+name(s) of the symbol(s) to which they are bound in the workspace -- see the
+documentation of the 'args' parameter, below.
 
-        • a sequence of neo.Block objects - these will be used for concatenation
 
-        • a sequence of str: these are workspace symbols bound to the neo.Block
-            objects used as data source
+By default, the source neo.Block objects are used in the order they are 
+passed inside the 'args' parameter, but this can be customized (see below).
+
+Var-positional parameters:
+--------------------------
+args : The data source.
+
+    When *args contains several objects, there are all expected to be 
+    neo.Block objects.
+
+    When args contains a single object, this can be:
+
+    • a neo.Block
+
+    • a str: the function will search for symbols in the workspace, that are
+        bound to neo.Block objects, using a glob search
+
+    • a sequence of neo.Block objects - these will be used for concatenation
+
+    • a sequence of str: these are either:
+        ∘ workspace symbols bound to the neo.Block objects used as data source
+        ∘ glob (string containing a '*' character) or regular expression pattern
+
+    NOTE: The order in which the neo.Block objects are passed will be preserved
+    UNLESS the keyword parameters 'sortby' and 'ascending' are passed (see below)
+
+    The only exception to this rule is when the source data is specified as 
+    a single str or a sequence of str. In this case, the source neo.Block
+    objects will ALWAYS be sorted:
+
+    • by the attribute specified by 'sortby' or their rec_datetime attribute
+        if 'sortby' is not given
+
+    • in ascending order unless 'ascending' is False
+        
+Var-keyword parameters:
+-----------------------
+
+There are three groups of keyword parameters:
+
+1. Parameters that specify new metadata for the newly created Block (see the
+    documentation of the neo.Block):
     
-        NOTE: The order in which the neo.Block objects are passed will be preserved
-        UNLESS the keyword parameters 'sortby' and 'ascending' are passed (see below)
+    name:str            
     
-        The only exception to this rule is when the source data is specified as 
-        a single str or a sequence of str. In this case, the source neo.Block
-        objects will ALWAYS be sorted:
+    description:str
     
-        • by the attribute specified by 'sortby' or their rec_datetime attribute
-            if 'sortby' is not given
+    rec_datetime:datetime.datetime
     
-        • in ascending order unless 'ascending' is False
+    file_origin:str
+    
+    file_datetime:datetime.datetime
+    
+    annotation:dict
+
+2. Parameters for choosing subsets of the Block's contents (WARNING: no 
+    checks are performed on these parameters; if they are wrong, exceptions
+    will be raised by the call chain starting with this function, especially
+    in "copy_with_data_subset" function which is used behind the scenes):
+
+    segments: utilities.GeneralIndexType; optional, default is None
+        When None, all segments in each block will be used; otherwise, only the
+        segments selected by this parameter will be copied to the result.
+    
+        For details, see core.utilities.normalized_index(…) and the type definition
+        core.utilities.GeneralIndexType.
+    
+        In most cases you would pass a single int value here, specifying the 
+        index of the segment of interest in all source neo.Blocks.
+                
+    analogsignals: utilities.GeneralIndexType; optional, default is None.
+        Indexing into each of the segments' 'analogsignals' attribute,
+        specifying which signals will be retained in the result. 
+
+        When None, ALL analogsignals in the source segments will be copied to
+        the result; otherwise, the behaviour is as detailed below:
+
+        • an int (>= 0) specifies the index of the only analog signal to 
+        be retained from each segment in the source data;
+            Prerequisites: 
+            ∘ the number of analogsignals in each source segment must be at
+                least 1 + the value of this parameter
+
+        • a str specifies the name of the analog signal to be retained 
+        from each segment in the source data;
+            Prerequisites: 
+            ∘ within each source segment, the analog signals must have 
+                unique names
+    
+            ∘ all source segments must contain an analog signal with the 
+                'name' attribute equal to the value of this parameter
+    
+            See neo_lookup(…) for details.
             
-    Var-keyword parameters:
-    -----------------------
-    
-    These fall in two groups:
-    
-    1. Parameters that specify new metadata for the newly created Block (see the
-        documentation of the neo.Block):
-        
-        name:str            
-        
-        description:str
-        
-        rec_datetime:datetime.datetime
-        
-        file_origin:str
-        
-        file_datetime:datetime.datetime
-        
-        annotation:dict
-    
-    2. Parameters for choosing subsets of the Block's contents (WARNING: no 
-        checks are performed on these parameters; if they are wrong, exceptions
-        will be raised by the call chain starting with this function, especially
-        in "copy_with_data_subset" function which is used behind the scenes):
-    
-        segments: int or None; 
-            When None, all segments in each block will be used.
-            When int then only segments with specified index in each Block
-            will be used in the concatenated result.
+        • a sequence of int: indices of the analogsignals to be retained 
+        from each segment in the source data;
+            Prerequisites: 
+            ∘ the number of analogsignals in each source segment must be at
+                least 1+ the highest value in this parameter
 
-            NOTE: This is the way to specify segments (or sweeps) containing
-            data from the same synaptic pathway.
-                    
-        analogsignals: int, str, range, slice, typing.Sequence
-            Indexing into each of the segments' 'analogsignals' attribute,
-            specifying which signals will be retained in the result. 
+        • a sequence of str: names of the analogsignals to be retained
+        from each segment in the source data;
+            Prerequisites: 
+            ∘ within each source segment, all analog signals must have a
+                unique name
+            ∘ all names specified by this parameter must resolve to signals
+                in all source segments.
 
-            • an int (>=0) specifies the index of the only analog signal to 
-            be retained from each segment in the source data;
-                Prerequisites: 
-                ∘ the number of analogsignals in each source segment must be at
-                    least 1 + the value of this parameter
+            See neo_lookup(…) for details.
+            
+        • a range;
+            Prerequisites: 
+            ∘ the range must be appropriate for the number of analog signals
+                in all source segments.
 
-            • a str specifies the name of the analog signal to be retained 
-            from each segment in the source data;
-                Prerequisites: 
-                ∘ within each source segment, the analog signals must have 
-                    unique names
-                ∘ all source segments must contain an analog signal with the 
-                    'name' attribute equal to the value of this parameter
+        • a slice;
+            Prerequisites: 
+            ∘ the slice must be appropriate for the number of analog signals
+                in all source segments.
+
+        • a 1D numpy array of int (signal indices) or bool elements (for
+            logical indexing)
+            Prerequisites: 
+            ∘ if an int array, its values must be valid indices for the 
+                analog signals in all source segments
+            
+            ∘ if a boolan array, its length must equal the size 
+            of the 'analogsignals' attribute in all source segments.
+    
+        • dataclasses.MISSING: indicates that NO analogsignals are to be
+            copied into the result.
+
+    irregularlysampledsignals:  indexing for irregularly sampled signals
+        Types, behaviour and prerequites are as for the 'analogsignals' 
+        parameter.
+
+    imagesequences: indexing for ImageSequence objects; same as 'analogsignals'
+        Types, behaviour and prerequites are as for the 'analogsignals' 
+        parameter.
+        (WARNING: this parameter only works with neo version >= 0.8.0)
+            
+    spiketrains: indexing of spike trains, as above
+            
+    epochs:      as above, for Epoch objects
+
+    events:      as above, for Event objects
+    
+3. Parameters that specify the handling of *args:
+    
+    glob: bool, default is True
+        When True, strings in args will be treated as a glob pattern; othwerwise,
+        they will be treated as regular expressions.
+    
+        NOTE: Here, a 'glob' pattern is a string containing the 'metacharacters'
+        '*' and/or '?' and is used for 'glob' matching against the symbols in the
+        workspace.
+    
+        A regular expression pattern is somewhat more complex than that (see the 
+        documentation for Pytyhon's 're' module).
+    
+        See also the function getvars(…) in core.workspacefunctions module.
+
+    sortby: str or callable, or None (default)
+        When None, source blocks will be iterated in the same order in which
+            they are passed to this function, in the '*args' parameter. If  
+            *args contains a single str or a sequence of str , the neo.Block 
+            objects will be sorted according to their 'rec-datetime' attribute.
+
+        When a str, this specifies the attribute name of each block to be 
+            used for sorting them. The attribute must resolve to an object
+            that supports ordering (a number, a str, a datetime, etc)
+
+        When a callable, this must be a function that takes a single argument
+            and return an object that supports ordering. This allows more
+            refined ordering, e.g. such as using a scalar attribute of the
+            first signal in the first segment:
+            
+            lambda x: x.segments[0].analogsignals[0].t_start
+
+    ascending:bool, default is True; only used when 'sortby' is not None
+
+    rename_segments:bool, optional (default True) - segments are renamed to 
+        the generic format f"segment_{k}" with 0 <= k < N where
+        N is the number of segments in the result
                 
-            • a sequence of int: indices of the analogsignals to be retained 
-            from each segment in the source data;
-                Prerequisites: 
-                ∘ the number of analogsignals in each source segment must be at
-                    least 1+ the highest value in this parameter
-
-            • a sequence of str: names of the analogsignals to be retained
-            from each segment in the source data;
-                Prerequisites: 
-                ∘ within each source segment, all analog signals must have a
-                    unique name
-                ∘ all names specified by this parameter must resolve to signals
-                    in all source segments.
-
-            • a range;
-                Prerequisites: 
-                ∘ the range must be appropriate for the number of analog signals
-                    in all source segments.
-
-            • a slice;
-                Prerequisites: 
-                ∘ the slice must be appropriate for the number of analog signals
-                    in all source segments.
-
-            • a 1D numpy array of int (signal indices) or bool elements (for
-                logical indexing)
-                Prerequisites: 
-                ∘ if an int array, its values must be valid indices for the 
-                    analog signals in all source segments
                 
-                ∘ if a boolan array, its length must equal the size 
-                of the 'analogsignals' attribute in all source segments.
+Returns:
+-------
+A new neo.Block object, optionally containing a subset of the segments and 
+signal-like objects as specified by the 
 
-                See neo_lookup() for details.
-                    
-        irregularlysampledsignals:  indexing for irregularly sampled signals
-            Types and prerequites are as for the 'analogsignals' parameter.
-    
-        imagesequences: indexing for ImageSequence objects; same as 'analogsignals'
-            Types and prerequites are as for the 'analogsignals' parameter.
-            (WARNING: this parameter only works with neo version >= 0.8.0)
-                
-        spiketrains: indexing of spike trains, see 'analosignals' for details
-                
-        epochs:      as above, for Epoch objects
-    
-        events:      as above, for Event objects
-    
-        sortby: str or callable, or None (default)
-            When None, source blocks will be iterated in the same order in which
-                they are passed to this function, in the '*args' parameter. If  
-                *args contains a single str or a sequence of str , the neo.Block 
-                objects will be sorted according to their 'rec-datetime' attribute.
-    
-            When a str, this specifies the attribute name of each block to be 
-                used for sorting them. The attribute must resolve to an object
-                that supports ordering (a number, a str, a datetime, etc)
-    
-            When a callable, this must be a function that takes a single argument
-                and return an object that supports ordering. This allows more
-                refined ordering, e.g. such as using a scalar attribute of the
-                first signal in the first segment:
-                
-                lambda x: x.segments[0].analogsignals[0].t_start
-    
-        ascending:bool, default is True; only used when 'sortby' is not None
-    
-        rename_segments:bool, optional (default True) - segments are renamed to 
-            the generic format f"segment_{k}" with 0 <= k < N where
-            N is the number of segments in the result
-                    
-                    
-    Returns:
-    -------
-    A new neo.Block object, optionally containing a subset of the segments and 
-    signal-like objects as specified by the 
-    
-    NOTE: this is different from what neo.core.container.Container.merge()
-    achieves. `merge` is inherited by Block, Segment, and Group) and basically
-    appends data objects to their corresponding child data containers 
-    (hence requiring identical time bases)
-    
-    Example:
-    =======
-    
-    1) concatenate neo.Blocks present in the workspace, selected by a glob search
-        on their bound symbols
-    block = concatenate_blocks("data_name_prefix*", segment_index=0)
-    
-    will concatenate the first segment (segment_index = 0) from all neo.Block 
-    variables having names beginning with 'data_name_prefix' in the user 
-    workspace.
-    
-    Changelog:
-    ==========
-    2023-05-22 16:08:31 Only accepts neo.Block or sequence of neo.Block
-    
-    NOTES:
-    ======
-    
-    ¹The data children of a neo.Segment object are attributes referring to
-        collections of neo data objects, as follows:
-    
-    Attribute name:type                             Element type:
-    ======================================================================
-    analogsignals:list                              neo.AnalogSignal
-                                                    Scipyen's DataSignal
+NOTE: this is different from what neo.core.container.Container.merge()
+achieves. `merge` is inherited by Block, Segment, and Group) and basically
+appends data objects to their corresponding child data containers 
+(hence requiring identical time bases)
 
-    irregularlysampledsignal:list                   neo.IrregularlySampledSignal
-                                                    Scipyen's IrregularlySampledDataSignal
+Example:
+=======
 
-    imagesequences:list                             neo.ImageSequence
+1) concatenate neo.Blocks present in the workspace, selected by a glob search
+    on their bound symbols
+block = concatenate_blocks("data_name_prefix*", segment_index=0)
 
-    spiketrains:neo.spiketrainlist.SpikeTrainList   neo.SpikeTrain
+will concatenate the first segment (segment_index = 0) from all neo.Block 
+variables having names beginning with 'data_name_prefix' in the user 
+workspace.
+    
+    
+See also:
+=========
+In the neoutils module:
+    copy_with_data_subset()
+    neo_lookup
+    
+In the core.utilities module:
+    normalized_index()
 
-    epochs:list                                     neo.Epoch,
-                                                    Scipyen's DataZone
+Changelog:
+==========
+2023-05-22 16:08:31 Only accepts neo.Block or sequence of neo.Block
 
-    events:list                                     neo.Event,
-                                                    Scipyen's DataMarker and
-                                                    TriggerEvent
+NOTES:
+======
+
+¹The data children of a neo.Segment object are attributes referring to
+    collections of neo data objects, as follows:
+
+Attribute name:type                             Element type:
+======================================================================
+analogsignals:list                              neo.AnalogSignal
+                                                Scipyen's DataSignal
+
+irregularlysampledsignal:list                   neo.IrregularlySampledSignal
+                                                Scipyen's IrregularlySampledDataSignal
+
+imagesequences:list                             neo.ImageSequence
+
+spiketrains:neo.spiketrainlist.SpikeTrainList   neo.SpikeTrain
+
+epochs:list                                     neo.Epoch,
+                                                Scipyen's DataZone
+
+events:list                                     neo.Event,
+                                                Scipyen's DataMarker and
+                                                TriggerEvent
 
 
     """
@@ -3395,19 +3434,22 @@ def concatenate_blocks(*args, **kwargs):
         if isinstance(args[0], str):
             try:
                 if isinstance(sortby, str):
-                    args =  workspacefunctions.getvars(args[0], var_type = (neo.Block,), 
+                    args =  workspacefunctions.getvars(args[0], 
+                                                       var_type = (neo.Block,), 
                                                        sort=True, 
                                                        sortkey=lambda x: getattr(x, sortby),
                                                        reverse=reverse)
                     
                 elif isinstance(sortby, typing.Callable):
-                    args =  workspacefunctions.getvars(args[0], var_type = (neo.Block,), 
+                    args =  workspacefunctions.getvars(args[0], 
+                                                       var_type = (neo.Block,), 
                                                        sort=True, 
                                                        sortkey=sortby,
                                                        reverse=reverse)
                 
                 else:
-                    args =  workspacefunctions.getvars(args[0], var_type = (neo.Block,), 
+                    args =  workspacefunctions.getvars(args[0], 
+                                                       var_type = (neo.Block,), 
                                                        sort=True, 
                                                        sortkey=lambda x: x.rec_datetime,
                                                        reverse=reverse)
@@ -4802,96 +4844,96 @@ def lookup(signal, value, channel=0, rtol=1e-05, atol=1e-08, equal_nan = False, 
 def inverse_lookup(signal, value, channel=0, rtol=1e-05, atol=1e-08, equal_nan = False, right=False):
     """Look-up for domain values given a nominal signal value.
     
-    The function addresses the question "what is (are) the value(s) of the 
-    signal's domain for signal samples with value close to a specific value?"
-    
-    For the inverse correspondence see lookup().
-    
-    Parameters:
-    ----------
-    signal: one of neo.AnalogSignal, neo.IrregularlySampledSignal, 
-            datatypes.DataSignal, or datatypes.IrregularlySampledDataSignal.
-        
-    value: float scalar, the nominal value of the signal, or a monotonic
-            sequence (tuple, list) of scalars.
-            
-            When a scalar, the function looks up the domain values corresponding 
-            to signal samples that are close to value within the atol and rtol, 
-            using numpy.isclose().
-            
-            NOTE 1:
-            
-            `a` and `b` are "close to" each other when
-            
-            absolute(`a` - `b`) <= (`atol` + `rtol` * absolute(`b`))
-            
-            When a sequence, its elements are boundaries of bins to which signal
-            values belong (half-open intervals, direction specified by the 
-            value of `right`); the function looks up the domain values for the 
-            signal samples with indices fall in these bins, as determined using 
-            numpy.digitize().
-            
-            NOTE 2: From numpy.digitize docstring:
-            
-            numpy.digitize(x, bins, right=False)[source]
-                
-                Return the indices of the bins to which each value in input array belongs.
-                right     order of bins   returned index i satisfies  meaning
-                False     increasing      bins[i-1] <= x <  bins[i]   x in [bins[i-1], bins[i])
-                True      increasing      bins[i-1] <  x <= bins[i]   x in (bins[i-1], bins[i]]
-                False     decreasing      bins[i-1] >  x >= bins[i]   x in [bins[i], bins[i-1])
-                True      decreasing      bins[i-1] >= x >  bins[i]   x in (bins[i], bins[i-1]]
+The function addresses the question "what is (are) the value(s) of the 
+signal's domain for signal samples with value close to a specific value?"
 
-            If values in x are beyond the bounds of bins, 0 or len(bins) is 
-            returned as appropriate.        
+For the inverse correspondence see lookup().
 
-    channel: int, default 0: the index of the signal channel; must be 
-        0 <= channel < signal.shape[1]
+Parameters:
+----------
+signal: one of neo.AnalogSignal, neo.IrregularlySampledSignal, 
+        datatypes.DataSignal, or datatypes.IrregularlySampledDataSignal.
+    
+value: float scalar, the nominal value of the signal, or a monotonic
+        sequence (tuple, list) of scalars.
         
-    rtol, atol: float scalars defaults are, respectively, 1e-05 and 1e-08 as
-        per numpy.isclose(); used when value is a scalar
+        When a scalar, the function looks up the domain values corresponding 
+        to signal samples that are close to value within the atol and rtol, 
+        using numpy.isclose().
         
-    equal_nan: bool, default False; specifies if np.nan values are treated as
-        equal; used when value is a scalar
+        NOTE 1:
         
-    right: bool, default False; see documentation for numpy.digitize() for details
-        used when value is a sequence
+        `a` and `b` are "close to" each other when
         
-    Returns:
-    -------
-    ret: Array with domain values where signal samples in the specified channel
-        channel are
+        absolute(`a` - `b`) <= (`atol` + `rtol` * absolute(`b`))
         
-            "close to" the specified nominal value (see the NOTE 1, above).
+        When a sequence, its elements are boundaries of bins to which signal
+        values belong (half-open intervals, direction specified by the 
+        value of `right`); the function looks up the domain values for the 
+        signal samples with indices fall in these bins, as determined using 
+        numpy.digitize().
         
-            OR 
+        NOTE 2: From numpy.digitize docstring:
+        
+        numpy.digitize(x, bins, right=False)[source]
             
-            fall within the boundaries of specified in value
+            Return the indices of the bins to which each value in input array belongs.
+            right     order of bins   returned index i satisfies  meaning
+            False     increasing      bins[i-1] <= x <  bins[i]   x in [bins[i-1], bins[i])
+            True      increasing      bins[i-1] <  x <= bins[i]   x in (bins[i-1], bins[i]]
+            False     decreasing      bins[i-1] >  x >= bins[i]   x in [bins[i], bins[i-1])
+            True      decreasing      bins[i-1] >= x >  bins[i]   x in (bins[i], bins[i-1]]
+
+        If values in x are beyond the bounds of bins, 0 or len(bins) is 
+        returned as appropriate.        
+
+channel: int, default 0: the index of the signal channel; must be 
+    0 <= channel < signal.shape[1]
+    
+rtol, atol: float scalars defaults are, respectively, 1e-05 and 1e-08 as
+    per numpy.isclose(); used when value is a scalar
+    
+equal_nan: bool, default False; specifies if np.nan values are treated as
+    equal; used when value is a scalar
+    
+right: bool, default False; see documentation for numpy.digitize() for details
+    used when value is a sequence
+    
+Returns:
+-------
+ret: Array with domain values where signal samples in the specified channel
+    channel are
+    
+        "close to" the specified nominal value (see the NOTE 1, above).
+    
+        OR 
         
-    index: Indexing array used to extract ret from the domain
+        fall within the boundaries of specified in value
     
-    sigvals: Subarray of the signal, indexed using the "index" array.
-    
-    CAUTION:
-    For regularly sampled signals (e.g. neo.AnalogSignal or datatypes.DataSignal)
-    this function will almost surely fail to return all domain values where the 
-    signal is close to the specified nominal value. The success depends on the 
-    sampling rate and signal quantization error.
-    
-    A better strategy is to search for the INTERSECTION between domain indices where
-    signal is <= upper value limit and indices where signal >= lower value limit.
-    
-    WARNING: Do not confuse with the functionality of pynverse module.
-    
-    Considering the signal as being the realization of a function y = f(x) where
-    x is the signal's domain and y the signal values, one might be inclined to 
-    use the pynverse module by Alvaro Sanchez-Gonzalez to calculate its inverse
-    function x = g(y) numerically. 
-    
-    However, pynverse uses functional programming to calculate the inverse of a 
-    mathematical function represented as a python function, or callable, and 
-    not an array realization of that function (see pynverse documentation for 
-    details).
+index: Indexing array used to extract ret from the domain
+
+sigvals: Subarray of the signal, indexed using the "index" array.
+
+CAUTION:
+For regularly sampled signals (e.g. neo.AnalogSignal or datatypes.DataSignal)
+this function will almost surely fail to return all domain values where the 
+signal is close to the specified nominal value. The success depends on the 
+sampling rate and signal quantization error.
+
+A better strategy is to search for the INTERSECTION between domain indices where
+signal is <= upper value limit and indices where signal >= lower value limit.
+
+WARNING: Do not confuse with the functionality of pynverse module.
+
+Considering the signal as being the realization of a function y = f(x) where
+x is the signal's domain and y the signal values, one might be inclined to 
+use the pynverse module by Alvaro Sanchez-Gonzalez to calculate its inverse
+function x = g(y) numerically. 
+
+However, pynverse uses functional programming to calculate the inverse of a 
+mathematical function represented as a python function, or callable, and 
+not an array realization of that function (see pynverse documentation for 
+details).
     
     """
     if not isinstance(signal, (neo.AnalogSignal, neo.IrregularlySampledSignal, 

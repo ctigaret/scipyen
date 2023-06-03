@@ -2305,21 +2305,29 @@ class with_doc:
     
     """
 
-    def __init__(self, method, use_header=True, 
+    def __init__(self, method:typing.Union[typing.Type, typing.Callable, typing.Sequence[typing.Union[typing.Type, typing.Callable]]], 
+                 use_header=True, 
                  header_str:typing.Optional[str] = None,
                  indent:str = "   ",
-                 timesfactor:int = 1):
-        self.method = method
-        if isinstance(method, (tuple, list)) and all(isinstance(v, typing.Callable) for v in method):
+                 indent_factor:int = 1):
+        # self.method = method
+        if isinstance(method, (tuple, list)):# and all(isinstance(v, typing.Callable) for v in method) or all(isinstance(v, typing.Type) for v in method):
             self.method = tuple(method)
         elif isinstance(method, typing.Callable):
             self.method = (method,)
+        elif isinstance(method, typing.Type):
+            self.method = tuple()
         else: 
-            self.method = None
+            self.method = tuple()
             
         if not isinstance(header_str, str) or len(header_str.strip()) == 0:
             if len(self.method):
-                header_str = f"Calls the {InflectEngine.plural('function', len(self.method))}:"
+                if all(isinstance(v, typing.Type) for v in self.method):
+                    header_str = f"inherits from the {InflectEngine.plural('class', len(self.method))}:"
+                elif all(isinstance(v, typing.Callable) for v in self.method):
+                    header_str = f"calls the {InflectEngine.plural('function', len(self.method))}:"
+                else:
+                    header_str = "Notes:"
             else:
                 header_str = "Notes:"
                 
@@ -2327,11 +2335,12 @@ class with_doc:
         
         if use_header:
             self.header = [header_str, "-" * len(header_str)]
+            
         else:
             self.header = []
             
         self.indent = indent
-        self.factor = timesfactor
+        self.factor = indent_factor
 
     def __call__(self, new_method):
         original_doc = new_method.__doc__
@@ -2344,9 +2353,10 @@ class with_doc:
                 
             else:
                 header = self.header
+                header[0] = header[0].capitalize()
                 
         else:
-            header = self.header # empty list
+            header = []
             
         if len(self.method):
             if len(self.method) > 1:
@@ -2357,7 +2367,6 @@ class with_doc:
                     docs = header
                     
                 docs += [self.indent_lines(f"{k}) {m.__name__}: \n{m.__doc__}" if m.__doc__ else f"{m.__name__}:") for k, m in enumerate(self.method)]
-                # docs += [f"{k}) {self.indent_lines(m.__name__, k)}: \n{self.indent_lines(m.__doc__, k)}" if m.__doc__ else f"{self.indent_lines(m.__name__, k)}:" for k, m in enumerate(self.method)]
                 new_doc =  "\n".join(docs)
                 
                 new_method.__doc__ = new_doc
