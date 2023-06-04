@@ -1952,7 +1952,7 @@ def get_sample_at_time(data, t):
         
     return ret
 
-def get_workspace_neo_blocks(*args, sortby:typing.Optional[typiing.Union[str, typing.Callable]]=None,
+def get_workspace_neo_blocks(*args, sortby:typing.Optional[typing.Union[str, typing.Callable]]=None,
                              ascending:bool=False):
     """Helper to get lookup neo.Blocks in the workspace by using globs or regexps"""
     
