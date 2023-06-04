@@ -1952,13 +1952,67 @@ def get_sample_at_time(data, t):
         
     return ret
 
-def get_workspace_neo_blocks(*args, sortby:typing.Optional[str]=None,
+def get_workspace_neo_blocks(*args, sortby:typing.Optional[typiing.Union[str, typing.Callable]]=None,
                              ascending:bool=False):
+    """Helper to get lookup neo.Blocks in the workspace by using globs or regexps"""
+    
+    reverse = not ascending
+    
     if len(args) == 1:
-        if isinstance(args[0], str):
-            pass
+        try:
+            if isinstance(sortby, str):
+                return workspacefunctions.getvars(args[0], 
+                                                    var_type = (neo.Block,), 
+                                                    sort=True, 
+                                                    sortkey=lambda x: getattr(x, sortby),
+                                                    reverse=reverse)
+                
+            elif isinstance(sortby, typing.Callable):
+                return workspacefunctions.getvars(args[0], 
+                                                    var_type = (neo.Block,), 
+                                                    sort=True, 
+                                                    sortkey=sortby,
+                                                    reverse=reverse)
             
-
+            else:
+                return workspacefunctions.getvars(args[0], 
+                                                    var_type = (neo.Block,), 
+                                                    sort=True, 
+                                                    sortkey=lambda x: x.rec_datetime,
+                                                    reverse=reverse)
+            
+            
+        except Exception as e:
+            print("String argument did not resolve to a list of neo.Block objects")
+            # print("String argument did not resolve to a list of neo.Block or neo.Segment objects")
+            traceback.print_exc()
+            return
+            
+    elif isinstance(args[0], collections.abc.Sequence) and all(isinstance(a, str) for a in args[0]):
+        try:
+            if isinstance(sortby, str):
+                return workspacefunctions.getvars(*args[0], var_type = (neo.Block, ), 
+                                                    sort=True, 
+                                                    sortkey=lambda x: getattr(x, sortby),
+                                                    reverse=reverse)
+                
+            elif isinstance(sortby, typing.Callable):
+                return workspacefunctions.getvars(*args[0], var_type = (neo.Block, ), 
+                                                    sort=True, 
+                                                    sortkey=sortby,
+                                                    reverse=reverse)
+                
+            else:
+                return workspacefunctions.getvars(*args[0], var_type = (neo.Block, ), 
+                                                    sort=True, 
+                                                    sortkey=lambda x: x.rec_datetime,
+                                                    reverse = reverse)
+            
+        except Exception as e:
+            print("String argument did not resolve to a list of neo.Block objects")
+            traceback.print_exc()
+            return
+        
 def get_domain_index(data, t):
     """Returns the sample index nearest to the domain scalar value `t`
     """
@@ -3433,26 +3487,28 @@ events:list                                     neo.Event,
         # if isinstance(args[0], (str, type)):
         if isinstance(args[0], str):
             try:
-                if isinstance(sortby, str):
-                    args =  workspacefunctions.getvars(args[0], 
-                                                       var_type = (neo.Block,), 
-                                                       sort=True, 
-                                                       sortkey=lambda x: getattr(x, sortby),
-                                                       reverse=reverse)
-                    
-                elif isinstance(sortby, typing.Callable):
-                    args =  workspacefunctions.getvars(args[0], 
-                                                       var_type = (neo.Block,), 
-                                                       sort=True, 
-                                                       sortkey=sortby,
-                                                       reverse=reverse)
-                
-                else:
-                    args =  workspacefunctions.getvars(args[0], 
-                                                       var_type = (neo.Block,), 
-                                                       sort=True, 
-                                                       sortkey=lambda x: x.rec_datetime,
-                                                       reverse=reverse)
+                args = get_workspace_neo_blocks(args[0], sortby=sortby,ascending=ascending)
+#             try:
+#                 if isinstance(sortby, str):
+#                     args =  workspacefunctions.getvars(args[0], 
+#                                                        var_type = (neo.Block,), 
+#                                                        sort=True, 
+#                                                        sortkey=lambda x: getattr(x, sortby),
+#                                                        reverse=reverse)
+#                     
+#                 elif isinstance(sortby, typing.Callable):
+#                     args =  workspacefunctions.getvars(args[0], 
+#                                                        var_type = (neo.Block,), 
+#                                                        sort=True, 
+#                                                        sortkey=sortby,
+#                                                        reverse=reverse)
+#                 
+#                 else:
+#                     args =  workspacefunctions.getvars(args[0], 
+#                                                        var_type = (neo.Block,), 
+#                                                        sort=True, 
+#                                                        sortkey=lambda x: x.rec_datetime,
+#                                                        reverse=reverse)
                 
                 
             except Exception as e:
@@ -3464,23 +3520,25 @@ events:list                                     neo.Event,
         # elif isinstance(args[0], collections.abc.Sequence) and all(isinstance(a, (type, str)) for a in args[0]):
         elif isinstance(args[0], collections.abc.Sequence) and all(isinstance(a, str) for a in args[0]):
             try:
-                if isinstance(sortby, str):
-                    args =  workspacefunctions.getvars(*args[0], var_type = (neo.Block, ), 
-                                                       sort=True, 
-                                                       sortkey=lambda x: getattr(x, sortby),
-                                                       reverse=reverse)
-                    
-                elif isinstance(sortby, typing.Callable):
-                    args =  workspacefunctions.getvars(*args[0], var_type = (neo.Block, ), 
-                                                       sort=True, 
-                                                       sortkey=sortby,
-                                                       reverse=reverse)
-                    
-                else:
-                    args =  workspacefunctions.getvars(*args[0], var_type = (neo.Block, ), 
-                                                       sort=True, 
-                                                       sortkey=lambda x: x.rec_datetime,
-                                                       reverse = reverse)
+                args = get_workspace_neo_blocks(args[0])
+#             try:
+#                 if isinstance(sortby, str):
+#                     args =  workspacefunctions.getvars(*args[0], var_type = (neo.Block, ), 
+#                                                        sort=True, 
+#                                                        sortkey=lambda x: getattr(x, sortby),
+#                                                        reverse=reverse)
+#                     
+#                 elif isinstance(sortby, typing.Callable):
+#                     args =  workspacefunctions.getvars(*args[0], var_type = (neo.Block, ), 
+#                                                        sort=True, 
+#                                                        sortkey=sortby,
+#                                                        reverse=reverse)
+#                     
+#                 else:
+#                     args =  workspacefunctions.getvars(*args[0], var_type = (neo.Block, ), 
+#                                                        sort=True, 
+#                                                        sortkey=lambda x: x.rec_datetime,
+#                                                        reverse = reverse)
                 
             except Exception as e:
                 print("String argument did not resolve to a list of neo.Block objects")
@@ -3489,6 +3547,21 @@ events:list                                     neo.Event,
             
         else:
             args = args[0] # unpack the args tuple
+            
+    else: # len(args) > 1
+        if all(isinstance(a, str) for a in args):
+            # get the variables by their symbols
+            ws = workspacefunctions.user_workspace()
+            not_found = [a for a in args if a not in ws]
+            if len(not_found):
+                raise KeyError(f"the following objects do not exist in the workspace: {not_found}")
+            
+            wrong_types = [a for a in args if not isinstance(a, neo.Block)]
+            
+            if len(wrong_types):
+                raise TypeError(f"The following workspace objects are of the wrong type; expecting {neo.Block.__name__}")
+            
+            args = [ws[a] for a in args]
 
     if isinstance(args, neo.Block):
         # nothing to here: return the source, or a copy of it

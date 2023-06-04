@@ -363,7 +363,7 @@ class ListTrait(List, ScipyenTraitTypeMixin):
                 if not silent:
                     self.hashed = new_hash
         except:
-            traceback.print_exc()
+            # traceback.print_exc()
             # if there is an error in comparing, default to notify
             silent = False
             

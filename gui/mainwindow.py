@@ -1446,6 +1446,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.shell.events.register("pre_execute", self.workspaceModel.preExecute)
         # self.shell.events.register("post_execute", self.workspaceModel.post_execute)
         self.shell.events.register("post_run_cell", self.workspaceModel.postRunCell)
+        
+        # NOTE: 2023-06-04 10:49:56
+        # for debugging only; comment out for relese
+        # self.shell.events.register("pre_run_cell", self.workspaceModel.preRunCell)
 
         # NOTE: 2021-01-06 17:22:45
         # A lot of things happen up to here which depend on an initialized bare-bones
