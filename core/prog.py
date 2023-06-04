@@ -1903,11 +1903,13 @@ class WithDescriptors(object):
     # 'parse_descriptor_specification' function in this module, for details.
     _descriptor_attributes_ = tuple()
     
-    # Maps a public attribute name (see above) to an instance of AttributeAdapter
-    # only needed for those descriptors that execute collateral code in the 
+    # Mapping (attribute name) : str ↦ AttributeAdapter
+    # Maps a public attribute name (see above) to an instance of AttributeAdapter.
+    # Needed for those descriptors that execute collateral code in the 
     # owner, BEFORE validating (optional) then setting the value via the 
-    # descriptor's '__set__()' method; when present, the AttributeAdapter is 
-    # called from the descriptor's '__set__()' method.
+    # descriptor's '__set__()' method.
+    #
+    # When present, the AttributeAdapter is called from the descriptor's '__set__()' method.
     #
     # The AttributeAdapter may also perform validation especially where the 
     # descriptor does NOT provide its own 'validate' method (which is also called

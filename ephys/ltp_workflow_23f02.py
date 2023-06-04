@@ -106,80 +106,118 @@
 # # sortedepis
 # # 
 
-# ------------
-# The idea is to generate a SynapticPathway with at least one PathwayEpisode,
-# given a list of source neo.Blocks (the 'trials')
-#
-# We can also use a dict to specify each pathway, in a list:
-#
-pathwaysDicts = list()
-
-# for each pathway 
-pathwayDict = {}
-pathwayDict["index"] = 0    # a single int - the index of the pathway (>=0) in 
-                            # the experiment
-pathwayDict["segments"] = 0 # usually, a single int - then index of the Segment 
-                            # (a.k.a sweep) in the source blocks, containing the
-                            # data for this pathway
-# ATTENTION: this will be IGNORED during conditioning episodes where a plasticity
-# induction protocol may be applied repeatedly to the same pathway (i.e.,
-# involving more than one sweep)
-# NOTE: conditioning is applied to the "test" pathway; however this may involve
-# stimulation of additional pathways (e.g. to a 'weak' pathway, to test for
-# 'associativity' between pathways). In this case, the pathway data is present 
-# in all sweeps (the sweeps are NOT pathway-specific, as they contain information
-# pertaining simultaneously to more than one pathway.
-                            
-# NOTE: these mappings are COMMON for all source blocks
-pathwayDict["response"] = "Im_prim_0"       # str (signal name) or int (signal index)
-pathwayDict["analogCommand"] = "Vm_sec_0"   # str (signal name) or int (signal index)
-pathwayDict["digitalCommand"] = "Stim_0"    # str (signal name) or int (signal index)
-pathwayDict["pathwayType"] = ltp.PathwayType.Test # or ltp.PathwayType.Control, etc
-pathwayDict["name"] = "Test"                # str = some relevant name
-
-
-# each pathway has at least an episode - specified by another dict, collected in
-# a list
-pathwayDict["episodes"] = [] # list of episodes, prototype is episodeDict, below:
-
-episodeDict = {}
-episodeDict["name"] = "Baseline"    # str =  some relevant name
-episodeDict["source"] = []          # list of neo.Blocks, ordered by rec_datetime
-episodeDict["pathways"] = []
-episodeDict["xtalk"] = []                   # list of unique int indices >= 0
-                                            # these are pathway indices (see above)
-                                            # and their order indicates
-                                            # the order in which the pathways 
-                                            # have been stimulated alternatively
-                                            # during a single paired-pulse stimulation
-                                            # see NOTE below
-                                            
-# NOTE: for a cross-talk, the pathwayType must be PathwayType.CrossTalk
-# and the 'order' key should be a sequence of pathway indices in the order they
-# were stimulated. The "xtalk" key is ignored for any other pathwayType value.
-#
-# A cross-talk pathway is a virtual pathway, where the possible synaptic overlap
-# between two putative 'real' pathways is tested using paired-pulse stimulation.
-#
-# This relies on a form of short-term plasticity seen with paired-pulse 
-# stimulation, when a pair of stimuli are delivered to the same pathway at a
-# short (20-30 ms) interval to evoke distinct synaptic responses in rapid succession.
-# In these conditions, the second synaptic response may be larger or smaller than 
-# the first, indicating respectively, paired-pulse 'facilitation' or 'depression'.
-#
-# Assuming that SINGLE stimuli evoke responses with the same amplitude in each 
-# pathway, then the absence of paired-pulse facilitation or depression when each
-# stimulus in a paired-pulse stimulation is delivered to alternative pathways 
-# indicates that the two pathways are independent (i.e., have no synaptic overlap).
-#
+# # ------------
+# # The idea is to generate a SynapticPathway with at least one PathwayEpisode,
+# # given a list of source neo.Blocks (the 'trials')
+# #
+# # We can also use a dict to specify each pathway, in a list:
+# #
+# pathwaysDicts = list()
 # 
+# # for each pathway 
+# pathwayDict = {}
+# pathwayDict["index"] = 0    # a single int - the index of the pathway (>=0) in 
+#                             # the experiment
+# pathwayDict["segments"] = 0 # usually, a single int - then index of the Segment 
+#                             # (a.k.a sweep) in the source blocks, containing the
+#                             # data for this pathway
+# # ATTENTION: this will be IGNORED during conditioning episodes where a plasticity
+# # induction protocol may be applied repeatedly to the same pathway (i.e.,
+# # involving more than one sweep)
+# # NOTE: conditioning is applied to the "test" pathway; however this may involve
+# # stimulation of additional pathways (e.g. to a 'weak' pathway, to test for
+# # 'associativity' between pathways). In this case, the pathway data is present 
+# # in all sweeps (the sweeps are NOT pathway-specific, as they contain information
+# # pertaining simultaneously to more than one pathway.
+#                             
+# # NOTE: these mappings are COMMON for all source blocks
+# pathwayDict["response"] = "Im_prim_0"       # str (signal name) or int (signal index)
+# pathwayDict["analogCommand"] = "Vm_sec_0"   # str (signal name) or int (signal index)
+# pathwayDict["digitalCommand"] = "Stim_0"    # str (signal name) or int (signal index)
+# pathwayDict["pathwayType"] = ltp.PathwayType.Test # or ltp.PathwayType.Control, etc
+# pathwayDict["name"] = "Test"                # str = some relevant name
+# 
+# 
+# # each pathway has at least an episode - specified by another dict, collected in
+# # a list
+# pathwayDict["episodes"] = [] # list of episodes, prototype is episodeDict, below:
+# 
+# episodeDict = {}
+# episodeDict["name"] = "Baseline"    # str =  some relevant name
+# episodeDict["source"] = []          # list of neo.Blocks, ordered by rec_datetime
+# episodeDict["pathways"] = []
+# episodeDict["xtalk"] = []                   # list of unique int indices >= 0
+#                                             # these are pathway indices (see above)
+#                                             # and their order indicates
+#                                             # the order in which the pathways 
+#                                             # have been stimulated alternatively
+#                                             # during a single paired-pulse stimulation
+#                                             # see NOTE below
+#                                             
+# # NOTE: for a cross-talk, the pathwayType must be PathwayType.CrossTalk
+# # and the 'order' key should be a sequence of pathway indices in the order they
+# # were stimulated. The "xtalk" key is ignored for any other pathwayType value.
+# #
+# # A cross-talk pathway is a virtual pathway, where the possible synaptic overlap
+# # between two putative 'real' pathways is tested using paired-pulse stimulation.
+# #
+# # This relies on a form of short-term plasticity seen with paired-pulse 
+# # stimulation, when a pair of stimuli are delivered to the same pathway at a
+# # short (20-30 ms) interval to evoke distinct synaptic responses in rapid succession.
+# # In these conditions, the second synaptic response may be larger or smaller than 
+# # the first, indicating respectively, paired-pulse 'facilitation' or 'depression'.
+# #
+# # Assuming that SINGLE stimuli evoke responses with the same amplitude in each 
+# # pathway, then the absence of paired-pulse facilitation or depression when each
+# # stimulus in a paired-pulse stimulation is delivered to alternative pathways 
+# # indicates that the two pathways are independent (i.e., have no synaptic overlap).
+# #
+# # 
+# 
+# # NOTE: episodes in the pathwayDict["episodes"] list will be ordered by the
+# # rec_datetime attribute of the first block in the episodeDict["source"] list; 
+# # so, make sure you've assigned their names in a meaningful way (e.g., you typically
+# # would avoid an episode named 'Baseline' to have been recorded AFTER an episode 
+# # named "Chase", etc)
+# 
+# #
 
-# NOTE: episodes in the pathwayDict["episodes"] list will be ordered by the
-# rec_datetime attribute of the first block in the episodeDict["source"] list; 
-# so, make sure you've assigned their names in a meaningful way (e.g., you typically
-# would avoid an episode named 'Baseline' to have been recorded AFTER an episode 
-# named "Chase", etc)
 
-#
+Constructing a SynapticPathway:
+    
+    a) from a concatenated new.Block and a Schedule
+    • requires: 
+        ∘ response signal(s) : GeneralIndexType
+            - may be different per episode
+    • optional:
+        ∘ analog command signal(s): GeneralIndexType
+        ∘ digital command signal(s): GeneralIndexType
+        ∘ protocol - ?
+            ⋆ TriggerProtocol (trigger events & timing)
+            ⋆ CommandProtocol (i.e., command waveforms & timing)
+    
+Pseudo-code for parsing the protocol from an ABF:
+    abf = getABF(neo Block object) ← inly works with neo Blocs created by reading
+        and ABF file; will FAIL for synthetic neo.Blocks (even if these were 
+        created through concatenation of ABF file-generated neo Blocks)
+    
+    Useful info:
+        abf.sweepCount → the number of sweeps - corresponds to the number of 
+            neo.Segment objects in the neo.Block
+            
+        
+        abf.channelCount → the number of channels - corresponds to the number of
+            neo.AnalogSignals objects in the segments (which must be the same in 
+            all segments)
+            
+        abf.sweepNumber → current sweep "set" by setSweep
+        
+        abf.setSweep(sweep:int, channel:Optional[int] = 0)
+        
+        e.g.:
+            
+        abf.setSweep(12, absoluteTime=False); plt.clf(); plt.plot(abf.sweepX, abf.sweepY)
 
-
+        compare with:
+    
+        abf.setSweep(12, absoluteTime=False); plt.clf(); plt.plot(abf.sweepX, abf.sweepY)

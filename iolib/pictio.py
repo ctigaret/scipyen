@@ -1766,7 +1766,12 @@ def getABF(obj):
     
     if loader == loadAxonFile:
         try:
-            return pyabf.ABF(filename)
+            if filename.lower().endswith(".abf"):
+                return pyabf.ABF(filename)
+            elif filename.lower().endswith(".atf"):
+                return pyabf.ATF(filename)
+            else:
+                raise RuntimeError("pyabf can only handle ABF and ATF files")
         except:
             pass
         

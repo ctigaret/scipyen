@@ -245,12 +245,12 @@ of the source data.
     this information here, instead of the SynapticPathway instance to which this
     episode belongs to.`
     
-• analogCommand : int or str - index or name of the analog signal containing
+• analogStimulus : int or str - index or name of the analog signal containing
     voltage- or current-clamp command signal (or None); such a signal is 
     typically recorded - when available - by feeding the secondary output of
     the amplifier into an ADC input in the acquisition board.
     
-• digitalCommand: int or str - index or name of the analog signal containing
+• digitalStimulus: int or str - index or name of the analog signal containing
     a recorded version of the triggers for extracellular stimulation.
     
     When available, these are triggers sent to stimulus isolation boxes to 
@@ -315,8 +315,8 @@ of the source data.
     def __init__(self, name:str, /, *args,
                  segments:typing.Optional[GeneralIndexType] = None,
                  response:typing.Optional[typing.Union[str, int]] = None, 
-                 analogCommand:typing.Optional[typing.Union[str, int]] = None, 
-                 digitalCommand:typing.Optional[typing.Union[str, int]] = None, 
+                 analogStimulus:typing.Optional[typing.Union[str, int]] = None, 
+                 digitalStimulus:typing.Optional[typing.Union[str, int]] = None, 
                  electrodeMode:ElectrodeMode = ElectrodeMode.Field,
                  clampMode:ClampMode = ClampMode.NoClamp,
                  xtalk:typing.Optional[typing.List[SynapticPathway]] = None,
@@ -366,8 +366,8 @@ See also the class documentation.
         super().__init__(name, **kwargs)
         
         self.response=response
-        self.analogCommand = analogCommand
-        self.digitalCommand = digitalCommand
+        self.analogStimulus = analogStimulus
+        self.digitalStimulus = digitalStimulus
         
         if not isinstance(electrodeMode, ElectrodeMode):
             electrodeMode = ElectrodeMode.Field
@@ -397,10 +397,6 @@ See also the class documentation.
         else:
             self.xtalk = []
                 
-            
-        # self.pathways = pathways
-        # self.xtalk = xtalk
-        
         sort = sortby is not None
         
         reverse = not ascending
@@ -447,8 +443,8 @@ See also the class documentation.
             p.text(supertxt)
             p.breakable()
             attr_repr = [" "]
-            attr_repr += [f"{a}: {getattr(self,a).__repr__()}" for a in ("response", "analogCommand",
-                                                         "digitalCommand",
+            attr_repr += [f"{a}: {getattr(self,a).__repr__()}" for a in ("response", "analogStimulus",
+                                                         "digitalStimulus",
                                                          "electrodeMode",
                                                          "clampMode")]
             
@@ -482,18 +478,20 @@ See also the class documentation.
 class SynapticPathway(BaseScipyenData):
     """Encapsulates a logical stimulus-response relationship between signals.
 
-    Signals are identified by name or their index in the collection of a sweep's
-    analogsignals (the `analogsignals` attribute of a neo.Segment object).
+    Signals are identified by name or their integer index in the collection of a 
+    neo.Segment (sweep) analogsignals. They are NOT stored in the SynapticPathway
+    instance.
 
-    These signals are and their contents are:
+    These signals are:
     • response (analog, regularly sampled): recorded synaptic responses
     
-    • analogCommand (analog, regularly sampled): command waveform; typically, 
-        this is a record of the secondary output of the amplifier, when available,
-        and carries the amplifier "command", e.g. the voltage command in voltage 
-        clamp, or injected current, in current clamp.
+    • analogStimulus (analog, regularly sampled): the recorded command waveform;
+        typically, this is a record of the secondary output of the amplifier, 
+        when available, that has been fed into an auxiliary analog input port of
+        the acquisition device; this signal carries the amplifier "command", e.g. 
+        the voltage command in voltage clamp, or injected current, in current clamp.
     
-    • digitalCommand (analog, regularly sampled): the TTL (a.k.a the "digital")
+    • digitalStimulus (analog, regularly sampled): the TTL (a.k.a the "digital")
         output signal from the acquisition board, typically recorded by feeding this 
         output into an analog input port, when available.
     
@@ -528,8 +526,8 @@ class SynapticPathway(BaseScipyenData):
                  index:int = 0,
                  segments:GeneralIndexType=0,
                  response:typing.Optional[typing.Union[str, int]]=None, 
-                 analogCommand:typing.Union[typing.Union[str, int]] = None, 
-                 digitalCommand:typing.Optional[typing.Union[str, int]] = None, 
+                 analogStimulus:typing.Union[typing.Union[str, int]] = None, 
+                 digitalStimulus:typing.Optional[typing.Union[str, int]] = None, 
                  schedule:typing.Optional[typing.Union[Schedule, typing.Sequence[PathwayEpisode]]] = None, 
                  **kwargs):
         """SynapticPathway constructor.
@@ -568,14 +566,14 @@ response: GeneralIndexType
     
     NOTE: This is also used when 'data'is constructed from *args. Therefore, it
     should typically resolve to subset of signals distinct from those indicated 
-    by the 'analogCommand' and 'digitalCommand' parameters (see next)
+    by the 'analogStimulus' and 'digitalStimulus' parameters (see next)
     
 
-analogCommand: GeneralIndexType
+analogStimulus: GeneralIndexType
     Index of the analog signal(s) containing the clamping command, or None.
     NOTE: Also used to construct the data from *args.
 
-digitalCommand: GeneralIndexType
+digitalStimulus: GeneralIndexType
     Index of the analog signal(s) containing the digital command, or None (default)
     NOTE: Also used to construct the data from *args.
     
@@ -597,9 +595,9 @@ Notes:
     """
         super().__init__(**kwargs)
         
-        if not isinstance(data, neo.Block):
-            if len(args):
-                data = concatenate_blocks(*args, segments=segments)
+        # if not isinstance(data, neo.Block):
+        #     if len(args):
+        #         data = concatenate_blocks(*args, segments=segments)
         
     @staticmethod
     def fromBlocks(pathName:str, pathwayType:PathwayType=PathwayType.Test, 
@@ -689,8 +687,8 @@ Notes:
         return SynapticPathway(data=data, name=pathName,
                                pathwayType=pathwayType,
                                response=response,
-                               analogCommand=analogCommand,
-                               digitalCommand=digitalCommand,
+                               analogStimulus=analogStimulus,
+                               digitalStimulus=digitalStimulus,
                                schedule=schedule)
         
         
@@ -806,8 +804,8 @@ def makeSynapticPathway(**kwargs):
         ---------------------------
         segments
         response
-        analogCommand
-        digitalCommand
+        analogStimulus
+        digitalStimulus
         pathwayType
         episodes: list of episodeDicts:
             name
