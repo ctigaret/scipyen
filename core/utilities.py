@@ -3391,6 +3391,19 @@ def name_lookup(container: typing.Sequence, name:str, multiple: bool = True) -> 
         
     return names.index(name)
 
+def merge_indexes(*args) -> typing.Optional[GeneralIndexType]:
+    """Merge several GeneralIndexType objects into one"""
+    
+    if len(args) == 0:
+        return
+    
+    if not all(isinstance(v, GeneralIndexType) for v in args):
+        raise TypeError("Expecting a sequence of GeneralIndexType objects")
+    
+    not_missing = [a for a in args if not isinstance(a, type(MISSING))]
+    
+    # ranges = 
+
 @with_doc(prog.filter_attr, use_header = True)
 def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series]], 
                      index: typing.Optional[GeneralIndexType] = None, 

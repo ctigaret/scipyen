@@ -522,33 +522,62 @@ class SynapticPathway(BaseScipyenData):
     _descriptor_attributes_ = _data_children_ + _data_attributes_ + BaseScipyenData._descriptor_attributes_
     
     @with_doc(concatenate_blocks, use_header = True)
-    def __init__(self, data:typing.Optional[neo.Block] = None, 
+    def __init__(self, *args, data:typing.Optional[neo.Block] = None, 
                  pathwayType:PathwayType = PathwayType.Test, 
                  name:typing.Optional[str]=None, 
+                 index:int = 0,
+                 segments:GeneralIndexType=0,
                  response:typing.Optional[typing.Union[str, int]]=None, 
                  analogCommand:typing.Union[typing.Union[str, int]] = None, 
                  digitalCommand:typing.Optional[typing.Union[str, int]] = None, 
-                 schedule:typing.Optional[typing.Union[Schedule, typing.Sequence[PathayEpisode]]] = None, **kwargs):
+                 schedule:typing.Optional[typing.Union[Schedule, typing.Sequence[PathwayEpisode]]] = None, 
+                 **kwargs):
         """SynapticPathway constructor.
+
+Var-positional parameters (may be empty)
+-----------------------------------------
+When present, they specify source neo.Block objects wthat will need to be 
+    concatenated to create the underlying data.
+
 Named parameters:
 -----------------
 data: A neo.Block obtained from concatenating several source neo.Blocks (see the
     function neoutils.concatenate_blocks(…) for details). Optional, default is 
     None.
     
-pathwayType: the role of the pathway in a synaptic plasticity experiment
+    When specified, the values in *args will be ignored.
+    
+pathwayType: PathwayType
+    The role of the pathway in a synaptic plasticity experiment
                 (Test, Control, Other)
 
-name: name of the pathway (by default is the name of the pathwayType)
+name: str
+     Name of the pathway (by default is the name of the pathwayType)
+    
+index: int
+    The index of the Pathway ( >= 0); default is 0
+    
+segments: GeneralIndexType¹
+    The index of the segments in the source data in *args.
+    
+    Used only when 'data' is constructed by concatenating the neo.Blocks in *args
 
-response: name or index¹ of the analog signal containing the synaptic response, 
-        or None (default)
+response: GeneralIndexType
+    The index of the analog signal(s) containing the synaptic response.
+    Default is None.
+    
+    NOTE: This is also used when 'data'is constructed from *args. Therefore, it
+    should typically resolve to subset of signals distinct from those indicated 
+    by the 'analogCommand' and 'digitalCommand' parameters (see next)
+    
 
-analogCommand: name or index¹ of the analog signal containing the analog
-        command signal or None (default)
+analogCommand: GeneralIndexType
+    Index of the analog signal(s) containing the clamping command, or None.
+    NOTE: Also used to construct the data from *args.
 
-digitalCommand: name or index¹ of the analog signal containing the digital
-        command signal or None (default)
+digitalCommand: GeneralIndexType
+    Index of the analog signal(s) containing the digital command, or None (default)
+    NOTE: Also used to construct the data from *args.
     
 schedule: a Schedule, or a sequence (tuple, list) of PathwayEpisodes; 
         optional, default is None.
@@ -560,8 +589,17 @@ schedule: a Schedule, or a sequence (tuple, list) of PathwayEpisodes;
 Var-keyword parameters (kwargs):
 --------------------------------
 These are passed directly to the superclass constructor (BaseScipyenData).
+    
+Notes:
+-----
+¹see core.utilities.GeneralIndexType
+    
     """
         super().__init__(**kwargs)
+        
+        if not isinstance(data, neo.Block):
+            if len(args):
+                data = concatenate_blocks(*args, segments=segments)
         
     @staticmethod
     def fromBlocks(pathName:str, pathwayType:PathwayType=PathwayType.Test, 
