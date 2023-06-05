@@ -74,6 +74,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     internalVariableChanged = pyqtSignal(dict, name="internalVariableChanged")
     varModified = pyqtSignal(object, name="varModified")
     sig_startAsyncUpdate = pyqtSignal(dict, name="sig_startAsyncUpdate")
+    
+    #                         ns    dataname ns_name 
+    sig_varAdded = pyqtSignal(dict, str,     str,     name="sig_varAdded")
+    sig_varRemoved = pyqtSignal(dict, str,     str,     name="sig_varRemoved")
+    sig_varModified = pyqtSignal(dict, str,     str,     name="sig_varModified")
 
     def __init__(self, shell, user_ns_hidden=dict(),
                  parent=None,
@@ -156,8 +161,16 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self._varChanges_callbacks_ = {WorkspaceVarChange.New:      partial(self.__class__.addRowForVariable2, self, self.shell.user_ns),
                                        WorkspaceVarChange.Modified: partial(self.__class__.updateRowForVariable2, self, self.shell.user_ns),
                                        WorkspaceVarChange.Removed:  partial(self.__class__.removeRowForVariable2, self, self.shell.user_ns)}
+        # self._varChanges_callbacks_ = {WorkspaceVarChange.New:      self.addRowForVariable2,
+        #                                WorkspaceVarChange.Modified: self.updateRowForVariable2,
+        #                                WorkspaceVarChange.Removed:  self.removeRowForVariable2}
+        
+        self.sig_varAdded.connect(self.addRowForVariable2)
+        self.sig_varModified.connect(self.updateRowForVariable2)
+        self.sig_varRemoved.connect(self.removeRowForVariable2)
 
-        self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
+        # self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
+        self.internalVariableChanged.connect(self._slot_cacheInternalVariableChange_)
         self.sig_startAsyncUpdate.connect(self._slot_updateModelAsync_)# , QtCore.Qt.QueuedConnection)
 
     def _foreignNamespacesCountChanged_(self, change):
@@ -736,17 +749,17 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         name = change.name
         change_type = change.get("change_type", change.type)
         
-        if change_type in ("remove", "removed"):
-            self.__changes__[name] = WorkspaceVarChange.Removed
-        elif change_type == "new":
+        if change_type == "new":
             self.__changes__[name] = WorkspaceVarChange.New
+        elif change_type in ("remove", "removed"):
+            self.__changes__[name] = WorkspaceVarChange.Removed
         elif change_type == "modified":
             self.__changes__[name] = WorkspaceVarChange.Modified
         else:   # for legacy (traitlets.TraitType-style) notifications
                 # that lack 'change_type' attribute
             self.__changes__[name] = WorkspaceVarChange.Modified
             
-        print(f"\n{self.__class__.__name__}._slot_cacheInternalVariableChange_ self.__changes__ = {self.__changes__} and {name} is in workspace: {name in self.shell.user_ns}")
+        # print(f"\n{self.__class__.__name__}._slot_cacheInternalVariableChange_ self.__changes__ = {self.__changes__} and {name} is in workspace: {name in self.shell.user_ns}")
 
     @pyqtSlot(dict)
     def _slot_internalVariableChanged_(self, change):
@@ -1038,18 +1051,19 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         in order to be able to manage them more consistently.
         
         """
+        from core.workspacefunctions import validate_varname
         
         # NOTE: 2023-06-01 08:14:33 - see also NOTE: 2023-06-01 08:14:33
         # still slow for many variables that have been modified and which are
         # reported as having been modified
         #
-        # try this:
         # print(f"\n{self.__class__.__name__}._updateModel_ last execution result: {self.lastExecutionResult}")
-        try:
-            self.internalVariableChanged.disconnect(self._slot_internalVariableChanged_)
-        except:
-            traceback.print_exc()
-        self.internalVariableChanged.connect(self._slot_cacheInternalVariableChange_)
+        
+        # try:
+        #     self.internalVariableChanged.disconnect(self._slot_internalVariableChanged_)
+        # except:
+        #     traceback.print_exc()
+        # self.internalVariableChanged.connect(self._slot_cacheInternalVariableChange_)
         
         
         # ATTENTION 2023-05-24 17:04:36
@@ -1123,12 +1137,17 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 # and thus they will reassign the variables in cached_mp_figs, 
                 # or other caches (when the varibale is nto an mpl figure.
                 # 
-                # Hence, simply checing for inclusion in self.cached_mpl_figs
+                # Hence, simply checking for inclusion in self.cached_mpl_figs
                 # will always lead to noop, below.
                 #
-                # Instead, we shoupd also check if v is the lastExecutionResult
+                # Instead, we should also check if v is the lastExecutionResult
                 # if v not in self.cached_mpl_figs:
-                if v not in self.cached_mpl_figs or v is self.lastExecutionResult:
+                # print(f"\n{self.__class__.__name__}._updateModel_: fig is last execution result: { v == self.lastExecutionResult}")
+                # if v == self.lastExecutionResult:
+                #     new_mpl_figs.add(v)
+                # elif v not in self.cached_mpl_figs:
+                #     new_mpl_figs.add(v)
+                if v not in self.cached_mpl_figs or v == self.lastExecutionResult:
                     new_mpl_figs.add(v)
 
         # print(f"\n{self.__class__.__name__}._updateModel_ new_mpl_figs not in cached_mpl_figs = {new_mpl_figs}")
@@ -1164,7 +1183,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # ) if isinstance(v, mpl.figure.Figure)]
 
             # adjust variable name to avoid clashes
-            if fig_var_name in ns:
+            if fig_var_name in ns and ns[fig_var_name] != fig: # avoid surprises
                 fig_var_name = validate_varname(fig_var_name, ws=ns)
                 
             # print(f"\n{self.__class__.__name__}._updateModel_ new figure {fig_var_name} ↦ {fig} ")
@@ -1250,11 +1269,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         # NOTE: 2023-06-01 08:16:13
         # see NOTE: 2023-06-01 08:14:33
-        try:
-            self.internalVariableChanged.disconnect(self._slot_cacheInternalVariableChange_)
-        except:
-            traceback.print_exc()
-        self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
+        # try:
+        #     self.internalVariableChanged.disconnect(self._slot_cacheInternalVariableChange_)
+        # except:
+        #     traceback.print_exc()
+        # self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
         
         # NOTE: 2023-06-05 20:59:00
         # connection to self._slot_updateModelAsync_
@@ -1265,7 +1284,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # the next two signal a change directory command issued at the console
         current_dir = os.getcwd()
         self.workingDir.emit(current_dir)
-
+        
     def _generateModelItemForObject_(self, propdict: dict, editable: typing.Optional[bool] = False, elidetip: typing.Optional[bool] = False, background: typing.Optional[QtGui.QBrush] = None, foreground: typing.Optional[QtGui.QBrush] = None):
         # print(f"_generateModelItemForObject_ propdict = {propdict}")
         item = QtGui.QStandardItem(propdict["display"])
@@ -1407,27 +1426,32 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     #         v_row = self.generateRowContents(dataname, data)
     #         self.updateRow(row, v_row)
 
-    def updateRowForVariable2(self, ns: dict, dataname: str, ns_name: typing.Optional[str] = None):
+    @pyqtSlot(dict, str, str)
+    def updateRowForVariable2(self, ns: dict, dataname: str, ns_name:str = "Internal"):
         # CAUTION This is only for internal workspace, but
         # TODO 2020-07-30 22:18:35 merge & factor code for both internal and foreign
         # kernels (make use of the ns parameter)
         #
+        # print(f"{self.__class__.__name__}.updateRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
         if dataname not in ns:
+            return
+        
+        if dataname not in self.getDisplayedVariableNames(asStrings=True, ws=ns_name):
+            self.addRowForVariable2(ns, dataname, ns_name)
             return
 
         data = ns[dataname]
 
-        if ns_name is None:
-            ns_name = "Internal"
+        # if ns_name is None:
+        #     ns_name = "Internal"
+        # 
+        # elif isinstance(ns_name, str):
+        #     if len(ns_name.strip()) == 0:
+        #         ns_name = "Internal"
+        # 
+        # else:
+        #     ns_name = "Internal"
 
-        elif isinstance(ns_name, str):
-            if len(ns_name.strip()) == 0:
-                ns_name = "Internal"
-
-        else:
-            ns_name = "Internal"
-
-        # print(f"{self.__class__.__name__}.updateRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
 
         row = self.rowIndexForItemsWithProps(Workspace=ns_name)
 
@@ -1491,13 +1515,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     #     else:
     #         self.removeRow(row)
 
-    def removeRowForVariable2(self, ns: dict, dataname: str, ns_name: typing.Optional[str] = None):
-        if isinstance(ns_name, str):
-            if len(ns_name.strip()) == 0:
-                ns_name = "Internal"
-
-        else:
-            ns_name = "Internal"
+    @pyqtSlot(dict, str, str)
+    def removeRowForVariable2(self, ns: dict, dataname: str, ns_name: str = "Internal"):
+        # if isinstance(ns_name, str):
+        #     if len(ns_name.strip()) == 0:
+        #         ns_name = "Internal"
+        # 
+        # else:
+        #     ns_name = "Internal"
 
         # print(f"{self.__class__.__name__}.removeRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
         row = self.rowIndexForItemsWithProps(Name=dataname, Workspace=ns_name)
@@ -1520,16 +1545,17 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     #     v_row = self.generateRowContents(dataname, data)
     #     self.appendRow(v_row)  # append the row to the model
 
-    def addRowForVariable2(self, ns: dict, dataname: str, ns_name: typing.Optional[str] = None):
+    @pyqtSlot(dict, str, str)
+    def addRowForVariable2(self, ns: dict, dataname: str, ns_name: str = "Internal"):
         """CAUTION Only use for data in the internal workspace, not in remote ones.
         """
-        print(f"\n{self.__class__.__name__}.addRowForVariable2 for {dataname}")
-        if isinstance(ns_name, str):
-            if len(ns_name.strip()) == 0:
-                ns_name = "Internal"
-
-        else:
-            ns_name = "Internal"
+        # print(f"\n{self.__class__.__name__}.addRowForVariable2 for {dataname}")
+        # if isinstance(ns_name, str):
+        #     if len(ns_name.strip()) == 0:
+        #         ns_name = "Internal"
+        # 
+        # else:
+        #     ns_name = "Internal"
 
         if dataname not in ns:
             return
@@ -1592,11 +1618,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         internal variable monitor which triggers Ui updates already.
 
         """
-        try:
-            self.internalVariableChanged.disconnect(self._slot_internalVariableChanged_)
-        except:
-            traceback.print_exc()
-        self.internalVariableChanged.connect(self._slot_cacheInternalVariableChange_)
+        # try:
+        #     self.internalVariableChanged.disconnect(self._slot_internalVariableChanged_)
+        # except:
+        #     traceback.print_exc()
+        # self.internalVariableChanged.connect(self._slot_cacheInternalVariableChange_)
         
         # currently displayed variables in the viewer widget
         displayed_var_names = set(self.getDisplayedVariableNames())
@@ -1627,11 +1653,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.internalVariablesMonitor.delete(*list(del_vars)) # -> WorkspaceVarChange.Removed
         self.internalVariablesMonitor.update(current_vars) # -> WorkspaceVarChange.New or WorkspaceVarChange.Modified
             
-        try:
-            self.internalVariableChanged.disconnect(self._slot_cacheInternalVariableChange_)
-        except:
-            traceback.print_exc()
-        self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
+        # try:
+        #     self.internalVariableChanged.disconnect(self._slot_cacheInternalVariableChange_)
+        # except:
+        #     traceback.print_exc()
+        # self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
         
         self.sig_startAsyncUpdate.emit(self.shell.user_ns)
         
@@ -1688,24 +1714,42 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
     @pyqtSlot(dict)
     def _slot_updateModelAsync_(self, namespace:dict):
-        """Triggered by self.sig_startAsyncUpdate emitted by self.update2()
+        """Triggered by self.sig_startAsyncUpdate signal.
+        This signal is emitted by self.update() and self._updateModel_()
         """
-        print(f"\n{self.__class__.__name__}._slot_updateModelAsync_ self.__changes__ = {self.__changes__}")
+        # print(f"\n{self.__class__.__name__}._slot_updateModelAsync_ self.__changes__ = {self.__changes__}")
         if len(self.__changes__) == 0:
             return
         
-        removals = filter(lambda x: x[1] == WorkspaceVarChange.Removed, self.__changes__.items())
-        additions = filter(lambda x: x[1] == WorkspaceVarChange.New, self.__changes__.items())
-        modifications = filter(lambda x: x[1] == WorkspaceVarChange.Modified, self.__changes__.items())
+        # removals = []
+        # additions = []
+        # modifications = []
+        
+        removals = list(filter(lambda x: x[1] == WorkspaceVarChange.Removed, self.__changes__.items()))
+        additions = list(filter(lambda x: x[1] == WorkspaceVarChange.New, self.__changes__.items()))
+        modifications = list(filter(lambda x: x[1] == WorkspaceVarChange.Modified, self.__changes__.items()))
+        
+        # print(f"\n{self.__class__.__name__}._slot_updateModelAsync_ removals = {removals}")
+        # print(f"\n{self.__class__.__name__}._slot_updateModelAsync_ additions = {additions}")
+        # print(f"\n{self.__class__.__name__}._slot_updateModelAsync_ modifications = {modifications}")
         
         
         for item in removals:
+            # self.sig_varRemoved.emit(self.shell.user_ns, item[0], "Internal")
+            # self._varChanges_callbacks_[item[1]](self.shell.user_ns, item[0])
+            # print(f"\n{self.__class__.__name__}._slot_updateModelAsync_ for {item[0]} to call {self._varChanges_callbacks_[item[1]].func.__name__}")
             self._varChanges_callbacks_[item[1]](item[0])
         
         for item in additions:
+            # self.sig_varAdded.emit(self.shell.user_ns, item[0], "Internal")
+            # self._varChanges_callbacks_[item[1]](self.shell.user_ns, item[0])
+            # print(f"\n{self.__class__.__name__}._slot_updateModelAsync_ for {item[0]} to call {self._varChanges_callbacks_[item[1]].func.__name__}")
             self._varChanges_callbacks_[item[1]](item[0])
         
         for item in modifications:
+            # self.sig_varModified.emit(self.shell.user_ns, item[0], "Internal")
+            # print(f"\n{self.__class__.__name__}._slot_updateModelAsync_ for {item[0]} to call {self._varChanges_callbacks_[item[1]].func.__name__}")
+            # self._varChanges_callbacks_[item[1]](self.shell.user_ns, item[0])
             self._varChanges_callbacks_[item[1]](item[0])
 
         self.__changes__.clear()
