@@ -168,6 +168,7 @@ import json
 from pprint import pprint
 from copy import copy, deepcopy
 import collections
+from collections import deque
 # from collections import ChainMap
 from importlib import reload  # I use this all too often !
 # END core python modules
@@ -1307,7 +1308,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self._lastVariableFind = str()
         self._commandHistoryFinderList = collections.deque()
         self._lastCommandFind = str()
-        self._recentScripts = list()
+        # self._recentScripts = list()
+        self._recentScripts = deque()
         self._recent_scripts_dict_ = dict()
         self._showFilesFilter = False
         self._console_docked_ = False
@@ -1804,12 +1806,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def recentScripts(self, val: typing.Optional[typing.Union[collections.deque, list, tuple]] = None):
         # print(f"ScipyenWindow.recentScripts.setter {val}")
         if isinstance(val, (collections.deque, list, tuple)):
-            # self._recentScripts = collections.deque((s for s in val if os.path.isfile(s)))
-            self._recentScripts = list((s for s in val if os.path.isfile(s)))
+            self._recentScripts = collections.deque((s for s in val if os.path.isfile(s)))
+            # self._recentScripts = list((s for s in val if os.path.isfile(s)))
 
         else:
-            self._recentScripts = list()
-            # self._recentScripts = collections.deque()
+            # self._recentScripts = list()
+            self._recentScripts = collections.deque()
 
         # NOTE:2022-01-28 23:16:57
         # obsolete; this is added to configurable_traits at __init__, AFTER
@@ -5694,7 +5696,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 self._run_python_source_code_(fileName, paste=False)
 
                 if fileName not in self.recentScripts:
-                    self.recentScripts.appendleft(fileName)
+                    if isinstance(self.recentScripts, deque):
+                        self.recentScripts.appendleft(fileName)
+                    else:
+                        rscripts = deque(self.recentScripts)
+                        rscripts.appendleft(fileName)
+                        self.recentScripts = rscripts
+                        # self.recentScripts.insert(0, fileName)
+                        
                     self._refreshRecentScriptsMenu_()
 
                 else:
@@ -5773,7 +5782,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # print("MainWindow new root path", newPath)
 
     @safeWrapper
-    def slot_selectWorkDir(self):
+    def slot_selectWorkDir(self, *args):
         targetDir = self.recentDirectories[0]
         caption = "Select Working Directory"
         if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
@@ -6555,8 +6564,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # be saved in the config
                 # see solution at NOTE:2022-01-28 23:16:57
                 #
-                # self.recentScripts.appendleft(self._temp_python_filename_)
-                self.recentScripts.insert(0, self._temp_python_filename_)
+                self.recentScripts.appendleft(self._temp_python_filename_)
+                # self.recentScripts.insert(0, self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
 
             else:
