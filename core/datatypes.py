@@ -891,9 +891,10 @@ class Episode:
     _:KW_ONLY
     begin:datetime.datetime = datetime.datetime.now()
     end:datetime.datetime = datetime.datetime.now()
-    startFrame:int = 0
+    beginFrame:int = 0
     endFrame:int = 1
     
+            
 @dataclass
 class Schedule:
     name:str = ""

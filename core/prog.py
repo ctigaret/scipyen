@@ -28,8 +28,9 @@ from traitlets import Bunch
 import numpy as np
 import neo, vigra
 import quantities as pq
-from . import workspacefunctions
-from .workspacefunctions import debug_scipyen
+# from . import workspacefunctions
+# from .workspacefunctions import debug_scipyen
+from .strutils import InflectEngine
 
 CALLABLE_TYPES = (types.FunctionType, types.MethodType,
                   types.WrapperDescriptorType, types.MethodWrapperType,
@@ -1288,18 +1289,20 @@ def processtimefunc(func):
         return r
     return wrapper
 
-def with_doc_after(f):
-    """TODO/FIXME
-    see for example vigra.arraytypes._preserve_doc decorator
-    """
-    def wrap(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            func.__doc__ = "\n".join([func.__doc__, f.__doc__])
-            print(func.__doc__)
-            return func
-        return wrapper
-    return wrap
+# NOTE: 2023-06-02 13:11:28
+# this below deprecated in favour of our own with_doc class (see above)
+# def with_doc_after(f):
+#     """TODO/FIXME
+#     see for example vigra.arraytypes._preserve_doc decorator
+#     """
+#     def wrap(func):
+#         @wraps(func)
+#         def wrapper(*args, **kwargs):
+#             func.__doc__ = "\n".join([func.__doc__, f.__doc__])
+#             print(func.__doc__)
+#             return func
+#         return wrapper
+#     return wrap
     
 
 def no_sip_autoconversion(klass):
@@ -1900,11 +1903,13 @@ class WithDescriptors(object):
     # 'parse_descriptor_specification' function in this module, for details.
     _descriptor_attributes_ = tuple()
     
-    # Maps a public attribute name (see above) to an instance of AttributeAdapter
-    # only needed for those descriptors that execute collateral code in the 
+    # Mapping (attribute name) : str ↦ AttributeAdapter
+    # Maps a public attribute name (see above) to an instance of AttributeAdapter.
+    # Needed for those descriptors that execute collateral code in the 
     # owner, BEFORE validating (optional) then setting the value via the 
-    # descriptor's '__set__()' method; when present, the AttributeAdapter is 
-    # called from the descriptor's '__set__()' method.
+    # descriptor's '__set__()' method.
+    #
+    # When present, the AttributeAdapter is called from the descriptor's '__set__()' method.
     #
     # The AttributeAdapter may also perform validation especially where the 
     # descriptor does NOT provide its own 'validate' method (which is also called
@@ -2293,3 +2298,101 @@ def show_caller_stack(stack):
     for s in stack:
         print(f"\tcaller\t {s.function} at line {s.lineno} in {s.filename}")
     
+class with_doc:
+    """
+    This decorator combines the docstrings of the provided and decorated objects
+    to produce the final docstring for the decorated object.
+    
+    Modified version of python quantities.decorators.with_doc
+    
+    """
+
+    def __init__(self, method:typing.Union[typing.Type, typing.Callable, typing.Sequence[typing.Union[typing.Type, typing.Callable]]], 
+                 use_header=True, 
+                 header_str:typing.Optional[str] = None,
+                 indent:str = "   ",
+                 indent_factor:int = 1):
+        # self.method = method
+        if isinstance(method, (tuple, list)):# and all(isinstance(v, typing.Callable) for v in method) or all(isinstance(v, typing.Type) for v in method):
+            self.method = tuple(method)
+        elif isinstance(method, typing.Callable):
+            self.method = (method,)
+        elif isinstance(method, typing.Type):
+            self.method = tuple()
+        else: 
+            self.method = tuple()
+            
+        if not isinstance(header_str, str) or len(header_str.strip()) == 0:
+            if len(self.method):
+                if all(isinstance(v, typing.Type) for v in self.method):
+                    header_str = f"inherits from the {InflectEngine.plural('class', len(self.method))}:"
+                elif all(isinstance(v, typing.Callable) for v in self.method):
+                    header_str = f"calls the {InflectEngine.plural('function', len(self.method))}:"
+                else:
+                    header_str = "Notes:"
+            else:
+                header_str = "Notes:"
+                
+        self.use_header = use_header
+        
+        if use_header:
+            self.header = [header_str, "-" * len(header_str)]
+            
+        else:
+            self.header = []
+            
+        self.indent = indent
+        self.factor = indent_factor
+
+    def __call__(self, new_method):
+        original_doc = new_method.__doc__
+        new_method_name = new_method.__name__
+        
+        if self.use_header:
+            if new_method_name:
+                header = [new_method.__name__ + " " + self.header[0]]
+                header.append("-" * len(header[0]))
+                
+            else:
+                header = self.header
+                header[0] = header[0].capitalize()
+                
+        else:
+            header = []
+            
+        if len(self.method):
+            if len(self.method) > 1:
+                if original_doc:
+                    docs = [original_doc]
+                    docs.extend(header)
+                else:
+                    docs = header
+                    
+                docs += [self.indent_lines(f"{k}) {m.__name__}: \n{m.__doc__}" if m.__doc__ else f"{m.__name__}:") for k, m in enumerate(self.method)]
+                new_doc =  "\n".join(docs)
+                
+                new_method.__doc__ = new_doc
+                
+            else:
+                m_doc = self.method[0].__doc__
+                if original_doc:
+                    docs = [original_doc]
+                    docs.extend(header)
+                else:
+                    docs = header
+                    
+                if m_doc:
+                    docs += [self.indent_lines(f"{self.method[0].__name__}: \n{m_doc}")]
+                    
+                new_doc = "\n".join(docs)
+                new_method.__doc__ = new_doc
+
+        return new_method
+    
+    def indent_lines(self, docstr:str, times:int=1):
+        doclines = docstr.split("\n")
+        
+        indlines = list(map(lambda x: f"{self.indent * self.factor * times}{x}", doclines))
+        
+        return "\n".join(indlines)
+        
